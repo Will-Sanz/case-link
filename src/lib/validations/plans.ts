@@ -5,6 +5,8 @@ const planStepDetailsSchema = z.object({
   detailed_instructions: z.string().optional(),
   checklist: z.array(z.string()).optional(),
   required_documents: z.array(z.string()).optional(),
+  contact_script: z.string().optional(),
+  materials_needed: z.array(z.string()).optional(),
   contacts: z
     .array(
       z.object({
@@ -36,6 +38,7 @@ const planStepWorkflowSchema = z.object({
   documents_received: z.boolean().optional(),
   family_understood: z.boolean().optional(),
   case_manager_assisted: z.boolean().optional(),
+  checklist_completed: z.array(z.boolean()).optional(),
 });
 
 export const generatePlanSchema = z.object({
@@ -94,4 +97,17 @@ export const linkResourceToStepSchema = z.object({
   matchId: z.string().uuid(),
   familyId: z.string().uuid(),
   stepId: z.string().uuid(),
+});
+
+export const toggleChecklistItemSchema = z.object({
+  stepId: z.string().uuid(),
+  familyId: z.string().uuid(),
+  checklistIndex: z.number().int().min(0),
+  completed: z.boolean(),
+});
+
+export const refineStepSchema = z.object({
+  stepId: z.string().uuid(),
+  familyId: z.string().uuid(),
+  feedback: z.string().min(1, "Feedback is required").max(2000),
 });

@@ -12,6 +12,7 @@ const ACTION_LABELS: Record<string, string> = {
   "step.escalation_flagged": "Escalation flagged",
   "step.activity_logged": "Activity logged",
   "step.completed": "Step completed",
+  "step.refined": "Step refined",
   "matching.run": "Resource matching run",
   "matching.accepted": "Resource accepted",
   "matching.dismissed": "Resource dismissed",

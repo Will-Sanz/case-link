@@ -10,6 +10,22 @@ export type FamilyListItem = {
   creator: { email: string } | null;
 };
 
+/** Enriched family list item with current step and action info */
+export type FamilyWithCurrentStep = FamilyListItem & {
+  current_step?: {
+    id: string;
+    title: string;
+    phase: string;
+    status: string;
+    due_date: string | null;
+    action_needed_now?: string;
+    is_blocked?: boolean;
+    is_escalated?: boolean;
+    days_overdue?: number;
+    days_since_activity?: number;
+  } | null;
+};
+
 export type FamilyGoalRow = {
   id: string;
   family_id: string;
@@ -97,16 +113,15 @@ export type PlanStepDetails = {
   expected_outcome?: string;
   timing_guidance?: string;
   priority?: "low" | "medium" | "high";
-  /** Why this step belongs in this stage; distinct from rationale */
   stage_goal?: string;
-  /** Why this action happens now rather than earlier */
   why_now?: string;
-  /** Index or brief reference to prior step this builds on (1-based) */
   depends_on?: string;
-  /** Type of milestone: outreach, preparation, follow_up, review, habit_building, contingency, renewal */
   milestone_type?: string;
-  /** Clear success marker for this step */
   success_marker?: string;
+  /** Script for outreach calls (what to say) */
+  contact_script?: string;
+  /** Materials/documents needed (alias for required_documents when both exist) */
+  materials_needed?: string[];
 };
 
 /** Case manager interaction data stored on plan steps */
@@ -119,6 +134,8 @@ export type PlanStepWorkflowData = {
   documents_received?: boolean;
   family_understood?: boolean;
   case_manager_assisted?: boolean;
+  /** Per-checklist-item completion: index maps to details.checklist */
+  checklist_completed?: boolean[];
 };
 
 export type PlanStepRow = {

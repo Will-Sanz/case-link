@@ -6,6 +6,7 @@ import type {
   FamilyGoalRow,
   FamilyListItem,
   FamilyMemberRow,
+  FamilyWithCurrentStep,
   MatchedResourceSummary,
   PlanRow,
   PlanStepRow,
@@ -74,6 +75,95 @@ export async function listFamilies(
   });
 
   return { items, total: count ?? 0 };
+}
+
+/** Enriches family list items with current active step and action summary */
+export async function enrichFamiliesWithCurrentStep(
+  client: SupabaseClient,
+  items: FamilyListItem[],
+): Promise<FamilyWithCurrentStep[]> {
+  if (items.length === 0) return [];
+
+  const familyIds = items.map((f) => f.id);
+  const { data: plans } = await client
+    .from("plans")
+    .select("id, family_id")
+    .in("family_id", familyIds)
+    .order("version", { ascending: false });
+
+  const latestPlanByFamily = new Map<string, string>();
+  for (const p of plans ?? []) {
+    if (!latestPlanByFamily.has(p.family_id)) {
+      latestPlanByFamily.set(p.family_id, p.id);
+    }
+  }
+
+  const planIds = [...latestPlanByFamily.values()];
+  const { data: steps } = await client
+    .from("plan_steps")
+    .select("id, plan_id, title, phase, status, due_date, workflow_data")
+    .in("plan_id", planIds)
+    .order("sort_order", { ascending: true });
+
+  const familyIdByPlanId = new Map<string, string>();
+  for (const p of plans ?? []) {
+    familyIdByPlanId.set(p.id, p.family_id);
+  }
+
+  const activeStepByFamily = new Map<
+    string,
+    { id: string; title: string; phase: string; status: string; due_date: string | null; workflow_data: unknown }
+  >();
+  for (const s of steps ?? []) {
+    const fid = familyIdByPlanId.get(s.plan_id);
+    if (!fid || activeStepByFamily.has(fid)) continue;
+    if (["pending", "in_progress", "blocked"].includes(s.status)) {
+      activeStepByFamily.set(fid, s);
+    }
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return items.map((item) => {
+    const step = activeStepByFamily.get(item.id);
+    if (!step) {
+      return { ...item, current_step: null };
+    }
+    const w = (step.workflow_data as { needs_escalation?: boolean }) ?? {};
+    const due = step.due_date ? new Date(step.due_date) : null;
+    const daysOverdue =
+      due && due < today
+        ? Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
+        : undefined;
+
+    let actionNeeded = step.title;
+    if (step.status === "blocked") {
+      actionNeeded = `Blocked: ${step.title}`;
+    } else if (daysOverdue != null && daysOverdue > 0) {
+      actionNeeded = `${step.title} (${daysOverdue}d overdue)`;
+    } else if (step.due_date) {
+      const dueDate = new Date(step.due_date);
+      if (dueDate.toDateString() === today.toDateString()) {
+        actionNeeded = `Due today: ${step.title}`;
+      }
+    }
+
+    return {
+      ...item,
+      current_step: {
+        id: step.id,
+        title: step.title,
+        phase: step.phase,
+        status: step.status,
+        due_date: step.due_date,
+        action_needed_now: actionNeeded,
+        is_blocked: step.status === "blocked",
+        is_escalated: !!w.needs_escalation,
+        days_overdue: daysOverdue,
+      },
+    };
+  });
 }
 
 export async function getFamilyDetail(

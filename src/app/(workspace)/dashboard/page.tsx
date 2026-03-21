@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { NeedsAttentionPanel } from "@/features/families/needs-attention-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
+import {
+  DashboardFamilyCards,
+  ActionableNowList,
+  CurrentStepByFamily,
+  SummaryCounts,
+} from "@/features/dashboard/dashboard-sections";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listFamilies } from "@/lib/services/families";
 import { countResources } from "@/lib/services/resources";
-import { getNeedsAttention } from "@/lib/services/workflow";
+import { getDashboardData } from "@/lib/services/workflow";
 
 function formatDt(iso: string) {
   try {
@@ -20,11 +25,16 @@ function formatDt(iso: string) {
   }
 }
 
-async function loadStats() {
+async function loadDashboard() {
   const supabase = await createSupabaseServerClient();
   let resourceCount = 0;
   let familyCount: number | null = null;
-  let needsAttention: Awaited<ReturnType<typeof getNeedsAttention>> = [];
+  let dashboardData: Awaited<ReturnType<typeof getDashboardData>> = {
+    familiesNeedingAttention: [],
+    actionableItems: [],
+    summaryCounts: { overdue: 0, blocked: 0, dueToday: 0, escalated: 0 },
+  };
+  let recent: Awaited<ReturnType<typeof listFamilies>>["items"] = [];
 
   try {
     resourceCount = await countResources(supabase);
@@ -32,48 +42,119 @@ async function loadStats() {
     resourceCount = 0;
   }
 
-  const { count, error } = await supabase
+  const { count } = await supabase
     .from("families")
     .select("*", { count: "exact", head: true });
-
-  if (!error) {
-    familyCount = count ?? 0;
-  }
+  familyCount = count ?? 0;
 
   try {
-    needsAttention = await getNeedsAttention(supabase, { limit: 15 });
+    dashboardData = await getDashboardData(supabase, { limit: 15 });
   } catch {
-    needsAttention = [];
+    dashboardData = {
+      familiesNeedingAttention: [],
+      actionableItems: [],
+      summaryCounts: { overdue: 0, blocked: 0, dueToday: 0, escalated: 0 },
+    };
   }
 
-  let recent: Awaited<ReturnType<typeof listFamilies>>["items"] = [];
   try {
     const listed = await listFamilies(supabase, {
       q: "",
       page: 1,
-      pageSize: 6,
+      pageSize: 8,
     });
     recent = listed.items;
   } catch {
     recent = [];
   }
 
-  return { resourceCount, familyCount, recent, needsAttention };
+  return { resourceCount, familyCount, dashboardData, recent };
 }
 
 export default async function DashboardPage() {
-  const { resourceCount, familyCount, recent, needsAttention } = await loadStats();
+  const { resourceCount, familyCount, dashboardData, recent } =
+    await loadDashboard();
+
+  const {
+    familiesNeedingAttention,
+    actionableItems,
+    summaryCounts,
+  } = dashboardData;
 
   return (
     <div className="space-y-10">
       <PageHeader
         title="Dashboard"
-        description="What needs attention today. Overdue steps, follow-ups, blocked items, and recent cases."
+        description="Your daily command center. What needs action now, who to follow up with, and what's blocked."
       />
 
-      {needsAttention.length > 0 ? (
-        <NeedsAttentionPanel items={needsAttention} compact />
-      ) : null}
+      <SummaryCounts counts={summaryCounts} />
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+          Families needing attention
+        </h2>
+        <p className="text-sm text-slate-600">
+          Cases with overdue steps, follow-ups due, blockers, or escalation.
+        </p>
+        {familiesNeedingAttention.length > 0 ? (
+          <DashboardFamilyCards families={familiesNeedingAttention} />
+        ) : (
+          <Card className="p-8">
+            <EmptyState
+              className="border-0 bg-transparent"
+              title="All caught up"
+              description="No families need immediate attention. Check recently updated cases below."
+              action={
+                <Link
+                  href="/families"
+                  className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+                >
+                  View all families
+                </Link>
+              }
+            />
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+          Actionable now
+        </h2>
+        <p className="text-sm text-slate-600">
+          The highest-priority actions across your caseload.
+        </p>
+        {actionableItems.length > 0 ? (
+          <ActionableNowList items={actionableItems} />
+        ) : (
+          <Card className="p-6">
+            <p className="text-sm text-slate-600">
+              No overdue, blocked, or due-today items. Use the families list to
+              find work.
+            </p>
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+          Current step by family
+        </h2>
+        <p className="text-sm text-slate-600">
+          Where each case stands operationally.
+        </p>
+        {familiesNeedingAttention.length > 0 ? (
+          <CurrentStepByFamily families={familiesNeedingAttention} />
+        ) : (
+          <Card className="p-6">
+            <p className="text-sm text-slate-600">
+              No active steps. Generate a plan for a family to see their current
+              step here.
+            </p>
+          </Card>
+        )}
+      </section>
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
@@ -131,7 +212,7 @@ export default async function DashboardPage() {
               Recently updated
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Quick access to active cases.
+              Cases with recent activity.
             </p>
           </div>
           <Link
@@ -144,7 +225,7 @@ export default async function DashboardPage() {
 
         <Card className="p-0">
           {recent.length === 0 ? (
-            <div className="p-2">
+            <div className="p-8">
               <EmptyState
                 className="border-0 bg-transparent"
                 title="No families yet"

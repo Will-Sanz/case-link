@@ -19,6 +19,8 @@ export type GeneratedStepDetails = {
   detailed_instructions?: string;
   checklist?: string[];
   required_documents?: string[];
+  contact_script?: string;
+  materials_needed?: string[];
   contacts?: Array<{
     name?: string;
     phone?: string;

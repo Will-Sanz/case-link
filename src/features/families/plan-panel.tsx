@@ -7,6 +7,7 @@ import {
   createManualStep,
   deletePlanStep,
   generatePlan,
+  toggleChecklistItem,
   updatePlanStep,
 } from "@/app/actions/plans";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +115,8 @@ function StepPreview({
   step,
   expanded,
   resourceMatches,
+  onToggleChecklist,
+  checklistPending,
 }: {
   step: PlanStepRow;
   expanded: boolean;
@@ -123,10 +126,16 @@ function StepPreview({
     plan_step_id?: string | null;
     resource?: { program_name: string } | null;
   }>;
+  onToggleChecklist?: (stepId: string, index: number, completed: boolean) => void;
+  checklistPending?: boolean;
 }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data;
   const hasDetails = d && (d.detailed_instructions || d.checklist?.length);
+
+  const checklist = d?.checklist ?? [];
+  const completed = (w?.checklist_completed ?? []) as boolean[];
+  const completedCount = checklist.filter((_, i) => completed[i]).length;
 
   if (!expanded) {
     const preview = d?.detailed_instructions ?? step.description;
@@ -135,6 +144,11 @@ function StepPreview({
         <p className="line-clamp-2 text-sm text-slate-600">
           {preview?.trim() || "No description — open to add context"}
         </p>
+        {checklist.length > 0 ? (
+          <p className="text-xs font-medium text-slate-500">
+            Checklist: {completedCount} of {checklist.length} done
+          </p>
+        ) : null}
         {w?.blocker_reason && step.status === "blocked" ? (
           <p className="text-xs text-red-700">
             Blocker: {w.blocker_reason}
@@ -188,21 +202,64 @@ function StepPreview({
             {d.detailed_instructions}
           </p>
         </div>
-      ) : step.description ? (
+      ) : null}
+      {(d as { contact_script?: string })?.contact_script ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            What to say (outreach script)
+          </p>
+          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-teal-50/80 px-3 py-2 text-sm text-slate-700">
+            {(d as { contact_script: string }).contact_script}
+          </p>
+        </div>
+      ) : null}
+      {step.description && !d?.detailed_instructions ? (
         <p className="whitespace-pre-wrap text-slate-700">{step.description}</p>
       ) : null}
       {d?.checklist && d.checklist.length > 0 ? (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Checklist
+            Checklist ({completedCount} of {checklist.length})
           </p>
           <ul className="mt-2 space-y-1.5">
-            {d.checklist.map((item, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-teal-400" />
-                <span className="text-slate-700">{item}</span>
-              </li>
-            ))}
+            {checklist.map((item, i) => {
+              const isDone = completed[i];
+              return (
+                <li key={i} className="flex gap-2">
+                  {onToggleChecklist ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onToggleChecklist(step.id, i, !isDone);
+                      }}
+                      disabled={checklistPending}
+                      className="mt-1.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-white transition-colors hover:border-teal-500 disabled:opacity-50"
+                    >
+                      {isDone ? (
+                        <span className="text-teal-600">✓</span>
+                      ) : null}
+                    </button>
+                  ) : (
+                    <span
+                      className={cn(
+                        "mt-1.5 size-1.5 shrink-0 rounded-full",
+                        isDone ? "bg-teal-500" : "bg-slate-300",
+                      )}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      "text-slate-700",
+                      isDone && "line-through text-slate-500",
+                    )}
+                  >
+                    {item}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}
@@ -388,6 +445,20 @@ export function PlanPanel({
     setError(null);
     startTransition(async () => {
       const r = await deletePlanStep({ stepId, familyId });
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  function handleToggleChecklist(stepId: string, index: number, completed: boolean) {
+    setError(null);
+    startTransition(async () => {
+      const r = await toggleChecklistItem({
+        stepId,
+        familyId,
+        checklistIndex: index,
+        completed,
+      });
       if (!r.ok) setError(r.error);
       else router.refresh();
     });
@@ -660,6 +731,8 @@ export function PlanPanel({
                                             step={step}
                                             expanded={isExpanded}
                                             resourceMatches={resourceMatches}
+                                            onToggleChecklist={handleToggleChecklist}
+                                            checklistPending={pending}
                                           />
                                           {hasRichContent && !isExpanded ? (
                                             <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">

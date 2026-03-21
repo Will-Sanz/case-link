@@ -11,11 +11,14 @@ import {
   mergeResourceAndRulesSteps,
 } from "@/lib/plan-generator/resource-context";
 import { getFamilyDetail } from "@/lib/services/families";
+import { refineStepWithOpenAI } from "@/lib/plan-generator/openai-refine-step";
 import {
   createManualStepSchema,
   deletePlanStepSchema,
   generatePlanSchema,
   logPlanStepActivitySchema,
+  refineStepSchema,
+  toggleChecklistItemSchema,
   updatePlanStepSchema,
 } from "@/lib/validations/plans";
 
@@ -403,6 +406,188 @@ export async function logPlanStepActivity(input: unknown): Promise<ActionResult>
     action,
     activity_type: activity_type ?? null,
   });
+
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function toggleChecklistItem(input: unknown): Promise<ActionResult> {
+  const parsed = toggleChecklistItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid request" };
+  }
+
+  let supabase;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { stepId, familyId, checklistIndex, completed } = parsed.data;
+
+  const { data: step } = await supabase
+    .from("plan_steps")
+    .select("plan_id, details, workflow_data")
+    .eq("id", stepId)
+    .maybeSingle();
+
+  if (!step) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("family_id")
+    .eq("id", step.plan_id)
+    .eq("family_id", familyId)
+    .maybeSingle();
+
+  if (!plan) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const details = (step.details as { checklist?: string[] }) ?? {};
+  const checklist = details.checklist ?? [];
+  const wd = (step.workflow_data as { checklist_completed?: boolean[] }) ?? {};
+  const completedArr = wd.checklist_completed ?? Array(checklist.length).fill(false);
+
+  if (checklistIndex >= checklist.length) {
+    return { ok: false, error: "Invalid checklist index" };
+  }
+
+  const next = [...completedArr];
+  while (next.length <= checklistIndex) {
+    next.push(false);
+  }
+  next[checklistIndex] = completed;
+
+  const { error } = await supabase
+    .from("plan_steps")
+    .update({
+      workflow_data: { ...wd, checklist_completed: next },
+    })
+    .eq("id", stepId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function refinePlanStep(input: unknown): Promise<ActionResult> {
+  const parsed = refineStepSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+  }
+
+  let supabase;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { stepId, familyId, feedback } = parsed.data;
+
+  const detail = await getFamilyDetail(supabase, familyId);
+  if (!detail) {
+    return { ok: false, error: "Family not found" };
+  }
+
+  const { data: step } = await supabase
+    .from("plan_steps")
+    .select("id, plan_id, phase, title, description, details")
+    .eq("id", stepId)
+    .maybeSingle();
+
+  if (!step) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("family_id")
+    .eq("id", step.plan_id)
+    .eq("family_id", familyId)
+    .maybeSingle();
+
+  if (!plan) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const env = getEnv();
+  const apiKey = env.OPENAI_API_KEY?.trim();
+  const model = env.OPENAI_PLAN_MODEL?.trim() || "gpt-4o-mini";
+
+  if (!apiKey) {
+    return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
+  }
+
+  const result = await refineStepWithOpenAI(
+    detail,
+    {
+      phase: step.phase,
+      title: step.title,
+      description: step.description,
+      details: step.details,
+    },
+    feedback,
+    apiKey,
+    model,
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: result.reason };
+  }
+
+  const { title, description, details } = result.step;
+
+  const { data: curStep } = await supabase
+    .from("plan_steps")
+    .select("workflow_data")
+    .eq("id", stepId)
+    .single();
+
+  const curWd = (curStep?.workflow_data as Record<string, unknown>) ?? {};
+  const nextWd = { ...curWd, checklist_completed: [] };
+
+  const { error } = await supabase
+    .from("plan_steps")
+    .update({
+      title,
+      description,
+      details: details ?? null,
+      workflow_data: nextWd,
+    })
+    .eq("id", stepId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  const session = await requireAppUserWithClient();
+  await supabase.from("plan_step_activity").insert({
+    plan_step_id: stepId,
+    family_id: familyId,
+    actor_user_id: session.user.id,
+    action: "step.refined",
+    notes: feedback,
+  });
+
+  await logCaseActivity(
+    supabase,
+    familyId,
+    session.user.id,
+    "step.refined",
+    "plan_step",
+    stepId,
+    { feedback: feedback.slice(0, 200) },
+  );
 
   revalidatePath(`/families/${familyId}`);
   return { ok: true };

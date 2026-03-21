@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { outlineLinkButtonClass, selectInputClass } from "@/lib/ui/form-classes";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { listFamilies } from "@/lib/services/families";
+import { enrichFamiliesWithCurrentStep, listFamilies } from "@/lib/services/families";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
 
 type PageProps = {
@@ -30,7 +30,8 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
   const raw = await searchParams;
   const filters = parseFamilyListQuery(raw);
   const supabase = await createSupabaseServerClient();
-  const { items, total } = await listFamilies(supabase, filters);
+  const { items: rawItems, total } = await listFamilies(supabase, filters);
+  const items = await enrichFamiliesWithCurrentStep(supabase, rawItems);
   const totalPages = Math.max(1, Math.ceil(total / filters.pageSize));
 
   const q = new URLSearchParams();
@@ -132,8 +133,8 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
             <li key={f.id}>
               <Link href={`/families/${f.id}`} className="block">
                 <Card className="group p-0 transition-shadow hover:border-slate-300/90 hover:shadow-md">
-                  <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-                    <div className="min-w-0">
+                  <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-slate-900 group-hover:text-teal-900">
                         {f.name}
                       </p>
@@ -141,6 +142,34 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                         <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-600">
                           {f.summary}
                         </p>
+                      ) : null}
+                      {f.current_step ? (
+                        <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+                          <p className="text-xs font-medium text-slate-500">
+                            Current step: {f.current_step.title}
+                          </p>
+                          <p className="mt-0.5 text-sm text-slate-700">
+                            {f.current_step.action_needed_now}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {f.current_step.is_blocked ? (
+                              <Badge className="bg-amber-100 text-amber-900">
+                                Blocked
+                              </Badge>
+                            ) : null}
+                            {f.current_step.is_escalated ? (
+                              <Badge className="bg-amber-100 text-amber-900">
+                                Escalation
+                              </Badge>
+                            ) : null}
+                            {f.current_step.days_overdue != null &&
+                            f.current_step.days_overdue > 0 ? (
+                              <Badge className="bg-red-100 text-red-900">
+                                {f.current_step.days_overdue}d overdue
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
                       ) : null}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <StatusBadge status={f.status} />
@@ -152,9 +181,12 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                         ) : null}
                       </div>
                     </div>
-                    <p className="shrink-0 text-xs font-medium text-slate-500">
-                      Updated {formatDt(f.updated_at)}
-                    </p>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <p className="text-xs font-medium text-slate-500">
+                        Updated {formatDt(f.updated_at)}
+                      </p>
+                      <span className="text-xs text-slate-400">Open case →</span>
+                    </div>
                   </div>
                 </Card>
               </Link>

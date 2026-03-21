@@ -19,6 +19,7 @@ const aiStepSchema = z.object({
   rationale: z.string().optional(),
   detailed_instructions: z.string().optional(),
   checklist: z.array(z.string()).optional(),
+  contact_script: z.string().optional(),
   required_documents: z.array(z.string()).optional(),
   contacts: z.array(contactSchema).optional(),
   blockers: z.array(z.string()).optional(),
@@ -148,7 +149,15 @@ Output ONLY valid JSON. No markdown. Shape:
 ## Quality
 - 3–12 steps total, spread across phases. Each phase should have distinct value.
 - Be specific. Avoid "explore options" or "seek assistance."
-- Each step should add NEW value. Later stages must feel like natural progressions, not replays.`;
+- Each step should add NEW value. Later stages must feel like natural progressions, not replays.
+
+## Checklist requirements (critical)
+- Every step should have a checklist of 3–6 CONCRETE, CHECKABLE sub-actions.
+- Each checklist item must be a single actionable task the case manager can mark off.
+- Bad: "Reach out to a credit counselor."
+- Good: ["Find one approved counseling contact", "Call between 9 AM and 4 PM", "Ask about debt counseling for families with poor credit", "Write down intake requirements", "Schedule earliest appointment", "Record date, contact name, and requested documents"]
+- Include contact_script when outreach is involved (exact phrasing for phone calls).
+- required_documents must list specific documents (e.g. "Government-issued ID", "Utility bill from last 30 days").`;
 
 /** Simple similarity: shared significant words / total words. Returns 0–1. */
 function titleSimilarity(a: string, b: string): number {
@@ -321,6 +330,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
             rationale: s.rationale,
             detailed_instructions: s.detailed_instructions,
             checklist: s.checklist,
+            contact_script: (s as { contact_script?: string }).contact_script,
             required_documents: s.required_documents,
             contacts: s.contacts,
             blockers: s.blockers,

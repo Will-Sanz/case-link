@@ -9,7 +9,7 @@ import {
   useTransition,
 } from "react";
 import { createPortal } from "react-dom";
-import { deletePlanStep, logPlanStepActivity, updatePlanStep } from "@/app/actions/plans";
+import { deletePlanStep, logPlanStepActivity, refinePlanStep, toggleChecklistItem, updatePlanStep } from "@/app/actions/plans";
 import { suggestNextMoveForBlockedStep } from "@/app/actions/suggest-next-move";
 import { fetchStepActivity } from "@/app/actions/step-activity";
 import { Badge } from "@/components/ui/badge";
@@ -131,6 +131,9 @@ function PlanStepModalInner({
   const [logActivityNotes, setLogActivityNotes] = useState("");
   const [suggestions, setSuggestions] = useState<string[] | null>(null);
   const [suggestPending, setSuggestPending] = useState(false);
+  const [showRefine, setShowRefine] = useState(false);
+  const [refineFeedback, setRefineFeedback] = useState("");
+  const [refinePending, setRefinePending] = useState(false);
 
   useEffect(() => {
     fetchStepActivity(step.id).then(setStepActivity);
@@ -615,7 +618,8 @@ function PlanStepModalInner({
                       })}
                     </span>
                     <span className="font-medium text-slate-700">
-                      {a.activity_type?.replace(/_/g, " ") ?? a.action}
+                      {a.activity_type?.replace(/_/g, " ") ??
+                        (a.action === "step.refined" ? "Step refined" : a.action)}
                     </span>
                     {a.notes ? (
                       <span className="text-slate-600">— {a.notes}</span>
@@ -626,8 +630,82 @@ function PlanStepModalInner({
             </div>
           ) : null}
 
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <h3 className="text-sm font-semibold text-slate-800">
+              Refine this step
+            </h3>
+            <p className="mt-1 text-xs text-slate-600">
+              Improve a weak AI-generated step without regenerating the whole plan.
+            </p>
+            {showRefine ? (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <Label className="text-xs text-slate-600">
+                    What should change?
+                  </Label>
+                  <textarea
+                    value={refineFeedback}
+                    onChange={(e) => setRefineFeedback(e.target.value)}
+                    placeholder="E.g. Make this more specific about documents needed, add a phone script, break into smaller tasks…"
+                    rows={3}
+                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    disabled={refinePending}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={refinePending || !refineFeedback.trim()}
+                    onClick={() => {
+                      setError(null);
+                      setRefinePending(true);
+                      refinePlanStep({
+                        stepId: step.id,
+                        familyId,
+                        feedback: refineFeedback.trim(),
+                      }).then((r) => {
+                        setRefinePending(false);
+                        if (r.ok) {
+                          setShowRefine(false);
+                          setRefineFeedback("");
+                          onClose();
+                          router.refresh();
+                        } else {
+                          setError(r.error);
+                        }
+                      });
+                    }}
+                  >
+                    {refinePending ? "Regenerating…" : "Regenerate this step"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={refinePending}
+                    onClick={() => {
+                      setShowRefine(false);
+                      setRefineFeedback("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-3"
+                onClick={() => setShowRefine(true)}
+              >
+                Give feedback / refine step
+              </Button>
+            )}
+          </div>
+
           {editing ? (
-            <div className="space-y-4">
+            <div className="mt-6 space-y-4">
               <div>
                 <Label htmlFor="modal-step-title">Title</Label>
                 <Input
@@ -731,19 +809,64 @@ function PlanStepModalInner({
                           </p>
                         </div>
                       ) : null}
+                      {(d as { contact_script?: string })?.contact_script ? (
+                        <div>
+                          <Label className="text-slate-500">
+                            What to say (outreach script)
+                          </Label>
+                          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-teal-50/80 px-3 py-2 text-sm text-slate-800">
+                            {(d as { contact_script: string }).contact_script}
+                          </p>
+                        </div>
+                      ) : null}
                       {d!.checklist && d!.checklist.length > 0 ? (
                         <div>
-                          <Label className="text-slate-500">Checklist</Label>
+                          <Label className="text-slate-500">
+                            Checklist (
+                            {(step.workflow_data?.checklist_completed ?? []).filter(Boolean).length} of {d!.checklist.length})
+                          </Label>
                           <ul className="mt-2 space-y-2">
-                            {d!.checklist.map((item, i) => (
-                              <li
-                                key={i}
-                                className="flex gap-2 text-sm text-slate-800"
-                              >
-                                <span className="mt-1 size-1.5 shrink-0 rounded-full bg-teal-400" />
-                                {item}
-                              </li>
-                            ))}
+                            {d!.checklist.map((item, i) => {
+                              const completed = (step.workflow_data?.checklist_completed ?? [])[i];
+                              return (
+                                <li
+                                  key={i}
+                                  className="flex gap-2 text-sm text-slate-800"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setError(null);
+                                      startTransition(async () => {
+                                        const r = await toggleChecklistItem({
+                                          stepId: step.id,
+                                          familyId,
+                                          checklistIndex: i,
+                                          completed: !completed,
+                                        });
+                                        if (!r.ok) setError(r.error);
+                                        else router.refresh();
+                                      });
+                                    }}
+                                    disabled={pending}
+                                    className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-white transition-colors hover:border-teal-500 disabled:opacity-50"
+                                  >
+                                    {completed ? (
+                                      <span className="text-teal-600">✓</span>
+                                    ) : null}
+                                  </button>
+                                  <span
+                                    className={
+                                      completed
+                                        ? "line-through text-slate-500"
+                                        : ""
+                                    }
+                                  >
+                                    {item}
+                                  </span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       ) : null}

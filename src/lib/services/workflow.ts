@@ -282,6 +282,190 @@ export async function getCaseActivity(
   });
 }
 
+export type DashboardFamilySummary = {
+  family_id: string;
+  family_name: string;
+  urgency: string | null;
+  status: string;
+  updated_at: string;
+  current_step: {
+    id: string;
+    title: string;
+    phase: string;
+    status: string;
+    due_date: string | null;
+    action_needed_now: string;
+    is_blocked: boolean;
+    is_escalated: boolean;
+    days_overdue?: number;
+    days_since_activity?: number;
+  } | null;
+};
+
+export type ActionableItem = {
+  family_id: string;
+  family_name: string;
+  step_id: string;
+  step_title: string;
+  step_phase: string;
+  action: string;
+  type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "no_activity" | "new_plan";
+};
+
+export async function getDashboardData(
+  client: SupabaseClient,
+  options?: { limit?: number },
+): Promise<{
+  familiesNeedingAttention: DashboardFamilySummary[];
+  actionableItems: ActionableItem[];
+  summaryCounts: { overdue: number; blocked: number; dueToday: number; escalated: number };
+}> {
+  const limit = options?.limit ?? 20;
+  const needsItems = await getNeedsAttention(client, { limit: 100 });
+
+  const familyIds = [...new Set(needsItems.map((i) => i.family_id))];
+  if (familyIds.length === 0) {
+    return {
+      familiesNeedingAttention: [],
+      actionableItems: [],
+      summaryCounts: { overdue: 0, blocked: 0, dueToday: 0, escalated: 0 },
+    };
+  }
+
+  const { data: families } = await client
+    .from("families")
+    .select("id, name, urgency, status, updated_at")
+    .in("id", familyIds);
+
+  const { data: plans } = await client
+    .from("plans")
+    .select("id, family_id")
+    .in("family_id", familyIds)
+    .order("version", { ascending: false });
+
+  const latestPlanByFamily = new Map<string, string>();
+  for (const p of plans ?? []) {
+    if (!latestPlanByFamily.has(p.family_id)) {
+      latestPlanByFamily.set(p.family_id, p.id);
+    }
+  }
+
+  const planIds = [...latestPlanByFamily.values()];
+  const { data: steps } = await client
+    .from("plan_steps")
+    .select("id, plan_id, title, phase, status, due_date, workflow_data")
+    .in("plan_id", planIds)
+    .order("sort_order", { ascending: true });
+
+  const familyIdByPlanId = new Map<string, string>();
+  for (const p of plans ?? []) {
+    familyIdByPlanId.set(p.id, p.family_id);
+  }
+
+  type StepRow = { id: string; plan_id: string; title: string; phase: string; status: string; due_date: string | null; workflow_data: unknown };
+  const activeStepByFamily = new Map<string, StepRow>();
+  for (const s of steps ?? []) {
+    const fid = familyIdByPlanId.get(s.plan_id);
+    if (!fid || activeStepByFamily.has(fid)) continue;
+    if (["pending", "in_progress", "blocked"].includes(s.status)) {
+      activeStepByFamily.set(fid, s);
+    }
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(today);
+  todayEnd.setDate(todayEnd.getDate() + 1);
+  const familyMap = new Map((families ?? []).map((f) => [f.id, f]));
+
+  const familiesNeedingAttention: DashboardFamilySummary[] = familyIds
+    .slice(0, limit)
+    .map((fid) => {
+      const fam = familyMap.get(fid);
+      const step = activeStepByFamily.get(fid);
+      const itemsForFamily = needsItems.filter((i) => i.family_id === fid);
+
+      let actionNeeded = "Open case to continue";
+      if (itemsForFamily.length > 0) {
+        const first = itemsForFamily[0];
+        if (first.type === "overdue")
+          actionNeeded = `Follow up: ${first.step_title ?? ""} (${first.days_overdue}d overdue)`;
+        else if (first.type === "follow_up_today")
+          actionNeeded = `Due today: ${first.step_title ?? ""}`;
+        else if (first.type === "blocked")
+          actionNeeded = `Blocked: ${first.step_title ?? ""}`;
+        else if (first.type === "escalation")
+          actionNeeded = `Escalation: ${first.step_title ?? ""}`;
+        else if (first.type === "no_activity")
+          actionNeeded = `No activity in ${first.days_since_activity ?? 0} days`;
+        else if (first.type === "new_plan")
+          actionNeeded = "Review new plan";
+        else actionNeeded = first.step_title ?? actionNeeded;
+      }
+
+      const w = (step?.workflow_data as { needs_escalation?: boolean }) ?? {};
+      const due = step?.due_date ? new Date(step.due_date) : null;
+      const daysOverdue = due && due < today
+        ? Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
+        : undefined;
+
+      return {
+        family_id: fid,
+        family_name: fam?.name ?? "Unknown",
+        urgency: fam?.urgency ?? null,
+        status: fam?.status ?? "active",
+        updated_at: fam?.updated_at ?? "",
+        current_step: step
+          ? {
+              id: step.id,
+              title: step.title,
+              phase: step.phase,
+              status: step.status,
+              due_date: step.due_date,
+              action_needed_now: actionNeeded,
+              is_blocked: step.status === "blocked",
+              is_escalated: !!w.needs_escalation,
+              days_overdue: daysOverdue,
+            }
+          : null,
+      };
+    });
+
+  const actionableItems: ActionableItem[] = needsItems.slice(0, 25).map((i) => {
+    let action = i.step_title ?? "Open case";
+    if (i.type === "overdue") action = `Follow up: ${i.step_title ?? ""} (${i.days_overdue}d overdue)`;
+    else if (i.type === "blocked") action = `Resolve blocker: ${i.step_title ?? ""}`;
+    else if (i.type === "follow_up_today") action = `Due today: ${i.step_title ?? ""}`;
+    else if (i.type === "follow_up_soon") action = `Due soon: ${i.step_title ?? ""}`;
+    else if (i.type === "escalation") action = `Escalation: ${i.step_title ?? ""}`;
+    else if (i.type === "no_activity") action = `Check in: ${i.family_name} (${i.days_since_activity}d no activity)`;
+    else if (i.type === "new_plan") action = `Review plan: ${i.family_name}`;
+
+    return {
+      family_id: i.family_id,
+      family_name: i.family_name,
+      step_id: i.step_id ?? "",
+      step_title: i.step_title ?? "",
+      step_phase: i.step_phase ?? "",
+      action,
+      type: i.type,
+    };
+  });
+
+  const summaryCounts = {
+    overdue: needsItems.filter((i) => i.type === "overdue").length,
+    blocked: needsItems.filter((i) => i.type === "blocked").length,
+    dueToday: needsItems.filter((i) => i.type === "follow_up_today").length,
+    escalated: needsItems.filter((i) => i.type === "escalation").length,
+  };
+
+  return {
+    familiesNeedingAttention,
+    actionableItems,
+    summaryCounts,
+  };
+}
+
 export async function getStepActivity(
   client: SupabaseClient,
   stepId: string,
