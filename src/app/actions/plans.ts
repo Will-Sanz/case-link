@@ -228,6 +228,8 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   );
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -300,6 +302,8 @@ export async function updatePlanStep(
   }
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -360,6 +364,8 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -414,6 +420,8 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
   await logCaseActivity(supabase, familyId, userId, "step.deleted", "plan_step", stepId);
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -476,6 +484,8 @@ export async function logPlanStepActivity(input: unknown): Promise<ActionResult>
   });
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -543,6 +553,8 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
   }
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -625,6 +637,8 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   }
 
   revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 

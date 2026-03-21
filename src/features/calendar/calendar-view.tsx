@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useMemo, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { CalendarEvent, CalendarEventType } from "@/types/calendar";
 import type { FamilyListItem } from "@/types/family";
 import { cn } from "@/lib/utils/cn";
+import { updatePlanStepActionItem } from "@/app/actions/plans";
 
 const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   follow_up_due: "Follow-up due",
@@ -236,6 +238,7 @@ export function CalendarView({
         <EventDetailPanel
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
+          onComplete={() => setSelectedEvent(null)}
         />
       </aside>
     </div>
@@ -252,6 +255,7 @@ function EventChip({
   compact?: boolean;
 }) {
   const style = EVENT_TYPE_STYLES[event.event_type];
+  const displayTitle = event.action_needed_now || `${event.family_name}${event.step_title ? `: ${event.step_title}` : ""}`;
   return (
     <button
       type="button"
@@ -260,18 +264,25 @@ function EventChip({
         onClick();
       }}
       className={cn(
-        "w-full rounded border px-2 py-1 text-left text-sm transition-colors hover:shadow-sm",
+        "w-full rounded-lg border px-2 py-1.5 text-left text-sm transition-all hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30",
         style,
-        compact && "truncate py-0.5 text-xs",
+        compact && "truncate py-1 text-xs",
       )}
     >
-      <span className="font-medium">{event.family_name}</span>
-      {event.step_title && (
-        <span className="text-slate-600"> — {event.step_title}</span>
-      )}
+      <span className="font-medium">{displayTitle}</span>
       {!compact && (
-        <span className="mt-0.5 block text-xs opacity-80">
-          {EVENT_TYPE_LABELS[event.event_type]}
+        <span className="mt-0.5 flex items-center gap-2">
+          <span className="text-xs opacity-80">
+            {EVENT_TYPE_LABELS[event.event_type]}
+          </span>
+          {event.stage && (
+            <span className="rounded bg-white/60 px-1 text-xs">
+              {event.stage}d
+            </span>
+          )}
+          {event.priority && event.priority !== "medium" && (
+            <span className="text-xs capitalize opacity-70">{event.priority}</span>
+          )}
         </span>
       )}
     </button>
@@ -562,13 +573,41 @@ function AgendaList({
 function EventDetailPanel({
   event,
   onClose,
+  onComplete,
 }: {
   event: CalendarEvent | null;
   onClose: () => void;
+  onComplete: () => void;
 }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const canMarkComplete =
+    event?.action_item_id &&
+    event.status !== "completed" &&
+    !event.completed_flag;
+
+  async function handleMarkComplete() {
+    if (!event?.action_item_id) return;
+    setError(null);
+    startTransition(async () => {
+      const r = await updatePlanStepActionItem({
+        actionItemId: event.action_item_id!,
+        familyId: event.family_id,
+        status: "completed",
+      });
+      if (!r.ok) setError(r.error);
+      else {
+        onComplete();
+        router.refresh();
+      }
+    });
+  }
+
   if (!event) {
     return (
-      <Card className="sticky top-6 p-6">
+      <Card className="sticky top-6 rounded-xl border-slate-200/90 p-6 shadow-sm">
         <p className="text-sm text-slate-500">
           Select an event to see details and actions.
         </p>
@@ -581,7 +620,7 @@ function EventDetailPanel({
     : `/families/${event.family_id}`;
 
   return (
-    <Card className="sticky top-6 p-5">
+    <Card className="sticky top-6 rounded-xl border-slate-200/90 p-5 shadow-sm transition-shadow">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-slate-900">Event details</h3>
         <Button variant="ghost" className="h-8 px-2" onClick={onClose}>
@@ -589,6 +628,11 @@ function EventDetailPanel({
         </Button>
       </div>
       <div className="mt-4 space-y-4">
+        {error && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            {error}
+          </p>
+        )}
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
             Family
@@ -611,6 +655,14 @@ function EventDetailPanel({
             <p className="text-slate-800">{event.step_title}</p>
           </div>
         )}
+        {event.priority && (
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+              Priority
+            </p>
+            <p className="text-slate-800 capitalize">{event.priority}</p>
+          </div>
+        )}
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
             Type
@@ -624,7 +676,7 @@ function EventDetailPanel({
             Date
           </p>
           <p className="text-slate-800">
-            {new Date(event.date).toLocaleDateString("en-US", {
+            {new Date(event.date + "T12:00:00").toLocaleDateString("en-US", {
               weekday: "long",
               month: "long",
               day: "numeric",
@@ -653,14 +705,24 @@ function EventDetailPanel({
           </div>
         )}
         <div className="flex flex-col gap-2 pt-4">
+          {canMarkComplete && (
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={handleMarkComplete}
+              disabled={pending}
+            >
+              {pending ? "Marking…" : "Mark complete"}
+            </Button>
+          )}
           <Link href={stepHref}>
-            <Button variant="primary" className="w-full">
+            <Button variant="secondary" className="w-full">
               {event.step_id ? "Open step" : "Open case"}
             </Button>
           </Link>
           <Link href={`/families/${event.family_id}`}>
-            <Button variant="secondary" className="w-full">
-              Open family
+            <Button variant="ghost" className="w-full">
+              Open full case
             </Button>
           </Link>
         </div>

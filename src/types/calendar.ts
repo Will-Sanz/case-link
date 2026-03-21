@@ -28,6 +28,8 @@ export type CalendarEvent = {
   urgency: "low" | "medium" | "high" | "crisis" | null;
   blocked_flag: boolean;
   escalated_flag: boolean;
+  /** True when underlying action item is completed */
+  completed_flag?: boolean;
   action_needed_now: string;
   source_type: "follow_up" | "due_date" | "blocked" | "escalation" | "stale" | "new_plan" | "stage";
   days_overdue?: number;

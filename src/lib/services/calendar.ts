@@ -7,10 +7,18 @@ function toDateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+/** Derive target date from plan start + week_index when target_date and follow_up_date are null */
+function deriveTargetDateFromWeek(
+  planCreatedAt: string,
+  weekIndex: number,
+  itemIndexInStep: number,
+): string {
+  const planStart = new Date(planCreatedAt);
+  planStart.setHours(0, 0, 0, 0);
+  const d = new Date(planStart);
+  const daysOffset = (weekIndex - 1) * 7 + Math.min(itemIndexInStep % 5, 4);
+  d.setDate(d.getDate() + daysOffset);
+  return d.toISOString().slice(0, 10);
 }
 
 export async function getCalendarEvents(
@@ -71,28 +79,35 @@ export async function getCalendarEvents(
 
   const { data: steps } = await client
     .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, workflow_data")
+    .select("id, plan_id, title, phase, status, due_date, workflow_data, details")
     .in("plan_id", planIds)
     .order("sort_order", { ascending: true });
 
   const stepIds = (steps ?? []).map((s) => s.id);
+
   let actionItems: Array<{
     id: string;
     plan_step_id: string;
     title: string;
     target_date: string | null;
+    follow_up_date: string | null;
     status: string;
     sort_order: number;
+    week_index: number;
   }> = [];
   if (stepIds.length > 0) {
     const { data: aiData } = await client
       .from("plan_step_action_items")
-      .select("id, plan_step_id, title, target_date, status, sort_order")
+      .select("id, plan_step_id, title, target_date, follow_up_date, status, sort_order, week_index")
       .in("plan_step_id", stepIds)
       .neq("status", "completed")
       .order("sort_order", { ascending: true });
-    actionItems = aiData ?? [];
+    actionItems = (aiData ?? []).map((a) => ({
+      ...a,
+      week_index: a.week_index ?? 1,
+    }));
   }
+
 
   const actionItemsByStep = new Map<string, typeof actionItems>();
   for (const ai of actionItems) {
@@ -101,7 +116,8 @@ export async function getCalendarEvents(
     actionItemsByStep.set(ai.plan_step_id, list);
   }
 
-  const today = startOfDay(new Date());
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const todayKey = toDateKey(today);
   const staleCutoff = new Date(today);
   staleCutoff.setDate(staleCutoff.getDate() - STALE_DAYS);
@@ -119,8 +135,9 @@ export async function getCalendarEvents(
     if (filters.blockedOnly && !ev.blocked_flag) return;
     if (filters.escalatedOnly && !ev.escalated_flag) return;
 
-    const evDate = new Date(ev.date);
-    if (evDate >= start && evDate <= end) {
+    const startKey = options.startDate.slice(0, 10);
+    const endKey = options.endDate.slice(0, 10);
+    if (ev.date >= startKey && ev.date <= endKey) {
       events.push(ev);
     }
   }
@@ -133,33 +150,47 @@ export async function getCalendarEvents(
     const familyName = fam?.name ?? "Unknown";
     const urgency = fam?.urgency ?? null;
     const w = (s.workflow_data as { needs_escalation?: boolean; blocker_reason?: string }) ?? {};
+    const details = (s.details as { priority?: "low" | "medium" | "high" }) ?? {};
     const isBlocked = s.status === "blocked";
     const isEscalated = !!w.needs_escalation;
     const stepActionItems = actionItemsByStep.get(s.id) ?? [];
     const hasActionItems = stepActionItems.length > 0;
 
     if (hasActionItems) {
-      for (const ai of stepActionItems) {
-        if (!ai.target_date) continue;
-        const due = new Date(ai.target_date);
+      const plan = latestPlanByFamily.get(familyId);
+      const planCreatedAt = plan?.created_at ?? new Date().toISOString();
+
+      for (let j = 0; j < stepActionItems.length; j++) {
+        const ai = stepActionItems[j];
+        const effectiveDate =
+          ai.target_date ??
+          ai.follow_up_date ??
+          deriveTargetDateFromWeek(planCreatedAt, ai.week_index, j);
+        if (!effectiveDate) continue;
+
+        const due = new Date(effectiveDate + "T12:00:00");
         const dueKey = toDateKey(due);
         const actionTitle = `${familyName}: ${ai.title}`;
+        const baseEv = {
+          family_id: familyId,
+          family_name: familyName,
+          step_id: s.id,
+          step_title: s.title,
+          action_item_id: ai.id,
+          stage: s.phase as "30" | "60" | "90",
+          status: ai.status,
+          urgency,
+          blocked_flag: isBlocked,
+          escalated_flag: isEscalated,
+          action_needed_now: actionTitle,
+          priority: details.priority ?? null,
+        };
         if (due < today) {
           addEvent({
+            ...baseEv,
             id: `overdue-${ai.id}`,
-            family_id: familyId,
-            family_name: familyName,
-            step_id: s.id,
-            step_title: s.title,
-            action_item_id: ai.id,
-            stage: s.phase as "30" | "60" | "90",
             event_type: "overdue",
             date: dueKey,
-            status: ai.status,
-            urgency,
-            blocked_flag: isBlocked,
-            escalated_flag: isEscalated,
-            action_needed_now: actionTitle,
             source_type: "due_date",
             days_overdue: Math.floor(
               (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
@@ -167,42 +198,36 @@ export async function getCalendarEvents(
           });
         } else {
           addEvent({
+            ...baseEv,
             id: `follow-${ai.id}`,
-            family_id: familyId,
-            family_name: familyName,
-            step_id: s.id,
-            step_title: s.title,
-            action_item_id: ai.id,
-            stage: s.phase as "30" | "60" | "90",
             event_type: dueKey === todayKey ? "follow_up_due" : "step_due",
             date: dueKey,
-            status: ai.status,
-            urgency,
-            blocked_flag: isBlocked,
-            escalated_flag: isEscalated,
-            action_needed_now: actionTitle,
             source_type: "follow_up",
           });
         }
       }
     } else if (s.due_date) {
-      const due = new Date(s.due_date);
+      const due = new Date(s.due_date + "T12:00:00");
       const dueKey = toDateKey(due);
+      const stepEv = {
+        family_id: familyId,
+        family_name: familyName,
+        step_id: s.id,
+        step_title: s.title,
+        stage: s.phase as "30" | "60" | "90",
+        status: s.status,
+        urgency,
+        blocked_flag: isBlocked,
+        escalated_flag: isEscalated,
+        action_needed_now: `${familyName}: ${s.title}`,
+        priority: details.priority ?? null,
+      };
       if (due < today) {
         addEvent({
+          ...stepEv,
           id: `overdue-${s.id}`,
-          family_id: familyId,
-          family_name: familyName,
-          step_id: s.id,
-          step_title: s.title,
-          stage: s.phase as "30" | "60" | "90",
           event_type: "overdue",
           date: dueKey,
-          status: s.status,
-          urgency,
-          blocked_flag: isBlocked,
-          escalated_flag: isEscalated,
-          action_needed_now: `${familyName}: ${s.title}`,
           source_type: "due_date",
           days_overdue: Math.floor(
             (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
@@ -210,19 +235,10 @@ export async function getCalendarEvents(
         });
       } else {
         addEvent({
+          ...stepEv,
           id: `follow-${s.id}`,
-          family_id: familyId,
-          family_name: familyName,
-          step_id: s.id,
-          step_title: s.title,
-          stage: s.phase as "30" | "60" | "90",
           event_type: dueKey === todayKey ? "follow_up_due" : "step_due",
           date: dueKey,
-          status: s.status,
-          urgency,
-          blocked_flag: isBlocked,
-          escalated_flag: isEscalated,
-          action_needed_now: `${familyName}: ${s.title}`,
           source_type: "follow_up",
         });
       }

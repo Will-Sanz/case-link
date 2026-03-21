@@ -256,8 +256,14 @@ function StepPreview({
 
   if (!expanded) {
     const preview = d?.detailed_instructions ?? step.description;
+    const actionNow =
+      (d?.action_needed_now as string | undefined) ??
+      (step.ai_helper_data?.action_needed_now as string | undefined);
     return (
-      <div className="mt-2 space-y-1">
+      <div className="mt-2 space-y-2">
+        {actionNow ? (
+          <p className="font-medium text-slate-800">{actionNow}</p>
+        ) : null}
         <p className="line-clamp-2 text-sm text-slate-600">
           {preview?.trim() || "No description — open to add context"}
         </p>
@@ -818,7 +824,7 @@ export function PlanPanel({
                               key={step.id}
                               id={`step-${step.id}`}
                               className={cn(
-                                "relative rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md",
+                                "relative rounded-xl border bg-white shadow-sm transition-all duration-200 hover:shadow-md",
                                 isBlocked && "border-red-200/80",
                                 isEscalated && "border-amber-300 ring-1 ring-amber-200/50",
                                 !isBlocked && !isEscalated && "border-slate-200/90",
