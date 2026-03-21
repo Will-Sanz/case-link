@@ -3,12 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/families", "/resources", "/admin"];
 
+/** NextResponse.next only accepts `request.headers` (not a full NextRequest). Passing the whole request breaks routing on Vercel. */
+function continueRequest(request: NextRequest) {
+  return NextResponse.next({
+    request: { headers: new Headers(request.headers) },
+  });
+}
+
 /**
  * Next.js 16+ `proxy` (Node runtime). Refreshes the Supabase session and guards protected routes.
  * Do not use this file from `middleware.ts` — Edge has stricter limits and caused Vercel failures.
  */
 export async function runSupabaseProxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  let supabaseResponse = continueRequest(request);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -36,7 +43,7 @@ export async function runSupabaseProxy(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
-        supabaseResponse = NextResponse.next({ request });
+        supabaseResponse = continueRequest(request);
         cookiesToSet.forEach(({ name, value, options }) => {
           supabaseResponse.cookies.set(name, value, options);
         });
@@ -44,8 +51,15 @@ export async function runSupabaseProxy(request: NextRequest) {
     },
   });
 
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims;
+  let claims: unknown = null;
+  try {
+    const { data, error } = await supabase.auth.getClaims();
+    if (!error && data?.claims) {
+      claims = data.claims;
+    }
+  } catch {
+    claims = null;
+  }
 
   if (isProtected && !claims) {
     const login = new URL("/login", request.url);

@@ -27,6 +27,8 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 5. **Do not run CSV import on deploy** — `npm run db:import` is a **manual** script from your machine or CI with `SUPABASE_SERVICE_ROLE_KEY`; it is not part of the Next.js build. The app deploys fine without `data/resources-seed.csv` in the bundle.
 6. **Post-deploy** — Sign up a user, promote to admin in SQL if needed (`update public.app_users set role = 'admin' where email = '…'`). Optionally run `npm run db:import` locally against production if you need resource rows.
 
+**If every URL returns Vercel `404 NOT_FOUND`:** In Vercel → Project → Settings → General, set **Root Directory** to the repository root (leave empty or `.`), not `src`. The app lives under `src/app` and **`src/proxy.ts`** must resolve from that layout; a wrong root breaks routing.
+
 ## Database schema (Supabase SQL)
 
 Schema lives in versioned migrations (apply in order):
