@@ -10,9 +10,11 @@ import {
 } from "@/app/actions/plans";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SectionHeader } from "@/components/ui/section-header";
+import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
 import type { PlanStepRow, PlanWithSteps } from "@/types/family";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -45,7 +47,7 @@ function StepStatusBadge({
         onChange={(e) =>
           onChange(e.target.value as PlanStepRow["status"])
         }
-        className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium ${cls} focus:ring-2 focus:ring-slate-400`}
+        className={`rounded-md border-0 px-2 py-0.5 text-xs font-medium ${cls} focus:ring-2 focus:ring-teal-600/25`}
       >
         <option value="pending">pending</option>
         <option value="in_progress">in_progress</option>
@@ -161,54 +163,53 @@ export function PlanPanel({
 
   return (
     <Card>
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <CardTitle className="text-base">30 / 60 / 90 day plan</CardTitle>
-          <p className="mt-1 text-sm text-slate-600">
-            With an API key configured, plans are drafted by AI first; otherwise
-            (or if AI fails) steps come from rules tied to goals and barriers.
-            Edit or add steps anytime.
-          </p>
-        </div>
-        {!plan ? (
-          <Button
-            type="button"
-            onClick={handleGenerate}
-            disabled={pending}
-            variant="secondary"
-          >
-            {pending ? "Generating…" : "Generate plan"}
-          </Button>
-        ) : (
-          <div className="flex gap-2">
+      <SectionHeader
+        title="30 / 60 / 90 day plan"
+        description="With an API key configured, plans are drafted by AI first; otherwise (or if AI fails) steps come from rules tied to goals and barriers. Edit or add steps anytime."
+        actions={
+          !plan ? (
             <Button
               type="button"
               onClick={handleGenerate}
               disabled={pending}
               variant="secondary"
             >
-              {pending ? "Generating…" : "Regenerate (new version)"}
+              {pending ? "Generating…" : "Generate plan"}
             </Button>
-            <Button
-              type="button"
-              onClick={() => setShowAddStep(true)}
-              disabled={pending}
-              variant="secondary"
-            >
-              Add step
-            </Button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={handleGenerate}
+                disabled={pending}
+                variant="secondary"
+              >
+                {pending ? "Generating…" : "Regenerate (new version)"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setShowAddStep(true)}
+                disabled={pending}
+                variant="secondary"
+              >
+                Add step
+              </Button>
+            </div>
+          )
+        }
+      />
 
       {error ? (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+        <p
+          className="mt-4 rounded-lg border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-900"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
 
       {!plan ? (
-        <p className="mt-4 text-sm text-slate-600">
+        <p className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
           No plan yet. Click &quot;Generate plan&quot; to create one from this
           family&apos;s goals and barriers.
         </p>
@@ -220,7 +221,7 @@ export function PlanPanel({
               {plan.generation_source === "openai" ? (
                 <>
                   {" "}
-                  <Badge className="bg-violet-100 text-violet-900">
+                  <Badge className="border-teal-200/80 bg-teal-50 text-teal-900">
                     AI{plan.ai_model ? ` (${plan.ai_model})` : ""}
                   </Badge>
                 </>
@@ -238,8 +239,11 @@ export function PlanPanel({
           </div>
           {(["30", "60", "90"] as const).map((phase) => (
             <div key={phase}>
-              <h3 className="mb-3 text-sm font-semibold text-slate-800">
-                {PHASE_LABELS[phase]} goals
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-xs tabular-nums text-slate-700">
+                  {phase}
+                </span>
+                {PHASE_LABELS[phase]} focus
               </h3>
               {stepsByPhase[phase].length === 0 ? (
                 <p className="text-sm text-slate-500">
@@ -250,7 +254,7 @@ export function PlanPanel({
                   {stepsByPhase[phase].map((step) => (
                     <li
                       key={step.id}
-                      className="rounded-lg border border-slate-100 bg-slate-50/50 p-4"
+                      className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.02]"
                     >
                       {editingStepId === step.id ? (
                         <div className="space-y-3">
@@ -265,7 +269,7 @@ export function PlanPanel({
                             onChange={(e) => setEditDesc(e.target.value)}
                             placeholder="Description"
                             rows={2}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            className={textareaClass}
                           />
                           <div className="flex gap-2">
                             <Button
@@ -349,7 +353,7 @@ export function PlanPanel({
                     onChange={(e) =>
                       setAddPhase(e.target.value as "30" | "60" | "90")
                     }
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    className={`mt-1 ${selectInputClass}`}
                   >
                     <option value="30">30-day</option>
                     <option value="60">60-day</option>
@@ -375,7 +379,7 @@ export function PlanPanel({
                     onChange={(e) => setAddDesc(e.target.value)}
                     placeholder="Details…"
                     rows={2}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    className={`mt-1 ${textareaClass}`}
                   />
                 </div>
                 <div className="flex gap-2">

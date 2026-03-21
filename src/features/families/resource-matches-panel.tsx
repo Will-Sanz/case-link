@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SectionHeader } from "@/components/ui/section-header";
 import type { ResourceMatchRow } from "@/types/family";
 
 function flagSummary(r: NonNullable<ResourceMatchRow["resource"]>): string {
@@ -104,44 +105,43 @@ export function ResourceMatchesPanel({
 
   return (
     <Card>
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <CardTitle className="text-base">Matched resources</CardTitle>
-          <p className="mt-1 text-sm text-slate-600">
-            Ranked from goals, barriers, and family narrative (deterministic — no
-            AI). Accept or dismiss suggestions; dismissed programs stay hidden
-            on refresh runs.
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={runMatch}
-          disabled={pending}
-          variant="secondary"
-        >
-          {pending ? "Working…" : "Run / refresh matching"}
-        </Button>
-      </div>
+      <SectionHeader
+        title="Matched resources"
+        description="Ranked from goals, barriers, and family narrative (deterministic — no AI). Accept or dismiss suggestions; dismissed programs stay hidden on refresh runs."
+        actions={
+          <Button
+            type="button"
+            onClick={runMatch}
+            disabled={pending}
+            variant="secondary"
+          >
+            {pending ? "Working…" : "Run / refresh matching"}
+          </Button>
+        }
+      />
 
       {error ? (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+        <p
+          className="mt-4 rounded-lg border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-900"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
 
       {matches.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-600">
+        <p className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
           No matches yet. Run matching to populate suggestions from the
           resource directory.
         </p>
       ) : (
-        <ul className="mt-4 space-y-4">
+        <ul className="mt-5 space-y-4">
           {matches.map((m) => {
             const r = m.resource;
             return (
               <li
                 key={m.id}
-                className="border-b border-slate-100 pb-4 last:border-0"
+                className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -149,7 +149,7 @@ export function ResourceMatchesPanel({
                       <>
                         <Link
                           href={`/resources/${r.id}`}
-                          className="font-semibold text-slate-900 hover:underline"
+                          className="font-semibold text-slate-900 underline-offset-2 hover:text-teal-900 hover:underline"
                         >
                           {r.program_name}
                         </Link>
@@ -218,13 +218,13 @@ export function ResourceMatchesPanel({
         </ul>
       )}
 
-      <div className="mt-8 border-t border-slate-100 pt-6">
+      <div className="mt-8 border-t border-slate-200/80 pt-6">
         <CardTitle className="text-base">Add resource manually</CardTitle>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm leading-relaxed text-slate-600">
           Search the directory and add as <strong>accepted</strong> (updates
           if this program was already matched).
         </p>
-        <form onSubmit={doSearch} className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <form onSubmit={doSearch} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <div className="flex-1">
             <Label htmlFor="res-search" className="sr-only">
               Search resources
@@ -241,7 +241,7 @@ export function ResourceMatchesPanel({
           </Button>
         </form>
         {searchResults.length > 0 ? (
-          <ul className="mt-3 space-y-2 border border-slate-100 rounded-lg p-3">
+          <ul className="mt-4 space-y-2 rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
             {searchResults.map((row) => (
               <li
                 key={row.id}

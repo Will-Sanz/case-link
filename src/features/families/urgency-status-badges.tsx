@@ -1,16 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 
 const urgencyClass: Record<string, string> = {
-  low: "bg-slate-100 text-slate-700",
-  medium: "bg-amber-100 text-amber-900",
-  high: "bg-orange-100 text-orange-900",
-  crisis: "bg-red-100 text-red-900",
+  low: "border-slate-200 bg-slate-100 text-slate-800",
+  medium: "border-amber-200/80 bg-amber-50 text-amber-950",
+  high: "border-orange-200/80 bg-orange-50 text-orange-950",
+  crisis: "border-red-200/80 bg-red-50 text-red-950",
 };
 
 const statusClass: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-900",
-  on_hold: "bg-amber-100 text-amber-900",
-  closed: "bg-slate-200 text-slate-700",
+  active: "border-emerald-200/80 bg-emerald-50 text-emerald-950",
+  on_hold: "border-amber-200/80 bg-amber-50 text-amber-950",
+  closed: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
 export function UrgencyBadge({
@@ -19,7 +19,11 @@ export function UrgencyBadge({
   urgency: "low" | "medium" | "high" | "crisis" | null;
 }) {
   if (!urgency) {
-    return <Badge className="bg-slate-50 text-slate-500">Urgency not set</Badge>;
+    return (
+      <Badge className="border-slate-200 bg-white font-normal text-slate-500">
+        Urgency not set
+      </Badge>
+    );
   }
   return (
     <Badge className={urgencyClass[urgency] ?? ""}>
@@ -34,7 +38,5 @@ export function StatusBadge({
   status: "active" | "on_hold" | "closed";
 }) {
   const label = status.replace(/_/g, " ");
-  return (
-    <Badge className={statusClass[status] ?? ""}>{label}</Badge>
-  );
+  return <Badge className={statusClass[status] ?? ""}>{label}</Badge>;
 }

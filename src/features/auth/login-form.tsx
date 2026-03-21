@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { alertErrorClass } from "@/lib/ui/form-classes";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
@@ -46,10 +47,7 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {error ? (
-        <p
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800"
-          role="alert"
-        >
+        <p className={alertErrorClass} role="alert">
           {error}
         </p>
       ) : null}

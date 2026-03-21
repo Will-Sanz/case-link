@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { alertErrorClass, selectInputClass } from "@/lib/ui/form-classes";
 import {
   PRESET_BARRIERS,
   PRESET_GOALS,
@@ -100,17 +102,17 @@ export function IntakeForm() {
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
       {serverError ? (
-        <p
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800"
-          role="alert"
-        >
+        <p className={alertErrorClass} role="alert">
           {serverError}
         </p>
       ) : null}
 
       <Card>
-        <CardTitle className="text-base">Household</CardTitle>
-        <div className="mt-4 space-y-4">
+        <CardTitle>Household</CardTitle>
+        <p className="mt-1 text-sm text-slate-600">
+          Basic identifying information and what brought the family in today.
+        </p>
+        <div className="mt-5 space-y-5">
           <div>
             <Label htmlFor="name">Household name or label</Label>
             <Input
@@ -126,10 +128,10 @@ export function IntakeForm() {
           </div>
           <div>
             <Label htmlFor="summary">Summary</Label>
-            <textarea
+            <Textarea
               id="summary"
               rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="mt-1.5"
               {...form.register("summary")}
             />
           </div>
@@ -137,7 +139,7 @@ export function IntakeForm() {
             <Label htmlFor="urgency">Urgency</Label>
             <select
               id="urgency"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className={`mt-1.5 ${selectInputClass}`}
               {...form.register("urgency")}
             >
               <option value="">Not specified</option>
@@ -149,20 +151,20 @@ export function IntakeForm() {
           </div>
           <div>
             <Label htmlFor="householdNotes">Current circumstances</Label>
-            <textarea
+            <Textarea
               id="householdNotes"
               rows={4}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="mt-1.5"
               {...form.register("householdNotes")}
             />
           </div>
           <div>
             <Label htmlFor="initialCaseNote">Intake notes (optional)</Label>
-            <textarea
+            <Textarea
               id="initialCaseNote"
               rows={3}
               placeholder="First dated note for the file…"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="mt-1.5"
               {...form.register("initialCaseNote")}
             />
           </div>
@@ -170,11 +172,11 @@ export function IntakeForm() {
       </Card>
 
       <Card>
-        <CardTitle className="text-base">Goals</CardTitle>
+        <CardTitle>Goals</CardTitle>
         <p className="mt-1 text-sm text-slate-600">
           Select one or more, or add your own.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {PRESET_GOALS.map((g) => {
             const on = goalIndexByPreset(g.value) >= 0;
             return (
@@ -182,10 +184,10 @@ export function IntakeForm() {
                 key={g.value}
                 type="button"
                 onClick={() => toggleGoalPreset(g.value, g.label)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "border-slate-800 bg-slate-800 text-white"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
                 {g.label}
@@ -234,11 +236,11 @@ export function IntakeForm() {
       </Card>
 
       <Card>
-        <CardTitle className="text-base">Barriers</CardTitle>
+        <CardTitle>Barriers</CardTitle>
         <p className="mt-1 text-sm text-slate-600">
           Select one or more, or add your own.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {PRESET_BARRIERS.map((b) => {
             const on = barrierIndexByPreset(b.value) >= 0;
             return (
@@ -246,10 +248,10 @@ export function IntakeForm() {
                 key={b.value}
                 type="button"
                 onClick={() => toggleBarrierPreset(b.value, b.label)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "border-slate-800 bg-slate-800 text-white"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
                 {b.label}
@@ -298,11 +300,14 @@ export function IntakeForm() {
       </Card>
 
       <Card>
-        <CardTitle className="text-base">Household members (optional)</CardTitle>
+        <CardTitle>Household members (optional)</CardTitle>
+        <p className="mt-1 text-sm text-slate-600">
+          Add anyone else in the household you want on the record.
+        </p>
         {membersFA.fields.map((field, index) => (
           <div
             key={field.id}
-            className="mt-4 space-y-3 border-t border-slate-100 pt-4 first:mt-0 first:border-0 first:pt-0"
+            className="mt-5 space-y-4 border-t border-slate-100 pt-5 first:mt-0 first:border-0 first:pt-0"
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-slate-700">
@@ -344,9 +349,9 @@ export function IntakeForm() {
             </div>
             <div>
               <Label>Notes</Label>
-              <textarea
+              <Textarea
                 rows={2}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1.5 min-h-0"
                 {...form.register(`members.${index}.notes`)}
               />
             </div>
@@ -369,12 +374,12 @@ export function IntakeForm() {
         </Button>
       </Card>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-slate-200/80 pt-8">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? "Saving…" : "Create family profile"}
         </Button>
         <Link href="/families">
-          <Button type="button" variant="secondary">
+          <Button type="button" variant="outline">
             Cancel
           </Button>
         </Link>

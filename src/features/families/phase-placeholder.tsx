@@ -8,9 +8,9 @@ export function PhasePlaceholder({
   description: string;
 }) {
   return (
-    <Card className="border-dashed border-slate-200 bg-slate-50/80">
-      <CardTitle className="text-base text-slate-700">{title}</CardTitle>
-      <p className="mt-2 text-sm text-slate-600">{description}</p>
+    <Card className="border-dashed border-slate-300/90 bg-slate-50/50">
+      <CardTitle className="text-slate-800">{title}</CardTitle>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">{description}</p>
     </Card>
   );
 }

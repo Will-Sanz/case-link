@@ -2,9 +2,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
+import { outlineLinkButtonClass, selectInputClass } from "@/lib/ui/form-classes";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listFamilies } from "@/lib/services/families";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
@@ -45,21 +48,19 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Families</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Profiles you created or are assigned to.
-          </p>
-        </div>
-        <Link href="/families/new">
-          <Button type="button">New family intake</Button>
-        </Link>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Families"
+        description="Profiles you created or are assigned to. Filter by status and urgency to prioritize follow-up."
+        actions={
+          <Link href="/families/new">
+            <Button type="button">New family intake</Button>
+          </Link>
+        }
+      />
 
-      <Card className="p-5">
-        <form method="get" className="grid gap-4 md:grid-cols-4">
+      <Card className="p-5 sm:p-6">
+        <form method="get" className="grid gap-5 md:grid-cols-4">
           <div className="md:col-span-2">
             <Label htmlFor="q">Search</Label>
             <Input
@@ -67,7 +68,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
               name="q"
               placeholder="Name or summary…"
               defaultValue={filters.q}
-              className="mt-1"
+              className="mt-1.5"
             />
           </div>
           <div>
@@ -76,7 +77,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
               id="status"
               name="status"
               defaultValue={filters.status ?? ""}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className={`mt-1.5 ${selectInputClass}`}
             >
               <option value="">Any</option>
               <option value="active">Active</option>
@@ -90,7 +91,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
               id="urgency"
               name="urgency"
               defaultValue={filters.urgency ?? ""}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className={`mt-1.5 ${selectInputClass}`}
             >
               <option value="">Any</option>
               <option value="low">Low</option>
@@ -99,12 +100,9 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
               <option value="crisis">Crisis</option>
             </select>
           </div>
-          <div className="flex items-end gap-2 md:col-span-4">
-            <Button type="submit">Apply</Button>
-            <Link
-              href="/families"
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
+          <div className="flex flex-wrap items-end gap-2 md:col-span-4">
+            <Button type="submit">Apply filters</Button>
+            <Link href="/families" className={outlineLinkButtonClass}>
               Reset
             </Link>
           </div>
@@ -112,45 +110,49 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
       </Card>
 
       <p className="text-sm text-slate-600">
-        {items.length} of {total} famil{total === 1 ? "y" : "ies"}
-        {totalPages > 1
-          ? ` · Page ${filters.page} of ${totalPages}`
-          : null}
+        <span className="font-medium text-slate-800">{items.length}</span> of{" "}
+        <span className="font-medium text-slate-800">{total}</span> famil
+        {total === 1 ? "y" : "ies"}
+        {totalPages > 1 ? ` · Page ${filters.page} of ${totalPages}` : null}
       </p>
 
       {items.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-slate-600">
-          No families match.{" "}
-          <Link href="/families/new" className="font-medium text-slate-900 underline">
-            Start an intake
-          </Link>
-          .
-        </Card>
+        <EmptyState
+          title="No families match"
+          description="Try broadening your search or clearing filters. New intakes can be added anytime."
+          action={
+            <Link href="/families/new" className={outlineLinkButtonClass}>
+              Start an intake
+            </Link>
+          }
+        />
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {items.map((f) => (
             <li key={f.id}>
-              <Link href={`/families/${f.id}`}>
-                <Card className="p-4 transition hover:border-slate-300">
-                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                    <div>
-                      <p className="font-semibold text-slate-900">{f.name}</p>
+              <Link href={`/families/${f.id}`} className="block">
+                <Card className="group p-0 transition-shadow hover:border-slate-300/90 hover:shadow-md">
+                  <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 group-hover:text-teal-900">
+                        {f.name}
+                      </p>
                       {f.summary ? (
-                        <p className="line-clamp-2 text-sm text-slate-600">
+                        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-600">
                           {f.summary}
                         </p>
                       ) : null}
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <StatusBadge status={f.status} />
                         <UrgencyBadge urgency={f.urgency} />
                         {f.creator?.email ? (
-                          <Badge className="bg-white font-normal text-slate-600">
+                          <Badge className="border-slate-200/60 bg-white font-normal text-slate-600">
                             {f.creator.email}
                           </Badge>
                         ) : null}
                       </div>
                     </div>
-                    <p className="shrink-0 text-xs text-slate-500">
+                    <p className="shrink-0 text-xs font-medium text-slate-500">
                       Updated {formatDt(f.updated_at)}
                     </p>
                   </div>
@@ -162,20 +164,17 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
       )}
 
       {totalPages > 1 ? (
-        <nav className="flex flex-wrap gap-2">
+        <nav
+          className="flex flex-wrap gap-2 border-t border-slate-200/80 pt-6"
+          aria-label="Pagination"
+        >
           {filters.page > 1 ? (
-            <Link
-              href={pageHref(filters.page - 1)}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
+            <Link href={pageHref(filters.page - 1)} className={outlineLinkButtonClass}>
               Previous
             </Link>
           ) : null}
           {filters.page < totalPages ? (
-            <Link
-              href={pageHref(filters.page + 1)}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
+            <Link href={pageHref(filters.page + 1)} className={outlineLinkButtonClass}>
               Next
             </Link>
           ) : null}

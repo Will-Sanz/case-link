@@ -4,6 +4,7 @@ import { useState } from "react";
 import { updateFamilyMeta } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
 import type { FamilyDetail } from "@/types/family";
 
 export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
@@ -42,7 +43,10 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {error ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p
+          className="rounded-lg border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-900"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
@@ -55,7 +59,7 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
             onChange={(e) =>
               setStatus(e.target.value as FamilyDetail["status"])
             }
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className={`mt-1 ${selectInputClass}`}
           >
             <option value="active">Active</option>
             <option value="on_hold">On hold</option>
@@ -68,7 +72,7 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
             id="fam-urgency"
             value={urgency}
             onChange={(e) => setUrgency(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className={`mt-1 ${selectInputClass}`}
           >
             <option value="">Not specified</option>
             <option value="low">Low</option>
@@ -85,7 +89,7 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
           rows={3}
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className={`mt-1 ${textareaClass}`}
         />
       </div>
       <div>
@@ -95,7 +99,7 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
           rows={4}
           value={householdNotes}
           onChange={(e) => setHouseholdNotes(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className={`mt-1 ${textareaClass}`}
         />
       </div>
       <Button type="submit" variant="secondary" disabled={pending}>

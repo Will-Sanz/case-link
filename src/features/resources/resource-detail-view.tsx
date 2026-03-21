@@ -15,20 +15,26 @@ function Field({
   }
   const display = typeof value === "boolean" ? (value ? "Yes" : "No") : value;
   return (
-    <div className="border-b border-slate-100 py-3 last:border-0">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+    <div className="border-b border-slate-100 py-3.5 last:border-0">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-slate-900">{display}</dd>
+      <dd className="mt-1.5 text-sm leading-relaxed text-slate-900">{display}</dd>
     </div>
   );
 }
 
 function FlagRow({ label, on }: { label: string; on: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2 text-sm">
-      <span className="text-slate-600">{label}</span>
-      <Badge className={on ? "bg-emerald-100 text-emerald-800" : ""}>
+    <div className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0">
+      <span className="text-slate-700">{label}</span>
+      <Badge
+        className={
+          on
+            ? "border-emerald-200/80 bg-emerald-50 text-emerald-900"
+            : "border-slate-200 bg-white text-slate-500"
+        }
+      >
         {on ? "Yes" : "No"}
       </Badge>
     </div>
@@ -37,27 +43,27 @@ function FlagRow({ label, on }: { label: string; on: boolean }) {
 
 export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-8">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/[0.03] sm:p-8">
         <Link
           href="/resources"
-          className="text-sm font-medium text-slate-600 hover:text-slate-900"
+          className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
         >
           ← Back to resources
         </Link>
-        <h1 className="mt-3 text-2xl font-semibold text-slate-900">
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
           {r.program_name}
         </h1>
-        <p className="text-slate-600">{r.office_or_department}</p>
+        <p className="mt-2 text-slate-600">{r.office_or_department}</p>
         {r.category ? (
-          <Badge className="mt-2">{r.category}</Badge>
+          <Badge className="mt-4">{r.category}</Badge>
         ) : null}
       </div>
 
       {r.description ? (
         <Card>
-          <CardTitle className="text-base">Description</CardTitle>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+          <CardTitle>Description</CardTitle>
+          <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
             {r.description}
           </p>
         </Card>
@@ -65,7 +71,7 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardTitle className="text-base">Primary contact</CardTitle>
+          <CardTitle>Primary contact</CardTitle>
           <dl className="mt-2">
             <Field label="Name" value={r.primary_contact_name} />
             <Field label="Title" value={r.primary_contact_title} />
@@ -74,7 +80,7 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
           </dl>
         </Card>
         <Card>
-          <CardTitle className="text-base">Secondary contact</CardTitle>
+          <CardTitle>Secondary contact</CardTitle>
           <dl className="mt-2">
             <Field label="Name" value={r.secondary_contact_name} />
             <Field label="Title" value={r.secondary_contact_title} />
@@ -85,7 +91,7 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
       </div>
 
       <Card>
-        <CardTitle className="text-base">Partner fair & recruitment</CardTitle>
+        <CardTitle>Partner fair & recruitment</CardTitle>
         <dl className="mt-2">
           <Field
             label="Invite to March Partner Fair"
@@ -100,19 +106,25 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
       </Card>
 
       <Card>
-        <CardTitle className="text-base">Services offered</CardTitle>
+        <CardTitle>Services offered</CardTitle>
         <div className="mt-2 divide-y divide-slate-100">
           <FlagRow label="Tabling at events" on={r.tabling_at_events} />
-          <FlagRow label="Promotional / informational materials" on={r.promotional_materials} />
+          <FlagRow
+            label="Promotional / informational materials"
+            on={r.promotional_materials}
+          />
           <FlagRow label="Educational workshops" on={r.educational_workshops} />
-          <FlagRow label="Volunteer recruitment or support" on={r.volunteer_recruitment_support} />
+          <FlagRow
+            label="Volunteer recruitment or support"
+            on={r.volunteer_recruitment_support}
+          />
         </div>
       </Card>
 
       {r.services_select_all ? (
         <Card>
-          <CardTitle className="text-base">Community school options (raw)</CardTitle>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+          <CardTitle>Community school options (raw)</CardTitle>
+          <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
             {r.services_select_all}
           </p>
         </Card>
@@ -120,8 +132,8 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
 
       {r.additional_info ? (
         <Card>
-          <CardTitle className="text-base">Additional information</CardTitle>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+          <CardTitle>Additional information</CardTitle>
+          <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
             {r.additional_info}
           </p>
         </Card>
@@ -129,8 +141,8 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
 
       {(r.tags?.length ?? 0) > 0 ? (
         <Card>
-          <CardTitle className="text-base">Tags</CardTitle>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <CardTitle>Tags</CardTitle>
+          <div className="mt-4 flex flex-wrap gap-2">
             {(r.tags ?? []).map((t) => (
               <Badge key={t}>{t}</Badge>
             ))}

@@ -2,8 +2,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { checkboxClass, outlineLinkButtonClass } from "@/lib/ui/form-classes";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listResources } from "@/lib/services/resources";
 import { parseResourceListQuery } from "@/lib/validations/resource-filters";
@@ -22,13 +25,13 @@ function FlagFilter({
   defaultOn: boolean;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
       <input
         type="checkbox"
         name={name}
         value="true"
         defaultChecked={defaultOn}
-        className="rounded border-slate-300 text-slate-800 focus:ring-slate-500"
+        className={checkboxClass}
       />
       {label}
     </label>
@@ -62,17 +65,15 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Resources</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Community partners and programs imported from your directory CSV.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Resources"
+        description="Community partners and programs from your directory. Use flags and search to narrow programs that fit a family’s needs."
+      />
 
-      <Card className="p-5">
-        <form method="get" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <Card className="p-5 sm:p-6">
+        <form method="get" className="space-y-6">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <Label htmlFor="q">Search</Label>
               <Input
@@ -80,7 +81,7 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
                 name="q"
                 placeholder="Program, organization, keywords…"
                 defaultValue={filters.q}
-                className="mt-1"
+                className="mt-1.5"
               />
             </div>
             <div>
@@ -90,15 +91,18 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
                 name="category"
                 placeholder="e.g. Youth"
                 defaultValue={filters.category ?? ""}
-                className="mt-1"
+                className="mt-1.5"
               />
             </div>
           </div>
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-slate-700">
+          <fieldset className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <legend className="px-1 text-sm font-medium text-slate-800">
               Service flags
             </legend>
-            <div className="flex flex-wrap gap-4">
+            <p className="mb-3 text-xs text-slate-600">
+              Checked filters require that service to be offered.
+            </p>
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
               <FlagFilter
                 name="tabling"
                 label="Tabling at events"
@@ -128,10 +132,7 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
           </fieldset>
           <div className="flex flex-wrap gap-2">
             <Button type="submit">Apply filters</Button>
-            <Link
-              href="/resources"
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
+            <Link href="/resources" className={outlineLinkButtonClass}>
               Reset
             </Link>
           </div>
@@ -139,43 +140,47 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
       </Card>
 
       <p className="text-sm text-slate-600">
-        Showing {items.length} of {total} results
+        Showing{" "}
+        <span className="font-medium text-slate-800">{items.length}</span> of{" "}
+        <span className="font-medium text-slate-800">{total}</span> results
         {totalPages > 1
           ? ` · Page ${filters.page} of ${totalPages}`
           : null}
       </p>
 
       {items.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-slate-600">
-          No resources match your filters. Import the CSV if the database is
-          empty — see README.
-        </Card>
+        <EmptyState
+          title="No resources match"
+          description="Try adjusting filters or search terms. If the directory is empty, import your CSV — see the project README."
+        />
       ) : (
         <ul className="space-y-3">
           {items.map((r) => (
             <li key={r.id}>
-              <Card className="p-5 transition hover:border-slate-300">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                  <div>
+              <Card className="p-0 transition-shadow hover:border-slate-300/90 hover:shadow-md">
+                <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start sm:gap-8">
+                  <div className="min-w-0">
                     <Link
                       href={`/resources/${r.id}`}
-                      className="text-base font-semibold text-slate-900 hover:underline"
+                      className="text-base font-semibold text-slate-900 underline-offset-2 hover:text-teal-900 hover:underline"
                     >
                       {r.program_name}
                     </Link>
-                    <p className="text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-slate-600">
                       {r.office_or_department}
                     </p>
                     {r.category ? (
-                      <Badge className="mt-2">{r.category}</Badge>
+                      <Badge className="mt-3">{r.category}</Badge>
                     ) : null}
                   </div>
-                  <div className="text-right text-sm text-slate-600">
+                  <div className="shrink-0 text-sm text-slate-600 sm:text-right">
                     {r.primary_contact_email ? (
-                      <p>{r.primary_contact_email}</p>
+                      <p className="break-all">{r.primary_contact_email}</p>
                     ) : null}
                     {r.primary_contact_phone ? (
-                      <p className="tabular-nums">{r.primary_contact_phone}</p>
+                      <p className="tabular-nums text-slate-700">
+                        {r.primary_contact_phone}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -186,20 +191,17 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
       )}
 
       {totalPages > 1 ? (
-        <nav className="flex flex-wrap items-center gap-2">
+        <nav
+          className="flex flex-wrap items-center gap-2 border-t border-slate-200/80 pt-6"
+          aria-label="Pagination"
+        >
           {filters.page > 1 ? (
-            <Link
-              href={pageHref(filters.page - 1)}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
+            <Link href={pageHref(filters.page - 1)} className={outlineLinkButtonClass}>
               Previous
             </Link>
           ) : null}
           {filters.page < totalPages ? (
-            <Link
-              href={pageHref(filters.page + 1)}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
+            <Link href={pageHref(filters.page + 1)} className={outlineLinkButtonClass}>
               Next
             </Link>
           ) : null}
