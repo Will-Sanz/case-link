@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { updateSession } from "./src/lib/supabase/middleware";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/families", "/resources", "/admin"];
 
