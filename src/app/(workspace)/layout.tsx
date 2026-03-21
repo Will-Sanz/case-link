@@ -1,0 +1,22 @@
+import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
+import { ensureAppUser, getSessionUser } from "@/lib/auth/session";
+import { AppShell } from "@/components/layout/app-shell";
+
+export default async function WorkspaceLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const authUser = await getSessionUser();
+  if (!authUser) {
+    redirect("/login");
+  }
+  const appUser = await ensureAppUser(authUser);
+
+  return (
+    <AppShell email={appUser.email} role={appUser.role}>
+      {children}
+    </AppShell>
+  );
+}
