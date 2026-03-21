@@ -7,11 +7,17 @@ import { NextResponse } from "next/dist/server/web/spec-extension/response";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/families", "/resources", "/admin"];
 
-/** NextResponse.next only accepts `request.headers` (not a full NextRequest). Passing the whole request breaks routing on Vercel. */
-function continueRequest(request: NextRequest) {
-  return NextResponse.next({
-    request: { headers: new Headers(request.headers) },
-  });
+/**
+ * Continue to the App Router without overriding request headers.
+ *
+ * Do not pass `NextResponse.next({ request: { headers } })`: Next.js then sets
+ * `x-middleware-override-headers` and resolve-routes **deletes every `req` header not in that set**
+ * (see `resolve-routes.js`). A cloned/Headers view can omit keys present on Node’s `req`, breaking
+ * routing on Vercel (NOT_FOUND / failed invocations). Session refresh still applies via
+ * `response.cookies.set` on the returned `NextResponse`.
+ */
+function continueToApp() {
+  return NextResponse.next();
 }
 
 /**
@@ -19,7 +25,7 @@ function continueRequest(request: NextRequest) {
  * Do not use this file from `middleware.ts` — Edge has stricter limits and caused Vercel failures.
  */
 export async function runSupabaseProxy(request: NextRequest) {
-  let supabaseResponse = continueRequest(request);
+  let supabaseResponse = continueToApp();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -47,7 +53,7 @@ export async function runSupabaseProxy(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
-        supabaseResponse = continueRequest(request);
+        supabaseResponse = continueToApp();
         cookiesToSet.forEach(({ name, value, options }) => {
           supabaseResponse.cookies.set(name, value, options);
         });

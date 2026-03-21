@@ -27,7 +27,7 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 5. **Do not run CSV import on deploy** — `npm run db:import` is a **manual** script from your machine or CI with `SUPABASE_SERVICE_ROLE_KEY`; it is not part of the Next.js build. The app deploys fine without `data/resources-seed.csv` in the bundle.
 6. **Post-deploy** — Sign up a user, promote to admin in SQL if needed (`update public.app_users set role = 'admin' where email = '…'`). Optionally run `npm run db:import` locally against production if you need resource rows.
 
-**If every URL returns Vercel `404 NOT_FOUND`:** In Vercel → Project → Settings → General, set **Root Directory** to the repository root (leave empty or `.`), not `src`. The app lives under `src/app` and **`src/proxy.ts`** must resolve from that layout; a wrong root breaks routing.
+**If every URL returns Vercel `404 NOT_FOUND`:** (1) In Vercel → Project → Settings → General, set **Root Directory** to the repository root (leave empty or `.`), not `src`. (2) The proxy must not call `NextResponse.next({ request: { headers: … } })` with a partial header list — Next.js then strips other `req` headers and routing can fail; this repo uses plain `NextResponse.next()` in `src/lib/supabase/proxy.ts` and relies on `response.cookies` for Supabase session updates.
 
 **If logs show `ReferenceError: __dirname is not defined`:** The proxy must not import from `next/server` (that pulls in `ua-parser-js`). This repo imports `NextRequest` / `NextResponse` from `next/dist/server/web/spec-extension/*` in `src/proxy.ts` and `src/lib/supabase/proxy.ts` only.
 
