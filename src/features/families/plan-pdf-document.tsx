@@ -110,7 +110,8 @@ const styles = StyleSheet.create({
 
 function StepContent({ step }: { step: PlanStepRow }) {
   const d = step.details as PlanStepDetails | null | undefined;
-  const w = step.workflow_data as { outcome_notes?: string } | null | undefined;
+  const w = step.workflow_data as { outcome_notes?: string; blocker_reason?: string } | null | undefined;
+  const helperData = step.ai_helper_data as { action_needed_now?: string } | null | undefined;
   const dueDate = step.due_date
     ? new Date(step.due_date).toLocaleDateString(undefined, {
         month: "long",
@@ -120,21 +121,67 @@ function StepContent({ step }: { step: PlanStepRow }) {
     : null;
   const isCompleted = step.status === "completed";
   const isBlocked = step.status === "blocked";
+  const actionNow = d?.action_needed_now ?? helperData?.action_needed_now;
 
   return (
     <View style={styles.stepCard}>
       <Text style={styles.stepTitle}>{step.title}</Text>
 
-      {/* Family-facing: Next steps first, then context */}
+      {step.status ? (
+        <Text style={styles.stepStatus}>{step.status.replace("_", " ")}</Text>
+      ) : null}
+
+      {d?.priority ? (
+        <Text style={[styles.bodyText, { marginBottom: 6 }]}>Priority: {d.priority}</Text>
+      ) : null}
+
+      {actionNow ? (
+        <>
+          <Text style={styles.sectionLabel}>Action needed now</Text>
+          <Text style={[styles.bodyText, { fontWeight: "bold", marginBottom: 8 }]}>{actionNow}</Text>
+        </>
+      ) : null}
+
+      {(d?.stage_goal || d?.why_now) ? (
+        <>
+          {d?.stage_goal ? (
+            <>
+              <Text style={styles.sectionLabel}>Stage focus</Text>
+              <Text style={styles.bodyText}>{d.stage_goal}</Text>
+            </>
+          ) : null}
+          {d?.why_now ? (
+            <>
+              <Text style={styles.sectionLabel}>Why now</Text>
+              <Text style={styles.bodyText}>{d.why_now}</Text>
+            </>
+          ) : null}
+        </>
+      ) : null}
+
+      {d?.rationale ? (
+        <>
+          <Text style={styles.sectionLabel}>Why this matters</Text>
+          <Text style={styles.bodyText}>{d.rationale}</Text>
+        </>
+      ) : null}
+
       {d?.detailed_instructions ? (
         <>
-          <Text style={styles.sectionLabel}>Your next steps</Text>
+          <Text style={styles.sectionLabel}>What to do</Text>
           <Text style={styles.bodyText}>{d.detailed_instructions}</Text>
         </>
       ) : step.description ? (
         <>
-          <Text style={styles.sectionLabel}>Your next steps</Text>
+          <Text style={styles.sectionLabel}>What to do</Text>
           <Text style={styles.bodyText}>{step.description}</Text>
+        </>
+      ) : null}
+
+      {d?.contact_script ? (
+        <>
+          <Text style={styles.sectionLabel}>What to say (outreach script)</Text>
+          <Text style={styles.bodyText}>{d.contact_script}</Text>
         </>
       ) : null}
 
@@ -152,16 +199,14 @@ function StepContent({ step }: { step: PlanStepRow }) {
 
       {d?.required_documents && d.required_documents.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Documents to bring</Text>
-          <Text style={styles.bodyText}>
-            {d.required_documents.join(", ")}
-          </Text>
+          <Text style={styles.sectionLabel}>What to prepare</Text>
+          <Text style={styles.bodyText}>{d.required_documents.join(", ")}</Text>
         </>
       ) : null}
 
       {d?.contacts && d.contacts.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Contact information</Text>
+          <Text style={styles.sectionLabel}>Contacts</Text>
           {d.contacts.map((c, i) => (
             <Text key={i} style={styles.contactLine}>
               {[c.name, c.phone, c.email].filter(Boolean).join(" · ")}
@@ -171,17 +216,34 @@ function StepContent({ step }: { step: PlanStepRow }) {
         </>
       ) : null}
 
-      {d?.rationale ? (
+      {d?.expected_outcome ? (
         <>
-          <Text style={styles.sectionLabel}>Why this helps</Text>
-          <Text style={styles.bodyText}>{d.rationale}</Text>
+          <Text style={styles.sectionLabel}>Success looks like</Text>
+          <Text style={styles.bodyText}>{d.expected_outcome}</Text>
         </>
       ) : null}
 
-      {d?.expected_outcome ? (
+      {d?.blockers && d.blockers.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Goal</Text>
-          <Text style={styles.bodyText}>{d.expected_outcome}</Text>
+          <Text style={styles.sectionLabel}>Common blockers</Text>
+          {d.blockers.map((b, i) => (
+            <View key={i} style={styles.listItem}>
+              <Text style={styles.bullet}>•</Text>
+              <Text style={styles.bodyText}>{b}</Text>
+            </View>
+          ))}
+        </>
+      ) : null}
+
+      {d?.fallback_options && d.fallback_options.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>Fallback options</Text>
+          {d.fallback_options.map((f, i) => (
+            <View key={i} style={styles.listItem}>
+              <Text style={styles.bullet}>•</Text>
+              <Text style={styles.bodyText}>{f}</Text>
+            </View>
+          ))}
         </>
       ) : null}
 
@@ -189,6 +251,30 @@ function StepContent({ step }: { step: PlanStepRow }) {
         <>
           <Text style={styles.sectionLabel}>When</Text>
           <Text style={styles.bodyText}>{d.timing_guidance}</Text>
+        </>
+      ) : null}
+
+      {step.action_items && step.action_items.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>Weekly action items</Text>
+          {step.action_items
+            .sort((a, b) => a.week_index - b.week_index)
+            .map((ai, i) => (
+              <View key={i} style={styles.listItem}>
+                <Text style={styles.bullet}>•</Text>
+                <View>
+                  <Text style={styles.bodyText}>
+                    Week {ai.week_index}: {ai.title}
+                    {ai.target_date ? ` (${new Date(ai.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })})` : ""}
+                  </Text>
+                  {ai.description ? (
+                    <Text style={[styles.bodyText, { marginLeft: 8, color: "#64748b", fontSize: 9 }]}>
+                      {ai.description}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ))}
         </>
       ) : null}
 
@@ -206,7 +292,7 @@ function StepContent({ step }: { step: PlanStepRow }) {
 
       {isBlocked ? (
         <Text style={[styles.bodyText, { marginTop: 6, color: "#b91c1c", fontStyle: "italic" }]}>
-          Currently on hold — your case manager will follow up
+          {w?.blocker_reason ? `Blocked: ${w.blocker_reason}` : "Currently on hold — your case manager will follow up"}
         </Text>
       ) : null}
     </View>

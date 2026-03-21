@@ -3,6 +3,8 @@ import { getCalendarEvents } from "@/lib/services/calendar";
 import { listFamilies } from "@/lib/services/families";
 import { CalendarView } from "@/features/calendar/calendar-view";
 
+export const dynamic = "force-dynamic";
+
 function getDateRange(
   view: string,
   monthParam: string | null,
@@ -112,16 +114,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Calendar
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Follow-ups, due dates, and workload across your caseload. Auto-updates from plan steps.
-        </p>
-      </div>
-
+    <div className="-mx-4 -mb-8 -mt-8 flex min-h-[calc(100dvh-8rem)] flex-col sm:-mx-6 lg:-mb-10 lg:-mx-8 lg:-mt-10">
       <CalendarView
         events={events}
         workload={workload}
@@ -129,6 +122,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         view={view}
         dateRange={{ start, end }}
         monthLabel={monthLabel}
+        compact
       />
     </div>
   );

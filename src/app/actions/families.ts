@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAppUser, requireAppUserWithClient } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { z } from "zod";
 import {
   addCaseNoteSchema,
   familyIntakeFormSchema,
@@ -221,5 +222,28 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
   revalidatePath("/families");
   revalidatePath(`/families/${familyId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+  return { ok: true };
+}
+
+export async function deleteFamily(input: unknown): Promise<ActionResult> {
+  const parsed = z.object({ familyId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid family ID" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("families")
+    .delete()
+    .eq("id", parsed.data.familyId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/families");
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
   return { ok: true };
 }

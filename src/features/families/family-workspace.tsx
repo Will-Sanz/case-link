@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
@@ -10,6 +14,8 @@ import { PhasePlaceholder } from "@/features/families/phase-placeholder";
 import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { UpdateFamilyForm } from "@/features/families/update-family-form";
+import { updateFamilyMeta, deleteFamily } from "@/app/actions/families";
+import { Button } from "@/components/ui/button";
 import type { FamilyDetail } from "@/types/family";
 
 function formatDt(iso: string) {
@@ -32,6 +38,29 @@ function SectionLabel({ children }: { children: string }) {
 }
 
 export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleCloseCase() {
+    setError(null);
+    startTransition(async () => {
+      const r = await updateFamilyMeta({ familyId: family.id, status: "closed" });
+      if (!r.ok) setError(r.error);
+      else router.push("/families");
+    });
+  }
+
+  function handleDeleteCase() {
+    if (!confirm("Delete this case permanently? This cannot be undone.")) return;
+    setError(null);
+    startTransition(async () => {
+      const r = await deleteFamily({ familyId: family.id });
+      if (!r.ok) setError(r.error);
+      else router.push("/families");
+    });
+  }
+
   return (
     <div className="space-y-10">
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/[0.03] sm:p-8">
@@ -64,7 +93,48 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
               </time>
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            {family.status === "closed" ? (
+              <Button
+                variant="secondary"
+                className="text-sm"
+                onClick={() => {
+                  setError(null);
+                  startTransition(async () => {
+                    const r = await updateFamilyMeta({ familyId: family.id, status: "active" });
+                    if (!r.ok) setError(r.error);
+                    else router.refresh();
+                  });
+                }}
+                disabled={pending}
+              >
+                {pending ? "Saving…" : "Reopen case"}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                className="text-sm"
+                onClick={handleCloseCase}
+                disabled={pending}
+              >
+                {pending ? "Saving…" : "Close case"}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50"
+              onClick={handleDeleteCase}
+              disabled={pending}
+            >
+              Delete case
+            </Button>
+          </div>
         </div>
+        {error && (
+          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
       {/* Needs attention — workflow layer */}

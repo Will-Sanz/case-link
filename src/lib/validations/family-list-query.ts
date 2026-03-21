@@ -9,6 +9,9 @@ export const familyListQuerySchema = z.object({
     emptyToUndef,
     z.enum(["active", "on_hold", "closed"]).optional(),
   ),
+  /** When "active", show active+on_hold; when "legacy", show closed only */
+  tab: z.preprocess(emptyToUndef, z.enum(["active", "legacy"]).optional()),
+  statusIn: z.array(z.enum(["active", "on_hold", "closed"])).optional(),
   urgency: z.preprocess(
     emptyToUndef,
     z.enum(["low", "medium", "high", "crisis"]).optional(),
@@ -31,6 +34,7 @@ export function parseFamilyListQuery(
   const parsed = familyListQuerySchema.safeParse({
     q: first("q"),
     status: first("status"),
+    tab: first("tab"),
     urgency: first("urgency"),
     page: first("page"),
     pageSize: first("pageSize"),

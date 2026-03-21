@@ -18,7 +18,7 @@ export function CaseAssistantPanel({
   const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   function ask(q: string) {
     if (!q.trim()) return;

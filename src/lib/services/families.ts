@@ -51,7 +51,9 @@ export async function listFamilies(
     qb = qb.or(`name.ilike.%${e}%,summary.ilike.%${e}%`);
   }
 
-  if (filters.status) {
+  if (filters.statusIn && filters.statusIn.length > 0) {
+    qb = qb.in("status", filters.statusIn);
+  } else if (filters.status) {
     qb = qb.eq("status", filters.status);
   }
   if (filters.urgency) {

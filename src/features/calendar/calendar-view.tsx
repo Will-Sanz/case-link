@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useMemo, useTransition } from "react";
+import { useCallback, useState, useMemo, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { CalendarEvent, CalendarEventType } from "@/types/calendar";
 import type { FamilyListItem } from "@/types/family";
 import { cn } from "@/lib/utils/cn";
+import { getFamilyColor } from "@/lib/utils/family-colors";
 import { updatePlanStepActionItem } from "@/app/actions/plans";
 
 const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
@@ -22,33 +23,33 @@ const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   stage_milestone: "Stage",
 };
 
-const EVENT_TYPE_STYLES: Record<CalendarEventType, string> = {
-  follow_up_due: "border-teal-200 bg-teal-50/80 text-teal-900",
-  step_due: "border-slate-200 bg-slate-50/80 text-slate-800",
-  overdue: "border-red-200 bg-red-50/80 text-red-900",
-  blocked_review: "border-amber-200 bg-amber-50/80 text-amber-900",
-  escalation_review: "border-amber-300 bg-amber-50/80 text-amber-900",
-  stale_case_check: "border-slate-200 bg-slate-50/80 text-slate-700",
-  new_plan_review: "border-teal-200 bg-teal-50/60 text-teal-800",
-  stage_milestone: "border-slate-200 bg-slate-100 text-slate-700",
-};
-
 function buildNavParams(
   view: string,
   dateRange: { start: string; end: string },
   dir: "prev" | "next",
 ): Record<string, string> {
-  const d = new Date(dateRange.start + "T12:00:00");
   if (view === "month") {
-    d.setMonth(d.getMonth() + (dir === "next" ? 1 : -1));
-    return { view, month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` };
+    const [y, m] = dateRange.start.split("-").map(Number);
+    let newYear = y;
+    let newMonth = dir === "next" ? m + 1 : m - 1;
+    if (newMonth > 12) {
+      newMonth = 1;
+      newYear += 1;
+    } else if (newMonth < 1) {
+      newMonth = 12;
+      newYear -= 1;
+    }
+    return {
+      view,
+      month: `${newYear}-${String(newMonth).padStart(2, "0")}`,
+    };
   }
-  if (view === "week") {
-    d.setDate(d.getDate() + (dir === "next" ? 7 : -7));
-    return { view, date: d.toISOString().slice(0, 10) };
-  }
-  d.setDate(d.getDate() + (dir === "next" ? 14 : -14));
-  return { view, date: d.toISOString().slice(0, 10) };
+  const d = new Date(dateRange.start + "T12:00:00");
+  d.setDate(d.getDate() + (dir === "next" ? 7 : -7));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return { view, date: `${y}-${m}-${day}` };
 }
 
 function buildTodayParams(view: string): Record<string, string> {
@@ -74,6 +75,7 @@ type CalendarViewProps = {
   view: "month" | "week" | "agenda";
   dateRange: { start: string; end: string };
   monthLabel: string;
+  compact?: boolean;
 };
 
 export function CalendarView({
@@ -83,16 +85,32 @@ export function CalendarView({
   view,
   dateRange,
   monthLabel,
+  compact = false,
 }: CalendarViewProps) {
+  const router = useRouter();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  const prevParams = buildNavParams(view, dateRange, "prev");
-  const nextParams = buildNavParams(view, dateRange, "next");
-  const todayParams = buildTodayParams(view);
+  const prevParams = useMemo(
+    () => buildNavParams(view, dateRange, "prev"),
+    [view, dateRange.start, dateRange.end],
+  );
+  const nextParams = useMemo(
+    () => buildNavParams(view, dateRange, "next"),
+    [view, dateRange.start, dateRange.end],
+  );
+  const todayParams = useMemo(() => buildTodayParams(view), [view]);
 
   const prevHref = `/calendar?${new URLSearchParams(prevParams)}`;
   const nextHref = `/calendar?${new URLSearchParams(nextParams)}`;
   const todayHref = `/calendar?${new URLSearchParams(todayParams)}`;
+
+  const handleNav = useCallback(
+    (e: React.MouseEvent, href: string) => {
+      e.preventDefault();
+      router.push(href);
+    },
+    [router],
+  );
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -105,116 +123,144 @@ export function CalendarView({
   }, [events]);
 
   const agendaGroups = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowKey = tomorrow.toISOString().slice(0, 10);
-    const weekEnd = new Date();
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    const weekEndKey = weekEnd.toISOString().slice(0, 10);
+    const rangeStart = dateRange.start;
+    const rangeEnd = dateRange.end;
 
     const overdue: CalendarEvent[] = [];
-    const todayList: CalendarEvent[] = [];
-    const tomorrowList: CalendarEvent[] = [];
-    const thisWeek: CalendarEvent[] = [];
-    const later: CalendarEvent[] = [];
+    const byDate: { date: string; label: string; events: CalendarEvent[] }[] = [];
 
+    const eventDates = new Set<string>();
     for (const e of events) {
-      if (e.event_type === "overdue") overdue.push(e);
-      else if (e.date === today) todayList.push(e);
-      else if (e.date === tomorrowKey) tomorrowList.push(e);
-      else if (e.date > tomorrowKey && e.date <= weekEndKey) thisWeek.push(e);
-      else if (e.date > weekEndKey) later.push(e);
+      if (e.date < rangeStart && e.event_type === "overdue") {
+        overdue.push(e);
+      } else if (e.date >= rangeStart && e.date <= rangeEnd) {
+        eventDates.add(e.date);
+      }
     }
 
-    return { overdue, today: todayList, tomorrow: tomorrowList, thisWeek, later };
-  }, [events]);
+    const sortedDates = [...eventDates].sort();
+    for (const d of sortedDates) {
+      const dayEvents = events.filter((e) => e.date === d);
+      byDate.push({
+        date: d,
+        label: new Date(d + "T12:00:00").toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: d.slice(0, 4) !== String(new Date().getFullYear()) ? "numeric" : undefined,
+        }),
+        events: dayEvents,
+      });
+    }
+
+    return { overdue, byDate };
+  }, [events, dateRange.start, dateRange.end]);
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
-      <div className="min-w-0 flex-1 space-y-4">
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
-            {(["agenda", "week", "month"] as const).map((v) => (
-              <Link
-                key={v}
-                href={`/calendar?${new URLSearchParams({ view: v, ...(v === "month" ? { month: dateRange.start.slice(0, 7) } : { date: dateRange.start }) })}`}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  view === v
-                    ? "bg-teal-100 text-teal-900"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                )}
-              >
-                {v.charAt(0).toUpperCase() + v.slice(1)}
-              </Link>
-            ))}
-          </div>
+    <div className={cn("flex min-h-0 flex-1", compact ? "flex-col lg:flex-row" : "flex-col gap-6 lg:flex-row")}>
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", compact && "overflow-hidden")}>
+        {/* Google-style toolbar */}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white py-2 pl-1 pr-3">
           <div className="flex items-center gap-1">
-            <Link href={prevHref}>
-              <Button variant="secondary" className="px-2 py-1.5 text-sm">
-                ←
-              </Button>
+            <Link
+              href={todayHref}
+              onClick={(e) => handleNav(e, todayHref)}
+              className={cn(
+                "rounded px-2 py-1 font-medium transition-colors",
+                compact ? "text-xs text-slate-700 hover:bg-slate-100" : "text-sm",
+              )}
+            >
+              Today
             </Link>
-            <Link href={todayHref}>
-              <Button variant="secondary" className="px-3 py-1.5 text-sm">
-                Today
-              </Button>
-            </Link>
-            <Link href={nextHref}>
-              <Button variant="secondary" className="px-2 py-1.5 text-sm">
-                →
-              </Button>
-            </Link>
-          </div>
-          <span className="text-sm font-medium text-slate-700">{monthLabel}</span>
-        </div>
-
-        {/* Workload summary */}
-        <div className="flex flex-wrap gap-3">
-          {workload.dueToday > 0 && (
-            <div className="rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2">
-              <span className="text-sm font-medium text-teal-900">
-                {workload.dueToday} due today
-              </span>
+            <div className="flex items-center">
+              <Link
+                href={prevHref}
+                onClick={(e) => handleNav(e, prevHref)}
+                className="rounded p-1 text-slate-600 hover:bg-slate-100"
+                aria-label="Previous"
+              >
+                <span className={compact ? "text-sm" : ""}>‹</span>
+              </Link>
+              <Link
+                href={nextHref}
+                onClick={(e) => handleNav(e, nextHref)}
+                className="rounded p-1 text-slate-600 hover:bg-slate-100"
+                aria-label="Next"
+              >
+                <span className={compact ? "text-sm" : ""}>›</span>
+              </Link>
             </div>
-          )}
-          {workload.overdue > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2">
-              <span className="text-sm font-medium text-red-900">
-                {workload.overdue} overdue
-              </span>
-            </div>
-          )}
-          {workload.blocked > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
-              <span className="text-sm font-medium text-amber-900">
-                {workload.blocked} blocked
-              </span>
-            </div>
-          )}
-          {workload.escalated > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50/60 px-3 py-2">
-              <span className="text-sm font-medium text-amber-900">
-                {workload.escalated} escalation
-              </span>
-            </div>
-          )}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
-            <span className="text-sm text-slate-700">
-              {workload.dueThisWeek} due this week · {workload.activeFamilies} families
+            <span className={cn("ml-2 font-medium text-slate-800", compact ? "text-sm" : "text-base")}>
+              {monthLabel}
             </span>
           </div>
+          <div className="flex items-center gap-1">
+            {(["month", "week", "agenda"] as const).map((v) => {
+              const viewParams = {
+                view: v,
+                ...(v === "month"
+                  ? { month: dateRange.start.slice(0, 7) }
+                  : { date: dateRange.start }),
+              };
+              const viewHref = `/calendar?${new URLSearchParams(viewParams)}`;
+              return (
+                <Link
+                  key={v}
+                  href={viewHref}
+                  onClick={(e) => handleNav(e, viewHref)}
+                  className={cn(
+                    "rounded px-2.5 py-1 font-medium transition-colors",
+                    compact ? "text-xs" : "text-sm",
+                    view === v
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                  )}
+                >
+                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Main calendar area */}
-        <Card className="min-h-[400px] overflow-hidden p-0">
+        {/* Compact workload pills */}
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-slate-100 bg-slate-50/50 px-3 py-1.5">
+          {workload.dueToday > 0 && (
+            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-medium text-teal-800">
+              {workload.dueToday} today
+            </span>
+          )}
+          {workload.overdue > 0 && (
+            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800">
+              {workload.overdue} overdue
+            </span>
+          )}
+          {workload.blocked > 0 && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              {workload.blocked} blocked
+            </span>
+          )}
+          {workload.escalated > 0 && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              {workload.escalated} escalation
+            </span>
+          )}
+          <span className="text-[11px] text-slate-500">
+            {workload.dueThisWeek} this week · {workload.activeFamilies} families
+          </span>
+        </div>
+
+        {/* Main calendar area - key forces full re-render when range changes */}
+        <div
+          key={`${view}-${dateRange.start}-${dateRange.end}`}
+          className={cn("min-h-0 flex-1 overflow-auto", compact && "border border-slate-200 bg-white")}
+        >
           {view === "month" && (
             <MonthGrid
               dateRange={dateRange}
               eventsByDate={eventsByDate}
               onEventClick={setSelectedEvent}
+              compact={compact}
             />
           )}
           {view === "week" && (
@@ -222,19 +268,21 @@ export function CalendarView({
               dateRange={dateRange}
               eventsByDate={eventsByDate}
               onEventClick={setSelectedEvent}
+              compact={compact}
             />
           )}
           {view === "agenda" && (
             <AgendaList
               agendaGroups={agendaGroups}
               onEventClick={setSelectedEvent}
+              compact={compact}
             />
           )}
-        </Card>
+        </div>
       </div>
 
-      {/* Detail panel */}
-      <aside className="w-full shrink-0 lg:w-80">
+      {/* Detail panel - narrower when compact */}
+      <aside className={cn("shrink-0 border-l border-slate-200 bg-white", compact ? "w-64 lg:w-72" : "w-full lg:w-80")}>
         <EventDetailPanel
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
@@ -249,13 +297,18 @@ function EventChip({
   event,
   onClick,
   compact = false,
+  size = "default",
 }: {
   event: CalendarEvent;
   onClick: () => void;
   compact?: boolean;
+  size?: "default" | "tiny";
 }) {
-  const style = EVENT_TYPE_STYLES[event.event_type];
+  const familyColor = getFamilyColor(event.family_id);
+  const isCompleted = event.completed_flag;
   const displayTitle = event.action_needed_now || `${event.family_name}${event.step_title ? `: ${event.step_title}` : ""}`;
+  const isTiny = size === "tiny" || compact;
+
   return (
     <button
       type="button"
@@ -264,27 +317,26 @@ function EventChip({
         onClick();
       }}
       className={cn(
-        "w-full rounded-lg border px-2 py-1.5 text-left text-sm transition-all hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30",
-        style,
-        compact && "truncate py-1 text-xs",
+        "w-full rounded border border-l-4 px-1.5 py-0.5 text-left transition-all hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30",
+        isCompleted ? familyColor.muted : familyColor.bg,
+        familyColor.border,
+        isCompleted && "opacity-80",
+        isTiny ? "text-[11px] leading-tight" : "text-xs",
+        compact && "truncate",
       )}
+      title={`${event.family_name} — ${displayTitle}`}
     >
-      <span className="font-medium">{displayTitle}</span>
-      {!compact && (
-        <span className="mt-0.5 flex items-center gap-2">
-          <span className="text-xs opacity-80">
-            {EVENT_TYPE_LABELS[event.event_type]}
-          </span>
-          {event.stage && (
-            <span className="rounded bg-white/60 px-1 text-xs">
-              {event.stage}d
-            </span>
-          )}
+      <span className="font-medium text-slate-800">{displayTitle}</span>
+      {!compact && !isTiny && (
+        <span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-600">
+          {event.stage && <span>{event.stage}d</span>}
           {event.priority && event.priority !== "medium" && (
-            <span className="text-xs capitalize opacity-70">{event.priority}</span>
+            <span className="capitalize">{event.priority}</span>
           )}
+          {isCompleted && <span>✓</span>}
         </span>
       )}
+      {isTiny && isCompleted && <span className="ml-0.5 opacity-70">✓</span>}
     </button>
   );
 }
@@ -293,22 +345,24 @@ function MonthGrid({
   dateRange,
   eventsByDate,
   onEventClick,
+  compact = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
+  compact?: boolean;
 }) {
   const totalEvents = [...eventsByDate.values()].reduce((s, arr) => s + arr.length, 0);
   if (totalEvents === 0) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center p-12">
+      <div className="flex min-h-[300px] items-center justify-center p-8">
         <EmptyState
           title="No events this month"
-          description="Follow-up dates and step due dates from your plans will appear here. Set a follow-up date on a plan step to see it on the calendar."
+          description="Follow-up dates and step due dates from your plans will appear here."
           action={
             <Link
               href="/families"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+              className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline"
             >
               Open Families
             </Link>
@@ -318,17 +372,19 @@ function MonthGrid({
     );
   }
 
-  return <MonthGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} />;
+  return <MonthGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} compact={compact} />;
 }
 
 function MonthGridInner({
   dateRange,
   eventsByDate,
   onEventClick,
+  compact = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
+  compact?: boolean;
 }) {
   const start = new Date(dateRange.start + "T12:00:00");
   const end = new Date(dateRange.end + "T12:00:00");
@@ -352,11 +408,13 @@ function MonthGridInner({
     cells.push({ date: null, day: 0 });
   }
 
+  const maxEvents = compact ? 6 : 4;
+
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-7 gap-px text-center">
+    <div className={cn(compact ? "p-1" : "p-3")}>
+      <div className="grid min-h-[400px] grid-cols-7 gap-px bg-slate-200">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div key={d} className="bg-slate-100 py-2 text-xs font-medium text-slate-600">
+          <div key={d} className={cn("bg-slate-50 py-1 text-center font-medium text-slate-600", compact ? "text-[10px]" : "text-xs")}>
             {d}
           </div>
         ))}
@@ -364,27 +422,28 @@ function MonthGridInner({
           <div
             key={i}
             className={cn(
-              "min-h-[100px] border-b border-r border-slate-100 bg-white p-2 last:border-r-0",
-              !c.date && "bg-slate-50/50",
+              "min-h-0 overflow-hidden bg-white p-1",
+              !c.date && "bg-slate-50/70",
             )}
           >
             {c.date && (
               <>
                 <div
                   className={cn(
-                    "mb-1 inline-flex h-6 w-6 items-center justify-center text-xs font-medium",
-                    c.date === today && "rounded-full bg-teal-600 text-white",
+                    "mb-0.5 inline-flex items-center justify-center font-medium",
+                    compact ? "h-4 w-4 text-[10px]" : "h-5 w-5 text-xs",
+                    c.date === today && "rounded-full bg-blue-600 text-white",
                   )}
                 >
                   {c.day}
                 </div>
-                <div className="space-y-1">
-                  {(eventsByDate.get(c.date) ?? []).slice(0, 3).map((ev) => (
-                    <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} compact />
+                <div className="space-y-0.5 overflow-hidden">
+                  {(eventsByDate.get(c.date) ?? []).slice(0, maxEvents).map((ev) => (
+                    <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} compact size="tiny" />
                   ))}
-                  {(eventsByDate.get(c.date) ?? []).length > 3 && (
-                    <span className="text-xs text-slate-500">
-                      +{(eventsByDate.get(c.date) ?? []).length - 3} more
+                  {(eventsByDate.get(c.date) ?? []).length > maxEvents && (
+                    <span className="text-[10px] text-slate-500">
+                      +{(eventsByDate.get(c.date) ?? []).length - maxEvents}
                     </span>
                   )}
                 </div>
@@ -401,23 +460,22 @@ function WeekGrid({
   dateRange,
   eventsByDate,
   onEventClick,
+  compact = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
+  compact?: boolean;
 }) {
   const totalEvents = [...eventsByDate.values()].reduce((s, arr) => s + arr.length, 0);
   if (totalEvents === 0) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center p-12">
+      <div className="flex min-h-[300px] items-center justify-center p-8">
         <EmptyState
           title="No events this week"
           description="Set follow-up dates on plan steps to see them here."
           action={
-            <Link
-              href="/families"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
-            >
+            <Link href="/families" className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline">
               Open Families
             </Link>
           }
@@ -426,17 +484,19 @@ function WeekGrid({
     );
   }
 
-  return <WeekGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} />;
+  return <WeekGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} compact={compact} />;
 }
 
 function WeekGridInner({
   dateRange,
   eventsByDate,
   onEventClick,
+  compact = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
+  compact?: boolean;
 }) {
   const start = new Date(dateRange.start + "T12:00:00");
   const today = new Date().toISOString().slice(0, 10);
@@ -453,23 +513,23 @@ function WeekGridInner({
   }
 
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-7 gap-2">
+    <div className={cn("h-full p-2", compact ? "p-1" : "p-3")}>
+      <div className="grid h-full grid-cols-7 gap-1">
         {days.map(({ date, label }) => (
           <div
             key={date}
             className={cn(
-              "rounded-lg border p-3",
-              date === today ? "border-teal-300 bg-teal-50/50" : "border-slate-200 bg-white",
+              "min-h-0 overflow-auto rounded border p-2",
+              date === today ? "border-blue-400 bg-blue-50/50" : "border-slate-200 bg-white",
             )}
           >
-            <p className="mb-2 text-sm font-medium text-slate-700">{label}</p>
-            <div className="space-y-1">
+            <p className={cn("mb-1 font-medium text-slate-700", compact ? "text-[10px]" : "text-xs")}>{label}</p>
+            <div className="space-y-0.5">
               {(eventsByDate.get(date) ?? []).map((ev) => (
-                <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
+                <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} size="tiny" />
               ))}
               {(eventsByDate.get(date) ?? []).length === 0 && (
-                <p className="text-xs text-slate-400">No items</p>
+                <p className="text-[10px] text-slate-400">None</p>
               )}
             </div>
           </div>
@@ -482,38 +542,37 @@ function WeekGridInner({
 function AgendaList({
   agendaGroups,
   onEventClick,
+  compact = false,
 }: {
   agendaGroups: {
     overdue: CalendarEvent[];
-    today: CalendarEvent[];
-    tomorrow: CalendarEvent[];
-    thisWeek: CalendarEvent[];
-    later: CalendarEvent[];
+    byDate: { date: string; label: string; events: CalendarEvent[] }[];
   };
   onEventClick: (e: CalendarEvent) => void;
+  compact?: boolean;
 }) {
-  const sections = [
-    { title: "Overdue", events: agendaGroups.overdue, empty: "No overdue items" },
-    { title: "Today", events: agendaGroups.today, empty: "No items due today" },
-    { title: "Tomorrow", events: agendaGroups.tomorrow, empty: "No items tomorrow" },
-    { title: "This week", events: agendaGroups.thisWeek, empty: "Nothing this week" },
-    { title: "Later", events: agendaGroups.later, empty: "Nothing upcoming" },
-  ];
+  const overdueSection = { title: "Overdue", events: agendaGroups.overdue, empty: "None" };
+  const dateSections = agendaGroups.byDate.map((d) => ({
+    title: d.label,
+    events: d.events,
+    empty: "None" as const,
+  }));
+  const sections = overdueSection.events.length > 0
+    ? [overdueSection, ...dateSections]
+    : dateSections;
 
-  const total = agendaGroups.overdue.length + agendaGroups.today.length +
-    agendaGroups.tomorrow.length + agendaGroups.thisWeek.length + agendaGroups.later.length;
+  const total =
+    agendaGroups.overdue.length +
+    agendaGroups.byDate.reduce((sum, d) => sum + d.events.length, 0);
 
   if (total === 0) {
     return (
-      <div className="p-12">
+      <div className="p-8">
         <EmptyState
           title="No calendar items"
-          description="As you assign follow-up dates and work through plan steps, tasks will appear here. Try opening a family and setting a next follow-up date on a step."
+          description="Set follow-up dates on plan steps to see them here."
           action={
-            <Link
-              href="/families"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
-            >
+            <Link href="/families" className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline">
               Open Families
             </Link>
           }
@@ -525,16 +584,16 @@ function AgendaList({
   return (
     <div className="divide-y divide-slate-100">
       {sections.map(({ title, events, empty }) => (
-        <div key={title} className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">{title}</h3>
+        <div key={title} className={compact ? "p-2" : "p-3"}>
+          <h3 className={cn("mb-1.5 font-semibold text-slate-700", compact ? "text-[10px]" : "text-xs")}>{title}</h3>
           {events.length === 0 ? (
-            <p className="text-sm text-slate-500">{empty}</p>
+            <p className={cn("text-slate-500", compact ? "text-[10px]" : "text-xs")}>{empty}</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {events.map((ev) => (
                 <li key={ev.id}>
-                  <div className="flex items-start gap-3">
-                    <span className="shrink-0 text-xs text-slate-500">
+                  <div className="flex items-start gap-2">
+                    <span className={cn("shrink-0 text-slate-500", compact ? "text-[10px]" : "text-[11px]")}>
                       {new Date(ev.date).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -542,19 +601,14 @@ function AgendaList({
                       })}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <EventChip event={ev} onClick={() => onEventClick(ev)} />
-                      <p className="mt-1 text-xs text-slate-600">{ev.action_needed_now}</p>
+                      <EventChip event={ev} onClick={() => onEventClick(ev)} size="tiny" />
                       {(ev.blocked_flag || ev.escalated_flag) && (
-                        <div className="mt-1 flex gap-2">
+                        <div className="mt-0.5 flex gap-1">
                           {ev.blocked_flag && (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
-                              Blocked
-                            </span>
+                            <span className="rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-900">Blocked</span>
                           )}
                           {ev.escalated_flag && (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
-                              Escalation
-                            </span>
+                            <span className="rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-900">Escalation</span>
                           )}
                         </div>
                       )}
@@ -615,12 +669,13 @@ function EventDetailPanel({
     );
   }
 
+  const familyColor = getFamilyColor(event.family_id);
   const stepHref = event.step_id
     ? `/families/${event.family_id}#step-${event.step_id}`
     : `/families/${event.family_id}`;
 
   return (
-    <Card className="sticky top-6 rounded-xl border-slate-200/90 p-5 shadow-sm transition-shadow">
+    <Card className={cn("sticky top-6 rounded-xl border-slate-200/90 p-5 shadow-sm transition-shadow border-l-4", familyColor.border)}>
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-slate-900">Event details</h3>
         <Button variant="ghost" className="h-8 px-2" onClick={onClose}>
