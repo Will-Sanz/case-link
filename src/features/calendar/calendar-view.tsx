@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useMemo, useTransition, useEffect, useRef } from "react";
+import { useCallback, useState, useMemo, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,6 +11,7 @@ import type { FamilyListItem } from "@/types/family";
 import { cn } from "@/lib/utils/cn";
 import { getFamilyColor } from "@/lib/utils/family-colors";
 import { updatePlanStepActionItem } from "@/app/actions/plans";
+import { navigate, today, toSearchParams, type CalendarView as CalendarViewType } from "@/lib/utils/calendar-date";
 
 const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   follow_up_due: "Follow-up due",
@@ -23,38 +24,8 @@ const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   stage_milestone: "Stage",
 };
 
-function buildNavParams(
-  view: string,
-  dateRange: { start: string; end: string },
-  dir: "prev" | "next",
-): Record<string, string> {
-  if (view === "month") {
-    const parts = dateRange.start.split("-").map(Number);
-    const y = parts[0];
-    const m = parts[1] ?? 1;
-    const delta = dir === "next" ? 1 : -1;
-    const d = new Date(y, m - 1, 15);
-    d.setMonth(d.getMonth() + delta);
-    const newY = d.getFullYear();
-    const newM = String(d.getMonth() + 1).padStart(2, "0");
-    return { view, month: `${newY}-${newM}` };
-  }
-
-  const d = new Date(dateRange.start + "T12:00:00");
-  d.setDate(d.getDate() + (dir === "next" ? 7 : -7));
-  const newY = d.getFullYear();
-  const newM = String(d.getMonth() + 1).padStart(2, "0");
-  const newD = String(d.getDate()).padStart(2, "0");
-  return { view, date: `${newY}-${newM}-${newD}` };
-}
-
-function buildTodayParams(view: string): Record<string, string> {
-  const today = new Date().toISOString().slice(0, 10);
-  if (view === "month") {
-    const [y, m] = today.split("-");
-    return { view, month: `${y}-${m}` };
-  }
-  return { view, date: today };
+function toHref(view: CalendarViewType, currentDate: Date): string {
+  return `/calendar?${new URLSearchParams(toSearchParams(view, currentDate))}`;
 }
 
 type CalendarViewProps = {
@@ -68,7 +39,8 @@ type CalendarViewProps = {
     activeFamilies: number;
   };
   families: FamilyListItem[];
-  view: "month" | "week" | "agenda";
+  view: CalendarViewType;
+  currentDateKey: string;
   dateRange: { start: string; end: string };
   monthLabel: string;
   compact?: boolean;
@@ -79,6 +51,7 @@ export function CalendarView({
   workload,
   families,
   view,
+  currentDateKey,
   dateRange,
   monthLabel,
   compact = false,
@@ -86,19 +59,23 @@ export function CalendarView({
   const router = useRouter();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  const prevParams = useMemo(
-    () => buildNavParams(view, dateRange, "prev"),
-    [view, dateRange.start, dateRange.end],
+  const currentDate = useMemo(
+    () => new Date(currentDateKey + "T12:00:00"),
+    [currentDateKey],
   );
-  const nextParams = useMemo(
-    () => buildNavParams(view, dateRange, "next"),
-    [view, dateRange.start, dateRange.end],
-  );
-  const todayParams = useMemo(() => buildTodayParams(view), [view]);
 
-  const prevHref = `/calendar?${new URLSearchParams(prevParams)}`;
-  const nextHref = `/calendar?${new URLSearchParams(nextParams)}`;
-  const todayHref = `/calendar?${new URLSearchParams(todayParams)}`;
+  const prevHref = useMemo(
+    () => toHref(view, navigate(view, currentDate, "prev")),
+    [view, currentDateKey],
+  );
+  const nextHref = useMemo(
+    () => toHref(view, navigate(view, currentDate, "next")),
+    [view, currentDateKey],
+  );
+  const todayHref = useMemo(
+    () => toHref(view, today()),
+    [view],
+  );
 
   const handleNav = useCallback(
     (e: React.MouseEvent, href: string) => {
@@ -192,13 +169,7 @@ export function CalendarView({
           </div>
           <div className="flex items-center gap-1">
             {(["month", "week", "agenda"] as const).map((v) => {
-              const viewParams = {
-                view: v,
-                ...(v === "month"
-                  ? { month: dateRange.start.slice(0, 7) }
-                  : { date: dateRange.start }),
-              };
-              const viewHref = `/calendar?${new URLSearchParams(viewParams)}`;
+              const viewHref = toHref(v, currentDate);
               return (
                 <Link
                   key={v}
@@ -257,7 +228,6 @@ export function CalendarView({
               eventsByDate={eventsByDate}
               onEventClick={setSelectedEvent}
               compact={compact}
-              scrollToToday={dateRange.start.slice(0, 7) === new Date().toISOString().slice(0, 7)}
             />
           )}
           {view === "week" && (
@@ -343,13 +313,11 @@ function MonthGrid({
   eventsByDate,
   onEventClick,
   compact = false,
-  scrollToToday = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
   compact?: boolean;
-  scrollToToday?: boolean;
 }) {
   const totalEvents = [...eventsByDate.values()].reduce((s, arr) => s + arr.length, 0);
   if (totalEvents === 0) {
@@ -371,7 +339,7 @@ function MonthGrid({
     );
   }
 
-  return <MonthGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} compact={compact} scrollToToday={scrollToToday} />;
+  return <MonthGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} compact={compact} />;
 }
 
 function MonthGridInner({
@@ -379,20 +347,12 @@ function MonthGridInner({
   eventsByDate,
   onEventClick,
   compact = false,
-  scrollToToday = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
   compact?: boolean;
-  scrollToToday?: boolean;
 }) {
-  const todayRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (scrollToToday && todayRef.current) {
-      todayRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [scrollToToday]);
   const start = new Date(dateRange.start + "T12:00:00");
   const end = new Date(dateRange.end + "T12:00:00");
   const startDay = start.getDay();
@@ -428,7 +388,6 @@ function MonthGridInner({
         {cells.map((c, i) => (
           <div
             key={i}
-            ref={c.date === today ? todayRef : undefined}
             className={cn(
               "min-h-0 overflow-hidden bg-white p-1",
               !c.date && "bg-slate-50/70",

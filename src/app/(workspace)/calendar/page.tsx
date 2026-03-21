@@ -2,66 +2,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCalendarEvents } from "@/lib/services/calendar";
 import { listFamilies } from "@/lib/services/families";
 import { CalendarView } from "@/features/calendar/calendar-view";
+import {
+  parseCurrentDate,
+  getVisibleRange,
+  today,
+  type CalendarView as CalendarViewType,
+} from "@/lib/utils/calendar-date";
 
 export const dynamic = "force-dynamic";
-
-function getDateRange(
-  view: string,
-  monthParam: string | null,
-  dateParam: string | null,
-): { start: string; end: string; monthLabel: string } {
-  const now = new Date();
-  let start: Date;
-  let end: Date;
-
-  if (view === "agenda") {
-    const base = dateParam
-      ? new Date(dateParam + "T12:00:00")
-      : new Date();
-    start = new Date(base);
-    start.setDate(start.getDate() - 7);
-    end = new Date(base);
-    end.setDate(end.getDate() + 30);
-    const s = start.toISOString().slice(0, 10);
-    const e = end.toISOString().slice(0, 10);
-    return {
-      start: s,
-      end: e,
-      monthLabel: `${start.toLocaleDateString("en-US", { month: "short", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`,
-    };
-  }
-
-  if (view === "week") {
-    const base = dateParam ? new Date(dateParam + "T12:00:00") : new Date();
-    const day = base.getDay();
-    const diff = base.getDate() - day + (day === 0 ? -6 : 1); // Monday
-    start = new Date(base);
-    start.setDate(diff);
-    end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    const s = start.toISOString().slice(0, 10);
-    const e = end.toISOString().slice(0, 10);
-    return {
-      start: s,
-      end: e,
-      monthLabel: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
-    };
-  }
-
-  // month view
-  const [y, m] = monthParam
-    ? monthParam.split("-").map(Number)
-    : [now.getFullYear(), now.getMonth() + 1];
-  start = new Date(y, (m ?? now.getMonth() + 1) - 1, 1);
-  end = new Date(y, (m ?? now.getMonth() + 1), 0);
-  const s = start.toISOString().slice(0, 10);
-  const e = end.toISOString().slice(0, 10);
-  return {
-    start: s,
-    end: e,
-    monthLabel: start.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-  };
-}
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -69,14 +17,12 @@ type PageProps = {
 
 export default async function CalendarPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const view = (typeof params.view === "string" ? params.view : "agenda") as
-    | "month"
-    | "week"
-    | "agenda";
+  const view = (typeof params.view === "string" ? params.view : "month") as CalendarViewType;
   const monthParam = typeof params.month === "string" ? params.month : null;
   const dateParam = typeof params.date === "string" ? params.date : null;
 
-  const { start, end, monthLabel } = getDateRange(view, monthParam, dateParam);
+  const currentDate = parseCurrentDate(view, monthParam, dateParam);
+  const { start, end, monthLabel } = getVisibleRange(view, currentDate);
 
   const supabase = await createSupabaseServerClient();
 
@@ -85,8 +31,8 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     listFamilies(supabase, { q: "", page: 1, pageSize: 200 }),
   ]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const weekEnd = new Date();
+  const todayKey = today().toISOString().slice(0, 10);
+  const weekEnd = new Date(todayKey);
   weekEnd.setDate(weekEnd.getDate() + 7);
   const weekEndKey = weekEnd.toISOString().slice(0, 10);
 
@@ -101,8 +47,8 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     if (e.event_type === "overdue") overdue++;
     if (e.blocked_flag) blocked++;
     if (e.escalated_flag) escalated++;
-    if (e.date === today) dueToday++;
-    if (e.date >= today && e.date <= weekEndKey) dueThisWeek++;
+    if (e.date === todayKey) dueToday++;
+    if (e.date >= todayKey && e.date <= weekEndKey) dueThisWeek++;
   }
   const workload = {
     dueToday,
@@ -113,6 +59,8 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     activeFamilies: familyIds.size,
   };
 
+  const currentDateKey = currentDate.toISOString().slice(0, 10);
+
   return (
     <div className="-mx-4 -mb-8 -mt-8 flex min-h-[calc(100dvh-8rem)] flex-col sm:-mx-6 lg:-mb-10 lg:-mx-8 lg:-mt-10">
       <CalendarView
@@ -120,6 +68,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         workload={workload}
         families={familiesRes.items}
         view={view}
+        currentDateKey={currentDateKey}
         dateRange={{ start, end }}
         monthLabel={monthLabel}
         compact

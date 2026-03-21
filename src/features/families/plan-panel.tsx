@@ -531,7 +531,7 @@ export function PlanPanel({
   const [addDesc, setAddDesc] = useState("");
   const [modalStepId, setModalStepId] = useState<string | null>(null);
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
-  const [focusMode, setFocusMode] = useState(true);
+  const [focusMode, setFocusMode] = useState(false);
 
   function toggleExpand(stepId: string) {
     setExpandedStepIds((prev) => {
