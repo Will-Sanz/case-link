@@ -1,11 +1,20 @@
 import { z } from "zod";
 
+const emptyToUndef = (v: unknown) =>
+  v === "" || v === null || v === undefined ? undefined : v;
+
 export const familyListQuerySchema = z.object({
   q: z.string().max(200).optional().default(""),
-  status: z.enum(["active", "on_hold", "closed"]).optional(),
-  urgency: z.enum(["low", "medium", "high", "crisis"]).optional(),
-  page: z.coerce.number().int().min(1).optional().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+  status: z.preprocess(
+    emptyToUndef,
+    z.enum(["active", "on_hold", "closed"]).optional(),
+  ),
+  urgency: z.preprocess(
+    emptyToUndef,
+    z.enum(["low", "medium", "high", "crisis"]).optional(),
+  ),
+  page: z.coerce.number().int().min(1).catch(1),
+  pageSize: z.coerce.number().int().min(1).max(100).catch(20),
 });
 
 export type FamilyListQuery = z.infer<typeof familyListQuerySchema>;
@@ -27,11 +36,14 @@ export function parseFamilyListQuery(
     pageSize: first("pageSize"),
   });
 
-  if (parsed.success) return parsed.data;
+  if (parsed.success) {
+    return parsed.data;
+  }
 
-  return familyListQuerySchema.parse({
-    q: "",
+  const qRaw = first("q");
+  return {
+    q: typeof qRaw === "string" ? qRaw.slice(0, 200) : "",
     page: 1,
     pageSize: 20,
-  });
+  };
 }

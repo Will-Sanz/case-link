@@ -47,17 +47,6 @@ export type CaseNoteRow = {
   author: { email: string } | null;
 };
 
-export type ActivityLogRow = {
-  id: string;
-  family_id: string;
-  actor_user_id: string | null;
-  action: string;
-  entity_type: string | null;
-  entity_id: string | null;
-  details: unknown;
-  created_at: string;
-};
-
 export type MatchedResourceSummary = {
   id: string;
   slug: string;
@@ -133,7 +122,6 @@ export type FamilyDetail = {
   barriers: FamilyBarrierRow[];
   members: FamilyMemberRow[];
   caseNotes: CaseNoteRow[];
-  activity: ActivityLogRow[];
   resourceMatches: ResourceMatchRow[];
   plan: PlanWithSteps | null;
 };

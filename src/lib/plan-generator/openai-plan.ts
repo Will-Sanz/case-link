@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import type { FamilyDetail } from "@/types/family";
+import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, PlanPhase } from "./types";
 
 const aiStepSchema = z.object({
@@ -22,6 +23,8 @@ function shouldLogOpenAi(): boolean {
   return process.env.OPENAI_DEBUG === "1";
 }
 
+const AI_PROMPT_MATCH_LIMIT = 15;
+
 function buildFamilyContext(detail: FamilyDetail): string {
   const lines: string[] = [
     `Household name: ${detail.name}`,
@@ -35,7 +38,14 @@ function buildFamilyContext(detail: FamilyDetail): string {
       ? `Barriers:\n${detail.barriers.map((b) => `- ${b.label}${b.preset_key ? ` (${b.preset_key})` : ""}`).join("\n")}`
       : null,
   ].filter(Boolean) as string[];
-  return lines.join("\n\n");
+
+  const familyBlock = lines.join("\n\n");
+  const resourcesBlock = formatMatchesForAiPrompt(
+    detail.resourceMatches,
+    AI_PROMPT_MATCH_LIMIT,
+  );
+
+  return `${familyBlock}\n\n---\n\n${resourcesBlock}`;
 }
 
 /**
@@ -48,16 +58,24 @@ export async function tryGeneratePlanStepsWithOpenAI(
 ): Promise<OpenAiPlanResult> {
   const context = buildFamilyContext(detail);
   const system = `You are an experienced housing and social services case manager assistant in Philadelphia.
-Given a family's situation, produce a practical 30-60-90 day case plan.
+Given a family's situation and (when present) a ranked list of REAL community programs from their resource directory, produce a practical 30-60-90 day case plan.
 
 Rules:
 - Output ONLY valid JSON, no markdown. Shape: {"steps":[{"phase":"30"|"60"|"90","title":"...","description":"..."},...]}
 - phase "30" = first month priorities, "60" = next 30 days, "90" = following 30 days.
-- 3–12 steps total, spread across phases when appropriate. Each title is concise; description is actionable for a case manager.
-- Align steps with the stated goals and barriers; suggest concrete next actions (referrals, documentation, follow-ups).
-- Do not invent specific agency names unless they appear in the input; prefer generic program types when unsure.`;
+- 3–12 steps total, spread across phases. Each title is concise; description is operational (who to call, what to send, what to document).
 
-  const user = `Create a case plan for this family:\n\n${context}`;
+RESOURCE GROUNDING (critical):
+- When MATCHED_COMMUNITY_RESOURCES is provided, treat it as the PRIMARY basis for concrete actions. Most steps should name a specific program from that list and explain the next outreach step (call, email, intake, referral packet, follow-up date).
+- Use exact program names, office/department, and contact details from the list when you include them in descriptions.
+- Prefer "Contact [Program X] at [phone/email] to begin [intake/referral] for …" over generic advice like "seek legal help" or "explore workforce options".
+- If several resources fit one goal, assign clear priorities across phases (e.g. immediate stabilization in 30-day, follow-on in 60/90).
+- Do NOT invent organizations not in the matched list. If the list is empty or insufficient for a goal, use generic program-type language only for that gap.
+
+General:
+- Align with stated goals and barriers; steps should be doable by a case manager this week.`;
+
+  const user = `Create a case plan for this family. Ground steps in matched resources whenever they are listed below.\n\n${context}`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -73,7 +91,7 @@ Rules:
           { role: "user", content: user },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.4,
+        temperature: 0.35,
         max_tokens: 4096,
       }),
     });

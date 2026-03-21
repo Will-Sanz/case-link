@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   addManualResourceMatch,
   runResourceMatching,
@@ -37,6 +37,8 @@ function MatchStatusBadge({ status }: { status: ResourceMatchRow["status"] }) {
   return <Badge className={cls}>{status}</Badge>;
 }
 
+const MAX_VISIBLE_MATCHES = 10;
+
 export function ResourceMatchesPanel({
   familyId,
   matches,
@@ -52,6 +54,17 @@ export function ResourceMatchesPanel({
   const [searchResults, setSearchResults] = useState<
     { id: string; program_name: string; office_or_department: string }[]
   >([]);
+  const [showAllMatches, setShowAllMatches] = useState(false);
+
+  const actionableMatches = useMemo(
+    () => matches.filter((m) => m.status !== "dismissed"),
+    [matches],
+  );
+
+  const visibleMatches = useMemo(() => {
+    if (showAllMatches) return actionableMatches;
+    return actionableMatches.slice(0, MAX_VISIBLE_MATCHES);
+  }, [actionableMatches, showAllMatches]);
 
   function runMatch() {
     setError(null);
@@ -107,7 +120,7 @@ export function ResourceMatchesPanel({
     <Card>
       <SectionHeader
         title="Matched resources"
-        description="Ranked from goals, barriers, and family narrative (deterministic — no AI). Accept or dismiss suggestions; dismissed programs stay hidden on refresh runs."
+        description="Top matches are ranked by the matching engine (goals, barriers, narrative). The list shows the highest-priority suggestions first; accept or dismiss to triage."
         actions={
           <Button
             type="button"
@@ -134,9 +147,22 @@ export function ResourceMatchesPanel({
           No matches yet. Run matching to populate suggestions from the
           resource directory.
         </p>
+      ) : actionableMatches.length === 0 ? (
+        <p className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
+          All matches are dismissed. Run matching again for fresh suggestions,
+          or add a program manually below.
+        </p>
       ) : (
-        <ul className="mt-5 space-y-4">
-          {matches.map((m) => {
+        <>
+          {!showAllMatches &&
+          actionableMatches.length > MAX_VISIBLE_MATCHES ? (
+            <p className="mt-5 text-sm text-slate-600">
+              Showing the top {MAX_VISIBLE_MATCHES} matches by score. Use
+              &quot;Show all&quot; to see the full list.
+            </p>
+          ) : null}
+          <ul className="mt-4 space-y-4">
+          {visibleMatches.map((m) => {
             const r = m.resource;
             return (
               <li
@@ -215,7 +241,22 @@ export function ResourceMatchesPanel({
               </li>
             );
           })}
-        </ul>
+          </ul>
+          {actionableMatches.length > MAX_VISIBLE_MATCHES ? (
+            <div className="mt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-sm"
+                onClick={() => setShowAllMatches((v) => !v)}
+              >
+                {showAllMatches
+                  ? "Show top matches only"
+                  : `Show all ${actionableMatches.length} matches`}
+              </Button>
+            </div>
+          ) : null}
+        </>
       )}
 
       <div className="mt-8 border-t border-slate-200/80 pt-6">

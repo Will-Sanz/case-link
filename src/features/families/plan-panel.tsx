@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   createManualStep,
   deletePlanStep,
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeader } from "@/components/ui/section-header";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
+import { PlanStepModal } from "@/features/families/plan-step-modal";
 import type { PlanStepRow, PlanWithSteps } from "@/types/family";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -76,6 +77,7 @@ export function PlanPanel({
   const [addPhase, setAddPhase] = useState<"30" | "60" | "90">("30");
   const [addTitle, setAddTitle] = useState("");
   const [addDesc, setAddDesc] = useState("");
+  const [modalStepId, setModalStepId] = useState<string | null>(null);
 
   function handleGenerate() {
     setError(null);
@@ -161,7 +163,13 @@ export function PlanPanel({
     "90": plan?.steps.filter((s) => s.phase === "90") ?? [],
   };
 
+  const modalStep = useMemo(() => {
+    if (!plan || !modalStepId) return null;
+    return plan.steps.find((s) => s.id === modalStepId) ?? null;
+  }, [plan, modalStepId]);
+
   return (
+    <>
     <Card>
       <SectionHeader
         title="30 / 60 / 90 day plan"
@@ -292,11 +300,32 @@ export function PlanPanel({
                         </div>
                       ) : (
                         <>
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <p className="font-medium text-slate-900">
-                              {step.title}
-                            </p>
-                            <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={() => setModalStepId(step.id)}
+                                className="w-full rounded-lg p-1 -m-1 text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25"
+                              >
+                                <p className="font-medium text-slate-900">
+                                  {step.title}
+                                </p>
+                                {step.description ? (
+                                  <p className="mt-2 line-clamp-3 text-sm text-slate-600">
+                                    {step.description}
+                                  </p>
+                                ) : (
+                                  <p className="mt-2 text-xs text-slate-400">
+                                    No description — open to add context
+                                  </p>
+                                )}
+                                <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-800">
+                                  View details
+                                  <span aria-hidden>→</span>
+                                </span>
+                              </button>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
                               <StepStatusBadge
                                 status={step.status}
                                 onChange={(s) =>
@@ -322,11 +351,6 @@ export function PlanPanel({
                               </Button>
                             </div>
                           </div>
-                          {step.description ? (
-                            <p className="mt-2 text-sm text-slate-600">
-                              {step.description}
-                            </p>
-                          ) : null}
                         </>
                       )}
                     </li>
@@ -407,5 +431,16 @@ export function PlanPanel({
         </div>
       )}
     </Card>
+
+    {plan && modalStep ? (
+      <PlanStepModal
+        key={`${modalStep.id}-${modalStep.updated_at}`}
+        step={modalStep}
+        plan={plan}
+        familyId={familyId}
+        onClose={() => setModalStepId(null)}
+      />
+    ) : null}
+    </>
   );
 }

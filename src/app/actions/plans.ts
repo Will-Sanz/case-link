@@ -5,6 +5,10 @@ import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { generatePlanSteps } from "@/lib/plan-generator";
 import { tryGeneratePlanStepsWithOpenAI } from "@/lib/plan-generator/openai-plan";
+import {
+  generatedStepsFromMatches,
+  mergeResourceAndRulesSteps,
+} from "@/lib/plan-generator/resource-context";
 import { getFamilyDetail } from "@/lib/services/families";
 import {
   createManualStepSchema,
@@ -51,12 +55,17 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
       label: b.label,
     })),
   });
+  const resourceSteps = generatedStepsFromMatches(detail.resourceMatches);
+  const rulesStepsMerged = mergeResourceAndRulesSteps(
+    resourceSteps,
+    rulesSteps,
+  );
 
   const env = getEnv();
   const apiKey = env.OPENAI_API_KEY?.trim();
   const model = env.OPENAI_PLAN_MODEL?.trim() || "gpt-4o-mini";
 
-  let steps = rulesSteps;
+  let steps = rulesStepsMerged;
   let generationSource: "openai" | "rules" = "rules";
   let aiModel: string | null = null;
 
@@ -76,7 +85,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   const summary =
     generationSource === "openai"
       ? `Plan v${nextVersion} (AI: ${model})`
-      : `Plan v${nextVersion} (rules from goals & barriers)`;
+      : `Plan v${nextVersion} (rules + matched resources)`;
 
   const { data: plan, error: planErr } = await supabase
     .from("plans")

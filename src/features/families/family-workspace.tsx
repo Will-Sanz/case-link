@@ -168,82 +168,46 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         <div>
           <SectionLabel>Documentation</SectionLabel>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">
-            Notes & activity
+            Case notes
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Dated notes for the file and a read-only log of changes in this case.
+            Dated entries for the file after visits, calls, or partner contact.
           </p>
         </div>
-        <div className="space-y-6">
-          <Card>
-            <CardTitle>Case notes</CardTitle>
-            <div className="mt-5 border-b border-slate-100 pb-6">
-              <AddCaseNoteForm familyId={family.id} />
+        <Card>
+          <CardTitle>Case notes</CardTitle>
+          <div className="mt-5 border-b border-slate-100 pb-6">
+            <AddCaseNoteForm familyId={family.id} />
+          </div>
+          {family.caseNotes.length === 0 ? (
+            <div className="mt-6">
+              <EmptyState
+                className="border-slate-200/80 bg-slate-50/40 py-8"
+                title="No notes yet"
+                description="Add a dated entry above when you speak with the family or partners."
+              />
             </div>
-            {family.caseNotes.length === 0 ? (
-              <div className="mt-6">
-                <EmptyState
-                  className="border-slate-200/80 bg-slate-50/40 py-8"
-                  title="No notes yet"
-                  description="Add a dated entry above when you speak with the family or partners."
-                />
-              </div>
-            ) : (
-              <ul className="mt-6 space-y-5">
-                {family.caseNotes.map((n) => (
-                  <li
-                    key={n.id}
-                    className="border-l-2 border-teal-200 pl-4"
-                  >
-                    <p className="text-xs font-medium text-slate-500">
-                      {formatDt(n.created_at)}
-                      {n.author?.email ? (
-                        <span className="text-slate-400"> · {n.author.email}</span>
-                      ) : null}
-                    </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                      {n.body}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card>
-            <CardTitle>Activity</CardTitle>
-            {family.activity.length === 0 ? (
-              <div className="mt-4">
-                <EmptyState
-                  className="border-slate-200/80 bg-slate-50/40 py-8"
-                  title="No events yet"
-                  description="System activity will appear here as the case is updated."
-                />
-              </div>
-            ) : (
-              <ul className="mt-5 space-y-0">
-                {family.activity.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex gap-3 border-t border-slate-100 py-3 first:border-0 first:pt-0"
-                  >
-                    <span className="w-28 shrink-0 text-xs tabular-nums text-slate-500">
-                      {formatDt(a.created_at)}
-                    </span>
-                    <div className="min-w-0 text-sm">
-                      <span className="font-medium text-slate-900">
-                        {a.action}
-                      </span>
-                      {a.entity_type ? (
-                        <span className="text-slate-600"> · {a.entity_type}</span>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
+          ) : (
+            <ul className="mt-6 space-y-5">
+              {family.caseNotes.map((n) => (
+                <li
+                  key={n.id}
+                  className="border-l-2 border-teal-200 pl-4"
+                >
+                  <p className="text-xs font-medium text-slate-500">
+                    {formatDt(n.created_at)}
+                    {n.author?.email ? (
+                      <span className="text-slate-400"> · {n.author.email}</span>
+                    ) : null}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                    {n.body}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </section>
 
       <section className="space-y-4">

@@ -1,4 +1,4 @@
-import type { PlanPhase, StepTemplate } from "./types";
+import type { StepTemplate } from "./types";
 
 /** Maps preset keys to suggested plan step templates. Each key can yield multiple steps across phases. */
 const PRESET_STEPS: Record<string, StepTemplate[]> = {

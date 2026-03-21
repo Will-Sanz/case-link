@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  ActivityLogRow,
   CaseNoteRow,
   FamilyBarrierRow,
   FamilyDetail,
@@ -107,15 +106,8 @@ export async function getFamilyDetail(
     return null;
   }
 
-  const [
-    goalsRes,
-    barriersRes,
-    membersRes,
-    notesRes,
-    activityRes,
-    matchesRes,
-    planRes,
-  ] = await Promise.all([
+  const [goalsRes, barriersRes, membersRes, notesRes, matchesRes, planRes] =
+    await Promise.all([
     client
       .from("family_goals")
       .select("*")
@@ -146,12 +138,6 @@ export async function getFamilyDetail(
       .eq("family_id", familyId)
       .order("created_at", { ascending: false })
       .limit(50),
-    client
-      .from("activity_log")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("created_at", { ascending: false })
-      .limit(30),
     client.from("resource_matches").select(
       `
         id,
@@ -206,17 +192,13 @@ export async function getFamilyDetail(
     };
   }
 
-  for (const res of [
-    goalsRes,
-    barriersRes,
-    membersRes,
-    notesRes,
-    activityRes,
-    matchesRes,
-  ]) {
+  for (const res of [goalsRes, barriersRes, membersRes, notesRes, matchesRes]) {
     if (res.error) {
       throw new Error(res.error.message);
     }
+  }
+  if (planRes.error) {
+    throw new Error(planRes.error.message);
   }
 
   const f = fam as FamilyDetail & {
@@ -242,7 +224,6 @@ export async function getFamilyDetail(
     barriers: (barriersRes.data ?? []) as FamilyBarrierRow[],
     members: (membersRes.data ?? []) as FamilyMemberRow[],
     caseNotes: normalizeCaseNotes(notesRes.data ?? []),
-    activity: (activityRes.data ?? []) as ActivityLogRow[],
     resourceMatches: sortResourceMatches(
       normalizeResourceMatches(matchesRes.data ?? []),
     ),
