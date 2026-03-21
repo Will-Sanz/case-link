@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:import": "tsx scripts/import-resources.ts"
+    "db:import": "tsx scripts/import-resources.ts",
+    "db:create-admin": "tsx scripts/create-admin-user.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
