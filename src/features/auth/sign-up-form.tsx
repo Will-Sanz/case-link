@@ -38,8 +38,10 @@ export function SignUpForm() {
     setPending(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const origin = window.location.origin;
-      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(nextPath.startsWith("/") ? nextPath : "/dashboard")}`;
+      // Use production URL for email confirmation so the link always lands on production dashboard
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+      const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(nextPath.startsWith("/") ? nextPath : "/dashboard")}`;
 
       const { data, error: signError } = await supabase.auth.signUp({
         email: email.trim(),

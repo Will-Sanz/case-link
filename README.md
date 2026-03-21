@@ -10,6 +10,7 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 |----------|----------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser + server user-scoped client |
+| `NEXT_PUBLIC_APP_URL` | Yes (production) | Production URL (e.g. `https://homelessness-project.vercel.app`) — ensures email confirmation links redirect to production dashboard |
 | `SUPABASE_SERVICE_ROLE_KEY` | No (web app) | Server-only; required for `npm run db:import` only — bypasses RLS — never `NEXT_PUBLIC_*` or client code |
 | `OPENAI_API_KEY` | No | Server-only; when set, plan generation tries OpenAI first, then rules |
 | `OPENAI_PLAN_MODEL` | No | Chat model (default `gpt-4o-mini`) |
@@ -21,7 +22,8 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 2. **GitHub → Vercel** — Import the repo; framework preset **Next.js**. Build command `npm run build`, output default (`.next`). Session refresh and route protection run in **`src/proxy.ts`** (Next.js 16 **Node** proxy). A root `middleware.ts` on **Edge** previously caused `MIDDLEWARE_INVOCATION_FAILED` on Vercel with this Supabase setup; keep using `src/proxy.ts` next to `src/app`.
 3. **Environment variables** — In Vercel → Project → Settings → Environment Variables, add at least:
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_APP_URL` — your production URL (e.g. `https://homelessness-project.vercel.app`) so email confirmation links redirect to the dashboard  
    Use **Production** (and **Preview** if you use preview deploys). Redeploy after changing env vars.
 4. **Auth URLs** — In Supabase → Authentication → URL Configuration, set **Site URL** to your production origin (e.g. `https://your-app.vercel.app`) and add **Redirect URLs**: `https://your-app.vercel.app/auth/callback` (and preview URLs if needed).
 5. **Do not run CSV import on deploy** — `npm run db:import` is a **manual** script from your machine or CI with `SUPABASE_SERVICE_ROLE_KEY`; it is not part of the Next.js build. The app deploys fine without `data/resources-seed.csv` in the bundle.

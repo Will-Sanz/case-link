@@ -23,6 +23,7 @@ Set in Vercel → Project → Settings → Environment Variables (Production and
 |----------|----------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Browser + server user-scoped client |
+| `NEXT_PUBLIC_APP_URL` | **Yes** (production) | Production URL (e.g. `https://homelessness-project.vercel.app`) — used for email confirmation redirects so users land on dashboard after verifying |
 | `SUPABASE_SERVICE_ROLE_KEY` | No (web app) | Server-only; for `db:import` script only |
 | `OPENAI_API_KEY` | No | Plan generation |
 
