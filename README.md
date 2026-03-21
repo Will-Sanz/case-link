@@ -29,6 +29,8 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 
 **If every URL returns Vercel `404 NOT_FOUND`:** In Vercel → Project → Settings → General, set **Root Directory** to the repository root (leave empty or `.`), not `src`. The app lives under `src/app` and **`src/proxy.ts`** must resolve from that layout; a wrong root breaks routing.
 
+**If logs show `ReferenceError: __dirname is not defined`:** The proxy must not import from `next/server` (that pulls in `ua-parser-js`). This repo imports `NextRequest` / `NextResponse` from `next/dist/server/web/spec-extension/*` in `src/proxy.ts` and `src/lib/supabase/proxy.ts` only.
+
 ## Database schema (Supabase SQL)
 
 Schema lives in versioned migrations (apply in order):

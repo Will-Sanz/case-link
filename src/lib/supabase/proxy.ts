@@ -1,5 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/dist/server/web/spec-extension/request";
+import { NextResponse } from "next/dist/server/web/spec-extension/response";
+
+// Import NextRequest/NextResponse from spec-extension paths, not `next/server`, so we do not load
+// user-agent / ua-parser-js (uses `__dirname`, which is undefined in some proxy bundles).
 
 const PROTECTED_PREFIXES = ["/dashboard", "/families", "/resources", "/admin"];
 
