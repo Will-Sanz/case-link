@@ -58,6 +58,38 @@ export type ActivityLogRow = {
   created_at: string;
 };
 
+export type MatchedResourceSummary = {
+  id: string;
+  slug: string;
+  program_name: string;
+  office_or_department: string;
+  category: string | null;
+  primary_contact_name: string | null;
+  primary_contact_title: string | null;
+  primary_contact_email: string | null;
+  primary_contact_phone: string | null;
+  secondary_contact_name: string | null;
+  secondary_contact_email: string | null;
+  secondary_contact_phone: string | null;
+  recruit_for_grocery_giveaways: boolean | null;
+  tabling_at_events: boolean;
+  promotional_materials: boolean;
+  educational_workshops: boolean;
+  volunteer_recruitment_support: boolean;
+};
+
+export type ResourceMatchRow = {
+  id: string;
+  family_id: string;
+  resource_id: string;
+  match_reason: string;
+  score: number;
+  status: "suggested" | "accepted" | "dismissed";
+  created_at: string;
+  updated_at: string;
+  resource: MatchedResourceSummary | null;
+};
+
 export type FamilyDetail = {
   id: string;
   name: string;
@@ -74,4 +106,5 @@ export type FamilyDetail = {
   members: FamilyMemberRow[];
   caseNotes: CaseNoteRow[];
   activity: ActivityLogRow[];
+  resourceMatches: ResourceMatchRow[];
 };

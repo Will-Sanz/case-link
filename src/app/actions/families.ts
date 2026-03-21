@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAppUser } from "@/lib/auth/session";
+import { requireAppUser, requireAppUserWithClient } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   addCaseNoteSchema,
@@ -18,34 +18,52 @@ export type ActionResult =
 export async function createFamilyIntake(
   input: FamilyIntakeFormValues,
 ): Promise<ActionResult> {
-  const user = await requireAppUser();
   const parsed = familyIntakeFormSchema.safeParse(input);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => i.message).join("; ");
     return { ok: false, error: msg || "Invalid form data" };
   }
 
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch (e) {
+    if (e instanceof Error && e.message === "Unauthorized") {
+      return { ok: false, error: "Unauthorized" };
+    }
+    throw e;
+  }
+
   const v = normalizeIntakeForDb(parsed.data);
-  const supabase = await createSupabaseServerClient();
 
-  const { data: fam, error: famErr } = await supabase
-    .from("families")
-    .insert({
-      name: v.name,
-      summary: v.summary,
-      urgency: v.urgency,
-      household_notes: v.householdNotes,
-      status: "active",
-      created_by_id: user.id,
-    })
-    .select("id")
-    .single();
+  // Ownership is set in the DB from auth.uid() (RPC is SECURITY DEFINER, bypasses RLS on
+  // families INSERT while still binding created_by_id to the JWT — avoids client/PostgREST
+  // WITH CHECK mismatches).
+  const { data: familyIdRaw, error: famErr } = await supabase.rpc(
+    "create_family_intake_row",
+    {
+      p_name: v.name,
+      p_summary: v.summary,
+      p_urgency: v.urgency,
+      p_household_notes: v.householdNotes,
+      p_status: "active",
+    },
+  );
 
-  if (famErr || !fam) {
+  if (famErr || familyIdRaw == null) {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[createFamilyIntake] rpc error:", {
+        message: famErr?.message,
+        code: famErr?.code,
+        details: famErr?.details,
+        hint: famErr?.hint,
+      });
+    }
     return { ok: false, error: famErr?.message ?? "Could not create family" };
   }
 
-  const familyId = fam.id as string;
+  const familyId = familyIdRaw as string;
 
   const rollback = async () => {
     await supabase.from("families").delete().eq("id", familyId);

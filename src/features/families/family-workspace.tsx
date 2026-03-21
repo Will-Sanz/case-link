@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
 import { PhasePlaceholder } from "@/features/families/phase-placeholder";
+import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { UpdateFamilyForm } from "@/features/families/update-family-form";
 import type { FamilyDetail } from "@/types/family";
@@ -156,11 +157,12 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         )}
       </Card>
 
+      <ResourceMatchesPanel
+        familyId={family.id}
+        matches={family.resourceMatches}
+      />
+
       <div className="grid gap-4 md:grid-cols-2">
-        <PhasePlaceholder
-          title="Matched resources"
-          description="Deterministic matching and accept/dismiss will appear in Phase 3."
-        />
         <PhasePlaceholder
           title="30 / 60 / 90 day plan"
           description="Plan generation and editable steps ship in Phase 4."

@@ -14,9 +14,12 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 
 ## Database schema (Supabase SQL)
 
-Schema lives in versioned migrations:
+Schema lives in versioned migrations (apply in order):
 
 - `supabase/migrations/20260321000000_init_schema.sql`
+- `supabase/migrations/20260321120000_family_rls.sql`
+- `supabase/migrations/20260321140000_resource_matches_rls.sql`
+- `supabase/migrations/20260321160000_family_intake_rpc.sql` — `create_family_intake_row()` for new family rows (sets `created_by_id` from `auth.uid()` inside the DB)
 
 Apply it using either:
 
@@ -52,15 +55,24 @@ npm run dev
 
 Hand-maintained shapes live under `src/types/` (e.g. `database.ts`, `user-role.ts`). Optionally replace or augment with [generated types](https://supabase.com/docs/guides/api/generating-types) from your project.
 
-## Phase 2 — Families (current)
+## Phase 3 — Resource matching (current)
 
-Apply the family RLS migration after the base schema:
+Apply **`20260321140000_resource_matches_rls.sql`** so case managers can read/write **`resource_matches`** for families they can access.
 
-- `supabase/migrations/20260321120000_family_rls.sql`
+**Behavior:**
 
-This adds `can_access_family()` / `is_app_admin()` helpers and policies so **creators**, **assignees** (`family_case_managers`), and **admins** can work with families, goals, barriers, members, case notes, and activity log. It also extends **`app_users` read** so you can show creator / assignee / note-author emails in the UI.
+- **`src/lib/matching/engine.ts`** — Deterministic scorer: maps **preset goal/barrier keys** to category hints, text keywords, service flags, and light overlap between family narrative and resource `search_text` / program copy. **No embeddings, no OpenAI.**
+- **Run / refresh matching** — Deletes only **`suggested`** rows, re-inserts top matches; **never** re-suggests **`dismissed`** programs; leaves **`accepted`** as-is.
+- **Accept / dismiss** — Updates `match_status`; activity log events `matching.run`, `matching.accepted`, `matching.dismissed`, `matching.manual_add`.
+- **Manual add** — Search + **Add** upserts **`accepted`** (same `family_id` + `resource_id`); dismissed rows can be re-added this way. Search hides programs already linked as accepted or suggested.
 
-**Routes:** `/families` (list + filters), `/families/new` (intake: goals, barriers, members, notes), `/families/[id]` (overview editor, panels, case notes, activity, placeholders for later phases).
+UI: family workspace **Matched resources** panel (replaces the Phase 3 placeholder).
+
+## Phase 2 — Families
+
+**Migration:** `supabase/migrations/20260321120000_family_rls.sql` — `can_access_family()` / `is_app_admin()`, families + related tables, extended **`app_users` read** for list/detail.
+
+**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers/members, notes, activity; plan/referrals placeholders remain for Phases 4–5).
 
 ## Phase 1
 
@@ -102,9 +114,12 @@ The parser expects the **Google Sheets–style** header on row 2 (0-based index 
 - `src/app/(workspace)/` — authenticated shell (nav + `ensureAppUser`)
 - `src/components/ui/` — small reusable UI primitives
 - `src/features/` — auth, resources, families (intake, workspace)
-- `src/lib/services/` — Supabase query helpers (`resources.ts`, `families.ts`)
-- `src/app/actions/` — server actions (e.g. `families.ts`)
+- `src/lib/services/` — Supabase query helpers (`resources.ts`, `families.ts`, `resources-picker.ts`)
+- `src/lib/matching/` — deterministic resource matcher (no AI)
+- `src/app/actions/` — server actions (`families.ts`, `resource-matches.ts`)
 - `src/lib/db/resource-import/` — CSV parse/normalize/map → DB payload
 - `src/lib/validations/` — Zod schemas for query params
 
-**Matching, plans, referrals, tasks (Phases 3–5):** UI placeholders exist on the family page; logic ships in later phases.
+**Plans, referrals, tasks (Phases 4–5):** Placeholders remain on the family page.
+
+**Phase 3 matching** is rules-based; tune presets and weights in `src/lib/matching/engine.ts`.

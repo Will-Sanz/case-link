@@ -7,6 +7,8 @@ import type {
   FamilyGoalRow,
   FamilyListItem,
   FamilyMemberRow,
+  MatchedResourceSummary,
+  ResourceMatchRow,
 } from "@/types/family";
 import type { FamilyListQuery } from "@/lib/validations/family-list-query";
 
@@ -108,6 +110,7 @@ export async function getFamilyDetail(
     membersRes,
     notesRes,
     activityRes,
+    matchesRes,
   ] = await Promise.all([
     client
       .from("family_goals")
@@ -145,9 +148,47 @@ export async function getFamilyDetail(
       .eq("family_id", familyId)
       .order("created_at", { ascending: false })
       .limit(30),
+    client.from("resource_matches").select(
+      `
+        id,
+        family_id,
+        resource_id,
+        match_reason,
+        score,
+        status,
+        created_at,
+        updated_at,
+        resource:resources (
+          id,
+          slug,
+          program_name,
+          office_or_department,
+          category,
+          primary_contact_name,
+          primary_contact_title,
+          primary_contact_email,
+          primary_contact_phone,
+          secondary_contact_name,
+          secondary_contact_email,
+          secondary_contact_phone,
+          recruit_for_grocery_giveaways,
+          tabling_at_events,
+          promotional_materials,
+          educational_workshops,
+          volunteer_recruitment_support
+        )
+      `,
+    ).eq("family_id", familyId),
   ]);
 
-  for (const res of [goalsRes, barriersRes, membersRes, notesRes, activityRes]) {
+  for (const res of [
+    goalsRes,
+    barriersRes,
+    membersRes,
+    notesRes,
+    activityRes,
+    matchesRes,
+  ]) {
     if (res.error) {
       throw new Error(res.error.message);
     }
@@ -177,7 +218,51 @@ export async function getFamilyDetail(
     members: (membersRes.data ?? []) as FamilyMemberRow[],
     caseNotes: normalizeCaseNotes(notesRes.data ?? []),
     activity: (activityRes.data ?? []) as ActivityLogRow[],
+    resourceMatches: sortResourceMatches(
+      normalizeResourceMatches(matchesRes.data ?? []),
+    ),
   };
+}
+
+function normalizeResourceEmbed(
+  raw: MatchedResourceSummary | MatchedResourceSummary[] | null,
+): MatchedResourceSummary | null {
+  if (!raw) return null;
+  return Array.isArray(raw) ? raw[0] ?? null : raw;
+}
+
+function normalizeResourceMatches(rows: unknown[]): ResourceMatchRow[] {
+  return rows.map((raw) => {
+    const row = raw as ResourceMatchRow & {
+      resource?: MatchedResourceSummary | MatchedResourceSummary[] | null;
+    };
+    return {
+      id: row.id,
+      family_id: row.family_id,
+      resource_id: row.resource_id,
+      match_reason: row.match_reason,
+      score: row.score,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      resource: normalizeResourceEmbed(row.resource ?? null),
+    };
+  });
+}
+
+const STATUS_ORDER: Record<ResourceMatchRow["status"], number> = {
+  accepted: 0,
+  suggested: 1,
+  dismissed: 2,
+};
+
+function sortResourceMatches(rows: ResourceMatchRow[]): ResourceMatchRow[] {
+  return [...rows].sort((a, b) => {
+    const so = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+    if (so !== 0) return so;
+    if (b.score !== a.score) return b.score - a.score;
+    return a.created_at.localeCompare(b.created_at);
+  });
 }
 
 function normalizeCaseNotes(rows: unknown[]): CaseNoteRow[] {
