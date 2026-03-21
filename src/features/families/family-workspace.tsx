@@ -7,7 +7,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
 import { CaseActivityTimeline } from "@/features/families/case-activity-timeline";
-import { NeedsAttentionPanel } from "@/features/families/needs-attention-panel";
+import { CaseCommandCenter } from "@/features/families/case-command-center";
 import { PlanPanel } from "@/features/families/plan-panel";
 import { CaseAssistantPanel } from "@/features/families/case-assistant-panel";
 import { PhasePlaceholder } from "@/features/families/phase-placeholder";
@@ -143,21 +143,18 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         )}
       </div>
 
-      {/* Needs attention — workflow layer */}
+      {/* Action command center — what to do right now, one-click into work */}
       {family.needsAttention && family.needsAttention.length > 0 ? (
-        <NeedsAttentionPanel items={family.needsAttention} familyId={family.id} />
+        <CaseCommandCenter items={family.needsAttention} familyId={family.id} />
       ) : null}
 
-      {/* 30/60/90 plan — primary action surface, command center */}
+      {/* Current step workspace + full plan — primary work surface */}
       <PlanPanel
         familyId={family.id}
         plan={family.plan ?? null}
         familyName={family.name}
         resourceMatches={family.resourceMatches}
       />
-
-      {/* Case-level AI assistant */}
-      <CaseAssistantPanel familyId={family.id} familyName={family.name} />
 
       <section className="space-y-4">
         <div>
@@ -332,6 +329,9 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
           description="Outreach tracking and tasks land in Phase 5."
         />
       </section>
+
+      {/* Case assistant — secondary, for custom questions */}
+      <CaseAssistantPanel familyId={family.id} familyName={family.name} />
     </div>
   );
 }

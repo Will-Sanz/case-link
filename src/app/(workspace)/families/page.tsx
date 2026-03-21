@@ -33,9 +33,12 @@ function FamilyCard({
   f: Awaited<ReturnType<typeof enrichFamiliesWithCurrentStep>>[0];
   formatDt: (iso: string) => string;
 }) {
+  const caseHref = f.current_step
+    ? `/families/${f.id}#step-${f.current_step.id}`
+    : `/families/${f.id}`;
   return (
     <li>
-      <Link href={`/families/${f.id}`} className="block">
+      <Link href={caseHref} className="block">
         <Card className="group p-0 transition-shadow hover:border-slate-300/90 hover:shadow-md">
           <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start">
             <div className="min-w-0 flex-1">

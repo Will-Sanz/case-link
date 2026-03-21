@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   createManualStep,
   deletePlanStep,
@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
+import { InlineStepAiHelp } from "@/features/families/inline-step-ai-help";
 import { PlanStepModal } from "@/features/families/plan-step-modal";
 import { PlanPdfExport } from "@/features/families/plan-pdf-export";
 import type {
@@ -229,6 +230,7 @@ function StepPreview({
   checklistPending,
   onToggleActionItem,
   familyName,
+  familyId,
 }: {
   step: PlanStepRow;
   expanded: boolean;
@@ -242,6 +244,7 @@ function StepPreview({
   checklistPending?: boolean;
   onToggleActionItem?: (actionItemId: string, completed: boolean) => void;
   familyName?: string;
+  familyId?: string;
 }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data;
@@ -496,6 +499,13 @@ function StepPreview({
           pending={checklistPending}
         />
       ) : null}
+      {expanded && familyId ? (
+        <InlineStepAiHelp
+          step={step}
+          familyId={familyId}
+          isBlocked={step.status === "blocked"}
+        />
+      ) : null}
       {resourceMatches && resourceMatches.length > 0 ? (
         <LinkedResources stepId={step.id} matches={resourceMatches} />
       ) : null}
@@ -532,6 +542,29 @@ export function PlanPanel({
   const [modalStepId, setModalStepId] = useState<string | null>(null);
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
   const [focusMode, setFocusMode] = useState(false);
+  const hashScrolledRef = useRef(false);
+
+  useEffect(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const match = hash.match(/^#step-(.+)$/);
+    if (match) {
+      const stepId = match[1];
+      setExpandedStepIds((prev) => new Set(prev).add(stepId));
+      setFocusMode(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (hashScrolledRef.current) return;
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const match = hash.match(/^#step-(.+)$/);
+    if (!match || !expandedStepIds.has(match[1])) return;
+    const el = document.getElementById(`step-${match[1]}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      hashScrolledRef.current = true;
+    }
+  }, [expandedStepIds]);
 
   function toggleExpand(stepId: string) {
     setExpandedStepIds((prev) => {
@@ -687,17 +720,17 @@ export function PlanPanel({
         className="rounded-2xl border-2 border-teal-100 bg-white shadow-lg shadow-slate-900/[0.04]"
         id="plan-section"
       >
-        <div className="border-b border-slate-100 bg-gradient-to-br from-teal-50/80 to-white px-6 py-5 sm:px-8 sm:py-6">
+        <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 sm:px-8 sm:py-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-teal-700">
-                Action plan
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Plan
               </p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
                 30 / 60 / 90 day plan
               </h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Step-by-step guidance for the family. Generate with AI, edit as needed, and share as a PDF.
+              <p className="mt-1 max-w-2xl text-sm text-slate-600">
+                Expand a step to work on it — AI help, checklist, and actions are inline.
               </p>
               {plan && totalCount > 0 ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -949,6 +982,7 @@ export function PlanPanel({
                                               checklistPending={pending}
                                               onToggleActionItem={handleToggleActionItem}
                                               familyName={familyName}
+                                              familyId={familyId}
                                             />
                                           </div>
                                           {hasRichContent && !isExpanded ? (

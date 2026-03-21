@@ -19,7 +19,7 @@ export function CaseAssistantPanel({
   const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   function ask(q: string) {
     if (!q.trim()) return;
@@ -52,7 +52,7 @@ export function CaseAssistantPanel({
               Case Assistant
             </p>
             <p className="text-xs text-slate-500">
-              AI help for {familyName}
+              Ask for more help
             </p>
           </div>
         </div>

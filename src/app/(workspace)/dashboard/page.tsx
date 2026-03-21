@@ -84,18 +84,18 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-10">
       <PageHeader
-        title="Dashboard"
-        description="Your daily command center. What needs action now, who to follow up with, and what's blocked."
+        title="Today"
+        description="Your work queue. What needs action now, who to follow up with, and what's blocked."
       />
 
       <SummaryCounts counts={summaryCounts} />
 
-      <section className="space-y-4">
+      <section id="today" className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-          Families needing attention
+          Action queue
         </h2>
         <p className="text-sm text-slate-600">
-          Cases with overdue steps, follow-ups due, blockers, or escalation.
+          Due today, overdue, blocked — click to open the exact step.
         </p>
         {familiesNeedingAttention.length > 0 ? (
           <DashboardFamilyCards families={familiesNeedingAttention} />
@@ -120,10 +120,10 @@ export default async function DashboardPage() {
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-          Actionable now
+          Quick actions
         </h2>
         <p className="text-sm text-slate-600">
-          The highest-priority actions across your caseload.
+          Highest-priority items — one click to open the step.
         </p>
         {actionableItems.length > 0 ? (
           <ActionableNowList items={actionableItems} />

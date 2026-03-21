@@ -26,7 +26,7 @@ export function AppShell({
           </span>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-3" aria-label="Main">
-          <NavLink href="/dashboard">Dashboard</NavLink>
+          <NavLink href="/dashboard">Today</NavLink>
           <NavLink href="/families">Families</NavLink>
           <NavLink href="/calendar">Calendar</NavLink>
           <NavLink href="/resources">Resources</NavLink>
@@ -71,7 +71,7 @@ export function AppShell({
             aria-label="Main"
           >
             <NavLink href="/dashboard" className="shrink-0 whitespace-nowrap">
-              Dashboard
+              Today
             </NavLink>
             <NavLink href="/families" className="shrink-0 whitespace-nowrap">
               Families
