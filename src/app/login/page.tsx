@@ -9,6 +9,8 @@ type PageProps = {
   searchParams: Promise<{ next?: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function LoginPage({ searchParams }: PageProps) {
   const user = await getSessionUser();
   if (user) {

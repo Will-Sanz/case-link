@@ -10,7 +10,22 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 |----------|----------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser + server user-scoped client |
-| `SUPABASE_SERVICE_ROLE_KEY` | For imports / admin automation only | Server-only; bypasses RLS — never expose to the client |
+| `SUPABASE_SERVICE_ROLE_KEY` | No (web app) | Server-only; required for `npm run db:import` only — bypasses RLS — never `NEXT_PUBLIC_*` or client code |
+| `OPENAI_API_KEY` | No | Server-only; when set, plan generation tries OpenAI first, then rules |
+| `OPENAI_PLAN_MODEL` | No | Chat model (default `gpt-4o-mini`) |
+| `OPENAI_DEBUG` | No | Set to `1` for extra server logs around plan generation |
+
+## Deploying to Vercel
+
+1. **Supabase first** — Create/link a project and run all migrations in `supabase/migrations/` in filename order (CLI `supabase db push` or SQL Editor). The app will not function without a matching schema + RLS.
+2. **GitHub → Vercel** — Import the repo; framework preset **Next.js**. Build command `npm run build`, output default (`.next`).
+3. **Environment variables** — In Vercel → Project → Settings → Environment Variables, add at least:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
+   Use **Production** (and **Preview** if you use preview deploys). Redeploy after changing env vars.
+4. **Auth URLs** — In Supabase → Authentication → URL Configuration, set **Site URL** to your production origin (e.g. `https://your-app.vercel.app`) and add **Redirect URLs**: `https://your-app.vercel.app/auth/callback` (and preview URLs if needed).
+5. **Do not run CSV import on deploy** — `npm run db:import` is a **manual** script from your machine or CI with `SUPABASE_SERVICE_ROLE_KEY`; it is not part of the Next.js build. The app deploys fine without `data/resources-seed.csv` in the bundle.
+6. **Post-deploy** — Sign up a user, promote to admin in SQL if needed (`update public.app_users set role = 'admin' where email = '…'`). Optionally run `npm run db:import` locally against production if you need resource rows.
 
 ## Database schema (Supabase SQL)
 
@@ -64,7 +79,7 @@ Apply **`20260321140000_resource_matches_rls.sql`** so case managers can read/wr
 
 - **`src/lib/matching/engine.ts`** — Deterministic scorer: maps **preset goal/barrier keys** to category hints, text keywords, service flags, and light overlap between family narrative and resource `search_text` / program copy. **No embeddings, no OpenAI.**
 - **Run / refresh matching** — Deletes only **`suggested`** rows, re-inserts top matches; **never** re-suggests **`dismissed`** programs; leaves **`accepted`** as-is.
-- **Accept / dismiss** — Updates `match_status`; activity log events `matching.run`, `matching.accepted`, `matching.dismissed`, `matching.manual_add`.
+- **Accept / dismiss** — Updates `match_status`; server actions also append rows to **`activity_log`** (`matching.run`, `matching.accepted`, `matching.dismissed`, `matching.manual_add`).
 - **Manual add** — Search + **Add** upserts **`accepted`** (same `family_id` + `resource_id`); dismissed rows can be re-added this way. Search hides programs already linked as accepted or suggested.
 
 UI: family workspace **Matched resources** panel (replaces the Phase 3 placeholder).
@@ -75,7 +90,7 @@ UI: family workspace **Matched resources** panel (replaces the Phase 3 placehold
 
 **Behavior:**
 
-- **`src/lib/plan-generator/`** — Rules-based step templates: preset goal/barrier keys map to suggested steps (30-day, 60-day, 90-day phases). No AI.
+- **`src/lib/plan-generator/`** — Rules-based step templates: preset goal/barrier keys map to suggested steps (30-day, 60-day, 90-day phases). Used when OpenAI is unavailable or returns nothing.
 - **Generate plan** — If `OPENAI_API_KEY` is set, tries **OpenAI** first (`OPENAI_PLAN_MODEL`, default `gpt-4o-mini`); on failure or missing key, uses **rules** from goals/barriers. Regenerate creates a new version.
 - **Debug** — Set `OPENAI_DEBUG=1` in `.env.local` to log token usage and any rules fallback (see `[openai-plan]` / `[generatePlan]` in the terminal).
 - **Edit steps** — Update title, description, status (pending, in_progress, completed, blocked).
@@ -88,7 +103,7 @@ UI: family workspace **30 / 60 / 90 day plan** panel.
 
 **Migration:** `supabase/migrations/20260321120000_family_rls.sql` — `can_access_family()` / `is_app_admin()`, families + related tables, extended **`app_users` read** for list/detail.
 
-**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers/members, notes, activity, plan; referrals placeholder for Phase 5).
+**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers, household members, case notes, matched resources, plan; referrals placeholder for Phase 5).
 
 ## Phase 1
 
@@ -107,7 +122,7 @@ For **email confirmation**, add your redirect URL under **Authentication → URL
 | `/dashboard` | Stats, recent families, quick links |
 | `/families` | List / search / filter families |
 | `/families/new` | Intake (goals, barriers, members, notes) |
-| `/families/[id]` | Family workspace (overview, notes, activity, matched resources, plan; referrals stubbed) |
+| `/families/[id]` | Family workspace (overview, case notes, matched resources, plan; referrals stubbed) |
 | `/resources` | Search/filter/paginate active resources |
 | `/resources/[id]` | Full resource / contact / service-flag detail |
 

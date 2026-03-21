@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { getEnv } from "@/lib/env";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Completes email confirmation / OAuth flows (code exchange → session cookies).
  */
