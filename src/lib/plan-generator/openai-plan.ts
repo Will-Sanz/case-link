@@ -18,6 +18,10 @@ export type OpenAiPlanResult =
   | { ok: true; steps: GeneratedStep[]; model: string }
   | { ok: false; reason: string };
 
+function shouldLogOpenAi(): boolean {
+  return process.env.OPENAI_DEBUG === "1";
+}
+
 function buildFamilyContext(detail: FamilyDetail): string {
   const lines: string[] = [
     `Household name: ${detail.name}`,
@@ -76,6 +80,9 @@ Rules:
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
+      if (shouldLogOpenAi()) {
+        console.info("[openai-plan] HTTP", res.status, errText.slice(0, 300));
+      }
       return {
         ok: false,
         reason: `OpenAI HTTP ${res.status}: ${errText.slice(0, 200)}`,
@@ -84,9 +91,18 @@ Rules:
 
     const data = (await res.json()) as {
       choices?: { message?: { content?: string | null } }[];
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      };
     };
+
     const raw = data.choices?.[0]?.message?.content;
     if (!raw || typeof raw !== "string") {
+      if (shouldLogOpenAi()) {
+        console.info("[openai-plan] empty response:", data);
+      }
       return { ok: false, reason: "Empty OpenAI response" };
     }
 
@@ -94,12 +110,33 @@ Rules:
     try {
       parsed = JSON.parse(raw);
     } catch {
+      if (shouldLogOpenAi()) {
+        console.info("[openai-plan] ← JSON.parse failed on assistant content");
+      }
       return { ok: false, reason: "OpenAI returned invalid JSON" };
     }
 
     const validated = aiResponseSchema.safeParse(parsed);
     if (!validated.success) {
+      if (shouldLogOpenAi()) {
+        console.info(
+          "[openai-plan] validation failed:",
+          validated.error.message,
+          JSON.stringify(parsed).slice(0, 500),
+        );
+      }
       return { ok: false, reason: "OpenAI JSON did not match expected shape" };
+    }
+
+    if (shouldLogOpenAi()) {
+      const usage = data.usage;
+      console.info(
+        "[openai-plan]",
+        validated.data.steps.length,
+        "steps,",
+        usage?.total_tokens ?? "?",
+        "tokens",
+      );
     }
 
     const phaseOrder: PlanPhase[] = ["30", "60", "90"];

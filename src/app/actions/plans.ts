@@ -60,12 +60,16 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   let generationSource: "openai" | "rules" = "rules";
   let aiModel: string | null = null;
 
+  const debugPlan = process.env.OPENAI_DEBUG === "1";
+
   if (apiKey) {
     const ai = await tryGeneratePlanStepsWithOpenAI(detail, apiKey, model);
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;
       generationSource = "openai";
       aiModel = ai.model;
+    } else if (debugPlan && !ai.ok) {
+      console.info("[generatePlan] OpenAI failed, rules fallback:", ai.reason);
     }
   }
 

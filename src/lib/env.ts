@@ -13,6 +13,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   /** Chat model for plan generation (default gpt-4o-mini). */
   OPENAI_PLAN_MODEL: z.string().optional(),
+  /** Set to "1" to log OpenAI request/response in any NODE_ENV. */
+  OPENAI_DEBUG: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

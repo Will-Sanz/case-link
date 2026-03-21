@@ -77,6 +77,7 @@ UI: family workspace **Matched resources** panel (replaces the Phase 3 placehold
 
 - **`src/lib/plan-generator/`** — Rules-based step templates: preset goal/barrier keys map to suggested steps (30-day, 60-day, 90-day phases). No AI.
 - **Generate plan** — If `OPENAI_API_KEY` is set, tries **OpenAI** first (`OPENAI_PLAN_MODEL`, default `gpt-4o-mini`); on failure or missing key, uses **rules** from goals/barriers. Regenerate creates a new version.
+- **Debug** — Set `OPENAI_DEBUG=1` in `.env.local` to log token usage and any rules fallback (see `[openai-plan]` / `[generatePlan]` in the terminal).
 - **Edit steps** — Update title, description, status (pending, in_progress, completed, blocked).
 - **Add manual step** — Add custom steps to any phase.
 - **Delete step** — Remove steps from the plan.
