@@ -20,7 +20,7 @@ export async function createSupabaseServerClient() {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // Called from a Server Component without mutable cookies; middleware refreshes session.
+            // Called from a Server Component without mutable cookies; root proxy refreshes session.
           }
         },
       },

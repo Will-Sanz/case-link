@@ -18,7 +18,7 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 ## Deploying to Vercel
 
 1. **Supabase first** — Create/link a project and run all migrations in `supabase/migrations/` in filename order (CLI `supabase db push` or SQL Editor). The app will not function without a matching schema + RLS.
-2. **GitHub → Vercel** — Import the repo; framework preset **Next.js**. Build command `npm run build`, output default (`.next`).
+2. **GitHub → Vercel** — Import the repo; framework preset **Next.js**. Build command `npm run build`, output default (`.next`). Session refresh and route protection run in **`src/proxy.ts`** (Next.js 16 **Node** proxy). A root `middleware.ts` on **Edge** previously caused `MIDDLEWARE_INVOCATION_FAILED` on Vercel with this Supabase setup; keep using `src/proxy.ts` next to `src/app`.
 3. **Environment variables** — In Vercel → Project → Settings → Environment Variables, add at least:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
