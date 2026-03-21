@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
+import { PlanPanel } from "@/features/families/plan-panel";
 import { PhasePlaceholder } from "@/features/families/phase-placeholder";
 import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
@@ -162,16 +163,12 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         matches={family.resourceMatches}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <PhasePlaceholder
-          title="30 / 60 / 90 day plan"
-          description="Plan generation and editable steps ship in Phase 4."
-        />
-        <PhasePlaceholder
-          title="Referrals & tasks"
-          description="Outreach tracking and tasks land in Phase 5."
-        />
-      </div>
+      <PlanPanel familyId={family.id} plan={family.plan ?? null} />
+
+      <PhasePlaceholder
+        title="Referrals & tasks"
+        description="Outreach tracking and tasks land in Phase 5."
+      />
     </div>
   );
 }

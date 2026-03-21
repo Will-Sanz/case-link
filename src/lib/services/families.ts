@@ -8,6 +8,9 @@ import type {
   FamilyListItem,
   FamilyMemberRow,
   MatchedResourceSummary,
+  PlanRow,
+  PlanStepRow,
+  PlanWithSteps,
   ResourceMatchRow,
 } from "@/types/family";
 import type { FamilyListQuery } from "@/lib/validations/family-list-query";
@@ -111,6 +114,7 @@ export async function getFamilyDetail(
     notesRes,
     activityRes,
     matchesRes,
+    planRes,
   ] = await Promise.all([
     client
       .from("family_goals")
@@ -179,7 +183,28 @@ export async function getFamilyDetail(
         )
       `,
     ).eq("family_id", familyId),
+    client
+      .from("plans")
+      .select("id, family_id, version, summary, generation_source, ai_model, created_at")
+      .eq("family_id", familyId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  let plan: PlanWithSteps | null = null;
+  if (planRes.data) {
+    const p = planRes.data as PlanRow;
+    const { data: stepsData } = await client
+      .from("plan_steps")
+      .select("*")
+      .eq("plan_id", p.id)
+      .order("sort_order", { ascending: true });
+    plan = {
+      ...p,
+      steps: (stepsData ?? []) as PlanStepRow[],
+    };
+  }
 
   for (const res of [
     goalsRes,
@@ -221,6 +246,7 @@ export async function getFamilyDetail(
     resourceMatches: sortResourceMatches(
       normalizeResourceMatches(matchesRes.data ?? []),
     ),
+    plan,
   };
 }
 

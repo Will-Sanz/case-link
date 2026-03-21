@@ -1,10 +1,10 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import { requireAppUser } from "@/lib/auth/session";
+import { requireAppUserWithClient } from "@/lib/auth/session";
 import { rankResourcesForFamily } from "@/lib/matching/engine";
 import type { FamilyMatchInput, MatchableResource } from "@/lib/matching/types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getFamilyDetail } from "@/lib/services/families";
 import { searchResourcesForPicker } from "@/lib/services/resources-picker";
 import {
@@ -18,12 +18,12 @@ import type { ResourcePickerRow } from "@/lib/services/resources-picker";
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 async function logActivity(
+  supabase: SupabaseClient,
   familyId: string,
   userId: string,
   action: string,
   details?: Record<string, unknown>,
 ) {
-  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("activity_log").insert({
     family_id: familyId,
     actor_user_id: userId,
@@ -35,14 +35,20 @@ async function logActivity(
 }
 
 export async function runResourceMatching(input: unknown): Promise<ActionResult> {
-  const user = await requireAppUser();
   const parsed = runMatchingSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
 
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
   const { familyId } = parsed.data;
-  const supabase = await createSupabaseServerClient();
 
   const detail = await getFamilyDetail(supabase, familyId);
   if (!detail) {
@@ -134,7 +140,7 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
     }
   }
 
-  await logActivity(familyId, user.id, "matching.run", {
+  await logActivity(supabase, familyId, user.id, "matching.run", {
     suggestions: toInsert.length,
     evaluated: resources.length,
   });
@@ -146,14 +152,20 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
 export async function updateResourceMatchStatus(
   input: unknown,
 ): Promise<ActionResult> {
-  const user = await requireAppUser();
   const parsed = updateMatchStatusSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
 
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
   const { matchId, familyId, status } = parsed.data;
-  const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase
     .from("resource_matches")
@@ -165,20 +177,26 @@ export async function updateResourceMatchStatus(
     return { ok: false, error: error.message };
   }
 
-  await logActivity(familyId, user.id, `matching.${status}`, { matchId });
+  await logActivity(supabase, familyId, user.id, `matching.${status}`, { matchId });
   revalidatePath(`/families/${familyId}`);
   return { ok: true };
 }
 
 export async function addManualResourceMatch(input: unknown): Promise<ActionResult> {
-  const user = await requireAppUser();
   const parsed = addManualMatchSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
 
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
   const { familyId, resourceId } = parsed.data;
-  const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase.from("resource_matches").upsert(
     {
@@ -195,7 +213,7 @@ export async function addManualResourceMatch(input: unknown): Promise<ActionResu
     return { ok: false, error: error.message };
   }
 
-  await logActivity(familyId, user.id, "matching.manual_add", { resourceId });
+  await logActivity(supabase, familyId, user.id, "matching.manual_add", { resourceId });
   revalidatePath(`/families/${familyId}`);
   return { ok: true };
 }
@@ -203,13 +221,17 @@ export async function addManualResourceMatch(input: unknown): Promise<ActionResu
 export async function searchResourcesAction(
   input: unknown,
 ): Promise<{ ok: true; items: ResourcePickerRow[] } | { ok: false; error: string }> {
-  await requireAppUser();
   const parsed = searchResourcesSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid search" };
   }
 
-  const supabase = await createSupabaseServerClient();
+  let supabase;
+  try {
+    ({ supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
   try {
     const items = await searchResourcesForPicker(supabase, parsed.data.q);
     return { ok: true, items };

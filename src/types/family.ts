@@ -90,6 +90,34 @@ export type ResourceMatchRow = {
   resource: MatchedResourceSummary | null;
 };
 
+export type PlanStepRow = {
+  id: string;
+  plan_id: string;
+  phase: "30" | "60" | "90";
+  title: string;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+  due_date: string | null;
+  assigned_to_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlanRow = {
+  id: string;
+  family_id: string;
+  version: number;
+  summary: string | null;
+  generation_source: string;
+  ai_model: string | null;
+  created_at: string;
+};
+
+export type PlanWithSteps = PlanRow & {
+  steps: PlanStepRow[];
+};
+
 export type FamilyDetail = {
   id: string;
   name: string;
@@ -107,4 +135,5 @@ export type FamilyDetail = {
   caseNotes: CaseNoteRow[];
   activity: ActivityLogRow[];
   resourceMatches: ResourceMatchRow[];
+  plan: PlanWithSteps | null;
 };

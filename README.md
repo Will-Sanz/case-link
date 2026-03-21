@@ -20,6 +20,7 @@ Schema lives in versioned migrations (apply in order):
 - `supabase/migrations/20260321120000_family_rls.sql`
 - `supabase/migrations/20260321140000_resource_matches_rls.sql`
 - `supabase/migrations/20260321160000_family_intake_rpc.sql` — `create_family_intake_row()` for new family rows (sets `created_by_id` from `auth.uid()` inside the DB)
+- `supabase/migrations/20260321170000_plans_rls.sql` — RLS for plans, plan_steps, plan_step_resources
 
 Apply it using either:
 
@@ -68,11 +69,25 @@ Apply **`20260321140000_resource_matches_rls.sql`** so case managers can read/wr
 
 UI: family workspace **Matched resources** panel (replaces the Phase 3 placeholder).
 
+## Phase 4 — 30 / 60 / 90 day plan
+
+**Migration:** `supabase/migrations/20260321170000_plans_rls.sql` — RLS for plans and related tables.
+
+**Behavior:**
+
+- **`src/lib/plan-generator/`** — Rules-based step templates: preset goal/barrier keys map to suggested steps (30-day, 60-day, 90-day phases). No AI.
+- **Generate plan** — If `OPENAI_API_KEY` is set, tries **OpenAI** first (`OPENAI_PLAN_MODEL`, default `gpt-4o-mini`); on failure or missing key, uses **rules** from goals/barriers. Regenerate creates a new version.
+- **Edit steps** — Update title, description, status (pending, in_progress, completed, blocked).
+- **Add manual step** — Add custom steps to any phase.
+- **Delete step** — Remove steps from the plan.
+
+UI: family workspace **30 / 60 / 90 day plan** panel.
+
 ## Phase 2 — Families
 
 **Migration:** `supabase/migrations/20260321120000_family_rls.sql` — `can_access_family()` / `is_app_admin()`, families + related tables, extended **`app_users` read** for list/detail.
 
-**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers/members, notes, activity; plan/referrals placeholders remain for Phases 4–5).
+**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers/members, notes, activity, plan; referrals placeholder for Phase 5).
 
 ## Phase 1
 
@@ -91,7 +106,7 @@ For **email confirmation**, add your redirect URL under **Authentication → URL
 | `/dashboard` | Stats, recent families, quick links |
 | `/families` | List / search / filter families |
 | `/families/new` | Intake (goals, barriers, members, notes) |
-| `/families/[id]` | Family workspace (overview, notes, activity; Phase 3+ panels stubbed) |
+| `/families/[id]` | Family workspace (overview, notes, activity, matched resources, plan; referrals stubbed) |
 | `/resources` | Search/filter/paginate active resources |
 | `/resources/[id]` | Full resource / contact / service-flag detail |
 
@@ -115,11 +130,12 @@ The parser expects the **Google Sheets–style** header on row 2 (0-based index 
 - `src/components/ui/` — small reusable UI primitives
 - `src/features/` — auth, resources, families (intake, workspace)
 - `src/lib/services/` — Supabase query helpers (`resources.ts`, `families.ts`, `resources-picker.ts`)
+- `src/lib/plan-generator/` — rules-based plan step templates from goals/barriers
 - `src/lib/matching/` — deterministic resource matcher (no AI)
-- `src/app/actions/` — server actions (`families.ts`, `resource-matches.ts`)
+- `src/app/actions/` — server actions (`families.ts`, `resource-matches.ts`, `plans.ts`)
 - `src/lib/db/resource-import/` — CSV parse/normalize/map → DB payload
 - `src/lib/validations/` — Zod schemas for query params
 
-**Plans, referrals, tasks (Phases 4–5):** Placeholders remain on the family page.
+**Referrals & tasks (Phase 5):** Placeholder remains on the family page.
 
 **Phase 3 matching** is rules-based; tune presets and weights in `src/lib/matching/engine.ts`.

@@ -9,7 +9,10 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   /** Server-only; required for privileged scripts (e.g. resource import). */
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  /** Server-only; when set, plan generation tries OpenAI first, then rules fallback. */
   OPENAI_API_KEY: z.string().optional(),
+  /** Chat model for plan generation (default gpt-4o-mini). */
+  OPENAI_PLAN_MODEL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
