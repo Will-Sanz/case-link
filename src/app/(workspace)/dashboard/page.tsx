@@ -185,6 +185,7 @@ export default async function DashboardPage() {
           <CardTitle>Quick actions</CardTitle>
           <ul className="mt-4 space-y-1">
             {[
+              { href: "/calendar", label: "Calendar" },
               { href: "/families/new", label: "New family intake" },
               { href: "/families", label: "Search families" },
               { href: "/resources", label: "Search resources" },

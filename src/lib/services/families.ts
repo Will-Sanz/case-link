@@ -9,6 +9,7 @@ import type {
   FamilyWithCurrentStep,
   MatchedResourceSummary,
   PlanRow,
+  PlanStepActionItemRow,
   PlanStepRow,
   PlanWithSteps,
   ResourceMatchRow,
@@ -277,9 +278,30 @@ export async function getFamilyDetail(
       .select("*")
       .eq("plan_id", p.id)
       .order("sort_order", { ascending: true });
+
+    const stepIds = (stepsData ?? []).map((s) => s.id);
+    let actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
+    if (stepIds.length > 0) {
+      const { data: actionItems } = await client
+        .from("plan_step_action_items")
+        .select("*")
+        .in("plan_step_id", stepIds)
+        .order("sort_order", { ascending: true });
+      for (const ai of actionItems ?? []) {
+        const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
+        list.push(ai as PlanStepActionItemRow);
+        actionItemsByStep.set(ai.plan_step_id, list);
+      }
+    }
+
+    const stepsWithItems = (stepsData ?? []).map((s) => ({
+      ...s,
+      action_items: actionItemsByStep.get(s.id) ?? [],
+    })) as PlanStepRow[];
+
     plan = {
       ...p,
-      steps: (stepsData ?? []) as PlanStepRow[],
+      steps: stepsWithItems,
     };
   }
 

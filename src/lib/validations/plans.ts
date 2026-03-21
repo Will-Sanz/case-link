@@ -106,6 +106,13 @@ export const toggleChecklistItemSchema = z.object({
   completed: z.boolean(),
 });
 
+export const updatePlanStepActionItemSchema = z.object({
+  actionItemId: z.string().uuid(),
+  familyId: z.string().uuid(),
+  status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
+  target_date: z.string().nullable().optional(),
+});
+
 export const refineStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),

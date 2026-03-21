@@ -13,6 +13,14 @@ export type PlanGeneratorInput = {
   barriers: { preset_key: string | null; label: string }[];
 };
 
+/** Smaller scheduled action item for a step (weekly cadence, calendar-facing) */
+export type GeneratedActionItem = {
+  title: string;
+  week_index: number;
+  /** Optional ISO date; if omitted, derived from plan start + week_index */
+  target_date?: string;
+};
+
 /** Rich content for generated plan steps */
 export type GeneratedStepDetails = {
   rationale?: string;
@@ -45,4 +53,6 @@ export type GeneratedStep = {
   description: string;
   sort_order: number;
   details?: GeneratedStepDetails;
+  /** Smaller weekly action items; if absent, derived from checklist for rules fallback */
+  action_items?: GeneratedActionItem[];
 };

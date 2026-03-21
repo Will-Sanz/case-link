@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 import type { FamilyDetail } from "@/types/family";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
-import type { GeneratedStep, GeneratedStepDetails, PlanPhase } from "./types";
+import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
 
 const contactSchema = z.object({
   name: z.string().optional(),
@@ -12,10 +12,17 @@ const contactSchema = z.object({
   notes: z.string().optional(),
 });
 
+const aiActionItemSchema = z.object({
+  title: z.string().min(1).max(300),
+  week_index: z.number().int().min(1).max(12),
+  target_date: z.string().optional(),
+});
+
 const aiStepSchema = z.object({
   phase: z.enum(["30", "60", "90"]),
   title: z.string().min(1).max(500),
   description: z.string().max(4000),
+  action_items: z.array(aiActionItemSchema).optional(),
   rationale: z.string().optional(),
   detailed_instructions: z.string().optional(),
   checklist: z.array(z.string()).optional(),
@@ -122,11 +129,15 @@ Output ONLY valid JSON. No markdown. Shape:
       "phase": "30" | "60" | "90",
       "title": "Clear, phase-specific step title",
       "description": "2–3 sentence summary",
-      "stage_goal": "What this phase aims to achieve (for 30: setup, 60: execution, 90: sustainability)",
-      "why_now": "Why this action happens in THIS stage rather than earlier or later",
-      "depends_on": "Brief ref to prior step if this builds on it (e.g. '30-day CAP intake')",
+      "action_items": [
+        { "title": "Concrete action (e.g. Call CAP to begin intake)", "week_index": 1 },
+        { "title": "Follow-up action", "week_index": 2 }
+      ],
+      "stage_goal": "What this phase aims to achieve",
+      "why_now": "Why this action happens in THIS stage",
+      "depends_on": "Brief ref to prior step if applicable",
       "milestone_type": "outreach | preparation | follow_up | review | habit_building | contingency | renewal | application | troubleshooting",
-      "rationale": "Why this step matters to the family",
+      "rationale": "Why this step matters",
       "detailed_instructions": "Full step-by-step guidance. Be specific.",
       "checklist": ["Sub-step 1", "Sub-step 2", ...],
       "required_documents": ["Doc 1", "Doc 2"],
@@ -140,6 +151,15 @@ Output ONLY valid JSON. No markdown. Shape:
     }
   ]
 }
+
+## Action items (CRITICAL)
+- Every step MUST have an "action_items" array of 1–5 smaller tasks.
+- week_index: 1–4 = 30-day phase, 5–8 = 60-day phase, 9–12 = 90-day phase.
+- Distribute work realistically: 1–5 action items per week across the plan.
+- Each action_items[].title must be specific, actionable, and calendar-ready (e.g. "Call CAP to begin intake", "Gather utility bill and pay stubs", "Submit proof of income to CAP").
+- Do NOT use vague titles like "Complete step" or "Action item".
+- Later actions should build on earlier ones where appropriate.
+- Prefer concrete due-week placement over dumping all items in week 1.
 
 ## Resource grounding
 - When MATCHED_COMMUNITY_RESOURCES are provided, use them when they fit. Include program names and contact details.
@@ -308,6 +328,15 @@ export async function tryGeneratePlanStepsWithOpenAI(
     stepsList = deduplicateSteps(stepsList);
 
     const steps: GeneratedStep[] = stepsList.map((s, i) => {
+      const actionItems: GeneratedActionItem[] | undefined =
+        s.action_items && s.action_items.length > 0
+          ? s.action_items.map((a) => ({
+              title: a.title.trim(),
+              week_index: a.week_index,
+              target_date: a.target_date,
+            }))
+          : undefined;
+
       const hasDetails =
         s.rationale ||
         s.detailed_instructions ||
@@ -352,6 +381,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
         description: s.description.trim(),
         sort_order: i,
         details,
+        action_items: actionItems,
       };
     });
 

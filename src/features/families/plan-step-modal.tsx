@@ -9,7 +9,7 @@ import {
   useTransition,
 } from "react";
 import { createPortal } from "react-dom";
-import { deletePlanStep, logPlanStepActivity, refinePlanStep, toggleChecklistItem, updatePlanStep } from "@/app/actions/plans";
+import { deletePlanStep, logPlanStepActivity, refinePlanStep, toggleChecklistItem, updatePlanStep, updatePlanStepActionItem } from "@/app/actions/plans";
 import { suggestNextMoveForBlockedStep } from "@/app/actions/suggest-next-move";
 import { fetchStepActivity } from "@/app/actions/step-activity";
 import { Badge } from "@/components/ui/badge";
@@ -753,7 +753,8 @@ function PlanStepModalInner({
                 const d = step.details as PlanStepDetails | null | undefined;
                 const hasRichContent =
                   d &&
-                  (d.rationale ||
+                  ((step.action_items?.length ?? 0) > 0 ||
+                    d.rationale ||
                     d.detailed_instructions ||
                     (d.checklist && d.checklist.length > 0) ||
                     (d.required_documents &&
@@ -817,6 +818,56 @@ function PlanStepModalInner({
                           <p className="mt-1 whitespace-pre-wrap rounded-lg bg-teal-50/80 px-3 py-2 text-sm text-slate-800">
                             {(d as { contact_script: string }).contact_script}
                           </p>
+                        </div>
+                      ) : null}
+                      {step.action_items && step.action_items.length > 0 ? (
+                        <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+                          <Label className="text-teal-800">
+                            Weekly action items (
+                            {step.action_items.filter((a) => a.status === "completed").length} of {step.action_items.length} done)
+                          </Label>
+                          <ul className="mt-2 space-y-2">
+                            {[...step.action_items]
+                              .sort((a, b) => a.week_index - b.week_index || a.sort_order - b.sort_order)
+                              .map((ai) => {
+                                const isDone = ai.status === "completed";
+                                const dueStr = ai.target_date
+                                  ? new Date(ai.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                                  : null;
+                                return (
+                                  <li key={ai.id} className="flex gap-2 text-sm text-slate-800">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setError(null);
+                                        startTransition(async () => {
+                                          const r = await updatePlanStepActionItem({
+                                            actionItemId: ai.id,
+                                            familyId,
+                                            status: isDone ? "pending" : "completed",
+                                          });
+                                          if (!r.ok) setError(r.error);
+                                          else router.refresh();
+                                        });
+                                      }}
+                                      disabled={pending}
+                                      className={cn(
+                                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                                        isDone ? "border-teal-500 bg-teal-500 text-white" : "border-slate-300 bg-white hover:border-teal-400",
+                                      )}
+                                    >
+                                      {isDone ? "✓" : null}
+                                    </button>
+                                    <span className={cn(isDone && "line-through text-slate-500")}>
+                                      {ai.title}
+                                      {dueStr && (
+                                        <span className="ml-2 text-xs text-slate-500">Due {dueStr}</span>
+                                      )}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                          </ul>
                         </div>
                       ) : null}
                       {d!.checklist && d!.checklist.length > 0 ? (

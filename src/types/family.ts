@@ -138,6 +138,23 @@ export type PlanStepWorkflowData = {
   checklist_completed?: boolean[];
 };
 
+/** Smaller scheduled action items under a plan step (weekly cadence, calendar-facing) */
+export type PlanStepActionItemRow = {
+  id: string;
+  plan_step_id: string;
+  title: string;
+  description: string | null;
+  week_index: number;
+  target_date: string | null;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+  sort_order: number;
+  outcome: string | null;
+  notes: string | null;
+  follow_up_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PlanStepRow = {
   id: string;
   plan_id: string;
@@ -152,6 +169,8 @@ export type PlanStepRow = {
   updated_at: string;
   details?: PlanStepDetails | null;
   workflow_data?: PlanStepWorkflowData | null;
+  /** Child action items (smaller weekly tasks). Populated when fetched with action items. */
+  action_items?: PlanStepActionItemRow[];
 };
 
 export type PlanRow = {

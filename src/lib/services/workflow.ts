@@ -7,6 +7,8 @@ export type NeedsAttentionItem = {
   step_id?: string;
   step_title?: string;
   step_phase?: string;
+  action_item_id?: string;
+  action_item_title?: string;
   due_date?: string;
   days_overdue?: number;
   days_since_activity?: number;
@@ -87,6 +89,29 @@ export async function getNeedsAttention(
     .in("plan_id", planIds)
     .in("status", ["pending", "in_progress", "blocked"]);
 
+  const stepIds = (steps ?? []).map((s) => s.id);
+  let actionItems: Array<{
+    id: string;
+    plan_step_id: string;
+    title: string;
+    target_date: string | null;
+    status: string;
+  }> = [];
+  if (stepIds.length > 0) {
+    const { data: aiData } = await client
+      .from("plan_step_action_items")
+      .select("id, plan_step_id, title, target_date, status")
+      .in("plan_step_id", stepIds)
+      .neq("status", "completed");
+    actionItems = aiData ?? [];
+  }
+  const actionItemsByStep = new Map<string, typeof actionItems>();
+  for (const ai of actionItems) {
+    const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
+    list.push(ai);
+    actionItemsByStep.set(ai.plan_step_id, list);
+  }
+
   if (!steps?.length) {
     for (const f of families) {
       const plan = latestPlanByFamily.get(f.id);
@@ -121,6 +146,8 @@ export async function getNeedsAttention(
       if (!familyId) continue;
       const fam = familyMap.get(familyId);
       const familyName = fam?.name ?? "Unknown";
+      const stepActionItems = actionItemsByStep.get(s.id) ?? [];
+      const hasActionItems = stepActionItems.length > 0;
 
       const w = (s.workflow_data as { needs_escalation?: boolean }) ?? {};
       if (w.needs_escalation) {
@@ -145,7 +172,53 @@ export async function getNeedsAttention(
         });
       }
 
-      if (s.due_date) {
+      if (hasActionItems) {
+        for (const ai of stepActionItems) {
+          if (!ai.target_date) continue;
+          const due = new Date(ai.target_date);
+          if (due < today) {
+            const daysOverdue = Math.floor(
+              (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
+            );
+            items.push({
+              type: "overdue",
+              family_id: familyId,
+              family_name: familyName,
+              step_id: s.id,
+              step_title: s.title,
+              step_phase: s.phase,
+              action_item_id: ai.id,
+              action_item_title: ai.title,
+              due_date: ai.target_date,
+              days_overdue: daysOverdue,
+            });
+          } else if (due >= today && due < todayEnd) {
+            items.push({
+              type: "follow_up_today",
+              family_id: familyId,
+              family_name: familyName,
+              step_id: s.id,
+              step_title: s.title,
+              step_phase: s.phase,
+              action_item_id: ai.id,
+              action_item_title: ai.title,
+              due_date: ai.target_date,
+            });
+          } else if (due < soonEnd) {
+            items.push({
+              type: "follow_up_soon",
+              family_id: familyId,
+              family_name: familyName,
+              step_id: s.id,
+              step_title: s.title,
+              step_phase: s.phase,
+              action_item_id: ai.id,
+              action_item_title: ai.title,
+              due_date: ai.target_date,
+            });
+          }
+        }
+      } else if (s.due_date) {
         const due = new Date(s.due_date);
         if (due < today) {
           const daysOverdue = Math.floor(
@@ -388,10 +461,13 @@ export async function getDashboardData(
       let actionNeeded = "Open case to continue";
       if (itemsForFamily.length > 0) {
         const first = itemsForFamily[0];
+        const title = first.action_item_title ?? first.step_title ?? "";
         if (first.type === "overdue")
-          actionNeeded = `Follow up: ${first.step_title ?? ""} (${first.days_overdue}d overdue)`;
+          actionNeeded = title
+            ? `${first.family_name}: ${title} (${first.days_overdue}d overdue)`
+            : `Follow up (${first.days_overdue}d overdue)`;
         else if (first.type === "follow_up_today")
-          actionNeeded = `Due today: ${first.step_title ?? ""}`;
+          actionNeeded = title ? `${first.family_name}: ${title}` : `Due today: ${first.step_title ?? ""}`;
         else if (first.type === "blocked")
           actionNeeded = `Blocked: ${first.step_title ?? ""}`;
         else if (first.type === "escalation")
@@ -400,7 +476,9 @@ export async function getDashboardData(
           actionNeeded = `No activity in ${first.days_since_activity ?? 0} days`;
         else if (first.type === "new_plan")
           actionNeeded = "Review new plan";
-        else actionNeeded = first.step_title ?? actionNeeded;
+        else if (first.type === "follow_up_soon")
+          actionNeeded = title ? `${first.family_name}: ${title}` : (first.step_title ?? actionNeeded);
+        else actionNeeded = (title || first.step_title) ?? actionNeeded;
       }
 
       const w = (step?.workflow_data as { needs_escalation?: boolean }) ?? {};
@@ -432,11 +510,17 @@ export async function getDashboardData(
     });
 
   const actionableItems: ActionableItem[] = needsItems.slice(0, 25).map((i) => {
-    let action = i.step_title ?? "Open case";
-    if (i.type === "overdue") action = `Follow up: ${i.step_title ?? ""} (${i.days_overdue}d overdue)`;
+    const itemTitle = i.action_item_title ?? i.step_title ?? "";
+    let action = itemTitle || "Open case";
+    if (i.type === "overdue")
+      action = itemTitle
+        ? `${i.family_name}: ${itemTitle} (${i.days_overdue}d overdue)`
+        : `Follow up: ${i.step_title ?? ""} (${i.days_overdue}d overdue)`;
     else if (i.type === "blocked") action = `Resolve blocker: ${i.step_title ?? ""}`;
-    else if (i.type === "follow_up_today") action = `Due today: ${i.step_title ?? ""}`;
-    else if (i.type === "follow_up_soon") action = `Due soon: ${i.step_title ?? ""}`;
+    else if (i.type === "follow_up_today")
+      action = itemTitle ? `${i.family_name}: ${itemTitle}` : `Due today: ${i.step_title ?? ""}`;
+    else if (i.type === "follow_up_soon")
+      action = itemTitle ? `${i.family_name}: ${itemTitle}` : `Due soon: ${i.step_title ?? ""}`;
     else if (i.type === "escalation") action = `Escalation: ${i.step_title ?? ""}`;
     else if (i.type === "no_activity") action = `Check in: ${i.family_name} (${i.days_since_activity}d no activity)`;
     else if (i.type === "new_plan") action = `Review plan: ${i.family_name}`;

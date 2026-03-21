@@ -9,6 +9,7 @@ import {
   generatePlan,
   toggleChecklistItem,
   updatePlanStep,
+  updatePlanStepActionItem,
 } from "@/app/actions/plans";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,12 @@ import { Label } from "@/components/ui/label";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
 import { PlanStepModal } from "@/features/families/plan-step-modal";
 import { PlanPdfExport } from "@/features/families/plan-pdf-export";
-import type { PlanStepRow, PlanStepDetails, PlanWithSteps } from "@/types/family";
+import type {
+  PlanStepActionItemRow,
+  PlanStepRow,
+  PlanStepDetails,
+  PlanWithSteps,
+} from "@/types/family";
 import { cn } from "@/lib/utils/cn";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -110,6 +116,105 @@ function LinkedResources({
   );
 }
 
+/** Action items grouped by week with completion toggle */
+function ActionItemsSection({
+  step,
+  familyName,
+  onToggleActionItem,
+  pending,
+}: {
+  step: PlanStepRow;
+  familyName?: string;
+  onToggleActionItem?: (actionItemId: string, completed: boolean) => void;
+  pending?: boolean;
+}) {
+  const items = step.action_items ?? [];
+  if (items.length === 0) return null;
+
+  const byWeek = new Map<number, PlanStepActionItemRow[]>();
+  for (const ai of items) {
+    const list = byWeek.get(ai.week_index) ?? [];
+    list.push(ai);
+    byWeek.set(ai.week_index, list);
+  }
+  const weeks = [...byWeek.keys()].sort((a, b) => a - b);
+  const completedCount = items.filter((a) => a.status === "completed").length;
+
+  return (
+    <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+        Weekly action items ({completedCount} of {items.length} done)
+      </p>
+      <div className="mt-3 space-y-4">
+        {weeks.map((weekIdx) => (
+          <div key={weekIdx}>
+            <p className="text-xs font-medium text-teal-700">Week {weekIdx}</p>
+            <ul className="mt-1.5 space-y-1.5">
+              {(byWeek.get(weekIdx) ?? []).map((ai) => {
+                const isDone = ai.status === "completed";
+                const dueStr = ai.target_date
+                  ? new Date(ai.target_date).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : null;
+                return (
+                  <li key={ai.id} className="flex items-start gap-2">
+                    {onToggleActionItem ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onToggleActionItem(ai.id, !isDone)
+                        }
+                        disabled={pending}
+                        className={cn(
+                          "mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                          isDone
+                            ? "border-teal-500 bg-teal-500 text-white"
+                            : "border-slate-300 bg-white hover:border-teal-400",
+                        )}
+                      >
+                        {isDone ? "✓" : null}
+                      </button>
+                    ) : (
+                      <span
+                        className={cn(
+                          "mt-1 size-1.5 shrink-0 rounded-full",
+                          isDone ? "bg-teal-500" : "bg-slate-300",
+                        )}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={cn(
+                          "text-sm text-slate-700",
+                          isDone && "line-through text-slate-500",
+                        )}
+                      >
+                        {ai.title}
+                      </span>
+                      {dueStr && (
+                        <span
+                          className={cn(
+                            "ml-2 text-xs",
+                            isDone ? "text-slate-400" : "text-slate-500",
+                          )}
+                        >
+                          Due {dueStr}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Preview of step content for list view — uses details when available, else description */
 function StepPreview({
   step,
@@ -117,6 +222,8 @@ function StepPreview({
   resourceMatches,
   onToggleChecklist,
   checklistPending,
+  onToggleActionItem,
+  familyName,
 }: {
   step: PlanStepRow;
   expanded: boolean;
@@ -128,6 +235,8 @@ function StepPreview({
   }>;
   onToggleChecklist?: (stepId: string, index: number, completed: boolean) => void;
   checklistPending?: boolean;
+  onToggleActionItem?: (actionItemId: string, completed: boolean) => void;
+  familyName?: string;
 }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data;
@@ -137,6 +246,9 @@ function StepPreview({
   const completed = (w?.checklist_completed ?? []) as boolean[];
   const completedCount = checklist.filter((_, i) => completed[i]).length;
 
+  const actionItems = step.action_items ?? [];
+  const actionItemsDone = actionItems.filter((a) => a.status === "completed").length;
+
   if (!expanded) {
     const preview = d?.detailed_instructions ?? step.description;
     return (
@@ -144,7 +256,11 @@ function StepPreview({
         <p className="line-clamp-2 text-sm text-slate-600">
           {preview?.trim() || "No description — open to add context"}
         </p>
-        {checklist.length > 0 ? (
+        {actionItems.length > 0 ? (
+          <p className="text-xs font-medium text-slate-500">
+            Action items: {actionItemsDone} of {actionItems.length} done
+          </p>
+        ) : checklist.length > 0 ? (
           <p className="text-xs font-medium text-slate-500">
             Checklist: {completedCount} of {checklist.length} done
           </p>
@@ -349,6 +465,14 @@ function StepPreview({
           ) : null}
         </div>
       ) : null}
+      {actionItems.length > 0 ? (
+        <ActionItemsSection
+          step={step}
+          familyName={familyName}
+          onToggleActionItem={onToggleActionItem}
+          pending={checklistPending}
+        />
+      ) : null}
       {resourceMatches && resourceMatches.length > 0 ? (
         <LinkedResources stepId={step.id} matches={resourceMatches} />
       ) : null}
@@ -458,6 +582,19 @@ export function PlanPanel({
         familyId,
         checklistIndex: index,
         completed,
+      });
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  function handleToggleActionItem(actionItemId: string, completed: boolean) {
+    setError(null);
+    startTransition(async () => {
+      const r = await updatePlanStepActionItem({
+        actionItemId,
+        familyId,
+        status: completed ? "completed" : "pending",
       });
       if (!r.ok) setError(r.error);
       else router.refresh();
@@ -643,6 +780,7 @@ export function PlanPanel({
                         {stepsByPhase[phase].map((step) => {
                           const isExpanded = expandedStepIds.has(step.id);
                           const hasRichContent =
+                            (step.action_items?.length ?? 0) > 0 ||
                             (step.details as PlanStepDetails | null)?.checklist
                               ?.length ||
                             (step.details as PlanStepDetails | null)
@@ -733,6 +871,8 @@ export function PlanPanel({
                                             resourceMatches={resourceMatches}
                                             onToggleChecklist={handleToggleChecklist}
                                             checklistPending={pending}
+                                            onToggleActionItem={handleToggleActionItem}
+                                            familyName={familyName}
                                           />
                                           {hasRichContent && !isExpanded ? (
                                             <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">

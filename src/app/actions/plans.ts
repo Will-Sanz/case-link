@@ -10,6 +10,7 @@ import {
   generatedStepsFromMatches,
   mergeResourceAndRulesSteps,
 } from "@/lib/plan-generator/resource-context";
+import { ensureActionItems } from "@/lib/plan-generator/derive-action-items";
 import { getFamilyDetail } from "@/lib/services/families";
 import { refineStepWithOpenAI } from "@/lib/plan-generator/openai-refine-step";
 import {
@@ -19,10 +20,22 @@ import {
   logPlanStepActivitySchema,
   refineStepSchema,
   toggleChecklistItemSchema,
+  updatePlanStepActionItemSchema,
   updatePlanStepSchema,
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+function computeTargetDate(
+  planStart: Date,
+  weekIndex: number,
+  itemIndexInStep: number,
+): string {
+  const d = new Date(planStart);
+  const daysOffset = (weekIndex - 1) * 7 + Math.min(itemIndexInStep % 5, 4);
+  d.setDate(d.getDate() + daysOffset);
+  return d.toISOString().slice(0, 10);
+}
 
 async function logCaseActivity(
   supabase: SupabaseClient,
@@ -110,6 +123,8 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     }
   }
 
+  steps = ensureActionItems(steps);
+
   const summary =
     generationSource === "openai"
       ? `Plan v${nextVersion} (AI: ${model})`
@@ -124,7 +139,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
       generation_source: generationSource,
       ai_model: aiModel,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (planErr || !plan) {
@@ -132,20 +147,74 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   }
 
   if (steps.length > 0) {
-    const { error: stepsErr } = await supabase.from("plan_steps").insert(
-      steps.map((s) => ({
-        plan_id: plan.id,
-        phase: s.phase,
-        title: s.title,
-        description: s.description,
-        sort_order: s.sort_order,
-        status: "pending",
-        details: s.details ?? null,
-      })),
-    );
-    if (stepsErr) {
-      await supabase.from("plans").delete().eq("id", plan.id);
-      return { ok: false, error: stepsErr.message };
+    const { data: insertedSteps, error: stepsErr } = await supabase
+      .from("plan_steps")
+      .insert(
+        steps.map((s) => ({
+          plan_id: plan.id,
+          phase: s.phase,
+          title: s.title,
+          description: s.description,
+          sort_order: s.sort_order,
+          status: "pending",
+          details: s.details ?? null,
+        })),
+      )
+      .select("id, sort_order")
+      .order("sort_order", { ascending: true });
+
+    if (stepsErr || !insertedSteps?.length) {
+      if (!stepsErr) await supabase.from("plans").delete().eq("id", plan.id);
+      return { ok: false, error: stepsErr?.message ?? "Could not create steps" };
+    }
+
+    const planCreatedAt = new Date((plan as { created_at?: string }).created_at ?? Date.now());
+    const planStart = new Date(planCreatedAt);
+    planStart.setHours(0, 0, 0, 0);
+
+    const actionItemRows: Array<{
+      plan_step_id: string;
+      title: string;
+      description: string | null;
+      week_index: number;
+      target_date: string | null;
+      status: string;
+      sort_order: number;
+    }> = [];
+
+    const stepIdByIndex = new Map<number, string>();
+    for (const row of insertedSteps) {
+      stepIdByIndex.set(row.sort_order, row.id);
+    }
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const stepId = stepIdByIndex.get(step.sort_order) ?? insertedSteps[i]?.id;
+      if (!stepId) continue;
+      const actionItems = step.action_items ?? [];
+      for (let j = 0; j < actionItems.length; j++) {
+        const ai = actionItems[j];
+        const targetDate = computeTargetDate(planStart, ai.week_index, j);
+        actionItemRows.push({
+          plan_step_id: stepId,
+          title: ai.title,
+          description: null,
+          week_index: ai.week_index,
+          target_date: targetDate,
+          status: "pending",
+          sort_order: j,
+        });
+      }
+    }
+
+    if (actionItemRows.length > 0) {
+      const { error: itemsErr } = await supabase
+        .from("plan_step_action_items")
+        .insert(actionItemRows);
+      if (itemsErr) {
+        await supabase.from("plans").delete().eq("id", plan.id);
+        return { ok: false, error: itemsErr.message };
+      }
     }
   }
 
@@ -472,6 +541,88 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function updatePlanStepActionItem(input: unknown): Promise<ActionResult> {
+  const parsed = updatePlanStepActionItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid request" };
+  }
+
+  let supabase;
+  let userId: string | null = null;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { actionItemId, familyId, status, target_date } = parsed.data;
+
+  const { data: ai } = await supabase
+    .from("plan_step_action_items")
+    .select("plan_step_id")
+    .eq("id", actionItemId)
+    .maybeSingle();
+
+  if (!ai) {
+    return { ok: false, error: "Action item not found" };
+  }
+
+  const { data: step } = await supabase
+    .from("plan_steps")
+    .select("plan_id")
+    .eq("id", ai.plan_step_id)
+    .maybeSingle();
+
+  if (!step) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("family_id")
+    .eq("id", step.plan_id)
+    .eq("family_id", familyId)
+    .maybeSingle();
+
+  if (!plan) {
+    return { ok: false, error: "Action item not found" };
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (status !== undefined) patch.status = status;
+  if (target_date !== undefined) patch.target_date = target_date;
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: true };
+  }
+
+  const { error } = await supabase
+    .from("plan_step_action_items")
+    .update(patch)
+    .eq("id", actionItemId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  if (status === "completed") {
+    await logCaseActivity(
+      supabase,
+      familyId,
+      userId,
+      "step.action_item_completed",
+      "plan_step_action_item",
+      actionItemId,
+      {},
+    );
   }
 
   revalidatePath(`/families/${familyId}`);
