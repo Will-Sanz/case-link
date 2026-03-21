@@ -193,6 +193,11 @@ function ActionItemsSection({
                       >
                         {ai.title}
                       </span>
+                      {ai.description && (
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {ai.description}
+                        </p>
+                      )}
                       {dueStr && (
                         <span
                           className={cn(
@@ -279,8 +284,20 @@ function StepPreview({
     );
   }
 
+  const actionNow =
+    (d?.action_needed_now as string | undefined) ??
+    (step.ai_helper_data?.action_needed_now as string | undefined);
+
   return (
     <div className="mt-4 space-y-4 text-sm">
+      {actionNow ? (
+        <div className="rounded-lg border-2 border-teal-200 bg-teal-50/60 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+            Action needed now
+          </p>
+          <p className="mt-1.5 font-medium text-slate-900">{actionNow}</p>
+        </div>
+      ) : null}
       {(d?.stage_goal || d?.why_now) ? (
         <div className="rounded-lg bg-slate-50 p-3">
           {d?.stage_goal ? (

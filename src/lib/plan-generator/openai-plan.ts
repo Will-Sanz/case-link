@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import type { FamilyDetail } from "@/types/family";
+import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
 
@@ -14,6 +15,7 @@ const contactSchema = z.object({
 
 const aiActionItemSchema = z.object({
   title: z.string().min(1).max(300),
+  description: z.string().max(500).optional(),
   week_index: z.number().int().min(1).max(12),
   target_date: z.string().optional(),
 });
@@ -22,6 +24,7 @@ const aiStepSchema = z.object({
   phase: z.enum(["30", "60", "90"]),
   title: z.string().min(1).max(500),
   description: z.string().max(4000),
+  action_needed_now: z.string().max(500).optional(),
   action_items: z.array(aiActionItemSchema).optional(),
   rationale: z.string().optional(),
   detailed_instructions: z.string().optional(),
@@ -121,6 +124,16 @@ Focus: consolidation, long-term stability, habit-building, contingency planning,
 - Before finalizing: mentally check whether any step is too similar to an earlier one; if so, rewrite to be specific and differentiated.
 - Avoid repeating the same sentence structure across items.
 
+## Execution-oriented rules (CRITICAL)
+- Every step must be EXECUTABLE without extra interpretation. The case manager should be able to act immediately.
+- Avoid generic language like "reach out" or "explore options" without saying exactly how.
+- Outreach steps MUST include what to say (contact_script) and what to prepare (required_documents).
+- Every step should include at least one execution component: contact_script, required_documents, or concrete checklist.
+- Include fallback_options when the first attempt might fail.
+- Use organization names and contact details from MATCHED_COMMUNITY_RESOURCES when available.
+- Steps should REDUCE uncertainty, not create it.
+- Make output feel like a case manager can act on it immediately.
+
 ## Output format
 Output ONLY valid JSON. No markdown. Shape:
 {
@@ -129,9 +142,9 @@ Output ONLY valid JSON. No markdown. Shape:
       "phase": "30" | "60" | "90",
       "title": "Clear, phase-specific step title",
       "description": "2–3 sentence summary",
+      "action_needed_now": "One concrete sentence: what to do next (e.g. Call PECO customer assistance and ask about CAP enrollment)",
       "action_items": [
-        { "title": "Concrete action (e.g. Call CAP to begin intake)", "week_index": 1 },
-        { "title": "Follow-up action", "week_index": 2 }
+        { "title": "Concrete action", "description": "Optional: have account # ready, ask about X", "week_index": 1 }
       ],
       "stage_goal": "What this phase aims to achieve",
       "why_now": "Why this action happens in THIS stage",
@@ -155,11 +168,10 @@ Output ONLY valid JSON. No markdown. Shape:
 ## Action items (CRITICAL)
 - Every step MUST have an "action_items" array of 1–5 smaller tasks.
 - week_index: 1–4 = 30-day phase, 5–8 = 60-day phase, 9–12 = 90-day phase.
-- Distribute work realistically: 1–5 action items per week across the plan.
-- Each action_items[].title must be specific, actionable, and calendar-ready (e.g. "Call CAP to begin intake", "Gather utility bill and pay stubs", "Submit proof of income to CAP").
-- Do NOT use vague titles like "Complete step" or "Action item".
-- Later actions should build on earlier ones where appropriate.
-- Prefer concrete due-week placement over dumping all items in week 1.
+- Each action_items[].title must be specific, actionable, and calendar-ready.
+- Optionally add action_items[].description: short "how to do it" (e.g. "Have account number and latest bill ready. Ask about arrears assistance or payment plan. Write down rep name and next steps.").
+- Distribute work realistically: 1–5 action items per week.
+- Do NOT use vague titles. Later actions should build on earlier ones.
 
 ## Resource grounding
 - When MATCHED_COMMUNITY_RESOURCES are provided, use them when they fit. Include program names and contact details.
@@ -234,60 +246,33 @@ function deduplicateSteps<T extends { phase: string; title: string }>(
 }
 
 /**
- * Calls OpenAI to draft 30/60/90-day plan steps. Returns ok:false on any failure (caller uses rules fallback).
+ * Calls OpenAI to draft 30/60/90-day plan steps. Uses gpt-5.4 via Responses API.
+ * Returns ok:false on any failure (caller uses rules fallback).
  */
 export async function tryGeneratePlanStepsWithOpenAI(
   detail: FamilyDetail,
-  apiKey: string,
-  model: string,
 ): Promise<OpenAiPlanResult> {
   const context = buildFamilyContext(detail);
   const user = `Create a progressively sequenced 30-60-90 day case plan. Each stage must add NEW value—30-day: urgent setup, 60-day: execution and follow-through, 90-day: stabilization and sustainability. Do NOT repeat the same actions across phases. Use stage_goal, why_now, milestone_type for every step. Use matched resources when they apply.\n\n${context}`;
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: user },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.35,
-        max_tokens: 8192,
-      }),
+    const result = await createAiResponse({
+      taskType: "full_plan_generation",
+      instructions: SYSTEM_PROMPT + "\n\nOutput ONLY valid JSON. No markdown.",
+      input: user,
+      responseFormat: "json_object",
+      temperature: 0.35,
+      maxTokens: 8192,
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      if (shouldLogOpenAi()) {
-        console.info("[openai-plan] HTTP", res.status, errText.slice(0, 300));
-      }
-      return {
-        ok: false,
-        reason: `OpenAI HTTP ${res.status}: ${errText.slice(0, 200)}`,
-      };
-    }
-
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string | null } }[];
-      usage?: { total_tokens?: number };
-    };
-
-    const raw = data.choices?.[0]?.message?.content;
-    if (!raw || typeof raw !== "string") {
-      if (shouldLogOpenAi()) console.info("[openai-plan] empty response:", data);
-      return { ok: false, reason: "Empty OpenAI response" };
+    if (!result.ok) {
+      if (shouldLogOpenAi()) console.info("[openai-plan] error:", result.error);
+      return { ok: false, reason: result.error };
     }
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(result.text);
     } catch {
       if (shouldLogOpenAi())
         console.info("[openai-plan] JSON.parse failed");
@@ -311,7 +296,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
         "[openai-plan]",
         validated.data.steps.length,
         "steps,",
-        data.usage?.total_tokens ?? "?",
+        result.usage?.total_tokens ?? "?",
         "tokens",
       );
     }
@@ -332,12 +317,14 @@ export async function tryGeneratePlanStepsWithOpenAI(
         s.action_items && s.action_items.length > 0
           ? s.action_items.map((a) => ({
               title: a.title.trim(),
+              description: a.description?.trim(),
               week_index: a.week_index,
               target_date: a.target_date,
             }))
           : undefined;
 
       const hasDetails =
+        s.action_needed_now ||
         s.rationale ||
         s.detailed_instructions ||
         (s.checklist && s.checklist.length > 0) ||
@@ -356,6 +343,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
 
       const details: GeneratedStepDetails | undefined = hasDetails
         ? {
+            action_needed_now: s.action_needed_now,
             rationale: s.rationale,
             detailed_instructions: s.detailed_instructions,
             checklist: s.checklist,
@@ -385,7 +373,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
       };
     });
 
-    return { ok: true, steps, model };
+    return { ok: true, steps, model: result.model };
   } catch (e) {
     return {
       ok: false,

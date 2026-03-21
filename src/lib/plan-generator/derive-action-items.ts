@@ -52,11 +52,33 @@ export function deriveActionItemsForStep(step: GeneratedStep): GeneratedActionIt
 }
 
 /**
- * Ensures every step has action_items, deriving from checklist/title when needed.
+ * Derives action_needed_now from step when absent.
+ */
+export function deriveActionNeededNow(step: GeneratedStep): string | undefined {
+  if (step.details?.action_needed_now) return step.details.action_needed_now;
+  const firstAction = step.action_items?.[0];
+  if (firstAction) return firstAction.title;
+  return undefined;
+}
+
+/**
+ * Ensures every step has action_items and action_needed_now, deriving when needed.
  */
 export function ensureActionItems(steps: GeneratedStep[]): GeneratedStep[] {
-  return steps.map((s) => ({
-    ...s,
-    action_items: deriveActionItemsForStep(s),
-  }));
+  return steps.map((s) => {
+    const actionItems = deriveActionItemsForStep(s);
+    const actionNeededNow =
+      s.details?.action_needed_now ??
+      actionItems[0]?.title ??
+      s.title;
+    const details: import("./types").GeneratedStepDetails = {
+      ...s.details,
+      action_needed_now: actionNeededNow,
+    };
+    return {
+      ...s,
+      details,
+      action_items: actionItems,
+    };
+  });
 }

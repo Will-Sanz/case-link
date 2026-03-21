@@ -12,9 +12,11 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser + server user-scoped client |
 | `NEXT_PUBLIC_APP_URL` | Yes (production) | Production URL (e.g. `https://homelessness-project.vercel.app`) — ensures email confirmation links redirect to production dashboard |
 | `SUPABASE_SERVICE_ROLE_KEY` | No (web app) | Server-only; required for `npm run db:import` only — bypasses RLS — never `NEXT_PUBLIC_*` or client code |
-| `OPENAI_API_KEY` | No | Server-only; when set, plan generation tries OpenAI first, then rules |
-| `OPENAI_PLAN_MODEL` | No | Chat model (default `gpt-4o-mini`) |
-| `OPENAI_DEBUG` | No | Set to `1` for extra server logs around plan generation |
+| `OPENAI_API_KEY` | No | Server-only; when set, plan generation and AI helpers use OpenAI |
+| `OPENAI_MODEL_OVERRIDE` | No | Force one model for all AI tasks (e.g. `gpt-4o` for QA) |
+| `OPENAI_DEBUG` | No | Set to `1` to log AI requests and model selection |
+
+**AI model strategy:** Core casework (plan generation, refinement, case assistant, blocker help) uses **gpt-5.4** via the Responses API. Helper tools (call script, email draft, prep checklist, etc.) use **gpt-5.4-mini** for lower latency. See `src/lib/ai/models.ts` for routing.
 
 ## Deploying to Vercel
 
@@ -97,7 +99,7 @@ UI: family workspace **Matched resources** panel (replaces the Phase 3 placehold
 **Behavior:**
 
 - **`src/lib/plan-generator/`** — Rules-based step templates: preset goal/barrier keys map to suggested steps (30-day, 60-day, 90-day phases). Used when OpenAI is unavailable or returns nothing.
-- **Generate plan** — If `OPENAI_API_KEY` is set, tries **OpenAI** first (`OPENAI_PLAN_MODEL`, default `gpt-4o-mini`); on failure or missing key, uses **rules** from goals/barriers. Regenerate creates a new version.
+- **Generate plan** — If `OPENAI_API_KEY` is set, tries **OpenAI** first (gpt-5.4 via Responses API); on failure or missing key, uses **rules** from goals/barriers. Regenerate creates a new version.
 - **Debug** — Set `OPENAI_DEBUG=1` in `.env.local` to log token usage and any rules fallback (see `[openai-plan]` / `[generatePlan]` in the terminal).
 - **Edit steps** — Update title, description, status (pending, in_progress, completed, blocked).
 - **Add manual step** — Add custom steps to any phase.

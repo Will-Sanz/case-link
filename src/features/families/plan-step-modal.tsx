@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { deletePlanStep, logPlanStepActivity, refinePlanStep, toggleChecklistItem, updatePlanStep, updatePlanStepActionItem } from "@/app/actions/plans";
+import { generateStepHelperAction, saveStepHelperAction } from "@/app/actions/step-helper";
 import { suggestNextMoveForBlockedStep } from "@/app/actions/suggest-next-move";
 import { fetchStepActivity } from "@/app/actions/step-activity";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +135,11 @@ function PlanStepModalInner({
   const [showRefine, setShowRefine] = useState(false);
   const [refineFeedback, setRefineFeedback] = useState("");
   const [refinePending, setRefinePending] = useState(false);
+  const [helperType, setHelperType] = useState<string | null>(null);
+  const [helperContent, setHelperContent] = useState<string | null>(null);
+  const [helperList, setHelperList] = useState<string[] | null>(null);
+  const [helperPending, setHelperPending] = useState(false);
+  const aiHelper = step.ai_helper_data;
 
   useEffect(() => {
     fetchStepActivity(step.id).then(setStepActivity);
@@ -302,6 +308,24 @@ function PlanStepModalInner({
               {error}
             </p>
           ) : null}
+
+          {/* Action needed now */}
+          {(() => {
+            const actionNow =
+              (step.details as { action_needed_now?: string })?.action_needed_now ??
+              aiHelper?.action_needed_now;
+            if (!actionNow) return null;
+            return (
+              <div className="mb-6 rounded-xl border-2 border-teal-200 bg-teal-50/60 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+                  Action needed now
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {actionNow}
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Workflow section */}
           <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
@@ -704,6 +728,187 @@ function PlanStepModalInner({
             )}
           </div>
 
+          {/* AI help for this step */}
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <h3 className="text-sm font-semibold text-slate-800">
+              AI help for this step
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Generate scripts, checklists, and guidance tailored to this family and step.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(
+                [
+                  { type: "call_script" as const, label: "Generate call script" },
+                  { type: "email_draft" as const, label: "Draft email" },
+                  { type: "prep_checklist" as const, label: "Prep checklist" },
+                  { type: "fallback_options" as const, label: "Fallback options" },
+                  { type: "family_explanation" as const, label: "Explain to family" },
+                  { type: "break_into_actions" as const, label: "Break into smaller actions" },
+                  { type: "what_happens_next" as const, label: "What happens next" },
+                  ...(status === "blocked"
+                    ? [{ type: "troubleshoot_blocker" as const, label: "Troubleshoot blocker" }]
+                    : []),
+                ] as { type: Parameters<typeof generateStepHelperAction>[2]; label: string }[]
+              ).map(({ type, label }) => (
+                <Button
+                  key={type}
+                  type="button"
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  disabled={helperPending || pending}
+                  onClick={async () => {
+                    setHelperType(type);
+                    setHelperPending(true);
+                    setHelperContent(null);
+                    setHelperList(null);
+                    const r = await generateStepHelperAction(step.id, familyId, type);
+                    setHelperPending(false);
+                    if (r.ok) {
+                      setHelperContent(r.content);
+                      setHelperList(r.listContent ?? null);
+                    } else setError(r.error);
+                  }}
+                >
+                  {helperPending && helperType === type ? "Generating…" : label}
+                </Button>
+              ))}
+            </div>
+            {(helperContent || aiHelper?.call_script || aiHelper?.email_draft || aiHelper?.family_explanation || aiHelper?.next_step_guidance || (aiHelper?.prep_checklist ?? []).length > 0 || (aiHelper?.fallback_options ?? []).length > 0) && (
+              <div className="mt-4 space-y-3">
+                {helperContent && helperType && (
+                  <div className="rounded-lg border border-teal-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+                      {helperType.replace(/_/g, " ")}
+                    </p>
+                    {helperList ? (
+                      <ul className="mt-2 space-y-1 text-sm text-slate-800">
+                        {helperList.map((item, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="text-teal-600">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                        {helperContent}
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-3 px-3 py-1.5 text-sm"
+                      disabled={pending}
+                      onClick={async () => {
+                        const field =
+                          helperType === "call_script"
+                            ? "call_script"
+                            : helperType === "email_draft"
+                              ? "email_draft"
+                              : helperType === "prep_checklist" || helperType === "break_into_actions"
+                                ? "prep_checklist"
+                                : helperType === "fallback_options" || helperType === "troubleshoot_blocker"
+                                  ? "fallback_options"
+                                  : helperType === "family_explanation"
+                                    ? "family_explanation"
+                                    : helperType === "what_happens_next"
+                                      ? "next_step_guidance"
+                                      : "fallback_options";
+                        const val = helperList ?? (helperContent ?? "");
+                        const r = await saveStepHelperAction(
+                          step.id,
+                          familyId,
+                          field as keyof typeof aiHelper,
+                          Array.isArray(val) ? val : val,
+                        );
+                        if (r.ok) router.refresh();
+                        else setError(r.error);
+                      }}
+                    >
+                      Save to step
+                    </Button>
+                  </div>
+                )}
+                {aiHelper?.call_script && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Saved call script
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                      {aiHelper.call_script}
+                    </p>
+                  </div>
+                )}
+                {aiHelper?.email_draft && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Saved email draft
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                      {aiHelper.email_draft}
+                    </p>
+                  </div>
+                )}
+                {aiHelper?.prep_checklist && aiHelper.prep_checklist.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Saved prep checklist
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-slate-800">
+                      {aiHelper.prep_checklist.map((item, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-teal-600">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {aiHelper?.fallback_options && aiHelper.fallback_options.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Saved fallback options
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-slate-800">
+                      {aiHelper.fallback_options.map((item, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-teal-600">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {aiHelper?.family_explanation && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Saved family explanation
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                      {aiHelper.family_explanation}
+                    </p>
+                  </div>
+                )}
+                {aiHelper?.next_step_guidance && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Saved next-step guidance
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                      {aiHelper.next_step_guidance}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            {!helperContent && !aiHelper?.call_script && !aiHelper?.email_draft && !aiHelper?.family_explanation && !aiHelper?.next_step_guidance && (aiHelper?.prep_checklist ?? []).length === 0 && (aiHelper?.fallback_options ?? []).length === 0 && (
+              <p className="mt-3 text-xs text-slate-500">
+                Use a button above to generate help. Save useful content to keep it on this step.
+              </p>
+            )}
+          </div>
+
           {editing ? (
             <div className="mt-6 space-y-4">
               <div>
@@ -858,12 +1063,19 @@ function PlanStepModalInner({
                                     >
                                       {isDone ? "✓" : null}
                                     </button>
-                                    <span className={cn(isDone && "line-through text-slate-500")}>
-                                      {ai.title}
-                                      {dueStr && (
-                                        <span className="ml-2 text-xs text-slate-500">Due {dueStr}</span>
+                                    <div>
+                                      <span className={cn(isDone && "line-through text-slate-500")}>
+                                        {ai.title}
+                                        {dueStr && (
+                                          <span className="ml-2 text-xs text-slate-500">Due {dueStr}</span>
+                                        )}
+                                      </span>
+                                      {ai.description && (
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                          {ai.description}
+                                        </p>
                                       )}
-                                    </span>
+                                    </div>
                                   </li>
                                 );
                               })}

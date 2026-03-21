@@ -98,6 +98,8 @@ export type ResourceMatchRow = {
 
 /** Rich structured content for plan steps (checklist, contacts, blockers, etc.) */
 export type PlanStepDetails = {
+  /** Short, concrete next action (e.g. "Call PECO and ask about CAP enrollment") */
+  action_needed_now?: string;
   rationale?: string;
   detailed_instructions?: string;
   checklist?: string[];
@@ -122,6 +124,18 @@ export type PlanStepDetails = {
   contact_script?: string;
   /** Materials/documents needed (alias for required_documents when both exist) */
   materials_needed?: string[];
+};
+
+/** Saved AI helper content on plan steps */
+export type PlanStepAiHelperData = {
+  call_script?: string | null;
+  email_draft?: string | null;
+  prep_checklist?: string[] | null;
+  fallback_options?: string[] | null;
+  family_explanation?: string | null;
+  next_step_guidance?: string | null;
+  action_needed_now?: string | null;
+  last_assisted_at?: string | null;
 };
 
 /** Case manager interaction data stored on plan steps */
@@ -169,6 +183,8 @@ export type PlanStepRow = {
   updated_at: string;
   details?: PlanStepDetails | null;
   workflow_data?: PlanStepWorkflowData | null;
+  /** Saved AI helper content (call script, email draft, etc.) */
+  ai_helper_data?: PlanStepAiHelperData | null;
   /** Child action items (smaller weekly tasks). Populated when fetched with action items. */
   action_items?: PlanStepActionItemRow[];
 };

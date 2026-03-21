@@ -16,6 +16,8 @@ export type PlanGeneratorInput = {
 /** Smaller scheduled action item for a step (weekly cadence, calendar-facing) */
 export type GeneratedActionItem = {
   title: string;
+  /** Optional "how to do it" / prep guidance */
+  description?: string;
   week_index: number;
   /** Optional ISO date; if omitted, derived from plan start + week_index */
   target_date?: string;
@@ -23,6 +25,8 @@ export type GeneratedActionItem = {
 
 /** Rich content for generated plan steps */
 export type GeneratedStepDetails = {
+  /** Short, concrete next action (e.g. "Call PECO and ask about CAP enrollment") */
+  action_needed_now?: string;
   rationale?: string;
   detailed_instructions?: string;
   checklist?: string[];

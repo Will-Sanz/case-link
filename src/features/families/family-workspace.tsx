@@ -5,6 +5,7 @@ import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
 import { CaseActivityTimeline } from "@/features/families/case-activity-timeline";
 import { NeedsAttentionPanel } from "@/features/families/needs-attention-panel";
 import { PlanPanel } from "@/features/families/plan-panel";
+import { CaseAssistantPanel } from "@/features/families/case-assistant-panel";
 import { PhasePlaceholder } from "@/features/families/phase-placeholder";
 import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
@@ -78,6 +79,9 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         familyName={family.name}
         resourceMatches={family.resourceMatches}
       />
+
+      {/* Case-level AI assistant */}
+      <CaseAssistantPanel familyId={family.id} familyName={family.name} />
 
       <section className="space-y-4">
         <div>

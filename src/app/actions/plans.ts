@@ -104,7 +104,6 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
 
   const env = getEnv();
   const apiKey = env.OPENAI_API_KEY?.trim();
-  const model = env.OPENAI_PLAN_MODEL?.trim() || "gpt-4o-mini";
 
   let steps = rulesStepsMerged;
   let generationSource: "openai" | "rules" = "rules";
@@ -113,7 +112,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   const debugPlan = process.env.OPENAI_DEBUG === "1";
 
   if (apiKey) {
-    const ai = await tryGeneratePlanStepsWithOpenAI(detail, apiKey, model);
+    const ai = await tryGeneratePlanStepsWithOpenAI(detail);
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;
       generationSource = "openai";
@@ -126,8 +125,8 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   steps = ensureActionItems(steps);
 
   const summary =
-    generationSource === "openai"
-      ? `Plan v${nextVersion} (AI: ${model})`
+    generationSource === "openai" && aiModel
+      ? `Plan v${nextVersion} (AI: ${aiModel})`
       : `Plan v${nextVersion} (rules + matched resources)`;
 
   const { data: plan, error: planErr } = await supabase
@@ -198,7 +197,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
         actionItemRows.push({
           plan_step_id: stepId,
           title: ai.title,
-          description: null,
+          description: ai.description ?? null,
           week_index: ai.week_index,
           target_date: targetDate,
           status: "pending",
@@ -652,7 +651,7 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
 
   const { data: step } = await supabase
     .from("plan_steps")
-    .select("id, plan_id, phase, title, description, details")
+    .select("id, plan_id, phase, title, description, details, workflow_data")
     .eq("id", stepId)
     .maybeSingle();
 
@@ -672,12 +671,16 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
   }
 
   const env = getEnv();
-  const apiKey = env.OPENAI_API_KEY?.trim();
-  const model = env.OPENAI_PLAN_MODEL?.trim() || "gpt-4o-mini";
-
-  if (!apiKey) {
+  if (!env.OPENAI_API_KEY?.trim()) {
     return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
   }
+
+  const allSteps = detail.plan?.steps ?? [];
+  const stepIndex = allSteps.findIndex((s) => s.id === stepId);
+  const surroundingTitles = [
+    ...allSteps.slice(Math.max(0, stepIndex - 1), stepIndex),
+    ...allSteps.slice(stepIndex + 1, stepIndex + 2),
+  ].map((s) => s.title);
 
   const result = await refineStepWithOpenAI(
     detail,
@@ -686,10 +689,10 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
       title: step.title,
       description: step.description,
       details: step.details,
+      workflow_data: step.workflow_data,
     },
     feedback,
-    apiKey,
-    model,
+    { surroundingStepTitles: surroundingTitles },
   );
 
   if (!result.ok) {

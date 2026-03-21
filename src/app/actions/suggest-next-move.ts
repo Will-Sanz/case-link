@@ -4,6 +4,7 @@ import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createAiResponse } from "@/lib/ai/client";
 
 export type SuggestResult =
   | { ok: true; suggestions: string[] }
@@ -47,10 +48,7 @@ export async function suggestNextMoveForBlockedStep(
   const blockerReason = (step.workflow_data as { blocker_reason?: string })?.blocker_reason;
 
   const env = getEnv();
-  const apiKey = env.OPENAI_API_KEY;
-  const model = env.OPENAI_PLAN_MODEL ?? "gpt-4o-mini";
-
-  if (!apiKey) {
+  if (!env.OPENAI_API_KEY?.trim()) {
     return {
       ok: true,
       suggestions: fallbacks.length > 0
@@ -81,41 +79,20 @@ export async function suggestNextMoveForBlockedStep(
   const userPrompt = `Blocked step context:\n${context}\n\nSuggest 3–5 concrete next moves.`;
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.4,
-        max_tokens: 600,
-      }),
+    const result = await createAiResponse({
+      taskType: "blocker_troubleshoot",
+      instructions: systemPrompt,
+      input: userPrompt,
+      responseFormat: "json_object",
+      temperature: 0.4,
+      maxTokens: 600,
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return {
-        ok: false,
-        error: `Suggestions unavailable: ${errText.slice(0, 100)}`,
-      };
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
 
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string | null } }[];
-    };
-    const raw = data.choices?.[0]?.message?.content;
-    if (!raw || typeof raw !== "string") {
-      throw new Error("Empty response");
-    }
-
-    const parsed = JSON.parse(raw) as { suggestions?: string[] };
+    const parsed = JSON.parse(result.text) as { suggestions?: string[] };
     const suggestions = Array.isArray(parsed.suggestions)
       ? parsed.suggestions.filter((s): s is string => typeof s === "string").slice(0, 5)
       : [];
