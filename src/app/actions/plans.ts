@@ -112,6 +112,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
         description: s.description,
         sort_order: s.sort_order,
         status: "pending",
+        details: s.details ?? null,
       })),
     );
     if (stepsErr) {
@@ -170,8 +171,13 @@ export async function updatePlanStep(
 
   const updatePayload: Record<string, unknown> = {};
   if (patch.title !== undefined) updatePayload.title = patch.title;
-  if (patch.description !== undefined) updatePayload.description = patch.description;
+  if (patch.description !== undefined)
+    updatePayload.description = patch.description;
   if (patch.status !== undefined) updatePayload.status = patch.status;
+  if (patch.details !== undefined) updatePayload.details = patch.details;
+  if (patch.workflow_data !== undefined)
+    updatePayload.workflow_data = patch.workflow_data;
+  if (patch.due_date !== undefined) updatePayload.due_date = patch.due_date;
 
   const { error } = await supabase
     .from("plan_steps")

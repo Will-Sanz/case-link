@@ -16,7 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
-import type { PlanStepRow, PlanWithSteps } from "@/types/family";
+import type {
+  PlanStepRow,
+  PlanStepDetails,
+  PlanStepWorkflowData,
+  PlanWithSteps,
+} from "@/types/family";
 
 const PHASE_LABELS: Record<string, string> = {
   "30": "30-day",
@@ -77,6 +82,17 @@ type PlanStepModalInnerProps = {
   onClose: () => void;
 };
 
+const OUTREACH_RESULTS = [
+  "",
+  "No answer",
+  "Left voicemail",
+  "Appointment scheduled",
+  "Documents requested",
+  "Application submitted",
+  "Ineligible / closed",
+  "Other",
+] as const;
+
 function PlanStepModalInner({
   step,
   plan,
@@ -90,6 +106,21 @@ function PlanStepModalInner({
   const [title, setTitle] = useState(step.title);
   const [description, setDescription] = useState(step.description);
   const [status, setStatus] = useState<PlanStepRow["status"]>(step.status);
+  const [workflow, setWorkflow] = useState<PlanStepWorkflowData>({
+    blocker_reason: step.workflow_data?.blocker_reason ?? null,
+    outcome_notes: step.workflow_data?.outcome_notes ?? null,
+    contact_attempted_at: step.workflow_data?.contact_attempted_at ?? null,
+    outreach_result: step.workflow_data?.outreach_result ?? null,
+    needs_escalation: step.workflow_data?.needs_escalation ?? false,
+    documents_received: step.workflow_data?.documents_received ?? false,
+    family_understood: step.workflow_data?.family_understood ?? false,
+    case_manager_assisted: step.workflow_data?.case_manager_assisted ?? false,
+  });
+  const [dueDate, setDueDate] = useState(
+    step.due_date
+      ? new Date(step.due_date).toISOString().slice(0, 10)
+      : "",
+  );
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -103,6 +134,35 @@ function PlanStepModalInner({
       document.body.style.overflow = prev;
     };
   }, [onClose]);
+
+  const saveWorkflow = useCallback(() => {
+    setError(null);
+    startTransition(async () => {
+      const payload: Record<string, unknown> = {
+        stepId: step.id,
+        familyId,
+        status,
+        workflow_data: {
+          ...workflow,
+          blocker_reason: workflow.blocker_reason || null,
+          outcome_notes: workflow.outcome_notes || null,
+          contact_attempted_at: workflow.contact_attempted_at || null,
+          outreach_result: workflow.outreach_result || null,
+        },
+      };
+      if (dueDate) {
+        payload.due_date = new Date(dueDate).toISOString();
+      } else {
+        payload.due_date = null;
+      }
+      const r = await updatePlanStep(payload);
+      if (!r.ok) {
+        setError(r.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }, [step.id, familyId, status, workflow, dueDate, router]);
 
   const handleStatusChange = useCallback(
     (next: PlanStepRow["status"]) => {
@@ -171,7 +231,7 @@ function PlanStepModalInner({
         role="dialog"
         aria-modal="true"
         aria-labelledby="plan-step-modal-title"
-        className="relative z-10 flex max-h-[min(90vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/15"
+        className="relative z-10 flex max-h-[min(90vh,800px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/15"
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="min-w-0">
@@ -198,6 +258,11 @@ function PlanStepModalInner({
                   Rules / resources
                 </Badge>
               )}
+              {workflow.needs_escalation ? (
+                <Badge className="bg-amber-100 text-amber-900">
+                  Needs escalation
+                </Badge>
+              ) : null}
             </div>
           </div>
           <Button
@@ -221,19 +286,203 @@ function PlanStepModalInner({
             </p>
           ) : null}
 
-          <div>
-            <Label className="text-slate-700">Status</Label>
-            <div className="mt-1.5">
-              <ModalStatusSelect
-                status={status}
-                onChange={handleStatusChange}
-                disabled={pending || editing}
-              />
+          {/* Workflow section */}
+          <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <h3 className="text-sm font-semibold text-slate-800">
+              Case manager actions
+            </h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label className="text-slate-700">Status</Label>
+                <div className="mt-1.5">
+                  <ModalStatusSelect
+                    status={status}
+                    onChange={handleStatusChange}
+                    disabled={pending || editing}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="modal-due-date" className="text-slate-700">
+                  Follow-up / due date
+                </Label>
+                <Input
+                  id="modal-due-date"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="mt-1.5"
+                  disabled={pending}
+                />
+              </div>
             </div>
+
+            {status === "blocked" ? (
+              <div className="mt-4">
+                <Label htmlFor="modal-blocker" className="text-slate-700">
+                  Blocker reason
+                </Label>
+                <Input
+                  id="modal-blocker"
+                  value={workflow.blocker_reason ?? ""}
+                  onChange={(e) =>
+                    setWorkflow((w) => ({
+                      ...w,
+                      blocker_reason: e.target.value || null,
+                    }))
+                  }
+                  placeholder="What is blocking this step?"
+                  className="mt-1.5"
+                  disabled={pending}
+                />
+              </div>
+            ) : null}
+
+            {status === "completed" ? (
+              <div className="mt-4">
+                <Label htmlFor="modal-outcome" className="text-slate-700">
+                  Outcome achieved
+                </Label>
+                <Input
+                  id="modal-outcome"
+                  value={workflow.outcome_notes ?? ""}
+                  onChange={(e) =>
+                    setWorkflow((w) => ({
+                      ...w,
+                      outcome_notes: e.target.value || null,
+                    }))
+                  }
+                  placeholder="What was accomplished?"
+                  className="mt-1.5"
+                  disabled={pending}
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-4 space-y-3">
+              <Label className="text-slate-700">Outreach</Label>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[140px]">
+                  <Label className="text-xs text-slate-500">
+                    Contact attempted
+                  </Label>
+                  <Input
+                    type="date"
+                    value={
+                      workflow.contact_attempted_at
+                        ? workflow.contact_attempted_at.slice(0, 10)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setWorkflow((w) => ({
+                        ...w,
+                        contact_attempted_at: e.target.value
+                          ? `${e.target.value}T12:00:00Z`
+                          : null,
+                      }))
+                    }
+                    className="mt-1"
+                    disabled={pending}
+                  />
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <Label className="text-xs text-slate-500">Result</Label>
+                  <select
+                    value={workflow.outreach_result ?? ""}
+                    onChange={(e) =>
+                      setWorkflow((w) => ({
+                        ...w,
+                        outreach_result: e.target.value || null,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    disabled={pending}
+                  >
+                    {OUTREACH_RESULTS.map((r) => (
+                      <option key={r || "empty"} value={r}>
+                        {r || "—"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={workflow.needs_escalation ?? false}
+                  onChange={(e) =>
+                    setWorkflow((w) => ({
+                      ...w,
+                      needs_escalation: e.target.checked,
+                    }))
+                  }
+                  disabled={pending}
+                  className="rounded border-slate-300"
+                />
+                Needs escalation
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={workflow.documents_received ?? false}
+                  onChange={(e) =>
+                    setWorkflow((w) => ({
+                      ...w,
+                      documents_received: e.target.checked,
+                    }))
+                  }
+                  disabled={pending}
+                  className="rounded border-slate-300"
+                />
+                Documents received
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={workflow.family_understood ?? false}
+                  onChange={(e) =>
+                    setWorkflow((w) => ({
+                      ...w,
+                      family_understood: e.target.checked,
+                    }))
+                  }
+                  disabled={pending}
+                  className="rounded border-slate-300"
+                />
+                Family understood
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={workflow.case_manager_assisted ?? false}
+                  onChange={(e) =>
+                    setWorkflow((w) => ({
+                      ...w,
+                      case_manager_assisted: e.target.checked,
+                    }))
+                  }
+                  disabled={pending}
+                  className="rounded border-slate-300"
+                />
+                Case manager assisted
+              </label>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-4"
+              onClick={saveWorkflow}
+              disabled={pending}
+            >
+              Save workflow
+            </Button>
           </div>
 
           {editing ? (
-            <div className="mt-5 space-y-4">
+            <div className="space-y-4">
               <div>
                 <Label htmlFor="modal-step-title">Title</Label>
                 <Input
@@ -249,7 +498,7 @@ function PlanStepModalInner({
                   id="modal-step-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={10}
+                  rows={8}
                   className={`mt-1.5 ${textareaClass}`}
                 />
               </div>
@@ -276,18 +525,213 @@ function PlanStepModalInner({
               </div>
             </div>
           ) : (
-            <div className="mt-5">
-              <Label className="text-slate-700">Full detail</Label>
-              {description.trim() ? (
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                  {description}
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-slate-500">
-                  No description yet. Use Edit to add contacts, intake steps, or
-                  follow-up notes.
-                </p>
-              )}
+            <div className="space-y-4">
+              {(() => {
+                const d = step.details as PlanStepDetails | null | undefined;
+                const hasRichContent =
+                  d &&
+                  (d.rationale ||
+                    d.detailed_instructions ||
+                    (d.checklist && d.checklist.length > 0) ||
+                    (d.required_documents &&
+                      d.required_documents.length > 0) ||
+                    (d.contacts && d.contacts.length > 0) ||
+                    (d.blockers && d.blockers.length > 0) ||
+                    (d.fallback_options && d.fallback_options.length > 0) ||
+                    d.expected_outcome ||
+                    d.timing_guidance ||
+                    d.stage_goal ||
+                    d.why_now);
+
+                if (hasRichContent) {
+                  return (
+                    <>
+                      {(d!.stage_goal || d!.why_now) ? (
+                        <div className="rounded-lg bg-slate-50 p-3">
+                          {d!.stage_goal ? (
+                            <div>
+                              <Label className="text-slate-500">
+                                Stage focus
+                              </Label>
+                              <p className="mt-1 text-sm text-slate-800">
+                                {d!.stage_goal}
+                              </p>
+                            </div>
+                          ) : null}
+                          {d!.why_now ? (
+                            <div className="mt-2">
+                              <Label className="text-slate-500">Why now</Label>
+                              <p className="mt-1 text-sm text-slate-800">
+                                {d!.why_now}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {d!.rationale ? (
+                        <div>
+                          <Label className="text-slate-500">
+                            Why this matters
+                          </Label>
+                          <p className="mt-1 text-sm text-slate-800">
+                            {d!.rationale}
+                          </p>
+                        </div>
+                      ) : null}
+                      {d!.detailed_instructions ? (
+                        <div>
+                          <Label className="text-slate-500">What to do</Label>
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                            {d!.detailed_instructions}
+                          </p>
+                        </div>
+                      ) : null}
+                      {d!.checklist && d!.checklist.length > 0 ? (
+                        <div>
+                          <Label className="text-slate-500">Checklist</Label>
+                          <ul className="mt-2 space-y-2">
+                            {d!.checklist.map((item, i) => (
+                              <li
+                                key={i}
+                                className="flex gap-2 text-sm text-slate-800"
+                              >
+                                <span className="mt-1 size-1.5 shrink-0 rounded-full bg-teal-400" />
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {d!.required_documents &&
+                      d!.required_documents.length > 0 ? (
+                        <div>
+                          <Label className="text-slate-500">
+                            What to prepare
+                          </Label>
+                          <ul className="mt-2 flex flex-wrap gap-2">
+                            {d!.required_documents.map((doc, i) => (
+                              <li
+                                key={i}
+                                className="rounded-md bg-slate-100 px-2 py-1 text-sm text-slate-700"
+                              >
+                                {doc}
+                              </li>
+                            ))}
+                          </ul>
+                          {workflow.documents_received ? (
+                            <p className="mt-2 text-xs text-emerald-600">
+                              ✓ Documents received
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {d!.contacts && d!.contacts.length > 0 ? (
+                        <div>
+                          <Label className="text-slate-500">Contacts</Label>
+                          <ul className="mt-2 space-y-1.5">
+                            {d!.contacts.map((c, i) => (
+                              <li
+                                key={i}
+                                className="text-sm text-slate-800"
+                              >
+                                {c.name && (
+                                  <span className="font-medium">{c.name}</span>
+                                )}{" "}
+                                {c.phone && (
+                                  <a
+                                    href={`tel:${c.phone}`}
+                                    className="text-teal-700 hover:underline"
+                                  >
+                                    {c.phone}
+                                  </a>
+                                )}{" "}
+                                {c.email && (
+                                  <a
+                                    href={`mailto:${c.email}`}
+                                    className="text-teal-700 hover:underline"
+                                  >
+                                    {c.email}
+                                  </a>
+                                )}
+                                {c.notes && (
+                                  <span className="text-slate-500">
+                                    {" "}
+                                    — {c.notes}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {d!.expected_outcome ? (
+                        <div>
+                          <Label className="text-slate-500">
+                            Success looks like
+                          </Label>
+                          <p className="mt-1 text-sm text-slate-800">
+                            {d!.expected_outcome}
+                          </p>
+                        </div>
+                      ) : null}
+                      {(d!.blockers?.length ?? 0) > 0 ||
+                      (d!.fallback_options?.length ?? 0) > 0 ? (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {d!.blockers && d!.blockers.length > 0 ? (
+                            <div>
+                              <Label className="text-slate-500">
+                                Common blockers
+                              </Label>
+                              <ul className="mt-2 space-y-1 text-sm text-slate-800">
+                                {d!.blockers.map((b, i) => (
+                                  <li key={i}>• {b}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {d!.fallback_options &&
+                          d!.fallback_options.length > 0 ? (
+                            <div>
+                              <Label className="text-slate-500">
+                                Fallback options
+                              </Label>
+                              <ul className="mt-2 space-y-1 text-sm text-slate-800">
+                                {d!.fallback_options.map((f, i) => (
+                                  <li key={i}>• {f}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {d!.timing_guidance ? (
+                        <div>
+                          <Label className="text-slate-500">Timing</Label>
+                          <p className="mt-1 text-sm text-slate-800">
+                            {d!.timing_guidance}
+                          </p>
+                        </div>
+                      ) : null}
+                    </>
+                  );
+                }
+
+                return (
+                  <div>
+                    <Label className="text-slate-700">Full detail</Label>
+                    {description.trim() ? (
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                        {description}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-500">
+                        No description yet. Use Edit to add contacts, intake
+                        steps, or follow-up notes.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

@@ -79,6 +79,47 @@ export type ResourceMatchRow = {
   resource: MatchedResourceSummary | null;
 };
 
+/** Rich structured content for plan steps (checklist, contacts, blockers, etc.) */
+export type PlanStepDetails = {
+  rationale?: string;
+  detailed_instructions?: string;
+  checklist?: string[];
+  required_documents?: string[];
+  contacts?: Array<{
+    name?: string;
+    phone?: string;
+    email?: string;
+    notes?: string;
+  }>;
+  blockers?: string[];
+  fallback_options?: string[];
+  expected_outcome?: string;
+  timing_guidance?: string;
+  priority?: "low" | "medium" | "high";
+  /** Why this step belongs in this stage; distinct from rationale */
+  stage_goal?: string;
+  /** Why this action happens now rather than earlier */
+  why_now?: string;
+  /** Index or brief reference to prior step this builds on (1-based) */
+  depends_on?: string;
+  /** Type of milestone: outreach, preparation, follow_up, review, habit_building, contingency, renewal */
+  milestone_type?: string;
+  /** Clear success marker for this step */
+  success_marker?: string;
+};
+
+/** Case manager interaction data stored on plan steps */
+export type PlanStepWorkflowData = {
+  blocker_reason?: string | null;
+  outcome_notes?: string | null;
+  contact_attempted_at?: string | null;
+  outreach_result?: string | null;
+  needs_escalation?: boolean;
+  documents_received?: boolean;
+  family_understood?: boolean;
+  case_manager_assisted?: boolean;
+};
+
 export type PlanStepRow = {
   id: string;
   plan_id: string;
@@ -91,6 +132,8 @@ export type PlanStepRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  details?: PlanStepDetails | null;
+  workflow_data?: PlanStepWorkflowData | null;
 };
 
 export type PlanRow = {

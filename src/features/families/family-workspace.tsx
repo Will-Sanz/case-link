@@ -64,6 +64,13 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         </div>
       </div>
 
+      {/* 30/60/90 plan — primary action surface, front and center */}
+      <PlanPanel
+        familyId={family.id}
+        plan={family.plan ?? null}
+        familyName={family.name}
+      />
+
       <section className="space-y-4">
         <div>
           <SectionLabel>Profile & household</SectionLabel>
@@ -214,24 +221,21 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         <div>
           <SectionLabel>Planning</SectionLabel>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">
-            Resources & 30/60/90 plan
+            Resource matches
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Review suggested programs, then build and track the family&apos;s plan
-            by phase.
+            Suggested programs that feed into the plan. Run matching before
+            generating or regenerating the plan.
           </p>
         </div>
-        <div className="space-y-6">
-          <ResourceMatchesPanel
-            familyId={family.id}
-            matches={family.resourceMatches}
-          />
-          <PlanPanel familyId={family.id} plan={family.plan ?? null} />
-          <PhasePlaceholder
-            title="Referrals & tasks"
-            description="Outreach tracking and tasks land in Phase 5."
-          />
-        </div>
+        <ResourceMatchesPanel
+          familyId={family.id}
+          matches={family.resourceMatches}
+        />
+        <PhasePlaceholder
+          title="Referrals & tasks"
+          description="Outreach tracking and tasks land in Phase 5."
+        />
       </section>
     </div>
   );

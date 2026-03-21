@@ -1,5 +1,43 @@
 import { z } from "zod";
 
+const planStepDetailsSchema = z.object({
+  rationale: z.string().optional(),
+  detailed_instructions: z.string().optional(),
+  checklist: z.array(z.string()).optional(),
+  required_documents: z.array(z.string()).optional(),
+  contacts: z
+    .array(
+      z.object({
+        name: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .optional(),
+  blockers: z.array(z.string()).optional(),
+  fallback_options: z.array(z.string()).optional(),
+  expected_outcome: z.string().optional(),
+  timing_guidance: z.string().optional(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  stage_goal: z.string().optional(),
+  why_now: z.string().optional(),
+  depends_on: z.string().optional(),
+  milestone_type: z.string().optional(),
+  success_marker: z.string().optional(),
+});
+
+const planStepWorkflowSchema = z.object({
+  blocker_reason: z.string().nullable().optional(),
+  outcome_notes: z.string().nullable().optional(),
+  contact_attempted_at: z.string().nullable().optional(),
+  outreach_result: z.string().nullable().optional(),
+  needs_escalation: z.boolean().optional(),
+  documents_received: z.boolean().optional(),
+  family_understood: z.boolean().optional(),
+  case_manager_assisted: z.boolean().optional(),
+});
+
 export const generatePlanSchema = z.object({
   familyId: z.string().uuid(),
 });
@@ -10,6 +48,9 @@ export const updatePlanStepSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
+  details: planStepDetailsSchema.optional(),
+  workflow_data: planStepWorkflowSchema.optional(),
+  due_date: z.string().nullable().optional(),
 });
 
 export const createManualStepSchema = z.object({

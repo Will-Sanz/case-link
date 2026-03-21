@@ -1,5 +1,5 @@
 import type { ResourceMatchRow } from "@/types/family";
-import type { GeneratedStep, PlanPhase } from "./types";
+import type { GeneratedStep, GeneratedStepDetails, PlanPhase } from "./types";
 
 /** Non-dismissed matches only, highest score first (for plan AI + rules). */
 export function matchesForPlanContext(
@@ -55,11 +55,92 @@ export function generatedStepsFromMatches(
       .filter(Boolean)
       .join("\n");
 
+    const contacts: GeneratedStepDetails["contacts"] = [];
+    if (r.primary_contact_name || r.primary_contact_email || r.primary_contact_phone) {
+      contacts.push({
+        name: r.primary_contact_name ?? undefined,
+        email: r.primary_contact_email ?? undefined,
+        phone: r.primary_contact_phone ?? undefined,
+        notes: r.primary_contact_title ?? undefined,
+      });
+    }
+    if (
+      r.secondary_contact_name ||
+      r.secondary_contact_email ||
+      r.secondary_contact_phone
+    ) {
+      contacts.push({
+        name: r.secondary_contact_name ?? undefined,
+        email: r.secondary_contact_email ?? undefined,
+        phone: r.secondary_contact_phone ?? undefined,
+      });
+    }
+
+    const phaseGuidance =
+      phase === "30"
+        ? {
+            stage_goal: "Initial outreach and intake setup",
+            why_now: "First 30 days focus on making contact and starting intake; delays here push back the whole timeline.",
+            detailed_instructions: `Call or email ${r.program_name} (${r.office_or_department}) to begin intake or referral. ${contactLine ? `Use: ${contactLine}` : ""} Before reaching out, gather any required documents (ID, proof of address, income verification). After contact, document the representative's name, date, and next steps. Follow up in 3–5 business days if you don't hear back.`,
+          }
+        : phase === "60"
+          ? {
+              stage_goal: "Follow-through and application completion",
+              why_now: "By day 60, initial outreach should be done; this phase focuses on completing applications and troubleshooting.",
+              detailed_instructions: `Follow up on prior contact with ${r.program_name}. Submit any missing documents they requested. Attend scheduled appointments. If you haven't connected yet, try again and document the attempt. Record outcome in case notes.`,
+            }
+          : {
+              stage_goal: "Ongoing support and renewal",
+              why_now: "By day 90, focus shifts to sustaining gains, renewing assistance if needed, and contingency planning.",
+              detailed_instructions: `Check status with ${r.program_name}. If assistance was granted, note renewal dates. If still pending, escalate or explore fallbacks. Document current status and next steps for ongoing support.`,
+            };
+
+    const details: GeneratedStepDetails = {
+      ...phaseGuidance,
+      rationale: m.match_reason
+        ? `This program matches the family's needs: ${m.match_reason}`
+        : undefined,
+      checklist:
+        phase === "30"
+          ? [
+              "Gather ID, proof of address, and income documents",
+              `Contact ${r.program_name} by phone or email`,
+              "Document representative name, date, and outcome",
+              "Set follow-up reminder for 3–5 business days",
+            ]
+          : phase === "60"
+            ? [
+                "Submit any requested documents",
+                "Attend scheduled appointments",
+                "Document outcome and next steps",
+                "Record result in case notes",
+              ]
+            : [
+                "Verify current status",
+                "Note renewal or expiration dates",
+                "Update case notes with ongoing plan",
+              ],
+      required_documents:
+        phase === "30"
+          ? ["ID", "Proof of address", "Income verification"]
+          : undefined,
+      contacts: contacts.length > 0 ? contacts : undefined,
+      expected_outcome:
+        phase === "30"
+          ? "Intake started; next steps documented"
+          : phase === "60"
+            ? "Application completed or outcome documented"
+            : "Status confirmed; renewal or contingency plan in place",
+      milestone_type:
+        phase === "30" ? "outreach" : phase === "60" ? "follow_up" : "review",
+    };
+
     return {
       phase,
       title: `Outreach: ${r.program_name}`,
       description,
       sort_order: 0,
+      details,
     };
   });
 }

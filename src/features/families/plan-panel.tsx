@@ -13,15 +13,22 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SectionHeader } from "@/components/ui/section-header";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
 import { PlanStepModal } from "@/features/families/plan-step-modal";
-import type { PlanStepRow, PlanWithSteps } from "@/types/family";
+import { PlanPdfExport } from "@/features/families/plan-pdf-export";
+import type { PlanStepRow, PlanStepDetails, PlanWithSteps } from "@/types/family";
+import { cn } from "@/lib/utils/cn";
 
 const PHASE_LABELS: Record<string, string> = {
   "30": "30-day",
   "60": "60-day",
   "90": "90-day",
+};
+
+const PHASE_COLORS: Record<string, string> = {
+  "30": "bg-teal-600",
+  "60": "bg-teal-500",
+  "90": "bg-teal-400",
 };
 
 function StepStatusBadge({
@@ -48,24 +55,209 @@ function StepStatusBadge({
         onChange={(e) =>
           onChange(e.target.value as PlanStepRow["status"])
         }
-        className={`rounded-md border-0 px-2 py-0.5 text-xs font-medium ${cls} focus:ring-2 focus:ring-teal-600/25`}
+        className={cn(
+          "rounded-md border-0 px-2 py-0.5 text-xs font-medium focus:ring-2 focus:ring-teal-600/25",
+          cls,
+        )}
       >
-        <option value="pending">pending</option>
-        <option value="in_progress">in_progress</option>
-        <option value="completed">completed</option>
-        <option value="blocked">blocked</option>
+        <option value="pending">Pending</option>
+        <option value="in_progress">In progress</option>
+        <option value="completed">Completed</option>
+        <option value="blocked">Blocked</option>
       </select>
     );
   }
-  return <Badge className={cls}>{status}</Badge>;
+  return <Badge className={cls}>{status.replace("_", " ")}</Badge>;
+}
+
+/** Preview of step content for list view — uses details when available, else description */
+function StepPreview({
+  step,
+  expanded,
+}: {
+  step: PlanStepRow;
+  expanded: boolean;
+}) {
+  const d = step.details as PlanStepDetails | null | undefined;
+  const w = step.workflow_data;
+  const hasDetails = d && (d.detailed_instructions || d.checklist?.length);
+
+  if (!expanded) {
+    const preview = d?.detailed_instructions ?? step.description;
+    return (
+      <div className="mt-2 space-y-1">
+        <p className="line-clamp-2 text-sm text-slate-600">
+          {preview?.trim() || "No description — open to add context"}
+        </p>
+        {w?.blocker_reason && step.status === "blocked" ? (
+          <p className="text-xs text-red-700">
+            Blocker: {w.blocker_reason}
+          </p>
+        ) : null}
+        {w?.outcome_notes && step.status === "completed" ? (
+          <p className="text-xs text-emerald-700">
+            Outcome: {w.outcome_notes}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-4 text-sm">
+      {(d?.stage_goal || d?.why_now) ? (
+        <div className="rounded-lg bg-slate-50 p-3">
+          {d?.stage_goal ? (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Stage focus
+              </p>
+              <p className="mt-1 text-slate-700">{String(d?.stage_goal ?? "")}</p>
+            </>
+          ) : null}
+          {d?.why_now ? (
+            <>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Why now
+              </p>
+              <p className="mt-1 text-slate-700">{String(d?.why_now ?? "")}</p>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      {d?.rationale ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Why this matters
+          </p>
+          <p className="mt-1 text-slate-700">{d.rationale}</p>
+        </div>
+      ) : null}
+      {d?.detailed_instructions ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            What to do
+          </p>
+          <p className="mt-1 whitespace-pre-wrap leading-relaxed text-slate-700">
+            {d.detailed_instructions}
+          </p>
+        </div>
+      ) : step.description ? (
+        <p className="whitespace-pre-wrap text-slate-700">{step.description}</p>
+      ) : null}
+      {d?.checklist && d.checklist.length > 0 ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Checklist
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {d.checklist.map((item, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-teal-400" />
+                <span className="text-slate-700">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {d?.required_documents && d.required_documents.length > 0 ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            What to prepare
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {d.required_documents.map((doc, i) => (
+              <li
+                key={i}
+                className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700"
+              >
+                {doc}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {d?.contacts && d.contacts.length > 0 ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Contacts
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {d.contacts.map((c, i) => (
+              <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-slate-700">
+                {c.name && <span className="font-medium">{c.name}</span>}
+                {c.phone && (
+                  <a
+                    href={`tel:${c.phone}`}
+                    className="text-teal-700 hover:underline"
+                  >
+                    {c.phone}
+                  </a>
+                )}
+                {c.email && (
+                  <a
+                    href={`mailto:${c.email}`}
+                    className="text-teal-700 hover:underline"
+                  >
+                    {c.email}
+                  </a>
+                )}
+                {c.notes && (
+                  <span className="text-slate-500">— {c.notes}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {d?.expected_outcome ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Success looks like
+          </p>
+          <p className="mt-1 text-slate-700">{d.expected_outcome}</p>
+        </div>
+      ) : null}
+      {(d?.blockers?.length ?? 0) > 0 || (d?.fallback_options?.length ?? 0) > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {d?.blockers && d.blockers.length > 0 ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Common blockers
+              </p>
+              <ul className="mt-2 space-y-1 text-slate-700">
+                {d.blockers.map((b, i) => (
+                  <li key={i}>• {b}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {d?.fallback_options && d.fallback_options.length > 0 ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Fallback options
+              </p>
+              <ul className="mt-2 space-y-1 text-slate-700">
+                {d.fallback_options.map((f, i) => (
+                  <li key={i}>• {f}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function PlanPanel({
   familyId,
   plan,
+  familyName,
 }: {
   familyId: string;
   plan: PlanWithSteps | null;
+  familyName?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -78,6 +270,16 @@ export function PlanPanel({
   const [addTitle, setAddTitle] = useState("");
   const [addDesc, setAddDesc] = useState("");
   const [modalStepId, setModalStepId] = useState<string | null>(null);
+  const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
+
+  function toggleExpand(stepId: string) {
+    setExpandedStepIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepId)) next.delete(stepId);
+      else next.add(stepId);
+      return next;
+    });
+  }
 
   function handleGenerate() {
     setError(null);
@@ -168,279 +370,403 @@ export function PlanPanel({
     return plan.steps.find((s) => s.id === modalStepId) ?? null;
   }, [plan, modalStepId]);
 
+  const completedCount = plan?.steps.filter((s) => s.status === "completed").length ?? 0;
+  const totalCount = plan?.steps.length ?? 0;
+  const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
   return (
     <>
-    <Card>
-      <SectionHeader
-        title="30 / 60 / 90 day plan"
-        description="With an API key configured, plans are drafted by AI first; otherwise (or if AI fails) steps come from rules tied to goals and barriers. Edit or add steps anytime."
-        actions={
-          !plan ? (
-            <Button
-              type="button"
-              onClick={handleGenerate}
-              disabled={pending}
-              variant="secondary"
-            >
-              {pending ? "Generating…" : "Generate plan"}
-            </Button>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={handleGenerate}
-                disabled={pending}
-                variant="secondary"
-              >
-                {pending ? "Generating…" : "Regenerate (new version)"}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setShowAddStep(true)}
-                disabled={pending}
-                variant="secondary"
-              >
-                Add step
-              </Button>
+      <section
+        className="rounded-2xl border-2 border-teal-100 bg-white shadow-lg shadow-slate-900/[0.04]"
+        id="plan-section"
+      >
+        <div className="border-b border-slate-100 bg-gradient-to-br from-teal-50/80 to-white px-6 py-5 sm:px-8 sm:py-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-teal-700">
+                Action plan
+              </p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                30 / 60 / 90 day plan
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                Step-by-step guidance for the family. Generate with AI, edit as needed, and share as a PDF.
+              </p>
+              {plan && totalCount > 0 ? (
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-teal-600 transition-all"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">
+                    {completedCount} of {totalCount} completed
+                  </span>
+                </div>
+              ) : null}
             </div>
-          )
-        }
-      />
-
-      {error ? (
-        <p
-          className="mt-4 rounded-lg border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-900"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
-      {!plan ? (
-        <p className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
-          No plan yet. Click &quot;Generate plan&quot; to create one from this
-          family&apos;s goals and barriers.
-        </p>
-      ) : (
-        <div className="mt-6 space-y-8">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">
-              Source:
-              {plan.generation_source === "openai" ? (
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {plan ? (
                 <>
-                  {" "}
-                  <Badge className="border-teal-200/80 bg-teal-50 text-teal-900">
-                    AI{plan.ai_model ? ` (${plan.ai_model})` : ""}
-                  </Badge>
-                </>
-              ) : plan.generation_source === "manual" ? (
-                <Badge className="bg-slate-100 text-slate-700">Manual</Badge>
-              ) : (
-                <Badge className="bg-slate-100 text-slate-700">
-                  Rules-based (goals & barriers)
-                </Badge>
-              )}
-            </span>
-            {plan.summary ? (
-              <span className="text-xs text-slate-400">· {plan.summary}</span>
-            ) : null}
-          </div>
-          {(["30", "60", "90"] as const).map((phase) => (
-            <div key={phase}>
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-xs tabular-nums text-slate-700">
-                  {phase}
-                </span>
-                {PHASE_LABELS[phase]} focus
-              </h3>
-              {stepsByPhase[phase].length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  No steps in this phase. Add one below.
-                </p>
-              ) : (
-                <ul className="space-y-3">
-                  {stepsByPhase[phase].map((step) => (
-                    <li
-                      key={step.id}
-                      className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.02]"
-                    >
-                      {editingStepId === step.id ? (
-                        <div className="space-y-3">
-                          <Input
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            placeholder="Title"
-                            className="font-medium"
-                          />
-                          <textarea
-                            value={editDesc}
-                            onChange={(e) => setEditDesc(e.target.value)}
-                            placeholder="Description"
-                            rows={2}
-                            className={textareaClass}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              className="px-3 py-1.5 text-sm"
-                              onClick={saveEdit}
-                              disabled={pending || !editTitle.trim()}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="px-3 py-1.5 text-sm"
-                              onClick={cancelEdit}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <button
-                                type="button"
-                                onClick={() => setModalStepId(step.id)}
-                                className="w-full rounded-lg p-1 -m-1 text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25"
-                              >
-                                <p className="font-medium text-slate-900">
-                                  {step.title}
-                                </p>
-                                {step.description ? (
-                                  <p className="mt-2 line-clamp-3 text-sm text-slate-600">
-                                    {step.description}
-                                  </p>
-                                ) : (
-                                  <p className="mt-2 text-xs text-slate-400">
-                                    No description — open to add context
-                                  </p>
-                                )}
-                                <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-800">
-                                  View details
-                                  <span aria-hidden>→</span>
-                                </span>
-                              </button>
-                            </div>
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              <StepStatusBadge
-                                status={step.status}
-                                onChange={(s) =>
-                                  handleStatusChange(step.id, s)
-                                }
-                                disabled={pending}
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                className="text-slate-500 py-1 px-2 text-xs"
-                                onClick={() => startEdit(step)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                className="text-red-600 py-1 px-2 text-xs"
-                                onClick={() => handleDelete(step.id)}
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-
-          {showAddStep ? (
-            <form
-              onSubmit={handleAddStep}
-              className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4"
-            >
-              <h4 className="mb-3 text-sm font-medium text-slate-800">
-                Add step
-              </h4>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="add-phase">Phase</Label>
-                  <select
-                    id="add-phase"
-                    value={addPhase}
-                    onChange={(e) =>
-                      setAddPhase(e.target.value as "30" | "60" | "90")
-                    }
-                    className={`mt-1 ${selectInputClass}`}
-                  >
-                    <option value="30">30-day</option>
-                    <option value="60">60-day</option>
-                    <option value="90">90-day</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="add-title">Title</Label>
-                  <Input
-                    id="add-title"
-                    value={addTitle}
-                    onChange={(e) => setAddTitle(e.target.value)}
-                    placeholder="Step title"
-                    className="mt-1"
-                    required
+                  <PlanPdfExport
+                    plan={plan}
+                    familyName={familyName ?? undefined}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="add-desc">Description (optional)</Label>
-                  <textarea
-                    id="add-desc"
-                    value={addDesc}
-                    onChange={(e) => setAddDesc(e.target.value)}
-                    placeholder="Details…"
-                    rows={2}
-                    className={`mt-1 ${textareaClass}`}
-                  />
-                </div>
-                <div className="flex gap-2">
                   <Button
-                    type="submit"
-                    disabled={pending || !addTitle.trim()}
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={pending}
+                    variant="secondary"
+                    className="border-slate-200"
                   >
-                    Add step
+                    {pending ? "Generating…" : "Regenerate"}
                   </Button>
                   <Button
                     type="button"
+                    onClick={() => setShowAddStep(true)}
+                    disabled={pending}
                     variant="secondary"
-                    onClick={() => {
-                      setShowAddStep(false);
-                      setAddTitle("");
-                      setAddDesc("");
-                    }}
+                    className="border-slate-200"
                   >
-                    Cancel
+                    Add step
                   </Button>
-                </div>
-              </div>
-            </form>
-          ) : null}
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={pending}
+                  className="bg-teal-600 hover:bg-teal-700"
+                >
+                  {pending ? "Generating…" : "Generate plan"}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-    </Card>
 
-    {plan && modalStep ? (
-      <PlanStepModal
-        key={`${modalStep.id}-${modalStep.updated_at}`}
-        step={modalStep}
-        plan={plan}
-        familyId={familyId}
-        onClose={() => setModalStepId(null)}
-      />
-    ) : null}
+        <div className="px-6 py-5 sm:px-8 sm:py-6">
+          {error ? (
+            <p
+              className="mb-5 rounded-lg border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-900"
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
+
+          {!plan ? (
+            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center">
+              <p className="text-base text-slate-600">
+                No plan yet. Click <strong>Generate plan</strong> to create one from this family&apos;s goals and barriers.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-slate-500">Source:</span>
+                {plan.generation_source === "openai" ? (
+                  <Badge className="border-teal-200/80 bg-teal-50 text-teal-900">
+                    AI{plan.ai_model ? ` (${plan.ai_model})` : ""}
+                  </Badge>
+                ) : plan.generation_source === "manual" ? (
+                  <Badge className="bg-slate-100 text-slate-700">Manual</Badge>
+                ) : (
+                  <Badge className="bg-slate-100 text-slate-700">
+                    Rules + resources
+                  </Badge>
+                )}
+                {plan.summary ? (
+                  <span className="text-slate-400">· {plan.summary}</span>
+                ) : null}
+              </div>
+
+              <div className="relative">
+                <div
+                  className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-teal-400 via-teal-300 to-teal-200 sm:left-6"
+                  aria-hidden
+                />
+                {(["30", "60", "90"] as const).map((phase) => (
+                  <div key={phase} className="relative pl-12 sm:pl-14">
+                    <div className="mb-4 flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white",
+                          PHASE_COLORS[phase],
+                        )}
+                      >
+                        {phase}
+                      </span>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {PHASE_LABELS[phase]} focus
+                      </h3>
+                      <span className="text-sm text-slate-500">
+                        {stepsByPhase[phase].length} step
+                        {stepsByPhase[phase].length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+
+                    {stepsByPhase[phase].length === 0 ? (
+                      <p className="mb-6 rounded-lg bg-slate-50/80 px-4 py-3 text-sm text-slate-500">
+                        No steps in this phase. Add one below.
+                      </p>
+                    ) : (
+                      <ul className="mb-8 space-y-4">
+                        {stepsByPhase[phase].map((step) => {
+                          const isExpanded = expandedStepIds.has(step.id);
+                          const hasRichContent =
+                            (step.details as PlanStepDetails | null)?.checklist
+                              ?.length ||
+                            (step.details as PlanStepDetails | null)
+                              ?.detailed_instructions;
+
+                          const w = step.workflow_data;
+                          const isBlocked = step.status === "blocked";
+                          const isEscalated = w?.needs_escalation;
+                          const dueDate = step.due_date
+                            ? new Date(step.due_date).toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : null;
+
+                          return (
+                            <li
+                              key={step.id}
+                              className={cn(
+                                "relative rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md",
+                                isBlocked && "border-red-200/80",
+                                isEscalated && "border-amber-300 ring-1 ring-amber-200/50",
+                                !isBlocked && !isEscalated && "border-slate-200/90",
+                              )}
+                            >
+                              {editingStepId === step.id ? (
+                                <div className="p-5 space-y-3">
+                                  <Input
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                    placeholder="Title"
+                                    className="font-medium"
+                                  />
+                                  <textarea
+                                    value={editDesc}
+                                    onChange={(e) => setEditDesc(e.target.value)}
+                                    placeholder="Description"
+                                    rows={3}
+                                    className={textareaClass}
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      className="px-3 py-1.5 text-sm"
+                                      onClick={saveEdit}
+                                      disabled={pending || !editTitle.trim()}
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      className="px-3 py-1.5 text-sm"
+                                      onClick={cancelEdit}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="p-5">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="min-w-0 flex-1">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            hasRichContent
+                                              ? toggleExpand(step.id)
+                                              : setModalStepId(step.id)
+                                          }
+                                          className="w-full rounded-lg p-1 -m-1 text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25"
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <p className="font-semibold text-slate-900">
+                                              {step.title}
+                                            </p>
+                                            {(step.details as PlanStepDetails | null)?.priority ? (
+                                              <Badge className="border-slate-200 bg-white text-slate-600">
+                                                {(step.details as PlanStepDetails).priority}
+                                              </Badge>
+                                            ) : null}
+                                          </div>
+                                          <StepPreview
+                                            step={step}
+                                            expanded={isExpanded}
+                                          />
+                                          {hasRichContent && !isExpanded ? (
+                                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                                              Expand for details
+                                              <span aria-hidden>↓</span>
+                                            </span>
+                                          ) : hasRichContent && isExpanded ? (
+                                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                                              Collapse
+                                              <span aria-hidden>↑</span>
+                                            </span>
+                                          ) : (
+                                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                                              View details
+                                              <span aria-hidden>→</span>
+                                            </span>
+                                          )}
+                                        </button>
+                                      </div>
+                                      <div className="flex shrink-0 flex-col items-end gap-2">
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                          {isEscalated ? (
+                                            <Badge className="bg-amber-100 text-amber-900">
+                                              Needs escalation
+                                            </Badge>
+                                          ) : null}
+                                          {dueDate ? (
+                                            <span
+                                              className="text-xs text-slate-500"
+                                              title="Follow-up date"
+                                            >
+                                              Due {dueDate}
+                                            </span>
+                                          ) : null}
+                                          <StepStatusBadge
+                                            status={step.status}
+                                            onChange={(s) =>
+                                              handleStatusChange(step.id, s)
+                                            }
+                                            disabled={pending}
+                                          />
+                                        </div>
+                                        <div className="flex gap-1">
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                            onClick={() => setModalStepId(step.id)}
+                                            title="Open full detail"
+                                          >
+                                            Open
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                            onClick={() => startEdit(step)}
+                                          >
+                                            Edit
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="h-8 px-2 text-red-600 hover:text-red-800"
+                                            onClick={() => handleDelete(step.id)}
+                                          >
+                                            Delete
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {showAddStep ? (
+                <form
+                  onSubmit={handleAddStep}
+                  className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-5"
+                >
+                  <h4 className="mb-4 text-sm font-semibold text-slate-800">
+                    Add step
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="add-phase">Phase</Label>
+                      <select
+                        id="add-phase"
+                        value={addPhase}
+                        onChange={(e) =>
+                          setAddPhase(e.target.value as "30" | "60" | "90")
+                        }
+                        className={`mt-1 ${selectInputClass}`}
+                      >
+                        <option value="30">30-day</option>
+                        <option value="60">60-day</option>
+                        <option value="90">90-day</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="add-title">Title</Label>
+                      <Input
+                        id="add-title"
+                        value={addTitle}
+                        onChange={(e) => setAddTitle(e.target.value)}
+                        placeholder="Step title"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="add-desc">Description (optional)</Label>
+                      <textarea
+                        id="add-desc"
+                        value={addDesc}
+                        onChange={(e) => setAddDesc(e.target.value)}
+                        placeholder="Details…"
+                        rows={3}
+                        className={`mt-1 ${textareaClass}`}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        disabled={pending || !addTitle.trim()}
+                      >
+                        Add step
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setShowAddStep(false);
+                          setAddTitle("");
+                          setAddDesc("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {plan && modalStep ? (
+        <PlanStepModal
+          key={`${modalStep.id}-${modalStep.updated_at}`}
+          step={modalStep}
+          plan={plan}
+          familyId={familyId}
+          onClose={() => setModalStepId(null)}
+        />
+      ) : null}
     </>
   );
 }
