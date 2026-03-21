@@ -31,6 +31,12 @@ export function AppShell({
               Dashboard
             </Link>
             <Link
+              href="/families"
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Families
+            </Link>
+            <Link
               href="/resources"
               className="text-sm text-slate-600 hover:text-slate-900"
             >

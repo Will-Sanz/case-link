@@ -1,7 +1,19 @@
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
+import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { listFamilies } from "@/lib/services/families";
 import { countResources } from "@/lib/services/resources";
+
+function formatDt(iso: string) {
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+      new Date(iso),
+    );
+  } catch {
+    return iso;
+  }
+}
 
 async function loadStats() {
   const supabase = await createSupabaseServerClient();
@@ -22,11 +34,23 @@ async function loadStats() {
     familyCount = count ?? 0;
   }
 
-  return { resourceCount, familyCount };
+  let recent: Awaited<ReturnType<typeof listFamilies>>["items"] = [];
+  try {
+    const listed = await listFamilies(supabase, {
+      q: "",
+      page: 1,
+      pageSize: 6,
+    });
+    recent = listed.items;
+  } catch {
+    recent = [];
+  }
+
+  return { resourceCount, familyCount, recent };
 }
 
 export default async function DashboardPage() {
-  const { resourceCount, familyCount } = await loadStats();
+  const { resourceCount, familyCount, recent } = await loadStats();
 
   return (
     <div className="space-y-8">
@@ -55,11 +79,12 @@ export default async function DashboardPage() {
           <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">
             {familyCount === null ? "—" : familyCount}
           </p>
-          <p className="mt-2 text-xs text-slate-500">
-            {familyCount === null
-              ? "RLS policies for families ship in Phase 2."
-              : "Tracked in the system."}
-          </p>
+          <Link
+            href="/families"
+            className="mt-3 inline-block text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+          >
+            View all →
+          </Link>
         </Card>
         <Card className="p-5">
           <CardTitle className="text-base">Quick actions</CardTitle>
@@ -71,7 +96,14 @@ export default async function DashboardPage() {
               >
                 New family intake
               </Link>
-              <span className="text-slate-400"> — Phase 2</span>
+            </li>
+            <li>
+              <Link
+                href="/families"
+                className="font-medium text-slate-800 hover:underline"
+              >
+                Search families
+              </Link>
             </li>
             <li>
               <Link
@@ -86,10 +118,46 @@ export default async function DashboardPage() {
       </div>
 
       <Card>
-        <CardTitle>Recent families</CardTitle>
-        <p className="mt-2 text-sm text-slate-600">
-          Family list and activity will appear here after Phase 2 (intake + RLS).
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle>Recent families</CardTitle>
+          <Link
+            href="/families"
+            className="text-sm font-medium text-slate-700 hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+        {recent.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-600">
+            No families yet.{" "}
+            <Link href="/families/new" className="font-medium underline">
+              Create an intake
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-slate-100">
+            {recent.map((f) => (
+              <li key={f.id} className="py-3 first:pt-0">
+                <Link
+                  href={`/families/${f.id}`}
+                  className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"
+                >
+                  <div>
+                    <p className="font-medium text-slate-900">{f.name}</p>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <StatusBadge status={f.status} />
+                      <UrgencyBadge urgency={f.urgency} />
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    {formatDt(f.updated_at)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </div>
   );

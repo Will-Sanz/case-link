@@ -1,16 +1,28 @@
+import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
+import { IntakeForm } from "@/features/families/intake-form";
 
-export default function FamilyIntakePlaceholderPage() {
+export default function NewFamilyPage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-slate-900">New family intake</h1>
-      <Card>
-        <CardTitle className="text-base">Coming in Phase 2</CardTitle>
-        <p className="mt-2 text-sm text-slate-600">
-          The structured intake flow (goals, barriers, household members) will
-          live here. For now, use the resource directory to explore partner
-          programs.
+    <div className="space-y-6">
+      <div>
+        <Link
+          href="/families"
+          className="text-sm font-medium text-slate-600 hover:text-slate-900"
+        >
+          ← Families
+        </Link>
+        <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+          New family intake
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Capture goals, barriers, and household context for matching and
+          planning.
         </p>
+      </div>
+      <Card className="border-none bg-transparent p-0 shadow-none">
+        <CardTitle className="sr-only">Intake form</CardTitle>
+        <IntakeForm />
       </Card>
     </div>
   );

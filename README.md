@@ -52,7 +52,17 @@ npm run dev
 
 Hand-maintained shapes live under `src/types/` (e.g. `database.ts`, `user-role.ts`). Optionally replace or augment with [generated types](https://supabase.com/docs/guides/api/generating-types) from your project.
 
-## Phase 1 (current)
+## Phase 2 — Families (current)
+
+Apply the family RLS migration after the base schema:
+
+- `supabase/migrations/20260321120000_family_rls.sql`
+
+This adds `can_access_family()` / `is_app_admin()` helpers and policies so **creators**, **assignees** (`family_case_managers`), and **admins** can work with families, goals, barriers, members, case notes, and activity log. It also extends **`app_users` read** so you can show creator / assignee / note-author emails in the UI.
+
+**Routes:** `/families` (list + filters), `/families/new` (intake: goals, barriers, members, notes), `/families/[id]` (overview editor, panels, case notes, activity, placeholders for later phases).
+
+## Phase 1
 
 **Auth:** `/login` (sign in) and **`/signup`** (create account) use Supabase email + password. Under **Authentication → Providers**, enable **Email**. Under **Authentication → Sign In / Providers**, turn on **“Allow new users to sign up”** if you want open registration (or keep it off and only invite users from the dashboard).
 
@@ -66,10 +76,12 @@ For **email confirmation**, add your redirect URL under **Authentication → URL
 | `/login` | Case manager sign-in |
 | `/signup` | Create account (email + password) |
 | `/auth/callback` | Email confirmation / OAuth code exchange (no UI) |
-| `/dashboard` | Stats (resource count, family placeholder), quick links |
+| `/dashboard` | Stats, recent families, quick links |
+| `/families` | List / search / filter families |
+| `/families/new` | Intake (goals, barriers, members, notes) |
+| `/families/[id]` | Family workspace (overview, notes, activity; Phase 3+ panels stubbed) |
 | `/resources` | Search/filter/paginate active resources |
 | `/resources/[id]` | Full resource / contact / service-flag detail |
-| `/families/new` | Placeholder until Phase 2 intake |
 
 **Resource CSV import**
 
@@ -89,9 +101,10 @@ The parser expects the **Google Sheets–style** header on row 2 (0-based index 
 
 - `src/app/(workspace)/` — authenticated shell (nav + `ensureAppUser`)
 - `src/components/ui/` — small reusable UI primitives
-- `src/features/` — auth form, resource detail view
-- `src/lib/services/` — Supabase query helpers (e.g. `resources.ts`)
+- `src/features/` — auth, resources, families (intake, workspace)
+- `src/lib/services/` — Supabase query helpers (`resources.ts`, `families.ts`)
+- `src/app/actions/` — server actions (e.g. `families.ts`)
 - `src/lib/db/resource-import/` — CSV parse/normalize/map → DB payload
 - `src/lib/validations/` — Zod schemas for query params
 
-**Matching & plans (later phases):** not implemented in Phase 1; README will be extended when those services ship.
+**Matching, plans, referrals, tasks (Phases 3–5):** UI placeholders exist on the family page; logic ships in later phases.
