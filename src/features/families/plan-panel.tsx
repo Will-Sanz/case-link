@@ -531,6 +531,7 @@ export function PlanPanel({
   const [addDesc, setAddDesc] = useState("");
   const [modalStepId, setModalStepId] = useState<string | null>(null);
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
+  const [focusMode, setFocusMode] = useState(true);
 
   function toggleExpand(stepId: string) {
     setExpandedStepIds((prev) => {
@@ -646,11 +647,30 @@ export function PlanPanel({
     });
   }
 
+  const allSteps = plan?.steps ?? [];
+  const PHASE_ORDER: Record<string, number> = { "30": 0, "60": 1, "90": 2 };
+  const sortedSteps = [...allSteps].sort(
+    (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99),
+  );
+  const currentStep =
+    sortedSteps.find((s) => s.status === "in_progress" || s.status === "blocked") ??
+    sortedSteps.find((s) => s.status === "pending") ??
+    sortedSteps[0];
+
   const stepsByPhase = {
-    "30": plan?.steps.filter((s) => s.phase === "30") ?? [],
-    "60": plan?.steps.filter((s) => s.phase === "60") ?? [],
-    "90": plan?.steps.filter((s) => s.phase === "90") ?? [],
+    "30": allSteps.filter((s) => s.phase === "30"),
+    "60": allSteps.filter((s) => s.phase === "60"),
+    "90": allSteps.filter((s) => s.phase === "90"),
   };
+
+  const focusSteps =
+    focusMode && currentStep
+      ? ({ [currentStep.phase]: [currentStep] } as typeof stepsByPhase)
+      : stepsByPhase;
+  const displayPhases =
+    focusMode && currentStep
+      ? ([currentStep.phase] as const)
+      : (["30", "60", "90"] as const);
 
   const modalStep = useMemo(() => {
     if (!plan || !modalStepId) return null;
@@ -680,16 +700,28 @@ export function PlanPanel({
                 Step-by-step guidance for the family. Generate with AI, edit as needed, and share as a PDF.
               </p>
               {plan && totalCount > 0 ? (
-                <div className="mt-4 flex items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-200">
                     <div
-                      className="h-full rounded-full bg-teal-600 transition-all"
+                      className="h-full rounded-full bg-teal-600 transition-all duration-300"
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
                   <span className="text-sm font-medium text-slate-700">
                     {completedCount} of {totalCount} completed
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setFocusMode(!focusMode)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      focusMode
+                        ? "bg-teal-100 text-teal-800 hover:bg-teal-200"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                    )}
+                  >
+                    {focusMode ? "Focus mode" : "Full plan"}
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -774,7 +806,7 @@ export function PlanPanel({
                   className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-teal-400 via-teal-300 to-teal-200 sm:left-6"
                   aria-hidden
                 />
-                {(["30", "60", "90"] as const).map((phase) => (
+                {displayPhases.map((phase) => (
                   <div key={phase} className="relative pl-12 sm:pl-14">
                     <div className="mb-4 flex items-center gap-3">
                       <span
@@ -789,18 +821,18 @@ export function PlanPanel({
                         {PHASE_LABELS[phase]} focus
                       </h3>
                       <span className="text-sm text-slate-500">
-                        {stepsByPhase[phase].length} step
-                        {stepsByPhase[phase].length !== 1 ? "s" : ""}
+                        {focusSteps[phase].length} step
+                        {focusSteps[phase].length !== 1 ? "s" : ""}
                       </span>
                     </div>
 
-                    {stepsByPhase[phase].length === 0 ? (
+                    {focusSteps[phase].length === 0 ? (
                       <p className="mb-6 rounded-lg bg-slate-50/80 px-4 py-3 text-sm text-slate-500">
                         No steps in this phase. Add one below.
                       </p>
                     ) : (
                       <ul className="mb-8 space-y-4">
-                        {stepsByPhase[phase].map((step) => {
+                        {focusSteps[phase].map((step) => {
                           const isExpanded = expandedStepIds.has(step.id);
                           const hasRichContent =
                             (step.action_items?.length ?? 0) > 0 ||
@@ -824,7 +856,7 @@ export function PlanPanel({
                               key={step.id}
                               id={`step-${step.id}`}
                               className={cn(
-                                "relative rounded-xl border bg-white shadow-sm transition-all duration-200 hover:shadow-md",
+                                "relative rounded-xl border bg-white shadow-sm transition-all duration-200 ease-out hover:shadow-md",
                                 isBlocked && "border-red-200/80",
                                 isEscalated && "border-amber-300 ring-1 ring-amber-200/50",
                                 !isBlocked && !isEscalated && "border-slate-200/90",
@@ -869,51 +901,85 @@ export function PlanPanel({
                                   <div className="p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <div className="min-w-0 flex-1">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            hasRichContent
-                                              ? toggleExpand(step.id)
-                                              : setModalStepId(step.id)
-                                          }
-                                          className="w-full rounded-lg p-1 -m-1 text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25"
-                                        >
+                                        <div className="rounded-lg p-1 -m-1">
                                           <div className="flex items-center gap-2">
-                                            <p className="font-semibold text-slate-900">
-                                              {step.title}
-                                            </p>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                hasRichContent && !isExpanded
+                                                  ? toggleExpand(step.id)
+                                                  : setModalStepId(step.id)
+                                              }
+                                              className="text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                            >
+                                              <p className="font-semibold text-slate-900">
+                                                {step.title}
+                                              </p>
+                                            </button>
                                             {(step.details as PlanStepDetails | null)?.priority ? (
                                               <Badge className="border-slate-200 bg-white text-slate-600">
                                                 {(step.details as PlanStepDetails).priority}
                                               </Badge>
                                             ) : null}
+                                            {hasRichContent && (
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleExpand(step.id)}
+                                                className="shrink-0 rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                                                aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                title={isExpanded ? "Collapse" : "Expand"}
+                                              >
+                                                <span
+                                                  className={cn(
+                                                    "block text-sm font-medium transition-transform duration-200",
+                                                    isExpanded && "rotate-180",
+                                                  )}
+                                                >
+                                                  ▼
+                                                </span>
+                                              </button>
+                                            )}
                                           </div>
-                                          <StepPreview
-                                            step={step}
-                                            expanded={isExpanded}
-                                            resourceMatches={resourceMatches}
-                                            onToggleChecklist={handleToggleChecklist}
-                                            checklistPending={pending}
-                                            onToggleActionItem={handleToggleActionItem}
-                                            familyName={familyName}
-                                          />
+                                          <div className="mt-2">
+                                            <StepPreview
+                                              step={step}
+                                              expanded={isExpanded}
+                                              resourceMatches={resourceMatches}
+                                              onToggleChecklist={handleToggleChecklist}
+                                              checklistPending={pending}
+                                              onToggleActionItem={handleToggleActionItem}
+                                              familyName={familyName}
+                                            />
+                                          </div>
                                           {hasRichContent && !isExpanded ? (
-                                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleExpand(step.id)}
+                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                                            >
                                               Expand for details
                                               <span aria-hidden>↓</span>
-                                            </span>
+                                            </button>
                                           ) : hasRichContent && isExpanded ? (
-                                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleExpand(step.id)}
+                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                                            >
                                               Collapse
                                               <span aria-hidden>↑</span>
-                                            </span>
-                                          ) : (
-                                            <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                                            </button>
+                                          ) : !hasRichContent ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => setModalStepId(step.id)}
+                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                                            >
                                               View details
                                               <span aria-hidden>→</span>
-                                            </span>
-                                          )}
-                                        </button>
+                                            </button>
+                                          ) : null}
+                                        </div>
                                       </div>
                                       <div className="flex shrink-0 flex-col items-end gap-2">
                                         <div className="flex flex-wrap items-center justify-end gap-2">

@@ -2,10 +2,10 @@
  * AI model configuration and task routing.
  *
  * Two-model strategy:
- * - gpt-5.4: Core casework, high-stakes reasoning (plan generation, refinement, case assistant)
- * - gpt-5.4-mini: Fast helper actions (scripts, emails, checklists)
+ * - gpt-4o: Core casework, high-stakes reasoning (plan generation, refinement, case assistant)
+ * - gpt-4o-mini: Fast helper actions (scripts, emails, checklists)
  *
- * Override: Set OPENAI_MODEL_OVERRIDE in env to force one model for all tasks (e.g. gpt-4o for QA).
+ * Override: Set OPENAI_MODEL_OVERRIDE in env to force one model for all tasks.
  */
 
 /** Task types for model routing */
@@ -26,9 +26,9 @@ export type AiTaskType =
 /** Model IDs */
 export const MODELS = {
   /** Core reasoning: plan generation, refinement, case assistant, blocker help */
-  CORE: "gpt-5.4",
+  CORE: "gpt-4o",
   /** Fast helpers: scripts, emails, checklists, simple explanations */
-  HELPER: "gpt-5.4-mini",
+  HELPER: "gpt-4o-mini",
 } as const;
 
 /** Tasks that require core model (quality over latency) */
@@ -41,7 +41,7 @@ const CORE_TASKS: AiTaskType[] = [
 
 /**
  * Returns the model ID for a given task type.
- * Core casework uses gpt-5.4; helper tools use gpt-5.4-mini.
+ * Core casework uses gpt-4o; helper tools use gpt-4o-mini (faster).
  */
 export function getModelForTask(taskType: AiTaskType): string {
   if (CORE_TASKS.includes(taskType)) {

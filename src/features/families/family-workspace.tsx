@@ -16,6 +16,7 @@ import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-ba
 import { UpdateFamilyForm } from "@/features/families/update-family-form";
 import { updateFamilyMeta, deleteFamily } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
+import { getNextAction } from "@/lib/utils/next-action";
 import type { FamilyDetail } from "@/types/family";
 
 function formatDt(iso: string) {
@@ -71,7 +72,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
           ← Back to families
         </Link>
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
               {family.name}
             </h1>
@@ -79,6 +80,11 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
               <StatusBadge status={family.status} />
               <UrgencyBadge urgency={family.urgency} />
             </div>
+            {getNextAction(family) && (
+              <p className="mt-3 font-medium text-teal-800">
+                Next: {getNextAction(family)}
+              </p>
+            )}
             <p className="mt-3 text-sm text-slate-600">
               {family.creator?.email ? (
                 <>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useMemo, useTransition } from "react";
+import { useCallback, useState, useMemo, useTransition, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -29,27 +29,23 @@ function buildNavParams(
   dir: "prev" | "next",
 ): Record<string, string> {
   if (view === "month") {
-    const [y, m] = dateRange.start.split("-").map(Number);
-    let newYear = y;
-    let newMonth = dir === "next" ? m + 1 : m - 1;
-    if (newMonth > 12) {
-      newMonth = 1;
-      newYear += 1;
-    } else if (newMonth < 1) {
-      newMonth = 12;
-      newYear -= 1;
-    }
-    return {
-      view,
-      month: `${newYear}-${String(newMonth).padStart(2, "0")}`,
-    };
+    const parts = dateRange.start.split("-").map(Number);
+    const y = parts[0];
+    const m = parts[1] ?? 1;
+    const delta = dir === "next" ? 1 : -1;
+    const d = new Date(y, m - 1, 15);
+    d.setMonth(d.getMonth() + delta);
+    const newY = d.getFullYear();
+    const newM = String(d.getMonth() + 1).padStart(2, "0");
+    return { view, month: `${newY}-${newM}` };
   }
+
   const d = new Date(dateRange.start + "T12:00:00");
   d.setDate(d.getDate() + (dir === "next" ? 7 : -7));
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return { view, date: `${y}-${m}-${day}` };
+  const newY = d.getFullYear();
+  const newM = String(d.getMonth() + 1).padStart(2, "0");
+  const newD = String(d.getDate()).padStart(2, "0");
+  return { view, date: `${newY}-${newM}-${newD}` };
 }
 
 function buildTodayParams(view: string): Record<string, string> {
@@ -261,6 +257,7 @@ export function CalendarView({
               eventsByDate={eventsByDate}
               onEventClick={setSelectedEvent}
               compact={compact}
+              scrollToToday={dateRange.start.slice(0, 7) === new Date().toISOString().slice(0, 7)}
             />
           )}
           {view === "week" && (
@@ -346,11 +343,13 @@ function MonthGrid({
   eventsByDate,
   onEventClick,
   compact = false,
+  scrollToToday = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
   compact?: boolean;
+  scrollToToday?: boolean;
 }) {
   const totalEvents = [...eventsByDate.values()].reduce((s, arr) => s + arr.length, 0);
   if (totalEvents === 0) {
@@ -372,7 +371,7 @@ function MonthGrid({
     );
   }
 
-  return <MonthGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} compact={compact} />;
+  return <MonthGridInner dateRange={dateRange} eventsByDate={eventsByDate} onEventClick={onEventClick} compact={compact} scrollToToday={scrollToToday} />;
 }
 
 function MonthGridInner({
@@ -380,12 +379,20 @@ function MonthGridInner({
   eventsByDate,
   onEventClick,
   compact = false,
+  scrollToToday = false,
 }: {
   dateRange: { start: string; end: string };
   eventsByDate: Map<string, CalendarEvent[]>;
   onEventClick: (e: CalendarEvent) => void;
   compact?: boolean;
+  scrollToToday?: boolean;
 }) {
+  const todayRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (scrollToToday && todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [scrollToToday]);
   const start = new Date(dateRange.start + "T12:00:00");
   const end = new Date(dateRange.end + "T12:00:00");
   const startDay = start.getDay();
@@ -421,6 +428,7 @@ function MonthGridInner({
         {cells.map((c, i) => (
           <div
             key={i}
+            ref={c.date === today ? todayRef : undefined}
             className={cn(
               "min-h-0 overflow-hidden bg-white p-1",
               !c.date && "bg-slate-50/70",

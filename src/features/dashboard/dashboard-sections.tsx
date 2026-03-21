@@ -87,7 +87,13 @@ export function DashboardFamilyCards({
                   <Badge className="text-xs">{f.status}</Badge>
                 </div>
               </div>
-              <Link href={`/families/${f.family_id}`}>
+              <Link
+                href={
+                  f.current_step
+                    ? `/families/${f.family_id}#step-${f.current_step.id}`
+                    : `/families/${f.family_id}`
+                }
+              >
                 <Button type="button" variant="secondary" className="h-8 text-xs">
                   Open case
                 </Button>

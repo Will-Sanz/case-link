@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
@@ -37,7 +38,7 @@ export function CaseAssistantPanel({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50"
+        className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors duration-150 hover:bg-slate-50"
       >
         <div className="flex items-center gap-2">
           <span
@@ -57,7 +58,7 @@ export function CaseAssistantPanel({
         </div>
         <span
           className={cn(
-            "text-slate-400 transition-transform",
+            "text-slate-400 transition-transform duration-200",
             isOpen && "rotate-180",
           )}
         >
@@ -112,9 +113,22 @@ export function CaseAssistantPanel({
               <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
                 Answer
               </p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
-                {answer}
-              </p>
+              <div className="mt-2 text-sm text-slate-800">
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="leading-relaxed">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc pl-5 space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-5 space-y-0.5">{children}</ol>,
+                    li: ({ children }) => <li>{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
+                    h1: ({ children }) => <h3 className="mt-3 mb-1 font-semibold text-slate-900">{children}</h3>,
+                    h2: ({ children }) => <h4 className="mt-3 mb-1 font-semibold text-slate-800">{children}</h4>,
+                    h3: ({ children }) => <h4 className="mt-2 mb-1 font-medium text-slate-800">{children}</h4>,
+                  }}
+                >
+                  {answer}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
         </div>

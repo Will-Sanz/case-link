@@ -260,6 +260,8 @@ export async function updatePlanStep(
     .from("plans")
     .select("id")
     .eq("family_id", familyId)
+    .order("version", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!planRow) {
