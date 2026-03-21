@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -70,13 +71,58 @@ function StepStatusBadge({
   return <Badge className={cls}>{status.replace("_", " ")}</Badge>;
 }
 
+/** Linked resources for a step */
+function LinkedResources({
+  stepId,
+  matches,
+}: {
+  stepId: string;
+  matches: Array<{
+    id: string;
+    resource_id: string;
+    plan_step_id?: string | null;
+    resource?: { program_name: string } | null;
+  }>;
+}) {
+  const linked = matches.filter(
+    (m) => m.plan_step_id === stepId && m.resource,
+  );
+  if (linked.length === 0) return null;
+  return (
+    <div className="mt-2 rounded-lg bg-teal-50/80 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+        Linked resource{linked.length !== 1 ? "s" : ""}
+      </p>
+      <ul className="mt-1 space-y-1">
+        {linked.map((m) => (
+          <li key={m.id}>
+            <Link
+              href={`/resources/${m.resource_id}`}
+              className="text-sm text-teal-800 hover:underline"
+            >
+              {m.resource?.program_name ?? "Resource"}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** Preview of step content for list view — uses details when available, else description */
 function StepPreview({
   step,
   expanded,
+  resourceMatches,
 }: {
   step: PlanStepRow;
   expanded: boolean;
+  resourceMatches?: Array<{
+    id: string;
+    resource_id: string;
+    plan_step_id?: string | null;
+    resource?: { program_name: string } | null;
+  }>;
 }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data;
@@ -246,6 +292,9 @@ function StepPreview({
           ) : null}
         </div>
       ) : null}
+      {resourceMatches && resourceMatches.length > 0 ? (
+        <LinkedResources stepId={step.id} matches={resourceMatches} />
+      ) : null}
     </div>
   );
 }
@@ -254,10 +303,17 @@ export function PlanPanel({
   familyId,
   plan,
   familyName,
+  resourceMatches = [],
 }: {
   familyId: string;
   plan: PlanWithSteps | null;
   familyName?: string;
+  resourceMatches?: Array<{
+    id: string;
+    resource_id: string;
+    plan_step_id?: string | null;
+    resource?: { program_name: string; slug: string } | null;
+  }>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -534,6 +590,7 @@ export function PlanPanel({
                           return (
                             <li
                               key={step.id}
+                              id={`step-${step.id}`}
                               className={cn(
                                 "relative rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md",
                                 isBlocked && "border-red-200/80",
@@ -602,6 +659,7 @@ export function PlanPanel({
                                           <StepPreview
                                             step={step}
                                             expanded={isExpanded}
+                                            resourceMatches={resourceMatches}
                                           />
                                           {hasRichContent && !isExpanded ? (
                                             <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700">

@@ -110,26 +110,32 @@ const styles = StyleSheet.create({
 
 function StepContent({ step }: { step: PlanStepRow }) {
   const d = step.details as PlanStepDetails | null | undefined;
+  const w = step.workflow_data as { outcome_notes?: string } | null | undefined;
+  const dueDate = step.due_date
+    ? new Date(step.due_date).toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+  const isCompleted = step.status === "completed";
+  const isBlocked = step.status === "blocked";
 
   return (
     <View style={styles.stepCard}>
-      <Text style={styles.stepStatus}>{step.status.replace("_", " ")}</Text>
       <Text style={styles.stepTitle}>{step.title}</Text>
 
-      {d?.rationale ? (
-        <>
-          <Text style={styles.sectionLabel}>Why this matters</Text>
-          <Text style={styles.bodyText}>{d.rationale}</Text>
-        </>
-      ) : null}
-
+      {/* Family-facing: Next steps first, then context */}
       {d?.detailed_instructions ? (
         <>
-          <Text style={styles.sectionLabel}>What to do</Text>
+          <Text style={styles.sectionLabel}>Your next steps</Text>
           <Text style={styles.bodyText}>{d.detailed_instructions}</Text>
         </>
       ) : step.description ? (
-        <Text style={styles.bodyText}>{step.description}</Text>
+        <>
+          <Text style={styles.sectionLabel}>Your next steps</Text>
+          <Text style={styles.bodyText}>{step.description}</Text>
+        </>
       ) : null}
 
       {d?.checklist && d.checklist.length > 0 ? (
@@ -146,7 +152,7 @@ function StepContent({ step }: { step: PlanStepRow }) {
 
       {d?.required_documents && d.required_documents.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>What to prepare</Text>
+          <Text style={styles.sectionLabel}>Documents to bring</Text>
           <Text style={styles.bodyText}>
             {d.required_documents.join(", ")}
           </Text>
@@ -155,7 +161,7 @@ function StepContent({ step }: { step: PlanStepRow }) {
 
       {d?.contacts && d.contacts.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Contacts</Text>
+          <Text style={styles.sectionLabel}>Contact information</Text>
           {d.contacts.map((c, i) => (
             <Text key={i} style={styles.contactLine}>
               {[c.name, c.phone, c.email].filter(Boolean).join(" · ")}
@@ -165,32 +171,43 @@ function StepContent({ step }: { step: PlanStepRow }) {
         </>
       ) : null}
 
-      {d?.stage_goal ? (
+      {d?.rationale ? (
         <>
-          <Text style={styles.sectionLabel}>Stage focus</Text>
-          <Text style={styles.bodyText}>{d.stage_goal}</Text>
-        </>
-      ) : null}
-
-      {d?.why_now ? (
-        <>
-          <Text style={styles.sectionLabel}>Why now</Text>
-          <Text style={styles.bodyText}>{d.why_now}</Text>
+          <Text style={styles.sectionLabel}>Why this helps</Text>
+          <Text style={styles.bodyText}>{d.rationale}</Text>
         </>
       ) : null}
 
       {d?.expected_outcome ? (
         <>
-          <Text style={styles.sectionLabel}>Success looks like</Text>
+          <Text style={styles.sectionLabel}>Goal</Text>
           <Text style={styles.bodyText}>{d.expected_outcome}</Text>
         </>
       ) : null}
 
       {d?.timing_guidance ? (
         <>
-          <Text style={styles.sectionLabel}>Timing</Text>
+          <Text style={styles.sectionLabel}>When</Text>
           <Text style={styles.bodyText}>{d.timing_guidance}</Text>
         </>
+      ) : null}
+
+      {dueDate ? (
+        <Text style={[styles.bodyText, { marginTop: 6, color: "#0d9488", fontWeight: "bold" }]}>
+          Follow-up date: {dueDate}
+        </Text>
+      ) : null}
+
+      {isCompleted && w?.outcome_notes ? (
+        <Text style={[styles.bodyText, { marginTop: 6, color: "#047857" }]}>
+          Completed: {w.outcome_notes}
+        </Text>
+      ) : null}
+
+      {isBlocked ? (
+        <Text style={[styles.bodyText, { marginTop: 6, color: "#b91c1c", fontStyle: "italic" }]}>
+          Currently on hold — your case manager will follow up
+        </Text>
       ) : null}
     </View>
   );
@@ -215,12 +232,12 @@ export function PlanPdfDocument({
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.title}>30 / 60 / 90 Day Action Plan</Text>
+          <Text style={styles.title}>Your 30 / 60 / 90 Day Plan</Text>
           {familyName ? (
-            <Text style={styles.subtitle}>Family: {familyName}</Text>
+            <Text style={styles.subtitle}>Prepared for: {familyName}</Text>
           ) : null}
           <Text style={styles.subtitle}>
-            Generated {generatedDate} · Plan v{plan.version}
+            Created {generatedDate}
           </Text>
         </View>
 
@@ -231,7 +248,7 @@ export function PlanPdfDocument({
                 <Text style={{ color: "white", fontWeight: "bold" }}>{phase}</Text>
               </View>
               <Text style={styles.phaseTitle}>
-                {PHASE_LABELS[phase]} focus
+                {PHASE_LABELS[phase]} goals
               </Text>
             </View>
             {stepsByPhase[phase].map((step) => (

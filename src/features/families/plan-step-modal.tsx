@@ -9,7 +9,9 @@ import {
   useTransition,
 } from "react";
 import { createPortal } from "react-dom";
-import { deletePlanStep, updatePlanStep } from "@/app/actions/plans";
+import { deletePlanStep, logPlanStepActivity, updatePlanStep } from "@/app/actions/plans";
+import { suggestNextMoveForBlockedStep } from "@/app/actions/suggest-next-move";
+import { fetchStepActivity } from "@/app/actions/step-activity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ import type {
   PlanStepWorkflowData,
   PlanWithSteps,
 } from "@/types/family";
+import { ACTIVITY_TYPES } from "@/lib/validations/plans";
 
 const PHASE_LABELS: Record<string, string> = {
   "30": "30-day",
@@ -121,6 +124,17 @@ function PlanStepModalInner({
       ? new Date(step.due_date).toISOString().slice(0, 10)
       : "",
   );
+  const [stepActivity, setStepActivity] = useState<
+    Array<{ id: string; action: string; activity_type: string | null; notes: string | null; created_at: string }>
+  >([]);
+  const [logActivityType, setLogActivityType] = useState("");
+  const [logActivityNotes, setLogActivityNotes] = useState("");
+  const [suggestions, setSuggestions] = useState<string[] | null>(null);
+  const [suggestPending, setSuggestPending] = useState(false);
+
+  useEffect(() => {
+    fetchStepActivity(step.id).then(setStepActivity);
+  }, [step.id]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -318,23 +332,60 @@ function PlanStepModalInner({
             </div>
 
             {status === "blocked" ? (
-              <div className="mt-4">
-                <Label htmlFor="modal-blocker" className="text-slate-700">
-                  Blocker reason
-                </Label>
-                <Input
-                  id="modal-blocker"
-                  value={workflow.blocker_reason ?? ""}
-                  onChange={(e) =>
-                    setWorkflow((w) => ({
-                      ...w,
-                      blocker_reason: e.target.value || null,
-                    }))
-                  }
-                  placeholder="What is blocking this step?"
-                  className="mt-1.5"
-                  disabled={pending}
-                />
+              <div className="mt-4 space-y-3">
+                <div>
+                  <Label htmlFor="modal-blocker" className="text-slate-700">
+                    Blocker reason
+                  </Label>
+                  <Input
+                    id="modal-blocker"
+                    value={workflow.blocker_reason ?? ""}
+                    onChange={(e) =>
+                      setWorkflow((w) => ({
+                        ...w,
+                        blocker_reason: e.target.value || null,
+                      }))
+                    }
+                    placeholder="What is blocking this step?"
+                    className="mt-1.5"
+                    disabled={pending}
+                  />
+                </div>
+                <div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="py-1.5 px-3 text-sm"
+                    disabled={suggestPending || pending}
+                    onClick={() => {
+                      setSuggestPending(true);
+                      setSuggestions(null);
+                      suggestNextMoveForBlockedStep(step.id, familyId).then(
+                        (r) => {
+                          setSuggestPending(false);
+                          if (r.ok) setSuggestions(r.suggestions);
+                        },
+                      );
+                    }}
+                  >
+                    {suggestPending ? "Thinking…" : "Suggest next move"}
+                  </Button>
+                  {suggestions && suggestions.length > 0 ? (
+                    <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+                        Suggested next moves
+                      </p>
+                      <ul className="mt-2 space-y-1.5 text-sm text-slate-800">
+                        {suggestions.map((s, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="shrink-0 text-teal-600">•</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             ) : null}
 
@@ -480,6 +531,100 @@ function PlanStepModalInner({
               Save workflow
             </Button>
           </div>
+
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <h3 className="text-sm font-semibold text-slate-800">
+              Log activity
+            </h3>
+            <p className="mt-1 text-xs text-slate-600">
+              Record outreach attempts, appointments, or outcomes.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <Label className="text-xs text-slate-600">Activity type</Label>
+                <select
+                  value={logActivityType}
+                  onChange={(e) => setLogActivityType(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <option value="">Select…</option>
+                  {ACTIVITY_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-[2]">
+                <Label className="text-xs text-slate-600">Notes</Label>
+                <Input
+                  value={logActivityNotes}
+                  onChange={(e) => setLogActivityNotes(e.target.value)}
+                  placeholder="Brief outcome or summary…"
+                  className="mt-1"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={pending || !logActivityType.trim()}
+                onClick={() => {
+                  const type = logActivityType.trim();
+                  if (!type) return;
+                  setError(null);
+                  startTransition(async () => {
+                    const r = await logPlanStepActivity({
+                      stepId: step.id,
+                      familyId,
+                      action: "activity",
+                      activity_type: type,
+                      notes: logActivityNotes.trim() || undefined,
+                    });
+                    if (!r.ok) setError(r.error);
+                    else {
+                      setLogActivityType("");
+                      setLogActivityNotes("");
+                      fetchStepActivity(step.id).then(setStepActivity);
+                      router.refresh();
+                    }
+                  });
+                }}
+              >
+                Log
+              </Button>
+            </div>
+          </div>
+
+          {stepActivity.length > 0 ? (
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-slate-800">
+                Activity history
+              </h3>
+              <ul className="mt-3 space-y-2">
+                {stepActivity.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm"
+                  >
+                    <span className="shrink-0 text-slate-500">
+                      {new Date(a.created_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="font-medium text-slate-700">
+                      {a.activity_type?.replace(/_/g, " ") ?? a.action}
+                    </span>
+                    {a.notes ? (
+                      <span className="text-slate-600">— {a.notes}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {editing ? (
             <div className="space-y-4">

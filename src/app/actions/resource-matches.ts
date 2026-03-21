@@ -7,6 +7,7 @@ import { rankResourcesForFamily } from "@/lib/matching/engine";
 import type { FamilyMatchInput, MatchableResource } from "@/lib/matching/types";
 import { getFamilyDetail } from "@/lib/services/families";
 import { searchResourcesForPicker } from "@/lib/services/resources-picker";
+import { linkResourceToStepSchema } from "@/lib/validations/plans";
 import {
   addManualMatchSchema,
   runMatchingSchema,
@@ -214,6 +215,71 @@ export async function addManualResourceMatch(input: unknown): Promise<ActionResu
   }
 
   await logActivity(supabase, familyId, user.id, "matching.manual_add", { resourceId });
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function linkResourceToStep(input: unknown): Promise<ActionResult> {
+  const parsed = linkResourceToStepSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid request" };
+  }
+
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { matchId, familyId, stepId } = parsed.data;
+
+  const { error } = await supabase
+    .from("resource_matches")
+    .update({ plan_step_id: stepId })
+    .eq("id", matchId)
+    .eq("family_id", familyId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  await logActivity(supabase, familyId, user.id, "matching.linked_to_step", {
+    matchId,
+    stepId,
+  });
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function unlinkResourceFromStep(input: unknown): Promise<ActionResult> {
+  const parsed = linkResourceToStepSchema.pick({ matchId: true, familyId: true }).safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid request" };
+  }
+
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { matchId, familyId } = parsed.data;
+
+  const { error } = await supabase
+    .from("resource_matches")
+    .update({ plan_step_id: null })
+    .eq("id", matchId)
+    .eq("family_id", familyId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  await logActivity(supabase, familyId, user.id, "matching.unlinked_from_step", { matchId });
   revalidatePath(`/families/${familyId}`);
   return { ok: true };
 }

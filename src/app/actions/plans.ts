@@ -1,5 +1,6 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
@@ -14,10 +15,31 @@ import {
   createManualStepSchema,
   deletePlanStepSchema,
   generatePlanSchema,
+  logPlanStepActivitySchema,
   updatePlanStepSchema,
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+async function logCaseActivity(
+  supabase: SupabaseClient,
+  familyId: string,
+  userId: string | null,
+  action: string,
+  entityType?: string,
+  entityId?: string,
+  details?: Record<string, unknown>,
+) {
+  const { error } = await supabase.from("activity_log").insert({
+    family_id: familyId,
+    actor_user_id: userId,
+    action,
+    entity_type: entityType ?? null,
+    entity_id: entityId ?? null,
+    details: details ?? null,
+  });
+  void error;
+}
 
 export async function generatePlan(input: unknown): Promise<ActionResult> {
   const parsed = generatePlanSchema.safeParse(input);
@@ -26,8 +48,11 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
-    ({ supabase } = await requireAppUserWithClient());
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -121,19 +146,15 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     }
   }
 
-  const { error: logErr } = await supabase.from("activity_log").insert({
-    family_id: familyId,
-    actor_user_id: null,
-    action: "plan.generated",
-    entity_type: "plan",
-    entity_id: plan.id,
-    details: {
-      version: nextVersion,
-      steps: steps.length,
-      generation_source: generationSource,
-    },
-  });
-  void logErr;
+  await logCaseActivity(
+    supabase,
+    familyId,
+    userId,
+    "plan.generated",
+    "plan",
+    plan.id,
+    { version: nextVersion, steps: steps.length, generation_source: generationSource },
+  );
 
   revalidatePath(`/families/${familyId}`);
   return { ok: true };
@@ -148,8 +169,11 @@ export async function updatePlanStep(
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
-    ({ supabase } = await requireAppUserWithClient());
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -189,6 +213,21 @@ export async function updatePlanStep(
     return { ok: false, error: error.message };
   }
 
+  if (patch.status !== undefined) {
+    await logCaseActivity(
+      supabase,
+      familyId,
+      userId,
+      "step.status_changed",
+      "plan_step",
+      stepId,
+      { status: patch.status },
+    );
+  }
+  if (patch.workflow_data !== undefined && (patch.workflow_data as { needs_escalation?: boolean })?.needs_escalation) {
+    await logCaseActivity(supabase, familyId, userId, "step.escalation_flagged", "plan_step", stepId);
+  }
+
   revalidatePath(`/families/${familyId}`);
   return { ok: true };
 }
@@ -200,8 +239,11 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
-    ({ supabase } = await requireAppUserWithClient());
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -229,17 +271,21 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
 
   const sortOrder = (maxOrder?.sort_order ?? -1) + 1;
 
-  const { error } = await supabase.from("plan_steps").insert({
+  const { data: newStep, error } = await supabase.from("plan_steps").insert({
     plan_id: planId,
     phase,
     title,
     description: description ?? "",
     status: "pending",
     sort_order: sortOrder,
-  });
+  }).select("id").single();
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  if (newStep) {
+    await logCaseActivity(supabase, familyId, userId, "step.added", "plan_step", newStep.id, { title });
   }
 
   revalidatePath(`/families/${familyId}`);
@@ -253,8 +299,11 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
-    ({ supabase } = await requireAppUserWithClient());
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -290,6 +339,70 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
   if (error) {
     return { ok: false, error: error.message };
   }
+
+  await logCaseActivity(supabase, familyId, userId, "step.deleted", "plan_step", stepId);
+
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function logPlanStepActivity(input: unknown): Promise<ActionResult> {
+  const parsed = logPlanStepActivitySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid request" };
+  }
+
+  let supabase;
+  let userId: string | null = null;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { stepId, familyId, action, activity_type, notes, details } = parsed.data;
+
+  const { data: step } = await supabase
+    .from("plan_steps")
+    .select("plan_id")
+    .eq("id", stepId)
+    .maybeSingle();
+
+  if (!step) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("family_id")
+    .eq("id", step.plan_id)
+    .eq("family_id", familyId)
+    .maybeSingle();
+
+  if (!plan) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const { error } = await supabase.from("plan_step_activity").insert({
+    plan_step_id: stepId,
+    family_id: familyId,
+    actor_user_id: userId,
+    action,
+    activity_type: activity_type ?? null,
+    notes: notes ?? null,
+    details: details ?? {},
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  await logCaseActivity(supabase, familyId, userId, "step.activity_logged", "plan_step", stepId, {
+    action,
+    activity_type: activity_type ?? null,
+  });
 
   revalidatePath(`/families/${familyId}`);
   return { ok: true };

@@ -147,22 +147,34 @@ export async function addCaseNote(input: unknown): Promise<ActionResult> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("case_notes").insert({
-    family_id: parsed.data.familyId,
-    author_id: user.id,
-    body: parsed.data.body.trim(),
-  });
+  const { data: note, error } = await supabase
+    .from("case_notes")
+    .insert({
+      family_id: parsed.data.familyId,
+      author_id: user.id,
+      body: parsed.data.body.trim(),
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return { ok: false, error: error.message };
   }
+
+  await supabase.from("activity_log").insert({
+    family_id: parsed.data.familyId,
+    actor_user_id: user.id,
+    action: "note.added",
+    entity_type: "case_note",
+    entity_id: note?.id ?? null,
+  });
 
   revalidatePath(`/families/${parsed.data.familyId}`);
   return { ok: true };
 }
 
 export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
-  await requireAppUser();
+  const user = await requireAppUser();
   const parsed = updateFamilySchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid update" };
@@ -196,6 +208,15 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
   if (error) {
     return { ok: false, error: error.message };
   }
+
+  await supabase.from("activity_log").insert({
+    family_id: familyId,
+    actor_user_id: user.id,
+    action: "context.updated",
+    entity_type: "family",
+    entity_id: familyId,
+    details: patch,
+  });
 
   revalidatePath("/families");
   revalidatePath(`/families/${familyId}`);

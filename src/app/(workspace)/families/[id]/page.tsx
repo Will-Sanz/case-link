@@ -3,6 +3,10 @@ import { z } from "zod";
 import { FamilyWorkspace } from "@/features/families/family-workspace";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getFamilyDetail } from "@/lib/services/families";
+import {
+  getCaseActivity,
+  getNeedsAttention,
+} from "@/lib/services/workflow";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -16,11 +20,23 @@ export default async function FamilyDetailPage({ params }: PageProps) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const family = await getFamilyDetail(supabase, parsed.data);
+  const [family, needsAttention, caseActivity] = await Promise.all([
+    getFamilyDetail(supabase, parsed.data),
+    getNeedsAttention(supabase, { familyId: parsed.data, limit: 20 }),
+    getCaseActivity(supabase, parsed.data, 25),
+  ]);
 
   if (!family) {
     notFound();
   }
 
-  return <FamilyWorkspace family={family} />;
+  return (
+    <FamilyWorkspace
+      family={{
+        ...family,
+        needsAttention,
+        caseActivity,
+      }}
+    />
+  );
 }

@@ -76,6 +76,7 @@ export type ResourceMatchRow = {
   status: "suggested" | "accepted" | "dismissed";
   created_at: string;
   updated_at: string;
+  plan_step_id?: string | null;
   resource: MatchedResourceSummary | null;
 };
 
@@ -167,4 +168,14 @@ export type FamilyDetail = {
   caseNotes: CaseNoteRow[];
   resourceMatches: ResourceMatchRow[];
   plan: PlanWithSteps | null;
+  needsAttention?: import("@/lib/services/workflow").NeedsAttentionItem[];
+  caseActivity?: Array<{
+    id: string;
+    action: string;
+    entity_type: string | null;
+    entity_id: string | null;
+    details: Record<string, unknown> | null;
+    created_at: string;
+    actor_email?: string;
+  }>;
 };

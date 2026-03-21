@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { NeedsAttentionPanel } from "@/features/families/needs-attention-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listFamilies } from "@/lib/services/families";
 import { countResources } from "@/lib/services/resources";
+import { getNeedsAttention } from "@/lib/services/workflow";
 
 function formatDt(iso: string) {
   try {
@@ -22,6 +24,7 @@ async function loadStats() {
   const supabase = await createSupabaseServerClient();
   let resourceCount = 0;
   let familyCount: number | null = null;
+  let needsAttention: Awaited<ReturnType<typeof getNeedsAttention>> = [];
 
   try {
     resourceCount = await countResources(supabase);
@@ -37,6 +40,12 @@ async function loadStats() {
     familyCount = count ?? 0;
   }
 
+  try {
+    needsAttention = await getNeedsAttention(supabase, { limit: 15 });
+  } catch {
+    needsAttention = [];
+  }
+
   let recent: Awaited<ReturnType<typeof listFamilies>>["items"] = [];
   try {
     const listed = await listFamilies(supabase, {
@@ -49,18 +58,22 @@ async function loadStats() {
     recent = [];
   }
 
-  return { resourceCount, familyCount, recent };
+  return { resourceCount, familyCount, recent, needsAttention };
 }
 
 export default async function DashboardPage() {
-  const { resourceCount, familyCount, recent } = await loadStats();
+  const { resourceCount, familyCount, recent, needsAttention } = await loadStats();
 
   return (
     <div className="space-y-10">
       <PageHeader
         title="Dashboard"
-        description="Overview of your caseload and the resource directory. Jump back into active cases or start a new intake."
+        description="What needs attention today. Overdue steps, follow-ups, blocked items, and recent cases."
       />
+
+      {needsAttention.length > 0 ? (
+        <NeedsAttentionPanel items={needsAttention} compact />
+      ) : null}
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
@@ -115,10 +128,10 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-              Recent activity
+              Recently updated
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Families you recently opened or updated.
+              Quick access to active cases.
             </p>
           </div>
           <Link

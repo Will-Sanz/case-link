@@ -146,6 +146,7 @@ export async function getFamilyDetail(
         match_reason,
         score,
         status,
+        plan_step_id,
         created_at,
         updated_at,
         resource:resources (
@@ -242,6 +243,7 @@ function normalizeResourceMatches(rows: unknown[]): ResourceMatchRow[] {
   return rows.map((raw) => {
     const row = raw as ResourceMatchRow & {
       resource?: MatchedResourceSummary | MatchedResourceSummary[] | null;
+      plan_step_id?: string | null;
     };
     return {
       id: row.id,
@@ -250,6 +252,7 @@ function normalizeResourceMatches(rows: unknown[]): ResourceMatchRow[] {
       match_reason: row.match_reason,
       score: row.score,
       status: row.status,
+      plan_step_id: row.plan_step_id ?? null,
       created_at: row.created_at,
       updated_at: row.updated_at,
       resource: normalizeResourceEmbed(row.resource ?? null),

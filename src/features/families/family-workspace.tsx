@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
+import { CaseActivityTimeline } from "@/features/families/case-activity-timeline";
+import { NeedsAttentionPanel } from "@/features/families/needs-attention-panel";
 import { PlanPanel } from "@/features/families/plan-panel";
 import { PhasePlaceholder } from "@/features/families/phase-placeholder";
 import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
@@ -64,11 +66,17 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         </div>
       </div>
 
-      {/* 30/60/90 plan — primary action surface, front and center */}
+      {/* Needs attention — workflow layer */}
+      {family.needsAttention && family.needsAttention.length > 0 ? (
+        <NeedsAttentionPanel items={family.needsAttention} familyId={family.id} />
+      ) : null}
+
+      {/* 30/60/90 plan — primary action surface, command center */}
       <PlanPanel
         familyId={family.id}
         plan={family.plan ?? null}
         familyName={family.name}
+        resourceMatches={family.resourceMatches}
       />
 
       <section className="space-y-4">
@@ -181,12 +189,13 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
             Dated entries for the file after visits, calls, or partner contact.
           </p>
         </div>
-        <Card>
-          <CardTitle>Case notes</CardTitle>
-          <div className="mt-5 border-b border-slate-100 pb-6">
-            <AddCaseNoteForm familyId={family.id} />
-          </div>
-          {family.caseNotes.length === 0 ? (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardTitle>Case notes</CardTitle>
+            <div className="mt-5 border-b border-slate-100 pb-6">
+              <AddCaseNoteForm familyId={family.id} />
+            </div>
+            {family.caseNotes.length === 0 ? (
             <div className="mt-6">
               <EmptyState
                 className="border-slate-200/80 bg-slate-50/40 py-8"
@@ -214,7 +223,12 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
               ))}
             </ul>
           )}
-        </Card>
+          </Card>
+          <CaseActivityTimeline
+            items={family.caseActivity ?? []}
+            maxItems={15}
+          />
+        </div>
       </section>
 
       <section className="space-y-4">
@@ -231,6 +245,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         <ResourceMatchesPanel
           familyId={family.id}
           matches={family.resourceMatches}
+          plan={family.plan}
         />
         <PhasePlaceholder
           title="Referrals & tasks"

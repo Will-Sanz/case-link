@@ -51,6 +51,7 @@ export const updatePlanStepSchema = z.object({
   details: planStepDetailsSchema.optional(),
   workflow_data: planStepWorkflowSchema.optional(),
   due_date: z.string().nullable().optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
 });
 
 export const createManualStepSchema = z.object({
@@ -64,4 +65,33 @@ export const createManualStepSchema = z.object({
 export const deletePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
+});
+
+export const ACTIVITY_TYPES = [
+  "call_attempted",
+  "voicemail_left",
+  "email_sent",
+  "text_sent",
+  "appointment_scheduled",
+  "attended_appointment",
+  "documents_requested",
+  "documents_submitted",
+  "no_response",
+  "completed",
+  "other",
+] as const;
+
+export const logPlanStepActivitySchema = z.object({
+  stepId: z.string().uuid(),
+  familyId: z.string().uuid(),
+  action: z.string().min(1).max(100),
+  activity_type: z.string().max(50).optional(),
+  notes: z.string().max(2000).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const linkResourceToStepSchema = z.object({
+  matchId: z.string().uuid(),
+  familyId: z.string().uuid(),
+  stepId: z.string().uuid(),
 });

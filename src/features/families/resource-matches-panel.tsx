@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
   addManualResourceMatch,
+  linkResourceToStep,
   runResourceMatching,
   searchResourcesAction,
+  unlinkResourceFromStep,
   updateResourceMatchStatus,
 } from "@/app/actions/resource-matches";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +17,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeader } from "@/components/ui/section-header";
-import type { ResourceMatchRow } from "@/types/family";
+import type { PlanWithSteps, ResourceMatchRow } from "@/types/family";
 
 function flagSummary(r: NonNullable<ResourceMatchRow["resource"]>): string {
   const parts: string[] = [];
@@ -42,9 +44,11 @@ const MAX_VISIBLE_MATCHES = 10;
 export function ResourceMatchesPanel({
   familyId,
   matches,
+  plan,
 }: {
   familyId: string;
   matches: ResourceMatchRow[];
+  plan: PlanWithSteps | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -115,6 +119,26 @@ export function ResourceMatchesPanel({
       }
     });
   }
+
+  function doLinkToStep(matchId: string, stepId: string) {
+    setError(null);
+    startTransition(async () => {
+      const r = await linkResourceToStep({ matchId, familyId, stepId });
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  function doUnlink(matchId: string) {
+    setError(null);
+    startTransition(async () => {
+      const r = await unlinkResourceFromStep({ matchId, familyId });
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  const steps = plan?.steps ?? [];
 
   return (
     <Card>
@@ -236,6 +260,51 @@ export function ResourceMatchesPanel({
                     >
                       Dismiss
                     </Button>
+                  </div>
+                ) : m.status === "accepted" ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {m.plan_step_id ? (
+                      <>
+                        <Badge className="bg-teal-100 text-teal-900">
+                          Used in plan
+                        </Badge>
+                        {steps.find((s) => s.id === m.plan_step_id) ? (
+                          <Link
+                            href={`#step-${m.plan_step_id}`}
+                            className="text-xs text-teal-700 hover:underline"
+                          >
+                            → {steps.find((s) => s.id === m.plan_step_id)?.title}
+                          </Link>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs text-slate-600"
+                          onClick={() => doUnlink(m.id)}
+                          disabled={pending}
+                        >
+                          Unlink
+                        </Button>
+                      </>
+                    ) : steps.length > 0 ? (
+                      <select
+                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/25"
+                        value=""
+                        onChange={(e) => {
+                          const stepId = e.target.value;
+                          if (stepId) doLinkToStep(m.id, stepId);
+                          e.target.value = "";
+                        }}
+                        disabled={pending}
+                      >
+                        <option value="">Add to plan…</option>
+                        {steps.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title} ({s.phase}-day)
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
                   </div>
                 ) : null}
               </li>
