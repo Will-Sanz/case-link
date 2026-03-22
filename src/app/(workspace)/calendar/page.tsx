@@ -62,7 +62,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   const currentDateKey = currentDate.toISOString().slice(0, 10);
 
   return (
-    <div className="-mx-4 -mb-8 -mt-8 flex min-h-[calc(100dvh-8rem)] flex-col sm:-mx-6 lg:-mb-10 lg:-mx-8 lg:-mt-10">
+    <div className="flex min-h-[calc(100dvh-6rem)] flex-col">
       <CalendarView
         events={events}
         workload={workload}

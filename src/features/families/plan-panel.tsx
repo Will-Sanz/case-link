@@ -39,7 +39,7 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 const PHASE_COLORS: Record<string, string> = {
-  "30": "bg-blue-400/90/90",
+  "30": "bg-blue-500/90",
   "60": "bg-blue-400/90",
   "90": "bg-blue-400/80",
 };
@@ -509,26 +509,18 @@ export function PlanPanel({
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [regenerateFeedback, setRegenerateFeedback] = useState("");
 
-  useEffect(() => {
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
-    const match = hash.match(/^#step-(.+)$/);
-    if (match) {
-      const stepId = match[1];
-      setModalStepId(stepId);
-    }
-  }, []);
-
+  // Scroll to step from hash (e.g. deep link from dashboard) but do NOT auto-open modal
   useEffect(() => {
     if (hashScrolledRef.current) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     const match = hash.match(/^#step-(.+)$/);
-    if (!match || modalStepId !== match[1]) return;
+    if (!match) return;
     const el = document.getElementById(`step-${match[1]}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
       hashScrolledRef.current = true;
     }
-  }, [modalStepId]);
+  }, []);
 
   function handleGenerateFirst() {
     setError(null);
@@ -741,7 +733,7 @@ export function PlanPanel({
                   type="button"
                   onClick={handleGenerateFirst}
                   disabled={pending}
-                  className="bg-blue-400/90/90 hover:bg-blue-400/90"
+                  className="bg-blue-500/90 hover:bg-blue-400/90"
                 >
                   {pending ? "Generating…" : "Generate plan"}
                 </Button>
@@ -998,7 +990,7 @@ export function PlanPanel({
                                           {step.status !== "completed" && (
                                             <Button
                                               type="button"
-                                              className="h-8 bg-blue-400/90/90 px-3 text-xs font-medium text-white hover:bg-blue-400/90"
+                                              className="h-8 bg-blue-500/90 px-3 text-xs font-medium text-white hover:bg-blue-400/90"
                                               onClick={() =>
                                                 handleStatusChange(
                                                   step.id,

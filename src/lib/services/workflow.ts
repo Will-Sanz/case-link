@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type NeedsAttentionItem = {
-  type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "no_activity" | "new_plan";
+  type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "in_progress" | "no_activity" | "new_plan";
   family_id: string;
   family_name: string;
   step_id?: string;
@@ -256,6 +256,20 @@ export async function getNeedsAttention(
           });
         }
       }
+
+      if (s.status === "in_progress") {
+        const alreadyAdded = items.some((i) => i.step_id === s.id);
+        if (!alreadyAdded) {
+          items.push({
+            type: "in_progress",
+            family_id: familyId,
+            family_name: familyName,
+            step_id: s.id,
+            step_title: s.title,
+            step_phase: s.phase,
+          });
+        }
+      }
     }
 
     for (const f of families) {
@@ -305,6 +319,7 @@ export async function getNeedsAttention(
     "blocked",
     "escalation",
     "follow_up_soon",
+    "in_progress",
     "new_plan",
     "no_activity",
   ];
@@ -389,7 +404,7 @@ export type ActionableItem = {
   step_phase: string;
   step_status?: string;
   action: string;
-  type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "no_activity" | "new_plan";
+  type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "in_progress" | "no_activity" | "new_plan";
   due_date?: string | null;
   days_overdue?: number;
   checklist_progress?: { completed: number; total: number };
@@ -557,6 +572,7 @@ export async function getDashboardData(
     else if (i.type === "follow_up_soon")
       action = itemTitle ? `${i.family_name}: ${itemTitle}` : `Due soon: ${i.step_title ?? ""}`;
     else if (i.type === "escalation") action = `Escalation: ${i.step_title ?? ""}`;
+    else if (i.type === "in_progress") action = itemTitle ? `${i.family_name}: ${itemTitle}` : `Continue: ${i.step_title ?? ""}`;
     else if (i.type === "no_activity") action = `Check in: ${i.family_name} (${i.days_since_activity}d no activity)`;
     else if (i.type === "new_plan") action = `Review plan: ${i.family_name}`;
 

@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<NeedsAttentionItem["type"], string> = {
   follow_up_today: "Due today",
   follow_up_soon: "Due soon",
   escalation: "Escalation",
+  in_progress: "In progress",
   no_activity: "No recent activity",
   new_plan: "New plan",
 };
@@ -20,6 +21,7 @@ const TYPE_STYLES: Record<NeedsAttentionItem["type"], string> = {
   follow_up_today: "border-blue-200 bg-blue-50/80 hover:bg-blue-50",
   follow_up_soon: "border-slate-200 bg-slate-50/80 hover:bg-slate-50",
   escalation: "border-amber-300 bg-amber-50/90 hover:bg-amber-50",
+  in_progress: "border-blue-200 bg-blue-50/60 hover:bg-blue-50",
   no_activity: "border-slate-200 bg-slate-50/80 hover:bg-slate-50",
   new_plan: "border-blue-200 bg-blue-50/60 hover:bg-blue-50",
 };
@@ -30,6 +32,7 @@ const ORDER: NeedsAttentionItem["type"][] = [
   "blocked",
   "escalation",
   "follow_up_soon",
+  "in_progress",
   "new_plan",
   "no_activity",
 ];
@@ -42,7 +45,7 @@ export function CaseCommandCenter({
   items: NeedsAttentionItem[];
   familyId: string;
 }) {
-  const filtered = items.filter((i) => i.family_id === familyId).slice(0, 6);
+  const filtered = items.filter((i) => i.family_id === familyId).slice(0, 20);
   if (filtered.length === 0) return null;
 
   const sorted = [...filtered].sort(
@@ -116,7 +119,8 @@ export function CaseCommandCenter({
                       (item.type === "follow_up_soon" ||
                         item.type === "no_activity") &&
                         "bg-slate-200/80 text-slate-700",
-                      item.type === "new_plan" && "bg-blue-200/80 text-blue-900"
+                      (item.type === "in_progress" ||
+                        item.type === "new_plan") && "bg-blue-200/80 text-blue-900"
                     )}
                   >
                     {badge}

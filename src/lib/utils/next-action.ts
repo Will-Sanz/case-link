@@ -7,8 +7,9 @@ const TYPE_PRIORITY: Record<NeedsAttentionItem["type"], number> = {
   blocked: 2,
   escalation: 3,
   follow_up_soon: 4,
-  new_plan: 5,
-  no_activity: 6,
+  in_progress: 5,
+  new_plan: 6,
+  no_activity: 7,
 };
 
 /** Derive a short, concrete "next action" for a case */
@@ -33,7 +34,9 @@ export function getNextAction(
           ? " — due today"
           : top.type === "blocked"
             ? " — blocked"
-            : "";
+            : top.type === "in_progress"
+              ? " — in progress"
+              : "";
       return `${top.step_title}${suffix}`;
     }
     if (top.type === "no_activity" && top.days_since_activity != null) {

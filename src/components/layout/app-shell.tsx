@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/actions/auth";
+import { MainContent } from "@/components/layout/main-content";
 import { NavLink } from "@/components/layout/nav-link";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/types/user-role";
@@ -85,9 +86,7 @@ export function AppShell({
           </nav>
         </header>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </main>
+        <MainContent>{children}</MainContent>
       </div>
     </div>
   );

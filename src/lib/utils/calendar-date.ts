@@ -5,7 +5,7 @@
 
 export type CalendarView = "month" | "week" | "agenda";
 
-function toKey(d: Date): string {
+export function toKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
@@ -40,14 +40,14 @@ function startOfWeek(d: Date): Date {
 }
 
 /** First day of month */
-function startOfMonth(d: Date): Date {
+export function startOfMonth(d: Date): Date {
   const c = new Date(d.getFullYear(), d.getMonth(), 1);
   c.setHours(0, 0, 0, 0);
   return c;
 }
 
 /** Last day of month */
-function endOfMonth(d: Date): Date {
+export function endOfMonth(d: Date): Date {
   const c = new Date(d.getFullYear(), d.getMonth() + 1, 0);
   c.setHours(23, 59, 59, 999);
   return c;

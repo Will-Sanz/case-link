@@ -26,6 +26,7 @@ const TYPE_BADGE: Record<ActionableItem["type"], string> = {
   follow_up_today: "Due today",
   follow_up_soon: "Due soon",
   escalation: "Escalation",
+  in_progress: "In progress",
   no_activity: "No activity",
   new_plan: "New plan",
 };
@@ -62,6 +63,7 @@ export function NextBestActionCard({
     follow_up_today: "border-blue-200 bg-blue-50/25",
     follow_up_soon: "border-slate-200 bg-white",
     escalation: "border-amber-200 bg-amber-50/50",
+    in_progress: "border-blue-200 bg-blue-50/25",
     no_activity: "border-slate-200 bg-white",
     new_plan: "border-blue-200 bg-blue-50/25",
   };
@@ -330,6 +332,7 @@ export function ActionableNowList({ items }: { items: ActionableItem[] }) {
     follow_up_today: "border-blue-200 bg-blue-50/25",
     follow_up_soon: "border-slate-200 bg-white",
     escalation: "border-amber-200 bg-amber-50/50",
+    in_progress: "border-blue-200 bg-blue-50/25",
     no_activity: "border-slate-200 bg-white",
     new_plan: "border-blue-200 bg-blue-50/25",
   };

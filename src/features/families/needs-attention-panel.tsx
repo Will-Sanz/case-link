@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<NeedsAttentionItem["type"], string> = {
   follow_up_today: "Due today",
   follow_up_soon: "Due soon",
   escalation: "Escalation",
+  in_progress: "In progress",
   no_activity: "No recent activity",
   new_plan: "New plan",
 };
@@ -20,6 +21,7 @@ const TYPE_STYLES: Record<NeedsAttentionItem["type"], string> = {
   follow_up_today: "border-blue-200 bg-blue-50/50",
   follow_up_soon: "border-slate-200 bg-slate-50/50",
   escalation: "border-amber-300 bg-amber-50/80",
+  in_progress: "border-blue-200 bg-blue-50/30",
   no_activity: "border-slate-200 bg-slate-50/50",
   new_plan: "border-blue-200 bg-blue-50/30",
 };
@@ -51,6 +53,7 @@ export function NeedsAttentionPanel({
     "blocked",
     "escalation",
     "follow_up_soon",
+    "in_progress",
     "new_plan",
     "no_activity",
   ];
