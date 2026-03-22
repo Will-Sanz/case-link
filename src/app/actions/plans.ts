@@ -508,9 +508,11 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -553,15 +555,51 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
   }
   next[checklistIndex] = completed;
 
+  // Auto-update step status from checklist progress
+  const completedCount = next.filter(Boolean).length;
+  const totalRequired = checklist.length;
+  const allComplete = totalRequired > 0 && completedCount >= totalRequired;
+  const someComplete = completedCount > 0;
+
+  const { data: stepForStatus } = await supabase
+    .from("plan_steps")
+    .select("status")
+    .eq("id", stepId)
+    .single();
+
+  const currentStatus = (stepForStatus?.status as string) ?? "pending";
+  let statusUpdate: string | undefined;
+
+  if (allComplete && currentStatus !== "completed" && currentStatus !== "blocked") {
+    statusUpdate = "completed";
+  } else if (someComplete && currentStatus === "pending" && !allComplete) {
+    statusUpdate = "in_progress";
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    workflow_data: { ...wd, checklist_completed: next },
+  };
+  if (statusUpdate) updatePayload.status = statusUpdate;
+
   const { error } = await supabase
     .from("plan_steps")
-    .update({
-      workflow_data: { ...wd, checklist_completed: next },
-    })
+    .update(updatePayload)
     .eq("id", stepId);
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  if (statusUpdate && plan) {
+    await logCaseActivity(
+      supabase,
+      familyId,
+      userId,
+      "step.status_changed",
+      "plan_step",
+      stepId,
+      { status: statusUpdate, source: "checklist_auto" },
+    );
   }
 
   revalidatePath(`/families/${familyId}`);
@@ -646,6 +684,37 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
       actionItemId,
       {},
     );
+
+    // Auto-complete step if all action items are now completed
+    const { data: stepActionItems } = await supabase
+      .from("plan_step_action_items")
+      .select("id, status")
+      .eq("plan_step_id", ai.plan_step_id);
+    const allDone =
+      (stepActionItems ?? []).length > 0 &&
+      (stepActionItems ?? []).every((x) => x.status === "completed");
+    if (allDone) {
+      const { data: curStep } = await supabase
+        .from("plan_steps")
+        .select("status")
+        .eq("id", ai.plan_step_id)
+        .single();
+      if (curStep && curStep.status !== "completed" && curStep.status !== "blocked") {
+        await supabase
+          .from("plan_steps")
+          .update({ status: "completed" })
+          .eq("id", ai.plan_step_id);
+        await logCaseActivity(
+          supabase,
+          familyId,
+          userId,
+          "step.status_changed",
+          "plan_step",
+          ai.plan_step_id,
+          { status: "completed", source: "action_items_auto" },
+        );
+      }
+    }
   }
 
   revalidatePath(`/families/${familyId}`);

@@ -59,10 +59,10 @@ export function CaseCommandCenter({
           id="command-center-heading"
           className="text-base font-bold tracking-tight text-slate-900 sm:text-lg"
         >
-          Action needed now
+          Active work
         </h2>
         <p className="mt-0.5 text-sm text-slate-600">
-          Today&apos;s priorities for this case — click to open the step
+          Click to open a step and update progress
         </p>
       </div>
       <ul className="divide-y divide-slate-100">
@@ -122,7 +122,13 @@ export function CaseCommandCenter({
                     {badge}
                   </span>
                   <span className="text-xs font-medium text-teal-700">
-                    Open →
+                    {item.step_id
+                      ? item.type === "blocked"
+                        ? "Resolve →"
+                        : item.type === "overdue"
+                          ? "Follow up →"
+                          : "Open step →"
+                      : "Open case →"}
                   </span>
                 </div>
               </Link>

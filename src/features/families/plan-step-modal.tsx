@@ -64,9 +64,9 @@ function ModalStatusSelect({
         "focus:outline-none focus:ring-2 focus:ring-teal-600/25",
       )}
     >
-      <option value="pending">Pending</option>
+      <option value="pending">Not started</option>
       <option value="in_progress">In progress</option>
-      <option value="completed">Completed</option>
+      <option value="completed">Complete</option>
       <option value="blocked">Blocked</option>
     </select>
   );
@@ -498,10 +498,13 @@ function PlanStepModalInner({
           </div>
 
           {/* Workflow section */}
-          <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+          <div className="mb-6 rounded-xl border-2 border-teal-200 bg-teal-50/40 p-4">
             <h3 className="text-sm font-semibold text-slate-800">
-              Case manager actions
+              Update progress
             </h3>
+            <p className="mt-0.5 text-xs text-slate-600">
+              Update status, notes, and checklist progress here.
+            </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <Label className="text-slate-700">Status</Label>
@@ -725,7 +728,7 @@ function PlanStepModalInner({
               onClick={saveWorkflow}
               disabled={pending}
             >
-              Save workflow
+              Save progress
             </Button>
           </div>
 
@@ -1263,14 +1266,29 @@ function PlanStepModalInner({
         </div>
 
         {!editing ? (
-          <div className="flex shrink-0 flex-wrap gap-2 border-t border-slate-100 bg-slate-50/80 px-5 py-4">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-5 py-4">
+            {status !== "completed" ? (
+              <Button
+                type="button"
+                className="bg-teal-600 font-semibold hover:bg-teal-700"
+                onClick={() => handleStatusChange("completed")}
+                disabled={pending}
+              >
+                Mark step complete
+              </Button>
+            ) : (
+              <span className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900">
+                ✓ Step complete
+              </span>
+            )}
             <Button
               type="button"
               variant="secondary"
               onClick={() => setEditing(true)}
               disabled={pending}
+              title="Edit title and description"
             >
-              Edit
+              Edit step
             </Button>
             <Button
               type="button"
@@ -1289,6 +1307,11 @@ function PlanStepModalInner({
             >
               Close
             </Button>
+            {status === "completed" && (
+              <p className="mt-2 w-full text-xs text-slate-500">
+                Open the plan to view the next step.
+              </p>
+            )}
           </div>
         ) : null}
       </div>

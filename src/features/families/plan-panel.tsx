@@ -14,6 +14,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  StepStatusBadge,
+  ChecklistProgressBadge,
+} from "@/features/families/step-status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
@@ -39,45 +43,6 @@ const PHASE_COLORS: Record<string, string> = {
   "60": "bg-teal-500",
   "90": "bg-teal-400",
 };
-
-function StepStatusBadge({
-  status,
-  onChange,
-  disabled,
-}: {
-  status: PlanStepRow["status"];
-  onChange?: (status: PlanStepRow["status"]) => void;
-  disabled?: boolean;
-}) {
-  const cls =
-    status === "completed"
-      ? "bg-emerald-100 text-emerald-900"
-      : status === "in_progress"
-        ? "bg-amber-100 text-amber-900"
-        : status === "blocked"
-          ? "bg-red-100 text-red-900"
-          : "bg-slate-100 text-slate-700";
-  if (onChange && !disabled) {
-    return (
-      <select
-        value={status}
-        onChange={(e) =>
-          onChange(e.target.value as PlanStepRow["status"])
-        }
-        className={cn(
-          "rounded-md border-0 px-2 py-0.5 text-xs font-medium focus:ring-2 focus:ring-teal-600/25",
-          cls,
-        )}
-      >
-        <option value="pending">Pending</option>
-        <option value="in_progress">In progress</option>
-        <option value="completed">Completed</option>
-        <option value="blocked">Blocked</option>
-      </select>
-    );
-  }
-  return <Badge className={cls}>{status.replace("_", " ")}</Badge>;
-}
 
 /** Linked resources for a step */
 function LinkedResources({
@@ -541,7 +506,7 @@ export function PlanPanel({
   const [addDesc, setAddDesc] = useState("");
   const [modalStepId, setModalStepId] = useState<string | null>(null);
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
-  const [focusMode, setFocusMode] = useState(false);
+  const [workMode, setWorkMode] = useState(true);
   const hashScrolledRef = useRef(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [regenerateFeedback, setRegenerateFeedback] = useState("");
@@ -552,7 +517,7 @@ export function PlanPanel({
     if (match) {
       const stepId = match[1];
       setExpandedStepIds((prev) => new Set(prev).add(stepId));
-      setFocusMode(true);
+      setWorkMode(true);
     }
   }, []);
 
@@ -714,13 +679,18 @@ export function PlanPanel({
   };
 
   const focusSteps =
-    focusMode && currentStep
+    workMode && currentStep
       ? ({ [currentStep.phase]: [currentStep] } as typeof stepsByPhase)
       : stepsByPhase;
   const displayPhases =
-    focusMode && currentStep
+    workMode && currentStep
       ? ([currentStep.phase] as const)
       : (["30", "60", "90"] as const);
+
+  const upcomingSteps =
+    workMode && currentStep
+      ? sortedSteps.filter((s) => s.id !== currentStep.id)
+      : [];
 
   const modalStep = useMemo(() => {
     if (!plan || !modalStepId) return null;
@@ -741,13 +711,15 @@ export function PlanPanel({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Plan
+                Active work
               </p>
               <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
                 30 / 60 / 90 day plan
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-600">
-                Expand a step to work on it — AI help, checklist, and actions are inline.
+                {workMode
+                  ? "Focus on the current step. Open to update progress, check items, and mark complete."
+                  : "View all steps. Work mode focuses on the active step."}
               </p>
               {plan && totalCount > 0 ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -760,18 +732,42 @@ export function PlanPanel({
                   <span className="text-sm font-medium text-slate-700">
                     {completedCount} of {totalCount} completed
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setFocusMode(!focusMode)}
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                      focusMode
-                        ? "bg-teal-100 text-teal-800 hover:bg-teal-200"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                    )}
-                  >
-                    {focusMode ? "Focus mode" : "Full plan"}
-                  </button>
+                  <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWorkMode(true);
+                        if (currentStep) {
+                          setExpandedStepIds((prev) => new Set(prev).add(currentStep.id));
+                        }
+                      }}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                        workMode
+                          ? "bg-teal-600 text-white"
+                          : "text-slate-600 hover:bg-slate-50",
+                      )}
+                    >
+                      Work mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWorkMode(false);
+                        if (currentStep) {
+                          setExpandedStepIds((prev) => new Set(prev).add(currentStep.id));
+                        }
+                      }}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                        !workMode
+                          ? "bg-teal-600 text-white"
+                          : "text-slate-600 hover:bg-slate-50",
+                      )}
+                    >
+                      Full plan
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1026,7 +1022,7 @@ export function PlanPanel({
                                               onClick={() => setModalStepId(step.id)}
                                               className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
                                             >
-                                              View details
+                                              Open to update status and progress
                                               <span aria-hidden>→</span>
                                             </button>
                                           ) : null}
@@ -1048,30 +1044,69 @@ export function PlanPanel({
                                             </span>
                                           ) : null}
                                           <StepStatusBadge
-                                            status={step.status}
+                                            status={
+                                              step.status as
+                                                | "pending"
+                                                | "in_progress"
+                                                | "completed"
+                                                | "blocked"
+                                            }
                                             onChange={(s) =>
                                               handleStatusChange(step.id, s)
                                             }
                                             disabled={pending}
                                           />
+                                          {(step.details as PlanStepDetails | null)?.checklist && (
+                                            <ChecklistProgressBadge
+                                              completed={
+                                                (
+                                                  (step.workflow_data as {
+                                                    checklist_completed?: boolean[];
+                                                  })?.checklist_completed ?? []
+                                                ).filter(Boolean).length
+                                              }
+                                              total={
+                                                (
+                                                  step.details as PlanStepDetails
+                                                )?.checklist?.length ?? 0
+                                              }
+                                              showBar
+                                            />
+                                          )}
                                         </div>
-                                        <div className="flex gap-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          {step.status !== "completed" && (
+                                            <Button
+                                              type="button"
+                                              className="h-8 bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700"
+                                              onClick={() =>
+                                                handleStatusChange(
+                                                  step.id,
+                                                  "completed",
+                                                )
+                                              }
+                                              disabled={pending}
+                                            >
+                                              Mark complete
+                                            </Button>
+                                          )}
                                           <Button
                                             type="button"
-                                            variant="ghost"
-                                            className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                            variant="secondary"
+                                            className="h-8 px-2.5 text-xs"
                                             onClick={() => setModalStepId(step.id)}
-                                            title="Open full detail"
+                                            title="Open step to work on it"
                                           >
-                                            Open
+                                            Open step
                                           </Button>
                                           <Button
                                             type="button"
-                                            variant="ghost"
-                                            className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                            variant="outline"
+                                            className="h-8 px-2.5 text-xs"
                                             onClick={() => startEdit(step)}
+                                            title="Update status, notes, and checklist"
                                           >
-                                            Edit
+                                            Edit step
                                           </Button>
                                           <Button
                                             type="button"

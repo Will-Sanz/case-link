@@ -355,6 +355,11 @@ export async function getCaseActivity(
   });
 }
 
+export type ChecklistProgress = {
+  completed: number;
+  total: number;
+};
+
 export type DashboardFamilySummary = {
   family_id: string;
   family_name: string;
@@ -372,6 +377,7 @@ export type DashboardFamilySummary = {
     is_escalated: boolean;
     days_overdue?: number;
     days_since_activity?: number;
+    checklist_progress?: ChecklistProgress;
   } | null;
 };
 
@@ -381,8 +387,12 @@ export type ActionableItem = {
   step_id: string;
   step_title: string;
   step_phase: string;
+  step_status?: string;
   action: string;
   type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "no_activity" | "new_plan";
+  due_date?: string | null;
+  days_overdue?: number;
+  checklist_progress?: { completed: number; total: number };
 };
 
 export async function getDashboardData(
@@ -426,7 +436,7 @@ export async function getDashboardData(
   const planIds = [...latestPlanByFamily.values()];
   const { data: steps } = await client
     .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, workflow_data")
+    .select("id, plan_id, title, phase, status, due_date, workflow_data, details")
     .in("plan_id", planIds)
     .order("sort_order", { ascending: true });
 
@@ -435,7 +445,16 @@ export async function getDashboardData(
     familyIdByPlanId.set(p.id, p.family_id);
   }
 
-  type StepRow = { id: string; plan_id: string; title: string; phase: string; status: string; due_date: string | null; workflow_data: unknown };
+  type StepRow = {
+    id: string;
+    plan_id: string;
+    title: string;
+    phase: string;
+    status: string;
+    due_date: string | null;
+    workflow_data: unknown;
+    details?: { checklist?: string[] } | null;
+  };
   const activeStepByFamily = new Map<string, StepRow>();
   for (const s of steps ?? []) {
     const fid = familyIdByPlanId.get(s.plan_id);
@@ -443,6 +462,21 @@ export async function getDashboardData(
     if (["pending", "in_progress", "blocked"].includes(s.status)) {
       activeStepByFamily.set(fid, s);
     }
+  }
+
+  function getChecklistProgress(step: StepRow): { completed: number; total: number } | undefined {
+    const details = (step.details as { checklist?: string[] } | null) ?? {};
+    const checklist = details.checklist ?? [];
+    if (checklist.length === 0) return undefined;
+    const wd = (step.workflow_data as { checklist_completed?: boolean[] }) ?? {};
+    const completedArr = wd.checklist_completed ?? [];
+    const completed = checklist.filter((_, i) => completedArr[i]).length;
+    return { completed, total: checklist.length };
+  }
+
+  const stepById = new Map<string, StepRow>();
+  for (const s of steps ?? []) {
+    stepById.set(s.id, s as StepRow);
   }
 
   const today = new Date();
@@ -504,6 +538,7 @@ export async function getDashboardData(
               is_blocked: step.status === "blocked",
               is_escalated: !!w.needs_escalation,
               days_overdue: daysOverdue,
+              checklist_progress: getChecklistProgress(step),
             }
           : null,
       };
@@ -525,14 +560,21 @@ export async function getDashboardData(
     else if (i.type === "no_activity") action = `Check in: ${i.family_name} (${i.days_since_activity}d no activity)`;
     else if (i.type === "new_plan") action = `Review plan: ${i.family_name}`;
 
+    const step = i.step_id ? stepById.get(i.step_id) : undefined;
+    const checklistProgress = step ? getChecklistProgress(step) : undefined;
+
     return {
       family_id: i.family_id,
       family_name: i.family_name,
       step_id: i.step_id ?? "",
       step_title: i.step_title ?? "",
       step_phase: i.step_phase ?? "",
+      step_status: step?.status,
       action,
       type: i.type,
+      due_date: i.due_date ?? null,
+      days_overdue: i.days_overdue,
+      checklist_progress: checklistProgress,
     };
   });
 

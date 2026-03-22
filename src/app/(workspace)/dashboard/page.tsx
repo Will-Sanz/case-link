@@ -5,10 +5,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import {
-  DashboardFamilyCards,
-  ActionableNowList,
-  CurrentStepByFamily,
+  NextBestActionCard,
   SummaryCounts,
+  ActionableNowList,
+  DashboardFamilyCards,
 } from "@/features/dashboard/dashboard-sections";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listFamilies } from "@/lib/services/families";
@@ -81,89 +81,78 @@ export default async function DashboardPage() {
     summaryCounts,
   } = dashboardData;
 
+  const nba = actionableItems[0] ?? null;
+  const nbaFamily = nba
+    ? familiesNeedingAttention.find((f) => f.family_id === nba.family_id)
+    : null;
+
+  const otherActionable = actionableItems.slice(1);
+  const otherFamilies = nba
+    ? familiesNeedingAttention.filter((f) => f.family_id !== nba.family_id)
+    : familiesNeedingAttention;
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         title="Today"
-        description="Your work queue. What needs action now, who to follow up with, and what's blocked."
+        description="Your work queue. Start with the next best action."
       />
+
+      {nba ? (
+        <section>
+          <NextBestActionCard
+            item={nba}
+            urgency={nbaFamily?.urgency ?? null}
+            dueDate={nba.due_date}
+            daysOverdue={nba.days_overdue}
+          />
+        </section>
+      ) : (
+        <Card className="p-8">
+          <EmptyState
+            className="border-0 bg-transparent"
+            title="All caught up"
+            description="No families need immediate attention. Check recently updated cases or browse families."
+            action={
+              <Link
+                href="/families"
+                className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+              >
+                View all families
+              </Link>
+            }
+          />
+        </Card>
+      )}
 
       <SummaryCounts counts={summaryCounts} />
 
-      <section id="today" className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-          Action queue
-        </h2>
-        <p className="text-sm text-slate-600">
-          Due today, overdue, blocked — click to open the exact step.
-        </p>
-        {familiesNeedingAttention.length > 0 ? (
-          <DashboardFamilyCards families={familiesNeedingAttention} />
-        ) : (
-          <Card className="p-8">
-            <EmptyState
-              className="border-0 bg-transparent"
-              title="All caught up"
-              description="No families need immediate attention. Check recently updated cases below."
-              action={
-                <Link
-                  href="/families"
-                  className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
-                >
-                  View all families
-                </Link>
-              }
-            />
-          </Card>
-        )}
-      </section>
+      {otherActionable.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Rest of queue
+          </h2>
+          <ActionableNowList items={otherActionable} />
+        </section>
+      )}
 
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-          Quick actions
-        </h2>
-        <p className="text-sm text-slate-600">
-          Highest-priority items — one click to open the step.
-        </p>
-        {actionableItems.length > 0 ? (
-          <ActionableNowList items={actionableItems} />
-        ) : (
-          <Card className="p-6">
-            <p className="text-sm text-slate-600">
-              No overdue, blocked, or due-today items. Use the families list to
-              find work.
-            </p>
-          </Card>
-        )}
-      </section>
+      {otherFamilies.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Other families needing attention
+          </h2>
+          <DashboardFamilyCards families={otherFamilies} />
+        </section>
+      )}
 
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-          Current step by family
-        </h2>
-        <p className="text-sm text-slate-600">
-          Where each case stands operationally.
-        </p>
-        {familiesNeedingAttention.length > 0 ? (
-          <CurrentStepByFamily families={familiesNeedingAttention} />
-        ) : (
-          <Card className="p-6">
-            <p className="text-sm text-slate-600">
-              No active steps. Generate a plan for a family to see their current
-              step here.
-            </p>
-          </Card>
-        )}
-      </section>
-
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Active resources"
           value={resourceCount}
           footer={
             <Link
               href="/resources"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
             >
               Browse directory →
             </Link>
@@ -175,7 +164,7 @@ export default async function DashboardPage() {
           footer={
             <Link
               href="/families"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
             >
               View all families →
             </Link>
@@ -183,42 +172,65 @@ export default async function DashboardPage() {
         />
         <Card className="p-5 sm:col-span-2 lg:col-span-1">
           <CardTitle>Quick actions</CardTitle>
-          <ul className="mt-4 space-y-1">
-            {[
-              { href: "/calendar", label: "Calendar" },
-              { href: "/families/new", label: "New family intake" },
-              { href: "/families", label: "Search families" },
-              { href: "/resources", label: "Search resources" },
-            ].map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
-                >
-                  {item.label}
-                  <span className="text-slate-400" aria-hidden>
-                    →
-                  </span>
-                </Link>
-              </li>
-            ))}
+          <p className="mt-1 text-xs text-slate-500">
+            Shortcuts for common tasks
+          </p>
+          <ul className="mt-4 space-y-0.5">
+            <li>
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Active cases
+              </p>
+              <Link
+                href="/families"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Continue active cases
+                <span className="text-slate-400" aria-hidden>→</span>
+              </Link>
+            </li>
+            <li>
+              <p className="mb-1.5 mt-3 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Create or update
+              </p>
+              <Link
+                href="/families/new"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                New family intake
+                <span className="text-slate-400" aria-hidden>→</span>
+              </Link>
+              <Link
+                href="/calendar"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Calendar
+                <span className="text-slate-400" aria-hidden>→</span>
+              </Link>
+            </li>
+            <li>
+              <p className="mb-1.5 mt-3 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Directory
+              </p>
+              <Link
+                href="/resources"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Search resources
+                <span className="text-slate-400" aria-hidden>→</span>
+              </Link>
+            </li>
           </ul>
         </Card>
       </div>
 
-      <section className="space-y-4">
+      <section className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-              Recently updated
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Cases with recent activity.
-            </p>
-          </div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Recently updated
+          </h2>
           <Link
             href="/families"
-            className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+            className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
           >
             View all
           </Link>

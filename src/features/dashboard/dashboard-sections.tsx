@@ -4,6 +4,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  StepStatusBadge,
+  ChecklistProgressBadge,
+} from "@/features/families/step-status-badge";
 import type {
   ActionableItem,
   DashboardFamilySummary,
@@ -15,6 +19,129 @@ const PHASE_LABELS: Record<string, string> = {
   "60": "60-day",
   "90": "90-day",
 };
+
+const TYPE_BADGE: Record<ActionableItem["type"], string> = {
+  overdue: "Overdue",
+  blocked: "Blocked",
+  follow_up_today: "Due today",
+  follow_up_soon: "Due soon",
+  escalation: "Escalation",
+  no_activity: "No activity",
+  new_plan: "New plan",
+};
+
+function getQueueCtaLabel(item: ActionableItem): string {
+  if (!item.step_id) return "Open case";
+  const cp = item.checklist_progress;
+  const allDone = cp && cp.total > 0 && cp.completed >= cp.total;
+  if (allDone) return "Complete step";
+  if (item.step_status === "in_progress" || (cp && cp.completed > 0)) return "Continue step";
+  if (item.step_status === "blocked") return "Resolve blocker";
+  return "Start step";
+}
+
+/** Primary Next Best Action card — single dominant CTA at top of dashboard. */
+export function NextBestActionCard({
+  item,
+  urgency,
+  dueDate,
+  daysOverdue,
+}: {
+  item: ActionableItem;
+  urgency: string | null;
+  dueDate?: string | null;
+  daysOverdue?: number;
+}) {
+  const href = item.step_id
+    ? `/families/${item.family_id}#step-${item.step_id}`
+    : `/families/${item.family_id}`;
+
+  const typeStyles: Record<ActionableItem["type"], string> = {
+    overdue: "border-red-200 bg-red-50/30",
+    blocked: "border-amber-200 bg-amber-50/30",
+    follow_up_today: "border-teal-200 bg-teal-50/30",
+    follow_up_soon: "border-slate-200 bg-slate-50/30",
+    escalation: "border-amber-300 bg-amber-50/40",
+    no_activity: "border-slate-200 bg-slate-50/30",
+    new_plan: "border-teal-200 bg-teal-50/20",
+  };
+
+  return (
+    <Link href={href} className="block">
+      <Card
+        className={cn(
+          "overflow-hidden transition-all hover:shadow-lg",
+          typeStyles[item.type] ?? "border-teal-200 bg-teal-50/20",
+        )}
+      >
+        <div className="p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Next best action
+          </p>
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+            {item.action}
+          </h2>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="font-medium text-slate-800">{item.family_name}</span>
+            {urgency ? (
+              <Badge
+                className={cn(
+                  "text-xs",
+                  urgency === "crisis" && "bg-red-100 text-red-900",
+                  urgency === "high" && "bg-amber-100 text-amber-900",
+                )}
+              >
+                {urgency}
+              </Badge>
+            ) : null}
+            {item.step_phase ? (
+              <span className="text-xs text-slate-500">
+                {PHASE_LABELS[item.step_phase] ?? item.step_phase}
+              </span>
+            ) : null}
+            <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+              {TYPE_BADGE[item.type]}
+            </span>
+          </div>
+          {item.step_title ? (
+            <p className="mt-3 text-sm text-slate-600">
+              {item.step_title}
+            </p>
+          ) : null}
+          {item.checklist_progress && item.checklist_progress.total > 0 ? (
+            <div className="mt-2 flex items-center gap-3">
+              <ChecklistProgressBadge
+                completed={item.checklist_progress.completed}
+                total={item.checklist_progress.total}
+                showBar
+              />
+              {item.step_status ? (
+                <StepStatusBadge
+                  status={item.step_status as "pending" | "in_progress" | "completed" | "blocked"}
+                />
+              ) : null}
+            </div>
+          ) : null}
+          {(dueDate || daysOverdue != null) && (
+            <p className="mt-2 text-xs text-slate-500">
+              {daysOverdue != null && daysOverdue > 0 ? (
+                <span className="text-red-700">{daysOverdue} days overdue</span>
+              ) : dueDate ? (
+                <>Due {new Date(dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</>
+              ) : null}
+            </p>
+          )}
+          <div className="mt-6">
+            <span className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-700">
+              {getQueueCtaLabel(item)}
+            </span>
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 
 export function SummaryCounts({
   counts,
@@ -95,17 +222,40 @@ export function DashboardFamilyCards({
                 }
               >
                 <Button type="button" variant="secondary" className="h-8 text-xs">
-                  Open case
+                  {f.current_step
+                    ? f.current_step.status === "in_progress" ||
+                      (f.current_step.checklist_progress?.completed ?? 0) > 0
+                      ? "Continue step"
+                      : "Open step"
+                    : "Open case"}
                 </Button>
               </Link>
             </div>
 
             {f.current_step ? (
               <div className="rounded-lg bg-slate-50/80 px-3 py-2">
-                <p className="text-xs font-medium text-slate-500">
-                  {PHASE_LABELS[f.current_step.phase] ?? f.current_step.phase} ·{" "}
-                  {f.current_step.status.replace("_", " ")}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StepStatusBadge
+                    status={
+                      f.current_step.status as
+                        | "pending"
+                        | "in_progress"
+                        | "completed"
+                        | "blocked"
+                    }
+                  />
+                  {f.current_step.checklist_progress &&
+                  f.current_step.checklist_progress.total > 0 ? (
+                    <ChecklistProgressBadge
+                      completed={f.current_step.checklist_progress.completed}
+                      total={f.current_step.checklist_progress.total}
+                      showBar
+                    />
+                  ) : null}
+                  <span className="text-xs text-slate-500">
+                    {PHASE_LABELS[f.current_step.phase] ?? f.current_step.phase}
+                  </span>
+                </div>
                 <p className="mt-0.5 font-medium text-slate-800">
                   {f.current_step.title}
                 </p>
@@ -157,7 +307,14 @@ export function DashboardFamilyCards({
               }
               className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline"
             >
-              {f.current_step ? "Open current step →" : "Open case →"}
+              {f.current_step
+                ? f.current_step.checklist_progress &&
+                  f.current_step.checklist_progress.completed >=
+                    f.current_step.checklist_progress.total &&
+                  f.current_step.checklist_progress.total > 0
+                  ? "Complete step →"
+                  : "Open step →"
+                : "Open case →"}
             </Link>
           </div>
         </Card>
@@ -188,13 +345,23 @@ export function ActionableNowList({ items }: { items: ActionableItem[] }) {
                 : `/families/${item.family_id}`
             }
             className={cn(
-              "block rounded-lg border px-4 py-3 text-sm transition-colors hover:shadow-sm",
+              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm transition-colors hover:shadow-sm",
               typeStyles[item.type] ?? "border-slate-200 bg-white",
             )}
           >
-            <span className="font-medium text-slate-900">{item.family_name}</span>
-            <span className="text-slate-700"> — </span>
-            <span className="text-slate-700">{item.action}</span>
+            <div className="min-w-0 flex-1">
+              <span className="font-medium text-slate-900">{item.family_name}</span>
+              <span className="text-slate-700"> — </span>
+              <span className="text-slate-700">{item.action}</span>
+              {item.checklist_progress && item.checklist_progress.total > 0 ? (
+                <span className="ml-2 text-xs text-slate-500">
+                  ({item.checklist_progress.completed}/{item.checklist_progress.total})
+                </span>
+              ) : null}
+            </div>
+            <span className="shrink-0 text-xs font-medium text-teal-700">
+              {getQueueCtaLabel(item)} →
+            </span>
           </Link>
         </li>
       ))}
@@ -258,9 +425,15 @@ export function CurrentStepByFamily({
                 </td>
                 <td className="px-4 py-3">
                   {f.current_step ? (
-                    <span className="capitalize">
-                      {f.current_step.status.replace("_", " ")}
-                    </span>
+                    <StepStatusBadge
+                      status={
+                        f.current_step.status as
+                          | "pending"
+                          | "in_progress"
+                          | "completed"
+                          | "blocked"
+                      }
+                    />
                   ) : (
                     "—"
                   )}
