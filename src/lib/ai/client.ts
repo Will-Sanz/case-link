@@ -9,12 +9,21 @@ import {
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
+/** OpenAI Structured Outputs (strict JSON Schema). Preferred over json_object for plan/steps. */
+export type StructuredJsonSchema = {
+  name: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+};
+
 export type CreateResponseOptions = {
   taskType: AiTaskType;
   instructions: string;
   input: string | ChatMessage[];
-  /** JSON schema for structured output; if set, response is parsed as JSON */
+  /** Legacy JSON mode — model returns valid JSON only; no schema enforcement. */
   responseFormat?: "json_object";
+  /** When set, API enforces this schema (Responses: text.format; Chat: response_format json_schema). */
+  structuredJsonSchema?: StructuredJsonSchema;
   temperature?: number;
   maxTokens?: number;
 };
@@ -78,8 +87,22 @@ async function callResponsesApi(
     max_output_tokens: options.maxTokens ?? 4096,
   };
 
-  // Responses API: structured output via text.format would require full JSON schema.
-  // For now we rely on prompt instructions + parse; both APIs return raw text.
+  if (options.structuredJsonSchema) {
+    body.text = {
+      format: {
+        type: "json_schema",
+        name: options.structuredJsonSchema.name,
+        schema: options.structuredJsonSchema.schema,
+        strict: options.structuredJsonSchema.strict !== false,
+      },
+      verbosity: "high",
+    };
+  } else if (options.responseFormat === "json_object") {
+    body.text = {
+      format: { type: "json_object" },
+      verbosity: "medium",
+    };
+  }
 
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -163,7 +186,16 @@ async function callChatCompletionsApi(
     max_tokens: options.maxTokens ?? 4096,
   };
 
-  if (options.responseFormat === "json_object") {
+  if (options.structuredJsonSchema) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: options.structuredJsonSchema.name,
+        schema: options.structuredJsonSchema.schema,
+        strict: options.structuredJsonSchema.strict !== false,
+      },
+    };
+  } else if (options.responseFormat === "json_object") {
     body.response_format = { type: "json_object" };
   }
 

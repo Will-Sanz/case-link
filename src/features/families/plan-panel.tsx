@@ -505,7 +505,6 @@ export function PlanPanel({
   const [addTitle, setAddTitle] = useState("");
   const [addDesc, setAddDesc] = useState("");
   const [modalStepId, setModalStepId] = useState<string | null>(null);
-  const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
   const [workMode, setWorkMode] = useState(true);
   const hashScrolledRef = useRef(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
@@ -516,7 +515,7 @@ export function PlanPanel({
     const match = hash.match(/^#step-(.+)$/);
     if (match) {
       const stepId = match[1];
-      setExpandedStepIds((prev) => new Set(prev).add(stepId));
+      setModalStepId(stepId);
       setWorkMode(true);
     }
   }, []);
@@ -525,22 +524,13 @@ export function PlanPanel({
     if (hashScrolledRef.current) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     const match = hash.match(/^#step-(.+)$/);
-    if (!match || !expandedStepIds.has(match[1])) return;
+    if (!match || modalStepId !== match[1]) return;
     const el = document.getElementById(`step-${match[1]}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
       hashScrolledRef.current = true;
     }
-  }, [expandedStepIds]);
-
-  function toggleExpand(stepId: string) {
-    setExpandedStepIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(stepId)) next.delete(stepId);
-      else next.add(stepId);
-      return next;
-    });
-  }
+  }, [modalStepId]);
 
   function handleGenerateFirst() {
     setError(null);
@@ -738,7 +728,7 @@ export function PlanPanel({
                       onClick={() => {
                         setWorkMode(true);
                         if (currentStep) {
-                          setExpandedStepIds((prev) => new Set(prev).add(currentStep.id));
+                          setModalStepId(currentStep.id);
                         }
                       }}
                       className={cn(
@@ -755,7 +745,7 @@ export function PlanPanel({
                       onClick={() => {
                         setWorkMode(false);
                         if (currentStep) {
-                          setExpandedStepIds((prev) => new Set(prev).add(currentStep.id));
+                          setModalStepId(currentStep.id);
                         }
                       }}
                       className={cn(
@@ -879,7 +869,6 @@ export function PlanPanel({
                     ) : (
                       <ul className="mb-8 space-y-4">
                         {focusSteps[phase].map((step) => {
-                          const isExpanded = expandedStepIds.has(step.id);
                           const hasRichContent =
                             (step.action_items?.length ?? 0) > 0 ||
                             (step.details as PlanStepDetails | null)?.checklist
@@ -951,11 +940,7 @@ export function PlanPanel({
                                           <div className="flex items-center gap-2">
                                             <button
                                               type="button"
-                                              onClick={() =>
-                                                hasRichContent && !isExpanded
-                                                  ? toggleExpand(step.id)
-                                                  : setModalStepId(step.id)
-                                              }
+                                              onClick={() => setModalStepId(step.id)}
                                               className="text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25 rounded px-1 py-0.5 -mx-1 -my-0.5"
                                             >
                                               <p className="font-semibold text-slate-900">
@@ -970,17 +955,12 @@ export function PlanPanel({
                                             {hasRichContent && (
                                               <button
                                                 type="button"
-                                                onClick={() => toggleExpand(step.id)}
+                                                onClick={() => setModalStepId(step.id)}
                                                 className="shrink-0 rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                                                aria-label={isExpanded ? "Collapse" : "Expand"}
-                                                title={isExpanded ? "Collapse" : "Expand"}
+                                                aria-label="Open step"
+                                                title="Open step"
                                               >
-                                                <span
-                                                  className={cn(
-                                                    "block text-sm font-medium transition-transform duration-200",
-                                                    isExpanded && "rotate-180",
-                                                  )}
-                                                >
+                                                <span className="block text-sm font-medium">
                                                   ▼
                                                 </span>
                                               </button>
@@ -989,7 +969,7 @@ export function PlanPanel({
                                           <div className="mt-2">
                                             <StepPreview
                                               step={step}
-                                              expanded={isExpanded}
+                                              expanded={false}
                                               resourceMatches={resourceMatches}
                                               onToggleChecklist={handleToggleChecklist}
                                               checklistPending={pending}
@@ -998,25 +978,16 @@ export function PlanPanel({
                                               familyId={familyId}
                                             />
                                           </div>
-                                          {hasRichContent && !isExpanded ? (
+                                          {hasRichContent ? (
                                             <button
                                               type="button"
-                                              onClick={() => toggleExpand(step.id)}
+                                              onClick={() => setModalStepId(step.id)}
                                               className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
                                             >
                                               Expand for details
                                               <span aria-hidden>↓</span>
                                             </button>
-                                          ) : hasRichContent && isExpanded ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleExpand(step.id)}
-                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
-                                            >
-                                              Collapse
-                                              <span aria-hidden>↑</span>
-                                            </button>
-                                          ) : !hasRichContent ? (
+                                          ) : (
                                             <button
                                               type="button"
                                               onClick={() => setModalStepId(step.id)}
@@ -1025,7 +996,7 @@ export function PlanPanel({
                                               Open to update status and progress
                                               <span aria-hidden>→</span>
                                             </button>
-                                          ) : null}
+                                          )}
                                         </div>
                                       </div>
                                       <div className="flex shrink-0 flex-col items-end gap-2">

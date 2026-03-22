@@ -84,7 +84,7 @@ const HELPER_PROMPTS: Record<
     userPrefix: "Generate a call script for this step:\n\n",
   },
   email_draft: {
-    system: `You are an experienced case manager assistant. Generate a SHORT, USABLE outreach EMAIL for this step. Include: concise context, reason for outreach, clear request for next action, polite close. Use placeholders like [FAMILY NAME] or [ACCOUNT NUMBER] where the case manager would fill in. If a contact/organization is linked, address it appropriately. Output plain text only, no markdown.`,
+    system: `You are an experienced case manager assistant. Generate a USABLE outreach EMAIL for this step. Include: context, reason for outreach, clear request for next action, polite close. Use placeholders like [FAMILY NAME] or [ACCOUNT NUMBER] where the case manager would fill in. If a contact/organization is linked, address it appropriately. Output plain text only, no markdown.`,
     userPrefix: "Draft an outreach email for this step:\n\n",
   },
   prep_checklist: {
@@ -96,7 +96,7 @@ const HELPER_PROMPTS: Record<
     userPrefix: "Generate fallback options if the first attempt fails:\n\n",
   },
   family_explanation: {
-    system: `You are an experienced case manager assistant. Generate a SIMPLER explanation the case manager can use when talking to the family. Include: why this step matters, what the family needs to do, what to expect next, what documents to bring. Use plain language, avoid jargon. Output plain text only, no markdown.`,
+    system: `You are an experienced case manager assistant. Generate an explanation the case manager can use when talking to the family. Include: why this step matters, what the family needs to do, what to expect next, what documents to bring. Use plain language, avoid jargon. Output plain text only, no markdown.`,
     userPrefix: "Generate a family-friendly explanation for this step:\n\n",
   },
   break_into_actions: {
@@ -104,7 +104,7 @@ const HELPER_PROMPTS: Record<
     userPrefix: "Break this step into smaller immediate actions:\n\n",
   },
   what_happens_next: {
-    system: `You are an experienced case manager assistant. Generate a short "after this step" guide. Include: what success looks like, what to do if approved, what to do if denied, what follow-up step should happen next. Be specific. Output plain text only, no markdown.`,
+    system: `You are an experienced case manager assistant. Generate a "after this step" guide. Include: what success looks like, what to do if approved, what to do if denied, what follow-up step should happen next. Be specific. Output plain text only, no markdown.`,
     userPrefix: "Generate a 'what happens next' guide for this step:\n\n",
   },
   troubleshoot_blocker: {

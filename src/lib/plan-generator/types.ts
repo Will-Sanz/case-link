@@ -26,29 +26,29 @@ export type GeneratedActionItem = {
 /** Rich content for generated plan steps */
 export type GeneratedStepDetails = {
   /** Short, concrete next action (e.g. "Call PECO and ask about CAP enrollment") */
-  action_needed_now?: string;
-  rationale?: string;
-  detailed_instructions?: string;
-  checklist?: string[];
-  required_documents?: string[];
+  action_needed_now: string;
+  rationale: string;
+  detailed_instructions: string;
+  checklist: string[];
+  required_documents: string[];
   contact_script?: string;
   materials_needed?: string[];
-  contacts?: Array<{
-    name?: string;
+  contacts: Array<{
+    name: string;
     phone?: string;
     email?: string;
     notes?: string;
   }>;
-  blockers?: string[];
-  fallback_options?: string[];
-  expected_outcome?: string;
-  timing_guidance?: string;
-  priority?: "low" | "medium" | "high";
-  stage_goal?: string;
-  why_now?: string;
+  blockers: string[];
+  fallback_options: string[];
+  expected_outcome: string;
+  timing_guidance: string;
+  priority: "low" | "medium" | "high";
+  stage_goal: string;
+  why_now: string;
   depends_on?: string;
   milestone_type?: string;
-  success_marker?: string;
+  success_marker: string;
 };
 
 export type GeneratedStep = {
@@ -56,7 +56,7 @@ export type GeneratedStep = {
   title: string;
   description: string;
   sort_order: number;
-  details?: GeneratedStepDetails;
+  details: GeneratedStepDetails;
   /** Smaller weekly action items; if absent, derived from checklist for rules fallback */
   action_items?: GeneratedActionItem[];
 };
