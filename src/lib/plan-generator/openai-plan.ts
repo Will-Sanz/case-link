@@ -53,117 +53,201 @@ function buildFamilyContext(detail: FamilyDetail): string {
   return `${familyBlock}\n\n---\n\n${resourcesBlock}`;
 }
 
-const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PROGRESSIVELY SEQUENCED 30-60-90 day case plan that creates REAL MOVEMENT IMMEDIATELY—especially in the first 7 days. Each stage has a distinct role; the 30-day phase must be action-heavy, not assessment-heavy.
+const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PRIORITIZED 30-60-90 day case plan ordered by importance and urgency—NOT strict dependency chains. Steps should be in the most logical sequence for a case worker, but do not need to depend on each other.
 
-## PLANNING PHILOSOPHY (mandatory)
+## CORE GOAL: Prioritized Action Plan
+Generate a prioritized action plan, not a list of similar suggestions. The first step should be the most important action to take immediately. Each subsequent step should be clearly different and lower in urgency or impact. If two steps overlap significantly, combine them into one stronger step.
+
+## PRIORITIZATION RULES (mandatory)
+Rank steps by:
+1. **Urgency** — deadlines, immediate need for food, housing risk, eviction, crisis
+2. **Impact** — what unlocks the most support/resources (e.g., SNAP opens food access; housing application opens shelter options)
+3. **Time sensitivity** — applications with deadlines, benefits, scheduling delays
+
+- Step 1 = most important / most urgent action to take right now
+- Later steps = still valuable, but less urgent or lower impact
+- Do NOT force steps into a dependency chain if it's unnatural
+- Later steps can be parallel or independent; they must simply be less critical than earlier ones
+
+## DEDUPLICATION RULES (mandatory)
+Before returning steps, check for overlap in:
+- **Program names** — SNAP, WIC, food pantry, LIHEAP, etc. Do not have separate steps for "Apply for SNAP" and "Contact food pantry for SNAP referral" if they overlap in outcome
+- **Intent** — apply, contact, schedule, verify. Merge "Apply for SNAP and register with food pantry" into one well-scoped step unless there is a clear difference in timing or purpose
+- **Outcome** — food access, benefits access, housing stability. If two steps achieve the same outcome, combine them
+
+If two steps are very similar: merge them into one stronger step OR keep only the more actionable / higher-impact version.
+
+AVOID outputs like:
+- "Apply for SNAP and register with food pantry" + "Apply for SNAP/WIC and contact food pantries" (merge into one)
+- Multiple steps that all say "contact" or "apply" for the same program family
+
+## STEP QUALITY RULES
+- Each step must include: a clear, distinct title; one primary objective; specific action items
+- Titles must be meaningfully different from each other
+- Avoid repeating the same structure or wording across steps
+- Each step should answer: "Why is this a separate priority?"
+- Prefer fewer, high-quality steps over many repetitive ones (3–5 steps per phase max; 8–12 total is ideal)
+
+## PLANNING PHILOSOPHY
 Prioritize: (1) immediate stabilization, (2) urgent action in the first week, (3) concrete progress over passive assessment, (4) meaningful outcomes as early as possible.
 
-## CRITICAL: 30-day phase = URGENT ACTION, NOT ASSESSMENT
-The first 30 days are divided as:
+## 30-day phase = URGENT ACTION, NOT ASSESSMENT
 - **Week 1**: immediate stabilization and scheduling—front-load actions that move the case NOW
 - **Weeks 2–4**: follow-through, documentation, attendance, approvals, backup plans
 
-First-week steps MUST include actions like: schedule appointments, submit applications, contact agencies, gather and send documents, enroll in services, confirm eligibility, start payment-plan or legal-support processes, arrange transportation/childcare logistics, lock in deadlines and next appointments.
+First-week steps MUST include actions like: schedule appointments, submit applications, contact agencies, gather and send documents, enroll in services, confirm eligibility.
 
-By end of week 1, the household should have concrete actions underway—not a list of things to look into.
-
-## ANTI-PATTERN: Do NOT produce weak early-phase steps
-AVOID starting 30-day steps with: assess, explore, identify, connect with, review options—UNLESS the step also includes the immediate real-world action to take that same day or week.
-
-Instead, 30-day step titles and action_needed_now should use: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
-
-## PUSH ASSESSMENT INTO ACTION
-If you need to understand something, embed that learning into an action:
-- NOT "Assess childcare needs" → USE "Call childcare assistance line, confirm eligibility based on child ages and work schedule, and book the earliest intake appointment"
-- NOT "Assess employment barriers" → USE "Register both adults with the workforce office, ask about resume help and job placement, and document transportation or schedule barriers during registration"
-- NOT "Assess legal options" → USE "Call tenant legal aid, confirm eviction timeline, and request the earliest intake or hotline guidance"
+## ANTI-PATTERN: Do NOT produce weak or repetitive steps
+AVOID: assess, explore, identify—without immediate action. USE: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
+AVOID: multiple steps that are slight rewordings of the same idea (e.g., "Apply for benefits" + "Submit SNAP application").
 
 ## URGENCY SCALING (when Urgency is high or crisis)
-For high-risk or crisis households: compress timelines; push as many meaningful actions as possible into the first 3–7 days; favor immediate scheduling, filing, escalation; treat delays as risks. A family at high housing risk cannot wait 30 days for action. Reduce risk fast—do not just describe it.
+For high-risk households: compress timelines; push meaningful actions into the first 3–7 days; favor immediate scheduling, filing, escalation.
 
-## CRITICAL: Output is schema-enforced
-- You MUST return a JSON object that matches the API schema exactly: every key on every step, every time.
-- Do NOT omit any field. Do NOT return partial steps.
-- Every string field must contain operational guidance—not labels, not "TBD", not "N/A".
-- Be concise: short direct prose; 1–3 sentences per narrative field; 3–5 checklist items; 2–3 fallback options; 1–3 contacts. Avoid filler, repetition, generic case-management language.
+## Schema and output
+- Return JSON matching the API schema exactly. Every key, every step. No placeholders.
+- priority field: set "high" for steps 1–2, "medium" for mid-priority, "low" for later steps
+- depends_on: use sparingly; prefer natural ordering by priority over explicit dependencies
 
-## Stage differentiation
-- **30 days**: immediate stabilization and service activation—scheduling, submissions, enrollments, confirmations
-- **60 days**: follow-through, approvals, attendance, removal of blockers, service uptake
-- **90 days**: routine-building, sustainability, maintenance, relapse prevention
-
-Do NOT let the 30-day phase become mostly discovery work. Do NOT delay meaningful intervention until day 60 or 90.
-
-## Required content per step (every step)
-- action_needed_now — one clear imperative sentence (action verb first)
-- rationale — 1–2 concise sentences
-- detailed_instructions — 2–4 action-focused sentences or bullets
-- checklist — 3–5 concrete tasks
-- required_documents — only key documents needed
-- contacts — 1–3 most relevant
-- success_marker — 1 concise sentence
-- fallback_options — 2–3 concise options
-- priority — low | medium | high
-Plus: why_now, stage_goal, expected_outcome, timing_guidance, blockers, action_items (2+), contact_script (for outreach), depends_on, milestone_type.
-
-## Step count (STRICT)
-- At MOST 5 steps per phase (30, 60, 90), 15 steps total.
+## Step count
+- At MOST 5 steps per phase (30, 60, 90), 15 total. Prefer 3–4 per phase (9–12 total) for clarity.
 
 ## Resource grounding
 - Use MATCHED_COMMUNITY_RESOURCES when provided. Include program names and contact details.
 - action_items[].title must be specific and calendar-ready.`;
 
-/** Simple similarity: shared significant words / total words. Returns 0–1. */
-function titleSimilarity(a: string, b: string): number {
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[^\w\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 2);
-  const wordsA = new Set(norm(a));
-  const wordsB = new Set(norm(b));
+/** Extract significant tokens from text (words, program names). */
+function tokenize(text: string): Set<string> {
+  const lower = text.toLowerCase().replace(/[^\w\s]/g, " ");
+  const words = lower.split(/\s+/).filter((w) => w.length > 2);
+  return new Set(words);
+}
+
+/** Program-name fragments that indicate overlap (same outcome category). */
+const PROGRAM_FAMILIES = [
+  ["snap", "wic", "food", "pantry", "benefits", "ebt"],
+  ["liheap", "peco", "utility", "heat", "electric"],
+  ["housing", "shelter", "eviction", "rent", "landlord"],
+  ["legal", "aid", "tenant", "eviction"],
+  ["childcare", "child", "care", "daycare"],
+  ["employment", "workforce", "job", "career"],
+];
+
+/** Intent verbs that indicate similar actions. */
+const INTENT_VERBS = ["apply", "contact", "schedule", "verify", "submit", "register", "enroll", "call", "reach", "outreach"];
+
+/** Title + action_needed_now similarity. Returns 0–1. */
+function stepSimilarity(
+  a: { title: string; action_needed_now?: string },
+  b: { title: string; action_needed_now?: string },
+): number {
+  const textA = `${a.title} ${a.action_needed_now ?? ""}`;
+  const textB = `${b.title} ${b.action_needed_now ?? ""}`;
+  const wordsA = tokenize(textA);
+  const wordsB = tokenize(textB);
+
   let shared = 0;
   for (const w of wordsA) {
     if (wordsB.has(w)) shared++;
   }
   const total = wordsA.size + wordsB.size - shared;
-  return total === 0 ? 0 : shared / total;
+  const wordSim = total === 0 ? 0 : shared / total;
+
+  let programOverlap = 0;
+  for (const family of PROGRAM_FAMILIES) {
+    const inA = family.some((p) => textA.includes(p));
+    const inB = family.some((p) => textB.includes(p));
+    if (inA && inB) {
+      programOverlap = Math.max(programOverlap, 0.5);
+      const sharedIntent = family.filter((p) => wordsA.has(p) && wordsB.has(p)).length;
+      if (sharedIntent > 0) programOverlap = 0.8;
+      break;
+    }
+  }
+
+  const intentOverlap = INTENT_VERBS.filter((v) => wordsA.has(v) && wordsB.has(v)).length;
+  const intentBoost = intentOverlap >= 2 ? 0.3 : intentOverlap >= 1 ? 0.15 : 0;
+
+  return Math.min(1, wordSim + programOverlap + intentBoost);
 }
 
-function deduplicateSteps<T extends { phase: string; title: string }>(
+/** Deduplicate steps: merge or drop similar steps, keeping higher-priority one. */
+function deduplicateSteps<T extends { phase: string; title: string; action_needed_now?: string; priority?: string }>(
   steps: T[],
 ): T[] {
-  const SIMILARITY_THRESHOLD = 0.6;
+  const SIMILARITY_THRESHOLD = 0.55;
   const result: T[] = [];
+
+  const priorityScore = (s: T) => {
+    const phaseOrder = s.phase === "30" ? 3 : s.phase === "60" ? 2 : 1;
+    const priOrder = s.priority === "high" ? 3 : s.priority === "medium" ? 2 : 1;
+    return phaseOrder * 10 + priOrder;
+  };
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
-    let isDuplicate = false;
+    let merged = false;
 
     for (let j = 0; j < result.length; j++) {
       const earlier = result[j];
-      const sim = titleSimilarity(step.title, earlier.title);
+      const sim = stepSimilarity(
+        { title: step.title, action_needed_now: step.action_needed_now },
+        { title: earlier.title, action_needed_now: earlier.action_needed_now },
+      );
       if (sim >= SIMILARITY_THRESHOLD) {
-        isDuplicate = true;
-        if (shouldLogOpenAi()) {
-          console.info(
-            "[openai-plan] dedupe: similar steps",
-            { phase: earlier.phase, title: earlier.title },
-            { phase: step.phase, title: step.title },
-            `sim=${sim.toFixed(2)}`,
-          );
+        const keepEarlier = priorityScore(earlier) >= priorityScore(step);
+        if (keepEarlier) {
+          merged = true;
+          if (shouldLogOpenAi()) {
+            console.info(
+              "[openai-plan] dedupe: dropped similar (kept earlier)",
+              { phase: step.phase, title: step.title },
+              `sim=${sim.toFixed(2)}`,
+            );
+          }
+        } else {
+          result[j] = step;
+          if (shouldLogOpenAi()) {
+            console.info(
+              "[openai-plan] dedupe: replaced with higher-priority",
+              { phase: earlier.phase, title: earlier.title },
+              { phase: step.phase, title: step.title },
+            );
+          }
         }
         break;
       }
     }
 
-    if (!isDuplicate) {
+    if (!merged && !result.some((r) => stepSimilarity(
+      { title: step.title, action_needed_now: step.action_needed_now },
+      { title: r.title, action_needed_now: r.action_needed_now },
+    ) >= SIMILARITY_THRESHOLD)) {
       result.push(step);
     }
   }
 
   return result;
+}
+
+/** Sort steps by priority: urgency (phase) + impact (priority field). First step = highest. */
+function sortByPriority<T extends { phase: string; title: string; priority?: string }>(
+  steps: T[],
+): T[] {
+  const phaseOrder: Record<string, number> = { "30": 0, "60": 1, "90": 2 };
+  const priOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+  return [...steps].sort((a, b) => {
+    const phaseA = phaseOrder[a.phase] ?? 2;
+    const phaseB = phaseOrder[b.phase] ?? 2;
+    if (phaseA !== phaseB) return phaseA - phaseB;
+
+    const priA = priOrder[a.priority ?? "medium"] ?? 1;
+    const priB = priOrder[b.priority ?? "medium"] ?? 1;
+    if (priA !== priB) return priA - priB;
+
+    return a.title.localeCompare(b.title);
+  });
 }
 
 export function capStepsPerPhase<
@@ -250,13 +334,15 @@ export async function tryGeneratePlanStepsWithOpenAI(
     detail.urgency === "crisis" || detail.urgency === "high"
       ? `\n\n## URGENCY: ${detail.urgency.toUpperCase()}\nThis household is high-risk. Compress timelines. Push as many concrete actions as possible into the first 3–7 days. Front-load scheduling, filing, and escalation. Do not delay meaningful intervention.\n`
       : "";
-  const baseUser = `Create a 30-60-90 day case plan that drives real progress in week 1. HARD LIMIT: at most 5 steps per phase, 15 steps total.
+  const baseUser = `Create a 30-60-90 day case plan ordered by PRIORITY (urgency + impact), not dependency chains. Step 1 = most important action to take right now. Each step must be clearly distinct—no overlapping or repetitive steps. If SNAP, WIC, and food pantry actions overlap, merge into one well-scoped step.
 
-The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, register, confirm, enroll. Avoid passive 30-day steps that only assess, explore, or identify without immediate next action.
+HARD LIMIT: at most 5 steps per phase, 15 total. Prefer 3–4 per phase (9–12 total) for clarity.
 
-Every step MUST include ALL schema fields with substantive, action-oriented content. Keep prose concise: 1–3 sentences per field, 3–5 checklist items, 2–3 fallback options, 1–3 contacts. Use contact_script for outreach steps; null otherwise. No placeholders (TBD, N/A).
+The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, register, confirm, enroll. Avoid passive or duplicate steps.
 
-Phases: 30-day = immediate stabilization and service activation; 60-day = follow-through and approvals; 90-day = sustainability and maintenance. Use matched resources when they apply.${urgencyBlock}${feedbackBlock}\n\n${context}`;
+Every step MUST include ALL schema fields. Set priority: "high" for top 1–2 steps, "medium"/"low" for others. Use depends_on sparingly. No placeholders.
+
+Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sustainability. Use matched resources when they apply.${urgencyBlock}${feedbackBlock}\n\n${context}`;
 
   const maxAttempts = options?.retries ?? 4;
   let correction = "";
@@ -321,15 +407,9 @@ Phases: 30-day = immediate stabilization and service activation; 60-day = follow
       const actionOk = validate30DayActionOrientation(normalized);
 
       if (rich.ok && actionOk.ok) {
-        const phaseOrder: PlanPhase[] = ["30", "60", "90"];
-        let stepsList = [...normalized].sort(
-          (a, b) =>
-            phaseOrder.indexOf(a.phase as PlanPhase) -
-              phaseOrder.indexOf(b.phase as PlanPhase) ||
-            a.title.localeCompare(b.title),
-        );
-
+        let stepsList = sortByPriority(normalized);
         stepsList = deduplicateSteps(stepsList);
+        stepsList = sortByPriority(stepsList);
         stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
 
         if (shouldLogOpenAi() && stepsList.length < normalized.length) {
@@ -385,14 +465,9 @@ Phases: 30-day = immediate stabilization and service activation; 60-day = follow
       if (shouldLogOpenAi()) {
         console.info("[openai-plan] applied defaults after failed richness passes");
       }
-      const phaseOrder: PlanPhase[] = ["30", "60", "90"];
-      let stepsList = [...defaulted].sort(
-        (a, b) =>
-          phaseOrder.indexOf(a.phase as PlanPhase) -
-            phaseOrder.indexOf(b.phase as PlanPhase) ||
-          a.title.localeCompare(b.title),
-      );
+      let stepsList = sortByPriority(defaulted);
       stepsList = deduplicateSteps(stepsList);
+      stepsList = sortByPriority(stepsList);
       stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
       return {
         ok: true,

@@ -242,8 +242,7 @@ function OverviewSection({ family }: { family: FamilyDetail }) {
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="shrink-0"
+            className="shrink-0 text-sm"
             onClick={() => setIsEditing(true)}
           >
             Edit
@@ -374,7 +373,7 @@ function MembersSection({ family }: { family: FamilyDetail }) {
       <div>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Edit household members</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={pending}>
+          <Button type="button" variant="outline" className="text-sm" onClick={() => setIsEditing(false)} disabled={pending}>
             Cancel
           </Button>
         </div>
@@ -388,7 +387,7 @@ function MembersSection({ family }: { family: FamilyDetail }) {
             <div key={m.id || i} className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm font-medium text-slate-600">Member {i + 1}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => removeMember(i)}>
+                <Button type="button" variant="ghost" className="text-sm" onClick={() => removeMember(i)}>
                   Remove
                 </Button>
               </div>
@@ -464,7 +463,7 @@ function MembersSection({ family }: { family: FamilyDetail }) {
             </div>
           ))}
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={addMember}>
+            <Button type="button" variant="outline" className="text-sm" onClick={addMember}>
               Add member
             </Button>
             <Button type="submit" variant="secondary" disabled={pending}>
@@ -486,7 +485,7 @@ function MembersSection({ family }: { family: FamilyDetail }) {
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          className="text-sm"
           onClick={() => {
             setMembers(family.members);
             setIsEditing(true);
@@ -530,7 +529,17 @@ function GoalsSection({ family }: { family: FamilyDetail }) {
   const [pending, startTransition] = useTransition();
 
   function addGoal() {
-    setGoals((prev) => [...prev, { id: "", label: "" }]);
+    setGoals((prev) => [
+      ...prev,
+      {
+        id: "",
+        family_id: family.id,
+        preset_key: null,
+        label: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+      },
+    ]);
   }
 
   function removeGoal(index: number) {
@@ -556,7 +565,7 @@ function GoalsSection({ family }: { family: FamilyDetail }) {
       <div>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Edit goals</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={pending}>
+          <Button type="button" variant="outline" className="text-sm" onClick={() => setIsEditing(false)} disabled={pending}>
             Cancel
           </Button>
         </div>
@@ -580,13 +589,13 @@ function GoalsSection({ family }: { family: FamilyDetail }) {
                 placeholder="Goal"
                 className="flex-1"
               />
-              <Button type="button" variant="ghost" size="sm" onClick={() => removeGoal(i)}>
+              <Button type="button" variant="ghost" className="text-sm" onClick={() => removeGoal(i)}>
                 Remove
               </Button>
             </div>
           ))}
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={addGoal}>
+            <Button type="button" variant="outline" className="text-sm" onClick={addGoal}>
               Add goal
             </Button>
             <Button type="submit" variant="secondary" disabled={pending}>
@@ -608,7 +617,7 @@ function GoalsSection({ family }: { family: FamilyDetail }) {
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          className="text-sm"
           onClick={() => {
             setGoals(family.goals);
             setIsEditing(true);
@@ -644,7 +653,17 @@ function BarriersSection({ family }: { family: FamilyDetail }) {
   const [pending, startTransition] = useTransition();
 
   function addBarrier() {
-    setBarriers((prev) => [...prev, { id: "", label: "" }]);
+    setBarriers((prev) => [
+      ...prev,
+      {
+        id: "",
+        family_id: family.id,
+        preset_key: null,
+        label: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+      },
+    ]);
   }
 
   function removeBarrier(index: number) {
@@ -672,7 +691,7 @@ function BarriersSection({ family }: { family: FamilyDetail }) {
       <div>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Edit barriers</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={pending}>
+          <Button type="button" variant="outline" className="text-sm" onClick={() => setIsEditing(false)} disabled={pending}>
             Cancel
           </Button>
         </div>
@@ -696,13 +715,13 @@ function BarriersSection({ family }: { family: FamilyDetail }) {
                 placeholder="Barrier"
                 className="flex-1"
               />
-              <Button type="button" variant="ghost" size="sm" onClick={() => removeBarrier(i)}>
+              <Button type="button" variant="ghost" className="text-sm" onClick={() => removeBarrier(i)}>
                 Remove
               </Button>
             </div>
           ))}
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={addBarrier}>
+            <Button type="button" variant="outline" className="text-sm" onClick={addBarrier}>
               Add barrier
             </Button>
             <Button type="submit" variant="secondary" disabled={pending}>
@@ -724,7 +743,7 @@ function BarriersSection({ family }: { family: FamilyDetail }) {
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          className="text-sm"
           onClick={() => {
             setBarriers(family.barriers);
             setIsEditing(true);

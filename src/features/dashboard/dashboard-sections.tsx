@@ -63,8 +63,7 @@ export function NextBestActionCarousel({
         <Button
           type="button"
           variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0 rounded-full border-slate-200"
+          className="h-10 w-10 shrink-0 rounded-full border-slate-200 p-0"
           aria-label="Previous action"
           disabled={top5.length <= 1}
           onClick={() => setIndex((i) => (i === 0 ? top5.length - 1 : i - 1))}
@@ -82,8 +81,7 @@ export function NextBestActionCarousel({
         <Button
           type="button"
           variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0 rounded-full border-slate-200"
+          className="h-10 w-10 shrink-0 rounded-full border-slate-200 p-0"
           aria-label="Next action"
           disabled={top5.length <= 1}
           onClick={() => setIndex((i) => (i >= top5.length - 1 ? 0 : i + 1))}
