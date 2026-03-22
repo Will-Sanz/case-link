@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { generatePlanSteps } from "@/lib/plan-generator";
-import { tryGeneratePlanStepsWithOpenAI } from "@/lib/plan-generator/openai-plan";
+import {
+  capStepsPerPhase,
+  MAX_PLAN_STEPS_PER_PHASE,
+  tryGeneratePlanStepsWithOpenAI,
+} from "@/lib/plan-generator/openai-plan";
 import {
   generatedStepsFromMatches,
   mergeResourceAndRulesSteps,
@@ -73,7 +77,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Unauthorized" };
   }
 
-  const { familyId } = parsed.data;
+  const { familyId, regenerationFeedback } = parsed.data;
   const detail = await getFamilyDetail(supabase, familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
@@ -112,7 +116,9 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
   const debugPlan = process.env.OPENAI_DEBUG === "1";
 
   if (apiKey) {
-    const ai = await tryGeneratePlanStepsWithOpenAI(detail);
+    const ai = await tryGeneratePlanStepsWithOpenAI(detail, {
+      regenerationFeedback: regenerationFeedback?.trim() || undefined,
+    });
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;
       generationSource = "openai";
@@ -122,6 +128,10 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     }
   }
 
+  steps = capStepsPerPhase(steps, MAX_PLAN_STEPS_PER_PHASE);
+  steps.forEach((s, i) => {
+    s.sort_order = i;
+  });
   steps = ensureActionItems(steps);
 
   const summary =

@@ -543,6 +543,8 @@ export function PlanPanel({
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
   const [focusMode, setFocusMode] = useState(false);
   const hashScrolledRef = useRef(false);
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [regenerateFeedback, setRegenerateFeedback] = useState("");
 
   useEffect(() => {
     const hash = typeof window !== "undefined" ? window.location.hash : "";
@@ -575,10 +577,25 @@ export function PlanPanel({
     });
   }
 
-  function handleGenerate() {
+  function handleGenerateFirst() {
     setError(null);
     startTransition(async () => {
       const r = await generatePlan({ familyId });
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  function handleRegenerateConfirm() {
+    setError(null);
+    setShowRegenerateDialog(false);
+    const feedback = regenerateFeedback.trim() || undefined;
+    setRegenerateFeedback("");
+    startTransition(async () => {
+      const r = await generatePlan({
+        familyId,
+        regenerationFeedback: feedback,
+      });
       if (!r.ok) setError(r.error);
       else router.refresh();
     });
@@ -767,7 +784,7 @@ export function PlanPanel({
                   />
                   <Button
                     type="button"
-                    onClick={handleGenerate}
+                    onClick={() => setShowRegenerateDialog(true)}
                     disabled={pending}
                     variant="secondary"
                     className="border-slate-200"
@@ -787,7 +804,7 @@ export function PlanPanel({
               ) : (
                 <Button
                   type="button"
-                  onClick={handleGenerate}
+                  onClick={handleGenerateFirst}
                   disabled={pending}
                   className="bg-teal-600 hover:bg-teal-700"
                 >
@@ -1151,6 +1168,73 @@ export function PlanPanel({
           )}
         </div>
       </section>
+
+      {showRegenerateDialog ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+            aria-label="Close"
+            onClick={() => {
+              setShowRegenerateDialog(false);
+              setRegenerateFeedback("");
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="regenerate-plan-title"
+            className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+          >
+            <h3
+              id="regenerate-plan-title"
+              className="text-lg font-semibold text-slate-900"
+            >
+              Regenerate plan
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              A new plan version will be created from your family data and
+              resources. Optional: tell the AI what to change or emphasize.
+            </p>
+            <div className="mt-4">
+              <Label htmlFor="regenerate-feedback">
+                Feedback for the AI (optional)
+              </Label>
+              <textarea
+                id="regenerate-feedback"
+                value={regenerateFeedback}
+                onChange={(e) => setRegenerateFeedback(e.target.value)}
+                placeholder="e.g. Fewer steps, focus on housing first, family has no car, include more document prep…"
+                rows={4}
+                maxLength={4000}
+                className={`mt-1.5 ${textareaClass}`}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                {regenerateFeedback.length}/4000
+              </p>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowRegenerateDialog(false);
+                  setRegenerateFeedback("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRegenerateConfirm}
+                disabled={pending}
+              >
+                {pending ? "Generating…" : "Regenerate plan"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {plan && modalStep ? (
         <PlanStepModal

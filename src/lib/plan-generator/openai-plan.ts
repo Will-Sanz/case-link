@@ -45,8 +45,11 @@ const aiStepSchema = z.object({
 });
 
 const aiResponseSchema = z.object({
-  steps: z.array(aiStepSchema).min(1).max(40),
+  steps: z.array(aiStepSchema).min(1).max(15),
 });
+
+/** Hard cap: at most this many steps per 30/60/90 phase (15 total max). */
+export const MAX_PLAN_STEPS_PER_PHASE = 5;
 
 export type OpenAiPlanResult =
   | { ok: true; steps: GeneratedStep[]; model: string }
@@ -166,22 +169,37 @@ Output ONLY valid JSON. No markdown. Shape:
 }
 
 ## Action items (CRITICAL)
-- Every step MUST have an "action_items" array of 1–5 smaller tasks.
+- Every step MUST have an "action_items" array of 2–5 smaller tasks—enough to cover the work in that step.
 - week_index: 1–4 = 30-day phase, 5–8 = 60-day phase, 9–12 = 90-day phase.
 - Each action_items[].title must be specific, actionable, and calendar-ready.
-- Optionally add action_items[].description: short "how to do it" (e.g. "Have account number and latest bill ready. Ask about arrears assistance or payment plan. Write down rep name and next steps.").
-- Distribute work realistically: 1–5 action items per week.
-- Do NOT use vague titles. Later actions should build on earlier ones.
+- Add action_items[].description for complex tasks: "how to do it" (e.g. "Have account number and latest bill ready. Ask about arrears assistance or payment plan. Write down rep name and next steps.").
+- Distribute work realistically across weeks. Later actions should build on earlier ones.
+- Do NOT use vague titles like "Follow up" without specifying what to follow up on.
 
 ## Resource grounding
 - When MATCHED_COMMUNITY_RESOURCES are provided, use them when they fit. Include program names and contact details.
 - You are NOT limited to resources; provide general guidance when no match exists.
 - Combine: resource-based recommendations + general guidance + fallback advice.
 
-## Quality
-- 3–12 steps total, spread across phases. Each phase should have distinct value.
-- Be specific. Avoid "explore options" or "seek assistance."
-- Each step should add NEW value. Later stages must feel like natural progressions, not replays.
+## Step count (STRICT — do not violate)
+- At MOST 5 steps in the 30-day phase, at MOST 5 in the 60-day phase, at MOST 5 in the 90-day phase.
+- Maximum 15 steps total.
+- When you have fewer steps, CONSOLIDATE related work into each step—do NOT drop information. Merge = combine the full detail into fewer steps, not simplify.
+
+## DENSITY AND COMPLETENESS (CRITICAL — do not sacrifice detail)
+- Each step must be FULLY SELF-CONTAINED with everything the case manager needs to execute it.
+- Fewer steps does NOT mean less detail. Pack comprehensive guidance into each step.
+- EVERY step must include:
+  - detailed_instructions: full step-by-step guidance (2–5 paragraphs when outreach or complex procedures)
+  - checklist: 4–8 CONCRETE, CHECKABLE sub-actions (not vague; specific enough to mark off)
+  - action_items: 2–5 calendar-ready tasks with week_index and optional description
+  - action_needed_now: one crisp sentence for "what to do right now"
+  - rationale, stage_goal, why_now: context so the case manager understands why
+- For outreach steps: contact_script (what to say), required_documents (what to bring), contacts (from resources when available), fallback_options (if first attempt fails).
+- For preparation steps: required_documents, detailed_instructions, checklist.
+- Include blockers and expected_outcome when relevant.
+- Do NOT use placeholder text. Be specific: program names, document types, phone scripts.
+- Each step should feel like a complete mini-workguide—the case manager should never have to guess what to do next.
 
 ## Checklist requirements (critical)
 - Every step should have a checklist of 3–6 CONCRETE, CHECKABLE sub-actions.
@@ -245,15 +263,41 @@ function deduplicateSteps<T extends { phase: string; title: string }>(
   return result;
 }
 
+/** Enforce max steps per phase after model output (safety net). */
+export function capStepsPerPhase<
+  T extends { phase: string; title: string },
+>(steps: T[], maxPerPhase: number): T[] {
+  const counts: Record<string, number> = { "30": 0, "60": 0, "90": 0 };
+  const out: T[] = [];
+  for (const s of steps) {
+    const p = s.phase;
+    if (p !== "30" && p !== "60" && p !== "90") continue;
+    if ((counts[p] ?? 0) >= maxPerPhase) continue;
+    counts[p] = (counts[p] ?? 0) + 1;
+    out.push(s);
+  }
+  return out;
+}
+
+export type TryGeneratePlanOptions = {
+  /** Case manager notes when regenerating; the model must honor these. */
+  regenerationFeedback?: string;
+};
+
 /**
  * Calls OpenAI to draft 30/60/90-day plan steps. Uses gpt-5.4 via Responses API.
  * Returns ok:false on any failure (caller uses rules fallback).
  */
 export async function tryGeneratePlanStepsWithOpenAI(
   detail: FamilyDetail,
+  options?: TryGeneratePlanOptions,
 ): Promise<OpenAiPlanResult> {
   const context = buildFamilyContext(detail);
-  const user = `Create a progressively sequenced 30-60-90 day case plan. Each stage must add NEW value—30-day: urgent setup, 60-day: execution and follow-through, 90-day: stabilization and sustainability. Do NOT repeat the same actions across phases. Use stage_goal, why_now, milestone_type for every step. Use matched resources when they apply.\n\n${context}`;
+  const feedbackBlock =
+    options?.regenerationFeedback?.trim() ?
+      `\n\n## Regeneration instructions from the case manager (follow closely)\n${options.regenerationFeedback.trim()}\n`
+      : "";
+  const user = `Create a progressively sequenced 30-60-90 day case plan. HARD LIMIT: at most 5 steps per phase (30, 60, 90), 15 steps total—never exceed. When using fewer steps, CONSOLIDATE: pack full detail into each step. Every step must be COMPREHENSIVE—detailed_instructions, 4–8 checklist items, 2–5 action_items, contact_script when outreach, required_documents, fallback_options. Do not simplify or drop information. Each stage must add NEW value—30-day: urgent setup, 60-day: execution and follow-through, 90-day: stabilization and sustainability. Use stage_goal, why_now, milestone_type for every step. Use matched resources when they apply.${feedbackBlock}\n\n${context}`;
 
   try {
     const result = await createAiResponse({
@@ -311,6 +355,16 @@ export async function tryGeneratePlanStepsWithOpenAI(
       );
 
     stepsList = deduplicateSteps(stepsList);
+    stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
+
+    if (shouldLogOpenAi() && stepsList.length < validated.data.steps.length) {
+      console.info(
+        "[openai-plan] capped steps per phase:",
+        validated.data.steps.length,
+        "→",
+        stepsList.length,
+      );
+    }
 
     const steps: GeneratedStep[] = stepsList.map((s, i) => {
       const actionItems: GeneratedActionItem[] | undefined =

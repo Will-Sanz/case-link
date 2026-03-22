@@ -43,6 +43,8 @@ const planStepWorkflowSchema = z.object({
 
 export const generatePlanSchema = z.object({
   familyId: z.string().uuid(),
+  /** Optional notes when regenerating an existing plan; passed to the AI. */
+  regenerationFeedback: z.string().max(4000).optional(),
 });
 
 export const updatePlanStepSchema = z.object({
