@@ -1,81 +1,61 @@
 import "server-only";
 
-import { z } from "zod";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStepDetails } from "./types";
-
-const contactSchema = z.object({
-  name: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const aiStepSchema = z.object({
-  phase: z.enum(["30", "60", "90"]),
-  title: z.string().min(1).max(500),
-  description: z.string().max(4000),
-  action_needed_now: z.string().max(500).optional(),
-  rationale: z.string().optional(),
-  detailed_instructions: z.string().optional(),
-  checklist: z.array(z.string()).optional(),
-  required_documents: z.array(z.string()).optional(),
-  contact_script: z.string().optional(),
-  contacts: z.array(contactSchema).optional(),
-  blockers: z.array(z.string()).optional(),
-  fallback_options: z.array(z.string()).optional(),
-  expected_outcome: z.string().optional(),
-  timing_guidance: z.string().optional(),
-  priority: z.enum(["low", "medium", "high"]).optional(),
-  stage_goal: z.string().optional(),
-  why_now: z.string().optional(),
-  depends_on: z.string().optional(),
-  milestone_type: z.string().optional(),
-  success_marker: z.string().optional(),
-});
+import {
+  OPENAI_SINGLE_PLAN_STEP_SCHEMA,
+  aiPlanStepSchema,
+  normalizePlanStep,
+  validatePlanStepsRichness,
+  applyPlanStepDefaults,
+  type AiPlanStepParsed,
+} from "./plan-step-openai-schema";
 
 export type RefineStepResult =
-  | { ok: true; step: { title: string; description: string; details?: GeneratedStepDetails } }
+  | { ok: true; step: { title: string; description: string; details: GeneratedStepDetails } }
   | { ok: false; reason: string };
+
+function cloneSchema(schema: unknown): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+}
 
 const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant. Your job is to REFINE A SINGLE PLAN STEP based on case manager feedback. Make it an EXECUTION-READY step the case manager can act on immediately.
 
+## Action-oriented refinement
+- Use action verbs: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
+- Avoid passive starts: assess, explore, identify, connect with, review options—unless paired with an immediate same-day action.
+- Embed any assessment into a concrete task (e.g. "Call X, confirm Y, and book Z" not "Assess Y").
+
+## CRITICAL: Output is schema-enforced
+- You MUST return one JSON object matching the API schema exactly—all keys, every time.
+- Do NOT omit any field. No "TBD", "N/A", or placeholder strings.
+- Keep prose concise: 1–3 sentences per narrative field, 3–5 checklist items, 2–3 fallback options.
+
 ## Rules
-- Output ONLY the revised step. Do NOT rewrite the whole plan.
+- Output ONLY the revised step as the root JSON object (not wrapped in "steps").
 - Keep the step in the same phase (30, 60, or 90) unless the feedback explicitly asks to change it.
-- Make the step MORE SPECIFIC, ACTIONABLE, and EXECUTION-FRIENDLY. Avoid vague advice.
-- Add action_needed_now: one short sentence stating the exact next action (e.g. "Call PECO customer assistance and ask about CAP enrollment").
-- The checklist MUST contain concrete, checkable sub-actions (e.g. "Call between 9 AM and 4 PM", "Write down intake requirements").
+- Make the step MORE SPECIFIC, ACTIONABLE, and EXECUTION-FRIENDLY.
+- The checklist MUST contain at least 3 concrete, checkable sub-actions.
+- You MUST include at least 2 action_items with week_index and specific titles.
 - Incorporate the case manager's feedback exactly where reasonable.
-- Do NOT repeat actions already covered in other steps unless it's a true follow-up.
-- Use contact_script when outreach is involved (exact phrasing for phone calls).
-- Include required_documents when documents are needed.
-- Include fallback_options when the first approach might fail.
-- If the step is blocked, consider workarounds, smaller first steps, or alternate resources.
+- Use contact_script for outreach (exact phone script); use null if not an outreach step.
+- Include required_documents when documents are needed; be specific.
+- Include blockers (≥1) and fallback_options (≥1) with realistic content.
 - When linked resources exist, use their names and contact details practically.
 
-## Output format
-Output ONLY valid JSON. No markdown. Shape:
-{
-  "phase": "30" | "60" | "90",
-  "title": "Clear step title",
-  "description": "2-3 sentence summary",
-  "action_needed_now": "One concrete sentence: what to do next",
-  "rationale": "Why this matters",
-  "detailed_instructions": "Step-by-step guidance. Be specific.",
-  "checklist": ["Specific sub-action 1", "Specific sub-action 2", ...],
-  "required_documents": ["Doc 1", "Doc 2"],
-  "contact_script": "What to say when calling: ...",
-  "contacts": [{"name": "...", "phone": "...", "email": "...", "notes": "..."}],
-  "fallback_options": ["If X fails, try Y"],
-  "expected_outcome": "What success looks like",
-  "success_marker": "Clear indicator this step is done"
-}`;
+## Required fields (all must be substantive)
+- phase, title, description, action_needed_now
+- why_now, rationale, stage_goal, detailed_instructions (2–4 action-focused sentences)
+- checklist (3–5 items), required_documents, contacts (1–3)
+- blockers, fallback_options (2–3), expected_outcome, success_marker, timing_guidance
+- priority: "low" | "medium" | "high"
+- action_items: array of { title, description (nullable), week_index, target_date (nullable) }
+- contact_script, depends_on, milestone_type (use null when not applicable)`;
 
 /**
- * Refines a single plan step. Uses gpt-5.4 via Responses API.
+ * Refines a single plan step. Uses strict JSON Schema + richness validation.
  */
 export async function refineStepWithOpenAI(
   detail: FamilyDetail,
@@ -87,7 +67,7 @@ export async function refineStepWithOpenAI(
     workflow_data?: { blocker_reason?: string | null };
   },
   feedback: string,
-  options?: { surroundingStepTitles?: string[] },
+  options?: { surroundingStepTitles?: string[]; retries?: number },
 ): Promise<RefineStepResult> {
   const blockerReason = currentStep.workflow_data?.blocker_reason;
   const context = [
@@ -125,7 +105,7 @@ export async function refineStepWithOpenAI(
       ? `\n## Surrounding steps (for context, do not repeat)\n${options!.surroundingStepTitles!.join("\n")}`
       : "";
 
-  const userPrompt = `## Case context
+  const baseUser = `## Case context
 ${context}
 
 ## Current step (to refine)
@@ -134,77 +114,144 @@ ${currentContent}${surroundingBlock}
 ## Case manager feedback
 ${feedback}
 
-Refine ONLY this step. Output the revised step as JSON.${blockerReason ? ` The step is BLOCKED because: ${blockerReason}. Consider workarounds, smaller first steps, or alternate approaches.` : ""}`;
+Refine ONLY this step. Return the full step object with ALL schema fields filled with operational, action-oriented detail. Be concise but actionable.${blockerReason ? ` The step is BLOCKED because: ${blockerReason}. Consider workarounds, smaller first steps, or alternate approaches.` : ""}`;
 
-  try {
-    const result = await createAiResponse({
-      taskType: "step_refinement",
-      instructions: SYSTEM_PROMPT + "\n\nOutput ONLY valid JSON. No markdown.",
-      input: userPrompt,
-      responseFormat: "json_object",
-      temperature: 0.4,
-      maxTokens: 2048,
-    });
+  const maxAttempts = options?.retries ?? 4;
+  let correction = "";
+  let lastNormalized: AiPlanStepParsed | null = null;
 
-    if (!result.ok) {
-      return { ok: false, reason: result.error };
-    }
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const user =
+      correction ?
+        `${baseUser}\n\n## REQUIRED FIX\n${correction}\nRegenerate the complete step JSON with substantive content in every field.`
+      : baseUser;
 
-    const parsed = JSON.parse(result.text) as unknown;
-    const validated = aiStepSchema.safeParse(parsed);
-    if (!validated.success) {
-      return { ok: false, reason: "OpenAI JSON did not match expected shape" };
-    }
+    try {
+      const result = await createAiResponse({
+        taskType: "step_refinement",
+        instructions:
+          SYSTEM_PROMPT + "\n\nRespond with JSON only matching the enforced schema. No markdown.",
+        input: user,
+        structuredJsonSchema: {
+          name: "refined_plan_step",
+          schema: cloneSchema(OPENAI_SINGLE_PLAN_STEP_SCHEMA),
+          strict: true,
+        },
+        temperature: 0.4,
+        maxTokens: 8192,
+      });
 
-    const s = validated.data;
-    const hasDetails =
-      s.action_needed_now ||
-      s.rationale ||
-      s.detailed_instructions ||
-      (s.checklist && s.checklist.length > 0) ||
-      (s.required_documents && s.required_documents.length > 0) ||
-      (s.contacts && s.contacts.length > 0) ||
-      (s.fallback_options && s.fallback_options.length > 0) ||
-      s.expected_outcome ||
-      s.timing_guidance ||
-      s.priority ||
-      s.stage_goal ||
-      s.why_now ||
-      s.contact_script;
+      if (!result.ok) {
+        return { ok: false, reason: result.error };
+      }
 
-    const details: GeneratedStepDetails | undefined = hasDetails
-      ? {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.text);
+      } catch {
+        correction = "Invalid JSON. Return one JSON object only.";
+        continue;
+      }
+
+      const validated = aiPlanStepSchema.safeParse(parsed);
+      if (!validated.success) {
+        correction = `Validation failed: ${validated.error.message.slice(0, 600)}`;
+        continue;
+      }
+
+      const normalized = normalizePlanStep(validated.data);
+      lastNormalized = normalized;
+
+      const rich = validatePlanStepsRichness([normalized]);
+      if (rich.ok) {
+        const s = normalized;
+        const details: GeneratedStepDetails = {
           action_needed_now: s.action_needed_now,
           rationale: s.rationale,
           detailed_instructions: s.detailed_instructions,
           checklist: s.checklist,
           required_documents: s.required_documents,
-          contact_script: s.contact_script,
-          contacts: s.contacts,
+          contact_script: s.contact_script?.trim() || undefined,
+          contacts: s.contacts.map((c) => ({
+            name: c.name,
+            phone: c.phone?.trim() || undefined,
+            email: c.email?.trim() || undefined,
+            notes: c.notes?.trim() || undefined,
+          })),
+          blockers: s.blockers,
           fallback_options: s.fallback_options,
           expected_outcome: s.expected_outcome,
           timing_guidance: s.timing_guidance,
           priority: s.priority,
           stage_goal: s.stage_goal,
           why_now: s.why_now,
-          depends_on: s.depends_on,
-          milestone_type: s.milestone_type,
+          depends_on: s.depends_on?.trim() || undefined,
+          milestone_type: s.milestone_type?.trim() || undefined,
           success_marker: s.success_marker,
-        }
-      : undefined;
+        };
 
-    return {
-      ok: true,
-      step: {
-        title: s.title.trim(),
-        description: s.description.trim(),
-        details,
-      },
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      reason: e instanceof Error ? e.message : "OpenAI request failed",
-    };
+        return {
+          ok: true,
+          step: {
+            title: s.title.trim(),
+            description: s.description.trim(),
+            details,
+          },
+        };
+      }
+
+      correction = rich.reasons.slice(0, 10).join("\n");
+    } catch (e) {
+      if (attempt < maxAttempts - 1) {
+        correction = e instanceof Error ? e.message : "Retry.";
+        continue;
+      }
+      return {
+        ok: false,
+        reason: e instanceof Error ? e.message : "OpenAI request failed",
+      };
+    }
   }
+
+  if (lastNormalized) {
+    const defaulted = applyPlanStepDefaults(lastNormalized);
+    const rich2 = validatePlanStepsRichness([defaulted]);
+    if (rich2.ok) {
+      const s = defaulted;
+      const details: GeneratedStepDetails = {
+        action_needed_now: s.action_needed_now,
+        rationale: s.rationale,
+        detailed_instructions: s.detailed_instructions,
+        checklist: s.checklist,
+        required_documents: s.required_documents,
+        contact_script: s.contact_script?.trim() || undefined,
+        contacts: s.contacts.map((c) => ({
+          name: c.name,
+          phone: c.phone?.trim() || undefined,
+          email: c.email?.trim() || undefined,
+          notes: c.notes?.trim() || undefined,
+        })),
+        blockers: s.blockers,
+        fallback_options: s.fallback_options,
+        expected_outcome: s.expected_outcome,
+        timing_guidance: s.timing_guidance,
+        priority: s.priority,
+        stage_goal: s.stage_goal,
+        why_now: s.why_now,
+        depends_on: s.depends_on?.trim() || undefined,
+        milestone_type: s.milestone_type?.trim() || undefined,
+        success_marker: s.success_marker,
+      };
+      return {
+        ok: true,
+        step: {
+          title: s.title.trim(),
+          description: s.description.trim(),
+          details,
+        },
+      };
+    }
+  }
+
+  return { ok: false, reason: "Failed to refine step after multiple retries" };
 }

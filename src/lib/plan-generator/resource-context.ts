@@ -58,7 +58,7 @@ export function generatedStepsFromMatches(
     const contacts: GeneratedStepDetails["contacts"] = [];
     if (r.primary_contact_name || r.primary_contact_email || r.primary_contact_phone) {
       contacts.push({
-        name: r.primary_contact_name ?? undefined,
+        name: r.primary_contact_name?.trim() || r.program_name,
         email: r.primary_contact_email ?? undefined,
         phone: r.primary_contact_phone ?? undefined,
         notes: r.primary_contact_title ?? undefined,
@@ -70,7 +70,7 @@ export function generatedStepsFromMatches(
       r.secondary_contact_phone
     ) {
       contacts.push({
-        name: r.secondary_contact_name ?? undefined,
+        name: r.secondary_contact_name?.trim() || `${r.program_name} (secondary)`,
         email: r.secondary_contact_email ?? undefined,
         phone: r.secondary_contact_phone ?? undefined,
       });
@@ -79,9 +79,9 @@ export function generatedStepsFromMatches(
     const phaseGuidance =
       phase === "30"
         ? {
-            stage_goal: "Initial outreach and intake setup",
-            why_now: "First 30 days focus on making contact and starting intake; delays here push back the whole timeline.",
-            detailed_instructions: `Call or email ${r.program_name} (${r.office_or_department}) to begin intake or referral. ${contactLine ? `Use: ${contactLine}` : ""} Before reaching out, gather any required documents (ID, proof of address, income verification). After contact, document the representative's name, date, and next steps. Follow up in 3–5 business days if you don't hear back.`,
+            stage_goal: "Immediate outreach, intake scheduling, and application submission",
+            why_now: "Week 1 must include concrete action—schedule intake, submit application, or confirm next steps. Delays push back the whole timeline.",
+            detailed_instructions: `Call ${r.program_name} (${r.office_or_department}) to schedule intake or submit referral. ${contactLine ? `Use: ${contactLine}` : ""} Gather ID, proof of address, income verification before calling. During the call, book the earliest intake appointment and confirm required documents. Document representative name, date, and next steps. Follow up in 2–3 business days if no callback.`,
           }
         : phase === "60"
           ? {
@@ -96,10 +96,11 @@ export function generatedStepsFromMatches(
             };
 
     const details: GeneratedStepDetails = {
+      action_needed_now: `Reach out to ${r.program_name} and complete the next concrete task for this phase (call, email, or appointment).`,
       ...phaseGuidance,
       rationale: m.match_reason
         ? `This program matches the family's needs: ${m.match_reason}`
-        : undefined,
+        : `Structured outreach to ${r.program_name} advances housing and stability goals for this case.`,
       checklist:
         phase === "30"
           ? [
@@ -123,8 +124,30 @@ export function generatedStepsFromMatches(
       required_documents:
         phase === "30"
           ? ["ID", "Proof of address", "Income verification"]
-          : undefined,
-      contacts: contacts.length > 0 ? contacts : undefined,
+          : [],
+      contacts,
+      blockers: [
+        "No callback or long wait times",
+        "Missing documents delaying intake",
+        "Eligibility uncertainty after first contact",
+      ],
+      fallback_options: [
+        `Try alternate contact channel or hours for ${r.program_name}`,
+        "Document attempts and consult supervisor or resource directory for backup programs",
+      ],
+      timing_guidance:
+        phase === "30"
+          ? "Within the first 2–3 weeks of the 30-day window"
+          : phase === "60"
+            ? "Mid-plan: complete follow-through before day 75"
+            : "Late plan: confirm sustainability and renewals before day 90",
+      priority: phase === "30" ? "high" : "medium",
+      success_marker:
+        phase === "30"
+          ? "First successful contact logged with named staff and next step scheduled"
+          : phase === "60"
+            ? "Application status updated or barrier documented with plan"
+            : "Ongoing status and any renewal dates captured in case notes",
       expected_outcome:
         phase === "30"
           ? "Intake started; next steps documented"

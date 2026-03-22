@@ -1,54 +1,19 @@
 import "server-only";
 
-import { z } from "zod";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
+import {
+  OPENAI_PLAN_STEPS_ROOT_SCHEMA,
+  aiPlanResponseSchema,
+  normalizePlanStep,
+  validatePlanStepsRichness,
+  validate30DayActionOrientation,
+  applyPlanStepDefaults,
+  type AiPlanStepParsed,
+} from "./plan-step-openai-schema";
 
-const contactSchema = z.object({
-  name: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const aiActionItemSchema = z.object({
-  title: z.string().min(1).max(300),
-  description: z.string().max(500).optional(),
-  week_index: z.number().int().min(1).max(12),
-  target_date: z.string().optional(),
-});
-
-const aiStepSchema = z.object({
-  phase: z.enum(["30", "60", "90"]),
-  title: z.string().min(1).max(500),
-  description: z.string().max(4000),
-  action_needed_now: z.string().max(500).optional(),
-  action_items: z.array(aiActionItemSchema).optional(),
-  rationale: z.string().optional(),
-  detailed_instructions: z.string().optional(),
-  checklist: z.array(z.string()).optional(),
-  contact_script: z.string().optional(),
-  required_documents: z.array(z.string()).optional(),
-  contacts: z.array(contactSchema).optional(),
-  blockers: z.array(z.string()).optional(),
-  fallback_options: z.array(z.string()).optional(),
-  expected_outcome: z.string().optional(),
-  timing_guidance: z.string().optional(),
-  priority: z.enum(["low", "medium", "high"]).optional(),
-  stage_goal: z.string().optional(),
-  why_now: z.string().optional(),
-  depends_on: z.string().optional(),
-  milestone_type: z.string().optional(),
-  success_marker: z.string().optional(),
-});
-
-const aiResponseSchema = z.object({
-  steps: z.array(aiStepSchema).min(1).max(15),
-});
-
-/** Hard cap: at most this many steps per 30/60/90 phase (15 total max). */
 export const MAX_PLAN_STEPS_PER_PHASE = 5;
 
 export type OpenAiPlanResult =
@@ -60,6 +25,10 @@ function shouldLogOpenAi(): boolean {
 }
 
 const AI_PROMPT_MATCH_LIMIT = 15;
+
+function cloneSchema(schema: unknown): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+}
 
 function buildFamilyContext(detail: FamilyDetail): string {
   const lines: string[] = [
@@ -84,130 +53,65 @@ function buildFamilyContext(detail: FamilyDetail): string {
   return `${familyBlock}\n\n---\n\n${resourcesBlock}`;
 }
 
-const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PROGRESSIVELY SEQUENCED 30-60-90 day case plan where each stage has a distinct role and later stages build on earlier ones—never repeat the same advice in slightly different wording.
+const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PROGRESSIVELY SEQUENCED 30-60-90 day case plan that creates REAL MOVEMENT IMMEDIATELY—especially in the first 7 days. Each stage has a distinct role; the 30-day phase must be action-heavy, not assessment-heavy.
 
-## CRITICAL: Stage differentiation (each phase has a different job)
+## PLANNING PHILOSOPHY (mandatory)
+Prioritize: (1) immediate stabilization, (2) urgent action in the first week, (3) concrete progress over passive assessment, (4) meaningful outcomes as early as possible.
 
-### 30-day phase = URGENT ACTION AND SETUP
-Focus: immediate stabilization, triage, intake, urgent outreach, first document gathering, emergency appointments, initial contact.
-- First outreach to key programs
-- Initial document collection (ID, proof of address)
-- Schedule urgent appointments
-- Begin intake processes
-- Assess immediate risks
-- Connect with crisis resources if needed
+## CRITICAL: 30-day phase = URGENT ACTION, NOT ASSESSMENT
+The first 30 days are divided as:
+- **Week 1**: immediate stabilization and scheduling—front-load actions that move the case NOW
+- **Weeks 2–4**: follow-through, documentation, attendance, approvals, backup plans
 
-### 60-day phase = EXECUTION AND FOLLOW-THROUGH
-Focus: follow-through, appointments, progress checks, application completion, troubleshooting, early momentum.
-- Follow up on 30-day outreach (with a SPECIFIC new action—e.g. "Submit missing documents" not "Contact X again")
-- Attend scheduled appointments
-- Complete applications started in 30-day
-- Troubleshoot barriers that emerged
-- Document outcomes and next steps
-- Build momentum on started processes
+First-week steps MUST include actions like: schedule appointments, submit applications, contact agencies, gather and send documents, enroll in services, confirm eligibility, start payment-plan or legal-support processes, arrange transportation/childcare logistics, lock in deadlines and next appointments.
 
-### 90-day phase = STABILIZATION AND SUSTAINABILITY
-Focus: consolidation, long-term stability, habit-building, contingency planning, renewals, reassessment, next-phase planning.
-- Consolidate gains
-- Renew or extend assistance
-- Build sustainable habits (budgeting, routines)
-- Contingency planning (what if X happens)
-- Reassess goals and barriers
-- Plan next phase beyond 90 days
+By end of week 1, the household should have concrete actions underway—not a list of things to look into.
 
-## ANTI-REPETITION RULES (mandatory)
-- Do NOT restate the same action in multiple phases unless it has a DIFFERENT goal, context, or next step.
-- Each phase must contain DISTINCT actions appropriate to that point in the timeline.
-- If a later phase references an earlier step, it must ADVANCE it (e.g. "Submit documents requested in intake" not "Call again").
-- Prefer PROGRESSION over repetition.
-- Do NOT repeat: "gather documents," "call this number," "follow up" unless the later version is materially different (e.g. 60-day: "Submit the documents they requested" vs 30-day: "Gather initial documents").
-- Avoid generic restatements of earlier advice.
-- Avoid near-duplicate phrasing across stages.
-- Vary guidance types: outreach, preparation, follow-up, habit-building, documentation, review, contingency planning.
-- Before finalizing: mentally check whether any step is too similar to an earlier one; if so, rewrite to be specific and differentiated.
-- Avoid repeating the same sentence structure across items.
+## ANTI-PATTERN: Do NOT produce weak early-phase steps
+AVOID starting 30-day steps with: assess, explore, identify, connect with, review options—UNLESS the step also includes the immediate real-world action to take that same day or week.
 
-## Execution-oriented rules (CRITICAL)
-- Every step must be EXECUTABLE without extra interpretation. The case manager should be able to act immediately.
-- Avoid generic language like "reach out" or "explore options" without saying exactly how.
-- Outreach steps MUST include what to say (contact_script) and what to prepare (required_documents).
-- Every step should include at least one execution component: contact_script, required_documents, or concrete checklist.
-- Include fallback_options when the first attempt might fail.
-- Use organization names and contact details from MATCHED_COMMUNITY_RESOURCES when available.
-- Steps should REDUCE uncertainty, not create it.
-- Make output feel like a case manager can act on it immediately.
+Instead, 30-day step titles and action_needed_now should use: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
 
-## Output format
-Output ONLY valid JSON. No markdown. Shape:
-{
-  "steps": [
-    {
-      "phase": "30" | "60" | "90",
-      "title": "Clear, phase-specific step title",
-      "description": "2–3 sentence summary",
-      "action_needed_now": "One concrete sentence: what to do next (e.g. Call PECO customer assistance and ask about CAP enrollment)",
-      "action_items": [
-        { "title": "Concrete action", "description": "Optional: have account # ready, ask about X", "week_index": 1 }
-      ],
-      "stage_goal": "What this phase aims to achieve",
-      "why_now": "Why this action happens in THIS stage",
-      "depends_on": "Brief ref to prior step if applicable",
-      "milestone_type": "outreach | preparation | follow_up | review | habit_building | contingency | renewal | application | troubleshooting",
-      "rationale": "Why this step matters",
-      "detailed_instructions": "Full step-by-step guidance. Be specific.",
-      "checklist": ["Sub-step 1", "Sub-step 2", ...],
-      "required_documents": ["Doc 1", "Doc 2"],
-      "contacts": [{"name": "...", "phone": "...", "email": "...", "notes": "..."}],
-      "blockers": ["Common obstacle 1"],
-      "fallback_options": ["If X fails, try Y"],
-      "expected_outcome": "What success looks like",
-      "success_marker": "Clear indicator this step is done",
-      "timing_guidance": "When to do this",
-      "priority": "low" | "medium" | "high"
-    }
-  ]
-}
+## PUSH ASSESSMENT INTO ACTION
+If you need to understand something, embed that learning into an action:
+- NOT "Assess childcare needs" → USE "Call childcare assistance line, confirm eligibility based on child ages and work schedule, and book the earliest intake appointment"
+- NOT "Assess employment barriers" → USE "Register both adults with the workforce office, ask about resume help and job placement, and document transportation or schedule barriers during registration"
+- NOT "Assess legal options" → USE "Call tenant legal aid, confirm eviction timeline, and request the earliest intake or hotline guidance"
 
-## Action items (CRITICAL)
-- Every step MUST have an "action_items" array of 2–5 smaller tasks—enough to cover the work in that step.
-- week_index: 1–4 = 30-day phase, 5–8 = 60-day phase, 9–12 = 90-day phase.
-- Each action_items[].title must be specific, actionable, and calendar-ready.
-- Add action_items[].description for complex tasks: "how to do it" (e.g. "Have account number and latest bill ready. Ask about arrears assistance or payment plan. Write down rep name and next steps.").
-- Distribute work realistically across weeks. Later actions should build on earlier ones.
-- Do NOT use vague titles like "Follow up" without specifying what to follow up on.
+## URGENCY SCALING (when Urgency is high or crisis)
+For high-risk or crisis households: compress timelines; push as many meaningful actions as possible into the first 3–7 days; favor immediate scheduling, filing, escalation; treat delays as risks. A family at high housing risk cannot wait 30 days for action. Reduce risk fast—do not just describe it.
+
+## CRITICAL: Output is schema-enforced
+- You MUST return a JSON object that matches the API schema exactly: every key on every step, every time.
+- Do NOT omit any field. Do NOT return partial steps.
+- Every string field must contain operational guidance—not labels, not "TBD", not "N/A".
+- Be concise: short direct prose; 1–3 sentences per narrative field; 3–5 checklist items; 2–3 fallback options; 1–3 contacts. Avoid filler, repetition, generic case-management language.
+
+## Stage differentiation
+- **30 days**: immediate stabilization and service activation—scheduling, submissions, enrollments, confirmations
+- **60 days**: follow-through, approvals, attendance, removal of blockers, service uptake
+- **90 days**: routine-building, sustainability, maintenance, relapse prevention
+
+Do NOT let the 30-day phase become mostly discovery work. Do NOT delay meaningful intervention until day 60 or 90.
+
+## Required content per step (every step)
+- action_needed_now — one clear imperative sentence (action verb first)
+- rationale — 1–2 concise sentences
+- detailed_instructions — 2–4 action-focused sentences or bullets
+- checklist — 3–5 concrete tasks
+- required_documents — only key documents needed
+- contacts — 1–3 most relevant
+- success_marker — 1 concise sentence
+- fallback_options — 2–3 concise options
+- priority — low | medium | high
+Plus: why_now, stage_goal, expected_outcome, timing_guidance, blockers, action_items (2+), contact_script (for outreach), depends_on, milestone_type.
+
+## Step count (STRICT)
+- At MOST 5 steps per phase (30, 60, 90), 15 steps total.
 
 ## Resource grounding
-- When MATCHED_COMMUNITY_RESOURCES are provided, use them when they fit. Include program names and contact details.
-- You are NOT limited to resources; provide general guidance when no match exists.
-- Combine: resource-based recommendations + general guidance + fallback advice.
-
-## Step count (STRICT — do not violate)
-- At MOST 5 steps in the 30-day phase, at MOST 5 in the 60-day phase, at MOST 5 in the 90-day phase.
-- Maximum 15 steps total.
-- When you have fewer steps, CONSOLIDATE related work into each step—do NOT drop information. Merge = combine the full detail into fewer steps, not simplify.
-
-## DENSITY AND COMPLETENESS (CRITICAL — do not sacrifice detail)
-- Each step must be FULLY SELF-CONTAINED with everything the case manager needs to execute it.
-- Fewer steps does NOT mean less detail. Pack comprehensive guidance into each step.
-- EVERY step must include:
-  - detailed_instructions: full step-by-step guidance (2–5 paragraphs when outreach or complex procedures)
-  - checklist: 4–8 CONCRETE, CHECKABLE sub-actions (not vague; specific enough to mark off)
-  - action_items: 2–5 calendar-ready tasks with week_index and optional description
-  - action_needed_now: one crisp sentence for "what to do right now"
-  - rationale, stage_goal, why_now: context so the case manager understands why
-- For outreach steps: contact_script (what to say), required_documents (what to bring), contacts (from resources when available), fallback_options (if first attempt fails).
-- For preparation steps: required_documents, detailed_instructions, checklist.
-- Include blockers and expected_outcome when relevant.
-- Do NOT use placeholder text. Be specific: program names, document types, phone scripts.
-- Each step should feel like a complete mini-workguide—the case manager should never have to guess what to do next.
-
-## Checklist requirements (critical)
-- Every step should have a checklist of 3–6 CONCRETE, CHECKABLE sub-actions.
-- Each checklist item must be a single actionable task the case manager can mark off.
-- Bad: "Reach out to a credit counselor."
-- Good: ["Find one approved counseling contact", "Call between 9 AM and 4 PM", "Ask about debt counseling for families with poor credit", "Write down intake requirements", "Schedule earliest appointment", "Record date, contact name, and requested documents"]
-- Include contact_script when outreach is involved (exact phrasing for phone calls).
-- required_documents must list specific documents (e.g. "Government-issued ID", "Utility bill from last 30 days").`;
+- Use MATCHED_COMMUNITY_RESOURCES when provided. Include program names and contact details.
+- action_items[].title must be specific and calendar-ready.`;
 
 /** Simple similarity: shared significant words / total words. Returns 0–1. */
 function titleSimilarity(a: string, b: string): number {
@@ -227,7 +131,6 @@ function titleSimilarity(a: string, b: string): number {
   return total === 0 ? 0 : shared / total;
 }
 
-/** Filter overly similar steps. Keeps first occurrence, drops later near-duplicates. */
 function deduplicateSteps<T extends { phase: string; title: string }>(
   steps: T[],
 ): T[] {
@@ -263,7 +166,6 @@ function deduplicateSteps<T extends { phase: string; title: string }>(
   return result;
 }
 
-/** Enforce max steps per phase after model output (safety net). */
 export function capStepsPerPhase<
   T extends { phase: string; title: string },
 >(steps: T[], maxPerPhase: number): T[] {
@@ -280,13 +182,60 @@ export function capStepsPerPhase<
 }
 
 export type TryGeneratePlanOptions = {
-  /** Case manager notes when regenerating; the model must honor these. */
   regenerationFeedback?: string;
+  retries?: number;
 };
 
+function parsedStepsToGenerated(stepsList: AiPlanStepParsed[]): GeneratedStep[] {
+  return stepsList.map((s, i) => {
+    const actionItems: GeneratedActionItem[] | undefined =
+      s.action_items && s.action_items.length > 0 ?
+        s.action_items.map((a) => ({
+          title: a.title.trim(),
+          description: a.description?.trim() || undefined,
+          week_index: a.week_index,
+          target_date: a.target_date?.trim() || undefined,
+        }))
+      : undefined;
+
+    const details: GeneratedStepDetails = {
+      action_needed_now: s.action_needed_now,
+      rationale: s.rationale,
+      detailed_instructions: s.detailed_instructions,
+      checklist: s.checklist,
+      contact_script: s.contact_script?.trim() || undefined,
+      required_documents: s.required_documents,
+      contacts: s.contacts.map((c) => ({
+        name: c.name,
+        phone: c.phone?.trim() || undefined,
+        email: c.email?.trim() || undefined,
+        notes: c.notes?.trim() || undefined,
+      })),
+      blockers: s.blockers,
+      fallback_options: s.fallback_options,
+      expected_outcome: s.expected_outcome,
+      timing_guidance: s.timing_guidance,
+      priority: s.priority,
+      stage_goal: s.stage_goal,
+      why_now: s.why_now,
+      depends_on: s.depends_on?.trim() || undefined,
+      milestone_type: s.milestone_type?.trim() || undefined,
+      success_marker: s.success_marker,
+    };
+
+    return {
+      phase: s.phase as PlanPhase,
+      title: s.title.trim(),
+      description: s.description.trim(),
+      sort_order: i,
+      details,
+      action_items: actionItems,
+    };
+  });
+}
+
 /**
- * Calls OpenAI to draft 30/60/90-day plan steps. Uses gpt-5.4 via Responses API.
- * Returns ok:false on any failure (caller uses rules fallback).
+ * Calls OpenAI to draft 30/60/90-day plan steps. Uses strict JSON Schema + richness validation + retries.
  */
 export async function tryGeneratePlanStepsWithOpenAI(
   detail: FamilyDetail,
@@ -297,141 +246,164 @@ export async function tryGeneratePlanStepsWithOpenAI(
     options?.regenerationFeedback?.trim() ?
       `\n\n## Regeneration instructions from the case manager (follow closely)\n${options.regenerationFeedback.trim()}\n`
       : "";
-  const user = `Create a progressively sequenced 30-60-90 day case plan. HARD LIMIT: at most 5 steps per phase (30, 60, 90), 15 steps total—never exceed. When using fewer steps, CONSOLIDATE: pack full detail into each step. Every step must be COMPREHENSIVE—detailed_instructions, 4–8 checklist items, 2–5 action_items, contact_script when outreach, required_documents, fallback_options. Do not simplify or drop information. Each stage must add NEW value—30-day: urgent setup, 60-day: execution and follow-through, 90-day: stabilization and sustainability. Use stage_goal, why_now, milestone_type for every step. Use matched resources when they apply.${feedbackBlock}\n\n${context}`;
+  const urgencyBlock =
+    detail.urgency === "crisis" || detail.urgency === "high"
+      ? `\n\n## URGENCY: ${detail.urgency.toUpperCase()}\nThis household is high-risk. Compress timelines. Push as many concrete actions as possible into the first 3–7 days. Front-load scheduling, filing, and escalation. Do not delay meaningful intervention.\n`
+      : "";
+  const baseUser = `Create a 30-60-90 day case plan that drives real progress in week 1. HARD LIMIT: at most 5 steps per phase, 15 steps total.
 
-  try {
-    const result = await createAiResponse({
-      taskType: "full_plan_generation",
-      instructions: SYSTEM_PROMPT + "\n\nOutput ONLY valid JSON. No markdown.",
-      input: user,
-      responseFormat: "json_object",
-      temperature: 0.35,
-      maxTokens: 8192,
-    });
+The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, register, confirm, enroll. Avoid passive 30-day steps that only assess, explore, or identify without immediate next action.
 
-    if (!result.ok) {
-      if (shouldLogOpenAi()) console.info("[openai-plan] error:", result.error);
-      return { ok: false, reason: result.error };
-    }
+Every step MUST include ALL schema fields with substantive, action-oriented content. Keep prose concise: 1–3 sentences per field, 3–5 checklist items, 2–3 fallback options, 1–3 contacts. Use contact_script for outreach steps; null otherwise. No placeholders (TBD, N/A).
 
-    let parsed: unknown;
+Phases: 30-day = immediate stabilization and service activation; 60-day = follow-through and approvals; 90-day = sustainability and maintenance. Use matched resources when they apply.${urgencyBlock}${feedbackBlock}\n\n${context}`;
+
+  const maxAttempts = options?.retries ?? 4;
+  let correction = "";
+  let lastNormalized: AiPlanStepParsed[] | null = null;
+  let lastModel = "";
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const user =
+      correction ?
+        `${baseUser}\n\n## REQUIRED FIX (previous output was rejected)\n${correction}\nRegenerate the complete plan JSON. Every step must be fully filled with operational detail—not minimal or single-line fields.`
+      : baseUser;
+
     try {
-      parsed = JSON.parse(result.text);
-    } catch {
-      if (shouldLogOpenAi())
-        console.info("[openai-plan] JSON.parse failed");
-      return { ok: false, reason: "OpenAI returned invalid JSON" };
-    }
+      const result = await createAiResponse({
+        taskType: "full_plan_generation",
+        instructions:
+          SYSTEM_PROMPT +
+          "\n\nRespond with JSON only matching the enforced schema. No markdown.",
+        input: user,
+        structuredJsonSchema: {
+          name: "case_plan_steps",
+          schema: cloneSchema(OPENAI_PLAN_STEPS_ROOT_SCHEMA),
+          strict: true,
+        },
+        temperature: 0.35,
+        maxTokens: 16384,
+      });
 
-    const validated = aiResponseSchema.safeParse(parsed);
-    if (!validated.success) {
+      if (!result.ok) {
+        if (shouldLogOpenAi()) console.info("[openai-plan] error:", result.error);
+        return { ok: false, reason: result.error };
+      }
+
+      lastModel = result.model;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.text);
+      } catch {
+        if (shouldLogOpenAi()) console.info("[openai-plan] JSON.parse failed, retrying...");
+        correction =
+          "The response was not valid JSON. Output a single JSON object with a 'steps' array only.";
+        continue;
+      }
+
+      const validated = aiPlanResponseSchema.safeParse(parsed);
+      if (!validated.success) {
+        if (shouldLogOpenAi()) {
+          console.info(
+            "[openai-plan] Zod validation failed:",
+            validated.error.message,
+          );
+        }
+        correction = `Schema/type validation failed: ${validated.error.message.slice(0, 800)}`;
+        continue;
+      }
+
+      const normalized = validated.data.steps.map(normalizePlanStep);
+      lastNormalized = normalized;
+
+      const rich = validatePlanStepsRichness(normalized);
+      const actionOk = validate30DayActionOrientation(normalized);
+
+      if (rich.ok && actionOk.ok) {
+        const phaseOrder: PlanPhase[] = ["30", "60", "90"];
+        let stepsList = [...normalized].sort(
+          (a, b) =>
+            phaseOrder.indexOf(a.phase as PlanPhase) -
+              phaseOrder.indexOf(b.phase as PlanPhase) ||
+            a.title.localeCompare(b.title),
+        );
+
+        stepsList = deduplicateSteps(stepsList);
+        stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
+
+        if (shouldLogOpenAi() && stepsList.length < normalized.length) {
+          console.info(
+            "[openai-plan] capped/deduped steps:",
+            normalized.length,
+            "→",
+            stepsList.length,
+          );
+        }
+
+        if (shouldLogOpenAi()) {
+          console.info(
+            "[openai-plan]",
+            stepsList.length,
+            "steps,",
+            result.usage?.total_tokens ?? "?",
+            "tokens",
+          );
+        }
+
+        return {
+          ok: true,
+          steps: parsedStepsToGenerated(stepsList),
+          model: lastModel,
+        };
+      }
+
       if (shouldLogOpenAi()) {
+        const allReasons = [...(rich.ok ? [] : rich.reasons), ...(actionOk.ok ? [] : actionOk.reasons)];
         console.info(
           "[openai-plan] validation failed:",
-          validated.error.message,
-          JSON.stringify(parsed).slice(0, 500),
+          allReasons.slice(0, 5).join(" | "),
         );
       }
-      return { ok: false, reason: "OpenAI JSON did not match expected shape" };
+      correction = [...(rich.ok ? [] : rich.reasons), ...(actionOk.ok ? [] : actionOk.reasons)].slice(0, 12).join("\n");
+    } catch (e) {
+      if (attempt < maxAttempts - 1) {
+        correction = e instanceof Error ? e.message : "Unknown error; retry.";
+        continue;
+      }
+      return {
+        ok: false,
+        reason: e instanceof Error ? e.message : "OpenAI request failed",
+      };
     }
+  }
 
-    if (shouldLogOpenAi()) {
-      console.info(
-        "[openai-plan]",
-        validated.data.steps.length,
-        "steps,",
-        result.usage?.total_tokens ?? "?",
-        "tokens",
-      );
-    }
-
-    const phaseOrder: PlanPhase[] = ["30", "60", "90"];
-    let stepsList = validated.data.steps
-      .sort(
+  if (lastNormalized?.length) {
+    const defaulted = lastNormalized.map(applyPlanStepDefaults);
+    const rich2 = validatePlanStepsRichness(defaulted);
+    if (rich2.ok) {
+      if (shouldLogOpenAi()) {
+        console.info("[openai-plan] applied defaults after failed richness passes");
+      }
+      const phaseOrder: PlanPhase[] = ["30", "60", "90"];
+      let stepsList = [...defaulted].sort(
         (a, b) =>
           phaseOrder.indexOf(a.phase as PlanPhase) -
             phaseOrder.indexOf(b.phase as PlanPhase) ||
           a.title.localeCompare(b.title),
       );
-
-    stepsList = deduplicateSteps(stepsList);
-    stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
-
-    if (shouldLogOpenAi() && stepsList.length < validated.data.steps.length) {
-      console.info(
-        "[openai-plan] capped steps per phase:",
-        validated.data.steps.length,
-        "→",
-        stepsList.length,
-      );
-    }
-
-    const steps: GeneratedStep[] = stepsList.map((s, i) => {
-      const actionItems: GeneratedActionItem[] | undefined =
-        s.action_items && s.action_items.length > 0
-          ? s.action_items.map((a) => ({
-              title: a.title.trim(),
-              description: a.description?.trim(),
-              week_index: a.week_index,
-              target_date: a.target_date,
-            }))
-          : undefined;
-
-      const hasDetails =
-        s.action_needed_now ||
-        s.rationale ||
-        s.detailed_instructions ||
-        (s.checklist && s.checklist.length > 0) ||
-        (s.required_documents && s.required_documents.length > 0) ||
-        (s.contacts && s.contacts.length > 0) ||
-        (s.blockers && s.blockers.length > 0) ||
-        (s.fallback_options && s.fallback_options.length > 0) ||
-        s.expected_outcome ||
-        s.timing_guidance ||
-        s.priority ||
-        s.stage_goal ||
-        s.why_now ||
-        s.depends_on ||
-        s.milestone_type ||
-        s.success_marker;
-
-      const details: GeneratedStepDetails | undefined = hasDetails
-        ? {
-            action_needed_now: s.action_needed_now,
-            rationale: s.rationale,
-            detailed_instructions: s.detailed_instructions,
-            checklist: s.checklist,
-            contact_script: (s as { contact_script?: string }).contact_script,
-            required_documents: s.required_documents,
-            contacts: s.contacts,
-            blockers: s.blockers,
-            fallback_options: s.fallback_options,
-            expected_outcome: s.expected_outcome,
-            timing_guidance: s.timing_guidance,
-            priority: s.priority,
-            stage_goal: s.stage_goal,
-            why_now: s.why_now,
-            depends_on: s.depends_on,
-            milestone_type: s.milestone_type,
-            success_marker: s.success_marker,
-          }
-        : undefined;
-
+      stepsList = deduplicateSteps(stepsList);
+      stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
       return {
-        phase: s.phase as PlanPhase,
-        title: s.title.trim(),
-        description: s.description.trim(),
-        sort_order: i,
-        details,
-        action_items: actionItems,
+        ok: true,
+        steps: parsedStepsToGenerated(stepsList),
+        model: lastModel || "unknown",
       };
-    });
-
-    return { ok: true, steps, model: result.model };
-  } catch (e) {
-    return {
-      ok: false,
-      reason: e instanceof Error ? e.message : "OpenAI request failed",
-    };
+    }
   }
+
+  return {
+    ok: false,
+    reason: "Failed to generate a sufficiently detailed plan after retries",
+  };
 }

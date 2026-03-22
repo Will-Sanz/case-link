@@ -5,313 +5,313 @@ const PRESET_STEPS: Record<string, StepTemplate[]> = {
   housing_stability: [
     {
       phase: "30",
-      title: "Assess housing stability needs",
-      description: "Review current housing situation, lease status, and any immediate concerns.",
+      title: "Schedule housing intake and submit rent assistance application",
+      description: "Call housing stabilization programs, confirm eligibility, and submit applications for rent assistance or repairs.",
     },
     {
       phase: "60",
-      title: "Connect with housing stabilization resources",
-      description: "Identify and reach out to programs that support rent assistance, repairs, or tenant rights.",
+      title: "Follow up on housing applications and attend appointments",
+      description: "Submit missing documents, attend scheduled appointments, and document outcomes.",
     },
     {
       phase: "90",
-      title: "Evaluate housing stability progress",
-      description: "Check in on housing goals and adjust plan as needed.",
+      title: "Confirm ongoing housing support and renewal dates",
+      description: "Check in on housing goals, note renewal deadlines, and adjust plan as needed.",
     },
   ],
   eviction_risk: [
     {
       phase: "30",
-      title: "Assess eviction timeline and legal options",
-      description: "Document notice dates, court dates if any, and connect with tenant legal services.",
+      title: "Call tenant legal aid and request earliest intake",
+      description: "Contact legal aid, confirm eviction timeline and court dates, and schedule intake or hotline guidance.",
     },
     {
       phase: "60",
-      title: "Pursue legal representation or mediation",
-      description: "Follow up with legal aid or landlord-tenant mediation programs.",
+      title: "Attend legal appointments and submit required documents",
+      description: "Follow up with legal aid or mediation, submit paperwork, and document outcomes.",
     },
   ],
   housing_instability: [
     {
       phase: "30",
-      title: "Assess housing situation and options",
-      description: "Understand current living arrangement and explore emergency shelter or transitional housing if needed.",
+      title: "Contact housing navigation and apply for emergency or transitional housing",
+      description: "Call housing navigation programs, apply for shelter or rapid rehousing, and schedule intake appointments.",
     },
     {
       phase: "60",
-      title: "Connect with housing navigation or rapid rehousing",
-      description: "Engage programs that help families secure stable housing.",
+      title: "Submit documents and attend housing appointments",
+      description: "Complete applications, submit required documents, and attend scheduled housing appointments.",
     },
   ],
   employment: [
     {
       phase: "30",
-      title: "Identify job readiness and skills",
-      description: "Assess employment history, skills, and barriers to work.",
+      title: "Register with workforce office and schedule job readiness intake",
+      description: "Apply to workforce programs, schedule intake, and document transportation or childcare barriers during registration.",
     },
     {
       phase: "60",
-      title: "Connect with workforce or job training programs",
-      description: "Apply to employment programs that match the family's goals.",
+      title: "Complete job training applications and attend appointments",
+      description: "Submit applications, attend training or placement appointments, and document outcomes.",
     },
     {
       phase: "90",
-      title: "Support job search and placement",
+      title: "Support job search applications and interview follow-up",
       description: "Assist with applications, interviews, and follow-up.",
     },
   ],
   unemployment: [
     {
       phase: "30",
-      title: "Assess employment barriers",
-      description: "Identify obstacles (transportation, childcare, skills) and supports needed.",
+      title: "Register with workforce office and document barriers",
+      description: "Apply to workforce programs, document transportation/childcare/skill barriers during registration, and schedule resume or placement support.",
     },
     {
       phase: "60",
-      title: "Connect with workforce development programs",
-      description: "Link to job training, resume support, or job placement services.",
+      title: "Complete job training applications and attend intake",
+      description: "Submit applications to job training or placement services and attend scheduled appointments.",
     },
   ],
   legal_assistance: [
     {
       phase: "30",
-      title: "Identify legal needs and urgency",
-      description: "Document the type of legal matter and any deadlines.",
+      title: "Call legal aid hotline and request earliest intake",
+      description: "Contact legal aid, document deadlines and case type, and schedule intake or referral.",
     },
     {
       phase: "60",
-      title: "Connect with legal aid or pro bono services",
-      description: "Refer to appropriate legal services for the family's situation.",
+      title: "Attend legal intake and submit required documents",
+      description: "Complete intake with legal aid or pro bono services and submit any requested paperwork.",
     },
   ],
   legal_matter: [
     {
       phase: "30",
-      title: "Assess active legal matter",
-      description: "Document case status, court dates, and representation needs.",
+      title: "Call legal aid and schedule intake for active matter",
+      description: "Contact legal aid, confirm court dates and representation needs, and book the earliest intake.",
     },
     {
       phase: "60",
-      title: "Support connection to legal resources",
-      description: "Help family access legal aid or appropriate referrals.",
+      title: "Submit documents and attend legal appointments",
+      description: "Help family complete intake, submit paperwork, and attend scheduled legal appointments.",
     },
   ],
   utility_support: [
     {
       phase: "30",
-      title: "Assess utility arrears and shutoff risk",
-      description: "Identify outstanding bills, LIHEAP or other assistance eligibility.",
+      title: "Apply to CAP/TAP/UESF and gather utility bills",
+      description: "Call utility assistance programs, confirm eligibility, and submit application with bills and shutoff notices.",
     },
     {
       phase: "60",
-      title: "Connect with utility assistance programs",
-      description: "Apply to CAP, TAP, UESF, or similar programs as applicable.",
+      title: "Submit missing documents and confirm application status",
+      description: "Follow up on applications, submit any requested documents, and confirm approval or next steps.",
     },
   ],
   utility_debt: [
     {
       phase: "30",
-      title: "Document utility debt and risk level",
-      description: "Gather bills, shutoff notices, and determine urgency.",
+      title: "Gather bills and shutoff notices; apply for utility assistance",
+      description: "Collect utility bills and shutoff notices, call assistance programs, and submit application.",
     },
     {
       phase: "60",
-      title: "Apply for utility assistance",
-      description: "Connect with programs that help with water, electric, or gas arrears.",
+      title: "Submit documents and confirm application status",
+      description: "Complete application requirements and follow up on approval.",
     },
   ],
   food_support: [
     {
       phase: "30",
-      title: "Assess food security and SNAP eligibility",
-      description: "Check current food access and potential benefits enrollment.",
+      title: "Apply for SNAP and register with food pantry",
+      description: "Submit SNAP application, call food pantries to confirm eligibility and intake, and schedule first pickup or delivery.",
     },
     {
       phase: "60",
-      title: "Connect with food pantries and nutrition programs",
-      description: "Link to local food resources and grocery programs.",
+      title: "Complete SNAP interview and attend pantry appointments",
+      description: "Complete SNAP interview, attend pantry intake, and document ongoing food access.",
     },
   ],
   food_insecurity: [
     {
       phase: "30",
-      title: "Assess food access needs",
-      description: "Understand current food situation and barriers.",
+      title: "Apply for SNAP/WIC and contact food pantries",
+      description: "Submit SNAP or WIC application, call pantries and school meal programs, and schedule intake.",
     },
     {
       phase: "60",
-      title: "Connect to food resources",
-      description: "Refer to pantries, SNAP, WIC, or school meal programs as appropriate.",
+      title: "Complete benefit interviews and pantry intake",
+      description: "Attend SNAP/WIC interviews and pantry appointments; document outcomes.",
     },
   ],
   transportation: [
     {
       phase: "30",
-      title: "Assess transportation needs",
-      description: "Identify how family gets to work, appointments, and essential trips.",
+      title: "Apply for SEPTA transit program and schedule intake",
+      description: "Call transit assistance programs, confirm eligibility, and submit application for passes or rideshare.",
     },
     {
       phase: "60",
-      title: "Connect with transit or mobility programs",
-      description: "Explore SEPTA programs, subsidized transit, or rideshare options.",
+      title: "Submit documents and confirm transit benefit",
+      description: "Complete application requirements and secure transit support.",
     },
   ],
   no_transportation: [
     {
       phase: "30",
-      title: "Identify transportation barriers",
-      description: "Document where family needs to go and what's preventing access.",
+      title: "Apply for transit assistance and document trip needs",
+      description: "Call transit programs, document work and appointment trips, and submit application.",
     },
     {
       phase: "60",
-      title: "Connect with transit assistance or ride programs",
-      description: "Link to programs that provide transit passes or transportation support.",
+      title: "Complete intake and secure transit support",
+      description: "Attend intake, submit documents, and confirm transit passes or ride options.",
     },
   ],
   immigration_documentation: [
     {
       phase: "30",
-      title: "Assess immigration documentation status",
-      description: "Understand what documents are needed and any deadlines.",
+      title: "Call immigration legal services and schedule consultation",
+      description: "Contact accredited representatives, document deadlines and needed documents, and book earliest consultation.",
     },
     {
       phase: "60",
-      title: "Connect with immigration legal services",
-      description: "Refer to reputable immigration attorneys or accredited representatives.",
+      title: "Attend consultation and submit required documents",
+      description: "Complete intake with immigration legal services and submit requested paperwork.",
     },
   ],
   credit_improvement: [
     {
       phase: "30",
-      title: "Assess credit situation and goals",
-      description: "Understand current credit and what the family hopes to achieve.",
+      title: "Register with financial counseling and request credit report review",
+      description: "Call credit counseling programs, schedule intake, and bring credit report for review.",
     },
     {
       phase: "60",
-      title: "Connect with financial counseling or credit-building programs",
-      description: "Refer to programs that help with credit repair and financial literacy.",
+      title: "Attend counseling sessions and enroll in credit-building program",
+      description: "Complete intake and follow recommended credit-building steps.",
     },
   ],
   bad_credit: [
     {
       phase: "30",
-      title: "Assess credit barriers",
-      description: "Understand how credit is affecting housing, employment, or other goals.",
+      title: "Schedule credit counseling intake and gather credit reports",
+      description: "Call credit counseling, request free credit reports, and book intake to address housing/employment barriers.",
     },
     {
       phase: "60",
-      title: "Connect with credit counseling",
-      description: "Link to services that help address credit issues.",
+      title: "Attend counseling and start dispute or repair process",
+      description: "Complete intake and begin credit repair steps as recommended.",
     },
   ],
   digital_literacy: [
     {
       phase: "30",
-      title: "Assess digital access and skills",
-      description: "Identify device access, internet, and comfort with technology.",
+      title: "Enroll in digital literacy program and request device/internet assistance",
+      description: "Call programs that provide devices, internet, or training; schedule intake and document needs.",
     },
     {
       phase: "60",
-      title: "Connect with digital literacy programs",
-      description: "Refer to programs that teach basic computer and online skills.",
+      title: "Attend training sessions and confirm access",
+      description: "Complete enrollment and attend first sessions.",
     },
   ],
   low_digital_literacy: [
     {
       phase: "30",
-      title: "Identify digital barriers",
-      description: "Understand how limited digital access affects the family.",
+      title: "Apply for device/internet assistance and schedule tech training",
+      description: "Call programs for devices or internet, document barriers, and schedule training intake.",
     },
     {
       phase: "60",
-      title: "Connect with tech support or training",
-      description: "Link to programs that provide devices, internet, or training.",
+      title: "Receive device and attend first training session",
+      description: "Complete intake and attend training.",
     },
   ],
   childcare: [
     {
       phase: "30",
-      title: "Assess childcare needs and preferences",
-      description: "Document ages of children, schedule needs, and any special requirements.",
+      title: "Call childcare assistance and book earliest intake",
+      description: "Contact childcare assistance line, confirm eligibility by child ages and work schedule, and schedule intake.",
     },
     {
       phase: "60",
-      title: "Connect with childcare resources",
-      description: "Explore Pre-K, subsidized care, or after-school programs.",
+      title: "Submit childcare application and attend intake",
+      description: "Complete subsidy application, attend intake, and document placement or waitlist status.",
     },
   ],
   childcare_barrier: [
     {
       phase: "30",
-      title: "Identify childcare barriers",
-      description: "Understand what's preventing access to reliable childcare.",
+      title: "Register with childcare assistance and document barriers",
+      description: "Call childcare subsidy programs and Head Start, document schedule and transportation barriers, and schedule intake.",
     },
     {
       phase: "60",
-      title: "Connect with childcare assistance programs",
-      description: "Refer to subsidies, Head Start, or other early childhood programs.",
+      title: "Submit applications and attend childcare intake",
+      description: "Complete subsidy and Head Start applications and attend appointments.",
     },
   ],
   youth_programming: [
     {
       phase: "30",
-      title: "Assess youth program interests",
-      description: "Identify ages, interests, and what types of programs would help.",
+      title: "Register youth for after-school or enrichment program",
+      description: "Call programs matching child ages and interests, confirm availability, and submit registration.",
     },
     {
       phase: "60",
-      title: "Connect youth with after-school or enrichment programs",
-      description: "Link to programs that support academic and social development.",
+      title: "Complete enrollment and confirm start date",
+      description: "Attend intake if needed and confirm youth is enrolled.",
     },
   ],
   education_workforce_training: [
     {
       phase: "30",
-      title: "Assess education and training goals",
-      description: "Identify GED, ESL, or workforce training interests.",
+      title: "Apply to GED, ESL, or vocational program and schedule intake",
+      description: "Call adult education or training programs, confirm eligibility, and submit application.",
     },
     {
       phase: "60",
-      title: "Connect with education or training programs",
-      description: "Refer to adult education, GED prep, or vocational programs.",
+      title: "Complete intake and attend first classes",
+      description: "Attend enrollment appointments and start program.",
     },
     {
       phase: "90",
-      title: "Support enrollment and follow-up",
-      description: "Assist with applications and check in on progress.",
+      title: "Check in on progress and support completion",
+      description: "Assist with attendance and follow-up as needed.",
     },
   ],
   healthcare_access: [
     {
       phase: "30",
-      title: "Assess healthcare access and needs",
-      description: "Identify primary care, insurance status, and any urgent health concerns.",
+      title: "Apply for Medicaid/CHIP and schedule healthcare intake",
+      description: "Submit Medicaid or CHIP application, call community health centers, and book earliest appointment.",
     },
     {
       phase: "60",
-      title: "Connect with healthcare enrollment or navigation",
-      description: "Link to Medicaid, CHIP, or community health resources.",
+      title: "Complete enrollment and attend first appointment",
+      description: "Finish insurance enrollment and attend scheduled healthcare appointments.",
     },
   ],
   health_barrier: [
     {
       phase: "30",
-      title: "Assess health and disability barriers",
-      description: "Understand how health or disability affects daily life and goals.",
+      title: "Schedule intake with health or disability support program",
+      description: "Call medical, behavioral, or disability services, document barriers, and book earliest intake.",
     },
     {
       phase: "60",
-      title: "Connect with health and disability supports",
-      description: "Refer to appropriate medical, behavioral, or disability services.",
+      title: "Attend intake and submit required documentation",
+      description: "Complete intake and follow recommended next steps.",
     },
   ],
 };
 
 /** Default steps added when no preset-driven steps exist (e.g. goals are custom only). */
 const DEFAULT_STEPS: StepTemplate[] = [
-  { phase: "30", title: "Review goals and identify immediate priorities", description: "Discuss what matters most right now and what supports would help." },
-  { phase: "60", title: "Connect with relevant resources", description: "Based on priorities, identify and reach out to programs that can help." },
-  { phase: "90", title: "Check in on progress and adjust plan", description: "Review progress and update the plan as needed." },
+  { phase: "30", title: "Schedule first appointments and submit priority applications", description: "Call 2–3 key programs from goals, submit applications, and book earliest intake appointments." },
+  { phase: "60", title: "Follow up on applications and attend scheduled appointments", description: "Submit missing documents, attend appointments, and document outcomes." },
+  { phase: "90", title: "Confirm progress and set renewal or next-phase dates", description: "Check in on goals and update plan with next steps." },
 ];
 
 export function getStepTemplatesForPreset(presetKey: string | null): StepTemplate[] {
