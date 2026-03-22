@@ -16,7 +16,7 @@ function Field({
   const display = typeof value === "boolean" ? (value ? "Yes" : "No") : value;
   return (
     <div className="border-b border-slate-100 py-3.5 last:border-0">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <dt className="text-xs font-medium text-slate-500">
         {label}
       </dt>
       <dd className="mt-1.5 text-sm leading-relaxed text-slate-900">{display}</dd>
@@ -44,10 +44,10 @@ function FlagRow({ label, on }: { label: string; on: boolean }) {
 export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
   return (
     <div className="space-y-8">
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/[0.03] sm:p-8">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Link
           href="/resources"
-          className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+          className="text-sm font-medium text-blue-800 underline-offset-2 hover:text-blue-900 hover:underline"
         >
           ← Back to resources
         </Link>

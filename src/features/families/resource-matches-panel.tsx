@@ -191,7 +191,7 @@ export function ResourceMatchesPanel({
             return (
               <li
                 key={m.id}
-                className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4"
+                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -199,7 +199,7 @@ export function ResourceMatchesPanel({
                       <>
                         <Link
                           href={`/resources/${r.id}`}
-                          className="font-semibold text-slate-900 underline-offset-2 hover:text-teal-900 hover:underline"
+                          className="font-semibold text-slate-900 underline-offset-2 hover:text-blue-900 hover:underline"
                         >
                           {r.program_name}
                         </Link>
@@ -265,13 +265,13 @@ export function ResourceMatchesPanel({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {m.plan_step_id ? (
                       <>
-                        <Badge className="bg-teal-100 text-teal-900">
+                        <Badge className="bg-blue-100 text-blue-900">
                           Used in plan
                         </Badge>
                         {steps.find((s) => s.id === m.plan_step_id) ? (
                           <Link
                             href={`#step-${m.plan_step_id}`}
-                            className="text-xs text-teal-700 hover:underline"
+                            className="text-xs text-blue-700 hover:underline"
                           >
                             → {steps.find((s) => s.id === m.plan_step_id)?.title}
                           </Link>
@@ -288,7 +288,7 @@ export function ResourceMatchesPanel({
                       </>
                     ) : steps.length > 0 ? (
                       <select
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/25"
+                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
                         value=""
                         onChange={(e) => {
                           const stepId = e.target.value;
@@ -351,7 +351,7 @@ export function ResourceMatchesPanel({
           </Button>
         </form>
         {searchResults.length > 0 ? (
-          <ul className="mt-4 space-y-2 rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
+          <ul className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
             {searchResults.map((row) => (
               <li
                 key={row.id}

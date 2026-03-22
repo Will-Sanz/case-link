@@ -13,20 +13,20 @@ export function AuthShell({
   footer?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-[#eef1f4] px-4 py-16">
-      <div className="w-full max-w-[420px]">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-teal-700 text-sm font-bold text-white shadow-sm shadow-teal-900/20">
+    <div className="flex min-h-full flex-col items-center justify-center bg-[#f4f6f8] px-4 py-16">
+      <div className="w-full max-w-[400px]">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/90 text-sm font-semibold text-white">
             CL
           </div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-lg font-semibold text-slate-900">
             {title}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
             {subtitle}
           </p>
         </div>
-        <Card className="border-slate-200/80 p-6 shadow-md shadow-slate-900/[0.06]">
+        <Card className="p-6">
           {children}
         </Card>
         {footer ? (

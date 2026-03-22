@@ -40,7 +40,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
         New case manager?{" "}
         <Link
           href={signupHref}
-          className="font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+          className="font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
         >
           Create an account
         </Link>

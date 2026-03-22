@@ -7,7 +7,7 @@ export default function NewFamilyPage() {
       <div>
         <Link
           href="/families"
-          className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+          className="text-sm font-medium text-blue-800 underline-offset-2 hover:text-blue-800 hover:underline"
         >
           ← Back to families
         </Link>
@@ -19,8 +19,8 @@ export default function NewFamilyPage() {
           resource matching and the 30/60/90 plan.
         </p>
       </div>
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-1 shadow-sm sm:p-2">
-        <div className="rounded-xl px-2 py-6 sm:px-6 sm:py-8">
+      <div className="rounded-lg border border-slate-200 bg-white p-1 sm:p-2">
+        <div className="rounded-lg px-4 py-6 sm:px-6 sm:py-8">
           <IntakeForm />
         </div>
       </div>

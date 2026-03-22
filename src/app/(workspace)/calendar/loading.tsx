@@ -16,10 +16,10 @@ export default function CalendarLoading() {
               <div key={i} className="h-10 w-24 animate-pulse rounded-lg bg-slate-100" />
             ))}
           </div>
-          <div className="min-h-[400px] animate-pulse rounded-xl border-2 border-slate-100 bg-slate-50/50" />
+          <div className="min-h-[400px] animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
         </div>
         <aside className="w-full shrink-0 lg:w-80">
-          <div className="sticky top-6 h-64 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+          <div className="sticky top-6 h-64 animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
         </aside>
       </div>
     </div>

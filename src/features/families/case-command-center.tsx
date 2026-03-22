@@ -17,11 +17,11 @@ const TYPE_LABELS: Record<NeedsAttentionItem["type"], string> = {
 const TYPE_STYLES: Record<NeedsAttentionItem["type"], string> = {
   overdue: "border-red-200 bg-red-50/80 hover:bg-red-50",
   blocked: "border-amber-200 bg-amber-50/80 hover:bg-amber-50",
-  follow_up_today: "border-teal-200 bg-teal-50/80 hover:bg-teal-50",
+  follow_up_today: "border-blue-200 bg-blue-50/80 hover:bg-blue-50",
   follow_up_soon: "border-slate-200 bg-slate-50/80 hover:bg-slate-50",
   escalation: "border-amber-300 bg-amber-50/90 hover:bg-amber-50",
   no_activity: "border-slate-200 bg-slate-50/80 hover:bg-slate-50",
-  new_plan: "border-teal-200 bg-teal-50/60 hover:bg-teal-50",
+  new_plan: "border-blue-200 bg-blue-50/60 hover:bg-blue-50",
 };
 
 const ORDER: NeedsAttentionItem["type"][] = [
@@ -51,10 +51,10 @@ export function CaseCommandCenter({
 
   return (
     <section
-      className="rounded-2xl border-2 border-teal-200 bg-gradient-to-br from-teal-50/90 to-white shadow-lg shadow-slate-900/[0.03]"
+      className="rounded-lg border border-blue-200 bg-blue-50/30"
       aria-labelledby="command-center-heading"
     >
-      <div className="border-b border-teal-100 px-5 py-4 sm:px-6">
+      <div className="border-b border-blue-100 px-5 py-4 sm:px-6">
         <h2
           id="command-center-heading"
           className="text-base font-bold tracking-tight text-slate-900 sm:text-lg"
@@ -106,22 +106,22 @@ export function CaseCommandCenter({
                 <div className="flex shrink-0 items-center gap-2">
                   <span
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                      "rounded-md px-2 py-0.5 text-xs font-medium",
                       item.type === "overdue" && "bg-red-200/80 text-red-900",
                       item.type === "follow_up_today" &&
-                        "bg-teal-200/80 text-teal-900",
+                        "bg-blue-200/80 text-blue-900",
                       item.type === "blocked" && "bg-amber-200/80 text-amber-900",
                       item.type === "escalation" &&
                         "bg-amber-200/80 text-amber-900",
                       (item.type === "follow_up_soon" ||
                         item.type === "no_activity") &&
                         "bg-slate-200/80 text-slate-700",
-                      item.type === "new_plan" && "bg-teal-200/80 text-teal-900"
+                      item.type === "new_plan" && "bg-blue-200/80 text-blue-900"
                     )}
                   >
                     {badge}
                   </span>
-                  <span className="text-xs font-medium text-teal-700">
+                  <span className="text-xs font-medium text-blue-700">
                     {item.step_id
                       ? item.type === "blocked"
                         ? "Resolve →"

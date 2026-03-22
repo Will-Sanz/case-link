@@ -5,7 +5,7 @@
 
 /** Professional, accessible palette - soft but distinct tones */
 const FAMILY_PALETTE = [
-  { bg: "bg-teal-50", border: "border-l-teal-500 border-teal-200", muted: "bg-teal-50/70" },
+  { bg: "bg-blue-50", border: "border-l-blue-500 border-blue-200", muted: "bg-blue-50/70" },
   { bg: "bg-sky-50", border: "border-l-sky-500 border-sky-200", muted: "bg-sky-50/70" },
   { bg: "bg-violet-50", border: "border-l-violet-500 border-violet-200", muted: "bg-violet-50/70" },
   { bg: "bg-amber-50", border: "border-l-amber-500 border-amber-200", muted: "bg-amber-50/70" },

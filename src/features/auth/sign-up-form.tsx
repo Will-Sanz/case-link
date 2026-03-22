@@ -82,7 +82,7 @@ export function SignUpForm() {
           {info}{" "}
           <Link
             href={`/login?next=${encodeURIComponent(nextPath.startsWith("/") ? nextPath : "/dashboard")}`}
-            className="font-medium text-teal-900 underline-offset-2 hover:underline"
+            className="font-medium text-blue-900 underline-offset-2 hover:underline"
           >
             Go to sign in
           </Link>

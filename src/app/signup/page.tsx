@@ -40,7 +40,7 @@ export default async function SignUpPage({ searchParams }: PageProps) {
         Already have an account?{" "}
         <Link
           href={loginHref}
-          className="font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+          className="font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
         >
           Sign in
         </Link>

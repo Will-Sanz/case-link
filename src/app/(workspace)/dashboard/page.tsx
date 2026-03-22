@@ -116,7 +116,7 @@ export default async function DashboardPage() {
             action={
               <Link
                 href="/families"
-                className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+                className="text-sm font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
               >
                 View all families
               </Link>
@@ -129,7 +129,7 @@ export default async function DashboardPage() {
 
       {otherActionable.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h2 className="text-xs font-medium text-slate-500">
             Rest of queue
           </h2>
           <ActionableNowList items={otherActionable} />
@@ -138,7 +138,7 @@ export default async function DashboardPage() {
 
       {otherFamilies.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h2 className="text-xs font-medium text-slate-500">
             Other families needing attention
           </h2>
           <DashboardFamilyCards families={otherFamilies} />
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
           footer={
             <Link
               href="/resources"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+              className="text-sm font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
             >
               Browse directory →
             </Link>
@@ -164,7 +164,7 @@ export default async function DashboardPage() {
           footer={
             <Link
               href="/families"
-              className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+              className="text-sm font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
             >
               View all families →
             </Link>
@@ -177,43 +177,43 @@ export default async function DashboardPage() {
           </p>
           <ul className="mt-4 space-y-0.5">
             <li>
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="mb-1.5 px-2 text-xs font-medium text-slate-500">
                 Active cases
               </p>
               <Link
                 href="/families"
-                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-blue-50/80"
               >
                 Continue active cases
                 <span className="text-slate-400" aria-hidden>→</span>
               </Link>
             </li>
             <li>
-              <p className="mb-1.5 mt-3 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="mb-1.5 mt-3 px-2 text-xs font-medium text-slate-500">
                 Create or update
               </p>
               <Link
                 href="/families/new"
-                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-blue-50/80"
               >
                 New family intake
                 <span className="text-slate-400" aria-hidden>→</span>
               </Link>
               <Link
                 href="/calendar"
-                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-blue-50/80"
               >
                 Calendar
                 <span className="text-slate-400" aria-hidden>→</span>
               </Link>
             </li>
             <li>
-              <p className="mb-1.5 mt-3 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="mb-1.5 mt-3 px-2 text-xs font-medium text-slate-500">
                 Directory
               </p>
               <Link
                 href="/resources"
-                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-blue-50/80"
               >
                 Search resources
                 <span className="text-slate-400" aria-hidden>→</span>
@@ -225,12 +225,12 @@ export default async function DashboardPage() {
 
       <section className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h2 className="text-xs font-medium text-slate-500">
             Recently updated
           </h2>
           <Link
             href="/families"
-            className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+            className="text-sm font-medium text-blue-700 underline-offset-2 hover:text-blue-600 hover:underline"
           >
             View all
           </Link>
@@ -246,7 +246,7 @@ export default async function DashboardPage() {
                 action={
                   <Link
                     href="/families/new"
-                    className="text-sm font-medium text-teal-800 underline-offset-2 hover:underline"
+                    className="text-sm font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
                   >
                     Start an intake
                   </Link>
@@ -259,7 +259,7 @@ export default async function DashboardPage() {
                 <li key={f.id}>
                   <Link
                     href={`/families/${f.id}`}
-                    className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 px-5 py-4 transition-colors duration-150 hover:bg-blue-50/50 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-slate-900">{f.name}</p>

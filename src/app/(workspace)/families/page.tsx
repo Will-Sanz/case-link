@@ -39,10 +39,10 @@ function FamilyCard({
   return (
     <li>
       <Link href={caseHref} className="block">
-        <Card className="group p-0 transition-shadow hover:border-slate-300/90 hover:shadow-md">
+        <Card className="group p-0 transition-colors duration-150 hover:bg-blue-50/50">
           <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start">
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-slate-900 group-hover:text-teal-900">
+              <p className="font-semibold text-slate-900 group-hover:text-blue-800">
                 {f.name}
               </p>
               {f.summary ? (
@@ -51,7 +51,7 @@ function FamilyCard({
                 </p>
               ) : null}
               {f.current_step ? (
-                <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+                <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                   <p className="text-xs font-medium text-slate-500">
                     Current step: {f.current_step.title}
                   </p>
@@ -60,13 +60,13 @@ function FamilyCard({
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {f.current_step.is_blocked ? (
-                      <Badge className="bg-amber-100 text-amber-900">Blocked</Badge>
+                      <Badge className="border-amber-200 bg-amber-50 text-amber-800">Blocked</Badge>
                     ) : null}
                     {f.current_step.is_escalated ? (
-                      <Badge className="bg-amber-100 text-amber-900">Escalation</Badge>
+                      <Badge className="border-amber-200 bg-amber-50 text-amber-800">Escalation</Badge>
                     ) : null}
                     {f.current_step.days_overdue != null && f.current_step.days_overdue > 0 ? (
-                      <Badge className="bg-red-100 text-red-900">
+                      <Badge className="border-red-200 bg-red-50 text-red-800">
                         {f.current_step.days_overdue}d overdue
                       </Badge>
                     ) : null}
@@ -77,7 +77,7 @@ function FamilyCard({
                 <StatusBadge status={f.status} />
                 <UrgencyBadge urgency={f.urgency} />
                 {f.creator?.email ? (
-                  <Badge className="border-slate-200/60 bg-white font-normal text-slate-600">
+                  <Badge className="border-slate-200 bg-slate-50 font-normal text-slate-600">
                     {f.creator.email}
                   </Badge>
                 ) : null}

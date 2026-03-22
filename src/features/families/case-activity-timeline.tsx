@@ -62,9 +62,9 @@ export function CaseActivityTimeline({
   const visible = items.slice(0, maxItems);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+        <h2 className="text-sm font-medium text-slate-500">
           Case activity
         </h2>
         <p className="mt-0.5 text-sm text-slate-600">
@@ -80,7 +80,7 @@ export function CaseActivityTimeline({
         {visible.map((item) => (
           <li key={item.id} className="px-4 py-3 sm:px-5">
             <div className="flex gap-3">
-              <div className="mt-1 size-2 shrink-0 rounded-full bg-teal-500" />
+              <div className="mt-1 size-2 shrink-0 rounded-full bg-blue-500" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-slate-800">
                   {ACTION_LABELS[item.action] ?? item.action.replace(/\./g, " ")}

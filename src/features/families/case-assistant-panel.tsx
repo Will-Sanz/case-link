@@ -34,7 +34,7 @@ export function CaseAssistantPanel({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -42,7 +42,7 @@ export function CaseAssistantPanel({
       >
         <div className="flex items-center gap-2">
           <span
-            className="flex size-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700"
+            className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700"
             aria-hidden
           >
             ◉
@@ -109,8 +109,8 @@ export function CaseAssistantPanel({
             </p>
           )}
           {answer && (
-            <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/40 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/40 p-3">
+              <p className="text-xs font-medium text-blue-800">
                 Answer
               </p>
               <div className="mt-2 text-sm text-slate-800">

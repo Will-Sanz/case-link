@@ -89,8 +89,8 @@ export function InlineStepAiHelp({
   }
 
   return (
-    <div className="mt-4 rounded-xl border-2 border-slate-200 bg-white p-4">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+      <h4 className="text-xs font-medium text-slate-600">
         AI help
       </h4>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -113,8 +113,8 @@ export function InlineStepAiHelp({
         </p>
       )}
       {helperContent && helperType && (
-        <div ref={outputRef} className="mt-4 rounded-lg border-2 border-teal-300 bg-teal-50/50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+        <div ref={outputRef} className="mt-4 rounded-lg border-2 border-blue-300 bg-blue-50/50 p-3">
+          <p className="text-xs font-medium text-blue-800">
             {helperType.replace(/_/g, " ")}
           </p>
           <div className="mt-3 text-sm text-slate-800">
@@ -122,7 +122,7 @@ export function InlineStepAiHelp({
               <ul className="space-y-1">
                 {helperList.map((item, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="shrink-0 text-teal-600">•</span>
+                    <span className="shrink-0 text-blue-600">•</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -150,7 +150,7 @@ export function InlineStepAiHelp({
         (aiHelper?.prep_checklist ?? []).length > 0 ||
         (aiHelper?.fallback_options ?? []).length > 0) && (
         <div className="mt-4 space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             Saved to step
           </p>
           <div className="space-y-1.5 text-xs">

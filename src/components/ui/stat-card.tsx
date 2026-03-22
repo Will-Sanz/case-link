@@ -15,14 +15,14 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.03]",
+        "rounded-lg border border-slate-200 bg-white p-5",
         className,
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-medium text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-slate-900">
+      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-slate-900">
         {value}
       </p>
       {footer ? <div className="mt-4">{footer}</div> : null}

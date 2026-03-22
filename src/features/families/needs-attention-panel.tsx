@@ -17,11 +17,11 @@ const TYPE_LABELS: Record<NeedsAttentionItem["type"], string> = {
 const TYPE_STYLES: Record<NeedsAttentionItem["type"], string> = {
   overdue: "border-red-200 bg-red-50/50",
   blocked: "border-amber-200 bg-amber-50/50",
-  follow_up_today: "border-teal-200 bg-teal-50/50",
+  follow_up_today: "border-blue-200 bg-blue-50/50",
   follow_up_soon: "border-slate-200 bg-slate-50/50",
   escalation: "border-amber-300 bg-amber-50/80",
   no_activity: "border-slate-200 bg-slate-50/50",
-  new_plan: "border-teal-200 bg-teal-50/30",
+  new_plan: "border-blue-200 bg-blue-50/30",
 };
 
 export function NeedsAttentionPanel({
@@ -56,9 +56,9 @@ export function NeedsAttentionPanel({
   ];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+        <h2 className="text-sm font-medium text-slate-500">
           Needs attention
         </h2>
         <p className="mt-0.5 text-sm text-slate-600">

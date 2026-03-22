@@ -57,38 +57,38 @@ export function NextBestActionCard({
     : `/families/${item.family_id}`;
 
   const typeStyles: Record<ActionableItem["type"], string> = {
-    overdue: "border-red-200 bg-red-50/30",
-    blocked: "border-amber-200 bg-amber-50/30",
-    follow_up_today: "border-teal-200 bg-teal-50/30",
-    follow_up_soon: "border-slate-200 bg-slate-50/30",
-    escalation: "border-amber-300 bg-amber-50/40",
-    no_activity: "border-slate-200 bg-slate-50/30",
-    new_plan: "border-teal-200 bg-teal-50/20",
+    overdue: "border-red-200 bg-red-50/50",
+    blocked: "border-amber-200 bg-amber-50/50",
+    follow_up_today: "border-blue-200 bg-blue-50/25",
+    follow_up_soon: "border-slate-200 bg-white",
+    escalation: "border-amber-200 bg-amber-50/50",
+    no_activity: "border-slate-200 bg-white",
+    new_plan: "border-blue-200 bg-blue-50/25",
   };
 
   return (
     <Link href={href} className="block">
       <Card
         className={cn(
-          "overflow-hidden transition-all hover:shadow-lg",
-          typeStyles[item.type] ?? "border-teal-200 bg-teal-50/20",
+          "overflow-hidden transition-colors duration-150 hover:bg-blue-50/40",
+          typeStyles[item.type] ?? "border-slate-200 bg-white",
         )}
       >
-        <div className="p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div className="p-5 sm:p-6">
+          <p className="text-xs font-medium text-slate-500">
             Next best action
           </p>
-          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          <h2 className="mt-1.5 text-lg font-semibold text-slate-900 sm:text-xl">
             {item.action}
           </h2>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-800">{item.family_name}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="font-medium text-slate-700">{item.family_name}</span>
             {urgency ? (
               <Badge
                 className={cn(
                   "text-xs",
-                  urgency === "crisis" && "bg-red-100 text-red-900",
-                  urgency === "high" && "bg-amber-100 text-amber-900",
+                  urgency === "crisis" && "bg-red-50 text-red-800 border-red-200",
+                  urgency === "high" && "bg-amber-50 text-amber-800 border-amber-200",
                 )}
               >
                 {urgency}
@@ -99,7 +99,7 @@ export function NextBestActionCard({
                 {PHASE_LABELS[item.step_phase] ?? item.step_phase}
               </span>
             ) : null}
-            <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
               {TYPE_BADGE[item.type]}
             </span>
           </div>
@@ -131,8 +131,8 @@ export function NextBestActionCard({
               ) : null}
             </p>
           )}
-          <div className="mt-6">
-            <span className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-700">
+          <div className="mt-5">
+            <span className="inline-flex items-center justify-center rounded-lg bg-blue-500/90 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500">
               {getQueueCtaLabel(item)}
             </span>
           </div>
@@ -152,29 +152,29 @@ export function SummaryCounts({
   if (total === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-2">
       {counts.overdue > 0 ? (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50/60 px-4 py-2">
-          <span className="text-sm font-medium text-red-900">Overdue</span>
-          <Badge className="bg-red-200 text-red-900">{counts.overdue}</Badge>
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+          <span className="text-sm font-medium text-red-800">Overdue</span>
+          <Badge className="border-red-200 bg-red-100 text-red-800">{counts.overdue}</Badge>
         </div>
       ) : null}
       {counts.blocked > 0 ? (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-2">
-          <span className="text-sm font-medium text-amber-900">Blocked</span>
-          <Badge className="bg-amber-200 text-amber-900">{counts.blocked}</Badge>
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <span className="text-sm font-medium text-amber-800">Blocked</span>
+          <Badge className="border-amber-200 bg-amber-100 text-amber-800">{counts.blocked}</Badge>
         </div>
       ) : null}
       {counts.dueToday > 0 ? (
-        <div className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50/60 px-4 py-2">
-          <span className="text-sm font-medium text-teal-900">Due today</span>
-          <Badge className="bg-teal-200 text-teal-900">{counts.dueToday}</Badge>
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200/70 bg-blue-50/40 px-3 py-2">
+          <span className="text-sm font-medium text-blue-700">Due today</span>
+          <Badge className="border-blue-200/70 bg-blue-50/60 text-blue-700">{counts.dueToday}</Badge>
         </div>
       ) : null}
       {counts.escalated > 0 ? (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50/80 px-4 py-2">
-          <span className="text-sm font-medium text-amber-900">Escalation</span>
-          <Badge className="bg-amber-200 text-amber-900">{counts.escalated}</Badge>
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <span className="text-sm font-medium text-amber-800">Escalation</span>
+          <Badge className="border-amber-200 bg-amber-100 text-amber-800">{counts.escalated}</Badge>
         </div>
       ) : null}
     </div>
@@ -192,9 +192,9 @@ export function DashboardFamilyCards({
         <Card
           key={f.family_id}
           className={cn(
-            "p-4 transition-shadow hover:shadow-md",
+            "p-4 transition-colors duration-150 hover:bg-blue-50/40",
             f.current_step?.is_blocked && "border-amber-200",
-            f.current_step?.is_escalated && "border-amber-300 ring-1 ring-amber-200/50",
+            f.current_step?.is_escalated && "border-amber-200",
           )}
         >
           <div className="flex flex-col gap-3">
@@ -205,8 +205,8 @@ export function DashboardFamilyCards({
                   <Badge
                     className={cn(
                       "text-xs",
-                      f.urgency === "crisis" && "bg-red-100 text-red-900",
-                      f.urgency === "high" && "bg-amber-100 text-amber-900",
+                      f.urgency === "crisis" && "bg-red-50 text-red-800 border-red-200",
+                      f.urgency === "high" && "bg-amber-50 text-amber-800 border-amber-200",
                     )}
                   >
                     {f.urgency ?? "—"}
@@ -233,7 +233,7 @@ export function DashboardFamilyCards({
             </div>
 
             {f.current_step ? (
-              <div className="rounded-lg bg-slate-50/80 px-3 py-2">
+              <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <StepStatusBadge
                     status={
@@ -281,12 +281,12 @@ export function DashboardFamilyCards({
                 {(f.current_step.is_blocked || f.current_step.is_escalated) && (
                   <div className="mt-2 flex gap-2">
                     {f.current_step.is_blocked ? (
-                      <Badge className="bg-amber-100 text-amber-900">
+                      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
                         Blocked
                       </Badge>
                     ) : null}
                     {f.current_step.is_escalated ? (
-                      <Badge className="bg-amber-100 text-amber-900">
+                      <Badge className="border-amber-200 bg-amber-50 text-amber-800">
                         Escalation
                       </Badge>
                     ) : null}
@@ -305,7 +305,7 @@ export function DashboardFamilyCards({
                   ? `/families/${f.family_id}#step-${f.current_step.id}`
                   : `/families/${f.family_id}`
               }
-              className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline"
+              className="text-sm font-medium text-blue-600/90 hover:text-blue-600 hover:underline"
             >
               {f.current_step
                 ? f.current_step.checklist_progress &&
@@ -327,11 +327,11 @@ export function ActionableNowList({ items }: { items: ActionableItem[] }) {
   const typeStyles: Record<string, string> = {
     overdue: "border-red-200 bg-red-50/50",
     blocked: "border-amber-200 bg-amber-50/50",
-    follow_up_today: "border-teal-200 bg-teal-50/50",
-    follow_up_soon: "border-slate-200 bg-slate-50/50",
-    escalation: "border-amber-300 bg-amber-50/80",
-    no_activity: "border-slate-200 bg-slate-50/50",
-    new_plan: "border-teal-200 bg-teal-50/30",
+    follow_up_today: "border-blue-200 bg-blue-50/25",
+    follow_up_soon: "border-slate-200 bg-white",
+    escalation: "border-amber-200 bg-amber-50/50",
+    no_activity: "border-slate-200 bg-white",
+    new_plan: "border-blue-200 bg-blue-50/25",
   };
 
   return (
@@ -345,7 +345,7 @@ export function ActionableNowList({ items }: { items: ActionableItem[] }) {
                 : `/families/${item.family_id}`
             }
             className={cn(
-              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm transition-colors hover:shadow-sm",
+              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm transition-colors duration-150 hover:bg-blue-50/40",
               typeStyles[item.type] ?? "border-slate-200 bg-white",
             )}
           >
@@ -359,7 +359,7 @@ export function ActionableNowList({ items }: { items: ActionableItem[] }) {
                 </span>
               ) : null}
             </div>
-            <span className="shrink-0 text-xs font-medium text-teal-700">
+            <span className="shrink-0 text-xs font-medium text-blue-600/90">
               {getQueueCtaLabel(item)} →
             </span>
           </Link>
@@ -379,7 +379,7 @@ export function CurrentStepByFamily({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50">
+            <tr className="border-b border-slate-200 bg-slate-50">
               <th className="px-4 py-3 text-left font-semibold text-slate-700">
                 Family
               </th>
@@ -401,12 +401,12 @@ export function CurrentStepByFamily({
             {families.map((f) => (
               <tr
                 key={f.family_id}
-                className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50"
+                className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
               >
                 <td className="px-4 py-3">
                   <Link
                     href={`/families/${f.family_id}`}
-                    className="font-medium text-slate-900 hover:text-teal-800 hover:underline"
+                    className="font-medium text-slate-900 hover:text-blue-600/90 hover:underline"
                   >
                     {f.family_name}
                   </Link>
@@ -445,14 +445,14 @@ export function CurrentStepByFamily({
                   {f.current_step ? (
                     <Link
                       href={`/families/${f.family_id}#step-${f.current_step.id}`}
-                      className="text-teal-700 hover:underline"
+                      className="text-blue-600/90 hover:underline"
                     >
                       Open step
                     </Link>
                   ) : (
                     <Link
                       href={`/families/${f.family_id}`}
-                      className="text-teal-700 hover:underline"
+                      className="text-blue-600/90 hover:underline"
                     >
                       Open case
                     </Link>

@@ -32,7 +32,7 @@ function formatDt(iso: string) {
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+    <p className="text-xs font-medium text-slate-500">
       {children}
     </p>
   );
@@ -64,16 +64,16 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
 
   return (
     <div className="space-y-10">
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/[0.03] sm:p-8">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Link
           href="/families"
-          className="text-sm font-medium text-teal-800 underline-offset-2 hover:text-teal-900 hover:underline"
+          className="text-sm font-medium text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
         >
           ← Back to families
         </Link>
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
               {family.name}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -81,7 +81,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
               <UrgencyBadge urgency={family.urgency} />
             </div>
             {getNextAction(family) && (
-              <p className="mt-3 font-medium text-teal-800">
+              <p className="mt-3 font-medium text-blue-700">
                 Next: {getNextAction(family)}
               </p>
             )}
@@ -191,7 +191,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
                     key={g.id}
                     className="flex gap-2 rounded-lg bg-slate-50/80 px-3 py-2"
                   >
-                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-teal-600" />
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-blue-600" />
                     <span>{g.label}</span>
                   </li>
                 ))}
@@ -285,7 +285,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
               {family.caseNotes.map((n) => (
                 <li
                   key={n.id}
-                  className="border-l-2 border-teal-200 pl-4"
+                  className="border-l-2 border-blue-200 pl-4"
                 >
                   <p className="text-xs font-medium text-slate-500">
                     {formatDt(n.created_at)}

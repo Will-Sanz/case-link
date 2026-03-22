@@ -95,7 +95,7 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
               />
             </div>
           </div>
-          <fieldset className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+          <fieldset className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <legend className="px-1 text-sm font-medium text-slate-800">
               Service flags
             </legend>
@@ -162,7 +162,7 @@ export default async function ResourcesPage({ searchParams }: PageProps) {
                   <div className="min-w-0">
                     <Link
                       href={`/resources/${r.id}`}
-                      className="text-base font-semibold text-slate-900 underline-offset-2 hover:text-teal-900 hover:underline"
+                      className="text-base font-semibold text-slate-900 underline-offset-2 hover:text-blue-800 hover:underline"
                     >
                       {r.program_name}
                     </Link>

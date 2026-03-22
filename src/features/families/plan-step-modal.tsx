@@ -45,12 +45,12 @@ function ModalStatusSelect({
 }) {
   const cls =
     status === "completed"
-      ? "bg-emerald-100 text-emerald-900"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
       : status === "in_progress"
-        ? "bg-amber-100 text-amber-900"
+        ? "border-amber-200 bg-amber-50 text-amber-800"
         : status === "blocked"
-          ? "bg-red-100 text-red-900"
-          : "bg-slate-100 text-slate-700";
+        ? "border-red-200 bg-red-50 text-red-800"
+      : "border-slate-200 bg-slate-50 text-slate-700";
   return (
     <select
       value={status}
@@ -61,7 +61,7 @@ function ModalStatusSelect({
       className={cn(
         "w-full max-w-[220px] rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium",
         cls,
-        "focus:outline-none focus:ring-2 focus:ring-teal-600/25",
+        "focus:outline-none focus:ring-2 focus:ring-blue-500/25",
       )}
     >
       <option value="pending">Not started</option>
@@ -317,11 +317,11 @@ function PlanStepModalInner({
         role="dialog"
         aria-modal="true"
         aria-labelledby="plan-step-modal-title"
-        className="relative z-10 flex max-h-[min(90vh,900px)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/15"
+        className="relative z-10 flex max-h-[min(90vh,900px)] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white"
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium text-slate-500">
               {PHASE_LABELS[step.phase] ?? step.phase} phase · Plan v
               {planMeta.version}
             </p>
@@ -333,7 +333,7 @@ function PlanStepModalInner({
             </h2>
             <div className="mt-2 flex flex-wrap gap-2">
               {planMeta.generation_source === "openai" ? (
-                <Badge className="border-teal-200/80 bg-teal-50 text-teal-900">
+                <Badge className="border-blue-200/70 bg-blue-50/40 text-blue-700">
                   AI draft
                   {planMeta.ai_model ? ` · ${planMeta.ai_model}` : ""}
                 </Badge>
@@ -345,7 +345,7 @@ function PlanStepModalInner({
                 </Badge>
               )}
               {workflow.needs_escalation ? (
-                <Badge className="bg-amber-100 text-amber-900">
+                <Badge className="border-amber-200 bg-amber-50 text-amber-800">
                   Needs escalation
                 </Badge>
               ) : null}
@@ -423,8 +423,8 @@ function PlanStepModalInner({
                     if (!actionNow) return null;
                     return (
                       <div className="sticky top-0 z-10 -mx-1 -mt-1 mb-1 bg-white/95 px-1 pb-2 backdrop-blur-sm">
-                        <div className="rounded-xl border-2 border-teal-200 bg-teal-50/70 px-4 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+                        <div className="rounded-lg border border-blue-200/70 bg-blue-50/40/50 px-4 py-3">
+                          <p className="text-xs font-medium text-blue-700">
                             Action needed now
                           </p>
                           <p className="mt-1.5 text-base font-semibold leading-snug text-slate-900">
@@ -439,14 +439,14 @@ function PlanStepModalInner({
                   {checklist.length > 0 ? (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                        <p className="text-xs font-medium text-slate-600">
                           Checklist
                         </p>
                         <span
                           className={cn(
                             "text-sm font-medium",
                             checklistCompleted >= checklist.length
-                              ? "text-emerald-700"
+                              ? "text-emerald-800"
                               : "text-slate-600",
                           )}
                         >
@@ -486,7 +486,7 @@ function PlanStepModalInner({
                                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors",
                                   completed
                                     ? "border-emerald-500 bg-emerald-500 text-white"
-                                    : "border-slate-300 bg-white hover:border-teal-400",
+                                    : "border-slate-300 bg-white hover:border-slate-400",
                                 )}
                               >
                                 {completed ? "✓" : null}
@@ -509,7 +509,7 @@ function PlanStepModalInner({
                   {/* Weekly action items (when no checklist or in addition) */}
                   {step.action_items && step.action_items.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      <p className="text-xs font-medium text-slate-600">
                         Action items (
                         {step.action_items.filter((a) => a.status === "completed").length} of {step.action_items.length})
                       </p>
@@ -551,7 +551,7 @@ function PlanStepModalInner({
                                     "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
                                     isDone
                                       ? "border-emerald-500 bg-emerald-500 text-white"
-                                      : "border-slate-300 bg-white hover:border-teal-400",
+                                      : "border-slate-300 bg-white hover:border-slate-400",
                                   )}
                                 >
                                   {isDone ? "✓" : null}
@@ -590,14 +590,14 @@ function PlanStepModalInner({
                     {status !== "completed" ? (
                       <Button
                         type="button"
-                        className="mt-2 w-full bg-teal-600 font-semibold hover:bg-teal-700"
+                        className="mt-2 w-full bg-blue-500/90 font-semibold hover:bg-blue-500"
                         onClick={() => handleStatusChange("completed")}
                         disabled={pending}
                       >
                         Mark step complete
                       </Button>
                     ) : (
-                      <span className="mt-2 block rounded-lg bg-emerald-100 px-3 py-2 text-center text-sm font-medium text-emerald-900">
+                      <span className="mt-2 block rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-800">
                         ✓ Step complete
                       </span>
                     )}
@@ -605,7 +605,7 @@ function PlanStepModalInner({
 
                   {/* Compact update progress */}
                   <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/40 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    <p className="text-xs font-medium text-slate-600">
                       Update progress
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -813,7 +813,7 @@ function PlanStepModalInner({
                     onToggle={() => toggleContext("contact_script")}
                   >
                     {(d as { contact_script?: string })?.contact_script ? (
-                      <p className="whitespace-pre-wrap rounded-lg bg-teal-50/80 px-3 py-2 text-sm text-slate-800">
+                      <p className="whitespace-pre-wrap rounded-lg bg-blue-50/50 px-3 py-2 text-sm text-slate-800">
                         {(d as { contact_script: string }).contact_script}
                       </p>
                     ) : null}
@@ -831,14 +831,14 @@ function PlanStepModalInner({
                           <li key={i}>
                             {c.name && <span className="font-medium">{c.name}</span>}{" "}
                             {c.phone && (
-                              <a href={`tel:${c.phone}`} className="text-teal-700 hover:underline">
+                              <a href={`tel:${c.phone}`} className="text-blue-600/90 hover:underline">
                                 {c.phone}
                               </a>
                             )}{" "}
                             {c.email && (
                               <a
                                 href={`mailto:${c.email}`}
-                                className="text-teal-700 hover:underline"
+                                className="text-blue-600/90 hover:underline"
                               >
                                 {c.email}
                               </a>
@@ -869,7 +869,7 @@ function PlanStepModalInner({
                       </ul>
                     ) : null}
                     {workflow.documents_received ? (
-                      <p className="mt-2 text-xs text-emerald-600">✓ Documents received</p>
+                      <p className="mt-2 text-xs text-emerald-700">✓ Documents received</p>
                     ) : null}
                   </ContextSection>
 
@@ -941,7 +941,7 @@ function PlanStepModalInner({
 
                   {/* AI help — always visible, contextual */}
                   <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    <h4 className="text-xs font-medium text-slate-600">
                       AI help
                     </h4>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -984,8 +984,8 @@ function PlanStepModalInner({
               ))}
             </div>
                     {helperContent && helperType && (
-                      <div ref={helperOutputRef} className="mt-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
-                        <h5 className="text-sm font-semibold text-teal-900">
+                      <div ref={helperOutputRef} className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <h5 className="text-sm font-medium text-slate-900">
                           {helperType.replace(/_/g, " ")}
                         </h5>
                         <div className="mt-2 text-sm text-slate-800">
@@ -993,7 +993,7 @@ function PlanStepModalInner({
                     <ul className="space-y-1.5">
                       {helperList.map((item, i) => (
                         <li key={i} className="flex gap-2">
-                          <span className="shrink-0 text-teal-600">•</span>
+                          <span className="shrink-0 text-blue-600/90">•</span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -1041,7 +1041,7 @@ function PlanStepModalInner({
                     )}
                     {(aiHelper?.call_script || aiHelper?.email_draft || aiHelper?.family_explanation || aiHelper?.next_step_guidance || (aiHelper?.prep_checklist ?? []).length > 0 || (aiHelper?.fallback_options ?? []).length > 0) && (
                       <div className="mt-3 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <p className="text-xs font-medium text-slate-500">
                   Saved to this step
                 </p>
                 {aiHelper?.call_script && (
@@ -1062,7 +1062,7 @@ function PlanStepModalInner({
                     <ul className="mt-1.5 space-y-1 text-sm text-slate-800">
                       {aiHelper.prep_checklist.map((item, i) => (
                         <li key={i} className="flex gap-2">
-                          <span className="text-teal-600">•</span>
+                          <span className="text-blue-600/90">•</span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -1075,7 +1075,7 @@ function PlanStepModalInner({
                     <ul className="mt-1.5 space-y-1 text-sm text-slate-800">
                       {aiHelper.fallback_options.map((item, i) => (
                         <li key={i} className="flex gap-2">
-                          <span className="text-teal-600">•</span>
+                          <span className="text-blue-600/90">•</span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -1100,7 +1100,7 @@ function PlanStepModalInner({
 
                   {/* Log activity */}
                   <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    <h4 className="text-xs font-medium text-slate-600">
                       Log activity
                     </h4>
                     <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -1158,7 +1158,7 @@ function PlanStepModalInner({
 
                   {stepActivity.length > 0 ? (
                     <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      <h4 className="text-xs font-medium text-slate-600">
                         Activity history
                       </h4>
                       <ul className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
@@ -1185,7 +1185,7 @@ function PlanStepModalInner({
 
                   {/* Refine */}
                   <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    <h4 className="text-xs font-medium text-slate-600">
                       Refine step
                     </h4>
                     {showRefine ? (
@@ -1266,14 +1266,14 @@ function PlanStepModalInner({
             {status !== "completed" ? (
               <Button
                 type="button"
-                className="bg-teal-600 font-semibold hover:bg-teal-700"
+                className="bg-blue-500/90 font-semibold hover:bg-blue-500"
                 onClick={() => handleStatusChange("completed")}
                 disabled={pending}
               >
                 Mark step complete
               </Button>
             ) : (
-              <span className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900">
+              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
                 ✓ Step complete
               </span>
             )}

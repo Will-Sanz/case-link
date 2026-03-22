@@ -193,7 +193,7 @@ export function CalendarView({
         {/* Compact workload pills */}
         <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-slate-100 bg-slate-50/50 px-3 py-1.5">
           {workload.dueToday > 0 && (
-            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-medium text-teal-800">
+            <span className="rounded-full bg-blue-50/70 px-2 py-0.5 text-[11px] font-medium text-blue-700">
               {workload.dueToday} today
             </span>
           )}
@@ -284,7 +284,7 @@ function EventChip({
         onClick();
       }}
       className={cn(
-        "w-full rounded border border-l-4 px-1.5 py-0.5 text-left transition-all hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30",
+        "w-full rounded border border-l-4 px-1.5 py-0.5 text-left transition-all hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500/30",
         isCompleted ? familyColor.muted : familyColor.bg,
         familyColor.border,
         isCompleted && "opacity-80",
@@ -329,7 +329,7 @@ function MonthGrid({
           action={
             <Link
               href="/families"
-              className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline"
+              className="text-xs font-medium text-blue-700 underline-offset-2 hover:underline"
             >
               Open Families
             </Link>
@@ -399,7 +399,7 @@ function MonthGridInner({
                   className={cn(
                     "mb-0.5 inline-flex items-center justify-center font-medium",
                     compact ? "h-4 w-4 text-[10px]" : "h-5 w-5 text-xs",
-                    c.date === today && "rounded-full bg-blue-600 text-white",
+                    c.date === today && "rounded-full bg-blue-500/80 text-white",
                   )}
                 >
                   {c.day}
@@ -442,7 +442,7 @@ function WeekGrid({
           title="No events this week"
           description="Set follow-up dates on plan steps to see them here."
           action={
-            <Link href="/families" className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline">
+            <Link href="/families" className="text-xs font-medium text-blue-700 underline-offset-2 hover:underline">
               Open Families
             </Link>
           }
@@ -487,7 +487,7 @@ function WeekGridInner({
             key={date}
             className={cn(
               "min-h-0 overflow-auto rounded border p-2",
-              date === today ? "border-blue-400 bg-blue-50/50" : "border-slate-200 bg-white",
+              date === today ? "border-blue-400 bg-blue-50/40" : "border-slate-200 bg-white",
             )}
           >
             <p className={cn("mb-1 font-medium text-slate-700", compact ? "text-[10px]" : "text-xs")}>{label}</p>
@@ -539,7 +539,7 @@ function AgendaList({
           title="No calendar items"
           description="Set follow-up dates on plan steps to see them here."
           action={
-            <Link href="/families" className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline">
+            <Link href="/families" className="text-xs font-medium text-blue-700 underline-offset-2 hover:underline">
               Open Families
             </Link>
           }
@@ -628,7 +628,7 @@ function EventDetailPanel({
 
   if (!event) {
     return (
-      <Card className="sticky top-6 rounded-xl border-slate-200/90 p-6 shadow-sm">
+      <Card className="sticky top-6 p-5">
         <p className="text-sm text-slate-500">
           Select an event to see details and actions.
         </p>
@@ -642,7 +642,7 @@ function EventDetailPanel({
     : `/families/${event.family_id}`;
 
   return (
-    <Card className={cn("sticky top-6 rounded-xl border-slate-200/90 p-5 shadow-sm transition-shadow border-l-4", familyColor.border)}>
+    <Card className={cn("sticky top-6 p-5 transition-colors border-l-4", familyColor.border)}>
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-slate-900">Event details</h3>
         <Button variant="ghost" className="h-8 px-2" onClick={onClose}>

@@ -1,16 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 
 const urgencyClass: Record<string, string> = {
-  low: "border-slate-200 bg-slate-100 text-slate-800",
-  medium: "border-amber-200/80 bg-amber-50 text-amber-950",
-  high: "border-orange-200/80 bg-orange-50 text-orange-950",
-  crisis: "border-red-200/80 bg-red-50 text-red-950",
+  low: "border-slate-200 bg-slate-100 text-slate-700",
+  medium: "border-amber-200 bg-amber-50 text-amber-900",
+  high: "border-amber-300 bg-amber-50 text-amber-900",
+  crisis: "border-red-200 bg-red-50 text-red-800",
 };
 
 const statusClass: Record<string, string> = {
-  active: "border-emerald-200/80 bg-emerald-50 text-emerald-950",
-  on_hold: "border-amber-200/80 bg-amber-50 text-amber-950",
-  closed: "border-slate-200 bg-slate-100 text-slate-700",
+  active: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  on_hold: "border-amber-200 bg-amber-50 text-amber-800",
+  closed: "border-slate-200 bg-slate-100 text-slate-600",
 };
 
 export function UrgencyBadge({
@@ -20,7 +20,7 @@ export function UrgencyBadge({
 }) {
   if (!urgency) {
     return (
-      <Badge className="border-slate-200 bg-white font-normal text-slate-500">
+      <Badge className="border-slate-200 bg-slate-50 font-normal text-slate-500">
         Urgency not set
       </Badge>
     );

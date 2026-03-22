@@ -39,9 +39,9 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 const PHASE_COLORS: Record<string, string> = {
-  "30": "bg-teal-600",
-  "60": "bg-teal-500",
-  "90": "bg-teal-400",
+  "30": "bg-blue-400/90/90",
+  "60": "bg-blue-400/90",
+  "90": "bg-blue-400/80",
 };
 
 /** Linked resources for a step */
@@ -62,8 +62,8 @@ function LinkedResources({
   );
   if (linked.length === 0) return null;
   return (
-    <div className="mt-2 rounded-lg bg-teal-50/80 px-3 py-2">
-      <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+    <div className="mt-2 rounded-lg border border-slate-100 bg-blue-50/40 px-3 py-2">
+      <p className="text-xs font-medium text-blue-700">
         Linked resource{linked.length !== 1 ? "s" : ""}
       </p>
       <ul className="mt-1 space-y-1">
@@ -71,7 +71,7 @@ function LinkedResources({
           <li key={m.id}>
             <Link
               href={`/resources/${m.resource_id}`}
-              className="text-sm text-teal-800 hover:underline"
+              className="text-sm text-blue-700 hover:underline"
             >
               {m.resource?.program_name ?? "Resource"}
             </Link>
@@ -107,14 +107,14 @@ function ActionItemsSection({
   const completedCount = items.filter((a) => a.status === "completed").length;
 
   return (
-    <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/40 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium text-slate-700">
         Weekly action items ({completedCount} of {items.length} done)
       </p>
       <div className="mt-3 space-y-4">
         {weeks.map((weekIdx) => (
           <div key={weekIdx}>
-            <p className="text-xs font-medium text-teal-700">Week {weekIdx}</p>
+            <p className="text-xs font-medium text-slate-600">Week {weekIdx}</p>
             <ul className="mt-1.5 space-y-1.5">
               {(byWeek.get(weekIdx) ?? []).map((ai) => {
                 const isDone = ai.status === "completed";
@@ -136,8 +136,8 @@ function ActionItemsSection({
                         className={cn(
                           "mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                           isDone
-                            ? "border-teal-500 bg-teal-500 text-white"
-                            : "border-slate-300 bg-white hover:border-teal-400",
+                            ? "border-blue-400 bg-blue-400/90 text-white"
+                            : "border-slate-300 bg-white hover:border-blue-300",
                         )}
                       >
                         {isDone ? "✓" : null}
@@ -146,7 +146,7 @@ function ActionItemsSection({
                       <span
                         className={cn(
                           "mt-1 size-1.5 shrink-0 rounded-full",
-                          isDone ? "bg-teal-500" : "bg-slate-300",
+                          isDone ? "bg-blue-400/90" : "bg-slate-300",
                         )}
                       />
                     )}
@@ -265,8 +265,8 @@ function StepPreview({
   return (
     <div className="mt-4 space-y-4 text-sm">
       {actionNow ? (
-        <div className="rounded-lg border-2 border-teal-200 bg-teal-50/60 px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+        <div className="rounded-lg border border-blue-200/70 bg-blue-50/40/40 px-3 py-2">
+          <p className="text-xs font-medium text-blue-700">
             Action needed now
           </p>
           <p className="mt-1.5 font-medium text-slate-900">{actionNow}</p>
@@ -276,7 +276,7 @@ function StepPreview({
         <div className="rounded-lg bg-slate-50 p-3">
           {d?.stage_goal ? (
             <>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-medium text-slate-500">
                 Stage focus
               </p>
               <p className="mt-1 text-slate-700">{String(d?.stage_goal ?? "")}</p>
@@ -284,7 +284,7 @@ function StepPreview({
           ) : null}
           {d?.why_now ? (
             <>
-              <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="mt-2 text-xs font-medium text-slate-500">
                 Why now
               </p>
               <p className="mt-1 text-slate-700">{String(d?.why_now ?? "")}</p>
@@ -294,7 +294,7 @@ function StepPreview({
       ) : null}
       {d?.rationale ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             Why this matters
           </p>
           <p className="mt-1 text-slate-700">{d.rationale}</p>
@@ -302,7 +302,7 @@ function StepPreview({
       ) : null}
       {d?.detailed_instructions ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             What to do
           </p>
           <p className="mt-1 whitespace-pre-wrap leading-relaxed text-slate-700">
@@ -312,10 +312,10 @@ function StepPreview({
       ) : null}
       {(d as { contact_script?: string })?.contact_script ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             What to say (outreach script)
           </p>
-          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-teal-50/80 px-3 py-2 text-sm text-slate-700">
+          <p className="mt-1 whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             {(d as { contact_script: string }).contact_script}
           </p>
         </div>
@@ -325,7 +325,7 @@ function StepPreview({
       ) : null}
       {d?.checklist && d.checklist.length > 0 ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             Checklist ({completedCount} of {checklist.length})
           </p>
           <ul className="mt-2 space-y-1.5">
@@ -342,17 +342,17 @@ function StepPreview({
                         onToggleChecklist(step.id, i, !isDone);
                       }}
                       disabled={checklistPending}
-                      className="mt-1.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-white transition-colors hover:border-teal-500 disabled:opacity-50"
+                      className="mt-1.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-white transition-colors hover:border-blue-500 disabled:opacity-50"
                     >
                       {isDone ? (
-                        <span className="text-teal-600">✓</span>
+                        <span className="text-blue-600">✓</span>
                       ) : null}
                     </button>
                   ) : (
                     <span
                       className={cn(
                         "mt-1.5 size-1.5 shrink-0 rounded-full",
-                        isDone ? "bg-teal-500" : "bg-slate-300",
+                        isDone ? "bg-blue-400/90" : "bg-slate-300",
                       )}
                     />
                   )}
@@ -372,7 +372,7 @@ function StepPreview({
       ) : null}
       {d?.required_documents && d.required_documents.length > 0 ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             What to prepare
           </p>
           <ul className="mt-2 flex flex-wrap gap-2">
@@ -389,7 +389,7 @@ function StepPreview({
       ) : null}
       {d?.contacts && d.contacts.length > 0 ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             Contacts
           </p>
           <ul className="mt-2 space-y-1.5">
@@ -399,7 +399,7 @@ function StepPreview({
                 {c.phone && (
                   <a
                     href={`tel:${c.phone}`}
-                    className="text-teal-700 hover:underline"
+                    className="text-blue-600 hover:underline"
                   >
                     {c.phone}
                   </a>
@@ -407,7 +407,7 @@ function StepPreview({
                 {c.email && (
                   <a
                     href={`mailto:${c.email}`}
-                    className="text-teal-700 hover:underline"
+                    className="text-blue-600 hover:underline"
                   >
                     {c.email}
                   </a>
@@ -422,7 +422,7 @@ function StepPreview({
       ) : null}
       {d?.expected_outcome ? (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             Success looks like
           </p>
           <p className="mt-1 text-slate-700">{d.expected_outcome}</p>
@@ -432,7 +432,7 @@ function StepPreview({
         <div className="grid gap-3 sm:grid-cols-2">
           {d?.blockers && d.blockers.length > 0 ? (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-medium text-slate-500">
                 Common blockers
               </p>
               <ul className="mt-2 space-y-1 text-slate-700">
@@ -444,7 +444,7 @@ function StepPreview({
           ) : null}
           {d?.fallback_options && d.fallback_options.length > 0 ? (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-medium text-slate-500">
                 Fallback options
               </p>
               <ul className="mt-2 space-y-1 text-slate-700">
@@ -505,7 +505,6 @@ export function PlanPanel({
   const [addTitle, setAddTitle] = useState("");
   const [addDesc, setAddDesc] = useState("");
   const [modalStepId, setModalStepId] = useState<string | null>(null);
-  const [workMode, setWorkMode] = useState(true);
   const hashScrolledRef = useRef(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [regenerateFeedback, setRegenerateFeedback] = useState("");
@@ -516,7 +515,6 @@ export function PlanPanel({
     if (match) {
       const stepId = match[1];
       setModalStepId(stepId);
-      setWorkMode(true);
     }
   }, []);
 
@@ -668,19 +666,8 @@ export function PlanPanel({
     "90": allSteps.filter((s) => s.phase === "90"),
   };
 
-  const focusSteps =
-    workMode && currentStep
-      ? ({ [currentStep.phase]: [currentStep] } as typeof stepsByPhase)
-      : stepsByPhase;
-  const displayPhases =
-    workMode && currentStep
-      ? ([currentStep.phase] as const)
-      : (["30", "60", "90"] as const);
-
-  const upcomingSteps =
-    workMode && currentStep
-      ? sortedSteps.filter((s) => s.id !== currentStep.id)
-      : [];
+  const focusSteps = stepsByPhase;
+  const displayPhases = ["30", "60", "90"] as const;
 
   const modalStep = useMemo(() => {
     if (!plan || !modalStepId) return null;
@@ -694,70 +681,32 @@ export function PlanPanel({
   return (
     <>
       <section
-        className="rounded-2xl border-2 border-teal-100 bg-white shadow-lg shadow-slate-900/[0.04]"
+        className="rounded-lg border border-slate-200 bg-white"
         id="plan-section"
       >
-        <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 sm:px-8 sm:py-5">
+        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 sm:py-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-medium text-slate-500">
                 Active work
               </p>
               <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
                 30 / 60 / 90 day plan
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-600">
-                {workMode
-                  ? "Focus on the current step. Open to update progress, check items, and mark complete."
-                  : "View all steps. Work mode focuses on the active step."}
+                View all steps. Open any step to update progress, check items, and mark complete.
               </p>
               {plan && totalCount > 0 ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-200">
                     <div
-                      className="h-full rounded-full bg-teal-600 transition-all duration-300"
+                      className="h-full rounded-full bg-blue-500/80 transition-all duration-300"
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
                   <span className="text-sm font-medium text-slate-700">
                     {completedCount} of {totalCount} completed
                   </span>
-                  <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWorkMode(true);
-                        if (currentStep) {
-                          setModalStepId(currentStep.id);
-                        }
-                      }}
-                      className={cn(
-                        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        workMode
-                          ? "bg-teal-600 text-white"
-                          : "text-slate-600 hover:bg-slate-50",
-                      )}
-                    >
-                      Work mode
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWorkMode(false);
-                        if (currentStep) {
-                          setModalStepId(currentStep.id);
-                        }
-                      }}
-                      className={cn(
-                        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        !workMode
-                          ? "bg-teal-600 text-white"
-                          : "text-slate-600 hover:bg-slate-50",
-                      )}
-                    >
-                      Full plan
-                    </button>
-                  </div>
                 </div>
               ) : null}
             </div>
@@ -792,7 +741,7 @@ export function PlanPanel({
                   type="button"
                   onClick={handleGenerateFirst}
                   disabled={pending}
-                  className="bg-teal-600 hover:bg-teal-700"
+                  className="bg-blue-400/90/90 hover:bg-blue-400/90"
                 >
                   {pending ? "Generating…" : "Generate plan"}
                 </Button>
@@ -804,7 +753,7 @@ export function PlanPanel({
         <div className="px-6 py-5 sm:px-8 sm:py-6">
           {error ? (
             <p
-              className="mb-5 rounded-lg border border-red-200 bg-red-50/90 px-3 py-2.5 text-sm text-red-900"
+              className="mb-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800"
               role="alert"
             >
               {error}
@@ -812,7 +761,7 @@ export function PlanPanel({
           ) : null}
 
           {!plan ? (
-            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center">
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
               <p className="text-base text-slate-600">
                 No plan yet. Click <strong>Generate plan</strong> to create one from this family&apos;s goals and barriers.
               </p>
@@ -822,7 +771,7 @@ export function PlanPanel({
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="text-slate-500">Source:</span>
                 {plan.generation_source === "openai" ? (
-                  <Badge className="border-teal-200/80 bg-teal-50 text-teal-900">
+                  <Badge className="border-blue-200/70 bg-blue-50/40 text-blue-700">
                     AI{plan.ai_model ? ` (${plan.ai_model})` : ""}
                   </Badge>
                 ) : plan.generation_source === "manual" ? (
@@ -839,7 +788,7 @@ export function PlanPanel({
 
               <div className="relative">
                 <div
-                  className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-teal-400 via-teal-300 to-teal-200 sm:left-6"
+                  className="absolute left-4 top-0 bottom-0 w-px bg-slate-200 sm:left-6"
                   aria-hidden
                 />
                 {displayPhases.map((phase) => (
@@ -891,10 +840,10 @@ export function PlanPanel({
                               key={step.id}
                               id={`step-${step.id}`}
                               className={cn(
-                                "relative rounded-xl border bg-white shadow-sm transition-all duration-200 ease-out hover:shadow-md",
-                                isBlocked && "border-red-200/80",
-                                isEscalated && "border-amber-300 ring-1 ring-amber-200/50",
-                                !isBlocked && !isEscalated && "border-slate-200/90",
+                                "relative rounded-lg border bg-white transition-colors duration-150 hover:bg-blue-50/40",
+                                isBlocked && "border-red-200",
+                                isEscalated && "border-amber-200",
+                                !isBlocked && !isEscalated && "border-slate-200",
                               )}
                             >
                               {editingStepId === step.id ? (
@@ -941,7 +890,7 @@ export function PlanPanel({
                                             <button
                                               type="button"
                                               onClick={() => setModalStepId(step.id)}
-                                              className="text-left outline-offset-2 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-600/25 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                              className="text-left outline-offset-2 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300"
                                             >
                                               <p className="font-semibold text-slate-900">
                                                 {step.title}
@@ -982,7 +931,7 @@ export function PlanPanel({
                                             <button
                                               type="button"
                                               onClick={() => setModalStepId(step.id)}
-                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600/90 hover:text-blue-600 hover:underline"
                                             >
                                               Expand for details
                                               <span aria-hidden>↓</span>
@@ -991,7 +940,7 @@ export function PlanPanel({
                                             <button
                                               type="button"
                                               onClick={() => setModalStepId(step.id)}
-                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                                              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600/90 hover:text-blue-600 hover:underline"
                                             >
                                               Open to update status and progress
                                               <span aria-hidden>→</span>
@@ -1002,7 +951,7 @@ export function PlanPanel({
                                       <div className="flex shrink-0 flex-col items-end gap-2">
                                         <div className="flex flex-wrap items-center justify-end gap-2">
                                           {isEscalated ? (
-                                            <Badge className="bg-amber-100 text-amber-900">
+                                            <Badge className="border-amber-200 bg-amber-50 text-amber-800">
                                               Needs escalation
                                             </Badge>
                                           ) : null}
@@ -1049,7 +998,7 @@ export function PlanPanel({
                                           {step.status !== "completed" && (
                                             <Button
                                               type="button"
-                                              className="h-8 bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700"
+                                              className="h-8 bg-blue-400/90/90 px-3 text-xs font-medium text-white hover:bg-blue-400/90"
                                               onClick={() =>
                                                 handleStatusChange(
                                                   step.id,
@@ -1105,7 +1054,7 @@ export function PlanPanel({
               {showAddStep ? (
                 <form
                   onSubmit={handleAddStep}
-                  className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-5"
+                  className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5"
                 >
                   <h4 className="mb-4 text-sm font-semibold text-slate-800">
                     Add step
@@ -1190,7 +1139,7 @@ export function PlanPanel({
             role="dialog"
             aria-modal="true"
             aria-labelledby="regenerate-plan-title"
-            className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+            className="relative z-10 w-full max-w-lg rounded-lg border border-slate-200 bg-white p-5"
           >
             <h3
               id="regenerate-plan-title"

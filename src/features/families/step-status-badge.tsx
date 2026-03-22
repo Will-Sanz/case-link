@@ -13,10 +13,10 @@ const STATUS_LABELS: Record<StepStatus, string> = {
 };
 
 const STATUS_CLASSES: Record<StepStatus, string> = {
-  pending: "bg-slate-100 text-slate-700",
-  in_progress: "bg-amber-100 text-amber-900",
-  completed: "bg-emerald-100 text-emerald-900",
-  blocked: "bg-red-100 text-red-900",
+  pending: "border-slate-200 bg-slate-50 text-slate-700",
+  in_progress: "border-blue-200/70 bg-blue-50/50 text-blue-700",
+  completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  blocked: "border-red-200 bg-red-50 text-red-800",
 };
 
 export function StepStatusBadge({
@@ -39,7 +39,7 @@ export function StepStatusBadge({
         value={status}
         onChange={(e) => onChange(e.target.value as StepStatus)}
         className={cn(
-          "rounded-md border-0 px-2 py-0.5 text-xs font-medium focus:ring-2 focus:ring-teal-600/25 cursor-pointer",
+          "rounded-md border px-2 py-0.5 text-xs font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20",
           cls,
           className,
         )}
@@ -87,8 +87,8 @@ export function ChecklistProgressBadge({
         <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-200">
           <div
             className={cn(
-              "h-full rounded-full transition-all duration-300",
-              allDone ? "bg-emerald-500" : "bg-amber-500",
+              "h-full rounded-full transition-all duration-200",
+              allDone ? "bg-emerald-500" : "bg-blue-400",
             )}
             style={{ width: `${pct}%` }}
           />

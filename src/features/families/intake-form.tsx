@@ -186,7 +186,7 @@ export function IntakeForm() {
                 onClick={() => toggleGoalPreset(g.value, g.label)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm"
+                    ? "border-blue-600 bg-blue-50 text-blue-900 shadow-sm"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
@@ -250,7 +250,7 @@ export function IntakeForm() {
                 onClick={() => toggleBarrierPreset(b.value, b.label)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm"
+                    ? "border-blue-600 bg-blue-50 text-blue-900 shadow-sm"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
