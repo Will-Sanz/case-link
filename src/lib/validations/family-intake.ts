@@ -84,3 +84,38 @@ export const addCaseNoteSchema = z.object({
   familyId: z.string().uuid(),
   body: z.string().min(1, "Note cannot be empty").max(12000),
 });
+
+export const updateGoalsSchema = z.object({
+  familyId: z.string().uuid(),
+  goals: z.array(z.object({
+    id: z.string().uuid().optional(),
+    label: z.string().min(1).max(200),
+  })).max(40),
+});
+
+export const updateBarriersSchema = z.object({
+  familyId: z.string().uuid(),
+  barriers: z.array(z.object({
+    id: z.string().uuid().optional(),
+    label: z.string().min(1).max(200),
+  })).max(40),
+});
+
+export const updateMembersSchema = z.object({
+  familyId: z.string().uuid(),
+  members: z.array(z.object({
+    id: z.string().uuid().optional(),
+    display_name: z.string().min(1).max(200),
+    relationship: z.string().max(120).optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+    age_approx: z
+      .union([z.number().int().min(0).max(120), z.string()])
+      .optional()
+      .nullable()
+      .transform((v) => {
+        if (v == null || v === "") return null;
+        const n = typeof v === "string" ? parseInt(v, 10) : v;
+        return Number.isFinite(n) && n >= 0 && n <= 120 ? n : null;
+      }),
+  })).max(20),
+});

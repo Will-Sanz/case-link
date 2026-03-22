@@ -8,7 +8,10 @@ import {
   addCaseNoteSchema,
   familyIntakeFormSchema,
   normalizeIntakeForDb,
+  updateBarriersSchema,
   updateFamilySchema,
+  updateGoalsSchema,
+  updateMembersSchema,
   type FamilyIntakeFormValues,
 } from "@/lib/validations/family-intake";
 
@@ -245,5 +248,126 @@ export async function deleteFamily(input: unknown): Promise<ActionResult> {
   revalidatePath("/families");
   revalidatePath("/dashboard");
   revalidatePath("/calendar");
+  return { ok: true };
+}
+
+export async function updateFamilyGoals(input: unknown): Promise<ActionResult> {
+  await requireAppUser();
+  const parsed = updateGoalsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid goals data" };
+  }
+  const { familyId, goals } = parsed.data;
+  const supabase = await createSupabaseServerClient();
+
+  const existing = await supabase.from("family_goals").select("id").eq("family_id", familyId);
+  const existingIds = new Set((existing.data ?? []).map((r) => r.id));
+  const incomingIds = new Set(goals.map((g) => g.id).filter(Boolean) as string[]);
+
+  for (const g of goals) {
+    if (g.id && existingIds.has(g.id)) {
+      const { error } = await supabase
+        .from("family_goals")
+        .update({ label: g.label, sort_order: goals.indexOf(g) })
+        .eq("id", g.id);
+      if (error) return { ok: false, error: error.message };
+    } else if (!g.id) {
+      const { error } = await supabase.from("family_goals").insert({
+        family_id: familyId,
+        label: g.label,
+        sort_order: goals.indexOf(g),
+      });
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+  for (const id of existingIds) {
+    if (!incomingIds.has(id)) {
+      const { error } = await supabase.from("family_goals").delete().eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function updateFamilyBarriers(input: unknown): Promise<ActionResult> {
+  await requireAppUser();
+  const parsed = updateBarriersSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid barriers data" };
+  }
+  const { familyId, barriers } = parsed.data;
+  const supabase = await createSupabaseServerClient();
+
+  const existing = await supabase.from("family_barriers").select("id").eq("family_id", familyId);
+  const existingIds = new Set((existing.data ?? []).map((r) => r.id));
+  const incomingIds = new Set(barriers.map((b) => b.id).filter(Boolean) as string[]);
+
+  for (const b of barriers) {
+    if (b.id && existingIds.has(b.id)) {
+      const { error } = await supabase
+        .from("family_barriers")
+        .update({ label: b.label, sort_order: barriers.indexOf(b) })
+        .eq("id", b.id);
+      if (error) return { ok: false, error: error.message };
+    } else if (!b.id) {
+      const { error } = await supabase.from("family_barriers").insert({
+        family_id: familyId,
+        label: b.label,
+        sort_order: barriers.indexOf(b),
+      });
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+  for (const id of existingIds) {
+    if (!incomingIds.has(id)) {
+      const { error } = await supabase.from("family_barriers").delete().eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  revalidatePath(`/families/${familyId}`);
+  return { ok: true };
+}
+
+export async function updateFamilyMembers(input: unknown): Promise<ActionResult> {
+  await requireAppUser();
+  const parsed = updateMembersSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
+  }
+  const { familyId, members } = parsed.data;
+  const supabase = await createSupabaseServerClient();
+
+  const existing = await supabase.from("family_members").select("id").eq("family_id", familyId);
+  const existingIds = new Set((existing.data ?? []).map((r) => r.id));
+  const incomingIds = new Set(members.map((m) => m.id).filter(Boolean) as string[]);
+
+  for (const m of members) {
+    const row = {
+      display_name: m.display_name,
+      relationship: m.relationship ?? null,
+      notes: m.notes ?? null,
+      age_approx: m.age_approx ?? null,
+    };
+    if (m.id && existingIds.has(m.id)) {
+      const { error } = await supabase.from("family_members").update(row).eq("id", m.id);
+      if (error) return { ok: false, error: error.message };
+    } else if (!m.id) {
+      const { error } = await supabase
+        .from("family_members")
+        .insert({ family_id: familyId, ...row });
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+  for (const id of existingIds) {
+    if (!incomingIds.has(id)) {
+      const { error } = await supabase.from("family_members").delete().eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  revalidatePath(`/families/${familyId}`);
   return { ok: true };
 }

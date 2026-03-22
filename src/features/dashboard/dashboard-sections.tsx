@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import type {
   ActionableItem,
   DashboardFamilySummary,
 } from "@/lib/services/workflow";
+import { getFamilyColor } from "@/lib/utils/family-colors";
 import { cn } from "@/lib/utils/cn";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -39,6 +41,63 @@ function getQueueCtaLabel(item: ActionableItem): string {
   if (item.step_status === "in_progress" || (cp && cp.completed > 0)) return "Continue step";
   if (item.step_status === "blocked") return "Resolve blocker";
   return "Start step";
+}
+
+/** Carousel of 5 next best actions with left/right arrows. */
+export function NextBestActionCarousel({
+  items,
+  families,
+}: {
+  items: ActionableItem[];
+  families: DashboardFamilySummary[];
+}) {
+  const top5 = items.slice(0, 5);
+  const [index, setIndex] = useState(0);
+  if (top5.length === 0) return null;
+  const current = top5[index];
+  const family = families.find((f) => f.family_id === current.family_id);
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0 rounded-full border-slate-200"
+          aria-label="Previous action"
+          disabled={top5.length <= 1}
+          onClick={() => setIndex((i) => (i === 0 ? top5.length - 1 : i - 1))}
+        >
+          ←
+        </Button>
+        <div className="min-w-0 flex-1">
+          <NextBestActionCard
+            item={current}
+            urgency={family?.urgency ?? null}
+            dueDate={current.due_date}
+            daysOverdue={current.days_overdue}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0 rounded-full border-slate-200"
+          aria-label="Next action"
+          disabled={top5.length <= 1}
+          onClick={() => setIndex((i) => (i >= top5.length - 1 ? 0 : i + 1))}
+        >
+          →
+        </Button>
+      </div>
+      {top5.length > 1 && (
+        <p className="mt-2 text-center text-xs text-slate-500">
+          {index + 1} of {top5.length}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** Primary Next Best Action card — single dominant CTA at top of dashboard. */
@@ -326,49 +385,70 @@ export function DashboardFamilyCards({
 }
 
 export function ActionableNowList({ items }: { items: ActionableItem[] }) {
-  const typeStyles: Record<string, string> = {
-    overdue: "border-red-200 bg-red-50/50",
-    blocked: "border-amber-200 bg-amber-50/50",
-    follow_up_today: "border-blue-200 bg-blue-50/25",
-    follow_up_soon: "border-slate-200 bg-white",
-    escalation: "border-amber-200 bg-amber-50/50",
-    in_progress: "border-blue-200 bg-blue-50/25",
-    no_activity: "border-slate-200 bg-white",
-    new_plan: "border-blue-200 bg-blue-50/25",
-  };
+  const byFamily = items.reduce<Record<string, ActionableItem[]>>((acc, item) => {
+    const fid = item.family_id;
+    if (!acc[fid]) acc[fid] = [];
+    acc[fid].push(item);
+    return acc;
+  }, {});
+
+  const familyIds = Object.keys(byFamily).sort((a, b) => {
+    const nameA = byFamily[a]?.[0]?.family_name ?? "";
+    const nameB = byFamily[b]?.[0]?.family_name ?? "";
+    return nameA.localeCompare(nameB);
+  });
 
   return (
-    <ul className="space-y-2">
-      {items.map((item, idx) => (
-        <li key={`${item.family_id}-${item.step_id}-${idx}`}>
-          <Link
-            href={
-              item.step_id
-                ? `/families/${item.family_id}#step-${item.step_id}`
-                : `/families/${item.family_id}`
-            }
-            className={cn(
-              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm transition-colors duration-150 hover:bg-blue-50/40",
-              typeStyles[item.type] ?? "border-slate-200 bg-white",
-            )}
-          >
-            <div className="min-w-0 flex-1">
-              <span className="font-medium text-slate-900">{item.family_name}</span>
-              <span className="text-slate-700"> — </span>
-              <span className="text-slate-700">{item.action}</span>
-              {item.checklist_progress && item.checklist_progress.total > 0 ? (
-                <span className="ml-2 text-xs text-slate-500">
-                  ({item.checklist_progress.completed}/{item.checklist_progress.total})
-                </span>
-              ) : null}
-            </div>
-            <span className="shrink-0 text-xs font-medium text-blue-600/90">
-              {getQueueCtaLabel(item)} →
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-4">
+      {familyIds.map((familyId) => {
+        const familyItems = byFamily[familyId] ?? [];
+        const color = getFamilyColor(familyId);
+        const familyName = familyItems[0]?.family_name ?? "Unknown";
+        return (
+          <div key={familyId} className="space-y-2">
+            <p
+              className={cn(
+                "rounded-lg border px-4 py-2 text-sm font-semibold text-slate-800",
+                color.border,
+                color.bg,
+              )}
+            >
+              {familyName}
+            </p>
+            <ul className="space-y-2">
+              {familyItems.map((item, idx) => (
+                <li key={`${item.family_id}-${item.step_id}-${idx}`}>
+                  <Link
+                    href={
+                      item.step_id
+                        ? `/families/${item.family_id}#step-${item.step_id}`
+                        : `/families/${item.family_id}`
+                    }
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm transition-colors duration-150 hover:opacity-90",
+                      color.border,
+                      color.bg,
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="text-slate-700">{item.action}</span>
+                      {item.checklist_progress && item.checklist_progress.total > 0 ? (
+                        <span className="ml-2 text-xs text-slate-500">
+                          ({item.checklist_progress.completed}/{item.checklist_progress.total})
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-xs font-medium text-blue-600/90">
+                      {getQueueCtaLabel(item)} →
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

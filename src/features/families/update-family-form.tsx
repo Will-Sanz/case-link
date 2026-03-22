@@ -1,13 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateFamilyMeta } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
 import type { FamilyDetail } from "@/types/family";
 
-export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
+export function UpdateFamilyForm({
+  family,
+  onCancel,
+  onSuccess,
+}: {
+  family: FamilyDetail;
+  onCancel?: () => void;
+  onSuccess?: () => void;
+}) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [summary, setSummary] = useState(family.summary ?? "");
@@ -34,6 +44,9 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
       });
       if (!r.ok) {
         setError(r.error);
+      } else {
+        router.refresh();
+        onSuccess?.();
       }
     } finally {
       setPending(false);
@@ -102,9 +115,16 @@ export function UpdateFamilyForm({ family }: { family: FamilyDetail }) {
           className={`mt-1 ${textareaClass}`}
         />
       </div>
-      <Button type="submit" variant="secondary" disabled={pending}>
-        {pending ? "Saving…" : "Save changes"}
-      </Button>
+      <div className="flex gap-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" variant="secondary" disabled={pending}>
+          {pending ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
     </form>
   );
 }

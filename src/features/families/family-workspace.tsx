@@ -7,22 +7,32 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
 import { CaseActivityTimeline } from "@/features/families/case-activity-timeline";
-import { CaseCommandCenter } from "@/features/families/case-command-center";
 import { PlanPanel } from "@/features/families/plan-panel";
 import { CaseAssistantPanel } from "@/features/families/case-assistant-panel";
 import { PhasePlaceholder } from "@/features/families/phase-placeholder";
 import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { UpdateFamilyForm } from "@/features/families/update-family-form";
-import { updateFamilyMeta, deleteFamily } from "@/app/actions/families";
+import {
+  updateFamilyMeta,
+  deleteFamily,
+  updateFamilyGoals,
+  updateFamilyBarriers,
+  updateFamilyMembers,
+} from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { getNextAction } from "@/lib/utils/next-action";
+import {
+  selectInputClass,
+  textareaClass,
+} from "@/lib/ui/form-classes";
 import type { FamilyDetail } from "@/types/family";
 import { cn } from "@/lib/utils/cn";
 
 const SECTIONS = [
   { id: "overview", label: "Overview" },
-  { id: "open-work", label: "Open work" },
   { id: "plan", label: "30 / 60 / 90 plan" },
   { id: "members", label: "Household members" },
   { id: "goals", label: "Goals" },
@@ -49,10 +59,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const hasNeedsAttention = family.needsAttention && family.needsAttention.length > 0;
-  const [activeSection, setActiveSection] = useState<SectionId>(
-    hasNeedsAttention ? "open-work" : "overview",
-  );
+  const [activeSection, setActiveSection] = useState<SectionId>("overview");
 
   function handleCloseCase() {
     setError(null);
@@ -100,7 +107,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
       {/* Main content */}
       <div className="min-w-0 flex-1 overflow-auto">
         {/* Compact header */}
-        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-4 lg:px-8">
+        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-3 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <Link
@@ -173,12 +180,9 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
         </header>
 
         {/* Section content */}
-        <div className="px-4 py-6 lg:px-8">
+        <div className="px-4 py-4 lg:px-8">
           {activeSection === "overview" && (
             <OverviewSection family={family} />
-          )}
-          {activeSection === "open-work" && (
-            <OpenWorkSection family={family} hasNeedsAttention={!!hasNeedsAttention} />
           )}
           {activeSection === "plan" && (
             <PlanSection family={family} />
@@ -208,31 +212,77 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
 }
 
 function OverviewSection({ family }: { family: FamilyDetail }) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (isEditing) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">Edit overview</h2>
+        </div>
+        <UpdateFamilyForm
+          family={family}
+          onCancel={() => setIsEditing(false)}
+          onSuccess={() => setIsEditing(false)}
+        />
+      </div>
+    );
+  }
+
+  const statusLabel = family.status === "on_hold" ? "On hold" : family.status === "closed" ? "Closed" : "Active";
+  const urgencyLabel = family.urgency ?? "—";
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">Overview & circumstances</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Narrative and status. Keep this current before running matching or refreshing the plan.
-        </p>
-        <div className="mt-4">
-          <UpdateFamilyForm family={family} />
+    <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Overview & circumstances</h2>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setIsEditing(true)}
+          >
+            Edit
+          </Button>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <dt className="text-slate-500">Status</dt>
+            <dd className="font-medium text-slate-900">{statusLabel}</dd>
+            <dt className="text-slate-500">Urgency</dt>
+            <dd className="font-medium text-slate-900 capitalize">{String(urgencyLabel)}</dd>
+          </dl>
+          {family.summary ? (
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <p className="text-xs font-medium text-slate-500">Summary</p>
+              <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-800">{family.summary}</p>
+            </div>
+          ) : null}
+          {family.household_notes ? (
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <p className="text-xs font-medium text-slate-500">Current circumstances</p>
+              <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-800">{family.household_notes}</p>
+            </div>
+          ) : null}
+          {!family.summary && !family.household_notes ? (
+            <p className="mt-2 text-sm text-slate-500">No summary or circumstances recorded.</p>
+          ) : null}
         </div>
       </div>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:grid-rows-2">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Goals</h2>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">Goals</h3>
           {family.goals.length === 0 ? (
-            <EmptyState
-              className="mt-3 border-slate-200 bg-slate-50/50 py-6"
-              title="No goals recorded"
-              description="Goals from intake will appear here."
-            />
+            <p className="text-sm text-slate-500">No goals recorded</p>
           ) : (
-            <ul className="mt-3 space-y-2">
+            <ul className="space-y-1">
               {family.goals.map((g) => (
-                <li key={g.id} className="flex gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-800">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-blue-500/90" />
+                <li key={g.id} className="flex gap-2 rounded border border-slate-100 bg-white px-2 py-1.5 text-sm text-slate-800">
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-blue-500/90" />
                   <span>{g.label}</span>
                 </li>
               ))}
@@ -240,18 +290,14 @@ function OverviewSection({ family }: { family: FamilyDetail }) {
           )}
         </div>
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Barriers</h2>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">Barriers</h3>
           {family.barriers.length === 0 ? (
-            <EmptyState
-              className="mt-3 border-slate-200 bg-slate-50/50 py-6"
-              title="No barriers recorded"
-              description="Barriers from intake will appear here."
-            />
+            <p className="text-sm text-slate-500">No barriers recorded</p>
           ) : (
-            <ul className="mt-3 space-y-2">
+            <ul className="space-y-1">
               {family.barriers.map((b) => (
-                <li key={b.id} className="flex gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-800">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-500/90" />
+                <li key={b.id} className="flex gap-2 rounded border border-slate-100 bg-white px-2 py-1.5 text-sm text-slate-800">
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-amber-500/90" />
                   <span>{b.label}</span>
                 </li>
               ))}
@@ -259,41 +305,6 @@ function OverviewSection({ family }: { family: FamilyDetail }) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function OpenWorkSection({
-  family,
-  hasNeedsAttention,
-}: {
-  family: FamilyDetail;
-  hasNeedsAttention: boolean;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">Open work</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Steps and items needing attention. Click to open and update progress.
-        </p>
-      </div>
-      {hasNeedsAttention ? (
-        <CaseCommandCenter items={family.needsAttention!} familyId={family.id} />
-      ) : (
-        <div className="rounded-lg border border-slate-200 bg-white py-12">
-          <EmptyState
-            title="No open work"
-            description="All caught up. Add or update plan steps to see items here."
-          />
-        </div>
-      )}
-      <PlanPanel
-        familyId={family.id}
-        plan={family.plan ?? null}
-        familyName={family.name}
-        resourceMatches={family.resourceMatches}
-      />
     </div>
   );
 }
@@ -312,17 +323,183 @@ function PlanSection({ family }: { family: FamilyDetail }) {
 }
 
 function MembersSection({ family }: { family: FamilyDetail }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [members, setMembers] = useState(family.members);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function addMember() {
+    setMembers((prev) => [
+      ...prev,
+      {
+        id: "",
+        family_id: family.id,
+        display_name: "",
+        relationship: null,
+        notes: null,
+        age_approx: null,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  }
+
+  function removeMember(index: number) {
+    setMembers((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const valid = members
+      .filter((m) => m.display_name.trim())
+      .map((m) => ({
+        id: m.id || undefined,
+        display_name: m.display_name.trim(),
+        relationship: m.relationship,
+        notes: m.notes,
+        age_approx: m.age_approx,
+      }));
+    startTransition(async () => {
+      const r = await updateFamilyMembers({
+        familyId: family.id,
+        members: valid,
+      });
+      if (!r.ok) setError(r.error);
+      else setIsEditing(false);
+    });
+  }
+
+  if (isEditing) {
+    return (
+      <div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">Edit household members</h2>
+          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={pending}>
+            Cancel
+          </Button>
+        </div>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              {error}
+            </p>
+          )}
+          {members.map((m, i) => (
+            <div key={m.id || i} className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm font-medium text-slate-600">Member {i + 1}</span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeMember(i)}>
+                  Remove
+                </Button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor={`m-name-${i}`}>Name</Label>
+                  <Input
+                    id={`m-name-${i}`}
+                    value={m.display_name}
+                    onChange={(e) =>
+                      setMembers((prev) => {
+                        const next = [...prev];
+                        next[i] = { ...next[i]!, display_name: e.target.value };
+                        return next;
+                      })
+                    }
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`m-rel-${i}`}>Relationship</Label>
+                  <Input
+                    id={`m-rel-${i}`}
+                    value={m.relationship ?? ""}
+                    onChange={(e) =>
+                      setMembers((prev) => {
+                        const next = [...prev];
+                        next[i] = { ...next[i]!, relationship: e.target.value || null };
+                        return next;
+                      })
+                    }
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor={`m-age-${i}`}>Age (approx)</Label>
+                  <Input
+                    id={`m-age-${i}`}
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={m.age_approx ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setMembers((prev) => {
+                        const next = [...prev];
+                        next[i] = { ...next[i]!, age_approx: v === "" ? null : parseInt(v, 10) || null };
+                        return next;
+                      });
+                    }}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor={`m-notes-${i}`}>Notes</Label>
+                <textarea
+                  id={`m-notes-${i}`}
+                  value={m.notes ?? ""}
+                  onChange={(e) =>
+                    setMembers((prev) => {
+                      const next = [...prev];
+                      next[i] = { ...next[i]!, notes: e.target.value || null };
+                      return next;
+                    })
+                  }
+                  className={cn("mt-1 min-h-[4rem]", textareaClass)}
+                />
+              </div>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addMember}>
+              Add member
+            </Button>
+            <Button type="submit" variant="secondary" disabled={pending}>
+              {pending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2 className="text-base font-semibold text-slate-900">Household members</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        People in the household from intake.
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Household members</h2>
+          <p className="mt-1 text-sm text-slate-600">People in the household.</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setMembers(family.members);
+            setIsEditing(true);
+          }}
+        >
+          Edit
+        </Button>
+      </div>
       {family.members.length === 0 ? (
         <EmptyState
           className="mt-4 border-slate-200 bg-slate-50/50 py-8"
           title="No additional members"
-          description="Optional members from intake will be listed here."
+          description="Add household members to track who is in the family."
         />
       ) : (
         <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
@@ -347,17 +524,104 @@ function MembersSection({ family }: { family: FamilyDetail }) {
 }
 
 function GoalsSection({ family }: { family: FamilyDetail }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [goals, setGoals] = useState(family.goals);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function addGoal() {
+    setGoals((prev) => [...prev, { id: "", label: "" }]);
+  }
+
+  function removeGoal(index: number) {
+    setGoals((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const valid = goals.filter((g) => g.label.trim()).map((g) => ({ id: g.id || undefined, label: g.label.trim() }));
+    startTransition(async () => {
+      const r = await updateFamilyGoals({
+        familyId: family.id,
+        goals: valid,
+      });
+      if (!r.ok) setError(r.error);
+      else setIsEditing(false);
+    });
+  }
+
+  if (isEditing) {
+    return (
+      <div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">Edit goals</h2>
+          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={pending}>
+            Cancel
+          </Button>
+        </div>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              {error}
+            </p>
+          )}
+          {goals.map((g, i) => (
+            <div key={g.id || i} className="flex items-center gap-2">
+              <Input
+                value={g.label}
+                onChange={(e) =>
+                  setGoals((prev) => {
+                    const next = [...prev];
+                    next[i] = { ...next[i]!, label: e.target.value };
+                    return next;
+                  })
+                }
+                placeholder="Goal"
+                className="flex-1"
+              />
+              <Button type="button" variant="ghost" size="sm" onClick={() => removeGoal(i)}>
+                Remove
+              </Button>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addGoal}>
+              Add goal
+            </Button>
+            <Button type="submit" variant="secondary" disabled={pending}>
+              {pending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2 className="text-base font-semibold text-slate-900">Goals</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Family goals from intake.
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Goals</h2>
+          <p className="mt-1 text-sm text-slate-600">Family goals.</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setGoals(family.goals);
+            setIsEditing(true);
+          }}
+        >
+          Edit
+        </Button>
+      </div>
       {family.goals.length === 0 ? (
         <EmptyState
           className="mt-4 border-slate-200 bg-slate-50/50 py-8"
           title="No goals recorded"
-          description="Goals from intake will appear here."
+          description="Add goals to track what the family is working toward."
         />
       ) : (
         <ul className="mt-4 space-y-2">
@@ -374,17 +638,106 @@ function GoalsSection({ family }: { family: FamilyDetail }) {
 }
 
 function BarriersSection({ family }: { family: FamilyDetail }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [barriers, setBarriers] = useState(family.barriers);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function addBarrier() {
+    setBarriers((prev) => [...prev, { id: "", label: "" }]);
+  }
+
+  function removeBarrier(index: number) {
+    setBarriers((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const valid = barriers
+      .filter((b) => b.label.trim())
+      .map((b) => ({ id: b.id || undefined, label: b.label.trim() }));
+    startTransition(async () => {
+      const r = await updateFamilyBarriers({
+        familyId: family.id,
+        barriers: valid,
+      });
+      if (!r.ok) setError(r.error);
+      else setIsEditing(false);
+    });
+  }
+
+  if (isEditing) {
+    return (
+      <div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">Edit barriers</h2>
+          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={pending}>
+            Cancel
+          </Button>
+        </div>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              {error}
+            </p>
+          )}
+          {barriers.map((b, i) => (
+            <div key={b.id || i} className="flex items-center gap-2">
+              <Input
+                value={b.label}
+                onChange={(e) =>
+                  setBarriers((prev) => {
+                    const next = [...prev];
+                    next[i] = { ...next[i]!, label: e.target.value };
+                    return next;
+                  })
+                }
+                placeholder="Barrier"
+                className="flex-1"
+              />
+              <Button type="button" variant="ghost" size="sm" onClick={() => removeBarrier(i)}>
+                Remove
+              </Button>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addBarrier}>
+              Add barrier
+            </Button>
+            <Button type="submit" variant="secondary" disabled={pending}>
+              {pending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2 className="text-base font-semibold text-slate-900">Barriers</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Known barriers from intake.
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Barriers</h2>
+          <p className="mt-1 text-sm text-slate-600">Known barriers.</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setBarriers(family.barriers);
+            setIsEditing(true);
+          }}
+        >
+          Edit
+        </Button>
+      </div>
       {family.barriers.length === 0 ? (
         <EmptyState
           className="mt-4 border-slate-200 bg-slate-50/50 py-8"
           title="No barriers recorded"
-          description="Barriers from intake will appear here."
+          description="Add barriers to track what the family is working to overcome."
         />
       ) : (
         <ul className="mt-4 space-y-2">
