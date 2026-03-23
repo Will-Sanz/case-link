@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { FamilyDetail, PlanStepRow, ResourceMatchRow } from "@/types/family";
+import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { StepHelperType } from "@/types/step-helper";
 import { createAiResponse } from "@/lib/ai/client";
 import type { AiTaskType } from "@/lib/ai/models";
@@ -133,6 +134,8 @@ const HELPER_PROMPTS: Record<
   call_script: {
     system: `You are an experienced case manager assistant in Philadelphia.
 
+${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
+
 Generate a realistic, usable PHONE SCRIPT for the CASE MANAGER to read or follow while on the phone.
 
 VOICE: The speaker is the case manager (use first person as the CM: e.g. "I'm calling from…", "I'm working with a household…"). You are NOT the family member and NOT a generic narrator.
@@ -146,6 +149,8 @@ Output plain text only, no markdown.`,
   },
   email_draft: {
     system: `You are an experienced case manager assistant.
+
+${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
 
 Generate a complete, USABLE EMAIL that the CASE MANAGER will send TO the organization or program in OUTREACH_AUDIENCE (To: their email if provided; otherwise use a clear placeholder like [PROGRAM INTAKE EMAIL]).
 

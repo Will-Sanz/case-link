@@ -192,7 +192,8 @@ export function CalendarView({
           {/* View switcher */}
           <div className="flex gap-0.5 rounded-lg border border-slate-200 p-0.5">
             {(["month", "week", "agenda"] as const).map((v) => {
-              const viewHref = toHref(v, currentDate);
+              const targetDate = v === "week" ? today() : currentDate;
+              const viewHref = toHref(v, targetDate);
               return (
                 <Link
                   key={v}

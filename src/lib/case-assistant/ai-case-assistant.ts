@@ -1,5 +1,6 @@
 import "server-only";
 
+import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
@@ -65,6 +66,8 @@ export async function askCaseAssistant(
   const context = buildCaseContext(detail);
 
   const instructions = `You are an experienced case manager assistant in Philadelphia. You help case managers execute 30/60/90 day plans for families facing housing instability and related challenges.
+
+GEOGRAPHIC CONTEXT: ${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
 
 You have full context about:
 - The family (summary, urgency, goals, barriers, household)

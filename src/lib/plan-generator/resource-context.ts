@@ -1,3 +1,4 @@
+import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { ResourceMatchRow } from "@/types/family";
 import type { GeneratedStep, GeneratedStepDetails, PlanPhase } from "./types";
 
@@ -174,7 +175,7 @@ export function formatMatchesForAiPrompt(
 ): string {
   const rows = matchesForPlanContext(matches, max);
   if (rows.length === 0) {
-    return "MATCHED_RESOURCES: None yet (matching not run or all suggestions dismissed). Use general Philadelphia-area guidance only where needed; avoid inventing fake organization names.";
+    return `MATCHED_RESOURCES: None yet (matching not run or all suggestions dismissed). ${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS} Use general guidance only where needed; avoid inventing fake organization names.`;
   }
 
   const blocks = rows.map((m, idx) => {

@@ -4,6 +4,7 @@ import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
+import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import {
   OPENAI_PLAN_STEPS_ROOT_SCHEMA,
   aiPlanResponseSchema,
@@ -63,6 +64,14 @@ function buildFamilyContext(detail: FamilyDetail): string {
 }
 
 const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PRIORITIZED 30-60-90 day case plan ordered by importance and urgency—NOT strict dependency chains. Steps should be in the most logical sequence for a case worker, but do not need to depend on each other.
+
+## GEOGRAPHIC CONTEXT
+${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
+
+## FIELD: action_needed_now (mandatory style)
+- This is a short directive for the case manager: what to do next, or a crisp factual cue (timelines, deadlines, eligibility notes)—written as a **statement**, not an answer to a question.
+- Do **not** start with Yes, No, Sure, Correct, or similar. Do **not** phrase as Q&A (e.g. avoid leading with "Yes –" before a fact).
+- Prefer imperative or neutral declarative voice: e.g. "Submit SNAP application; decisions often within 30 days; ask about expedited SNAP (often within ~5 days) if eligible." NOT "Yes – SNAP decisions take up to 30 days…"
 
 ## CORE GOAL: Prioritized Action Plan
 Generate a prioritized action plan, not a list of similar suggestions. The first step should be the most important action to take immediately. Each subsequent step should be clearly different and lower in urgency or impact. If two steps overlap significantly, combine them into one stronger step.

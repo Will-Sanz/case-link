@@ -4,6 +4,7 @@ import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStepDetails } from "./types";
+import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import {
   OPENAI_SINGLE_PLAN_STEP_SCHEMA,
   aiPlanStepSchema,
@@ -22,6 +23,13 @@ function cloneSchema(schema: unknown): Record<string, unknown> {
 }
 
 const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant. Your job is to REFINE A SINGLE PLAN STEP based on case manager feedback. Make it an EXECUTION-READY step the case manager can act on immediately.
+
+## GEOGRAPHIC CONTEXT
+${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
+
+## action_needed_now (mandatory)
+- Short directive or crisp factual cue for the case manager as a **plain statement**, not an answer to an imaginary question.
+- Never start with Yes, No, Sure, Correct, or "Yes – …". Use imperative or neutral declarative wording.
 
 ## Action-oriented refinement
 - Use action verbs: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.

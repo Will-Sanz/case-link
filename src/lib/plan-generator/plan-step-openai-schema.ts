@@ -203,6 +203,23 @@ function normStr(v: string | null | undefined): string {
   return String(v).trim();
 }
 
+/**
+ * Removes conversational answer prefixes the model sometimes puts in action_needed_now
+ * (e.g. "Yes – SNAP timelines…" → "SNAP timelines…").
+ */
+export function sanitizeActionNeededNow(s: string): string {
+  let t = s.trim();
+  const conversationalPrefixes = [
+    /^(yes|sure|correct|absolutely|right|indeed)\s*[\u2013\u2014\-]\s*/i,
+    /^(yes|sure|correct|absolutely|right|indeed)\s*:\s*/i,
+    /^(yes|sure|correct|absolutely|right|indeed)\s*,\s+/i,
+  ];
+  for (const re of conversationalPrefixes) {
+    t = t.replace(re, "");
+  }
+  return t.trim();
+}
+
 function normNullable(v: string | null | undefined): string | undefined {
   if (v == null) return undefined;
   const t = v.trim();
@@ -215,7 +232,7 @@ export function normalizePlanStep(s: AiPlanStepParsed): AiPlanStepParsed {
     ...s,
     title: s.title.trim(),
     description: s.description.trim(),
-    action_needed_now: s.action_needed_now.trim(),
+    action_needed_now: sanitizeActionNeededNow(s.action_needed_now),
     rationale: s.rationale.trim(),
     detailed_instructions: s.detailed_instructions.trim(),
     checklist: s.checklist.map((c) => c.trim()).filter(Boolean),
