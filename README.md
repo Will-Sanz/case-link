@@ -117,7 +117,7 @@ UI: family workspace **30 / 60 / 90 day plan** panel.
 
 **Migration:** `supabase/migrations/20260321120000_family_rls.sql` — `can_access_family()` / `is_app_admin()`, families + related tables, extended **`app_users` read** for list/detail.
 
-**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers, household members, case notes, matched resources, plan; referrals placeholder for Phase 5).
+**Routes:** `/families`, `/families/new`, `/families/[id]` (overview, goals/barriers, household members, case notes, matched resources, plan).
 
 ## Phase 1
 
@@ -138,7 +138,7 @@ For **email confirmation**, add your redirect URL under **Authentication → URL
 | `/profile` | Case manager profile, preferences, sign out |
 | `/families` | List / search / filter families |
 | `/families/new` | Intake (goals, barriers, members, notes) |
-| `/families/[id]` | Family workspace (overview, case notes, matched resources, plan; referrals stubbed) |
+| `/families/[id]` | Family workspace (overview, case notes, matched resources, plan) |
 | `/resources` | Search/filter/paginate active resources |
 | `/resources/[id]` | Full resource / contact / service-flag detail |
 
@@ -167,7 +167,5 @@ The parser expects the **Google Sheets–style** header on row 2 (0-based index 
 - `src/app/actions/` — server actions (`families.ts`, `resource-matches.ts`, `plans.ts`)
 - `src/lib/db/resource-import/` — CSV parse/normalize/map → DB payload
 - `src/lib/validations/` — Zod schemas for query params
-
-**Referrals & tasks (Phase 5):** Placeholder remains on the family page.
 
 **Phase 3 matching** is rules-based; tune presets and weights in `src/lib/matching/engine.ts`.

@@ -10,7 +10,6 @@ import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
 import { CaseActivityTimeline } from "@/features/families/case-activity-timeline";
 import { PlanPanel } from "@/features/families/plan-panel";
 import { CaseAssistantPanel } from "@/features/families/case-assistant-panel";
-import { PhasePlaceholder } from "@/features/families/phase-placeholder";
 import { ResourceMatchesPanel } from "@/features/families/resource-matches-panel";
 import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-badges";
 import { UpdateFamilyForm } from "@/features/families/update-family-form";
@@ -911,10 +910,6 @@ function ResourcesSection({ family }: { family: FamilyDetail }) {
         familyId={family.id}
         matches={family.resourceMatches}
         plan={family.plan}
-      />
-      <PhasePlaceholder
-        title="Referrals & tasks"
-        description="Outreach tracking and tasks land in Phase 5."
       />
     </div>
   );
