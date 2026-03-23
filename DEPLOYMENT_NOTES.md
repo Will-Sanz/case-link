@@ -49,7 +49,9 @@ The most likely causes (in order):
 | `/login` | Case manager sign-in |
 | `/signup` | Create account |
 | `/auth/callback` | Email confirmation / OAuth |
-| `/dashboard` | Stats, recent families (authenticated) |
+| `/dashboard` | Today — action queue by due date (authenticated) |
+| `/calendar` | Calendar (authenticated) |
+| `/profile` | Case manager profile & sign out (authenticated) |
 | `/families` | List/search families (authenticated) |
 | `/families/new` | Intake form (authenticated) |
 | `/families/[id]` | Family workspace (authenticated) |

@@ -98,14 +98,14 @@ Minimal. Most surfaces use borders instead of shadows.
 
 - `src/app/globals.css` — Design tokens, body styles
 - `src/app/layout.tsx` — Inter font
-- `src/components/ui/*` — Button, Card, Input, Badge, Label, PageHeader, SectionHeader, StatCard, EmptyState
-- `src/components/layout/*` — AppShell, NavLink, AuthShell
+- `src/components/ui/*` — Button, Card, Input, Badge, Label, Textarea, PageHeader, SectionHeader, EmptyState
+- `src/components/layout/*` — AppShell, FamilyCaseChrome, NavLink, AuthShell, sidebar quick actions
 - `src/lib/ui/form-classes.ts` — Form input, alert, checkbox classes
-- `src/features/dashboard/*` — Dashboard sections
+- `src/features/dashboard/*` — Action queue dashboard (overdue / today / upcoming)
 - `src/features/families/*` — Plan panel, plan-step-modal, urgency/step badges, family workspace, case panels
 - `src/features/resources/*` — Resource detail view
 - `src/features/calendar/*` — Calendar view, loading
-- `src/app/(workspace)/*` — Dashboard, families, resources, calendar pages
+- `src/app/(workspace)/*` — Dashboard, families, resources, calendar, profile pages
 - `src/app/login/page.tsx`, `src/app/signup/page.tsx`
 
 ## Consistency Rules

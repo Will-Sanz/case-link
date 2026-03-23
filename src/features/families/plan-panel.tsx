@@ -530,17 +530,6 @@ export function PlanPanel({
     }
   }, [plan, modalStepId]);
 
-  /** Dev: confirm RSC props after regenerate (plan id / titles should change when a new version is saved). */
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    console.info("[PlanPanel] plan prop (from server)", {
-      planId: plan?.id,
-      version: plan?.version,
-      stepCount: plan?.steps?.length,
-      titles: plan?.steps?.map((s) => s.title),
-    });
-  }, [plan]);
-
   /** Rely on `revalidatePath` in the server action + `force-dynamic` page; avoid `replace(sameUrl)` which can reuse stale RSC. */
   async function refreshFamilyAfterPlanChange(): Promise<void> {
     await router.refresh();
@@ -550,25 +539,13 @@ export function PlanPanel({
     setError(null);
     startTransition(async () => {
       try {
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] generatePlan (first) → server", { familyId });
-        }
         const r = await generatePlan({ familyId });
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] generatePlan (first) ← server", r);
-        }
         if (!r.ok) {
           setError(r.error);
           return;
         }
         setModalStepId(null);
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] generatePlan (first) calling router.refresh()");
-        }
         await refreshFamilyAfterPlanChange();
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] generatePlan (first) router.refresh() done");
-        }
       } catch (e) {
         console.error("[PlanPanel] generatePlan error:", e);
         setError(
@@ -585,33 +562,17 @@ export function PlanPanel({
     setRegenerateFeedback("");
     startTransition(async () => {
       try {
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] regenerate → server", {
-            familyId,
-            regenerationFeedbackChars: feedback?.length ?? 0,
-            regenerationFeedback: feedback ?? null,
-          });
-        }
         const r = await generatePlan({
           familyId,
           regenerationFeedback: feedback,
           regenerateExistingPlan: true,
         });
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] regenerate ← server", r);
-        }
         if (!r.ok) {
           setError(r.error);
           return;
         }
         setModalStepId(null);
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] regenerate calling router.refresh()");
-        }
         await refreshFamilyAfterPlanChange();
-        if (process.env.NODE_ENV === "development") {
-          console.info("[PlanPanel] regenerate router.refresh() done");
-        }
       } catch (e) {
         console.error("[PlanPanel] regenerate plan error:", e);
         setError(

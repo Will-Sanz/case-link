@@ -56,14 +56,6 @@ export async function createFamilyIntake(
   );
 
   if (famErr || familyIdRaw == null) {
-    if (process.env.NODE_ENV === "development") {
-      console.info("[createFamilyIntake] rpc error:", {
-        message: famErr?.message,
-        code: famErr?.code,
-        details: famErr?.details,
-        hint: famErr?.hint,
-      });
-    }
     return { ok: false, error: famErr?.message ?? "Could not create family" };
   }
 

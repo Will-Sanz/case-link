@@ -16,7 +16,8 @@ Copy `.env.example` to `.env.local` and fill in values from the Supabase dashboa
 | `OPENAI_PLAN_MODEL` | No | Overrides plan create/regenerate model (default: `o3`) |
 | `OPENAI_UI_MODEL` | No | Overrides chat, UI helpers, refinements, and other non-plan AI (default: `gpt-4.1-mini`) |
 | `OPENAI_MODEL_OVERRIDE` | No | Force one model for all AI tasks (overrides the two above) |
-| `OPENAI_DEBUG` | No | Set to `1` to log AI requests and model selection |
+| `OPENAI_DEBUG` | No | Set to `1` to log AI requests, token usage, and verbose plan traces |
+| `PLAN_REGENERATE_DEBUG` | No | Set to `1` for extra plan-generation/regeneration trace logs (or use `OPENAI_DEBUG=1`). Set `0` to force off if needed |
 
 **AI model strategy:** **o3** for 30/60/90 plan generation and regeneration (`full_plan_generation`). **gpt-4.1-mini** for step refinement, case assistant, blocker help, call scripts, emails, checklists, and other UI helpers. See `src/lib/ai/models.ts` for routing.
 
@@ -69,7 +70,7 @@ update public.app_users set role = 'admin' where email = 'you@example.com';
 - **User session (RLS respected):** `createSupabaseServerClient()` from `src/lib/supabase/server.ts` — use in Server Components, Server Actions, and route handlers when acting as the logged-in user.
 - **Trusted server-only (bypasses RLS):** `createServiceRoleClient()` from `src/lib/supabase/service-role.ts` — only after verifying the caller (e.g. admin server action) or in one-off scripts; requires `SUPABASE_SERVICE_ROLE_KEY`.
 
-We are **not** using Prisma; Postgres is the source of truth and migrations are plain SQL under `supabase/migrations/`.
+We are **not** using Prisma; Postgres is the source of truth and migrations are plain SQL under `supabase/migrations/`. **Do not delete or reorder** applied migration files: new environments rely on running them in filename order from scratch.
 
 ## Local dev
 
@@ -130,7 +131,9 @@ For **email confirmation**, add your redirect URL under **Authentication → URL
 | `/login` | Case manager sign-in |
 | `/signup` | Create account (email + password) |
 | `/auth/callback` | Email confirmation / OAuth code exchange (no UI) |
-| `/dashboard` | Stats, recent families, quick links |
+| `/dashboard` | Today — date-bucketed action queue (overdue / today / upcoming) |
+| `/calendar` | Case calendar (due dates & events) |
+| `/profile` | Case manager profile, preferences, sign out |
 | `/families` | List / search / filter families |
 | `/families/new` | Intake (goals, barriers, members, notes) |
 | `/families/[id]` | Family workspace (overview, case notes, matched resources, plan; referrals stubbed) |
@@ -155,7 +158,7 @@ The parser expects the **Google Sheets–style** header on row 2 (0-based index 
 
 - `src/app/(workspace)/` — authenticated shell (nav + `ensureAppUser`)
 - `src/components/ui/` — small reusable UI primitives
-- `src/features/` — auth, resources, families (intake, workspace)
+- `src/features/` — auth, dashboard queue, calendar, resources, families (intake, workspace), profile
 - `src/lib/services/` — Supabase query helpers (`resources.ts`, `families.ts`, `resources-picker.ts`)
 - `src/lib/plan-generator/` — rules-based plan step templates from goals/barriers
 - `src/lib/matching/` — deterministic resource matcher (no AI)

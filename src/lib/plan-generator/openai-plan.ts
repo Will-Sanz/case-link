@@ -22,15 +22,14 @@ function shouldLogOpenAi(): boolean {
 }
 
 /**
- * Verbose logs for plan generation / regenerate (prompt → model → raw JSON → parsed steps).
- * On by default in `next dev`; set PLAN_REGENERATE_DEBUG=1 in production to enable.
- * Set PLAN_REGENERATE_DEBUG=0 to silence in development.
+ * Verbose trace logs for plan generation / regenerate (prompts, raw responses, retries).
+ * Off by default. Set `PLAN_REGENERATE_DEBUG=1` or `OPENAI_DEBUG=1` to enable.
  */
 export function shouldLogPlanRegenerate(): boolean {
   if (process.env.PLAN_REGENERATE_DEBUG === "0") return false;
   return (
     process.env.PLAN_REGENERATE_DEBUG === "1" ||
-    process.env.NODE_ENV === "development"
+    process.env.OPENAI_DEBUG === "1"
   );
 }
 
@@ -412,7 +411,6 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
         if (logRegen) {
           console.warn("[openai-plan/regenerate] ← AI error", result.error);
         }
-        if (shouldLogOpenAi()) console.info("[openai-plan] error:", result.error);
         return { ok: false, reason: result.error };
       }
 
@@ -524,7 +522,7 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
         continue;
       }
       if (logRegen) {
-        console.error("[openai-plan/regenerate] attempt threw, giving up", e);
+        console.warn("[openai-plan/regenerate] attempt threw, giving up", e);
       }
       return {
         ok: false,

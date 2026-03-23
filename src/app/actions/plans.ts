@@ -168,20 +168,18 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
         reason: !ai.ok ? ai.reason : "zero steps",
       });
       return { ok: false, error: msg };
-    } else {
+    } else if (logRegen) {
       if (!ai.ok) {
         console.warn(`${logPrefix} OpenAI failed, using rules fallback:`, ai.reason);
       } else if (ai.steps.length === 0) {
         console.warn(`${logPrefix} OpenAI returned zero steps, using rules fallback`);
       }
-      if (logRegen) {
-        console.info("[generatePlan] OpenAI branch not used for final steps", {
-          aiOk: ai.ok,
-          aiStepCount: ai.ok ? ai.steps.length : 0,
-          aiReason: ai.ok ? null : ai.reason,
-          rulesMergedStepCount: rulesStepsMerged.length,
-        });
-      }
+      console.info("[generatePlan] OpenAI branch not used for final steps", {
+        aiOk: ai.ok,
+        aiStepCount: ai.ok ? ai.steps.length : 0,
+        aiReason: ai.ok ? null : ai.reason,
+        rulesMergedStepCount: rulesStepsMerged.length,
+      });
     }
   }
 
@@ -293,7 +291,7 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
         return { ok: false, error: itemsErr.message };
       }
     }
-  } else {
+  } else if (logRegen) {
     console.warn(`${logPrefix} zero steps after generation; plan row created with no steps`);
   }
 
@@ -310,10 +308,6 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   revalidatePath(`/families/${familyId}`, "page");
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
-
-  if (process.env.NODE_ENV === "development") {
-    console.info(`${logPrefix} success family=${familyId} planId=${plan.id} v${nextVersion} steps=${steps.length}`);
-  }
 
   if (logRegen) {
     console.info("[generatePlan] returning to client", {
