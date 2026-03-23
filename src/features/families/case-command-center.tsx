@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import type { NeedsAttentionItem } from "@/lib/services/workflow";
+import {
+  familyCaseOverviewHref,
+  familyCaseStepHref,
+} from "@/lib/routes/family-case";
 import { cn } from "@/lib/utils/cn";
 
 const TYPE_LABELS: Record<NeedsAttentionItem["type"], string> = {
@@ -71,8 +75,8 @@ export function CaseCommandCenter({
       <ul className="divide-y divide-slate-100">
         {sorted.map((item, idx) => {
           const href = item.step_id
-            ? `/families/${familyId}#step-${item.step_id}`
-            : `/families/${familyId}`;
+            ? familyCaseStepHref(familyId, item.step_id)
+            : familyCaseOverviewHref(familyId);
           const actionTitle =
             item.action_item_title ?? item.step_title ?? item.family_name;
           const badge = TYPE_LABELS[item.type];

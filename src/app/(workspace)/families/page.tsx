@@ -10,6 +10,7 @@ import { StatusBadge, UrgencyBadge } from "@/features/families/urgency-status-ba
 import { outlineLinkButtonClass, selectInputClass } from "@/lib/ui/form-classes";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enrichFamiliesWithCurrentStep, listFamilies } from "@/lib/services/families";
+import { familyCaseOverviewHref, familyCaseStepHref } from "@/lib/routes/family-case";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
 
 type PageProps = {
@@ -33,13 +34,11 @@ function FamilyCard({
   f: Awaited<ReturnType<typeof enrichFamiliesWithCurrentStep>>[0];
   formatDt: (iso: string) => string;
 }) {
-  const caseHref = f.current_step
-    ? `/families/${f.id}#step-${f.current_step.id}`
-    : `/families/${f.id}`;
+  const overviewHref = familyCaseOverviewHref(f.id);
   return (
     <li>
-      <Link href={caseHref} className="block">
-        <Card className="group p-0 transition-colors duration-150 hover:bg-blue-50/50">
+      <Card className="group p-0 transition-colors duration-150 hover:bg-blue-50/50">
+        <Link href={overviewHref} className="block">
           <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start">
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-slate-900 group-hover:text-blue-800">
@@ -90,8 +89,18 @@ function FamilyCard({
               <span className="text-xs text-slate-400">Open case →</span>
             </div>
           </div>
-        </Card>
-      </Link>
+        </Link>
+        {f.current_step ? (
+          <div className="border-t border-slate-100 px-5 py-3 sm:px-6">
+            <Link
+              href={familyCaseStepHref(f.id, f.current_step.id)}
+              className="text-sm font-medium text-blue-600/90 hover:text-blue-600 hover:underline"
+            >
+              Open current step →
+            </Link>
+          </div>
+        ) : null}
+      </Card>
     </li>
   );
 }

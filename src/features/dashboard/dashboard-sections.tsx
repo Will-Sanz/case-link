@@ -13,6 +13,10 @@ import type {
   ActionableItem,
   DashboardFamilySummary,
 } from "@/lib/services/workflow";
+import {
+  familyCaseOverviewHref,
+  familyCaseStepHref,
+} from "@/lib/routes/family-case";
 import { getFamilyColor } from "@/lib/utils/family-colors";
 import { cn } from "@/lib/utils/cn";
 
@@ -111,8 +115,8 @@ export function NextBestActionCard({
   daysOverdue?: number;
 }) {
   const href = item.step_id
-    ? `/families/${item.family_id}#step-${item.step_id}`
-    : `/families/${item.family_id}`;
+    ? familyCaseStepHref(item.family_id, item.step_id)
+    : familyCaseOverviewHref(item.family_id);
 
   const typeStyles: Record<ActionableItem["type"], string> = {
     overdue: "border-red-200 bg-red-50/50",
@@ -276,8 +280,8 @@ export function DashboardFamilyCards({
               <Link
                 href={
                   f.current_step
-                    ? `/families/${f.family_id}#step-${f.current_step.id}`
-                    : `/families/${f.family_id}`
+                    ? familyCaseStepHref(f.family_id, f.current_step.id)
+                    : familyCaseOverviewHref(f.family_id)
                 }
               >
                 <Button type="button" variant="secondary" className="h-8 text-xs">
@@ -361,8 +365,8 @@ export function DashboardFamilyCards({
             <Link
               href={
                 f.current_step
-                  ? `/families/${f.family_id}#step-${f.current_step.id}`
-                  : `/families/${f.family_id}`
+                  ? familyCaseStepHref(f.family_id, f.current_step.id)
+                  : familyCaseOverviewHref(f.family_id)
               }
               className="text-sm font-medium text-blue-600/90 hover:text-blue-600 hover:underline"
             >
@@ -419,8 +423,8 @@ export function ActionableNowList({ items }: { items: ActionableItem[] }) {
                   <Link
                     href={
                       item.step_id
-                        ? `/families/${item.family_id}#step-${item.step_id}`
-                        : `/families/${item.family_id}`
+                        ? familyCaseStepHref(item.family_id, item.step_id)
+                        : familyCaseOverviewHref(item.family_id)
                     }
                     className={cn(
                       "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm transition-colors duration-150 hover:opacity-90",
@@ -486,7 +490,7 @@ export function CurrentStepByFamily({
               >
                 <td className="px-4 py-3">
                   <Link
-                    href={`/families/${f.family_id}`}
+                    href={familyCaseOverviewHref(f.family_id)}
                     className="font-medium text-slate-900 hover:text-blue-600/90 hover:underline"
                   >
                     {f.family_name}
@@ -525,14 +529,14 @@ export function CurrentStepByFamily({
                 <td className="px-4 py-3 text-right">
                   {f.current_step ? (
                     <Link
-                      href={`/families/${f.family_id}#step-${f.current_step.id}`}
+                      href={familyCaseStepHref(f.family_id, f.current_step.id)}
                       className="text-blue-600/90 hover:underline"
                     >
                       Open step
                     </Link>
                   ) : (
                     <Link
-                      href={`/families/${f.family_id}`}
+                      href={familyCaseOverviewHref(f.family_id)}
                       className="text-blue-600/90 hover:underline"
                     >
                       Open case

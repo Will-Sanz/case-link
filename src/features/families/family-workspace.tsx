@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useState, useTransition } from "react";
+import { useRegisterFamilyCaseTitle } from "@/components/layout/family-case-title-context";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddCaseNoteForm } from "@/features/families/add-case-note-form";
@@ -30,19 +31,11 @@ import {
 } from "@/lib/ui/form-classes";
 import type { FamilyDetail } from "@/types/family";
 import { cn } from "@/lib/utils/cn";
-
-const SECTIONS = [
-  { id: "overview", label: "Overview" },
-  { id: "plan", label: "30 / 60 / 90 plan" },
-  { id: "members", label: "Household members" },
-  { id: "goals", label: "Goals" },
-  { id: "barriers", label: "Barriers" },
-  { id: "notes", label: "Notes" },
-  { id: "activity", label: "Activity" },
-  { id: "resources", label: "Resources" },
-] as const;
-
-type SectionId = (typeof SECTIONS)[number]["id"];
+import {
+  FAMILY_WORKSPACE_SECTIONS,
+  parseFamilyWorkspaceSection,
+  type FamilyWorkspaceSectionId,
+} from "@/features/families/family-workspace-sections";
 
 function formatDt(iso: string) {
   try {
@@ -55,11 +48,49 @@ function formatDt(iso: string) {
   }
 }
 
+export function FamilyWorkspaceLoading() {
+  return (
+    <div className="min-h-[40vh] animate-pulse bg-[#f4f6f8] px-4 py-8 lg:px-10">
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="h-6 w-48 rounded bg-slate-200" />
+        <div className="h-10 w-full max-w-md rounded bg-slate-200" />
+        <div className="h-64 rounded-lg bg-slate-200/80" />
+      </div>
+    </div>
+  );
+}
+
 export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const setCaseTitle = useRegisterFamilyCaseTitle();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionId>("overview");
+
+  const activeSection: FamilyWorkspaceSectionId = parseFamilyWorkspaceSection(
+    searchParams.get("section"),
+  );
+
+  useLayoutEffect(() => {
+    setCaseTitle(family.name);
+    return () => setCaseTitle(null);
+  }, [family.name, setCaseTitle]);
+
+  /**
+   * Deep links: `/families/:id#step-...` should open the plan section once.
+   * Do NOT depend on `searchParams` — re-running when the user changes tabs would
+   * see the preserved `#step-` hash and force `section=plan` again (~1s bounce).
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!/^#step-/.test(hash)) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("section") === "plan") return;
+    params.set("section", "plan");
+    router.replace(`${pathname}?${params.toString()}${hash}`, { scroll: false });
+  }, [pathname, router]);
 
   function handleCloseCase() {
     setError(null);
@@ -81,17 +112,17 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-6rem)] flex-col lg:flex-row">
-      {/* Internal family nav sidebar */}
+    <div className="flex min-h-[calc(100dvh-6rem)] flex-col">
+      {/* Mobile / tablet: case sections (desktop uses unified app sidebar) */}
       <nav
-        className="flex shrink-0 flex-row flex-wrap gap-1 border-b border-slate-200 bg-white px-4 py-3 lg:w-52 lg:flex-col lg:flex-nowrap lg:border-b-0 lg:border-r lg:py-6"
+        className="flex shrink-0 flex-row flex-wrap gap-1 border-b border-slate-200 bg-white px-3 py-2.5 lg:hidden"
         aria-label="Family sections"
       >
-        {SECTIONS.map(({ id, label }) => (
-          <button
+        {FAMILY_WORKSPACE_SECTIONS.map(({ id, label }) => (
+          <Link
             key={id}
-            type="button"
-            onClick={() => setActiveSection(id)}
+            href={`${pathname}?section=${id}`}
+            scroll={false}
             className={cn(
               "rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
               activeSection === id
@@ -100,14 +131,12 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
             )}
           >
             {label}
-          </button>
+          </Link>
         ))}
       </nav>
 
-      {/* Main content */}
       <div className="min-w-0 flex-1 overflow-auto">
-        {/* Compact header */}
-        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-3 lg:px-8">
+        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-3 lg:px-10">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <Link
@@ -179,8 +208,7 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
           )}
         </header>
 
-        {/* Section content */}
-        <div className="px-4 py-4 lg:px-8">
+        <div className="px-4 py-5 lg:px-10 lg:py-6">
           {activeSection === "overview" && (
             <OverviewSection family={family} />
           )}

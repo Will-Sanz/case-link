@@ -8,6 +8,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { CalendarEvent, CalendarEventType } from "@/types/calendar";
 import type { FamilyListItem } from "@/types/family";
 import { cn } from "@/lib/utils/cn";
+import {
+  familyCaseOverviewHref,
+  familyCaseStepHref,
+} from "@/lib/routes/family-case";
 import { getFamilyColor } from "@/lib/utils/family-colors";
 import { updatePlanStepActionItem } from "@/app/actions/plans";
 import {
@@ -664,8 +668,8 @@ function EventDetailPanel({
 
   const familyColor = getFamilyColor(event.family_id);
   const stepHref = event.step_id
-    ? `/families/${event.family_id}#step-${event.step_id}`
-    : `/families/${event.family_id}`;
+    ? familyCaseStepHref(event.family_id, event.step_id)
+    : familyCaseOverviewHref(event.family_id);
 
   return (
     <div className={cn("flex h-full flex-col border-l-4", familyColor.border)}>
@@ -733,7 +737,7 @@ function EventDetailPanel({
                 {event.step_id ? "Open step" : "Open case"}
               </Button>
             </Link>
-            <Link href={`/families/${event.family_id}`}>
+            <Link href={familyCaseOverviewHref(event.family_id)}>
               <Button variant="ghost" className="w-full">
                 Open full case
               </Button>

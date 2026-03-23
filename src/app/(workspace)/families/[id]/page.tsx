@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { z } from "zod";
-import { FamilyWorkspace } from "@/features/families/family-workspace";
+import {
+  FamilyWorkspace,
+  FamilyWorkspaceLoading,
+} from "@/features/families/family-workspace";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getFamilyDetail } from "@/lib/services/families";
 import {
@@ -34,12 +38,14 @@ export default async function FamilyDetailPage({ params }: PageProps) {
   }
 
   return (
-    <FamilyWorkspace
-      family={{
-        ...family,
-        needsAttention,
-        caseActivity,
-      }}
-    />
+    <Suspense fallback={<FamilyWorkspaceLoading />}>
+      <FamilyWorkspace
+        family={{
+          ...family,
+          needsAttention,
+          caseActivity,
+        }}
+      />
+    </Suspense>
   );
 }

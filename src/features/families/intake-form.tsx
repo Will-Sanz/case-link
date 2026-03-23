@@ -92,7 +92,7 @@ export function IntakeForm() {
       return;
     }
     if (result.familyId) {
-      router.push(`/families/${result.familyId}`);
+      router.push(`/families/${result.familyId}?section=overview`);
     } else {
       router.push("/families");
     }

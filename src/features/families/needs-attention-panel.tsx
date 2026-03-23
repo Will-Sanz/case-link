@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import type { NeedsAttentionItem } from "@/lib/services/workflow";
+import {
+  familyCaseOverviewHref,
+  familyCaseStepHref,
+} from "@/lib/routes/family-case";
 import { cn } from "@/lib/utils/cn";
 
 const TYPE_LABELS: Record<NeedsAttentionItem["type"], string> = {
@@ -86,8 +90,8 @@ export function NeedsAttentionPanel({
                       <Link
                         href={
                           item.step_id
-                            ? `/families/${item.family_id}#step-${item.step_id}`
-                            : `/families/${item.family_id}`
+                            ? familyCaseStepHref(item.family_id, item.step_id)
+                            : familyCaseOverviewHref(item.family_id)
                         }
                         className={cn(
                           "block rounded-lg px-3 py-2 text-sm transition-colors hover:bg-slate-50",
