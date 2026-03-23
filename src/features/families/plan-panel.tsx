@@ -797,7 +797,8 @@ export function PlanPanel({
           {!plan ? (
             <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
               <p className="text-base text-slate-600">
-                No plan yet. Click <strong>Generate plan</strong> to create one from this family&apos;s goals and barriers.
+                No plan yet. Click <strong>Generate plan</strong>
+                {" "}to create one from this family&apos;s goals and barriers.
               </p>
             </div>
           ) : (

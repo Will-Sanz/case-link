@@ -1,7 +1,6 @@
 import "server-only";
 
-import type { FamilyDetail } from "@/types/family";
-import type { PlanStepRow } from "@/types/family";
+import type { FamilyDetail, PlanStepRow, ResourceMatchRow } from "@/types/family";
 import type { StepHelperType } from "@/types/step-helper";
 import { createAiResponse } from "@/lib/ai/client";
 import type { AiTaskType } from "@/lib/ai/models";
@@ -12,6 +11,65 @@ export type { StepHelperType } from "@/types/step-helper";
 export type StepHelperResult =
   | { ok: true; content: string; listContent?: string[] }
   | { ok: false; error: string };
+
+/**
+ * Organization this step is about — call scripts and emails must be FROM the case manager TO this audience.
+ */
+function buildOutreachAudienceBlock(detail: FamilyDetail, step: PlanStepRow): string {
+  const stepMatches = detail.resourceMatches
+    .filter((m) => m.plan_step_id === step.id && m.resource && m.status !== "dismissed")
+    .sort((a, b) => {
+      const pri = (x: ResourceMatchRow) =>
+        x.status === "accepted" ? 0 : x.status === "suggested" ? 1 : 2;
+      const p = pri(a) - pri(b);
+      if (p !== 0) return p;
+      return b.score - a.score;
+    });
+
+  const primary = stepMatches[0]?.resource;
+  if (primary) {
+    const lines = [
+      "OUTREACH_AUDIENCE (required framing — write/speak as the CASE MANAGER, addressing THIS organization):",
+      `- Organization / program: ${primary.program_name}`,
+      `- Office or department: ${primary.office_or_department}`,
+      primary.primary_contact_name
+        ? `- Staff contact (if known): ${primary.primary_contact_name}`
+        : null,
+      primary.primary_contact_email
+        ? `- Their email (recipient): ${primary.primary_contact_email}`
+        : null,
+      primary.primary_contact_phone
+        ? `- Their phone: ${primary.primary_contact_phone}`
+        : null,
+      "",
+      "The case manager is the caller/sender. The household is the client you are advocating for — do not write or speak as the family member. Greet and address the program or named staff at this organization.",
+    ];
+    return lines.filter((l) => l !== null).join("\n");
+  }
+
+  const outreachTitle = /^outreach:\s*(.+)$/i.exec(step.title.trim());
+  const inferredOrg = outreachTitle?.[1]?.trim() || step.title;
+  const d = step.details as { contacts?: Array<{ name?: string; email?: string; phone?: string }> } | null;
+  const c0 = d?.contacts?.[0];
+  const contactHint = c0
+    ? [
+        c0.name ? `- Possible contact: ${c0.name}` : null,
+        c0.email ? `- Possible email: ${c0.email}` : null,
+        c0.phone ? `- Possible phone: ${c0.phone}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
+  return [
+    "OUTREACH_AUDIENCE (required framing — write/speak as the CASE MANAGER to the organization this step references):",
+    `- Step / program focus: ${inferredOrg}`,
+    contactHint ? `${contactHint}\n` : "",
+    "No resource row is linked to this step. Still produce content from the case manager to the organization implied above (use MATCHED_COMMUNITY_RESOURCES below if a name matches). Never write as if the family is emailing the case manager.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 function buildStepContext(detail: FamilyDetail, step: PlanStepRow): string {
   const d = step.details as {
@@ -73,11 +131,33 @@ const HELPER_PROMPTS: Record<
   { system: string; userPrefix: string }
 > = {
   call_script: {
-    system: `You are an experienced case manager assistant in Philadelphia. Generate a realistic, usable PHONE SCRIPT for the case manager to use when calling. The script must be tailored to the family's situation, the specific step, and any linked organization. Include: (1) how to introduce the situation, (2) key questions to ask, (3) what info to have ready, (4) how to close the call, (5) what to write down. Be specific and practical. Use the organization name if linked. Output plain text only, no markdown.`,
+    system: `You are an experienced case manager assistant in Philadelphia.
+
+Generate a realistic, usable PHONE SCRIPT for the CASE MANAGER to read or follow while on the phone.
+
+VOICE: The speaker is the case manager (use first person as the CM: e.g. "I'm calling from…", "I'm working with a household…"). You are NOT the family member and NOT a generic narrator.
+
+AUDIENCE: The person answering at the ORGANIZATION / PROGRAM named in OUTREACH_AUDIENCE (or implied by the step). Address them directly ("I'd like to speak with…", "I'm calling about a referral…"). Name the program or department when known.
+
+CONTENT: Tailor to the family's situation and this step. Include: (1) brief intro as CM + agency if applicable, (2) reason for call on behalf of the household, (3) key questions for the organization's staff, (4) info the CM should have ready (use placeholders like [CASE ID] only where needed), (5) how to close and what to document.
+
+Output plain text only, no markdown.`,
     userPrefix: "Generate a call script for this step:\n\n",
   },
   email_draft: {
-    system: `You are an experienced case manager assistant. Generate a USABLE outreach EMAIL for this step. Include: context, reason for outreach, clear request for next action, polite close. Use placeholders like [FAMILY NAME] or [ACCOUNT NUMBER] where the case manager would fill in. If a contact/organization is linked, address it appropriately. Output plain text only, no markdown.`,
+    system: `You are an experienced case manager assistant.
+
+Generate a complete, USABLE EMAIL that the CASE MANAGER will send TO the organization or program in OUTREACH_AUDIENCE (To: their email if provided; otherwise use a clear placeholder like [PROGRAM INTAKE EMAIL]).
+
+VOICE: Written in first person as the case manager ("I am writing on behalf of…", "I'm reaching out from…"). The signer is the case manager — NOT the family writing to the case manager.
+
+AUDIENCE: Salutation and body must address the PROGRAM / ORGANIZATION or named staff (e.g. "Dear [Program name] Intake Team" or "Dear Ms. [Contact]"). The email is outbound from the CM to that organization.
+
+CONTENT: Brief context, reason for outreach, specific ask (intake, referral, status, documents, appointment), what you'll follow up with. Use placeholders like [CASE MANAGER NAME], [AGENCY], [CM PHONE], [CM EMAIL], [FAMILY NAME OR INITIALS], [HOUSEHOLD SIZE] where the CM would fill in — not as the family signing.
+
+Close with a professional sign-off from the case manager.
+
+Output plain text only, no markdown.`,
     userPrefix: "Draft an outreach email for this step:\n\n",
   },
   prep_checklist: {
@@ -125,7 +205,11 @@ export async function generateStepHelper(
   step: PlanStepRow,
   helperType: StepHelperType,
 ): Promise<StepHelperResult> {
-  const context = buildStepContext(detail, step);
+  const audiencePrefix =
+    helperType === "call_script" || helperType === "email_draft"
+      ? `${buildOutreachAudienceBlock(detail, step)}\n\n---\n\n`
+      : "";
+  const context = `${audiencePrefix}${buildStepContext(detail, step)}`;
   const blockerReason = (step.workflow_data as { blocker_reason?: string })?.blocker_reason;
   const prompts = HELPER_PROMPTS[helperType];
   const userContent =
