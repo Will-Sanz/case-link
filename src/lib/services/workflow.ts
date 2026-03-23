@@ -403,6 +403,8 @@ export type ActionableItem = {
   step_title: string;
   step_phase: string;
   step_status?: string;
+  /** Weekly action item title when this row is tied to plan_step_action_items */
+  action_item_title?: string | null;
   action: string;
   type: "overdue" | "blocked" | "follow_up_today" | "follow_up_soon" | "escalation" | "in_progress" | "no_activity" | "new_plan";
   due_date?: string | null;
@@ -412,13 +414,14 @@ export type ActionableItem = {
 
 export async function getDashboardData(
   client: SupabaseClient,
-  options?: { limit?: number },
+  options?: { limit?: number; actionableLimit?: number },
 ): Promise<{
   familiesNeedingAttention: DashboardFamilySummary[];
   actionableItems: ActionableItem[];
   summaryCounts: { overdue: number; blocked: number; dueToday: number; escalated: number };
 }> {
   const limit = options?.limit ?? 20;
+  const actionableLimit = options?.actionableLimit ?? 60;
   const needsItems = await getNeedsAttention(client, { limit: 100 });
 
   const familyIds = [...new Set(needsItems.map((i) => i.family_id))];
@@ -559,7 +562,9 @@ export async function getDashboardData(
       };
     });
 
-  const actionableItems: ActionableItem[] = needsItems.slice(0, 25).map((i) => {
+  const actionableItems: ActionableItem[] = needsItems
+    .slice(0, actionableLimit)
+    .map((i) => {
     const itemTitle = i.action_item_title ?? i.step_title ?? "";
     let action = itemTitle || "Open case";
     if (i.type === "overdue")
@@ -586,6 +591,7 @@ export async function getDashboardData(
       step_title: i.step_title ?? "",
       step_phase: i.step_phase ?? "",
       step_status: step?.status,
+      action_item_title: i.action_item_title ?? null,
       action,
       type: i.type,
       due_date: i.due_date ?? null,

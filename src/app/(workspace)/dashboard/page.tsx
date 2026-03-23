@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
-import {
-  NextBestActionCarousel,
-  SummaryCounts,
-  ActionableNowList,
-} from "@/features/dashboard/dashboard-sections";
+import { SummaryCounts } from "@/features/dashboard/dashboard-sections";
+import { ActionQueueDashboard } from "@/features/dashboard/action-queue-dashboard";
+import { bucketActionableItems } from "@/lib/dashboard/action-queue-buckets";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { countResources } from "@/lib/services/resources";
 import { getDashboardData } from "@/lib/services/workflow";
@@ -34,7 +31,10 @@ async function loadDashboard() {
   familyCount = count ?? 0;
 
   try {
-    dashboardData = await getDashboardData(supabase, { limit: 15 });
+    dashboardData = await getDashboardData(supabase, {
+      limit: 15,
+      actionableLimit: 100,
+    });
   } catch {
     dashboardData = {
       familiesNeedingAttention: [],
@@ -49,55 +49,22 @@ async function loadDashboard() {
 export default async function DashboardPage() {
   const { resourceCount, familyCount, dashboardData } = await loadDashboard();
 
-  const { familiesNeedingAttention, actionableItems, summaryCounts } =
-    dashboardData;
+  const { actionableItems, summaryCounts } = dashboardData;
 
-  const top5Actionable = actionableItems.slice(0, 5);
-  const otherActionable = actionableItems.slice(5);
-  const hasCarousel = top5Actionable.length > 0;
+  const queueBuckets = bucketActionableItems(actionableItems);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Today"
-        description="Your work queue. Start with the next best action."
+        description="Overdue first, then today, then the next few days — your command center for follow-ups."
       />
 
-      {hasCarousel ? (
-        <section>
-          <NextBestActionCarousel
-            items={top5Actionable}
-            families={familiesNeedingAttention}
-          />
-        </section>
-      ) : (
-        <Card className="p-8">
-          <EmptyState
-            className="border-0 bg-transparent"
-            title="All caught up"
-            description="No families need immediate attention. Check recently updated cases or browse families."
-            action={
-              <Link
-                href="/families"
-                className="text-sm font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
-              >
-                View all families
-              </Link>
-            }
-          />
-        </Card>
-      )}
+      <section aria-label="Action queue by due date">
+        <ActionQueueDashboard buckets={queueBuckets} />
+      </section>
 
       <SummaryCounts counts={summaryCounts} />
-
-      {otherActionable.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-xs font-medium text-slate-500">
-            Rest of queue
-          </h2>
-          <ActionableNowList items={otherActionable} />
-        </section>
-      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard

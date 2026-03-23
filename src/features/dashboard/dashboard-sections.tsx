@@ -17,6 +17,7 @@ import {
   familyCaseOverviewHref,
   familyCaseStepHref,
 } from "@/lib/routes/family-case";
+import { getQueueCtaLabel } from "@/features/dashboard/dashboard-queue-utils";
 import { getFamilyColor } from "@/lib/utils/family-colors";
 import { cn } from "@/lib/utils/cn";
 
@@ -36,16 +37,6 @@ const TYPE_BADGE: Record<ActionableItem["type"], string> = {
   no_activity: "No activity",
   new_plan: "New plan",
 };
-
-function getQueueCtaLabel(item: ActionableItem): string {
-  if (!item.step_id) return "Open case";
-  const cp = item.checklist_progress;
-  const allDone = cp && cp.total > 0 && cp.completed >= cp.total;
-  if (allDone) return "Complete step";
-  if (item.step_status === "in_progress" || (cp && cp.completed > 0)) return "Continue step";
-  if (item.step_status === "blocked") return "Resolve blocker";
-  return "Start step";
-}
 
 /** Carousel of 5 next best actions with left/right arrows. */
 export function NextBestActionCarousel({
