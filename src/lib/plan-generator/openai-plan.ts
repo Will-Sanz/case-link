@@ -8,9 +8,6 @@ import {
   OPENAI_PLAN_STEPS_ROOT_SCHEMA,
   aiPlanResponseSchema,
   normalizePlanStep,
-  validatePlanStepsRichness,
-  validate30DayActionOrientation,
-  applyPlanStepDefaults,
   type AiPlanStepParsed,
 } from "./plan-step-openai-schema";
 
@@ -22,6 +19,19 @@ export type OpenAiPlanResult =
 
 function shouldLogOpenAi(): boolean {
   return process.env.OPENAI_DEBUG === "1";
+}
+
+/**
+ * Verbose logs for plan generation / regenerate (prompt → model → raw JSON → parsed steps).
+ * On by default in `next dev`; set PLAN_REGENERATE_DEBUG=1 in production to enable.
+ * Set PLAN_REGENERATE_DEBUG=0 to silence in development.
+ */
+export function shouldLogPlanRegenerate(): boolean {
+  if (process.env.PLAN_REGENERATE_DEBUG === "0") return false;
+  return (
+    process.env.PLAN_REGENERATE_DEBUG === "1" ||
+    process.env.NODE_ENV === "development"
+  );
 }
 
 const AI_PROMPT_MATCH_LIMIT = 15;
@@ -267,6 +277,8 @@ export function capStepsPerPhase<
 
 export type TryGeneratePlanOptions = {
   regenerationFeedback?: string;
+  /** User clicked Regenerate — instruct model to rewrite every step from scratch. */
+  fullRegeneration?: boolean;
   retries?: number;
 };
 
@@ -325,10 +337,15 @@ export async function tryGeneratePlanStepsWithOpenAI(
   detail: FamilyDetail,
   options?: TryGeneratePlanOptions,
 ): Promise<OpenAiPlanResult> {
+  const logRegen = shouldLogPlanRegenerate();
   const context = buildFamilyContext(detail);
   const feedbackBlock =
     options?.regenerationFeedback?.trim() ?
       `\n\n## Regeneration instructions from the case manager (follow closely)\n${options.regenerationFeedback.trim()}\n`
+      : "";
+  const fullRegenBlock =
+    options?.fullRegeneration ?
+      `\n\n## FULL PLAN REGENERATION (mandatory)\nThe case manager is replacing an existing saved plan. You must produce ENTIRELY NEW content for every single step—fresh titles, descriptions, action_needed_now, rationale, detailed_instructions, checklists, action_items (titles and descriptions), contacts, blockers, fallback_options, and all other schema fields. Do not reuse or lightly rephrase generic templates; ground every step in this household's goals, barriers, urgency, and matched resources below. Each step should read as written for this case today.\n`
       : "";
   const urgencyBlock =
     detail.urgency === "crisis" || detail.urgency === "high"
@@ -342,11 +359,10 @@ The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, reg
 
 Every step MUST include ALL schema fields. Set priority: "high" for top 1–2 steps, "medium"/"low" for others. Use depends_on sparingly. No placeholders.
 
-Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sustainability. Use matched resources when they apply.${urgencyBlock}${feedbackBlock}\n\n${context}`;
+Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sustainability. Use matched resources when they apply.${fullRegenBlock}${urgencyBlock}${feedbackBlock}\n\n${context}`;
 
   const maxAttempts = options?.retries ?? 4;
   let correction = "";
-  let lastNormalized: AiPlanStepParsed[] | null = null;
   let lastModel = "";
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -354,6 +370,27 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
       correction ?
         `${baseUser}\n\n## REQUIRED FIX (previous output was rejected)\n${correction}\nRegenerate the complete plan JSON. Every step must be fully filled with operational detail—not minimal or single-line fields.`
       : baseUser;
+
+    if (logRegen) {
+      const fb = options?.regenerationFeedback?.trim();
+      console.info("[openai-plan/regenerate] → AI request", {
+        attempt: attempt + 1,
+        maxAttempts,
+        fullRegeneration: Boolean(options?.fullRegeneration),
+        familyId: detail.id,
+        familyName: detail.name,
+        hasRegenerationFeedback: Boolean(fb),
+        regenerationFeedbackChars: fb?.length ?? 0,
+        regenerationFeedback: fb ?? null,
+        feedbackBlockChars: feedbackBlock.length,
+        contextChars: context.length,
+        userPromptChars: user.length,
+        userPromptHead: user.slice(0, 900),
+        userPromptTail:
+          user.length > 900 ? user.slice(Math.max(0, user.length - 400)) : null,
+        hasCorrection: Boolean(correction),
+      });
+    }
 
     try {
       const result = await createAiResponse({
@@ -372,11 +409,38 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
       });
 
       if (!result.ok) {
+        if (logRegen) {
+          console.warn("[openai-plan/regenerate] ← AI error", result.error);
+        }
         if (shouldLogOpenAi()) console.info("[openai-plan] error:", result.error);
         return { ok: false, reason: result.error };
       }
 
       lastModel = result.model;
+
+      if (logRegen) {
+        let parsedPreview: unknown;
+        try {
+          parsedPreview = JSON.parse(result.text) as { steps?: unknown[] };
+        } catch {
+          parsedPreview = "(not valid JSON)";
+        }
+        const stepsPreview =
+          parsedPreview &&
+          typeof parsedPreview === "object" &&
+          parsedPreview !== null &&
+          "steps" in parsedPreview &&
+          Array.isArray((parsedPreview as { steps: unknown[] }).steps) ?
+            (parsedPreview as { steps: { title?: string }[] }).steps.map((s) => s.title)
+          : null;
+        console.info("[openai-plan/regenerate] ← AI response", {
+          model: result.model,
+          textChars: result.text.length,
+          total_tokens: result.usage?.total_tokens,
+          textPreview: result.text.slice(0, 2800),
+          parsedStepTitles: stepsPreview,
+        });
+      }
 
       let parsed: unknown;
       try {
@@ -390,6 +454,11 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
 
       const validated = aiPlanResponseSchema.safeParse(parsed);
       if (!validated.success) {
+        if (logRegen) {
+          console.warn("[openai-plan/regenerate] Zod rejected response", {
+            message: validated.error.message.slice(0, 1200),
+          });
+        }
         if (shouldLogOpenAi()) {
           console.info(
             "[openai-plan] Zod validation failed:",
@@ -401,55 +470,61 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
       }
 
       const normalized = validated.data.steps.map(normalizePlanStep);
-      lastNormalized = normalized;
 
-      const rich = validatePlanStepsRichness(normalized);
-      const actionOk = validate30DayActionOrientation(normalized);
+      let stepsList = sortByPriority(normalized);
+      stepsList = deduplicateSteps(stepsList);
+      stepsList = sortByPriority(stepsList);
+      stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
 
-      if (rich.ok && actionOk.ok) {
-        let stepsList = sortByPriority(normalized);
-        stepsList = deduplicateSteps(stepsList);
-        stepsList = sortByPriority(stepsList);
-        stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
-
-        if (shouldLogOpenAi() && stepsList.length < normalized.length) {
-          console.info(
-            "[openai-plan] capped/deduped steps:",
-            normalized.length,
-            "→",
-            stepsList.length,
-          );
-        }
-
-        if (shouldLogOpenAi()) {
-          console.info(
-            "[openai-plan]",
-            stepsList.length,
-            "steps,",
-            result.usage?.total_tokens ?? "?",
-            "tokens",
-          );
-        }
-
-        return {
-          ok: true,
-          steps: parsedStepsToGenerated(stepsList),
-          model: lastModel,
-        };
+      if (shouldLogOpenAi() && stepsList.length < normalized.length) {
+        console.info(
+          "[openai-plan] capped/deduped steps:",
+          normalized.length,
+          "→",
+          stepsList.length,
+        );
       }
 
       if (shouldLogOpenAi()) {
-        const allReasons = [...(rich.ok ? [] : rich.reasons), ...(actionOk.ok ? [] : actionOk.reasons)];
         console.info(
-          "[openai-plan] validation failed:",
-          allReasons.slice(0, 5).join(" | "),
+          "[openai-plan]",
+          stepsList.length,
+          "steps,",
+          result.usage?.total_tokens ?? "?",
+          "tokens",
         );
       }
-      correction = [...(rich.ok ? [] : rich.reasons), ...(actionOk.ok ? [] : actionOk.reasons)].slice(0, 12).join("\n");
+
+      const generatedSteps = parsedStepsToGenerated(stepsList);
+      if (logRegen) {
+        console.info("[openai-plan/regenerate] ✓ returning to generatePlan (first valid parse)", {
+          stepCount: generatedSteps.length,
+          phases: generatedSteps.reduce(
+            (acc, s) => {
+              acc[s.phase] = (acc[s.phase] ?? 0) + 1;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ),
+          titles: generatedSteps.map((s) => ({ phase: s.phase, title: s.title })),
+        });
+      }
+
+      return {
+        ok: true,
+        steps: generatedSteps,
+        model: lastModel,
+      };
     } catch (e) {
       if (attempt < maxAttempts - 1) {
         correction = e instanceof Error ? e.message : "Unknown error; retry.";
+        if (logRegen) {
+          console.warn("[openai-plan/regenerate] attempt threw, will retry", e);
+        }
         continue;
+      }
+      if (logRegen) {
+        console.error("[openai-plan/regenerate] attempt threw, giving up", e);
       }
       return {
         ok: false,
@@ -458,27 +533,11 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
     }
   }
 
-  if (lastNormalized?.length) {
-    const defaulted = lastNormalized.map(applyPlanStepDefaults);
-    const rich2 = validatePlanStepsRichness(defaulted);
-    if (rich2.ok) {
-      if (shouldLogOpenAi()) {
-        console.info("[openai-plan] applied defaults after failed richness passes");
-      }
-      let stepsList = sortByPriority(defaulted);
-      stepsList = deduplicateSteps(stepsList);
-      stepsList = sortByPriority(stepsList);
-      stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
-      return {
-        ok: true,
-        steps: parsedStepsToGenerated(stepsList),
-        model: lastModel || "unknown",
-      };
-    }
+  if (logRegen) {
+    console.warn("[openai-plan/regenerate] ✗ failed after all attempts (JSON/schema only)");
   }
-
   return {
     ok: false,
-    reason: "Failed to generate a sufficiently detailed plan after retries",
+    reason: "Failed to get valid plan JSON from the model after retries",
   };
 }

@@ -12,6 +12,9 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+/** Always fetch fresh family + plan after server actions (regenerate, etc.). */
+export const dynamic = "force-dynamic";
+
 export default async function FamilyDetailPage({ params }: PageProps) {
   const { id } = await params;
   const parsed = z.string().uuid().safeParse(id);

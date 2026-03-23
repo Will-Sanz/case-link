@@ -16,8 +16,10 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   /** Server-only; when set, plan generation tries OpenAI first, then rules fallback. */
   OPENAI_API_KEY: z.string().optional(),
-  /** Legacy: overrides plan model. Prefer OPENAI_MODEL_OVERRIDE for testing. */
+  /** Server-only; overrides plan generation/regeneration model (default: o3). */
   OPENAI_PLAN_MODEL: z.string().optional(),
+  /** Server-only; overrides chat, UI helpers, refinements, and other non-plan AI (default: gpt-4.1-mini). */
+  OPENAI_UI_MODEL: z.string().optional(),
   /** Override: force this model for ALL AI tasks (e.g. gpt-4o for QA). */
   OPENAI_MODEL_OVERRIDE: z.string().optional(),
   /** Set to "1" to log AI requests and model selection. */

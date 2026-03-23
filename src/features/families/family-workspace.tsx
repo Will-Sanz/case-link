@@ -312,6 +312,7 @@ function PlanSection({ family }: { family: FamilyDetail }) {
   return (
     <div className="space-y-6">
       <PlanPanel
+        key={family.plan?.id ?? "no-plan"}
         familyId={family.id}
         plan={family.plan ?? null}
         familyName={family.name}

@@ -8,6 +8,7 @@ import { generatePlanSteps } from "@/lib/plan-generator";
 import {
   capStepsPerPhase,
   MAX_PLAN_STEPS_PER_PHASE,
+  shouldLogPlanRegenerate,
   tryGeneratePlanStepsWithOpenAI,
 } from "@/lib/plan-generator/openai-plan";
 import {
@@ -29,6 +30,11 @@ import {
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/** Result of generatePlan — includes planId on success for client verification. */
+export type GeneratePlanResult =
+  | { ok: true; planId: string; version: number; stepCount: number }
+  | { ok: false; error: string };
 
 function computeTargetDate(
   planStart: Date,
@@ -61,7 +67,7 @@ async function logCaseActivity(
   void error;
 }
 
-export async function generatePlan(input: unknown): Promise<ActionResult> {
+export async function generatePlan(input: unknown): Promise<GeneratePlanResult> {
   const parsed = generatePlanSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
@@ -77,11 +83,25 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Unauthorized" };
   }
 
-  const { familyId, regenerationFeedback } = parsed.data;
+  const { familyId, regenerationFeedback, regenerateExistingPlan } = parsed.data;
+  const logRegen = shouldLogPlanRegenerate();
+  if (logRegen) {
+    const fb = regenerationFeedback?.trim();
+    console.info("[generatePlan] start", {
+      familyId,
+      regenerateExistingPlan: Boolean(regenerateExistingPlan),
+      hasRegenerationFeedback: Boolean(fb),
+      regenerationFeedbackChars: fb?.length ?? 0,
+      regenerationFeedback: fb ?? null,
+    });
+  }
+
   const detail = await getFamilyDetail(supabase, familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
+
+  const logPrefix = "[generatePlan]";
 
   const { data: existingPlan } = await supabase
     .from("plans")
@@ -108,24 +128,69 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
 
   const env = getEnv();
   const apiKey = env.OPENAI_API_KEY?.trim();
+  const mustUseAi = Boolean(regenerateExistingPlan);
+
+  if (mustUseAi && !apiKey) {
+    return {
+      ok: false,
+      error:
+        "Regenerating a plan requires AI. Add OPENAI_API_KEY to your environment and restart the server.",
+    };
+  }
 
   let steps = rulesStepsMerged;
   let generationSource: "openai" | "rules" = "rules";
   let aiModel: string | null = null;
 
-  const debugPlan = process.env.OPENAI_DEBUG === "1";
-
   if (apiKey) {
     const ai = await tryGeneratePlanStepsWithOpenAI(detail, {
       regenerationFeedback: regenerationFeedback?.trim() || undefined,
+      fullRegeneration: mustUseAi,
     });
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;
       generationSource = "openai";
       aiModel = ai.model;
-    } else if (debugPlan && !ai.ok) {
-      console.info("[generatePlan] OpenAI failed, rules fallback:", ai.reason);
+      if (logRegen) {
+        console.info("[generatePlan] using OpenAI steps", {
+          model: ai.model,
+          stepCount: ai.steps.length,
+          titles: ai.steps.map((s) => s.title),
+        });
+      }
+    } else if (mustUseAi) {
+      const msg =
+        !ai.ok ?
+          `Plan regeneration failed: ${ai.reason}`
+        : "The AI returned no steps. Try again, or shorten your regeneration notes.";
+      console.error(`${logPrefix} regenerate requires AI; not using rules fallback`, {
+        aiOk: ai.ok,
+        reason: !ai.ok ? ai.reason : "zero steps",
+      });
+      return { ok: false, error: msg };
+    } else {
+      if (!ai.ok) {
+        console.warn(`${logPrefix} OpenAI failed, using rules fallback:`, ai.reason);
+      } else if (ai.steps.length === 0) {
+        console.warn(`${logPrefix} OpenAI returned zero steps, using rules fallback`);
+      }
+      if (logRegen) {
+        console.info("[generatePlan] OpenAI branch not used for final steps", {
+          aiOk: ai.ok,
+          aiStepCount: ai.ok ? ai.steps.length : 0,
+          aiReason: ai.ok ? null : ai.reason,
+          rulesMergedStepCount: rulesStepsMerged.length,
+        });
+      }
     }
+  }
+
+  if (logRegen) {
+    console.info("[generatePlan] steps after AI/rules (before cap/sort)", {
+      generationSource,
+      stepCount: steps.length,
+      titles: steps.map((s) => s.title),
+    });
   }
 
   steps = capStepsPerPhase(steps, MAX_PLAN_STEPS_PER_PHASE);
@@ -152,6 +217,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     .single();
 
   if (planErr || !plan) {
+    console.error(`${logPrefix} plans insert failed:`, planErr?.message ?? "no row");
     return { ok: false, error: planErr?.message ?? "Could not create plan" };
   }
 
@@ -173,6 +239,7 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
       .order("sort_order", { ascending: true });
 
     if (stepsErr || !insertedSteps?.length) {
+      console.error(`${logPrefix} plan_steps insert failed:`, stepsErr?.message ?? "empty result");
       if (!stepsErr) await supabase.from("plans").delete().eq("id", plan.id);
       return { ok: false, error: stepsErr?.message ?? "Could not create steps" };
     }
@@ -221,10 +288,13 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
         .from("plan_step_action_items")
         .insert(actionItemRows);
       if (itemsErr) {
+        console.error(`${logPrefix} plan_step_action_items insert failed:`, itemsErr.message);
         await supabase.from("plans").delete().eq("id", plan.id);
         return { ok: false, error: itemsErr.message };
       }
     }
+  } else {
+    console.warn(`${logPrefix} zero steps after generation; plan row created with no steps`);
   }
 
   await logCaseActivity(
@@ -237,10 +307,31 @@ export async function generatePlan(input: unknown): Promise<ActionResult> {
     { version: nextVersion, steps: steps.length, generation_source: generationSource },
   );
 
-  revalidatePath(`/families/${familyId}`);
+  revalidatePath(`/families/${familyId}`, "page");
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
-  return { ok: true };
+
+  if (process.env.NODE_ENV === "development") {
+    console.info(`${logPrefix} success family=${familyId} planId=${plan.id} v${nextVersion} steps=${steps.length}`);
+  }
+
+  if (logRegen) {
+    console.info("[generatePlan] returning to client", {
+      ok: true,
+      planId: plan.id,
+      version: nextVersion,
+      stepCount: steps.length,
+      generationSource,
+      titles: steps.map((s) => s.title),
+    });
+  }
+
+  return {
+    ok: true,
+    planId: plan.id,
+    version: nextVersion,
+    stepCount: steps.length,
+  };
 }
 
 export async function updatePlanStep(

@@ -1,12 +1,16 @@
 /**
  * AI model configuration and task routing.
  *
- * Two-model strategy:
- * - gpt-4o: Core casework, high-stakes reasoning (plan generation, refinement, case assistant)
- * - gpt-4o-mini: Fast helper actions (scripts, emails, checklists)
+ * - **o3** — 30/60/90 plan generation & regeneration (`full_plan_generation`)
+ * - **gpt-4.1-mini** — chat, UI helpers, step refinement, case assistant, edits
  *
- * Override: Set OPENAI_MODEL_OVERRIDE in env to force one model for all tasks.
+ * Overrides:
+ * - OPENAI_PLAN_MODEL — overrides plan task model (default: o3)
+ * - OPENAI_UI_MODEL — overrides all non-plan AI tasks (default: gpt-4.1-mini)
+ * - OPENAI_MODEL_OVERRIDE — force one model for every task (`createAiResponse`)
  */
+
+import { getEnv } from "@/lib/env";
 
 /** Task types for model routing */
 export type AiTaskType =
@@ -23,16 +27,16 @@ export type AiTaskType =
   | "what_happens_next"
   | "troubleshoot_blocker";
 
-/** Model IDs */
 export const MODELS = {
-  /** Core reasoning: plan generation, refinement, case assistant, blocker help */
-  CORE: "gpt-4o",
-  /** Fast helpers: scripts, emails, checklists, simple explanations */
-  HELPER: "gpt-4o-mini",
+  PLAN_GENERATION: "o3",
+  CHAT_UI_EDITS: "gpt-4.1-mini",
 } as const;
 
-/** Tasks that require core model (quality over latency) */
-const CORE_TASKS: AiTaskType[] = [
+/** Plan create + regenerate (server action → OpenAI full plan). */
+const PLAN_TASK_TYPES: AiTaskType[] = ["full_plan_generation"];
+
+/** Tasks that use the Responses API (structured output / reasoning-heavy). */
+const RESPONSES_API_TASKS: AiTaskType[] = [
   "full_plan_generation",
   "step_refinement",
   "case_assistant",
@@ -41,18 +45,17 @@ const CORE_TASKS: AiTaskType[] = [
 
 /**
  * Returns the model ID for a given task type.
- * Core casework uses gpt-4o; helper tools use gpt-4o-mini (faster).
  */
 export function getModelForTask(taskType: AiTaskType): string {
-  if (CORE_TASKS.includes(taskType)) {
-    return MODELS.CORE;
+  if (PLAN_TASK_TYPES.includes(taskType)) {
+    return getEnv().OPENAI_PLAN_MODEL?.trim() || MODELS.PLAN_GENERATION;
   }
-  return MODELS.HELPER;
+  return getEnv().OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
 }
 
 /**
  * Whether this task should use the Responses API (reasoning-heavy).
  */
 export function useResponsesApi(taskType: AiTaskType): boolean {
-  return CORE_TASKS.includes(taskType);
+  return RESPONSES_API_TASKS.includes(taskType);
 }

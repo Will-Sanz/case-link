@@ -33,6 +33,16 @@ export type CreateResponseResult =
   | { ok: false; error: string };
 
 /**
+ * Reasoning models (o1, o3, o4, …) return 400 if `temperature` is sent on Responses / Chat.
+ */
+function modelSupportsTemperature(modelId: string): boolean {
+  const id = modelId.toLowerCase().trim();
+  // e.g. o3, o3-mini, o4-mini-2025-01-01
+  if (/^o\d/.test(id)) return false;
+  return true;
+}
+
+/**
  * Call OpenAI. Uses Responses API for core reasoning tasks, Chat Completions for helpers.
  * Supports env override: OPENAI_MODEL_OVERRIDE forces a single model for all tasks.
  */
@@ -83,9 +93,11 @@ async function callResponsesApi(
     model,
     instructions: options.instructions,
     input,
-    temperature: options.temperature ?? 0.4,
     max_output_tokens: options.maxTokens ?? 4096,
   };
+  if (modelSupportsTemperature(model)) {
+    body.temperature = options.temperature ?? 0.4;
+  }
 
   if (options.structuredJsonSchema) {
     body.text = {
@@ -95,12 +107,11 @@ async function callResponsesApi(
         schema: options.structuredJsonSchema.schema,
         strict: options.structuredJsonSchema.strict !== false,
       },
-      verbosity: "high",
+      // Omit `verbosity`: values like "high" are not supported on all models (e.g. gpt-4o) and return 400.
     };
   } else if (options.responseFormat === "json_object") {
     body.text = {
       format: { type: "json_object" },
-      verbosity: "medium",
     };
   }
 
@@ -182,9 +193,11 @@ async function callChatCompletionsApi(
   const body: Record<string, unknown> = {
     model,
     messages,
-    temperature: options.temperature ?? 0.4,
     max_tokens: options.maxTokens ?? 4096,
   };
+  if (modelSupportsTemperature(model)) {
+    body.temperature = options.temperature ?? 0.4;
+  }
 
   if (options.structuredJsonSchema) {
     body.response_format = {

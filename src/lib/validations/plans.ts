@@ -45,6 +45,11 @@ export const generatePlanSchema = z.object({
   familyId: z.string().uuid(),
   /** Optional notes when regenerating an existing plan; passed to the AI. */
   regenerationFeedback: z.string().max(4000).optional(),
+  /**
+   * Set by the Regenerate UI only. When true, the server requires a successful
+   * OpenAI plan (no rules fallback) so titles and full step content are freshly generated.
+   */
+  regenerateExistingPlan: z.boolean().optional(),
 });
 
 export const updatePlanStepSchema = z.object({
