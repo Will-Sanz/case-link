@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildPlanPresentation } from "@/lib/domain/plan/presentation";
 import type {
   CaseNoteRow,
   FamilyBarrierRow,
@@ -304,6 +305,7 @@ export async function getFamilyDetail(
     plan = {
       ...p,
       steps: stepsWithItems,
+      presentation: buildPlanPresentation(p),
     };
   }
 

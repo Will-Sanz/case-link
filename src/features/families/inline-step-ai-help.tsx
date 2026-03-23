@@ -3,32 +3,27 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { generateStepHelperAction, saveStepHelperAction } from "@/app/actions/step-helper";
+import {
+  generateStepHelperAction,
+  saveStepHelperOutputAction,
+} from "@/app/actions/step-helper";
 import type { PlanStepRow } from "@/types/family";
-
-const HELPER_OPTIONS = [
-  { type: "call_script" as const, label: "Call script" },
-  { type: "email_draft" as const, label: "Draft email" },
-  { type: "prep_checklist" as const, label: "Prep checklist" },
-  { type: "fallback_options" as const, label: "Fallback options" },
-  { type: "family_explanation" as const, label: "Explain to family" },
-  { type: "break_into_actions" as const, label: "Break into actions" },
-  { type: "what_happens_next" as const, label: "What happens next" },
-  { type: "troubleshoot_blocker" as const, label: "Troubleshoot blocker" },
-];
+import type { StepHelperType } from "@/types/step-helper";
 
 /** One-click AI help inline in the step workspace. No modal required. */
 export function InlineStepAiHelp({
   step,
   familyId,
   isBlocked,
+  stepHelperMenu,
 }: {
   step: PlanStepRow;
   familyId: string;
   isBlocked?: boolean;
+  stepHelperMenu: readonly { type: string; label: string }[];
 }) {
   const router = useRouter();
-  const [helperType, setHelperType] = useState<string | null>(null);
+  const [helperType, setHelperType] = useState<StepHelperType | null>(null);
   const [helperContent, setHelperContent] = useState<string | null>(null);
   const [helperList, setHelperList] = useState<string[] | null>(null);
   const [helperPending, setHelperPending] = useState(false);
@@ -36,8 +31,8 @@ export function InlineStepAiHelp({
   const outputRef = useRef<HTMLDivElement | null>(null);
 
   const aiHelper = step.ai_helper_data;
-  const options = HELPER_OPTIONS.filter(
-    (o) => o.type !== "troubleshoot_blocker" || isBlocked
+  const options = stepHelperMenu.filter(
+    (o) => o.type !== "troubleshoot_blocker" || isBlocked,
   );
 
   useEffect(() => {
@@ -46,7 +41,7 @@ export function InlineStepAiHelp({
     }
   }, [helperContent, helperList]);
 
-  async function handleGenerate(type: (typeof HELPER_OPTIONS)[number]["type"]) {
+  async function handleGenerate(type: StepHelperType) {
     setHelperType(type);
     setHelperPending(true);
     setHelperContent(null);
@@ -63,26 +58,12 @@ export function InlineStepAiHelp({
   async function handleSave() {
     if (!helperType) return;
     setError(null);
-    const field =
-      helperType === "call_script"
-        ? "call_script"
-        : helperType === "email_draft"
-          ? "email_draft"
-          : helperType === "prep_checklist" || helperType === "break_into_actions"
-            ? "prep_checklist"
-            : helperType === "fallback_options" || helperType === "troubleshoot_blocker"
-              ? "fallback_options"
-              : helperType === "family_explanation"
-                ? "family_explanation"
-                : helperType === "what_happens_next"
-                  ? "next_step_guidance"
-                  : "fallback_options";
     const val = helperList ?? (helperContent ?? "");
-    const r = await saveStepHelperAction(
+    const r = await saveStepHelperOutputAction(
       step.id,
       familyId,
-      field as keyof typeof aiHelper,
-      Array.isArray(val) ? val : val
+      helperType,
+      Array.isArray(val) ? val : val,
     );
     if (r.ok) router.refresh();
     else setError(r.error ?? "Save failed");
@@ -101,7 +82,7 @@ export function InlineStepAiHelp({
             variant="secondary"
             className="h-7 px-2.5 text-xs"
             disabled={helperPending}
-            onClick={() => handleGenerate(type)}
+            onClick={() => handleGenerate(type as StepHelperType)}
           >
             {helperPending && helperType === type ? "…" : label}
           </Button>

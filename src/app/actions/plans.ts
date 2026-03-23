@@ -200,7 +200,7 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   const summary =
     generationSource === "openai" && aiModel
       ? `Plan v${nextVersion} (AI: ${aiModel})`
-      : `Plan v${nextVersion} (rules + matched resources)`;
+      : `Plan v${nextVersion}`;
 
   const { data: plan, error: planErr } = await supabase
     .from("plans")

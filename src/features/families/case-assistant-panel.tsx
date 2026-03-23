@@ -5,15 +5,17 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
-import { CASE_QUICK_PROMPTS } from "@/lib/case-assistant/quick-prompts";
 import { cn } from "@/lib/utils/cn";
 
 export function CaseAssistantPanel({
   familyId,
   familyName,
+  quickPrompts,
 }: {
   familyId: string;
   familyName: string;
+  /** Suggested questions — provided by the server (see `getFamilyWorkspaceUiConfig`). */
+  quickPrompts: readonly string[];
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function CaseAssistantPanel({
             Ask about this case. The assistant knows the family, plan, and resources.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {CASE_QUICK_PROMPTS.map((prompt, i) => (
+            {quickPrompts.map((prompt, i) => (
               <Button
                 key={i}
                 type="button"

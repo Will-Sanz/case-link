@@ -11,7 +11,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { deletePlanStep, logPlanStepActivity, refinePlanStep, toggleChecklistItem, updatePlanStep, updatePlanStepActionItem } from "@/app/actions/plans";
-import { generateStepHelperAction, saveStepHelperAction } from "@/app/actions/step-helper";
+import {
+  generateStepHelperAction,
+  saveStepHelperOutputAction,
+} from "@/app/actions/step-helper";
 import { suggestNextMoveForBlockedStep } from "@/app/actions/suggest-next-move";
 import { fetchStepActivity } from "@/app/actions/step-activity";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +29,8 @@ import type {
   PlanStepWorkflowData,
   PlanWithSteps,
 } from "@/types/family";
-import { ACTIVITY_TYPES } from "@/lib/validations/plans";
+import type { PlanStepUiConfig } from "@/types/family-workspace-ui";
+import type { StepHelperType } from "@/types/step-helper";
 
 const PHASE_LABELS: Record<string, string> = {
   "30": "30-day",
@@ -125,24 +129,15 @@ type PlanStepModalInnerProps = {
   step: PlanStepRow;
   plan: PlanWithSteps;
   familyId: string;
+  planStepUi: PlanStepUiConfig;
   onClose: () => void;
 };
-
-const OUTREACH_RESULTS = [
-  "",
-  "No answer",
-  "Left voicemail",
-  "Appointment scheduled",
-  "Documents requested",
-  "Application submitted",
-  "Ineligible / closed",
-  "Other",
-] as const;
 
 function PlanStepModalInner({
   step,
   plan,
   familyId,
+  planStepUi,
   onClose,
 }: PlanStepModalInnerProps) {
   const router = useRouter();
@@ -177,7 +172,7 @@ function PlanStepModalInner({
   const [showRefine, setShowRefine] = useState(false);
   const [refineFeedback, setRefineFeedback] = useState("");
   const [refinePending, setRefinePending] = useState(false);
-  const [helperType, setHelperType] = useState<string | null>(null);
+  const [helperType, setHelperType] = useState<StepHelperType | null>(null);
   const [helperContent, setHelperContent] = useState<string | null>(null);
   const [helperList, setHelperList] = useState<string[] | null>(null);
   const [helperPending, setHelperPending] = useState(false);
@@ -332,12 +327,12 @@ function PlanStepModalInner({
               {editing ? "Edit step" : step.title}
             </h2>
             <div className="mt-2 flex flex-wrap gap-2">
-              {planMeta.generation_source === "openai" ? (
+              {planMeta.presentation.sourceKind === "ai" ? (
                 <Badge className="border-blue-200/70 bg-blue-50/40 text-blue-700">
                   AI draft
                   {planMeta.ai_model ? ` · ${planMeta.ai_model}` : ""}
                 </Badge>
-              ) : planMeta.generation_source === "manual" ? (
+              ) : planMeta.presentation.sourceKind === "manual" ? (
                 <Badge className="bg-slate-100 text-slate-700">Manual</Badge>
               ) : (
                 <Badge className="bg-slate-100 text-slate-700">
@@ -706,7 +701,7 @@ function PlanStepModalInner({
                           className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
                           disabled={pending}
                         >
-                          {OUTREACH_RESULTS.map((r) => (
+                          {planStepUi.outreachResults.map((r) => (
                             <option key={r || "empty"} value={r}>
                               {r || "—"}
                             </option>
@@ -945,43 +940,40 @@ function PlanStepModalInner({
                       AI help
                     </h4>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-              {(
-                [
-                  { type: "call_script" as const, label: "Generate call script" },
-                  { type: "email_draft" as const, label: "Draft email" },
-                  { type: "prep_checklist" as const, label: "Prep checklist" },
-                  { type: "fallback_options" as const, label: "Fallback options" },
-                  { type: "family_explanation" as const, label: "Explain to family" },
-                  { type: "break_into_actions" as const, label: "Break into smaller actions" },
-                  { type: "what_happens_next" as const, label: "What happens next" },
-                  ...(status === "blocked"
-                    ? [{ type: "troubleshoot_blocker" as const, label: "Troubleshoot blocker" }]
-                    : []),
-                ] as { type: Parameters<typeof generateStepHelperAction>[2]; label: string }[]
-              ).map(({ type, label }) => (
-                <Button
-                  key={type}
-                  type="button"
-                  variant="secondary"
-                  className="px-3 py-1.5 text-xs"
-                  disabled={helperPending || pending}
-                  onClick={async () => {
-                    setHelperType(type);
-                    setHelperPending(true);
-                    setHelperContent(null);
-                    setHelperList(null);
-                    setError(null);
-                    const r = await generateStepHelperAction(step.id, familyId, type);
-                    setHelperPending(false);
-                    if (r.ok) {
-                      setHelperContent(r.content);
-                      setHelperList(r.listContent ?? null);
-                    } else setError(r.error ?? "Something went wrong");
-                  }}
-                >
-                  {helperPending && helperType === type ? "Generating…" : label}
-                </Button>
-              ))}
+              {planStepUi.stepHelperMenu
+                .filter(
+                  (item) =>
+                    item.type !== "troubleshoot_blocker" || status === "blocked",
+                )
+                .map(({ type, label }) => (
+                  <Button
+                    key={type}
+                    type="button"
+                    variant="secondary"
+                    className="px-3 py-1.5 text-xs"
+                    disabled={helperPending || pending}
+                    onClick={async () => {
+                      const t = type as StepHelperType;
+                      setHelperType(t);
+                      setHelperPending(true);
+                      setHelperContent(null);
+                      setHelperList(null);
+                      setError(null);
+                      const r = await generateStepHelperAction(
+                        step.id,
+                        familyId,
+                        t,
+                      );
+                      setHelperPending(false);
+                      if (r.ok) {
+                        setHelperContent(r.content);
+                        setHelperList(r.listContent ?? null);
+                      } else setError(r.error ?? "Something went wrong");
+                    }}
+                  >
+                    {helperPending && helperType === type ? "Generating…" : label}
+                  </Button>
+                ))}
             </div>
                     {helperContent && helperType && (
                       <div ref={helperOutputRef} className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -1010,25 +1002,12 @@ function PlanStepModalInner({
                           className="mt-2 text-sm"
                           disabled={pending}
                           onClick={async () => {
-                            const field =
-                              helperType === "call_script"
-                                ? "call_script"
-                                : helperType === "email_draft"
-                                  ? "email_draft"
-                                  : helperType === "prep_checklist" || helperType === "break_into_actions"
-                                    ? "prep_checklist"
-                                    : helperType === "fallback_options" || helperType === "troubleshoot_blocker"
-                                      ? "fallback_options"
-                                      : helperType === "family_explanation"
-                                        ? "family_explanation"
-                                        : helperType === "what_happens_next"
-                                          ? "next_step_guidance"
-                                          : "fallback_options";
+                            if (!helperType) return;
                             const val = helperList ?? (helperContent ?? "");
-                            const r = await saveStepHelperAction(
+                            const r = await saveStepHelperOutputAction(
                               step.id,
                               familyId,
-                              field as keyof typeof aiHelper,
+                              helperType,
                               Array.isArray(val) ? val : val,
                             );
                             if (r.ok) router.refresh();
@@ -1111,9 +1090,9 @@ function PlanStepModalInner({
                           className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
                         >
                           <option value="">Select…</option>
-                          {ACTIVITY_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {t.replace(/_/g, " ")}
+                          {planStepUi.activityLogTypes.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
                             </option>
                           ))}
                         </select>
@@ -1320,11 +1299,13 @@ export function PlanStepModal({
   step,
   plan,
   familyId,
+  planStepUi,
   onClose,
 }: {
   step: PlanStepRow;
   plan: PlanWithSteps;
   familyId: string;
+  planStepUi: PlanStepUiConfig;
   onClose: () => void;
 }) {
   const isClient = useIsClient();
@@ -1338,6 +1319,7 @@ export function PlanStepModal({
       step={step}
       plan={plan}
       familyId={familyId}
+      planStepUi={planStepUi}
       onClose={onClose}
     />
   );

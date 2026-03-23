@@ -2,19 +2,12 @@ import "server-only";
 
 import type { FamilyDetail } from "@/types/family";
 import type { PlanStepRow } from "@/types/family";
+import type { StepHelperType } from "@/types/step-helper";
 import { createAiResponse } from "@/lib/ai/client";
 import type { AiTaskType } from "@/lib/ai/models";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
 
-export type StepHelperType =
-  | "call_script"
-  | "email_draft"
-  | "prep_checklist"
-  | "fallback_options"
-  | "family_explanation"
-  | "break_into_actions"
-  | "what_happens_next"
-  | "troubleshoot_blocker";
+export type { StepHelperType } from "@/types/step-helper";
 
 export type StepHelperResult =
   | { ok: true; content: string; listContent?: string[] }

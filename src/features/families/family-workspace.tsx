@@ -30,6 +30,7 @@ import {
   textareaClass,
 } from "@/lib/ui/form-classes";
 import type { FamilyDetail } from "@/types/family";
+import type { FamilyWorkspaceUiConfig } from "@/types/family-workspace-ui";
 import { cn } from "@/lib/utils/cn";
 import {
   FAMILY_WORKSPACE_SECTIONS,
@@ -60,7 +61,13 @@ export function FamilyWorkspaceLoading() {
   );
 }
 
-export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
+export function FamilyWorkspace({
+  family,
+  uiConfig,
+}: {
+  family: FamilyDetail;
+  uiConfig: FamilyWorkspaceUiConfig;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -210,10 +217,13 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
 
         <div className="px-4 py-5 lg:px-10 lg:py-6">
           {activeSection === "overview" && (
-            <OverviewSection family={family} />
+            <OverviewSection
+              family={family}
+              caseAssistantQuickPrompts={uiConfig.caseAssistantQuickPrompts}
+            />
           )}
           {activeSection === "plan" && (
-            <PlanSection family={family} />
+            <PlanSection family={family} planStepUi={uiConfig.planStep} />
           )}
           {activeSection === "members" && (
             <MembersSection family={family} />
@@ -239,19 +249,32 @@ export function FamilyWorkspace({ family }: { family: FamilyDetail }) {
   );
 }
 
-function OverviewSection({ family }: { family: FamilyDetail }) {
+function OverviewSection({
+  family,
+  caseAssistantQuickPrompts,
+}: {
+  family: FamilyDetail;
+  caseAssistantQuickPrompts: FamilyWorkspaceUiConfig["caseAssistantQuickPrompts"];
+}) {
   const [isEditing, setIsEditing] = useState(false);
 
   if (isEditing) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">Edit overview</h2>
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">Edit overview</h2>
+          </div>
+          <UpdateFamilyForm
+            family={family}
+            onCancel={() => setIsEditing(false)}
+            onSuccess={() => setIsEditing(false)}
+          />
         </div>
-        <UpdateFamilyForm
-          family={family}
-          onCancel={() => setIsEditing(false)}
-          onSuccess={() => setIsEditing(false)}
+        <CaseAssistantPanel
+          familyId={family.id}
+          familyName={family.name}
+          quickPrompts={caseAssistantQuickPrompts}
         />
       </div>
     );
@@ -332,11 +355,25 @@ function OverviewSection({ family }: { family: FamilyDetail }) {
           )}
         </div>
       </div>
+
+      <div className="col-span-full mt-2">
+        <CaseAssistantPanel
+          familyId={family.id}
+          familyName={family.name}
+          quickPrompts={caseAssistantQuickPrompts}
+        />
+      </div>
     </div>
   );
 }
 
-function PlanSection({ family }: { family: FamilyDetail }) {
+function PlanSection({
+  family,
+  planStepUi,
+}: {
+  family: FamilyDetail;
+  planStepUi: FamilyWorkspaceUiConfig["planStep"];
+}) {
   return (
     <div className="space-y-6">
       <PlanPanel
@@ -345,6 +382,7 @@ function PlanSection({ family }: { family: FamilyDetail }) {
         plan={family.plan ?? null}
         familyName={family.name}
         resourceMatches={family.resourceMatches}
+        planStepUi={planStepUi}
       />
     </div>
   );
@@ -878,7 +916,6 @@ function ResourcesSection({ family }: { family: FamilyDetail }) {
         title="Referrals & tasks"
         description="Outreach tracking and tasks land in Phase 5."
       />
-      <CaseAssistantPanel familyId={family.id} familyName={family.name} />
     </div>
   );
 }

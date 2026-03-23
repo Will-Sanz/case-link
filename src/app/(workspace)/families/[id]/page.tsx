@@ -11,6 +11,7 @@ import {
   getCaseActivity,
   getNeedsAttention,
 } from "@/lib/services/workflow";
+import { getFamilyWorkspaceUiConfig } from "@/lib/domain/family-workspace/ui-config";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -37,6 +38,8 @@ export default async function FamilyDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const workspaceUi = getFamilyWorkspaceUiConfig();
+
   return (
     <Suspense fallback={<FamilyWorkspaceLoading />}>
       <FamilyWorkspace
@@ -45,6 +48,7 @@ export default async function FamilyDetailPage({ params }: PageProps) {
           needsAttention,
           caseActivity,
         }}
+        uiConfig={workspaceUi}
       />
     </Suspense>
   );

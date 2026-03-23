@@ -4,10 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
-import {
-  generateStepHelper,
-  type StepHelperType,
-} from "@/lib/step-helper/ai-step-helper";
+import { stepHelperTypeToPersistField } from "@/lib/domain/step-helper/persist-field";
+import type { StepHelperType } from "@/types/step-helper";
+import { generateStepHelper } from "@/lib/step-helper/ai-step-helper";
 
 export type StepHelperActionResult =
   | { ok: true; content: string; listContent?: string[] }
@@ -35,6 +34,17 @@ export async function generateStepHelperAction(
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
+}
+
+/** Persists AI helper output; maps `helperType` → storage field on the server. */
+export async function saveStepHelperOutputAction(
+  stepId: string,
+  familyId: string,
+  helperType: StepHelperType,
+  value: string | string[] | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const field = stepHelperTypeToPersistField(helperType);
+  return saveStepHelperAction(stepId, familyId, field, value);
 }
 
 export async function saveStepHelperAction(

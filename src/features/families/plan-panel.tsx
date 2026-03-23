@@ -30,6 +30,7 @@ import type {
   PlanStepDetails,
   PlanWithSteps,
 } from "@/types/family";
+import type { PlanStepUiConfig } from "@/types/family-workspace-ui";
 import { cn } from "@/lib/utils/cn";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -196,6 +197,7 @@ function StepPreview({
   onToggleActionItem,
   familyName,
   familyId,
+  planStepUi,
 }: {
   step: PlanStepRow;
   expanded: boolean;
@@ -210,6 +212,7 @@ function StepPreview({
   onToggleActionItem?: (actionItemId: string, completed: boolean) => void;
   familyName?: string;
   familyId?: string;
+  planStepUi: PlanStepUiConfig;
 }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data;
@@ -469,6 +472,7 @@ function StepPreview({
           step={step}
           familyId={familyId}
           isBlocked={step.status === "blocked"}
+          stepHelperMenu={planStepUi.stepHelperMenu}
         />
       ) : null}
       {resourceMatches && resourceMatches.length > 0 ? (
@@ -483,6 +487,7 @@ export function PlanPanel({
   plan,
   familyName,
   resourceMatches = [],
+  planStepUi,
 }: {
   familyId: string;
   plan: PlanWithSteps | null;
@@ -493,6 +498,7 @@ export function PlanPanel({
     plan_step_id?: string | null;
     resource?: { program_name: string; slug: string } | null;
   }>;
+  planStepUi: PlanStepUiConfig;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -796,24 +802,6 @@ export function PlanPanel({
             </div>
           ) : (
             <div className="space-y-8">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-slate-500">Source:</span>
-                {plan.generation_source === "openai" ? (
-                  <Badge className="border-blue-200/70 bg-blue-50/40 text-blue-700">
-                    AI{plan.ai_model ? ` (${plan.ai_model})` : ""}
-                  </Badge>
-                ) : plan.generation_source === "manual" ? (
-                  <Badge className="bg-slate-100 text-slate-700">Manual</Badge>
-                ) : (
-                  <Badge className="bg-slate-100 text-slate-700">
-                    Rules + resources
-                  </Badge>
-                )}
-                {plan.summary ? (
-                  <span className="text-slate-400">· {plan.summary}</span>
-                ) : null}
-              </div>
-
               <div className="relative">
                 <div
                   className="absolute left-4 top-0 bottom-0 w-px bg-slate-200 sm:left-6"
@@ -953,6 +941,7 @@ export function PlanPanel({
                                               onToggleActionItem={handleToggleActionItem}
                                               familyName={familyName}
                                               familyId={familyId}
+                                              planStepUi={planStepUi}
                                             />
                                           </div>
                                           {hasRichContent ? (
@@ -1225,6 +1214,7 @@ export function PlanPanel({
           step={modalStep}
           plan={plan}
           familyId={familyId}
+          planStepUi={planStepUi}
           onClose={() => setModalStepId(null)}
         />
       ) : null}

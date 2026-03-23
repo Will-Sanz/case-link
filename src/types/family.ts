@@ -201,6 +201,10 @@ export type PlanRow = {
 
 export type PlanWithSteps = PlanRow & {
   steps: PlanStepRow[];
+  /** Derived on the server for UI — avoids branching on raw `generation_source` in components. */
+  presentation: {
+    sourceKind: "ai" | "manual" | "rules";
+  };
 };
 
 export type FamilyDetail = {

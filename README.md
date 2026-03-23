@@ -79,6 +79,8 @@ npm install
 npm run dev
 ```
 
+**Test user (local/staging):** With `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, run `npm run db:create-test-user` to create **`test@example.com`** / **`test`** as a `case_manager` (or pass `email` and `password` as args). **Do not use weak passwords in production.**
+
 ## TypeScript types for DB rows
 
 Hand-maintained shapes live under `src/types/` (e.g. `database.ts`, `user-role.ts`). Optionally replace or augment with [generated types](https://supabase.com/docs/guides/api/generating-types) from your project.
