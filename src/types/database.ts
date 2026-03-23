@@ -7,6 +7,16 @@ export type AppUserRow = {
   role: UserRole;
   created_at: string;
   updated_at: string;
+  /** Workspace profile (nullable until filled in). */
+  display_name?: string | null;
+  job_title?: string | null;
+  organization?: string | null;
+  phone?: string | null;
+  pronouns?: string | null;
+  service_area?: string | null;
+  bio?: string | null;
+  preferred_contact_method?: "email" | "phone" | "either" | null;
+  notes_signature?: string | null;
 };
 
 /** Subset of `public.resources` used by list/detail UIs. */

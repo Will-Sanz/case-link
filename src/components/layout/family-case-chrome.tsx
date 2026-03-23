@@ -28,13 +28,7 @@ import {
 import type { UserRole } from "@/types/user-role";
 import { cn } from "@/lib/utils/cn";
 
-function StandardAside({
-  email,
-  role,
-}: {
-  email: string;
-  role: UserRole;
-}) {
+function StandardAside() {
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-4">
@@ -48,37 +42,18 @@ function StandardAside({
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/calendar">Calendar</NavLink>
         <NavLink href="/resources">Resources</NavLink>
+        <NavLink href="/profile">Profile</NavLink>
       </nav>
       <div className="mx-3 shrink-0 border-t border-slate-200" />
       <SidebarQuickActions className="shrink-0 py-3" />
-      <div className="min-h-0 flex-1" aria-hidden />
-      <div className="shrink-0 border-t border-slate-200 p-4">
-        <p className="truncate text-xs text-slate-500" title={email}>
-          {email}
-        </p>
-        <p className="mt-1">
-          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
-            {role}
-          </span>
-        </p>
-        <form action={signOutAction} className="mt-3">
-          <Button type="submit" variant="secondary" className="w-full py-2 text-sm">
-            Sign out
-          </Button>
-        </form>
-      </div>
     </aside>
   );
 }
 
 function UnifiedAsideBody({
-  email,
-  role,
   familyId,
   familyTitle,
 }: {
-  email: string;
-  role: UserRole;
   familyId: string;
   familyTitle: string | null;
 }) {
@@ -100,6 +75,7 @@ function UnifiedAsideBody({
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/calendar">Calendar</NavLink>
         <NavLink href="/resources">Resources</NavLink>
+        <NavLink href="/profile">Profile</NavLink>
       </nav>
 
       <div className="mx-3 shrink-0 border-t border-slate-200" />
@@ -135,37 +111,11 @@ function UnifiedAsideBody({
 
       <div className="mx-3 shrink-0 border-t border-slate-200" />
       <SidebarQuickActions className="shrink-0 py-3" />
-
-      <div className="shrink-0 border-t border-slate-200 p-3">
-        <p className="truncate text-xs text-slate-500" title={email}>
-          {email}
-        </p>
-        <p className="mt-1">
-          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
-            {role}
-          </span>
-        </p>
-        <form action={signOutAction} className="mt-3">
-          <Button type="submit" variant="secondary" className="w-full py-2 text-sm">
-            Sign out
-          </Button>
-        </form>
-      </div>
     </aside>
   );
 }
 
-function UnifiedAsideFallback({
-  email,
-  role,
-  familyId,
-  familyTitle,
-}: {
-  email: string;
-  role: UserRole;
-  familyId: string;
-  familyTitle: string | null;
-}) {
+function UnifiedAsideFallback({ familyTitle }: { familyTitle: string | null }) {
   return (
     <aside className="sticky top-0 hidden h-dvh w-[15.5rem] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white lg:flex">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-3">
@@ -179,6 +129,7 @@ function UnifiedAsideFallback({
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/calendar">Calendar</NavLink>
         <NavLink href="/resources">Resources</NavLink>
+        <NavLink href="/profile">Profile</NavLink>
       </nav>
       <div className="mx-3 shrink-0 border-t border-slate-200" />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2 pt-3">
@@ -192,32 +143,11 @@ function UnifiedAsideFallback({
       </div>
       <div className="mx-3 shrink-0 border-t border-slate-200" />
       <SidebarQuickActions className="shrink-0 py-3" />
-      <div className="shrink-0 border-t border-slate-200 p-3">
-        <p className="truncate text-xs text-slate-500">{email}</p>
-        <p className="mt-1">
-          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
-            {role}
-          </span>
-        </p>
-        <form action={signOutAction} className="mt-3">
-          <Button type="submit" variant="secondary" className="w-full py-2 text-sm">
-            Sign out
-          </Button>
-        </form>
-      </div>
     </aside>
   );
 }
 
-export function FamilyCaseChrome({
-  email,
-  role,
-  children,
-}: {
-  email: string;
-  role: UserRole;
-  children: ReactNode;
-}) {
+export function FamilyCaseChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isCaseDetail = isFamilyCaseDetailPath(pathname);
   const familyId = useMemo(() => extractFamilyCaseId(pathname), [pathname]);
@@ -238,22 +168,12 @@ export function FamilyCaseChrome({
         {isCaseDetail && familyId ?
           <Suspense
             fallback={
-              <UnifiedAsideFallback
-                email={email}
-                role={role}
-                familyId={familyId}
-                familyTitle={familyTitle}
-              />
+              <UnifiedAsideFallback familyTitle={familyTitle} />
             }
           >
-            <UnifiedAsideBody
-              email={email}
-              role={role}
-              familyId={familyId}
-              familyTitle={familyTitle}
-            />
+            <UnifiedAsideBody familyId={familyId} familyTitle={familyTitle} />
           </Suspense>
-        : <StandardAside email={email} role={role} />}
+        : <StandardAside />}
 
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 border-b border-slate-200 bg-white lg:hidden">
@@ -288,6 +208,9 @@ export function FamilyCaseChrome({
               </NavLink>
               <NavLink href="/resources" className="shrink-0 whitespace-nowrap">
                 Resources
+              </NavLink>
+              <NavLink href="/profile" className="shrink-0 whitespace-nowrap">
+                Profile
               </NavLink>
             </nav>
             <MobileQuickActionsStrip />

@@ -46,6 +46,7 @@ Schema lives in versioned migrations (apply in order):
 - `supabase/migrations/20260321140000_resource_matches_rls.sql`
 - `supabase/migrations/20260321160000_family_intake_rpc.sql` — `create_family_intake_row()` for new family rows (sets `created_by_id` from `auth.uid()` inside the DB)
 - `supabase/migrations/20260321170000_plans_rls.sql` — RLS for plans, plan_steps, plan_step_resources
+- `supabase/migrations/20260325200000_app_users_profile.sql` — case manager profile fields on `app_users` (name, contact prefs, etc.)
 
 Apply it using either:
 
@@ -55,7 +56,7 @@ Apply it using either:
 
 2. **Dashboard**: SQL Editor → paste the migration file and run (acceptable for early prototyping).
 
-The app uses **`public.app_users`** for roles (`admin` / `case_manager`); each row’s `id` matches **`auth.users.id`**. On first authenticated request, `ensureAppUser` inserts or updates the row via the user’s JWT (RLS allows self-service on `app_users`).
+The app uses **`public.app_users`** for roles (`admin` / `case_manager`) and **workspace profile** columns (display name, phone, preferences, etc.); each row’s `id` matches **`auth.users.id`**. On first authenticated request, `ensureAppUser` inserts or updates the row via the user’s JWT (RLS allows self-service on `app_users`). The **Profile** page (`/profile`) reads and updates those columns; sign-in **email** stays tied to Supabase Auth (synced to `app_users.email` on login).
 
 **Promoting an admin:** after a user has signed up once, set their role in SQL:
 

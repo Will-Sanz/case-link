@@ -14,11 +14,7 @@ export default async function WorkspaceLayout({
   if (!authUser) {
     redirect("/login");
   }
-  const appUser = await ensureAppUser(authUser);
+  await ensureAppUser(authUser);
 
-  return (
-    <AppShell email={appUser.email} role={appUser.role}>
-      {children}
-    </AppShell>
-  );
+  return <AppShell>{children}</AppShell>;
 }

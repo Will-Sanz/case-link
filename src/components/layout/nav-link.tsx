@@ -9,6 +9,9 @@ function isActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") {
     return pathname === "/dashboard";
   }
+  if (href === "/profile") {
+    return pathname === "/profile";
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
