@@ -14,6 +14,10 @@ import { signOutAction } from "@/app/actions/auth";
 import { SetFamilyCaseTitleContext } from "@/components/layout/family-case-title-context";
 import { MainContent } from "@/components/layout/main-content";
 import { NavLink } from "@/components/layout/nav-link";
+import {
+  MobileQuickActionsStrip,
+  SidebarQuickActions,
+} from "@/components/layout/sidebar-quick-actions";
 import { Button } from "@/components/ui/button";
 import {
   extractFamilyCaseId,
@@ -32,20 +36,23 @@ function StandardAside({
   role: UserRole;
 }) {
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
-      <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-4">
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/90 text-xs font-semibold text-white">
           CL
         </div>
         <span className="font-semibold text-slate-900">CaseLink</span>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 p-2" aria-label="Main">
+      <nav className="shrink-0 flex flex-col gap-0.5 p-2 pb-1" aria-label="Main">
         <NavLink href="/dashboard">Today</NavLink>
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/calendar">Calendar</NavLink>
         <NavLink href="/resources">Resources</NavLink>
       </nav>
-      <div className="border-t border-slate-200 p-4">
+      <div className="mx-3 shrink-0 border-t border-slate-200" />
+      <SidebarQuickActions className="shrink-0 py-3" />
+      <div className="min-h-0 flex-1" aria-hidden />
+      <div className="shrink-0 border-t border-slate-200 p-4">
         <p className="truncate text-xs text-slate-500" title={email}>
           {email}
         </p>
@@ -80,7 +87,7 @@ function UnifiedAsideBody({
   const base = `/families/${familyId}`;
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[15.5rem] shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-[15.5rem] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white lg:flex">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/90 text-xs font-semibold text-white">
           CL
@@ -88,16 +95,16 @@ function UnifiedAsideBody({
         <span className="truncate font-semibold text-slate-900">CaseLink</span>
       </div>
 
-      <nav className="flex flex-col gap-0.5 p-2" aria-label="Main">
+      <nav className="shrink-0 flex flex-col gap-0.5 p-2 pb-1" aria-label="Main">
         <NavLink href="/dashboard">Today</NavLink>
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/calendar">Calendar</NavLink>
         <NavLink href="/resources">Resources</NavLink>
       </nav>
 
-      <div className="mx-3 border-t border-slate-200" />
+      <div className="mx-3 shrink-0 border-t border-slate-200" />
 
-      <div className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2 pt-3">
         <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
           Current case
         </p>
@@ -126,7 +133,10 @@ function UnifiedAsideBody({
         </nav>
       </div>
 
-      <div className="mt-auto shrink-0 border-t border-slate-200 p-3">
+      <div className="mx-3 shrink-0 border-t border-slate-200" />
+      <SidebarQuickActions className="shrink-0 py-3" />
+
+      <div className="shrink-0 border-t border-slate-200 p-3">
         <p className="truncate text-xs text-slate-500" title={email}>
           {email}
         </p>
@@ -157,21 +167,21 @@ function UnifiedAsideFallback({
   familyTitle: string | null;
 }) {
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[15.5rem] shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-[15.5rem] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white lg:flex">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/90 text-xs font-semibold text-white">
           CL
         </div>
         <span className="truncate font-semibold text-slate-900">CaseLink</span>
       </div>
-      <nav className="flex flex-col gap-0.5 p-2" aria-label="Main">
+      <nav className="shrink-0 flex flex-col gap-0.5 p-2 pb-1" aria-label="Main">
         <NavLink href="/dashboard">Today</NavLink>
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/calendar">Calendar</NavLink>
         <NavLink href="/resources">Resources</NavLink>
       </nav>
-      <div className="mx-3 border-t border-slate-200" />
-      <div className="px-2 pb-2 pt-3">
+      <div className="mx-3 shrink-0 border-t border-slate-200" />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2 pt-3">
         <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
           Current case
         </p>
@@ -180,7 +190,9 @@ function UnifiedAsideFallback({
         </p>
         <p className="mt-3 px-3 text-xs text-slate-400">Loading sections…</p>
       </div>
-      <div className="mt-auto border-t border-slate-200 p-3">
+      <div className="mx-3 shrink-0 border-t border-slate-200" />
+      <SidebarQuickActions className="shrink-0 py-3" />
+      <div className="shrink-0 border-t border-slate-200 p-3">
         <p className="truncate text-xs text-slate-500">{email}</p>
         <p className="mt-1">
           <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
@@ -222,7 +234,7 @@ export function FamilyCaseChrome({
 
   return (
     <SetFamilyCaseTitleContext.Provider value={setTitle}>
-      <div className="flex min-h-dvh bg-[#f4f6f8]">
+      <div className="flex min-h-dvh items-start bg-[#f4f6f8]">
         {isCaseDetail && familyId ?
           <Suspense
             fallback={
@@ -243,7 +255,7 @@ export function FamilyCaseChrome({
           </Suspense>
         : <StandardAside email={email} role={role} />}
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 border-b border-slate-200 bg-white lg:hidden">
             <div className="flex h-14 items-center justify-between gap-3 px-4">
               <Link
@@ -278,6 +290,7 @@ export function FamilyCaseChrome({
                 Resources
               </NavLink>
             </nav>
+            <MobileQuickActionsStrip />
           </header>
 
           <MainContent>{children}</MainContent>
