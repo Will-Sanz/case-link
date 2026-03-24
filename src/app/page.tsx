@@ -11,7 +11,7 @@ export default async function Home() {
     // Env vars missing or Supabase unreachable: treat as unauthenticated
   }
   if (user) {
-    redirect("/dashboard");
+    redirect("/families");
   }
   redirect("/login");
 }

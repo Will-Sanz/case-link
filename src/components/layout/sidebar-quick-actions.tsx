@@ -6,10 +6,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 
 const QUICK_ACTIONS = [
-  { href: "/families", label: "Continue active cases" },
-  { href: "/families/new", label: "New family intake" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/resources", label: "Search resources" },
+  { href: "/families", label: "Families" },
 ] as const;
 
 function isQuickActionActive(href: string, pathname: string): boolean {

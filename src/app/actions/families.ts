@@ -19,6 +19,44 @@ export type ActionResult =
   | { ok: true; familyId?: string }
   | { ok: false; error: string };
 
+export async function createSimpleFamily(
+  input: { name?: string },
+): Promise<ActionResult> {
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const name = input.name?.trim() || `Family ${new Date().toLocaleDateString("en-US")}`;
+  const { data: familyIdRaw, error: famErr } = await supabase.rpc(
+    "create_family_intake_row",
+    {
+      p_name: name,
+      p_summary: null,
+      p_urgency: "medium",
+      p_household_notes: null,
+      p_status: "active",
+    },
+  );
+  if (famErr || familyIdRaw == null) {
+    return { ok: false, error: famErr?.message ?? "Could not create family" };
+  }
+  const familyId = familyIdRaw as string;
+  await supabase.from("activity_log").insert({
+    family_id: familyId,
+    actor_user_id: user.id,
+    action: "family.created",
+    entity_type: "family",
+    entity_id: familyId,
+    details: { name },
+  });
+  revalidatePath("/families");
+  return { ok: true, familyId };
+}
+
 export async function createFamilyIntake(
   input: FamilyIntakeFormValues,
 ): Promise<ActionResult> {
