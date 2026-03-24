@@ -17,6 +17,10 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeader } from "@/components/ui/section-header";
+import {
+  maxRawMatchScore,
+  rawMatchScoreToPercent,
+} from "@/lib/matching/normalize-display-score";
 import type { PlanWithSteps, ResourceMatchRow } from "@/types/family";
 
 function flagSummary(r: NonNullable<ResourceMatchRow["resource"]>): string {
@@ -69,6 +73,11 @@ export function ResourceMatchesPanel({
     if (showAllMatches) return actionableMatches;
     return actionableMatches.slice(0, MAX_VISIBLE_MATCHES);
   }, [actionableMatches, showAllMatches]);
+
+  const maxMatchScore = useMemo(
+    () => maxRawMatchScore(actionableMatches.map((m) => m.score)),
+    [actionableMatches],
+  );
 
   function runMatch() {
     setError(null);
@@ -181,7 +190,7 @@ export function ResourceMatchesPanel({
           {!showAllMatches &&
           actionableMatches.length > MAX_VISIBLE_MATCHES ? (
             <p className="mt-5 text-sm text-slate-600">
-              Showing the top {MAX_VISIBLE_MATCHES} matches by score. Use
+              Showing the top {MAX_VISIBLE_MATCHES} matches by fit. Use
               &quot;Show all&quot; to see the full list.
             </p>
           ) : null}
@@ -220,7 +229,7 @@ export function ResourceMatchesPanel({
                   <div className="flex flex-wrap items-center gap-2">
                     <MatchStatusBadge status={m.status} />
                     <span className="text-xs text-slate-500">
-                      Score {Math.round(m.score)}
+                      {rawMatchScoreToPercent(m.score, maxMatchScore)}% match
                     </span>
                   </div>
                 </div>

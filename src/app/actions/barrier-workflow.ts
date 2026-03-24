@@ -6,6 +6,10 @@ import { runResourceMatching } from "@/app/actions/resource-matches";
 import { generatePlan, updatePlanStepActionItem } from "@/app/actions/plans";
 import { getFamilyDetail } from "@/lib/services/families";
 import {
+  maxRawMatchScore,
+  rawMatchScoreToPercent,
+} from "@/lib/matching/normalize-display-score";
+import {
   type BarrierPresetLabel,
   type BarrierWorkflowInput,
   type BarrierWorkflowPlanSection,
@@ -111,7 +115,7 @@ function mapFamilyToWorkflowResult(
     });
   }
 
-  const resources: BarrierWorkflowResource[] = detail.resourceMatches
+  const resourceMatchRows = detail.resourceMatches
     .filter((m) => m.status !== "dismissed" && m.resource)
     .sort((a, b) => {
       const pri = (x: "accepted" | "suggested" | "dismissed") =>
@@ -120,12 +124,13 @@ function mapFamilyToWorkflowResult(
       if (p !== 0) return p;
       return b.score - a.score;
     })
-    .slice(0, 12)
-    .map((m) => ({
+    .slice(0, 12);
+  const maxMatchScore = maxRawMatchScore(resourceMatchRows.map((m) => m.score));
+  const resources: BarrierWorkflowResource[] = resourceMatchRows.map((m) => ({
       id: m.id,
       name: m.resource!.program_name,
       programName: m.resource!.office_or_department || m.resource!.program_name,
-      similarityScore: m.score,
+      similarityScore: rawMatchScoreToPercent(m.score, maxMatchScore),
       description: m.resource!.office_or_department || m.resource!.category,
       category: m.resource!.category,
       contactName: m.resource!.primary_contact_name,

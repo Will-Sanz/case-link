@@ -51,6 +51,7 @@ export type BarrierWorkflowResource = {
   id: string;
   name: string;
   programName: string;
+  /** 0–100 display percent (normalized vs top match in the same list). */
   similarityScore: number;
   description: string | null;
   category: string | null;
