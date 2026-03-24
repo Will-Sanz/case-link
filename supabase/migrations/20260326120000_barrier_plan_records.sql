@@ -1,3 +1,7 @@
+-- barrier_plan_records: snapshot of generated barrier workflow per user.
+-- Prerequisites (run earlier migrations first): public.app_users, public.families,
+-- extension pgcrypto (for gen_random_uuid), public.set_updated_at() from init_schema.
+
 create table if not exists public.barrier_plan_records (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references public.app_users(id) on delete cascade,
@@ -43,18 +47,11 @@ create policy barrier_plan_records_delete
   for delete
   using (owner_user_id = auth.uid());
 
-create or replace function public.set_updated_at_barrier_plan_records()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
+-- Reuse shared trigger fn from init_schema (avoids duplicate trigger functions).
 drop trigger if exists trg_barrier_plan_records_updated_at on public.barrier_plan_records;
-create trigger trg_barrier_plan_records_updated_at
+drop trigger if exists barrier_plan_records_set_updated_at on public.barrier_plan_records;
+drop function if exists public.set_updated_at_barrier_plan_records();
+
+create trigger barrier_plan_records_set_updated_at
 before update on public.barrier_plan_records
-for each row
-execute function public.set_updated_at_barrier_plan_records();
+for each row execute function public.set_updated_at();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,13 @@ function formatDue(dueDate: string | null): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatElapsed(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${String(secs).padStart(2, "0")}s`;
 }
 
 function ResourceMatchCard({
@@ -263,13 +270,16 @@ export function FamilyLiteWorkspace({
   familyName: string;
   barrierOptions: readonly { key: string; label: string }[];
   initialResult: BarrierWorkflowResult | null;
-  tab?: "plan" | "resources" | "timeline" | "assistant";
+  tab?: "overview" | "plan" | "resources" | "timeline" | "assistant";
 }) {
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
       barrierOptions.some((o) => o.label === s),
     ),
+  );
+  const [additionalBarriers, setAdditionalBarriers] = useState(
+    initialResult?.additionalBarriers ?? "",
   );
   const [details, setDetails] = useState(initialResult?.additionalDetails ?? "");
   const [pending, startTransition] = useTransition();
@@ -279,7 +289,25 @@ export function FamilyLiteWorkspace({
   const [assistantQuestion, setAssistantQuestion] = useState("");
   const [assistantAnswer, setAssistantAnswer] = useState<string | null>(null);
   const [assistantError, setAssistantError] = useState<string | null>(null);
+  const [generateStartedAt, setGenerateStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  useEffect(() => {
+    if (!pending) {
+      setGenerateStartedAt(null);
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setGenerateStartedAt(startedAt);
+    setElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [pending]);
 
   function toggleLabel(label: BarrierPresetLabel) {
     setSelected((prev) =>
@@ -292,10 +320,12 @@ export function FamilyLiteWorkspace({
     startTransition(async () => {
       const r = await generateBarrierWorkflowForFamilyAction(familyId, {
         selectedBarriers: selected,
+        additionalBarriers,
         additionalDetails: details,
       });
       if (!r.ok) return setError(r.error);
       setResult(r.result);
+      setHasGeneratedThisSession(true);
     });
   }
 
@@ -355,10 +385,18 @@ export function FamilyLiteWorkspace({
     "60": timelineItems.filter((i) => i.phase === "60"),
     "90": timelineItems.filter((i) => i.phase === "90"),
   };
+  const allBarriers = [
+    ...(result?.selectedBarriers ?? []),
+    ...((result?.additionalBarriers ?? "")
+      .split(/\r?\n|,|;/)
+      .map((b) => b.trim())
+      .filter(Boolean)),
+  ];
+  const hasOverviewData = allBarriers.length > 0 || Boolean(result?.additionalDetails.trim());
 
   return (
     <div className="space-y-6">
-      {tab === "plan" ? (
+      {tab === "overview" ? (
         <Card className="border-slate-200/90 bg-white/95 p-5 shadow-[0_1px_0_rgba(15,23,42,0.02)] sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -397,12 +435,24 @@ export function FamilyLiteWorkspace({
           </div>
 
           <div className="mt-4">
+            <Label htmlFor="additional-barriers">Additional barriers</Label>
+            <Textarea
+              id="additional-barriers"
+              className="mt-1.5 min-h-[100px] border-slate-200/90 bg-slate-50/50"
+              value={additionalBarriers}
+              onChange={(e) => setAdditionalBarriers(e.target.value)}
+              placeholder="Add custom barriers not listed above (comma, semicolon, or new line separated)."
+            />
+          </div>
+
+          <div className="mt-4">
             <Label htmlFor="family-details">Additional details</Label>
             <Textarea
               id="family-details"
               className="mt-1.5 min-h-[100px] border-slate-200/90 bg-slate-50/50"
               value={details}
               onChange={(e) => setDetails(e.target.value)}
+              placeholder="Optional case context, constraints, or important notes."
             />
           </div>
 
@@ -414,8 +464,59 @@ export function FamilyLiteWorkspace({
 
           <div className="mt-4">
             <Button type="button" onClick={generate} disabled={pending} className="px-4 py-2">
-              {pending ? "Generating..." : result ? "Regenerate plan" : "Generate plan"}
+              {pending
+                ? "Generating..."
+                : hasGeneratedThisSession
+                  ? "Regenerate plan"
+                  : "Generate Plan and Match Resources"}
             </Button>
+          </div>
+          {pending && generateStartedAt ? (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-800">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700" />
+              <span>Building plan... {formatElapsed(elapsedSeconds)}</span>
+            </div>
+          ) : null}
+
+          {hasOverviewData ? (
+            <div className="mt-5 space-y-4 border-t border-slate-200 pt-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Current overview
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {allBarriers.map((barrier) => (
+                    <span
+                      key={barrier}
+                      className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800"
+                    >
+                      {barrier}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {result?.additionalDetails.trim() ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                  {result.additionalDetails}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {tab === "plan" ? (
+        <Card className="border-slate-200/90 bg-white/95 p-5 shadow-[0_1px_0_rgba(15,23,42,0.02)] sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
+              <p className="text-xs text-slate-500">Family ID: {familyId}</p>
+            </div>
+            {result?.lastSavedAt ? (
+              <p className="text-xs text-slate-500">
+                Updated {new Date(result.lastSavedAt).toLocaleString()}
+              </p>
+            ) : null}
           </div>
         </Card>
       ) : null}

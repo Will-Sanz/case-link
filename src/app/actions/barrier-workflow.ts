@@ -31,6 +31,15 @@ const BARRIER_KEY_BY_LABEL: Record<BarrierPresetLabel, string> = {
   Other: "other",
 };
 
+function toClientError(error: unknown): string {
+  if (error instanceof Error) {
+    const msg = error.message?.trim();
+    if (!msg) return "Unexpected error";
+    return msg;
+  }
+  return "Unexpected error";
+}
+
 function formatDateRange(start: Date, daysFrom: number, daysTo: number): string {
   const s = new Date(start);
   s.setDate(s.getDate() + daysFrom);
@@ -40,10 +49,22 @@ function formatDateRange(start: Date, daysFrom: number, daysTo: number): string 
   return `${s.toLocaleDateString("en-US", fmt)} - ${e.toLocaleDateString("en-US", fmt)}`;
 }
 
+function parseAdditionalBarriers(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(/\r?\n|,|;/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 function mapFamilyToWorkflowResult(
   referenceId: string,
   familyId: string,
   selectedBarriers: string[],
+  additionalBarriers: string,
   additionalDetails: string,
   lastSavedAt: string | null,
   detail: NonNullable<Awaited<ReturnType<typeof getFamilyDetail>>>,
@@ -122,6 +143,7 @@ function mapFamilyToWorkflowResult(
     referenceId,
     familyId,
     selectedBarriers,
+    additionalBarriers,
     additionalDetails,
     sections,
     resources,
@@ -165,12 +187,17 @@ export async function generateBarrierWorkflowAction(
 ): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
   const referenceId = input.referenceId?.trim() ?? "";
   const selected = Array.from(new Set((input.selectedBarriers ?? []).map((s) => s.trim()).filter(Boolean)));
+  const additionalBarriers = input.additionalBarriers?.trim() ?? "";
+  const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
   const details = input.additionalDetails?.trim() ?? "";
   if (!referenceId) {
     return { ok: false, error: "Enter a Family/Case ID to save and track this plan." };
   }
-  if (selected.length === 0 && details.length === 0) {
-    return { ok: false, error: "Select at least one barrier or add details." };
+  if (selected.length === 0 && parsedAdditionalBarriers.length === 0) {
+    return {
+      ok: false,
+      error: "Select at least one barrier or enter at least one additional barrier.",
+    };
   }
 
   try {
@@ -217,11 +244,11 @@ export async function generateBarrierWorkflowAction(
       label,
       sort_order: idx,
     }));
-    if (details) {
+    for (const barrier of parsedAdditionalBarriers) {
       barrierRows.push({
         family_id: familyId,
         preset_key: "other",
-        label: details.length > 200 ? `${details.slice(0, 197)}...` : details,
+        label: barrier.length > 200 ? `${barrier.slice(0, 197)}...` : barrier,
         sort_order: barrierRows.length,
       });
     }
@@ -235,8 +262,9 @@ export async function generateBarrierWorkflowAction(
 
     const planRes = await generatePlan({
       familyId,
-      regenerateExistingPlan: Boolean(existingRecord?.family_id),
-      regenerationFeedback: details || undefined,
+      regenerateExistingPlan: true,
+      regenerationFeedback:
+        [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
     });
     if (!planRes.ok) return { ok: false, error: planRes.error };
 
@@ -247,6 +275,7 @@ export async function generateBarrierWorkflowAction(
       referenceId,
       familyId,
       selected,
+      additionalBarriers,
       details,
       null,
       detail,
@@ -268,8 +297,9 @@ export async function generateBarrierWorkflowAction(
       ok: true,
       result: { ...mapped, lastSavedAt: savedAt },
     };
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    console.error("[barrier-workflow] generateBarrierWorkflowAction failed", error);
+    return { ok: false, error: toClientError(error) };
   }
 }
 
@@ -296,13 +326,20 @@ export async function toggleBarrierWorkflowActionItemAction(
     const detail = await getFamilyDetail(supabase, familyId);
     if (!detail) return { ok: false, error: "Workflow session not found." };
 
-    const selectedBarriers = detail.barriers.map((b) => b.label);
+    const selectedBarriers = detail.barriers
+      .filter((b) => b.preset_key !== "other")
+      .map((b) => b.label);
+    const additionalBarriers = detail.barriers
+      .filter((b) => b.preset_key === "other")
+      .map((b) => b.label)
+      .join("; ");
     const details = detail.summary ?? detail.household_notes ?? "";
     const referenceId = (record?.reference_id as string | undefined) ?? familyId;
     const mapped = mapFamilyToWorkflowResult(
       referenceId,
       familyId,
       selectedBarriers,
+      additionalBarriers,
       details,
       null,
       detail,
@@ -324,8 +361,9 @@ export async function toggleBarrierWorkflowActionItemAction(
       ok: true,
       result: { ...mapped, lastSavedAt: savedAt },
     };
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    console.error("[barrier-workflow] toggleBarrierWorkflowActionItemAction failed", error);
+    return { ok: false, error: toClientError(error) };
   }
 }
 
@@ -350,7 +388,11 @@ export async function loadBarrierWorkflowByReferenceAction(
 
     const selected = Array.isArray(record.selected_barriers)
       ? (record.selected_barriers as string[])
-      : detail.barriers.map((b) => b.label);
+      : detail.barriers.filter((b) => b.preset_key !== "other").map((b) => b.label);
+    const additionalBarriers = detail.barriers
+      .filter((b) => b.preset_key === "other")
+      .map((b) => b.label)
+      .join("; ");
     const details =
       (record.additional_details as string | null | undefined) ??
       detail.summary ??
@@ -363,13 +405,15 @@ export async function loadBarrierWorkflowByReferenceAction(
         ref,
         record.family_id as string,
         selected,
+        additionalBarriers,
         details,
         (record.updated_at as string | null | undefined) ?? null,
         detail,
       ),
     };
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    console.error("[barrier-workflow] loadBarrierWorkflowByReferenceAction failed", error);
+    return { ok: false, error: toClientError(error) };
   }
 }
 
@@ -391,8 +435,9 @@ export async function listRecentBarrierPlanRecordsAction(
       updatedAt: r.updated_at as string,
     }));
     return { ok: true, records };
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    console.error("[barrier-workflow] listRecentBarrierPlanRecordsAction failed", error);
+    return { ok: false, error: toClientError(error) };
   }
 }
 
@@ -401,9 +446,14 @@ export async function generateBarrierWorkflowForFamilyAction(
   input: Omit<BarrierWorkflowInput, "referenceId">,
 ): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
   const selected = Array.from(new Set((input.selectedBarriers ?? []).map((s) => s.trim()).filter(Boolean)));
+  const additionalBarriers = input.additionalBarriers?.trim() ?? "";
+  const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
   const details = input.additionalDetails?.trim() ?? "";
-  if (selected.length === 0 && details.length === 0) {
-    return { ok: false, error: "Select at least one barrier or add details." };
+  if (selected.length === 0 && parsedAdditionalBarriers.length === 0) {
+    return {
+      ok: false,
+      error: "Select at least one barrier or enter at least one additional barrier.",
+    };
   }
   try {
     const { supabase, user } = await requireAppUserWithClient();
@@ -421,11 +471,11 @@ export async function generateBarrierWorkflowForFamilyAction(
       label,
       sort_order: idx,
     }));
-    if (details) {
+    for (const barrier of parsedAdditionalBarriers) {
       barrierRows.push({
         family_id: familyId,
         preset_key: "other",
-        label: details.length > 200 ? `${details.slice(0, 197)}...` : details,
+        label: barrier.length > 200 ? `${barrier.slice(0, 197)}...` : barrier,
         sort_order: barrierRows.length,
       });
     }
@@ -445,7 +495,8 @@ export async function generateBarrierWorkflowForFamilyAction(
     const planRes = await generatePlan({
       familyId,
       regenerateExistingPlan: true,
-      regenerationFeedback: details || undefined,
+      regenerationFeedback:
+        [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
     });
     if (!planRes.ok) return { ok: false, error: planRes.error };
 
@@ -456,6 +507,7 @@ export async function generateBarrierWorkflowForFamilyAction(
       detail.name,
       familyId,
       selected,
+      additionalBarriers,
       details,
       null,
       detail,
@@ -473,8 +525,9 @@ export async function generateBarrierWorkflowForFamilyAction(
     revalidatePath(`/families/${familyId}`);
     revalidatePath("/families");
     return { ok: true, result: { ...mapped, lastSavedAt: savedAt } };
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    console.error("[barrier-workflow] generateBarrierWorkflowForFamilyAction failed", error);
+    return { ok: false, error: toClientError(error) };
   }
 }
 
@@ -493,7 +546,11 @@ export async function loadBarrierWorkflowForFamilyAction(
       .maybeSingle();
     const selected = Array.isArray(record?.selected_barriers)
       ? (record?.selected_barriers as string[])
-      : detail.barriers.map((b) => b.label);
+      : detail.barriers.filter((b) => b.preset_key !== "other").map((b) => b.label);
+    const additionalBarriers = detail.barriers
+      .filter((b) => b.preset_key === "other")
+      .map((b) => b.label)
+      .join("; ");
     const details = (record?.additional_details as string | null | undefined) ?? detail.summary ?? "";
     return {
       ok: true,
@@ -501,13 +558,15 @@ export async function loadBarrierWorkflowForFamilyAction(
         detail.name,
         familyId,
         selected,
+        additionalBarriers,
         details,
         (record?.updated_at as string | null | undefined) ?? null,
         detail,
       ),
     };
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    console.error("[barrier-workflow] loadBarrierWorkflowForFamilyAction failed", error);
+    return { ok: false, error: toClientError(error) };
   }
 }
 

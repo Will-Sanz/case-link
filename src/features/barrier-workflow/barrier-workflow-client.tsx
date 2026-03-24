@@ -28,6 +28,7 @@ export function BarrierWorkflowClient({
 }) {
   const [selected, setSelected] = useState<BarrierPresetLabel[]>([]);
   const [referenceId, setReferenceId] = useState("");
+  const [additionalBarriers, setAdditionalBarriers] = useState("");
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export function BarrierWorkflowClient({
         ),
       );
       setAdditionalDetails(r.result.additionalDetails);
+      setAdditionalBarriers(r.result.additionalBarriers);
       setReferenceId(r.result.referenceId);
       const recents = await listRecentBarrierPlanRecordsAction();
       if (recents.ok) setRecentRecords(recents.records);
@@ -86,6 +88,7 @@ export function BarrierWorkflowClient({
       const r = await generateBarrierWorkflowAction({
         referenceId,
         selectedBarriers: selected,
+        additionalBarriers,
         additionalDetails,
       });
       if (!r.ok) {
@@ -135,7 +138,7 @@ export function BarrierWorkflowClient({
           Barrier-based plan builder
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-          Select the barriers you are seeing, add optional details, and generate a
+          Select barriers, add any extra barriers, then optional case details to generate a
           focused 30 / 60 / 90 day plan with Philadelphia resource matches.
         </p>
 
@@ -180,7 +183,18 @@ export function BarrierWorkflowClient({
         </div>
 
         <div className="mt-5">
-          <Label htmlFor="additional-details">Add more details</Label>
+          <Label htmlFor="additional-barriers">Additional barriers</Label>
+          <Textarea
+            id="additional-barriers"
+            className="mt-2 min-h-[110px]"
+            placeholder="Add custom barriers (comma, semicolon, or new line separated)."
+            value={additionalBarriers}
+            onChange={(e) => setAdditionalBarriers(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-5">
+          <Label htmlFor="additional-details">Additional details</Label>
           <Textarea
             id="additional-details"
             className="mt-2 min-h-[110px]"

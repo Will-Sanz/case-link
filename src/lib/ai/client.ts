@@ -32,6 +32,14 @@ export type CreateResponseResult =
   | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
   | { ok: false; error: string };
 
+function summarizeInput(input: string | ChatMessage[]): { chars: number; preview: string } {
+  if (typeof input === "string") {
+    return { chars: input.length, preview: input.slice(0, 1200) };
+  }
+  const combined = input.map((m) => `[${m.role}] ${m.content}`).join("\n\n");
+  return { chars: combined.length, preview: combined.slice(0, 1200) };
+}
+
 /**
  * Reasoning models (o1, o3, o4, …) return 400 if `temperature` is sent on Responses / Chat.
  */
@@ -60,12 +68,46 @@ export async function createAiResponse(
   const useResponses = !modelOverride && useResponsesApi(options.taskType);
 
   const debug = process.env.OPENAI_DEBUG === "1";
+  const payloadDebug = process.env.OPENAI_PAYLOAD_DEBUG === "1";
+  const startedAt = Date.now();
+
+  if (debug || payloadDebug) {
+    const inputSummary = summarizeInput(options.input);
+    console.info("[ai] request:start", {
+      taskType: options.taskType,
+      model,
+      api: useResponses ? "responses" : "chat.completions",
+      hasStructuredJsonSchema: Boolean(options.structuredJsonSchema),
+      responseFormat: options.responseFormat ?? null,
+      inputChars: inputSummary.chars,
+      instructionsChars: options.instructions.length,
+      maxTokens: options.maxTokens ?? 4096,
+    });
+    if (payloadDebug) {
+      console.info("[ai] request:instructions", options.instructions.slice(0, 2000));
+      console.info("[ai] request:input_preview", inputSummary.preview);
+    }
+  }
 
   try {
-    if (useResponses) {
-      return await callResponsesApi(apiKey, model, options, debug);
+    const result = useResponses
+      ? await callResponsesApi(apiKey, model, options, debug)
+      : await callChatCompletionsApi(apiKey, model, options, debug);
+    if (debug || payloadDebug) {
+      console.info("[ai] request:end", {
+        taskType: options.taskType,
+        model,
+        elapsedMs: Date.now() - startedAt,
+        ok: result.ok,
+        error: result.ok ? null : result.error,
+        tokens: result.ok ? (result.usage?.total_tokens ?? null) : null,
+        outputChars: result.ok ? result.text.length : null,
+      });
+      if (payloadDebug && result.ok) {
+        console.info("[ai] response:preview", result.text.slice(0, 2500));
+      }
     }
-    return await callChatCompletionsApi(apiKey, model, options, debug);
+    return result;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Request failed";
     if (debug) {

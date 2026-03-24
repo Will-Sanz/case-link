@@ -7,6 +7,8 @@ import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhas
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import {
   OPENAI_PLAN_STEPS_ROOT_SCHEMA,
+  aiPlanStepSchema,
+  applyPlanStepDefaults,
   aiPlanResponseSchema,
   normalizePlanStep,
   type AiPlanStepParsed,
@@ -34,33 +36,31 @@ export function shouldLogPlanRegenerate(): boolean {
   );
 }
 
-const AI_PROMPT_MATCH_LIMIT = 15;
+const AI_PROMPT_MATCH_LIMIT = 10;
 
 function cloneSchema(schema: unknown): Record<string, unknown> {
   return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
 }
 
+/** Context sent to the model: barriers, case notes, and matched resources only (smaller prompt, faster). */
 function buildFamilyContext(detail: FamilyDetail): string {
-  const lines: string[] = [
-    `Household name: ${detail.name}`,
-    detail.urgency ? `Urgency: ${detail.urgency}` : null,
-    detail.summary ? `Summary: ${detail.summary}` : null,
-    detail.household_notes ? `Circumstances: ${detail.household_notes}` : null,
-    detail.goals.length
-      ? `Goals:\n${detail.goals.map((g) => `- ${g.label}${g.preset_key ? ` (${g.preset_key})` : ""}`).join("\n")}`
-      : null,
-    detail.barriers.length
-      ? `Barriers:\n${detail.barriers.map((b) => `- ${b.label}${b.preset_key ? ` (${b.preset_key})` : ""}`).join("\n")}`
-      : null,
-  ].filter(Boolean) as string[];
+  const notesParts = [detail.summary?.trim(), detail.household_notes?.trim()].filter(Boolean);
+  const notesBlock =
+    notesParts.length > 0
+      ? `Case notes:\n${notesParts.join("\n\n")}`
+      : "Case notes: (none provided)";
 
-  const familyBlock = lines.join("\n\n");
+  const barriersBlock =
+    detail.barriers.length > 0
+      ? `Barriers:\n${detail.barriers.map((b) => `- ${b.label}${b.preset_key ? ` (${b.preset_key})` : ""}`).join("\n")}`
+      : "Barriers: (none listed)";
+
   const resourcesBlock = formatMatchesForAiPrompt(
     detail.resourceMatches,
     AI_PROMPT_MATCH_LIMIT,
   );
 
-  return `${familyBlock}\n\n---\n\n${resourcesBlock}`;
+  return `${barriersBlock}\n\n${notesBlock}\n\n---\n\n${resourcesBlock}`;
 }
 
 const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PRIORITIZED 30-60-90 day case plan ordered by importance and urgency—NOT strict dependency chains. Steps should be in the most logical sequence for a case worker, but do not need to depend on each other.
@@ -123,12 +123,14 @@ AVOID: multiple steps that are slight rewordings of the same idea (e.g., "Apply 
 For high-risk households: compress timelines; push meaningful actions into the first 3–7 days; favor immediate scheduling, filing, escalation.
 
 ## Schema and output
-- Return JSON matching the API schema exactly. Every key, every step. No placeholders.
+- Return a single JSON object with top-level key "steps" only (array of plan steps). No markdown, no SQL, no references to database tables—only that JSON object.
+- Match the response shape (all keys on each step). No placeholders.
 - priority field: set "high" for steps 1–2, "medium" for mid-priority, "low" for later steps
 - depends_on: use sparingly; prefer natural ordering by priority over explicit dependencies
 
 ## Step count
 - At MOST 5 steps per phase (30, 60, 90), 15 total. Prefer 3–4 per phase (9–12 total) for clarity.
+- **MANDATORY:** At least **two** steps per phase: two with **"30"**, two with **"60"**, and two with **"90"** whenever the plan has six or more steps. Do not leave a horizon with only one step unless the total step count is below six.
 
 ## Resource grounding
 - Use MATCHED_COMMUNITY_RESOURCES when provided. Include program names and contact details.
@@ -283,6 +285,95 @@ export function capStepsPerPhase<
   return out;
 }
 
+const MIN_STEPS_PER_PHASE = 2;
+const PHASES_ORDER: ("30" | "60" | "90")[] = ["30", "60", "90"];
+
+function adjustActionItemsWeekIndexForPhase(
+  actionItems: AiPlanStepParsed["action_items"],
+  ph: "30" | "60" | "90",
+): AiPlanStepParsed["action_items"] {
+  const ranges: Record<typeof ph, [number, number]> = {
+    "30": [1, 4],
+    "60": [5, 8],
+    "90": [9, 12],
+  };
+  const [minW, maxW] = ranges[ph];
+  return actionItems.map((ai, j) => ({
+    ...ai,
+    week_index: Math.min(maxW, Math.max(minW, minW + j)),
+  }));
+}
+
+/**
+ * Models often skew all steps into one phase. Enforce at least MIN_STEPS_PER_PHASE per 30/60/90
+ * when there are enough steps (≥6); otherwise spread round-robin by priority.
+ */
+function ensureMinimumPerPhase(steps: AiPlanStepParsed[]): AiPlanStepParsed[] {
+  if (steps.length === 0) return steps;
+
+  const priOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const phaseOrderRank = (p: string) =>
+    p === "30" ? 0 : p === "60" ? 1 : p === "90" ? 2 : 1;
+
+  const sortedEntries = steps
+    .map((s, originalIndex) => ({ s, originalIndex }))
+    .sort((a, b) => {
+      const pr = (priOrder[a.s.priority] ?? 1) - (priOrder[b.s.priority] ?? 1);
+      if (pr !== 0) return pr;
+      const phr = phaseOrderRank(a.s.phase) - phaseOrderRank(b.s.phase);
+      if (phr !== 0) return phr;
+      return a.originalIndex - b.originalIndex;
+    });
+
+  const n = steps.length;
+  const assignment = new Map<number, "30" | "60" | "90">();
+  const counts = { "30": 0, "60": 0, "90": 0 };
+
+  let si = 0;
+
+  if (n >= MIN_STEPS_PER_PHASE * PHASES_ORDER.length) {
+    for (const ph of PHASES_ORDER) {
+      for (let k = 0; k < MIN_STEPS_PER_PHASE && si < n; k++) {
+        const { originalIndex } = sortedEntries[si++];
+        assignment.set(originalIndex, ph);
+        counts[ph]++;
+      }
+    }
+    let rot = 0;
+    let guard = 0;
+    while (si < n && guard < n * 12) {
+      guard++;
+      const ph = PHASES_ORDER[rot % PHASES_ORDER.length];
+      rot++;
+      if (counts[ph] >= MAX_PLAN_STEPS_PER_PHASE) continue;
+      const { originalIndex } = sortedEntries[si++];
+      assignment.set(originalIndex, ph);
+      counts[ph]++;
+    }
+    while (si < n) {
+      const ph = [...PHASES_ORDER].sort((a, b) => counts[a] - counts[b])[0];
+      const { originalIndex } = sortedEntries[si++];
+      assignment.set(originalIndex, ph);
+      counts[ph]++;
+    }
+  } else {
+    for (let j = 0; j < n; j++) {
+      const ph = PHASES_ORDER[j % PHASES_ORDER.length];
+      const { originalIndex } = sortedEntries[j];
+      assignment.set(originalIndex, ph);
+    }
+  }
+
+  return steps.map((step, i) => {
+    const ph = assignment.get(i) ?? "60";
+    return {
+      ...step,
+      phase: ph,
+      action_items: adjustActionItemsWeekIndexForPhase(step.action_items, ph),
+    };
+  });
+}
+
 export type TryGeneratePlanOptions = {
   regenerationFeedback?: string;
   /** User clicked Regenerate — instruct model to rewrite every step from scratch. */
@@ -338,6 +429,115 @@ function parsedStepsToGenerated(stepsList: AiPlanStepParsed[]): GeneratedStep[] 
   });
 }
 
+function toNonEmptyString(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const t = value.trim();
+  return t.length > 0 ? t : fallback;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean);
+}
+
+function salvageStepsFromParsedJson(parsed: unknown): AiPlanStepParsed[] {
+  if (!parsed || typeof parsed !== "object") return [];
+  const root = parsed as { steps?: unknown };
+  if (!Array.isArray(root.steps)) return [];
+
+  const fallbackPhase: Array<"30" | "60" | "90"> = ["30", "60", "90"];
+  const salvaged: AiPlanStepParsed[] = [];
+
+  for (let i = 0; i < root.steps.length; i++) {
+    const raw = root.steps[i];
+    if (!raw || typeof raw !== "object") continue;
+    const step = raw as Record<string, unknown>;
+    const phase =
+      step.phase === "30" || step.phase === "60" || step.phase === "90"
+        ? step.phase
+        : fallbackPhase[Math.min(2, Math.floor(i / 4))];
+    const title = toNonEmptyString(step.title, `Priority action ${i + 1}`);
+    const coerced = {
+      phase,
+      title,
+      description: toNonEmptyString(
+        step.description,
+        `Complete ${title.toLowerCase()} with documented outreach and follow-up.`,
+      ),
+      action_needed_now: toNonEmptyString(
+        step.action_needed_now,
+        `Start ${title.toLowerCase()} and record outcomes for next follow-up.`,
+      ),
+      action_items: Array.isArray(step.action_items)
+        ? step.action_items
+        : [
+            {
+              title: `Start ${title}`,
+              description: "Complete first outreach and document result.",
+              week_index: phase === "30" ? 1 : phase === "60" ? 5 : 9,
+              target_date: null,
+            },
+            {
+              title: `Follow up ${title}`,
+              description: "Confirm next steps and update case file.",
+              week_index: phase === "30" ? 2 : phase === "60" ? 6 : 10,
+              target_date: null,
+            },
+          ],
+      rationale: toNonEmptyString(
+        step.rationale,
+        `This action is necessary to reduce current barriers and move the case forward.`,
+      ),
+      detailed_instructions: toNonEmptyString(
+        step.detailed_instructions,
+        "Prepare required documents, complete outreach/submission, and log outcomes with dates.",
+      ),
+      checklist: toStringArray(step.checklist),
+      required_documents: toStringArray(step.required_documents),
+      contacts: Array.isArray(step.contacts) ? step.contacts : [],
+      blockers: toStringArray(step.blockers),
+      fallback_options: toStringArray(step.fallback_options),
+      expected_outcome: toNonEmptyString(
+        step.expected_outcome,
+        "Case has concrete progress and next action is scheduled.",
+      ),
+      success_marker: toNonEmptyString(
+        step.success_marker,
+        "Primary action completed and documented.",
+      ),
+      stage_goal: toNonEmptyString(
+        step.stage_goal,
+        "Advance this case milestone with clear follow-through.",
+      ),
+      why_now: toNonEmptyString(
+        step.why_now,
+        "Early execution reduces delays and unlocks downstream supports.",
+      ),
+      timing_guidance: toNonEmptyString(
+        step.timing_guidance,
+        "Begin this week and confirm follow-up date.",
+      ),
+      priority:
+        step.priority === "high" || step.priority === "medium" || step.priority === "low"
+          ? step.priority
+          : phase === "30"
+            ? "high"
+            : phase === "60"
+              ? "medium"
+              : "low",
+      contact_script: typeof step.contact_script === "string" ? step.contact_script : null,
+      depends_on: typeof step.depends_on === "string" ? step.depends_on : null,
+      milestone_type: typeof step.milestone_type === "string" ? step.milestone_type : null,
+    };
+    const parsedStep = aiPlanStepSchema.safeParse(coerced);
+    if (!parsedStep.success) continue;
+    salvaged.push(applyPlanStepDefaults(normalizePlanStep(parsedStep.data)));
+  }
+  return salvaged.slice(0, 15);
+}
+
 /**
  * Calls OpenAI to draft 30/60/90-day plan steps. Uses strict JSON Schema + richness validation + retries.
  */
@@ -353,11 +553,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
       : "";
   const fullRegenBlock =
     options?.fullRegeneration ?
-      `\n\n## FULL PLAN REGENERATION (mandatory)\nThe case manager is replacing an existing saved plan. You must produce ENTIRELY NEW content for every single step—fresh titles, descriptions, action_needed_now, rationale, detailed_instructions, checklists, action_items (titles and descriptions), contacts, blockers, fallback_options, and all other schema fields. Do not reuse or lightly rephrase generic templates; ground every step in this household's goals, barriers, urgency, and matched resources below. Each step should read as written for this case today.\n`
-      : "";
-  const urgencyBlock =
-    detail.urgency === "crisis" || detail.urgency === "high"
-      ? `\n\n## URGENCY: ${detail.urgency.toUpperCase()}\nThis household is high-risk. Compress timelines. Push as many concrete actions as possible into the first 3–7 days. Front-load scheduling, filing, and escalation. Do not delay meaningful intervention.\n`
+      `\n\n## FULL PLAN REGENERATION (mandatory)\nThe case manager is replacing an existing saved plan. You must produce ENTIRELY NEW content for every single step—fresh titles, descriptions, action_needed_now, rationale, detailed_instructions, checklists, action_items (titles and descriptions), contacts, blockers, fallback_options, and all other required fields. Do not reuse generic templates; ground every step in the barriers, case notes, and matched resources below.\n`
       : "";
   const baseUser = `Create a 30-60-90 day case plan ordered by PRIORITY (urgency + impact), not dependency chains. Step 1 = most important action to take right now. Each step must be clearly distinct—no overlapping or repetitive steps. If SNAP, WIC, and food pantry actions overlap, merge into one well-scoped step.
 
@@ -367,7 +563,7 @@ The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, reg
 
 Every step MUST include ALL schema fields. Set priority: "high" for top 1–2 steps, "medium"/"low" for others. Use depends_on sparingly. No placeholders.
 
-Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sustainability. Use matched resources when they apply.${fullRegenBlock}${urgencyBlock}${feedbackBlock}\n\n${context}`;
+Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sustainability. Use matched resources when details are above.${fullRegenBlock}${feedbackBlock}\n\n${context}`;
 
   const maxAttempts = options?.retries ?? 4;
   let correction = "";
@@ -410,10 +606,11 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
         structuredJsonSchema: {
           name: "case_plan_steps",
           schema: cloneSchema(OPENAI_PLAN_STEPS_ROOT_SCHEMA),
-          strict: true,
+          // Strict mode can fail on large nested schemas with obscure API errors; non-strict + Zod/salvage still validates output.
+          strict: false,
         },
         temperature: 0.35,
-        maxTokens: 16384,
+        maxTokens: 8192,
       });
 
       if (!result.ok) {
@@ -461,6 +658,24 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
 
       const validated = aiPlanResponseSchema.safeParse(parsed);
       if (!validated.success) {
+        let salvaged = salvageStepsFromParsedJson(parsed);
+        if (salvaged.length > 0) {
+          if (logRegen) {
+            console.warn("[openai-plan/regenerate] schema validation failed; salvaged steps", {
+              salvagedCount: salvaged.length,
+            });
+          }
+          salvaged = sortByPriority(salvaged);
+          salvaged = deduplicateSteps(salvaged);
+          salvaged = sortByPriority(salvaged);
+          salvaged = capStepsPerPhase(salvaged, MAX_PLAN_STEPS_PER_PHASE);
+          salvaged = ensureMinimumPerPhase(salvaged);
+          return {
+            ok: true,
+            steps: parsedStepsToGenerated(salvaged),
+            model: lastModel,
+          };
+        }
         if (logRegen) {
           console.warn("[openai-plan/regenerate] Zod rejected response", {
             message: validated.error.message.slice(0, 1200),
@@ -482,6 +697,7 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
       stepsList = deduplicateSteps(stepsList);
       stepsList = sortByPriority(stepsList);
       stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
+      stepsList = ensureMinimumPerPhase(stepsList);
 
       if (shouldLogOpenAi() && stepsList.length < normalized.length) {
         console.info(

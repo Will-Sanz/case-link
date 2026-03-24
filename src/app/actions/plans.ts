@@ -146,6 +146,7 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
     const ai = await tryGeneratePlanStepsWithOpenAI(detail, {
       regenerationFeedback: regenerationFeedback?.trim() || undefined,
       fullRegeneration: mustUseAi,
+      retries: 1,
     });
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;

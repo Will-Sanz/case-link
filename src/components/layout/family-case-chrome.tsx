@@ -73,6 +73,7 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
     () =>
       familyId
         ? [
+            { href: `/families/${familyId}/overview`, label: "Overview" },
             { href: `/families/${familyId}/plan`, label: "30/60/90 Plan" },
             { href: `/families/${familyId}/resources`, label: "Resources" },
             { href: `/families/${familyId}/timeline`, label: "Timeline" },

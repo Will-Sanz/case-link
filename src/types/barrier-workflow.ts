@@ -20,6 +20,7 @@ export type BarrierPresetLabel = (typeof BARRIER_PRESETS)[number]["label"];
 export type BarrierWorkflowInput = {
   referenceId: string;
   selectedBarriers: BarrierPresetLabel[];
+  additionalBarriers?: string;
   additionalDetails?: string;
 };
 
@@ -74,6 +75,7 @@ export type BarrierWorkflowResult = {
   referenceId: string;
   familyId: string;
   selectedBarriers: string[];
+  additionalBarriers: string;
   additionalDetails: string;
   sections: BarrierWorkflowPlanSection[];
   resources: BarrierWorkflowResource[];
