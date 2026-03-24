@@ -29,6 +29,7 @@ function StandardAside({
       </div>
       <nav className="shrink-0 flex flex-col gap-0.5 p-2 pb-1" aria-label="Main">
         <NavLink href="/families">Families</NavLink>
+        <NavLink href="/profile">Profile</NavLink>
       </nav>
       {familyTabs && familyTabs.length > 0 ? (
         <>
@@ -75,6 +76,7 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
             { href: `/families/${familyId}/plan`, label: "30/60/90 Plan" },
             { href: `/families/${familyId}/resources`, label: "Resources" },
             { href: `/families/${familyId}/timeline`, label: "Timeline" },
+            { href: `/families/${familyId}/assistant`, label: "Case Assistant" },
           ]
         : [],
     [familyId],
@@ -115,6 +117,9 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
           >
             <NavLink href="/families" className="shrink-0 whitespace-nowrap">
               Families
+            </NavLink>
+            <NavLink href="/profile" className="shrink-0 whitespace-nowrap">
+              Profile
             </NavLink>
             {familyTabs.map((item) => (
               <NavLink key={item.href} href={item.href} className="shrink-0 whitespace-nowrap">
