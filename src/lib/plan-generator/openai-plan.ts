@@ -129,8 +129,8 @@ For high-risk households: compress timelines; push meaningful actions into the f
 - depends_on: use sparingly; prefer natural ordering by priority over explicit dependencies
 
 ## Step count
-- At MOST 5 steps per phase (30, 60, 90), 15 total. Prefer 3–4 per phase (9–12 total) for clarity.
-- **MANDATORY:** At least **two** steps per phase: two with **"30"**, two with **"60"**, and two with **"90"** whenever the plan has six or more steps. Do not leave a horizon with only one step unless the total step count is below six.
+- Aim for roughly **2–5 steps per phase** (30, 60, 90) when the case needs that depth—**not** a fixed count. Use fewer steps when fewer distinct actions are needed; use more (up to 5 per phase) when warranted. **Do not pad** with filler steps or **split** one strong step into weak fragments just to hit a number.
+- At most 5 steps per phase and 15 total. Spread work across 30 / 60 / 90 so each horizon has real content when appropriate, but respect the case: natural count beats artificial balance.
 
 ## Resource grounding
 - Use MATCHED_COMMUNITY_RESOURCES when provided. Include program names and contact details.
@@ -283,95 +283,6 @@ export function capStepsPerPhase<
     out.push(s);
   }
   return out;
-}
-
-const MIN_STEPS_PER_PHASE = 2;
-const PHASES_ORDER: ("30" | "60" | "90")[] = ["30", "60", "90"];
-
-function adjustActionItemsWeekIndexForPhase(
-  actionItems: AiPlanStepParsed["action_items"],
-  ph: "30" | "60" | "90",
-): AiPlanStepParsed["action_items"] {
-  const ranges: Record<typeof ph, [number, number]> = {
-    "30": [1, 4],
-    "60": [5, 8],
-    "90": [9, 12],
-  };
-  const [minW, maxW] = ranges[ph];
-  return actionItems.map((ai, j) => ({
-    ...ai,
-    week_index: Math.min(maxW, Math.max(minW, minW + j)),
-  }));
-}
-
-/**
- * Models often skew all steps into one phase. Enforce at least MIN_STEPS_PER_PHASE per 30/60/90
- * when there are enough steps (≥6); otherwise spread round-robin by priority.
- */
-function ensureMinimumPerPhase(steps: AiPlanStepParsed[]): AiPlanStepParsed[] {
-  if (steps.length === 0) return steps;
-
-  const priOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-  const phaseOrderRank = (p: string) =>
-    p === "30" ? 0 : p === "60" ? 1 : p === "90" ? 2 : 1;
-
-  const sortedEntries = steps
-    .map((s, originalIndex) => ({ s, originalIndex }))
-    .sort((a, b) => {
-      const pr = (priOrder[a.s.priority] ?? 1) - (priOrder[b.s.priority] ?? 1);
-      if (pr !== 0) return pr;
-      const phr = phaseOrderRank(a.s.phase) - phaseOrderRank(b.s.phase);
-      if (phr !== 0) return phr;
-      return a.originalIndex - b.originalIndex;
-    });
-
-  const n = steps.length;
-  const assignment = new Map<number, "30" | "60" | "90">();
-  const counts = { "30": 0, "60": 0, "90": 0 };
-
-  let si = 0;
-
-  if (n >= MIN_STEPS_PER_PHASE * PHASES_ORDER.length) {
-    for (const ph of PHASES_ORDER) {
-      for (let k = 0; k < MIN_STEPS_PER_PHASE && si < n; k++) {
-        const { originalIndex } = sortedEntries[si++];
-        assignment.set(originalIndex, ph);
-        counts[ph]++;
-      }
-    }
-    let rot = 0;
-    let guard = 0;
-    while (si < n && guard < n * 12) {
-      guard++;
-      const ph = PHASES_ORDER[rot % PHASES_ORDER.length];
-      rot++;
-      if (counts[ph] >= MAX_PLAN_STEPS_PER_PHASE) continue;
-      const { originalIndex } = sortedEntries[si++];
-      assignment.set(originalIndex, ph);
-      counts[ph]++;
-    }
-    while (si < n) {
-      const ph = [...PHASES_ORDER].sort((a, b) => counts[a] - counts[b])[0];
-      const { originalIndex } = sortedEntries[si++];
-      assignment.set(originalIndex, ph);
-      counts[ph]++;
-    }
-  } else {
-    for (let j = 0; j < n; j++) {
-      const ph = PHASES_ORDER[j % PHASES_ORDER.length];
-      const { originalIndex } = sortedEntries[j];
-      assignment.set(originalIndex, ph);
-    }
-  }
-
-  return steps.map((step, i) => {
-    const ph = assignment.get(i) ?? "60";
-    return {
-      ...step,
-      phase: ph,
-      action_items: adjustActionItemsWeekIndexForPhase(step.action_items, ph),
-    };
-  });
 }
 
 export type TryGeneratePlanOptions = {
@@ -557,7 +468,7 @@ export async function tryGeneratePlanStepsWithOpenAI(
       : "";
   const baseUser = `Create a 30-60-90 day case plan ordered by PRIORITY (urgency + impact), not dependency chains. Step 1 = most important action to take right now. Each step must be clearly distinct—no overlapping or repetitive steps. If SNAP, WIC, and food pantry actions overlap, merge into one well-scoped step.
 
-HARD LIMIT: at most 5 steps per phase, 15 total. Prefer 3–4 per phase (9–12 total) for clarity.
+HARD LIMIT: at most 5 steps per phase, 15 total. Target about 2–5 per phase when the case needs it; do not pad or split steps artificially.
 
 The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, register, confirm, enroll. Avoid passive or duplicate steps.
 
@@ -669,7 +580,6 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
           salvaged = deduplicateSteps(salvaged);
           salvaged = sortByPriority(salvaged);
           salvaged = capStepsPerPhase(salvaged, MAX_PLAN_STEPS_PER_PHASE);
-          salvaged = ensureMinimumPerPhase(salvaged);
           return {
             ok: true,
             steps: parsedStepsToGenerated(salvaged),
@@ -697,8 +607,6 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
       stepsList = deduplicateSteps(stepsList);
       stepsList = sortByPriority(stepsList);
       stepsList = capStepsPerPhase(stepsList, MAX_PLAN_STEPS_PER_PHASE);
-      stepsList = ensureMinimumPerPhase(stepsList);
-
       if (shouldLogOpenAi() && stepsList.length < normalized.length) {
         console.info(
           "[openai-plan] capped/deduped steps:",
