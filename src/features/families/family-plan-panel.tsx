@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   previewRefinePlanStep,
   previewRefinePlan,
-  toggleChecklistItem,
   updatePlan,
   updatePlanStep,
   updatePlanStepActionItem,
@@ -17,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PlanPdfExport } from "@/features/families/plan-pdf-export";
-import { checkboxClass } from "@/lib/ui/form-classes";
+import { PlanStepCaseNote } from "@/features/families/plan-step-case-note";
 import { cn } from "@/lib/utils/cn";
 import type { BarrierWorkflowResult } from "@/types/barrier-workflow";
 import type {
@@ -26,21 +25,6 @@ import type {
   PlanStepRow,
   PlanWithSteps,
 } from "@/types/family";
-
-const PHASE_STYLE: Record<"30" | "60" | "90", string> = {
-  "30": "border-blue-200 bg-blue-50/50",
-  "60": "border-indigo-200 bg-indigo-50/40",
-  "90": "border-violet-200 bg-violet-50/40",
-};
-
-function checklistToText(lines: string[] | undefined): string {
-  return (lines ?? []).join("\n");
-}
-
-/** Keeps blank lines so pressing Enter can open a new checklist row while editing. */
-function textToChecklist(text: string): string[] {
-  return text.split(/\r?\n/).map((l) => l.trim());
-}
 
 function normalizeChecklistForSave(lines: string[] | undefined): string[] {
   return (lines ?? []).map((l) => l.trim()).filter((l) => l.length > 0);
@@ -76,80 +60,6 @@ function stepNeedsPersist(orig: PlanStepRow | undefined, next: PlanStepRow): boo
   return normalizeStepForPersistCompare(orig) !== normalizeStepForPersistCompare(next);
 }
 
-function textToNonEmptyLines(text: string): string[] {
-  return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-}
-
-function normalizeContactsForSave(
-  contacts:
-    | Array<{
-        name?: string | null;
-        phone?: string | null;
-        email?: string | null;
-        notes?: string | null;
-      }>
-    | undefined
-    | null,
-): PlanStepDetails["contacts"] {
-  const normalized = (contacts ?? []).map((c) => ({
-    name: c.name?.trim() ? c.name.trim() : undefined,
-    phone: c.phone?.trim() ? c.phone.trim() : undefined,
-    email: c.email?.trim() ? c.email.trim() : undefined,
-    notes: c.notes?.trim() ? c.notes.trim() : undefined,
-  }));
-
-  // Drop completely empty contact rows.
-  return normalized.filter((c) => Boolean(c.name || c.phone || c.email || c.notes));
-}
-
-type DisplayWeeklyActionItem = {
-  id: string;
-  title: string;
-  description: string | null | undefined;
-  status: PlanStepActionItemRow["status"];
-};
-
-const ACTION_VERB_RE =
-  /\b(call|submit|send|confirm|apply|schedule|register|request|book|gather|arrange|complete|enroll|secure|attend|file|prepare|contact)\b/i;
-
-// Heuristic: these strings tend to be "artifacts" (docs/info) rather than an executable action.
-const ARTIFACT_DOC_RE =
-  /\b(photo\s*id|photo\s*i\.?d|proof|lease|rent\s*statement|past-?due|statement|id\b|income\s*loss|layoff)\b/i;
-const ARTIFACT_CONTACT_RE =
-  /\b(email|phone|landlord\s*(email|phone)|contact\s*info)\b/i;
-
-function isArtifactLikeActionItemTitle(title: string): boolean {
-  const t = title.trim();
-  if (!t) return false;
-  // If it's already phrased like an action, keep it as a standalone action item.
-  if (ACTION_VERB_RE.test(t)) return false;
-  return ARTIFACT_DOC_RE.test(t) || ARTIFACT_CONTACT_RE.test(t);
-}
-
-function groupArtifactActionItems(
-  items: DisplayWeeklyActionItem[],
-): { groups: Array<{ parent: DisplayWeeklyActionItem; artifacts: DisplayWeeklyActionItem[] }>; orphans: DisplayWeeklyActionItem[] } {
-  const groups: Array<{ parent: DisplayWeeklyActionItem; artifacts: DisplayWeeklyActionItem[] }> = [];
-  const orphans: DisplayWeeklyActionItem[] = [];
-
-  let currentGroupIndex = -1;
-
-  for (const item of items) {
-    if (isArtifactLikeActionItemTitle(item.title)) {
-      if (currentGroupIndex >= 0) {
-        groups[currentGroupIndex]?.artifacts.push(item);
-      } else {
-        orphans.push(item);
-      }
-    } else {
-      groups.push({ parent: item, artifacts: [] });
-      currentGroupIndex = groups.length - 1;
-    }
-  }
-
-  return { groups, orphans };
-}
-
 function clonePlan(p: PlanWithSteps): PlanWithSteps {
   return structuredClone(p) as PlanWithSteps;
 }
@@ -173,14 +83,14 @@ export function FamilyPlanPanel({
   familyName,
   plan,
   workflow,
-  onToggleActionItem,
-  actionToggleDisabled,
+  onToggleActionItem: _onToggleActionItem,
+  actionToggleDisabled: _actionToggleDisabled,
 }: {
   familyId: string;
   familyName: string;
   plan: PlanWithSteps | null;
   workflow: BarrierWorkflowResult | null;
-  /** When set, view mode shows completion checkboxes for weekly items (barrier workflow). */
+  /** @deprecated Plan UI no longer shows action-item checkboxes; kept for API compatibility. */
   onToggleActionItem?: (actionItemId: string, done: boolean) => void;
   actionToggleDisabled?: boolean;
 }) {
@@ -196,7 +106,6 @@ export function FamilyPlanPanel({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [aiOpen, setAiOpen] = useState(false);
   const [aiStepId, setAiStepId] = useState<string | null>(null);
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiPreview, setAiPreview] = useState<{
@@ -447,25 +356,12 @@ export function FamilyPlanPanel({
     });
   }
 
-  function onDetailChecklistToggle(stepId: string, index: number, completed: boolean) {
-    setError(null);
-    startTransition(async () => {
-      const r = await toggleChecklistItem({
-        stepId,
-        familyId,
-        checklistIndex: index,
-        completed,
-      });
-      if (!r.ok) setError(r.error);
-      else router.refresh();
-    });
-  }
-
   function openAiForStep(stepId: string) {
+    if (!plan) return;
+    if (!editing) beginEdit();
     setAiStepId(stepId);
     setAiInstruction("");
     setAiPreview(null);
-    setAiOpen(true);
     setError(null);
   }
 
@@ -515,7 +411,6 @@ export function FamilyPlanPanel({
         }),
       };
     });
-    setAiOpen(false);
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
@@ -819,784 +714,48 @@ export function FamilyPlanPanel({
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-5">
           {workflow.sections.map((section) => (
-            <section
-              key={section.phase}
-              className={cn(
-                "rounded-xl border bg-white p-4",
-                PHASE_STYLE[section.phase],
-              )}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-900">{section.phase}-day</h3>
-                <p className="text-xs text-slate-500">{section.dueRangeLabel}</p>
+            <section key={section.phase} className="max-w-[800px] space-y-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200/80 pb-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  {section.phase}-day horizon
+                </h3>
+                <p className="text-xs text-slate-400">{section.dueRangeLabel}</p>
               </div>
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="text-sm leading-relaxed text-slate-600">
                 {editing ? phaseSummaries[section.phase] : section.summary}
               </p>
-              <div className="mt-3 space-y-3">
-                {stepsByPhase[section.phase].map((full) => {
-                  const d = (full?.details ?? {}) as PlanStepDetails;
-                  const barrierActionItems = (full.action_items ?? []).map((ai) => ({
-                    id: ai.id,
-                    title: ai.title,
-                    description: ai.description,
-                    status: ai.status,
-                  }));
-                  return (
-                    <article
-                      key={full.id}
-                      id={`step-${full.id}`}
-                      className="rounded-lg border border-slate-200/90 bg-white/90 p-3 shadow-sm"
-                    >
-                      {editing ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="h-8 border-slate-200 text-xs"
-                            onClick={() => openAiForStep(full.id)}
-                          >
-                            Edit with AI
-                          </Button>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="sm:col-span-2">
-                            <Label>Step title</Label>
-                            <Input
-                              className="mt-1"
-                              value={full.title}
-                              onChange={(e) => updateStepInDraft(full.id, { title: e.target.value })}
-                            />
-                          </div>
-                          <div>
-                            <Label>Phase</Label>
-                            <select
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                              value={full.phase}
-                              onChange={(e) =>
-                                updateStepInDraft(full.id, {
-                                  phase: e.target.value as PlanStepRow["phase"],
-                                })
-                              }
-                            >
-                              <option value="30">30-day</option>
-                              <option value="60">60-day</option>
-                              <option value="90">90-day</option>
-                            </select>
-                          </div>
-                          <div>
-                            <Label>Status</Label>
-                            <select
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                              value={full.status}
-                              onChange={(e) =>
-                                updateStepInDraft(full.id, {
-                                  status: e.target.value as PlanStepRow["status"],
-                                })
-                              }
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="in_progress">In progress</option>
-                              <option value="completed">Completed</option>
-                              <option value="blocked">Blocked</option>
-                            </select>
-                          </div>
-                          <div>
-                            <Label>Priority</Label>
-                            <select
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                              value={full.priority ?? "medium"}
-                              onChange={(e) =>
-                                (() => {
-                                  const nextPriority = e.target.value as PlanStepRow["priority"];
-                                  const detailsPriority =
-                                    nextPriority === "urgent" ? "high" : nextPriority ?? "medium";
-                                  updateStepInDraft(full.id, { priority: nextPriority });
-                                  updateStepDetails(full.id, { priority: detailsPriority });
-                                })()
-                              }
-                            >
-                              <option value="low">Low</option>
-                              <option value="medium">Medium</option>
-                              <option value="high">High</option>
-                              <option value="urgent">Urgent</option>
-                            </select>
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>Timing</Label>
-                            <Input
-                              className="mt-1"
-                              value={d.timing_guidance ?? ""}
-                              onChange={(e) =>
-                                updateStepDetails(full.id, {
-                                  timing_guidance: e.target.value || undefined,
-                                })
-                              }
-                              placeholder="e.g. Within 2 weeks; before intake"
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>Summary — what to do</Label>
-                            <Textarea
-                              className="mt-1 min-h-[88px] border-slate-200"
-                              value={full.description}
-                              onChange={(e) =>
-                                updateStepInDraft(full.id, { description: e.target.value })
-                              }
-                              placeholder="Concise instructions for the city form or case file."
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>Additional guidance (optional)</Label>
-                            <Textarea
-                              className="mt-1 min-h-[72px] border-slate-200"
-                              value={d.detailed_instructions ?? ""}
-                              onChange={(e) =>
-                                updateStepDetails(full.id, {
-                                  detailed_instructions: e.target.value || undefined,
-                                })
-                              }
-                              placeholder="Extra nuance, edge cases, or talking points — hidden by default in view."
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>Checklist (one item per line)</Label>
-                            <Textarea
-                              className="mt-1 min-h-[72px] border-slate-200 font-mono text-xs"
-                              value={checklistToText(d.checklist)}
-                              onChange={(e) =>
-                                updateStepDetails(full.id, {
-                                  checklist: textToChecklist(e.target.value),
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>Outcome notes</Label>
-                            <Textarea
-                              className="mt-1 min-h-[56px] border-slate-200"
-                              value={
-                                (full.workflow_data?.outcome_notes as string | undefined) ?? ""
-                              }
-                              onChange={(e) =>
-                                updateStepInDraft(full.id, {
-                                  workflow_data: {
-                                    ...full.workflow_data,
-                                    outcome_notes: e.target.value || null,
-                                  },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>Blocker reason</Label>
-                            <Textarea
-                              className="mt-1 min-h-[56px] border-slate-200"
-                              value={
-                                (full.workflow_data?.blocker_reason as string | undefined) ?? ""
-                              }
-                              onChange={(e) =>
-                                updateStepInDraft(full.id, {
-                                  workflow_data: {
-                                    ...full.workflow_data,
-                                    blocker_reason: e.target.value || null,
-                                  },
-                                })
-                              }
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2">
-                            <details className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
-                              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                                Advanced step content
-                              </summary>
-                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                <div className="sm:col-span-2">
-                                  <Label>Stage goal</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.stage_goal ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        stage_goal: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Rationale (why this matters)</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.rationale ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        rationale: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Why now</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.why_now ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        why_now: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Expected outcome</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.expected_outcome ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        expected_outcome: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Success marker</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.success_marker ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        success_marker: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Required documents (one per line)</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[72px] border-slate-200 font-mono text-xs"
-                                    value={(d.required_documents ?? []).join("\n")}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        required_documents: textToNonEmptyLines(e.target.value),
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Contacts</Label>
-                                  <div className="mt-2 space-y-2">
-                                    {(d.contacts ?? []).map((c, idx) => (
-                                      <div
-                                        key={`${full.id}-contact-${idx}`}
-                                        className="rounded-md border border-slate-200 bg-white p-2"
-                                      >
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                          <div>
-                                            <Label className="text-[11px]">Name</Label>
-                                            <Input
-                                              className="mt-1"
-                                              value={c.name ?? ""}
-                                              onChange={(e) => {
-                                                const next = [...(d.contacts ?? [])];
-                                                next[idx] = { ...next[idx], name: e.target.value };
-                                                updateStepDetails(full.id, {
-                                                  contacts: normalizeContactsForSave(next),
-                                                });
-                                              }}
-                                            />
-                                          </div>
-                                          <div>
-                                            <Label className="text-[11px]">Phone</Label>
-                                            <Input
-                                              className="mt-1"
-                                              value={c.phone ?? ""}
-                                              onChange={(e) => {
-                                                const next = [...(d.contacts ?? [])];
-                                                next[idx] = { ...next[idx], phone: e.target.value };
-                                                updateStepDetails(full.id, {
-                                                  contacts: normalizeContactsForSave(next),
-                                                });
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-
-                                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                          <div>
-                                            <Label className="text-[11px]">Email</Label>
-                                            <Input
-                                              className="mt-1"
-                                              value={c.email ?? ""}
-                                              onChange={(e) => {
-                                                const next = [...(d.contacts ?? [])];
-                                                next[idx] = { ...next[idx], email: e.target.value };
-                                                updateStepDetails(full.id, {
-                                                  contacts: normalizeContactsForSave(next),
-                                                });
-                                              }}
-                                            />
-                                          </div>
-                                          <div>
-                                            <Label className="text-[11px]">Notes</Label>
-                                            <Input
-                                              className="mt-1"
-                                              value={c.notes ?? ""}
-                                              onChange={(e) => {
-                                                const next = [...(d.contacts ?? [])];
-                                                next[idx] = { ...next[idx], notes: e.target.value };
-                                                updateStepDetails(full.id, {
-                                                  contacts: normalizeContactsForSave(next),
-                                                });
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-
-                                        <div className="mt-2 flex">
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            className="h-8 px-2 text-xs text-slate-700"
-                                            onClick={() => {
-                                              const next = [...(d.contacts ?? [])].filter((_, j) => j !== idx);
-                                              updateStepDetails(full.id, {
-                                                contacts: normalizeContactsForSave(next),
-                                              });
-                                            }}
-                                          >
-                                            Remove
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-
-                                    <Button
-                                      type="button"
-                                      variant="secondary"
-                                      className="h-8 border-slate-200"
-                                      onClick={() => {
-                                        const next = [
-                                          ...(d.contacts ?? []),
-                                          { name: "", phone: "", email: "", notes: "" },
-                                        ];
-                                        updateStepDetails(full.id, {
-                                          contacts: normalizeContactsForSave(next),
-                                        });
-                                      }}
-                                    >
-                                      Add contact
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Blockers (one per line)</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[72px] border-slate-200 font-mono text-xs"
-                                    value={(d.blockers ?? []).join("\n")}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        blockers: textToNonEmptyLines(e.target.value),
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Fallback options (one per line)</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[72px] border-slate-200 font-mono text-xs"
-                                    value={(d.fallback_options ?? []).join("\n")}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        fallback_options: textToNonEmptyLines(e.target.value),
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label>Contact script</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.contact_script ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        contact_script: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label>Depends on</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.depends_on ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        depends_on: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Milestone type</Label>
-                                  <Input
-                                    className="mt-1"
-                                    value={d.milestone_type ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        milestone_type: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            </details>
-                          </div>
-                        </div>
-
-                        {(full.action_items ?? []).length > 0 ? (
-                          <div className="space-y-2 border-t border-slate-200 pt-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Weekly action items
-                            </p>
-                            {(full.action_items ?? []).map((ai) => (
-                              <div
-                                key={ai.id}
-                                className="rounded-md border border-slate-200 bg-slate-50/80 p-2"
-                              >
-                                <Label className="text-[11px]">Title</Label>
-                                <Input
-                                  className="mt-1"
-                                  value={ai.title}
-                                  onChange={(e) =>
-                                    updateActionItemInDraft(full.id, ai.id, {
-                                      title: e.target.value,
-                                    })
-                                  }
-                                />
-                                <Label className="mt-2 block text-[11px]">Details</Label>
-                                <Input
-                                  className="mt-1"
-                                  value={ai.description ?? ""}
-                                  onChange={(e) =>
-                                    updateActionItemInDraft(full.id, ai.id, {
-                                      description: e.target.value || null,
-                                    })
-                                  }
-                                />
-                                <div className="mt-2">
-                                  <Label className="text-[11px]">Week #</Label>
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    className="mt-1 max-w-[120px]"
-                                    value={ai.week_index}
-                                    onChange={(e) =>
-                                      updateActionItemInDraft(full.id, ai.id, {
-                                        week_index: Number(e.target.value) || 1,
-                                      })
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="space-y-3 text-sm">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-base font-semibold tracking-tight text-slate-900">
-                              {full.title}
-                            </h4>
-                            {(full.description?.trim() ||
-                              d.action_needed_now?.trim() ||
-                              full.ai_helper_data?.action_needed_now?.trim()) ? (
-                              <p className="mt-2 text-[15px] leading-relaxed text-slate-700 whitespace-pre-wrap">
-                                {full.description?.trim() ||
-                                  d.action_needed_now?.trim() ||
-                                  full.ai_helper_data?.action_needed_now}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="shrink-0 text-left sm:text-right text-xs text-slate-500">
-                            <p className="font-medium capitalize text-slate-700">
-                              {(full.priority ?? d.priority ?? "medium").replace("_", " ")} priority
-                            </p>
-                            {d.timing_guidance?.trim() ? (
-                              <p className="mt-1 max-w-[220px] sm:ml-auto">{d.timing_guidance}</p>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {(barrierActionItems.length > 0 || (d.checklist ?? []).some((line) => line.trim().length > 0)) ? (
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                              Action items
-                            </p>
-                            <ul className="mt-2 space-y-2">
-                              {(() => {
-                                const { groups, orphans } = groupArtifactActionItems(
-                                  barrierActionItems as DisplayWeeklyActionItem[],
-                                );
-
-                                return (
-                                  <>
-                                    {groups.map((group) => (
-                                      <li
-                                        key={group.parent.id}
-                                        className="rounded-lg border border-slate-200 bg-white p-2 text-sm"
-                                      >
-                                        {onToggleActionItem ? (
-                                          <label className="flex items-start gap-2">
-                                            <input
-                                              type="checkbox"
-                                              className={`${checkboxClass} mt-0.5`}
-                                              checked={group.parent.status === "completed"}
-                                              disabled={actionToggleDisabled}
-                                              onChange={(e) =>
-                                                onToggleActionItem(
-                                                  group.parent.id,
-                                                  e.target.checked,
-                                                )
-                                              }
-                                            />
-                                            <span>
-                                              <span className="font-medium text-slate-800">
-                                                {group.parent.title}
-                                              </span>
-                                            </span>
-                                          </label>
-                                        ) : (
-                                          <>
-                                            <span className="font-medium text-slate-800">
-                                              {group.parent.title}
-                                            </span>
-                                          </>
-                                        )}
-
-                                        {group.artifacts.length > 0 ? (
-                                          <ul className="mt-2 ml-4 list-disc pl-2 text-sm text-slate-700">
-                                            {group.artifacts.map((a) => (
-                                            <li key={a.id}>{a.title}</li>
-                                            ))}
-                                          </ul>
-                                        ) : null}
-                                      </li>
-                                    ))}
-
-                                    {orphans.length > 0 ? (
-                                      <li className="rounded-lg border border-slate-200 bg-white p-2 text-sm">
-                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                          Additional items
-                                        </p>
-                                        <ul className="mt-1 ml-4 list-disc pl-2 text-sm text-slate-700">
-                                          {orphans.map((a) => (
-                                            <li key={a.id}>{a.title}</li>
-                                          ))}
-                                        </ul>
-                                      </li>
-                                    ) : null}
-                                  </>
-                                );
-                              })()}
-                              {(d.checklist ?? []).map((line, i) => {
-                                if (!line.trim()) return null;
-                                const completed =
-                                  full.workflow_data?.checklist_completed?.[i] ?? false;
-                                return (
-                                  <li
-                                    key={`${full.id}-ck-${i}`}
-                                    className="rounded-lg border border-slate-200 bg-white p-2"
-                                  >
-                                    <label className="flex items-start gap-2">
-                                      <input
-                                        type="checkbox"
-                                        className={`${checkboxClass} mt-0.5`}
-                                        checked={completed}
-                                        disabled={pending}
-                                        onChange={(e) =>
-                                          onDetailChecklistToggle(full.id, i, e.target.checked)
-                                        }
-                                      />
-                                      <span
-                                        className={cn(
-                                          "text-slate-800",
-                                          completed && "text-slate-500 line-through",
-                                        )}
-                                      >
-                                        {line.trim()}
-                                      </span>
-                                    </label>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        ) : null}
-
-                        {d.expected_outcome?.trim() ? (
-                          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
-                              Expected outcome
-                            </p>
-                            <p className="mt-1 text-sm text-emerald-950">{d.expected_outcome}</p>
-                          </div>
-                        ) : null}
-
-                        <div className="space-y-3 text-slate-700">
-                          {d.rationale?.trim() ? (
-                            <p>
-                              <span className="font-semibold">Rationale:</span> {d.rationale}
-                            </p>
-                          ) : null}
-                          {d.why_now?.trim() ? (
-                            <p>
-                              <span className="font-semibold">Why now:</span> {d.why_now}
-                            </p>
-                          ) : null}
-                          {d.detailed_instructions?.trim() ? (
-                            <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                Additional guidance
-                              </p>
-                              <p className="mt-1 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                {d.detailed_instructions}
-                              </p>
-                            </div>
-                          ) : null}
-
-                          {(d.required_documents ?? []).length > 0 ? (
-                            <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                Required documents
-                              </p>
-                              <ul className="mt-1 list-disc pl-5">
-                                {(d.required_documents ?? []).map((doc, i) =>
-                                  doc.trim() ? <li key={`${full.id}-doc-${i}`}>{doc.trim()}</li> : null,
-                                )}
-                              </ul>
-                            </div>
-                          ) : null}
-
-                          {(d.contacts ?? []).length > 0 ? (
-                            <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                Contacts
-                              </p>
-                              <ul className="mt-1 space-y-1">
-                                {(d.contacts ?? []).map((c, i) => {
-                                  const name = c.name?.trim() || "Contact";
-                                  const phone = c.phone?.trim();
-                                  const email = c.email?.trim();
-                                  const notes = c.notes?.trim();
-                                  return (
-                                    <li
-                                      key={`${full.id}-contact-${i}`}
-                                      className="rounded border border-slate-200 bg-white px-2 py-1.5"
-                                    >
-                                      <p className="font-medium text-slate-800">{name}</p>
-                                      <div className="mt-0.5 flex flex-wrap gap-3 text-xs">
-                                        {phone ? (
-                                          <a className="text-blue-700 hover:underline" href={`tel:${phone}`}>
-                                            {phone}
-                                          </a>
-                                        ) : null}
-                                        {email ? (
-                                          <a className="text-blue-700 hover:underline" href={`mailto:${email}`}>
-                                            {email}
-                                          </a>
-                                        ) : null}
-                                      </div>
-                                      {notes ? <p className="mt-1 text-xs text-slate-600">{notes}</p> : null}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-
-                              {d.contact_script?.trim() ? (
-                                <div className="mt-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Contact script
-                                  </p>
-                                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                    {d.contact_script}
-                                  </p>
-                                </div>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          {(full.workflow_data?.outcome_notes?.trim() ||
-                            full.workflow_data?.blocker_reason?.trim()) ? (
-                            <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2.5">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                Case notes
-                              </p>
-                              {full.workflow_data?.outcome_notes?.trim() ? (
-                                <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
-                                  {full.workflow_data.outcome_notes}
-                                </p>
-                              ) : null}
-                              {full.workflow_data?.blocker_reason?.trim() ? (
-                                <p className="mt-1 text-sm text-amber-900">
-                                  <span className="font-semibold">Blocked: </span>
-                                  {full.workflow_data.blocker_reason}
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          {(d.blockers ?? []).some((b) => b.trim()) ? (
-                            <div>
-                              <p className="font-semibold">Blockers:</p>
-                              <ul className="list-disc pl-5">
-                                {(d.blockers ?? []).map((b, i) =>
-                                  b.trim() ? <li key={`${full.id}-blocker-${i}`}>{b.trim()}</li> : null,
-                                )}
-                              </ul>
-                            </div>
-                          ) : null}
-                          {(d.fallback_options ?? []).some((b) => b.trim()) ? (
-                            <div>
-                              <p className="font-semibold">Fallback options (if blocked):</p>
-                              <ul className="list-disc pl-5">
-                                {(d.fallback_options ?? []).map((b, i) =>
-                                  b.trim() ? <li key={`${full.id}-fallback-${i}`}>{b.trim()}</li> : null,
-                                )}
-                              </ul>
-                            </div>
-                          ) : null}
-                          {d.success_marker?.trim() ? (
-                            <p>
-                              <span className="font-semibold">Success marker:</span> {d.success_marker}
-                            </p>
-                          ) : null}
-                          {d.milestone_type?.trim() ? (
-                            <p>
-                              <span className="font-semibold">Milestone type:</span> {d.milestone_type}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    )}
-                    </article>
-                  );
-                })}
+              <div className="mt-4 space-y-8">
+                {stepsByPhase[section.phase].map((full) => (
+                  <PlanStepCaseNote
+                    key={full.id}
+                    step={full}
+                    editing={Boolean(editing)}
+                    onPatchStep={(patch) => updateStepInDraft(full.id, patch)}
+                    onPatchDetails={(patch) => updateStepDetails(full.id, patch)}
+                    onPatchWorkflow={
+                      editing
+                        ? (next) =>
+                            updateStepInDraft(full.id, {
+                              workflow_data: next,
+                            })
+                        : undefined
+                    }
+                    refineOpen={aiStepId === full.id}
+                    refineInstruction={aiInstruction}
+                    refinePreview={aiPreview}
+                    refinePending={aiPending}
+                    onRefineInstruction={setAiInstruction}
+                    onRefineRun={runAiPreview}
+                    onRefineApply={applyAiToDraft}
+                    onRefineClose={() => {
+                      setAiStepId(null);
+                      setAiPreview(null);
+                      setAiInstruction("");
+                    }}
+                    onRefineDiscardPreview={() => setAiPreview(null)}
+                    onOpenRefine={() => openAiForStep(full.id)}
+                  />
+                ))}
               </div>
             </section>
           ))}
@@ -1662,71 +821,6 @@ export function FamilyPlanPanel({
           </div>
         </aside>
       </div>
-
-      {aiOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ai-step-title"
-        >
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
-            <h2 id="ai-step-title" className="text-base font-semibold text-slate-900">
-              Edit step with AI
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Describe the change you want for this step only. The assistant keeps facts and structure
-              unless you ask otherwise.
-            </p>
-            <Textarea
-              className="mt-3 min-h-[100px] border-slate-200"
-              value={aiInstruction}
-              onChange={(e) => setAiInstruction(e.target.value)}
-              placeholder="e.g. Make this more concrete for a family with no vehicle; keep the same programs."
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={runAiPreview} disabled={aiPending}>
-                {aiPending ? "Working…" : "Generate preview"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setAiOpen(false);
-                  setAiStepId(null);
-                  setAiPreview(null);
-                }}
-              >
-                Close
-              </Button>
-            </div>
-            {aiPreview ? (
-              <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-                <p className="font-semibold text-slate-900">{aiPreview.title}</p>
-                <p className="text-slate-700">{aiPreview.description}</p>
-                {aiPreview.details.action_needed_now ? (
-                  <p className="text-xs text-blue-900">
-                    <span className="font-semibold">Action: </span>
-                    {aiPreview.details.action_needed_now}
-                  </p>
-                ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" onClick={applyAiToDraft}>
-                    Apply to draft
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setAiPreview(null)}
-                  >
-                    Discard preview
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
       {planAiOpen ? (
         <div
