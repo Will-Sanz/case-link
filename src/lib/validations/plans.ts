@@ -52,6 +52,24 @@ export const generatePlanSchema = z.object({
   regenerateExistingPlan: z.boolean().optional(),
 });
 
+export const planClientDisplaySchema = z.object({
+  title: z.string().max(200).optional(),
+  phaseSummaries: z
+    .object({
+      "30": z.string().max(2000).optional(),
+      "60": z.string().max(2000).optional(),
+      "90": z.string().max(2000).optional(),
+    })
+    .optional(),
+});
+
+export const updatePlanSchema = z.object({
+  familyId: z.string().uuid(),
+  /** Internal plan label (e.g. version line). */
+  summary: z.string().max(500).optional(),
+  clientDisplay: planClientDisplaySchema.optional(),
+});
+
 export const updatePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
@@ -62,6 +80,8 @@ export const updatePlanStepSchema = z.object({
   workflow_data: planStepWorkflowSchema.optional(),
   due_date: z.string().nullable().optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  phase: z.enum(["30", "60", "90"]).optional(),
+  sort_order: z.number().int().min(0).max(999).optional(),
 });
 
 export const createManualStepSchema = z.object({
@@ -118,6 +138,9 @@ export const updatePlanStepActionItemSchema = z.object({
   familyId: z.string().uuid(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
   target_date: z.string().nullable().optional(),
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(4000).nullable().optional(),
+  week_index: z.number().int().min(1).max(52).optional(),
 });
 
 export const refineStepSchema = z.object({
@@ -125,3 +148,6 @@ export const refineStepSchema = z.object({
   familyId: z.string().uuid(),
   feedback: z.string().min(1, "Feedback is required").max(2000),
 });
+
+/** Same shape as refine; used for preview-only AI step revision. */
+export const previewRefineStepSchema = refineStepSchema;

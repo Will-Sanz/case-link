@@ -17,19 +17,31 @@ import {
 } from "@/lib/plan-generator/resource-context";
 import { ensureActionItems } from "@/lib/plan-generator/derive-action-items";
 import { getFamilyDetail } from "@/lib/services/families";
-import { refineStepWithOpenAI } from "@/lib/plan-generator/openai-refine-step";
+import {
+  refineStepWithOpenAI,
+  type RefineStepResult,
+} from "@/lib/plan-generator/openai-refine-step";
 import {
   createManualStepSchema,
   deletePlanStepSchema,
   generatePlanSchema,
   logPlanStepActivitySchema,
+  previewRefineStepSchema,
   refineStepSchema,
   toggleChecklistItemSchema,
+  updatePlanSchema,
   updatePlanStepActionItemSchema,
   updatePlanStepSchema,
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+export type PreviewRefinePlanStepResult =
+  | {
+      ok: true;
+      step: NonNullable<Extract<RefineStepResult, { ok: true }>["step"]>;
+    }
+  | { ok: false; error: string };
 
 /** Result of generatePlan — includes planId on success for client verification. */
 export type GeneratePlanResult =
@@ -329,6 +341,76 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   };
 }
 
+export async function updatePlan(input: unknown): Promise<ActionResult> {
+  const parsed = updatePlanSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid request" };
+  }
+
+  let supabase;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { familyId, summary, clientDisplay } = parsed.data;
+  if (summary === undefined && clientDisplay === undefined) {
+    return { ok: true };
+  }
+
+  const { data: planRow } = await supabase
+    .from("plans")
+    .select("id, client_display")
+    .eq("family_id", familyId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!planRow) {
+    return { ok: false, error: "Plan not found" };
+  }
+
+  const payload: Record<string, unknown> = {};
+  if (summary !== undefined) {
+    payload.summary = summary;
+  }
+
+  if (clientDisplay !== undefined) {
+    const existingRaw = planRow.client_display;
+    const existing =
+      existingRaw && typeof existingRaw === "object" && !Array.isArray(existingRaw)
+        ? (existingRaw as Record<string, unknown>)
+        : {};
+    const merged: Record<string, unknown> = { ...existing };
+    if (clientDisplay.title !== undefined) {
+      merged.title = clientDisplay.title;
+    }
+    if (clientDisplay.phaseSummaries !== undefined) {
+      const prev = (merged.phaseSummaries as Record<string, unknown> | undefined) ?? {};
+      merged.phaseSummaries = {
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(clientDisplay.phaseSummaries).filter(([, v]) => v !== undefined),
+        ),
+      };
+    }
+    payload.client_display = merged;
+  }
+
+  const { error } = await supabase.from("plans").update(payload).eq("id", planRow.id);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/families/${familyId}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function updatePlanStep(
   input: unknown,
 ): Promise<ActionResult> {
@@ -373,6 +455,9 @@ export async function updatePlanStep(
   if (patch.workflow_data !== undefined)
     updatePayload.workflow_data = patch.workflow_data;
   if (patch.due_date !== undefined) updatePayload.due_date = patch.due_date;
+  if (patch.priority !== undefined) updatePayload.priority = patch.priority;
+  if (patch.phase !== undefined) updatePayload.phase = patch.phase;
+  if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
 
   const { error } = await supabase
     .from("plan_steps")
@@ -746,6 +831,9 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   const patch: Record<string, unknown> = {};
   if (status !== undefined) patch.status = status;
   if (target_date !== undefined) patch.target_date = target_date;
+  if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+  if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+  if (parsed.data.week_index !== undefined) patch.week_index = parsed.data.week_index;
 
   if (Object.keys(patch).length === 0) {
     return { ok: true };
@@ -807,6 +895,83 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+/** AI revises a single step; returns proposed content without persisting. */
+export async function previewRefinePlanStep(
+  input: unknown,
+): Promise<PreviewRefinePlanStepResult> {
+  const parsed = previewRefineStepSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+  }
+
+  let supabase;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { stepId, familyId, feedback } = parsed.data;
+
+  const detail = await getFamilyDetail(supabase, familyId);
+  if (!detail) {
+    return { ok: false, error: "Family not found" };
+  }
+
+  const { data: step } = await supabase
+    .from("plan_steps")
+    .select("id, plan_id, phase, title, description, details, workflow_data")
+    .eq("id", stepId)
+    .maybeSingle();
+
+  if (!step) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("family_id")
+    .eq("id", step.plan_id)
+    .eq("family_id", familyId)
+    .maybeSingle();
+
+  if (!plan) {
+    return { ok: false, error: "Step not found" };
+  }
+
+  const env = getEnv();
+  if (!env.OPENAI_API_KEY?.trim()) {
+    return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
+  }
+
+  const allSteps = detail.plan?.steps ?? [];
+  const stepIndex = allSteps.findIndex((s) => s.id === stepId);
+  const surroundingTitles = [
+    ...allSteps.slice(Math.max(0, stepIndex - 1), stepIndex),
+    ...allSteps.slice(stepIndex + 1, stepIndex + 2),
+  ].map((s) => s.title);
+
+  const result = await refineStepWithOpenAI(
+    detail,
+    {
+      phase: step.phase,
+      title: step.title,
+      description: step.description,
+      details: step.details,
+      workflow_data: step.workflow_data,
+    },
+    feedback,
+    { surroundingStepTitles: surroundingTitles },
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: result.reason };
+  }
+
+  return { ok: true, step: result.step };
 }
 
 export async function refinePlanStep(input: unknown): Promise<ActionResult> {

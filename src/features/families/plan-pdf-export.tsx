@@ -9,9 +9,12 @@ import type { PlanWithSteps } from "@/types/family";
 export function PlanPdfExport({
   plan,
   familyName,
+  documentTitle,
 }: {
   plan: PlanWithSteps;
   familyName?: string;
+  /** User-facing title; falls back to plan summary / default. */
+  documentTitle?: string;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +28,7 @@ export function PlanPdfExport({
         <PlanPdfDocument
           plan={plan}
           familyName={familyName}
+          documentTitle={documentTitle}
           generatedDate={generatedDate}
         />,
       ).toBlob();

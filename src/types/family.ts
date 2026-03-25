@@ -176,6 +176,8 @@ export type PlanStepRow = {
   title: string;
   description: string;
   status: "pending" | "in_progress" | "completed" | "blocked";
+  /** Step urgency (column on plan_steps). */
+  priority?: "low" | "medium" | "high" | "urgent" | null;
   due_date: string | null;
   assigned_to_id: string | null;
   sort_order: number;
@@ -189,6 +191,12 @@ export type PlanStepRow = {
   action_items?: PlanStepActionItemRow[];
 };
 
+/** Saved in `plans.client_display` — user-facing plan title and section intros. */
+export type PlanClientDisplay = {
+  title?: string;
+  phaseSummaries?: Partial<Record<"30" | "60" | "90", string>>;
+};
+
 export type PlanRow = {
   id: string;
   family_id: string;
@@ -197,6 +205,8 @@ export type PlanRow = {
   generation_source: string;
   ai_model: string | null;
   created_at: string;
+  /** Optional display overrides edited in the family workspace. */
+  client_display?: PlanClientDisplay | null;
 };
 
 export type PlanWithSteps = PlanRow & {

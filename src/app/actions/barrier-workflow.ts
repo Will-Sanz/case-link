@@ -74,23 +74,30 @@ function mapFamilyToWorkflowResult(
   detail: NonNullable<Awaited<ReturnType<typeof getFamilyDetail>>>,
 ): BarrierWorkflowResult {
   const createdAt = detail.plan?.created_at ? new Date(detail.plan.created_at) : new Date();
+  const phaseSummaries = detail.plan?.client_display?.phaseSummaries;
   const sections: BarrierWorkflowPlanSection[] = [
     {
       phase: "30",
       dueRangeLabel: formatDateRange(createdAt, 0, 29),
-      summary: "Immediate stabilization and first outreach actions.",
+      summary:
+        phaseSummaries?.["30"] ??
+        "Immediate stabilization and first outreach actions.",
       steps: [],
     },
     {
       phase: "60",
       dueRangeLabel: formatDateRange(createdAt, 30, 59),
-      summary: "Follow-through on submissions, appointments, and follow-ups.",
+      summary:
+        phaseSummaries?.["60"] ??
+        "Follow-through on submissions, appointments, and follow-ups.",
       steps: [],
     },
     {
       phase: "90",
       dueRangeLabel: formatDateRange(createdAt, 60, 89),
-      summary: "Sustain progress, handle renewals, and close remaining blockers.",
+      summary:
+        phaseSummaries?.["90"] ??
+        "Sustain progress, handle renewals, and close remaining blockers.",
       steps: [],
     },
   ];
@@ -153,6 +160,7 @@ function mapFamilyToWorkflowResult(
     sections,
     resources,
     lastSavedAt,
+    planDisplayTitle: detail.plan?.client_display?.title?.trim() || null,
   };
 }
 

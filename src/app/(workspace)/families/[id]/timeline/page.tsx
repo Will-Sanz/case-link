@@ -24,6 +24,7 @@ export default async function FamilyTimelinePage({ params }: PageProps) {
       familyName={family.name}
       barrierOptions={BARRIER_PRESETS}
       initialResult={loaded.ok ? loaded.result : null}
+      plan={family.plan}
       tab="timeline"
     />
   );

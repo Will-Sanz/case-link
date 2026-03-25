@@ -47,6 +47,8 @@ ${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
 - Make the step MORE SPECIFIC, ACTIONABLE, and EXECUTION-FRIENDLY.
 - The checklist MUST contain at least 3 concrete, checkable sub-actions.
 - You MUST include at least 2 action_items with week_index and specific titles.
+- action_items should represent the executable task (submit/schedule/gather and compile the packet),
+  not individual document/contact names. Put document names into required_documents and contact info into contacts instead.
 - Incorporate the case manager's feedback exactly where reasonable.
 - Use contact_script for outreach (exact phone script); use null if not an outreach step.
 - Include required_documents when documents are needed; be specific.

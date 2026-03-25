@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,8 @@ import {
   generateBarrierWorkflowForFamilyAction,
   toggleBarrierWorkflowActionItemAction,
 } from "@/app/actions/barrier-workflow";
+import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
+import type { PlanWithSteps } from "@/types/family";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -264,14 +267,18 @@ export function FamilyLiteWorkspace({
   familyName,
   barrierOptions,
   initialResult,
+  plan,
   tab = "plan",
 }: {
   familyId: string;
   familyName: string;
   barrierOptions: readonly { key: string; label: string }[];
   initialResult: BarrierWorkflowResult | null;
+  /** Latest `plans` + `plan_steps` from the server — canonical for edit + PDF. */
+  plan: PlanWithSteps | null;
   tab?: "overview" | "plan" | "resources" | "timeline" | "assistant";
 }) {
+  const router = useRouter();
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
@@ -293,6 +300,10 @@ export function FamilyLiteWorkspace({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  useEffect(() => {
+    setResult(initialResult);
+  }, [initialResult]);
 
   useEffect(() => {
     if (!pending) {
@@ -335,6 +346,7 @@ export function FamilyLiteWorkspace({
       const r = await toggleBarrierWorkflowActionItemAction(result.familyId, actionItemId, done);
       if (!r.ok) return setError(r.error);
       setResult(r.result);
+      router.refresh();
     });
   }
 
@@ -522,55 +534,16 @@ export function FamilyLiteWorkspace({
       ) : null}
 
       {result && tab === "plan" ? (
-        <div>
-          <Card className="border-slate-200/90 bg-white/95 p-5 shadow-[0_1px_0_rgba(15,23,42,0.02)] sm:p-6">
-            <CardTitle className="text-base">30 / 60 / 90 day plan</CardTitle>
-            <div className="mt-4 space-y-5">
-              {result.sections.map((section) => (
-                <section key={section.phase} className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-slate-900">{section.phase}-day</h3>
-                    <p className="text-xs text-slate-500">{section.dueRangeLabel}</p>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-600">{section.summary}</p>
-                  <div className="mt-3 space-y-3">
-                    {section.steps.map((step) => (
-                      <article key={step.id} className="rounded-lg border border-slate-200/90 bg-slate-50/45 p-3">
-                        <p className="text-sm font-semibold text-slate-900">{step.title}</p>
-                        <p className="mt-1 text-sm text-slate-700 line-clamp-3">{step.description}</p>
-                        {step.actionItems.length > 0 ? (
-                          <ul className="mt-3 space-y-2">
-                            {step.actionItems.map((item) => (
-                              <li key={item.id} className="rounded-lg border border-slate-200 bg-white p-2">
-                                <label className="flex items-start gap-2">
-                                  <input
-                                    type="checkbox"
-                                    className={`${checkboxClass} mt-0.5`}
-                                    checked={item.status === "completed"}
-                                    disabled={pending}
-                                    onChange={(e) => toggleAction(item.id, e.target.checked)}
-                                  />
-                                  <span>
-                                    <span className="block text-sm font-medium text-slate-800">{item.title}</span>
-                                    {item.dueDate ? (
-                                      <span className="block text-xs text-slate-500">
-                                        Due {formatDue(item.dueDate)}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                </label>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </Card>
-        </div>
+        <Card className="border-slate-200/90 bg-white/95 p-5 shadow-[0_1px_0_rgba(15,23,42,0.02)] sm:p-6">
+          <FamilyPlanPanel
+            familyId={familyId}
+            familyName={familyName}
+            plan={plan}
+            workflow={result}
+            onToggleActionItem={toggleAction}
+            actionToggleDisabled={pending}
+          />
+        </Card>
       ) : null}
 
       {result && tab === "resources" ? (

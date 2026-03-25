@@ -134,7 +134,10 @@ For high-risk households: compress timelines; push meaningful actions into the f
 
 ## Resource grounding
 - Use MATCHED_COMMUNITY_RESOURCES when provided. Include program names and contact details.
-- action_items[].title must be specific and calendar-ready.`;
+- action_items[].title must be specific and calendar-ready.
+- action_items should represent the actionable task (submit, schedule, gather the packet),
+  not individual document/contact names. Put document names into required_documents and
+  contact info into contacts instead.`;
 
 /** Extract significant tokens from text (words, program names). */
 function tokenize(text: string): Set<string> {

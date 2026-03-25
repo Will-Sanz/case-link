@@ -15,6 +15,49 @@ const PHASE_LABELS: Record<string, string> = {
   "90": "90-day",
 };
 
+const ACTION_VERB_RE =
+  /\b(call|submit|send|confirm|apply|schedule|register|request|book|gather|arrange|complete|enroll|secure|attend|file|prepare|contact)\b/i;
+const ARTIFACT_DOC_RE =
+  /\b(photo\s*id|photo\s*i\.?d|proof|lease|rent\s*statement|past-?due|statement|id\b|income\s*loss|layoff)\b/i;
+const ARTIFACT_CONTACT_RE =
+  /\b(email|phone|landlord\s*(email|phone)|contact\s*info)\b/i;
+
+function isArtifactLikeActionItemTitle(title: string): boolean {
+  const t = title.trim();
+  if (!t) return false;
+  if (ACTION_VERB_RE.test(t)) return false;
+  return ARTIFACT_DOC_RE.test(t) || ARTIFACT_CONTACT_RE.test(t);
+}
+
+function groupArtifactActionItemsPdf(items: Array<{
+  id: string;
+  title: string;
+  target_date: string | null;
+  week_index: number;
+  description: string | null;
+  sort_order: number;
+}>) {
+  const groups: Array<{
+    parent: (typeof items)[number];
+    artifacts: (typeof items)[number][];
+  }> = [];
+  const orphans: Array<(typeof items)[number]> = [];
+  let currentGroupIndex = -1;
+  for (const item of items) {
+    if (isArtifactLikeActionItemTitle(item.title)) {
+      if (currentGroupIndex >= 0) {
+        groups[currentGroupIndex]?.artifacts.push(item);
+      } else {
+        orphans.push(item);
+      }
+    } else {
+      groups.push({ parent: item, artifacts: [] });
+      currentGroupIndex = groups.length - 1;
+    }
+  }
+  return { groups, orphans };
+}
+
 const styles = StyleSheet.create({
   page: {
     padding: 40,
@@ -257,24 +300,76 @@ function StepContent({ step }: { step: PlanStepRow }) {
       {step.action_items && step.action_items.length > 0 ? (
         <>
           <Text style={styles.sectionLabel}>Weekly action items</Text>
-          {step.action_items
-            .sort((a, b) => a.week_index - b.week_index)
-            .map((ai, i) => (
-              <View key={i} style={styles.listItem}>
-                <Text style={styles.bullet}>•</Text>
-                <View>
-                  <Text style={styles.bodyText}>
-                    Week {ai.week_index}: {ai.title}
-                    {ai.target_date ? ` (${new Date(ai.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })})` : ""}
-                  </Text>
-                  {ai.description ? (
-                    <Text style={[styles.bodyText, { marginLeft: 8, color: "#64748b", fontSize: 9 }]}>
-                      {ai.description}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
+          {(() => {
+            const sorted = [...step.action_items!].sort((a, b) => a.sort_order - b.sort_order);
+            const { groups, orphans } = groupArtifactActionItemsPdf(
+              sorted as Array<{
+                id: string;
+                title: string;
+                target_date: string | null;
+                week_index: number;
+                description: string | null;
+                sort_order: number;
+              }>,
+            );
+
+            return (
+              <>
+                {groups.map((g) => (
+                  <View key={g.parent.id} style={styles.listItem}>
+                    <Text style={styles.bullet}>•</Text>
+                    <View>
+                      <Text style={styles.bodyText}>
+                        Week {g.parent.week_index}: {g.parent.title}
+                        {g.parent.target_date
+                          ? ` (${new Date(g.parent.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })})`
+                          : ""}
+                      </Text>
+                      {g.parent.description ? (
+                        <Text
+                          style={[
+                            styles.bodyText,
+                            { marginLeft: 8, color: "#64748b", fontSize: 9 },
+                          ]}
+                        >
+                          {g.parent.description}
+                        </Text>
+                      ) : null}
+                      {g.artifacts.length > 0 ? (
+                        <>
+                          {g.artifacts.map((a) => (
+                            <Text
+                              key={a.id}
+                              style={[
+                                styles.bodyText,
+                                { marginLeft: 14, color: "#475569", fontSize: 9 },
+                              ]}
+                            >
+                              • {a.title}
+                              {a.target_date
+                                ? ` (Due ${new Date(a.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })})`
+                                : ""}
+                            </Text>
+                          ))}
+                        </>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+                {orphans.length > 0 ? (
+                  <>
+                    <Text style={[styles.sectionLabel, { marginTop: 8 }]}>Additional items</Text>
+                    {orphans.map((a) => (
+                      <View key={a.id} style={styles.listItem}>
+                        <Text style={styles.bullet}>•</Text>
+                        <Text style={styles.bodyText}>{a.title}</Text>
+                      </View>
+                    ))}
+                  </>
+                ) : null}
+              </>
+            );
+          })()}
         </>
       ) : null}
 
@@ -299,13 +394,24 @@ function StepContent({ step }: { step: PlanStepRow }) {
   );
 }
 
+function phaseIntro(
+  plan: PlanWithSteps,
+  phase: "30" | "60" | "90",
+): string | null {
+  const s = plan.client_display?.phaseSummaries?.[phase]?.trim();
+  if (s) return s;
+  return null;
+}
+
 export function PlanPdfDocument({
   plan,
   familyName,
+  documentTitle,
   generatedDate,
 }: {
   plan: PlanWithSteps;
   familyName?: string;
+  documentTitle?: string;
   generatedDate: string;
 }) {
   const stepsByPhase = {
@@ -314,34 +420,49 @@ export function PlanPdfDocument({
     "90": plan.steps.filter((s) => s.phase === "90"),
   };
 
+  const mainTitle =
+    documentTitle?.trim() ||
+    plan.client_display?.title?.trim() ||
+    plan.summary?.trim() ||
+    "30 / 60 / 90 Day Plan";
+
+  const phases: Array<"30" | "60" | "90"> = ["30", "60", "90"];
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.title}>Your 30 / 60 / 90 Day Plan</Text>
+          <Text style={styles.title}>{mainTitle}</Text>
           {familyName ? (
-            <Text style={styles.subtitle}>Prepared for: {familyName}</Text>
+            <Text style={styles.subtitle}>Case / family: {familyName}</Text>
           ) : null}
-          <Text style={styles.subtitle}>
-            Created {generatedDate}
-          </Text>
+          <Text style={styles.subtitle}>Plan version {plan.version}</Text>
+          <Text style={styles.subtitle}>Exported {generatedDate}</Text>
         </View>
 
-        {(["30", "60", "90"] as const).map((phase) => (
-          <View key={phase} style={styles.phaseSection}>
-            <View style={styles.phaseHeader}>
-              <View style={styles.phaseBadge}>
-                <Text style={{ color: "white", fontWeight: "bold" }}>{phase}</Text>
+        {phases.map((phase) => {
+          const intro = phaseIntro(plan, phase);
+          return (
+            <View key={phase} style={styles.phaseSection}>
+              <View style={styles.phaseHeader}>
+                <View style={styles.phaseBadge}>
+                  <Text style={{ color: "white", fontWeight: "bold" }}>{phase}</Text>
+                </View>
+                <Text style={styles.phaseTitle}>
+                  {PHASE_LABELS[phase]} horizon
+                </Text>
               </View>
-              <Text style={styles.phaseTitle}>
-                {PHASE_LABELS[phase]} goals
-              </Text>
+              {intro ? (
+                <Text style={[styles.bodyText, { marginBottom: 10, fontStyle: "italic" }]}>
+                  {intro}
+                </Text>
+              ) : null}
+              {stepsByPhase[phase].map((step) => (
+                <StepContent key={step.id} step={step} />
+              ))}
             </View>
-            {stepsByPhase[phase].map((step) => (
-              <StepContent key={step.id} step={step} />
-            ))}
-          </View>
-        ))}
+          );
+        })}
       </Page>
     </Document>
   );
