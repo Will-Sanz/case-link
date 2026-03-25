@@ -325,17 +325,12 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   });
   steps = ensureActionItems(steps);
 
-  const summary =
-    generationSource === "openai" && aiModel
-      ? `Plan v${nextVersion} (AI: ${aiModel})`
-      : `Plan v${nextVersion}`;
-
   const { data: plan, error: planErr } = await supabase
     .from("plans")
     .insert({
       family_id: familyId,
       version: nextVersion,
-      summary,
+      summary: null,
       generation_source: generationSource,
       ai_model: aiModel,
     })
@@ -515,7 +510,7 @@ export async function startStagedLeanPlanGeneration(input: {
     .insert({
       family_id: input.familyId,
       version: nextVersion,
-      summary: `Plan v${nextVersion} (draft in progress)`,
+      summary: null,
       generation_source: "openai",
       ai_model: phase30.model,
       generation_state: {
@@ -582,7 +577,7 @@ export async function advanceStagedLeanPlanGeneration(input: {
 
   const { data: planRow } = await supabase
     .from("plans")
-    .select("id, created_at, generation_state, version, summary, ai_model")
+    .select("id, created_at, generation_state, version, ai_model")
     .eq("family_id", input.familyId)
     .order("version", { ascending: false })
     .limit(1)
@@ -613,14 +608,14 @@ export async function advanceStagedLeanPlanGeneration(input: {
     return { ok: false, error: "Family not found" };
   }
 
-  async function persistState(updates: Partial<PlanGenerationState>, summaryLine?: string) {
+  async function persistState(updates: Partial<PlanGenerationState>, summaryUpdate?: string | null) {
     const next = { ...state, ...updates };
     state = next as PlanGenerationState;
     await supabase
       .from("plans")
       .update({
         generation_state: next,
-        ...(summaryLine ? { summary: summaryLine } : {}),
+        ...(summaryUpdate !== undefined ? { summary: summaryUpdate } : {}),
         ai_model: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
       })
       .eq("id", planId);
@@ -669,15 +664,12 @@ export async function advanceStagedLeanPlanGeneration(input: {
       return { ok: false, error: ins.error };
     }
     const models_used = [...state.models_used, res.model];
-    await persistState(
-      {
-        pending_phase: "90",
-        phases_complete: { ...state.phases_complete, "60": true },
-        models_used,
-        stage_timings_ms: { ...state.stage_timings_ms, "60": Date.now() - t },
-      },
-      `Plan v${activePlan.version as number} (draft in progress)`,
-    );
+    await persistState({
+      pending_phase: "90",
+      phases_complete: { ...state.phases_complete, "60": true },
+      models_used,
+      stage_timings_ms: { ...state.stage_timings_ms, "60": Date.now() - t },
+    });
     revalidatePath(`/families/${input.familyId}`, "page");
     revalidatePath("/calendar");
     return { ok: true, done: false, phaseCompleted: "60" };
@@ -687,14 +679,11 @@ export async function advanceStagedLeanPlanGeneration(input: {
     const n90 = await countStepsInPhase(supabase, planId, "90");
     if (n90 > 0) {
       const models_used = state.models_used;
-      await persistState(
-        {
-          pending_phase: null,
-          status: "complete",
-          phases_complete: { ...state.phases_complete, "90": true },
-        },
-        `Plan v${activePlan.version as number} (AI: ${[...new Set(models_used)].join(", ")})`,
-      );
+      await persistState({
+        pending_phase: null,
+        status: "complete",
+        phases_complete: { ...state.phases_complete, "90": true },
+      });
       revalidatePath(`/families/${input.familyId}`, "page");
       return { ok: true, done: true, phaseCompleted: "90" };
     }
@@ -730,16 +719,13 @@ export async function advanceStagedLeanPlanGeneration(input: {
       return { ok: false, error: ins.error };
     }
     const models_used = [...state.models_used, res.model];
-    await persistState(
-      {
-        pending_phase: null,
-        status: "complete",
-        phases_complete: { ...state.phases_complete, "90": true },
-        models_used,
-        stage_timings_ms: { ...state.stage_timings_ms, "90": Date.now() - t },
-      },
-      `Plan v${activePlan.version as number} (AI: ${[...new Set(models_used)].join(", ")})`,
-    );
+    await persistState({
+      pending_phase: null,
+      status: "complete",
+      phases_complete: { ...state.phases_complete, "90": true },
+      models_used,
+      stage_timings_ms: { ...state.stage_timings_ms, "90": Date.now() - t },
+    });
     revalidatePath(`/families/${input.familyId}`, "page");
     revalidatePath("/calendar");
     revalidatePath("/dashboard");

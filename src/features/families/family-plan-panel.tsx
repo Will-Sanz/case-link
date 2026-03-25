@@ -65,6 +65,17 @@ function cloneStep(s: PlanStepRow): PlanStepRow {
   return structuredClone(s) as PlanStepRow;
 }
 
+/** Old plans stored `Plan v3 (AI: …)` in `summary`; never use that as the page title. */
+const LEGACY_PLAN_VERSION_TITLE = /^plan v\d+\b/i;
+
+function planPageTitle(...candidates: (string | null | undefined)[]): string {
+  for (const c of candidates) {
+    const t = c?.trim();
+    if (t && !LEGACY_PLAN_VERSION_TITLE.test(t)) return t;
+  }
+  return "30 / 60 / 90 day plan";
+}
+
 export function FamilyPlanPanel({
   familyId,
   familyName,
@@ -517,11 +528,10 @@ export function FamilyPlanPanel({
     );
   }
 
-  const displayTitle =
-    workflow.planDisplayTitle?.trim() ||
-    plan?.client_display?.title?.trim() ||
-    plan?.summary?.trim() ||
-    "30 / 60 / 90 day plan";
+  const displayTitle = planPageTitle(
+    workflow.planDisplayTitle,
+    plan?.client_display?.title,
+  );
 
   return (
     <div className="space-y-4">
