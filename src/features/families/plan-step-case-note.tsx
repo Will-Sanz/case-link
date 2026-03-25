@@ -111,6 +111,11 @@ export function PlanStepCaseNote({
   onPatchStep,
   onPatchDetails,
   onPatchWorkflow,
+  onBeginEdit,
+  onSaveEdits,
+  onCancelEdits,
+  stepSavePending,
+  stepDirty,
   refineOpen,
   refineInstruction,
   refinePreview,
@@ -127,6 +132,11 @@ export function PlanStepCaseNote({
   onPatchStep: (patch: Partial<PlanStepRow>) => void;
   onPatchDetails: (patch: Partial<PlanStepDetails>) => void;
   onPatchWorkflow?: (patch: NonNullable<PlanStepRow["workflow_data"]>) => void;
+  onBeginEdit?: () => void;
+  onSaveEdits?: () => void;
+  onCancelEdits?: () => void;
+  stepSavePending?: boolean;
+  stepDirty?: boolean;
   refineOpen: boolean;
   refineInstruction: string;
   refinePreview: {
@@ -185,6 +195,10 @@ export function PlanStepCaseNote({
     setFocus(null);
   }, [bodyDraft, commitBody]);
 
+  useEffect(() => {
+    if (!editing) setFocus(null);
+  }, [editing]);
+
   const metaLine = [
     step.status.replace("_", " "),
     `${step.phase}-day`,
@@ -201,9 +215,43 @@ export function PlanStepCaseNote({
         step.phase === "30" && "border-l-teal-400/90 bg-teal-50/20",
         step.phase === "60" && "border-l-indigo-400/80 bg-indigo-50/15",
         step.phase === "90" && "border-l-violet-400/80 bg-violet-50/15",
+        editing && "rounded-r-xl ring-1 ring-blue-200/70 ring-offset-2 ring-offset-transparent",
       )}
     >
       <div className="space-y-5 py-4 pr-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200/60 pb-3">
+          {!editing ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 border-slate-200/90 text-xs"
+              onClick={() => onBeginEdit?.()}
+            >
+              Edit step
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 text-xs text-slate-600"
+                onClick={() => onCancelEdits?.()}
+                disabled={stepSavePending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="h-8 text-xs"
+                onClick={() => onSaveEdits?.()}
+                disabled={!stepDirty || stepSavePending}
+              >
+                {stepSavePending ? "Saving…" : "Save edits"}
+              </Button>
+            </>
+          )}
+        </div>
+
         <section className="space-y-1.5">
           <SectionLabel>Title</SectionLabel>
           {editing && focus === "title" ? (
@@ -454,70 +502,84 @@ export function PlanStepCaseNote({
           </section>
         ) : null}
 
-        <section className="space-y-3 border-t border-slate-200/80 pt-5">
-          <SectionLabel>Assist</SectionLabel>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onOpenRefine}>
-              Refine step
-            </Button>
-          </div>
-          {refineOpen ? (
-          <div
-            className="space-y-3 rounded-lg border border-slate-200/90 bg-white/80 p-3 shadow-sm"
-            role="region"
-            aria-label="Refine step with AI"
-          >
-            <p className="text-xs text-slate-600">
-              Describe how this step should read. Preview updates the draft only until you apply.
-            </p>
-            <Textarea
-              rows={3}
-              value={refineInstruction}
-              onChange={(e) => onRefineInstruction(e.target.value)}
-              placeholder="e.g. Shorten for a city intake form; keep contacts and documents."
-              className="border-slate-200 text-sm"
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" className="h-8 text-xs" disabled={refinePending} onClick={onRefineRun}>
-                {refinePending ? "Working…" : "Generate preview"}
-              </Button>
-              <Button type="button" variant="ghost" className="h-8 text-xs" onClick={onRefineClose}>
-                Close
+        {editing ? (
+          <section className="space-y-3 border-t border-slate-200/80 pt-5">
+            <SectionLabel>Assist</SectionLabel>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onOpenRefine}>
+                Refine step
               </Button>
             </div>
-            {refinePreview ? (
-              <div className="space-y-3 border-t border-slate-200 pt-3">
-                <div className="space-y-1.5">
-                  <SectionLabel>Preview title</SectionLabel>
-                  <p className="text-[15px] font-semibold text-slate-900">{refinePreview.title}</p>
+            {refineOpen ? (
+              <div
+                className="space-y-3 rounded-lg border border-slate-200/90 bg-white/80 p-3 shadow-sm"
+                role="region"
+                aria-label="Refine step with AI"
+              >
+                <p className="text-xs text-slate-600">
+                  Describe how this step should read. Preview updates this step&apos;s draft only until
+                  you apply; use <strong>Save edits</strong> to persist.
+                </p>
+                <Textarea
+                  rows={3}
+                  value={refineInstruction}
+                  onChange={(e) => onRefineInstruction(e.target.value)}
+                  placeholder="e.g. Shorten for a city intake form; keep contacts and documents."
+                  className="border-slate-200 text-sm"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-8 text-xs"
+                    disabled={refinePending}
+                    onClick={onRefineRun}
+                  >
+                    {refinePending ? "Working…" : "Generate preview"}
+                  </Button>
+                  <Button type="button" variant="ghost" className="h-8 text-xs" onClick={onRefineClose}>
+                    Close
+                  </Button>
                 </div>
-                <div className="space-y-1.5">
-                  <SectionLabel>Preview summary</SectionLabel>
-                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
-                    {refinePreview.description}
-                  </p>
-                </div>
-                {refinePreview.details.expected_outcome?.trim() ? (
-                  <div className="space-y-1.5">
-                    <SectionLabel>Preview outcome</SectionLabel>
-                    <p className="text-[15px] leading-relaxed text-slate-700">
-                      {refinePreview.details.expected_outcome}
-                    </p>
+                {refinePreview ? (
+                  <div className="space-y-3 border-t border-slate-200 pt-3">
+                    <div className="space-y-1.5">
+                      <SectionLabel>Preview title</SectionLabel>
+                      <p className="text-[15px] font-semibold text-slate-900">{refinePreview.title}</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <SectionLabel>Preview summary</SectionLabel>
+                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
+                        {refinePreview.description}
+                      </p>
+                    </div>
+                    {refinePreview.details.expected_outcome?.trim() ? (
+                      <div className="space-y-1.5">
+                        <SectionLabel>Preview outcome</SectionLabel>
+                        <p className="text-[15px] leading-relaxed text-slate-700">
+                          {refinePreview.details.expected_outcome}
+                        </p>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button type="button" className="h-8 text-xs" onClick={onRefineApply}>
+                        Apply to draft
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-8 text-xs"
+                        onClick={onRefineDiscardPreview}
+                      >
+                        Discard preview
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Button type="button" className="h-8 text-xs" onClick={onRefineApply}>
-                    Apply to draft
-                  </Button>
-                  <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onRefineDiscardPreview}>
-                    Discard preview
-                  </Button>
-                </div>
               </div>
             ) : null}
-          </div>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
       </div>
     </article>
   );
