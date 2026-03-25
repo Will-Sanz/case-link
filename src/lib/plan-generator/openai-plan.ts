@@ -3,9 +3,15 @@ import "server-only";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
-import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
+import { formatMatchesForAiPrompt, formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
+import {
+  draftRefineInputToAiParsed,
+  mergeLeanRefineIntoBase,
+  OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA,
+  planRefineLeanResponseSchema,
+} from "./plan-refine-lean";
 import {
   OPENAI_PLAN_STEPS_ROOT_SCHEMA,
   aiPlanStepSchema,
@@ -62,6 +68,49 @@ function buildFamilyContext(detail: FamilyDetail): string {
   );
 
   return `${barriersBlock}\n\n${notesBlock}\n\n---\n\n${resourcesBlock}`;
+}
+
+/** Shorter context for plan-level refine (compact resources, minimal prose). */
+function buildFamilyContextForRefine(detail: FamilyDetail): string {
+  const notes =
+    [detail.summary?.trim(), detail.household_notes?.trim()].filter(Boolean).join(" · ") || "none";
+  const barriers =
+    detail.barriers.length > 0 ?
+      detail.barriers.map((b) => b.label).join("; ")
+    : "none";
+  return `Barriers: ${barriers}\nCase notes: ${notes}\n${formatMatchesForPlannerPrompt(detail.resourceMatches, 6)}`;
+}
+
+function compactDraftJsonForRefine(
+  draftSteps: Array<{
+    phase: PlanPhase;
+    title: string;
+    description: string;
+    details: GeneratedStepDetails;
+    action_items: GeneratedActionItem[];
+  }>,
+): string {
+  return JSON.stringify(
+    draftSteps.map((s) => {
+      const d = s.details;
+      return {
+        phase: s.phase,
+        title: s.title,
+        description: s.description,
+        timing_guidance: d.timing_guidance,
+        required_documents: d.required_documents ?? [],
+        contacts: d.contacts ?? [],
+        expected_outcome: d.expected_outcome,
+        priority: d.priority,
+        action_items: (s.action_items ?? []).map((a) => ({
+          title: a.title,
+          week_index: a.week_index,
+        })),
+      };
+    }),
+    null,
+    2,
+  );
 }
 
 const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PRIORITIZED 30-60-90 day case plan ordered by importance and urgency—NOT strict dependency chains. Steps should be in the most logical sequence for a case worker, but do not need to depend on each other.
@@ -690,133 +739,176 @@ export async function previewRefinePlanStepsWithOpenAI(
   feedback: string,
   options?: { retries?: number; aiMode?: AiMode },
 ): Promise<OpenAiPlanResult> {
-  const logRegen = shouldLogPlanRegenerate();
-  const context = buildFamilyContext(detail);
+  void options?.retries;
+  const logRefine = process.env.PLAN_REFINE_DEBUG === "1" || process.env.OPENAI_DEBUG === "1";
+  const startedAt = Date.now();
+  const context = buildFamilyContextForRefine(detail);
+  const draftJson = compactDraftJsonForRefine(draftSteps);
 
-  // Provide the model with the *exact* draft to preserve, so manual edits are carried forward.
-  const draftJson = JSON.stringify(
-    draftSteps.map((s) => ({
-      phase: s.phase,
-      title: s.title,
-      description: s.description,
-      details: s.details,
-      action_items: s.action_items,
-    })),
-    null,
-    2,
-  );
-
-  const baseUser = `## Case context (facts + matched resources)
+  const user = `## Context
 ${context}
 
-## Current draft plan (MUST be preserved unless the feedback explicitly asks to rewrite)
+## Current plan (lean view — preserve unless feedback asks to change)
 ${draftJson}
 
-## Case manager feedback
-${feedback}
+## Instructions
+${feedback.trim()}
 
-REFINEMENT RULES (mandatory):
-1. Preserve the 30/60/90 structure: return the same number of steps, in the same order, and with the same phase assignment at each index.
-2. Preserve existing manual edits unless the feedback explicitly asks to rewrite them. If a field is not requested to change, copy it verbatim.
-3. Improve clarity, chronological flow, realism, and usefulness for a case manager filling out the city’s form.
-4. Keep the plan prioritized by urgency/impact (not strict dependencies).
-5. Do not invent unrelated programs or case details.
+## Rules
+- Revise this existing draft; do not invent a new plan shape.
+- Return exactly ${draftSteps.length} steps, same order and phase at each index (step 1 ↔ index 0, etc.).
+- Improve clarity and usefulness; do not reorder or merge steps unless the user explicitly asks.
+- Empty \`action_items\` → keep existing weekly items (system retains prior).
+- Empty \`required_documents\` or \`contacts\` → keep prior lists.
+- JSON only; key \`steps\` matching the schema.
+- Geographic scope: Philadelphia; use matched resources when relevant; do not invent programs.`;
 
-SCHEMA OUTPUT RULES (mandatory):
-- Return JSON only (no markdown) matching the enforced schema.
-`;
+  const instructions =
+    "You edit an existing case plan draft for a case manager. " +
+    "Return one JSON object with key `steps` only. Each step includes phase, title, description, " +
+    "required_documents, contacts, expected_outcome, timing_guidance, optional priority, and action_items " +
+    "(use [] to leave weekly items unchanged).";
 
-  const retries = options?.retries ?? 4;
-  let correction = "";
-  let lastModel = "";
+  try {
+    const result = await createAiResponse({
+      taskType: "plan_refinement",
+      instructions,
+      input: user,
+      structuredJsonSchema: {
+        name: "plan_refine_lean_steps",
+        schema: cloneSchema(OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA),
+        strict: false,
+      },
+      temperature: 0.25,
+      aiMode: options?.aiMode,
+    });
 
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const user =
-      correction ?
-        `${baseUser}\n\n## REQUIRED FIX\n${correction}\nRegenerate the full refined plan JSON.`
-      : baseUser;
-
-    try {
-      const result = await createAiResponse({
-        taskType: "full_plan_generation",
-        instructions:
-          "You are an experienced case manager assistant refining an existing plan draft.\n\n" +
-          "Respond with a single JSON object with key `steps` only, matching the enforced schema exactly.\n\n" +
-          "Important: preserve step order/phase at each index unless feedback explicitly asks otherwise.",
-        input: user,
-        structuredJsonSchema: {
-          name: "refined_case_plan_steps",
-          schema: cloneSchema(OPENAI_PLAN_STEPS_ROOT_SCHEMA),
-          strict: false,
-        },
-        temperature: 0.35,
-        aiMode: options?.aiMode,
-      });
-
-      if (!result.ok) {
-        return { ok: false, reason: result.error };
-      }
-
-      lastModel = result.model;
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.text);
-      } catch {
-        correction =
-          "The response was not valid JSON. Output a single JSON object with a 'steps' array only.";
-        continue;
-      }
-
-      const validated = aiPlanResponseSchema.safeParse(parsed);
-      if (!validated.success) {
-        correction = `Schema validation failed: ${validated.error.message.slice(0, 800)}`;
-        continue;
-      }
-
-      const normalized = validated.data.steps.map(normalizePlanStep);
-
-      if (normalized.length !== draftSteps.length) {
-        return {
+    if (!result.ok) {
+      if (logRefine) {
+        console.info("[plan-refine]", {
+          taskType: "plan_refinement",
+          model: null,
+          aiMode: options?.aiMode ?? null,
+          retry: false,
+          ms: Date.now() - startedAt,
           ok: false,
-          reason:
-            "Refinement changed the step count. Please refine again or request a different change scope.",
-        };
+          error: result.error,
+        });
       }
+      return { ok: false, reason: result.error };
+    }
 
-      for (let i = 0; i < normalized.length; i++) {
-        if (normalized[i].phase !== draftSteps[i].phase) {
-          return {
-            ok: false,
-            reason:
-              "Refinement changed step phase assignment. Please refine again or request a different change scope.",
-          };
-        }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(result.text);
+    } catch {
+      if (logRefine) {
+        console.info("[plan-refine]", {
+          taskType: "plan_refinement",
+          model: result.model,
+          aiMode: options?.aiMode ?? null,
+          retry: false,
+          ms: Date.now() - startedAt,
+          ok: false,
+          error: "invalid_json",
+        });
       }
+      return { ok: false, reason: "Refine response was not valid JSON." };
+    }
 
-      const generatedSteps = parsedStepsToGenerated(
-        normalized.map((s) => applyPlanStepDefaults(s)),
-      );
-
-      return { ok: true, steps: generatedSteps, model: lastModel };
-    } catch (e) {
-      if (attempt < retries - 1) {
-        correction = e instanceof Error ? e.message : "Retry.";
-        continue;
+    const validated = planRefineLeanResponseSchema.safeParse(parsed);
+    if (!validated.success) {
+      if (logRefine) {
+        console.info("[plan-refine]", {
+          taskType: "plan_refinement",
+          model: result.model,
+          aiMode: options?.aiMode ?? null,
+          retry: false,
+          ms: Date.now() - startedAt,
+          ok: false,
+          error: validated.error.message.slice(0, 200),
+        });
       }
       return {
         ok: false,
-        reason: e instanceof Error ? e.message : "OpenAI refinement failed",
+        reason: `Refine output did not match the expected shape: ${validated.error.message.slice(0, 300)}`,
       };
     }
-  }
 
-  if (logRegen) {
-    console.warn("[openai-plan/refine] ✗ failed after all retries");
-  }
+    if (validated.data.steps.length !== draftSteps.length) {
+      if (logRefine) {
+        console.info("[plan-refine]", {
+          taskType: "plan_refinement",
+          model: result.model,
+          aiMode: options?.aiMode ?? null,
+          retry: false,
+          ms: Date.now() - startedAt,
+          ok: false,
+          error: "step_count_mismatch",
+        });
+      }
+      return {
+        ok: false,
+        reason:
+          "Refinement changed the step count. Try again with narrower instructions, or edit steps individually.",
+      };
+    }
 
-  return {
-    ok: false,
-    reason: "Failed to get valid refined plan JSON from the model after retries",
-  };
+    const baselines = draftSteps.map((s) => draftRefineInputToAiParsed(s));
+    const merged = validated.data.steps.map((lean, i) => mergeLeanRefineIntoBase(baselines[i]!, lean));
+
+    for (let i = 0; i < merged.length; i++) {
+      if (merged[i]!.phase !== draftSteps[i]!.phase) {
+        if (logRefine) {
+          console.info("[plan-refine]", {
+            taskType: "plan_refinement",
+            model: result.model,
+            aiMode: options?.aiMode ?? null,
+            retry: false,
+            ms: Date.now() - startedAt,
+            ok: false,
+            error: "phase_mismatch",
+          });
+        }
+        return {
+          ok: false,
+          reason:
+            "Refinement changed a step's phase. Try again or adjust your instructions to keep 30/60/90 assignments.",
+        };
+      }
+    }
+
+    const generatedSteps = parsedStepsToGenerated(
+      merged.map((s) => applyPlanStepDefaults(normalizePlanStep(s))),
+    );
+
+    if (logRefine) {
+      console.info("[plan-refine]", {
+        taskType: "plan_refinement",
+        model: result.model,
+        aiMode: options?.aiMode ?? null,
+        retry: false,
+        ms: Date.now() - startedAt,
+        ok: true,
+      });
+    }
+
+    return { ok: true, steps: generatedSteps, model: result.model };
+  } catch (e) {
+    if (logRefine) {
+      console.info("[plan-refine]", {
+        taskType: "plan_refinement",
+        model: null,
+        aiMode: options?.aiMode ?? null,
+        retry: false,
+        ms: Date.now() - startedAt,
+        ok: false,
+        error: e instanceof Error ? e.message : "unknown",
+      });
+    }
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "OpenAI refinement failed",
+    };
+  }
 }

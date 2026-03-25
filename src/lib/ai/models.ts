@@ -13,6 +13,7 @@ import { getEnv } from "@/lib/env";
 export type AiTaskType =
   | "full_plan_generation"
   | "plan_phase_generation"
+  | "plan_refinement"
   | "step_refinement"
   | "case_assistant"
   | "blocker_troubleshoot"
@@ -37,6 +38,7 @@ const PLAN_PHASE_TASK_TYPES: AiTaskType[] = ["plan_phase_generation"];
 const RESPONSES_API_TASK_TYPES: AiTaskType[] = [
   "full_plan_generation",
   "plan_phase_generation",
+  "plan_refinement",
   "step_refinement",
   "case_assistant",
   "blocker_troubleshoot",
@@ -86,6 +88,9 @@ export function getDefaultMaxTokensForTask(taskType: AiTaskType, mode: AiMode): 
       return fast ? 6144 : 8192;
     case "plan_phase_generation":
       return fast ? 4096 : 6144;
+    /** Full-plan preview refine: lean JSON + merge; below monolithic generation. */
+    case "plan_refinement":
+      return fast ? 3584 : 5120;
     case "step_refinement":
       return fast ? 3072 : 4096;
     default:

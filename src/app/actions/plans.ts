@@ -1485,10 +1485,7 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
     detail,
     draftSteps as Parameters<typeof previewRefinePlanStepsWithOpenAI>[1],
     feedback,
-    {
-      retries: 2,
-      aiMode: planRefineMode,
-    },
+    { aiMode: planRefineMode },
   );
 
   if (!result.ok) {
