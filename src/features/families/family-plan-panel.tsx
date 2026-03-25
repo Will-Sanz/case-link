@@ -53,6 +53,37 @@ function normalizeChecklistForSave(lines: string[] | undefined): string[] {
   return (lines ?? []).map((l) => l.trim()).filter((l) => l.length > 0);
 }
 
+/** Snapshot of what we persist in `updatePlanStep`, for dirty detection only. */
+function normalizeStepForPersistCompare(step: PlanStepRow): string {
+  const d = { ...(step.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
+  const normalizedChecklist = normalizeChecklistForSave(d.checklist);
+  if (normalizedChecklist.length > 0) {
+    d.checklist = normalizedChecklist;
+  } else {
+    delete d.checklist;
+  }
+  const checklistLen = normalizedChecklist.length;
+  const wd = { ...(step.workflow_data ?? {}) };
+  if (wd.checklist_completed && wd.checklist_completed.length !== checklistLen) {
+    wd.checklist_completed = Array(checklistLen).fill(false);
+  }
+  return JSON.stringify({
+    title: step.title,
+    description: step.description,
+    status: step.status,
+    phase: step.phase,
+    priority: step.priority ?? undefined,
+    due_date: step.due_date,
+    details: Object.keys(d).length > 0 ? d : undefined,
+    workflow_data: wd,
+  });
+}
+
+function stepNeedsPersist(orig: PlanStepRow | undefined, next: PlanStepRow): boolean {
+  if (!orig) return true;
+  return normalizeStepForPersistCompare(orig) !== normalizeStepForPersistCompare(next);
+}
+
 function textToNonEmptyLines(text: string): string[] {
   return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
@@ -323,52 +354,75 @@ export function FamilyPlanPanel({
     setError(null);
     setSuccess(null);
     startTransition(async () => {
-      const rPlan = await updatePlan({
-        familyId,
-        clientDisplay: {
-          title: planTitle.trim() || undefined,
-          phaseSummaries: {
-            "30": phaseSummaries["30"].trim() || undefined,
-            "60": phaseSummaries["60"].trim() || undefined,
-            "90": phaseSummaries["90"].trim() || undefined,
+      let clientDisplayNeedsUpdate = !baseline;
+      if (baseline) {
+        if (planTitle.trim() !== (baseline.client_display?.title ?? "").trim()) {
+          clientDisplayNeedsUpdate = true;
+        } else {
+          for (const ph of ["30", "60", "90"] as const) {
+            const def = workflow?.sections.find((s) => s.phase === ph)?.summary ?? "";
+            const baseSummary =
+              baseline.client_display?.phaseSummaries?.[ph] ??
+              def ??
+              defaultPhaseSummaries()[ph];
+            if (phaseSummaries[ph].trim() !== baseSummary.trim()) {
+              clientDisplayNeedsUpdate = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (clientDisplayNeedsUpdate) {
+        const rPlan = await updatePlan({
+          familyId,
+          clientDisplay: {
+            title: planTitle.trim() || undefined,
+            phaseSummaries: {
+              "30": phaseSummaries["30"].trim() || undefined,
+              "60": phaseSummaries["60"].trim() || undefined,
+              "90": phaseSummaries["90"].trim() || undefined,
+            },
           },
-        },
-      });
-      if (!rPlan.ok) {
-        setError(rPlan.error);
-        return;
+        });
+        if (!rPlan.ok) {
+          setError(rPlan.error);
+          return;
+        }
       }
 
       for (const s of draft.steps) {
         const orig = baseline?.steps.find((x) => x.id === s.id);
-        const d = { ...(s.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
-        const normalizedChecklist = normalizeChecklistForSave(d.checklist);
-        if (normalizedChecklist.length > 0) {
-          d.checklist = normalizedChecklist;
-        } else {
-          delete d.checklist;
-        }
-        const checklistLen = normalizedChecklist.length;
-        const wd = { ...(s.workflow_data ?? {}) };
-        if (wd.checklist_completed && wd.checklist_completed.length !== checklistLen) {
-          wd.checklist_completed = Array(checklistLen).fill(false);
-        }
+        if (stepNeedsPersist(orig, s)) {
+          const d = { ...(s.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
+          const normalizedChecklist = normalizeChecklistForSave(d.checklist);
+          if (normalizedChecklist.length > 0) {
+            d.checklist = normalizedChecklist;
+          } else {
+            delete d.checklist;
+          }
+          const checklistLen = normalizedChecklist.length;
+          const wd = { ...(s.workflow_data ?? {}) };
+          if (wd.checklist_completed && wd.checklist_completed.length !== checklistLen) {
+            wd.checklist_completed = Array(checklistLen).fill(false);
+          }
 
-        const stepRes = await updatePlanStep({
-          stepId: s.id,
-          familyId,
-          title: s.title,
-          description: s.description,
-          status: s.status,
-          phase: s.phase,
-          priority: (s.priority ?? undefined) as "low" | "medium" | "high" | "urgent" | undefined,
-          due_date: s.due_date,
-          details: Object.keys(d).length > 0 ? d : undefined,
-          workflow_data: wd,
-        });
-        if (!stepRes.ok) {
-          setError(stepRes.error);
-          return;
+          const stepRes = await updatePlanStep({
+            stepId: s.id,
+            familyId,
+            title: s.title,
+            description: s.description,
+            status: s.status,
+            phase: s.phase,
+            priority: (s.priority ?? undefined) as "low" | "medium" | "high" | "urgent" | undefined,
+            due_date: s.due_date,
+            details: Object.keys(d).length > 0 ? d : undefined,
+            workflow_data: wd,
+          });
+          if (!stepRes.ok) {
+            setError(stepRes.error);
+            return;
+          }
         }
 
         for (const ai of s.action_items ?? []) {
