@@ -17,7 +17,7 @@ import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
 import { useAIMode } from "@/components/providers/ai-mode-provider";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
-import { askCaseAssistantAction } from "@/app/actions/case-assistant";
+import { CaseAssistantChat } from "@/features/families/case-assistant-chat";
 import { cn } from "@/lib/utils/cn";
 import type {
   BarrierPresetLabel,
@@ -283,12 +283,8 @@ export function FamilyLiteWorkspace({
   );
   const [details, setDetails] = useState(initialResult?.additionalDetails ?? "");
   const [pending, startTransition] = useTransition();
-  const [assistantPending, startAssistantTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [assistantQuestion, setAssistantQuestion] = useState("");
-  const [assistantAnswer, setAssistantAnswer] = useState<string | null>(null);
-  const [assistantError, setAssistantError] = useState<string | null>(null);
   const [generateStartedAt, setGenerateStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
@@ -369,23 +365,6 @@ export function FamilyLiteWorkspace({
     }
   }
 
-  function askAssistant() {
-    const q = assistantQuestion.trim();
-    if (!q) {
-      setAssistantError("Enter a question for the assistant.");
-      return;
-    }
-    setAssistantError(null);
-    startAssistantTransition(async () => {
-      const r = await askCaseAssistantAction(familyId, q, aiMode);
-      if (!r.ok) {
-        setAssistantError(r.error);
-        return;
-      }
-      setAssistantAnswer(r.answer);
-    });
-  }
-
   const timelineItems: TimelineItem[] = (result?.sections ?? [])
     .flatMap((section) =>
       section.steps.flatMap((step) =>
@@ -414,7 +393,11 @@ export function FamilyLiteWorkspace({
   const hasOverviewData = allBarriers.length > 0 || Boolean(result?.additionalDetails.trim());
 
   return (
-    <div className="space-y-6">
+    <div
+      className={cn(
+        tab === "assistant" ? "flex min-h-0 flex-1 flex-col" : "space-y-6",
+      )}
+    >
       {tab === "overview" ? (
         <Card className="border-slate-200/90 bg-white/95 p-5 shadow-[0_1px_0_rgba(15,23,42,0.02)] sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -652,62 +635,7 @@ export function FamilyLiteWorkspace({
       ) : null}
 
       {tab === "assistant" ? (
-        <div className="space-y-4">
-          <Card className="border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-5 sm:p-6">
-            <CardTitle className="text-base">Case assistant</CardTitle>
-            <p className="mt-1 text-sm text-slate-600">
-              Ask AI for execution guidance based on this family&apos;s current plan, barriers, and
-              matched resources.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                "What should I prioritize this week?",
-                "Draft outreach talking points for the top resource.",
-                "What could block this plan and how should I prepare?",
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => setAssistantQuestion(prompt)}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="border-slate-200/90 bg-white/95 p-5 sm:p-6">
-            <Label htmlFor="assistant-question">Your question</Label>
-            <Textarea
-              id="assistant-question"
-              className="mt-1.5 min-h-[120px] border-slate-200/90 bg-slate-50/50"
-              value={assistantQuestion}
-              onChange={(e) => setAssistantQuestion(e.target.value)}
-              placeholder="Ask about next steps, risks, resource outreach, or plan sequencing."
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button type="button" onClick={askAssistant} disabled={assistantPending}>
-                {assistantPending ? "Thinking..." : "Ask assistant"}
-              </Button>
-              <AiModeToggle />
-            </div>
-            {assistantError ? (
-              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                {assistantError}
-              </p>
-            ) : null}
-          </Card>
-
-          {assistantAnswer ? (
-            <Card className="border-slate-200/90 bg-white/95 p-5 sm:p-6">
-              <CardTitle className="text-base">Assistant response</CardTitle>
-              <div className="prose prose-slate mt-3 max-w-none text-sm whitespace-pre-wrap">
-                {assistantAnswer}
-              </div>
-            </Card>
-          ) : null}
-        </div>
+        <CaseAssistantChat familyId={familyId} familyName={familyName} />
       ) : null}
     </div>
   );

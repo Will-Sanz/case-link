@@ -3,6 +3,7 @@ import "server-only";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
+import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
@@ -58,16 +59,32 @@ function buildCaseContext(detail: FamilyDetail): string {
   return lines.join("\n");
 }
 
+const MAX_PRIOR_HISTORY_CHARS = 12_000;
+
+function formatPriorConversation(history: CaseAssistantHistoryItem[]): string {
+  if (!history.length) return "";
+  const blocks = history.map((m) => {
+    const label = m.role === "user" ? "Case manager" : "Assistant";
+    return `${label}:\n${m.content.trim()}`;
+  });
+  let text = blocks.join("\n\n---\n\n");
+  if (text.length > MAX_PRIOR_HISTORY_CHARS) {
+    text = `…\n\n${text.slice(-MAX_PRIOR_HISTORY_CHARS)}`;
+  }
+  return `## Prior messages in this session\n\n${text}\n\n`;
+}
+
 /**
  * Case-level assistant. Uses gpt-5.4 via Responses API.
  */
 export async function askCaseAssistant(
   detail: FamilyDetail,
   question: string,
-  options?: { aiMode?: AiMode },
+  options?: { aiMode?: AiMode; conversationHistory?: CaseAssistantHistoryItem[] },
 ): Promise<{ ok: true; answer: string } | { ok: false; error: string }> {
   const context = buildCaseContext(detail);
   const mode = parseAiMode(options?.aiMode);
+  const prior = formatPriorConversation(options?.conversationHistory ?? []);
 
   const instructions = `You are an experienced case manager assistant in Philadelphia. You help case managers execute 30/60/90 day plans for families facing housing instability and related challenges.
 
@@ -84,10 +101,10 @@ Answer questions practically and specifically. Give actionable guidance. Use the
   const input = `## Case context
 ${context}
 
-## Question
-${question}
+${prior}## Question
+${question.trim()}
 
-Answer concisely and practically.`;
+Answer concisely and practically. Use the prior messages only for continuity; rely on the case context as the source of truth for the family's current situation.`;
 
   const result = await createAiResponse({
     taskType: "case_assistant",

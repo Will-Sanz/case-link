@@ -94,7 +94,7 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh items-start bg-[#f4f6f8]">
       <StandardAside familyTabs={familyTabs} activeFamilyTab={activeFamilyTab} />
 
-      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
+      <div className="flex h-dvh max-h-dvh min-w-0 flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white lg:hidden">
           <div className="flex h-14 items-center justify-between gap-3 px-4">
             <Link

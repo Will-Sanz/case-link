@@ -3,16 +3,25 @@
 import { cn } from "@/lib/utils/cn";
 import { useAIMode } from "@/components/providers/ai-mode-provider";
 
+type AiModeToggleProps = {
+  className?: string;
+  /** Smaller, softer chrome for embedding in chat composers and dense toolbars. */
+  compact?: boolean;
+};
+
 /**
  * Segmented control for Fast vs Thinking AI preset. Tooltip via `title` for minimal UI noise.
  */
-export function AiModeToggle({ className }: { className?: string }) {
+export function AiModeToggle({ className, compact }: AiModeToggleProps) {
   const { mode, setMode } = useAIMode();
 
   return (
     <div
       className={cn(
-        "inline-flex rounded-lg border border-slate-200 bg-slate-50/90 p-0.5 text-[11px] font-medium shadow-sm",
+        "inline-flex rounded-lg p-0.5 font-medium",
+        compact
+          ? "gap-0 rounded-xl border-0 bg-slate-100/90 text-[10px] text-slate-600"
+          : "rounded-lg border border-slate-200 bg-slate-50/90 text-[11px] shadow-sm",
         className,
       )}
       role="group"
@@ -21,12 +30,17 @@ export function AiModeToggle({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setMode("fast")}
-        title="Faster results, lower cost, concise output"
+        title="Fast: quicker results"
         className={cn(
-          "rounded-md px-2.5 py-1 transition-colors",
+          "transition-colors",
+          compact ? "rounded-lg px-2 py-1" : "rounded-md px-2.5 py-1",
           mode === "fast"
-            ? "bg-white text-slate-900 shadow-sm"
-            : "text-slate-600 hover:text-slate-900",
+            ? compact
+              ? "bg-white font-semibold text-slate-900 shadow-sm"
+              : "bg-white text-slate-900 shadow-sm"
+            : compact
+              ? "text-slate-500 hover:text-slate-800"
+              : "text-slate-600 hover:text-slate-900",
         )}
       >
         Fast
@@ -34,12 +48,17 @@ export function AiModeToggle({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setMode("thinking")}
-        title="Deeper reasoning, richer detail, slower and higher cost"
+        title="Thinking: more detailed analysis"
         className={cn(
-          "rounded-md px-2.5 py-1 transition-colors",
+          "transition-colors",
+          compact ? "rounded-lg px-2 py-1" : "rounded-md px-2.5 py-1",
           mode === "thinking"
-            ? "bg-white text-slate-900 shadow-sm"
-            : "text-slate-600 hover:text-slate-900",
+            ? compact
+              ? "bg-white font-semibold text-slate-900 shadow-sm"
+              : "bg-white text-slate-900 shadow-sm"
+            : compact
+              ? "text-slate-500 hover:text-slate-800"
+              : "text-slate-600 hover:text-slate-900",
         )}
       >
         Thinking

@@ -5,15 +5,19 @@ import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { askCaseAssistant } from "@/lib/case-assistant/ai-case-assistant";
+import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
 
 export type CaseAssistantResult =
   | { ok: true; answer: string }
   | { ok: false; error: string };
 
+export type { CaseAssistantHistoryItem } from "@/types/case-assistant";
+
 export async function askCaseAssistantAction(
   familyId: string,
   question: string,
   aiMode?: AiMode,
+  conversationHistory?: CaseAssistantHistoryItem[],
 ): Promise<CaseAssistantResult> {
   try {
     const session = await requireAppUserWithClient();
@@ -25,7 +29,10 @@ export async function askCaseAssistantAction(
       return { ok: false, error: "AI requires OPENAI_API_KEY" };
     }
 
-    return await askCaseAssistant(detail, question, { aiMode });
+    return await askCaseAssistant(detail, question, {
+      aiMode,
+      conversationHistory,
+    });
   } catch {
     return { ok: false, error: "Unauthorized" };
   }

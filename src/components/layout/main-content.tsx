@@ -11,6 +11,11 @@ function isFullWidthPath(pathname: string): boolean {
   return false;
 }
 
+/** Case assistant uses a viewport-filling flex column so the composer stays pinned while messages scroll. */
+function isFamilyAssistantPath(pathname: string): boolean {
+  return /^\/families\/[^/]+\/assistant\/?$/.test(pathname);
+}
+
 export function MainContent({
   children,
   className,
@@ -18,15 +23,21 @@ export function MainContent({
   children: React.ReactNode;
   className?: string;
 }) {
-  const pathname = usePathname();
-  const fullWidth = isFullWidthPath(pathname ?? "");
+  const pathname = usePathname() ?? "";
+  const fullWidth = isFullWidthPath(pathname);
+  const assistantChatLayout = fullWidth && isFamilyAssistantPath(pathname);
 
   return (
     <main
       className={cn(
         "flex-1",
         fullWidth
-          ? "w-full max-w-none px-0 py-0"
+          ? cn(
+              "w-full max-w-none px-0 py-0 min-h-0",
+              assistantChatLayout
+                ? "flex flex-col overflow-hidden"
+                : "overflow-y-auto",
+            )
           : "mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
         className,
       )}
