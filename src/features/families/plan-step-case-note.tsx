@@ -219,39 +219,6 @@ export function PlanStepCaseNote({
       )}
     >
       <div className="space-y-5 py-4 pr-2">
-        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200/60 pb-3">
-          {!editing ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 border-slate-200/90 text-xs"
-              onClick={() => onBeginEdit?.()}
-            >
-              Edit step
-            </Button>
-          ) : (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 text-xs text-slate-600"
-                onClick={() => onCancelEdits?.()}
-                disabled={stepSavePending}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="h-8 text-xs"
-                onClick={() => onSaveEdits?.()}
-                disabled={!stepDirty || stepSavePending}
-              >
-                {stepSavePending ? "Saving…" : "Save edits"}
-              </Button>
-            </>
-          )}
-        </div>
-
         <section className="space-y-1.5">
           <SectionLabel>Title</SectionLabel>
           {editing && focus === "title" ? (
@@ -580,6 +547,39 @@ export function PlanStepCaseNote({
             ) : null}
           </section>
         ) : null}
+
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/60 pt-4">
+          {!editing ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 border-slate-200/90 text-xs"
+              onClick={() => onBeginEdit?.()}
+            >
+              Edit step
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 text-xs text-slate-600"
+                onClick={() => onCancelEdits?.()}
+                disabled={stepSavePending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="h-8 text-xs"
+                onClick={() => onSaveEdits?.()}
+                disabled={!stepDirty || stepSavePending}
+              >
+                {stepSavePending ? "Saving…" : "Save edits"}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </article>
   );

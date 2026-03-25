@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { checkboxClass } from "@/lib/ui/form-classes";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import {
   generateBarrierWorkflowForFamilyAction,
@@ -23,35 +22,6 @@ import type {
   BarrierPresetLabel,
   BarrierWorkflowResult,
 } from "@/types/barrier-workflow";
-
-type TimelineItem = {
-  id: string;
-  phase: "30" | "60" | "90";
-  title: string;
-  done: boolean;
-};
-
-const PHASE_STYLE: Record<"30" | "60" | "90", { dot: string; chip: string; ring: string }> = {
-  "30": {
-    dot: "bg-blue-500",
-    chip: "bg-blue-50 text-blue-800 border-blue-200",
-    ring: "border-l-blue-200",
-  },
-  "60": {
-    dot: "bg-indigo-500",
-    chip: "bg-indigo-50 text-indigo-800 border-indigo-200",
-    ring: "border-l-indigo-200",
-  },
-  "90": {
-    dot: "bg-violet-500",
-    chip: "bg-violet-50 text-violet-800 border-violet-200",
-    ring: "border-l-violet-200",
-  },
-};
-
-function phaseLabel(phase: "30" | "60" | "90"): string {
-  return `${phase}-day`;
-}
 
 function formatElapsed(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -183,77 +153,6 @@ function ResourceMatchCard({
   );
 }
 
-function TimelineLane({
-  phase,
-  items,
-  pending,
-  onToggle,
-}: {
-  phase: "30" | "60" | "90";
-  items: TimelineItem[];
-  pending: boolean;
-  onToggle: (id: string, checked: boolean) => void;
-}) {
-  const style = PHASE_STYLE[phase];
-  const completeCount = items.filter((i) => i.done).length;
-
-  return (
-    <section className={cn("rounded-xl border border-slate-200 bg-white p-4", style.ring)}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className={cn("h-2.5 w-2.5 rounded-full", style.dot)} />
-          <h3 className="text-sm font-semibold text-slate-900">{phaseLabel(phase)} horizon</h3>
-        </div>
-        <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", style.chip)}>
-          {completeCount}/{items.length} complete
-        </span>
-      </div>
-
-      {items.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">No scheduled tasks in this phase.</p>
-      ) : (
-        <ol className="relative mt-4 space-y-3 pl-6">
-          <div className="pointer-events-none absolute bottom-2 left-2 top-1 border-l border-slate-200" />
-          {items.map((item) => (
-            <li key={item.id} className="relative">
-              <span
-                className={cn(
-                  "absolute -left-[20px] top-[7px] h-2.5 w-2.5 rounded-full ring-2 ring-white",
-                  item.done ? "bg-emerald-500" : style.dot,
-                )}
-              />
-              <div className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
-                <div className="flex items-start justify-between gap-3">
-                  <label className="flex min-w-0 items-start gap-2">
-                    <input
-                      type="checkbox"
-                      className={`${checkboxClass} mt-0.5`}
-                      checked={item.done}
-                      disabled={pending}
-                      onChange={(e) => onToggle(item.id, e.target.checked)}
-                    />
-                    <p
-                      className={cn(
-                        "text-sm font-medium leading-snug",
-                        item.done ? "text-slate-500 line-through" : "text-slate-800",
-                      )}
-                    >
-                      {item.title}
-                    </p>
-                  </label>
-                </div>
-                <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
-                  {item.done ? "Completed" : "Upcoming"}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  );
-}
-
 export function FamilyLiteWorkspace({
   familyId,
   familyName,
@@ -268,7 +167,7 @@ export function FamilyLiteWorkspace({
   initialResult: BarrierWorkflowResult | null;
   /** Latest `plans` + `plan_steps` from the server — canonical for edit + PDF. */
   plan: PlanWithSteps | null;
-  tab?: "overview" | "plan" | "resources" | "timeline" | "assistant";
+  tab?: "overview" | "plan" | "resources" | "assistant";
 }) {
   const router = useRouter();
   const { mode: aiMode } = useAIMode();
@@ -365,24 +264,6 @@ export function FamilyLiteWorkspace({
     }
   }
 
-  const timelineItems: TimelineItem[] = (result?.sections ?? [])
-    .flatMap((section) =>
-      section.steps.flatMap((step) =>
-        step.actionItems.map((item) => ({
-          id: item.id,
-          phase: section.phase,
-          title: item.title,
-          done: item.status === "completed",
-        })),
-      ),
-    )
-    .sort((a, b) => a.title.localeCompare(b.title));
-
-  const timelineByPhase = {
-    "30": timelineItems.filter((i) => i.phase === "30"),
-    "60": timelineItems.filter((i) => i.phase === "60"),
-    "90": timelineItems.filter((i) => i.phase === "90"),
-  };
   const allBarriers = [
     ...(result?.selectedBarriers ?? []),
     ...((result?.additionalBarriers ?? "")
@@ -592,45 +473,6 @@ export function FamilyLiteWorkspace({
               ))}
             </div>
           )}
-        </div>
-      ) : null}
-
-      {result && tab === "timeline" ? (
-        <div className="space-y-4">
-          <Card className="border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-5 sm:p-6">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Timeline</CardTitle>
-                <p className="mt-1 text-sm text-slate-600">
-                  Chronological execution view grouped by 30/60/90 horizons.
-                </p>
-              </div>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">
-                {timelineItems.filter((i) => i.done).length}/{timelineItems.length} complete
-              </span>
-            </div>
-          </Card>
-
-          <div className="space-y-4">
-            <TimelineLane
-              phase="30"
-              items={timelineByPhase["30"]}
-              pending={pending}
-              onToggle={toggleAction}
-            />
-            <TimelineLane
-              phase="60"
-              items={timelineByPhase["60"]}
-              pending={pending}
-              onToggle={toggleAction}
-            />
-            <TimelineLane
-              phase="90"
-              items={timelineByPhase["90"]}
-              pending={pending}
-              onToggle={toggleAction}
-            />
-          </div>
         </div>
       ) : null}
 
