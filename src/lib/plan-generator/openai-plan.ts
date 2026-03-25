@@ -675,3 +675,146 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
     reason: "Failed to get valid plan JSON from the model after retries",
   };
 }
+
+export async function previewRefinePlanStepsWithOpenAI(
+  detail: FamilyDetail,
+  draftSteps: Array<{
+    phase: PlanPhase;
+    title: string;
+    description: string;
+    details: GeneratedStepDetails;
+    action_items: GeneratedActionItem[];
+  }>,
+  feedback: string,
+  options?: { retries?: number },
+): Promise<OpenAiPlanResult> {
+  const logRegen = shouldLogPlanRegenerate();
+  const context = buildFamilyContext(detail);
+
+  // Provide the model with the *exact* draft to preserve, so manual edits are carried forward.
+  const draftJson = JSON.stringify(
+    draftSteps.map((s) => ({
+      phase: s.phase,
+      title: s.title,
+      description: s.description,
+      details: s.details,
+      action_items: s.action_items,
+    })),
+    null,
+    2,
+  );
+
+  const baseUser = `## Case context (facts + matched resources)
+${context}
+
+## Current draft plan (MUST be preserved unless the feedback explicitly asks to rewrite)
+${draftJson}
+
+## Case manager feedback
+${feedback}
+
+REFINEMENT RULES (mandatory):
+1. Preserve the 30/60/90 structure: return the same number of steps, in the same order, and with the same phase assignment at each index.
+2. Preserve existing manual edits unless the feedback explicitly asks to rewrite them. If a field is not requested to change, copy it verbatim.
+3. Improve clarity, chronological flow, realism, and usefulness for a case manager filling out the city’s form.
+4. Keep the plan prioritized by urgency/impact (not strict dependencies).
+5. Do not invent unrelated programs or case details.
+
+SCHEMA OUTPUT RULES (mandatory):
+- Return JSON only (no markdown) matching the enforced schema.
+`;
+
+  const retries = options?.retries ?? 4;
+  let correction = "";
+  let lastModel = "";
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const user =
+      correction ?
+        `${baseUser}\n\n## REQUIRED FIX\n${correction}\nRegenerate the full refined plan JSON.`
+      : baseUser;
+
+    try {
+      const result = await createAiResponse({
+        taskType: "full_plan_generation",
+        instructions:
+          "You are an experienced case manager assistant refining an existing plan draft.\n\n" +
+          "Respond with a single JSON object with key `steps` only, matching the enforced schema exactly.\n\n" +
+          "Important: preserve step order/phase at each index unless feedback explicitly asks otherwise.",
+        input: user,
+        structuredJsonSchema: {
+          name: "refined_case_plan_steps",
+          schema: cloneSchema(OPENAI_PLAN_STEPS_ROOT_SCHEMA),
+          strict: false,
+        },
+        temperature: 0.35,
+        maxTokens: 8192,
+      });
+
+      if (!result.ok) {
+        return { ok: false, reason: result.error };
+      }
+
+      lastModel = result.model;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.text);
+      } catch {
+        correction =
+          "The response was not valid JSON. Output a single JSON object with a 'steps' array only.";
+        continue;
+      }
+
+      const validated = aiPlanResponseSchema.safeParse(parsed);
+      if (!validated.success) {
+        correction = `Schema validation failed: ${validated.error.message.slice(0, 800)}`;
+        continue;
+      }
+
+      const normalized = validated.data.steps.map(normalizePlanStep);
+
+      if (normalized.length !== draftSteps.length) {
+        return {
+          ok: false,
+          reason:
+            "Refinement changed the step count. Please refine again or request a different change scope.",
+        };
+      }
+
+      for (let i = 0; i < normalized.length; i++) {
+        if (normalized[i].phase !== draftSteps[i].phase) {
+          return {
+            ok: false,
+            reason:
+              "Refinement changed step phase assignment. Please refine again or request a different change scope.",
+          };
+        }
+      }
+
+      const generatedSteps = parsedStepsToGenerated(
+        normalized.map((s) => applyPlanStepDefaults(s)),
+      );
+
+      return { ok: true, steps: generatedSteps, model: lastModel };
+    } catch (e) {
+      if (attempt < retries - 1) {
+        correction = e instanceof Error ? e.message : "Retry.";
+        continue;
+      }
+      return {
+        ok: false,
+        reason: e instanceof Error ? e.message : "OpenAI refinement failed",
+      };
+    }
+  }
+
+  if (logRegen) {
+    console.warn("[openai-plan/refine] ✗ failed after all retries");
+  }
+
+  return {
+    ok: false,
+    reason: "Failed to get valid refined plan JSON from the model after retries",
+  };
+}

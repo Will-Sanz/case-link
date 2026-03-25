@@ -10,6 +10,7 @@ import {
   MAX_PLAN_STEPS_PER_PHASE,
   shouldLogPlanRegenerate,
   tryGeneratePlanStepsWithOpenAI,
+  previewRefinePlanStepsWithOpenAI,
 } from "@/lib/plan-generator/openai-plan";
 import {
   generatedStepsFromMatches,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/plan-generator/resource-context";
 import { ensureActionItems } from "@/lib/plan-generator/derive-action-items";
 import { getFamilyDetail } from "@/lib/services/families";
+import type { PlanStepDetails } from "@/types/family";
 import {
   refineStepWithOpenAI,
   type RefineStepResult,
@@ -27,6 +29,7 @@ import {
   generatePlanSchema,
   logPlanStepActivitySchema,
   previewRefineStepSchema,
+  previewRefinePlanSchema,
   refineStepSchema,
   toggleChecklistItemSchema,
   updatePlanSchema,
@@ -972,6 +975,96 @@ export async function previewRefinePlanStep(
   }
 
   return { ok: true, step: result.step };
+}
+
+export type PreviewRefinePlanResult =
+  | {
+      ok: true;
+      steps: Array<{
+        phase: "30" | "60" | "90";
+        title: string;
+        description: string;
+        details: PlanStepDetails;
+        action_items: Array<{
+          title: string;
+          description: string | null | undefined;
+          week_index: number;
+          target_date: string | null | undefined;
+        }>;
+      }>;
+      model: string;
+    }
+  | { ok: false; error: string };
+
+/** AI refines an existing *draft* plan; returns proposed steps without persisting. */
+export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePlanResult> {
+  const parsed = previewRefinePlanSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+  }
+
+  let supabase;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { familyId, feedback, draft } = parsed.data;
+
+  const detail = await getFamilyDetail(supabase, familyId);
+  if (!detail) {
+    return { ok: false, error: "Family not found" };
+  }
+
+  const env = getEnv();
+  if (!env.OPENAI_API_KEY?.trim()) {
+    return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
+  }
+
+  const draftSteps = draft.steps.map((s) => ({
+    phase: s.phase,
+    title: s.title,
+    description: s.description,
+    details: (s.details ?? {}) as PlanStepDetails,
+    action_items: s.action_items.map((ai) => ({
+      title: ai.title,
+      description: ai.description ?? undefined,
+      week_index: ai.week_index,
+      target_date: ai.target_date ?? undefined,
+    })),
+  }));
+
+  const result = await previewRefinePlanStepsWithOpenAI(
+    detail,
+    draftSteps as Parameters<typeof previewRefinePlanStepsWithOpenAI>[1],
+    feedback,
+    {
+    retries: 2,
+    },
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: result.reason };
+  }
+
+  return {
+    ok: true,
+    model: result.model,
+    steps: result.steps.map((s) => ({
+      phase: s.phase,
+      title: s.title,
+      description: s.description,
+      details: s.details as PlanStepDetails,
+      action_items: (s.action_items ?? []).map((ai) => ({
+        title: ai.title,
+        description: ai.description ?? null,
+        week_index: ai.week_index,
+        target_date: ai.target_date ?? null,
+      })),
+    })),
+  };
 }
 
 export async function refinePlanStep(input: unknown): Promise<ActionResult> {

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 const planStepDetailsSchema = z.object({
+  /** Short, concrete next action for the case manager. */
+  action_needed_now: z.string().optional(),
   rationale: z.string().optional(),
   detailed_instructions: z.string().optional(),
   checklist: z.array(z.string()).optional(),
@@ -148,6 +150,33 @@ export const refineStepSchema = z.object({
   familyId: z.string().uuid(),
   feedback: z.string().min(1, "Feedback is required").max(2000),
 });
+
+const previewDraftActionItemSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.union([z.string().max(4000), z.null()]).optional(),
+  week_index: z.number().int().min(1).max(12),
+  target_date: z.union([z.string(), z.null()]).optional(),
+});
+
+export const previewRefinePlanSchema = z.object({
+  familyId: z.string().uuid(),
+  feedback: z.string().min(1, "Feedback is required").max(2000),
+  draft: z.object({
+    steps: z
+      .array(
+        z.object({
+          phase: z.enum(["30", "60", "90"]),
+          title: z.string().min(1).max(500),
+          description: z.string().max(4000),
+          details: planStepDetailsSchema.optional(),
+          action_items: z.array(previewDraftActionItemSchema).min(1).max(10),
+        }),
+      )
+      .min(1)
+      .max(15),
+  }),
+});
+
 
 /** Same shape as refine; used for preview-only AI step revision. */
 export const previewRefineStepSchema = refineStepSchema;
