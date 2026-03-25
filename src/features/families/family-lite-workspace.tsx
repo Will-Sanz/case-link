@@ -2,10 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import {
   generateBarrierWorkflowForFamilyAction,
@@ -17,11 +14,43 @@ import { useAIMode } from "@/components/providers/ai-mode-provider";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { CaseAssistantChat } from "@/features/families/case-assistant-chat";
+import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
 import { cn } from "@/lib/utils/cn";
 import type {
   BarrierPresetLabel,
   BarrierWorkflowResult,
 } from "@/types/barrier-workflow";
+
+function savedAdditionalDetails(
+  r: BarrierWorkflowResult | null | undefined,
+): string {
+  return (r?.additionalDetails ?? "").trim();
+}
+
+/** Matches server `parseAdditionalBarriers` splitting; preserves order, case-insensitive dedupe. */
+function parseBarrierLinesOrdered(input: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of input.split(/\r?\n|,|;/)) {
+    const t = part.trim();
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
+}
+
+function initialCustomBarriers(
+  r: BarrierWorkflowResult | null | undefined,
+): { id: string; text: string }[] {
+  if (!r) return [];
+  return parseBarrierLinesOrdered(r.additionalBarriers ?? "").map((text) => ({
+    id: crypto.randomUUID(),
+    text,
+  }));
+}
 
 function formatElapsed(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -177,10 +206,12 @@ export function FamilyLiteWorkspace({
       barrierOptions.some((o) => o.label === s),
     ),
   );
-  const [additionalBarriers, setAdditionalBarriers] = useState(
-    initialResult?.additionalBarriers ?? "",
+  const [additionalContext, setAdditionalContext] = useState(() =>
+    savedAdditionalDetails(initialResult),
   );
-  const [details, setDetails] = useState(initialResult?.additionalDetails ?? "");
+  const [customBarriers, setCustomBarriers] = useState(() =>
+    initialCustomBarriers(initialResult),
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -214,13 +245,32 @@ export function FamilyLiteWorkspace({
     );
   }
 
+  function addCustomBarrier(raw: string) {
+    const text = raw.trim().slice(0, 200);
+    if (!text) return;
+    const key = text.toLowerCase();
+    const matchingPreset = barrierOptions.find((o) => o.label.toLowerCase() === key);
+    if (matchingPreset) {
+      const label = matchingPreset.label as BarrierPresetLabel;
+      setSelected((prev) => (prev.includes(label) ? prev : [...prev, label]));
+      return;
+    }
+    if (selected.some((s) => s.toLowerCase() === key)) return;
+    if (customBarriers.some((b) => b.text.toLowerCase() === key)) return;
+    setCustomBarriers((prev) => [...prev, { id: crypto.randomUUID(), text }]);
+  }
+
+  function removeCustomBarrier(id: string) {
+    setCustomBarriers((prev) => prev.filter((b) => b.id !== id));
+  }
+
   function generate() {
     setError(null);
     startTransition(async () => {
       const r = await generateBarrierWorkflowForFamilyAction(familyId, {
         selectedBarriers: selected,
-        additionalBarriers,
-        additionalDetails: details,
+        additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
+        additionalDetails: additionalContext.trim(),
         aiMode,
       });
       if (!r.ok) return setError(r.error);
@@ -264,15 +314,6 @@ export function FamilyLiteWorkspace({
     }
   }
 
-  const allBarriers = [
-    ...(result?.selectedBarriers ?? []),
-    ...((result?.additionalBarriers ?? "")
-      .split(/\r?\n|,|;/)
-      .map((b) => b.trim())
-      .filter(Boolean)),
-  ];
-  const hasOverviewData = allBarriers.length > 0 || Boolean(result?.additionalDetails.trim());
-
   return (
     <div
       className={cn(
@@ -280,124 +321,26 @@ export function FamilyLiteWorkspace({
       )}
     >
       {tab === "overview" ? (
-        <Card className="border-slate-200/90 bg-white/95 p-5 shadow-[0_1px_0_rgba(15,23,42,0.02)] sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
-              <p className="text-xs text-slate-500">Family ID: {familyId}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                  AI
-                </p>
-                <AiModeToggle className="mt-0.5" />
-              </div>
-              {result?.lastSavedAt ? (
-                <p className="text-xs text-slate-500">
-                  Updated {new Date(result.lastSavedAt).toLocaleString()}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="mt-3 sm:hidden">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">AI</p>
-            <AiModeToggle className="mt-0.5" />
-          </div>
-
-          <div className="mt-5">
-            <Label>Barriers</Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {barrierOptions.map((opt) => {
-                const on = selectedSet.has(opt.label as BarrierPresetLabel);
-                return (
-                  <button
-                    key={`${opt.key}-${opt.label}`}
-                    type="button"
-                    onClick={() => toggleLabel(opt.label as BarrierPresetLabel)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                      on
-                        ? "border-blue-200 bg-blue-50 text-blue-800"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <Label htmlFor="additional-barriers">Additional barriers</Label>
-            <Textarea
-              id="additional-barriers"
-              className="mt-1.5 min-h-[100px] border-slate-200/90 bg-slate-50/50"
-              value={additionalBarriers}
-              onChange={(e) => setAdditionalBarriers(e.target.value)}
-              placeholder="Add custom barriers not listed above (comma, semicolon, or new line separated)."
-            />
-          </div>
-
-          <div className="mt-4">
-            <Label htmlFor="family-details">Additional details</Label>
-            <Textarea
-              id="family-details"
-              className="mt-1.5 min-h-[100px] border-slate-200/90 bg-slate-50/50"
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              placeholder="Optional case context, constraints, or important notes."
-            />
-          </div>
-
-          {error ? (
-            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {error}
-            </p>
-          ) : null}
-
-          <div className="mt-4">
-            <Button type="button" onClick={generate} disabled={pending} className="px-4 py-2">
-              {pending
-                ? "Generating..."
-                : hasGeneratedThisSession
-                  ? "Regenerate plan"
-                  : "Generate Plan and Match Resources"}
-            </Button>
-          </div>
-          {pending && generateStartedAt ? (
-            <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-800">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700" />
-              <span>Building plan... {formatElapsed(elapsedSeconds)}</span>
-            </div>
-          ) : null}
-
-          {hasOverviewData ? (
-            <div className="mt-5 space-y-4 border-t border-slate-200 pt-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Current overview
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {allBarriers.map((barrier) => (
-                    <span
-                      key={barrier}
-                      className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800"
-                    >
-                      {barrier}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              {result?.additionalDetails.trim() ? (
-                <p className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700 whitespace-pre-wrap">
-                  {result.additionalDetails}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </Card>
+        <FamilyOverviewSetupCanvas
+          familyName={familyName}
+          familyId={familyId}
+          barrierOptions={barrierOptions}
+          selectedSet={selectedSet}
+          onToggleLabel={toggleLabel}
+          customBarriers={customBarriers}
+          onAddCustomBarrier={addCustomBarrier}
+          onRemoveCustomBarrier={removeCustomBarrier}
+          additionalContext={additionalContext}
+          onAdditionalContextChange={setAdditionalContext}
+          lastSavedAt={result?.lastSavedAt}
+          error={error}
+          pending={pending}
+          generateStartedAt={generateStartedAt}
+          elapsedSeconds={elapsedSeconds}
+          onGenerate={generate}
+          hasGeneratedThisSession={hasGeneratedThisSession}
+          formatElapsed={formatElapsed}
+        />
       ) : null}
 
       {tab === "plan" ? (

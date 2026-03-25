@@ -32,7 +32,6 @@ const BARRIER_KEY_BY_LABEL: Record<BarrierPresetLabel, string> = {
   Education: "education_workforce_training",
   "Domestic violence": "legal_matter",
   "Financial hardship": "utility_debt",
-  Other: "other",
 };
 
 function toClientError(error: unknown): string {
@@ -208,10 +207,10 @@ export async function generateBarrierWorkflowAction(
   if (!referenceId) {
     return { ok: false, error: "Enter a Family/Case ID to save and track this plan." };
   }
-  if (selected.length === 0 && parsedAdditionalBarriers.length === 0) {
+  if (selected.length === 0 && parsedAdditionalBarriers.length === 0 && !details) {
     return {
       ok: false,
-      error: "Select at least one barrier or enter at least one additional barrier.",
+      error: "Select at least one barrier or add supporting details below.",
     };
   }
 
@@ -468,10 +467,10 @@ export async function generateBarrierWorkflowForFamilyAction(
   const additionalBarriers = input.additionalBarriers?.trim() ?? "";
   const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
   const details = input.additionalDetails?.trim() ?? "";
-  if (selected.length === 0 && parsedAdditionalBarriers.length === 0) {
+  if (selected.length === 0 && parsedAdditionalBarriers.length === 0 && !details) {
     return {
       ok: false,
-      error: "Select at least one barrier or enter at least one additional barrier.",
+      error: "Select at least one barrier or add supporting details below.",
     };
   }
   try {

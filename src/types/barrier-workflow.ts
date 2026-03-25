@@ -14,7 +14,6 @@ export const BARRIER_PRESETS = [
   { key: "education_workforce_training", label: "Education" },
   { key: "legal_matter", label: "Domestic violence" },
   { key: "utility_debt", label: "Financial hardship" },
-  { key: "other", label: "Other" },
 ] as const;
 
 export type BarrierPresetLabel = (typeof BARRIER_PRESETS)[number]["label"];
