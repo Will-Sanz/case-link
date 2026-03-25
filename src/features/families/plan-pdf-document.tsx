@@ -374,7 +374,6 @@ export function PlanPdfDocument({
                 {familyName ? (
                   <Text style={styles.subtitle}>Case / family: {familyName}</Text>
                 ) : null}
-                <Text style={styles.subtitle}>Plan version {plan.version}</Text>
                 <Text style={styles.subtitle}>Exported {generatedDate}</Text>
               </View>
             ) : (

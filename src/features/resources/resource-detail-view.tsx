@@ -55,9 +55,6 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
           {r.program_name}
         </h1>
         <p className="mt-2 text-slate-600">{r.office_or_department}</p>
-        {r.category ? (
-          <Badge className="mt-4">{r.category}</Badge>
-        ) : null}
       </div>
 
       {r.description ? (

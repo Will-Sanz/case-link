@@ -68,34 +68,25 @@ function ResourceMatchCard({
   onCopy: (key: string, value: string | null) => void;
 }) {
   const hasPrimaryContact = Boolean(resource.primaryPhone || resource.primaryEmail);
+  const title = (resource.programName || resource.name).trim();
+  const nameDiffers = resource.name.trim() && resource.name.trim() !== title;
+  const contextLine =
+    nameDiffers
+      ? resource.name.trim()
+      : resource.description?.trim() && resource.description.trim() !== title
+        ? resource.description.trim()
+        : null;
 
   return (
     <article className="group rounded-xl border border-slate-200/80 bg-white/90 p-4 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors hover:border-slate-300/80">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold tracking-tight text-slate-900">
-            {resource.programName || resource.name}
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-500">{resource.name}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-            {Math.round(resource.similarityScore)}% match
-          </span>
-          {resource.category ? (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-              {resource.category}
-            </span>
-          ) : null}
-        </div>
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold tracking-tight text-slate-900">{title}</h3>
+        {contextLine ? (
+          <p className="mt-0.5 text-xs text-slate-500">{contextLine}</p>
+        ) : null}
       </div>
 
-      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/55 px-3 py-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Why this matches</p>
-        <p className="mt-1 text-xs leading-relaxed text-blue-900/85">{resource.whyMatched}</p>
-      </div>
-
-      <div className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/55 p-3">
+      <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/55 p-3">
         <div className="grid grid-cols-[70px_1fr] gap-2 text-xs">
           <span className="font-medium text-slate-500">Phone</span>
           <span className="text-slate-800">
@@ -325,7 +316,6 @@ export function FamilyLiteWorkspace({
       {tab === "overview" ? (
         <FamilyOverviewSetupCanvas
           familyName={familyName}
-          familyId={familyId}
           barrierOptions={barrierOptions}
           selectedSet={selectedSet}
           onToggleLabel={toggleLabel}
@@ -352,7 +342,6 @@ export function FamilyLiteWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
-              <p className="text-xs text-slate-500">Family ID: {familyId}</p>
             </div>
             {result?.lastSavedAt ? (
               <p className="text-xs text-slate-500">

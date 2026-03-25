@@ -66,12 +66,9 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                 Updated {new Date(f.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </p>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <span className="rounded bg-slate-100 px-2 py-1">
-                {f.status === "active" ? "Plan in progress" : "No plan yet"}
-              </span>
-              {f.summary ? <span className="line-clamp-1">{f.summary}</span> : null}
-            </div>
+            {f.summary ? (
+              <p className="mt-2 line-clamp-2 text-xs text-slate-600">{f.summary}</p>
+            ) : null}
           </Link>
         ))}
       </div>

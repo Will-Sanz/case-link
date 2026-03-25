@@ -17,7 +17,6 @@ type CustomBarrierRow = { id: string; text: string };
 
 export function FamilyOverviewSetupCanvas({
   familyName,
-  familyId,
   barrierOptions,
   selectedSet,
   onToggleLabel,
@@ -38,7 +37,6 @@ export function FamilyOverviewSetupCanvas({
   onGenerationAiModeChange,
 }: {
   familyName: string;
-  familyId: string;
   barrierOptions: readonly BarrierOption[];
   selectedSet: ReadonlySet<BarrierPresetLabel>;
   onToggleLabel: (label: BarrierPresetLabel) => void;
@@ -90,7 +88,6 @@ export function FamilyOverviewSetupCanvas({
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
-          <p className="text-xs text-slate-500">Family ID: {familyId}</p>
         </div>
         {lastSavedAt ? (
           <p className="text-xs text-slate-500">Updated {new Date(lastSavedAt).toLocaleString()}</p>

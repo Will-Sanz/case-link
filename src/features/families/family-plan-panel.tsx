@@ -528,12 +528,6 @@ export function FamilyPlanPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle className="text-base">{displayTitle}</CardTitle>
-          {plan ? (
-            <p className="mt-1 text-xs text-slate-500">
-              Version {plan.version}
-              {plan.presentation?.sourceKind === "ai" ? " · AI-assisted" : ""}
-            </p>
-          ) : null}
           {workflow?.selectedBarriers?.length ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {workflow.selectedBarriers.slice(0, 6).map((b) => (
@@ -579,31 +573,11 @@ export function FamilyPlanPanel({
         </p>
       ) : null}
 
-      {plan?.generation_state?.status === "running" ? (
-        <div className="rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2.5 text-sm text-amber-950">
-          <p className="font-medium">Building your draft plan</p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-900/90">
-            {plan.generation_state.phases_complete["30"] ? "30-day section saved. " : null}
-            {plan.generation_state.phases_complete["60"] ? "60-day section saved. " : null}
-            {!plan.generation_state.phases_complete["60"]
-              ? "Drafting 60-day section in the background…"
-              : !plan.generation_state.phases_complete["90"]
-                ? "Drafting 90-day section…"
-                : "Almost done…"}
-          </p>
-        </div>
-      ) : null}
       {plan?.generation_state?.status === "failed" ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           {plan.generation_state.error ??
             "Later phases could not be generated. You can edit the saved steps or regenerate from Overview."}
         </div>
-      ) : null}
-
-      {!plan ? (
-        <p className="text-sm text-slate-600">
-          No saved case plan yet. Use Overview to generate a plan; it will appear here for editing and export.
-        </p>
       ) : null}
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -682,25 +656,19 @@ export function FamilyPlanPanel({
                   key={r.id}
                   className="rounded-lg border border-slate-200 bg-white p-3"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {r.programName || r.name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-500">{r.category ?? r.name}</p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                      {Math.round(r.similarityScore)}%
-                    </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {(r.programName || r.name).trim()}
+                    </p>
+                    {r.name.trim() && r.name.trim() !== (r.programName || r.name).trim() ? (
+                      <p className="mt-0.5 text-xs text-slate-500">{r.name}</p>
+                    ) : r.description?.trim() &&
+                      r.description.trim() !== (r.programName || r.name).trim() ? (
+                      <p className="mt-0.5 text-xs text-slate-500">{r.description}</p>
+                    ) : null}
                   </div>
 
-                  {r.description ? (
-                    <p className="mt-2 text-xs text-slate-700 leading-relaxed">
-                      {r.description}
-                    </p>
-                  ) : null}
-
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-3 space-y-1">
                     {r.primaryPhone ? (
                       <a className="block text-xs text-blue-700 hover:underline" href={`tel:${r.primaryPhone}`}>
                         {r.primaryPhone}
@@ -713,16 +681,6 @@ export function FamilyPlanPanel({
                     ) : null}
                   </div>
 
-                  {r.whyMatched ? (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs font-semibold text-slate-600">
-                        Why this matches
-                      </summary>
-                      <p className="mt-1 text-xs text-slate-700 leading-relaxed">
-                        {r.whyMatched}
-                      </p>
-                    </details>
-                  ) : null}
                 </div>
               ))}
             </div>
@@ -787,7 +745,7 @@ export function FamilyPlanPanel({
             {planAiPreview ? (
               <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                 <p className="text-sm font-semibold text-slate-900">
-                  Preview ready ({planAiPreview.steps.length} steps · {planAiPreview.model})
+                  Preview ready ({planAiPreview.steps.length} steps)
                 </p>
                 <div className="grid gap-2 md:grid-cols-3">
                   {(["30", "60", "90"] as const).map((ph) => {
