@@ -9,12 +9,11 @@ import {
   loadBarrierWorkflowForFamilyAction,
   toggleBarrierWorkflowActionItemAction,
 } from "@/app/actions/barrier-workflow";
-import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
-import { useAIMode } from "@/components/providers/ai-mode-provider";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { CaseAssistantChat } from "@/features/families/case-assistant-chat";
 import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
+import type { AiMode } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
 import type {
   BarrierPresetLabel,
@@ -199,7 +198,7 @@ export function FamilyLiteWorkspace({
   tab?: "overview" | "plan" | "resources" | "assistant";
 }) {
   const router = useRouter();
-  const { mode: aiMode } = useAIMode();
+  const [planGenerationAiMode, setPlanGenerationAiMode] = useState<AiMode>("fast");
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
@@ -271,7 +270,7 @@ export function FamilyLiteWorkspace({
         selectedBarriers: selected,
         additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
         additionalDetails: additionalContext.trim(),
-        aiMode,
+        aiMode: planGenerationAiMode,
       });
       if (!r.ok) return setError(r.error);
       setResult(r.result);
@@ -280,7 +279,10 @@ export function FamilyLiteWorkspace({
       if (r.stagedPolling) {
         void (async () => {
           for (let i = 0; i < 40; i++) {
-            const adv = await advanceStagedLeanPlanGeneration({ familyId, aiMode });
+            const adv = await advanceStagedLeanPlanGeneration({
+              familyId,
+              aiMode: planGenerationAiMode,
+            });
             if (!adv.ok) break;
             const reload = await loadBarrierWorkflowForFamilyAction(familyId);
             if (reload.ok) setResult(reload.result);
@@ -340,6 +342,8 @@ export function FamilyLiteWorkspace({
           onGenerate={generate}
           hasGeneratedThisSession={hasGeneratedThisSession}
           formatElapsed={formatElapsed}
+          generationAiMode={planGenerationAiMode}
+          onGenerationAiModeChange={setPlanGenerationAiMode}
         />
       ) : null}
 
@@ -350,23 +354,11 @@ export function FamilyLiteWorkspace({
               <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
               <p className="text-xs text-slate-500">Family ID: {familyId}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                  AI
-                </p>
-                <AiModeToggle className="mt-0.5" />
-              </div>
-              {result?.lastSavedAt ? (
-                <p className="text-xs text-slate-500">
-                  Updated {new Date(result.lastSavedAt).toLocaleString()}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="mt-3 sm:hidden">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">AI</p>
-            <AiModeToggle className="mt-0.5" />
+            {result?.lastSavedAt ? (
+              <p className="text-xs text-slate-500">
+                Updated {new Date(result.lastSavedAt).toLocaleString()}
+              </p>
+            ) : null}
           </div>
         </Card>
       ) : null}

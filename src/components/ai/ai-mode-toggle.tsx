@@ -1,19 +1,32 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import { useAIMode } from "@/components/providers/ai-mode-provider";
+import type { AiMode } from "@/lib/ai/ai-mode";
+import { useOptionalAiMode } from "@/components/providers/ai-mode-provider";
 
 type AiModeToggleProps = {
   className?: string;
   /** Smaller, softer chrome for embedding in chat composers and dense toolbars. */
   compact?: boolean;
+  /** Controlled mode (no global provider required). */
+  value?: AiMode;
+  onChange?: (mode: AiMode) => void;
 };
 
 /**
  * Segmented control for Fast vs Thinking AI preset. Tooltip via `title` for minimal UI noise.
+ * Pass `value` + `onChange` for local control; otherwise uses `AiModeProvider` if present.
  */
-export function AiModeToggle({ className, compact }: AiModeToggleProps) {
-  const { mode, setMode } = useAIMode();
+export function AiModeToggle({ className, compact, value, onChange }: AiModeToggleProps) {
+  const ctx = useOptionalAiMode();
+  const controlled = value !== undefined && onChange !== undefined;
+  const mode = controlled ? value : ctx?.mode;
+  const setMode = controlled ? onChange : ctx?.setMode;
+  if (mode === undefined || setMode === undefined) {
+    throw new Error(
+      "AiModeToggle needs value+onChange, or must be wrapped in AiModeProvider when uncontrolled.",
+    );
+  }
 
   return (
     <div

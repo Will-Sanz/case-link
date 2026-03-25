@@ -9,8 +9,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { AiMode } from "@/lib/ai/ai-mode";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
 import type { PlanStepDetails, PlanStepRow } from "@/types/family";
@@ -126,6 +128,8 @@ export function PlanStepCaseNote({
   onRefineClose,
   onRefineDiscardPreview,
   onOpenRefine,
+  refineAiMode,
+  onRefineAiModeChange,
 }: {
   step: PlanStepRow;
   editing: boolean;
@@ -152,6 +156,8 @@ export function PlanStepCaseNote({
   onRefineClose: () => void;
   onRefineDiscardPreview: () => void;
   onOpenRefine: () => void;
+  refineAiMode: AiMode;
+  onRefineAiModeChange: (mode: AiMode) => void;
 }) {
   const d = (step.details ?? {}) as PlanStepDetails;
   const [focus, setFocus] = useState<FocusField>(null);
@@ -494,6 +500,16 @@ export function PlanStepCaseNote({
                   placeholder="e.g. Shorten for a city intake form; keep contacts and documents."
                   className="border-slate-200 text-sm"
                 />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                    AI mode
+                  </span>
+                  <AiModeToggle
+                    compact
+                    value={refineAiMode}
+                    onChange={onRefineAiModeChange}
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"

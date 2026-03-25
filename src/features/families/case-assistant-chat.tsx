@@ -10,9 +10,8 @@ import {
 import ReactMarkdown from "react-markdown";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
 import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
-import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
 import { Button } from "@/components/ui/button";
-import { useAIMode } from "@/components/providers/ai-mode-provider";
+import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
 
 type ChatMessage = {
@@ -108,7 +107,6 @@ export function CaseAssistantChat({
   familyId: string;
   familyName: string;
 }) {
-  const { mode: aiMode } = useAIMode();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +142,7 @@ export function CaseAssistantChat({
     setDraft("");
 
     startTransition(async () => {
-      const r = await askCaseAssistantAction(familyId, q, aiMode, prior);
+      const r = await askCaseAssistantAction(familyId, q, DEFAULT_AI_MODE, prior);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -302,9 +300,8 @@ export function CaseAssistantChat({
               placeholder="Message the assistant…"
               className="max-h-40 min-h-[3rem] w-full resize-y border-0 bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-60"
             />
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/60 px-2 py-2">
-              <AiModeToggle compact />
-              <span className="hidden text-[10px] text-slate-400 sm:inline">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/60 px-2 py-2">
+              <span className="mr-auto hidden text-[10px] text-slate-400 sm:inline">
                 Enter to send · Shift+Enter new line
               </span>
               <Button

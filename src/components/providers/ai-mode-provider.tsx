@@ -77,3 +77,8 @@ export function useAIMode(): AiModeContextValue {
   }
   return ctx;
 }
+
+/** For components that may render outside controlled AI mode props. */
+export function useOptionalAiMode(): AiModeContextValue | null {
+  return useContext(AiModeContext);
+}

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
+import type { AiMode } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
 import type { BarrierPresetLabel } from "@/types/barrier-workflow";
 
@@ -33,6 +34,8 @@ export function FamilyOverviewSetupCanvas({
   onGenerate,
   hasGeneratedThisSession,
   formatElapsed,
+  generationAiMode,
+  onGenerationAiModeChange,
 }: {
   familyName: string;
   familyId: string;
@@ -52,6 +55,8 @@ export function FamilyOverviewSetupCanvas({
   onGenerate: () => void;
   hasGeneratedThisSession: boolean;
   formatElapsed: (seconds: number) => string;
+  generationAiMode: AiMode;
+  onGenerationAiModeChange: (mode: AiMode) => void;
 }) {
   const [customDraft, setCustomDraft] = useState("");
 
@@ -87,20 +92,10 @@ export function FamilyOverviewSetupCanvas({
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
           <p className="text-xs text-slate-500">Family ID: {familyId}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="hidden text-right sm:block">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">AI</p>
-            <AiModeToggle className="mt-0.5" />
-          </div>
-          {lastSavedAt ? (
-            <p className="text-xs text-slate-500">Updated {new Date(lastSavedAt).toLocaleString()}</p>
-          ) : null}
-        </div>
+        {lastSavedAt ? (
+          <p className="text-xs text-slate-500">Updated {new Date(lastSavedAt).toLocaleString()}</p>
+        ) : null}
       </header>
-      <div className="mt-3 sm:hidden">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">AI</p>
-        <AiModeToggle className="mt-0.5" />
-      </div>
 
       <div className="mx-auto mt-8 max-w-3xl space-y-10">
         {/* 2. Barriers */}
@@ -254,21 +249,29 @@ export function FamilyOverviewSetupCanvas({
 
         {/* 4. Generate */}
         <div className="space-y-3 pt-1">
-          <Button
-            type="button"
-            onClick={onGenerate}
-            disabled={pending}
-            className={cn(
-              "h-14 w-full max-w-xl text-base font-semibold tracking-tight shadow-sm",
-              "bg-slate-900 text-white hover:bg-slate-800",
-            )}
-          >
-            {pending
-              ? "Generating..."
-              : hasGeneratedThisSession
-                ? "Regenerate Plan and Match Resources"
-                : "Generate Plan and Match Resources"}
-          </Button>
+          <div className="flex max-w-3xl flex-wrap items-stretch gap-3">
+            <Button
+              type="button"
+              onClick={onGenerate}
+              disabled={pending}
+              className={cn(
+                "h-14 min-h-[3.5rem] flex-1 text-base font-semibold tracking-tight shadow-sm sm:min-w-[min(100%,18rem)]",
+                "bg-slate-900 text-white hover:bg-slate-800",
+              )}
+            >
+              {pending
+                ? "Generating..."
+                : hasGeneratedThisSession
+                  ? "Regenerate Plan and Match Resources"
+                  : "Generate Plan and Match Resources"}
+            </Button>
+            <div className="flex min-h-[3.5rem] flex-col justify-center gap-1.5 sm:min-w-0">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                AI mode
+              </span>
+              <AiModeToggle value={generationAiMode} onChange={onGenerationAiModeChange} />
+            </div>
+          </div>
           {pending && generateStartedAt ? (
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span

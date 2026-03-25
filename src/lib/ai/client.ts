@@ -31,7 +31,7 @@ export type CreateResponseOptions = {
   structuredJsonSchema?: StructuredJsonSchema;
   temperature?: number;
   maxTokens?: number;
-  /** From client `useAIMode()`; defaults to fast when omitted. */
+  /** Defaults to fast when omitted. */
   aiMode?: AiMode;
 };
 
