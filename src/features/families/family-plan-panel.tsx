@@ -547,8 +547,8 @@ export function FamilyPlanPanel({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {plan ? (
-            <PlanPdfExport plan={plan} familyName={familyName} documentTitle={displayTitle} />
+          {plan && workflow ? (
+            <PlanPdfExport plan={plan} familyName={familyName} workflow={workflow} />
           ) : null}
           {plan ? (
             <Button

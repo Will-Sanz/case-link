@@ -1,409 +1,381 @@
 "use client";
 
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-} from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { PlanWithSteps, PlanStepRow, PlanStepDetails } from "@/types/family";
 
-const PHASE_LABELS: Record<string, string> = {
-  "30": "30-day",
-  "60": "60-day",
-  "90": "90-day",
-};
+// --- Text normalization (client-side PDF only; no PII logging) ---
 
-const ACTION_VERB_RE =
-  /\b(call|submit|send|confirm|apply|schedule|register|request|book|gather|arrange|complete|enroll|secure|attend|file|prepare|contact)\b/i;
-const ARTIFACT_DOC_RE =
-  /\b(photo\s*id|photo\s*i\.?d|proof|lease|rent\s*statement|past-?due|statement|id\b|income\s*loss|layoff)\b/i;
-const ARTIFACT_CONTACT_RE =
-  /\b(email|phone|landlord\s*(email|phone)|contact\s*info)\b/i;
-
-function isArtifactLikeActionItemTitle(title: string): boolean {
-  const t = title.trim();
-  if (!t) return false;
-  if (ACTION_VERB_RE.test(t)) return false;
-  return ARTIFACT_DOC_RE.test(t) || ARTIFACT_CONTACT_RE.test(t);
+function cleanText(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
 }
 
-function groupArtifactActionItemsPdf(items: Array<{
-  id: string;
-  title: string;
-  target_date: string | null;
-  week_index: number;
-  description: string | null;
-  sort_order: number;
-}>) {
-  const groups: Array<{
-    parent: (typeof items)[number];
-    artifacts: (typeof items)[number][];
-  }> = [];
-  const orphans: Array<(typeof items)[number]> = [];
-  let currentGroupIndex = -1;
-  for (const item of items) {
-    if (isArtifactLikeActionItemTitle(item.title)) {
-      if (currentGroupIndex >= 0) {
-        groups[currentGroupIndex]?.artifacts.push(item);
-      } else {
-        orphans.push(item);
-      }
-    } else {
-      groups.push({ parent: item, artifacts: [] });
-      currentGroupIndex = groups.length - 1;
+function capitalizeWord(w: string): string {
+  if (!w) return w;
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+}
+
+function formatPriority(p: PlanStepRow["priority"] | null | undefined): string | null {
+  if (!p || p === "medium") return null;
+  if (p === "urgent") return "Urgent";
+  return capitalizeWord(p);
+}
+
+function formatTimeline(step: PlanStepRow, d: PlanStepDetails | undefined): string | null {
+  const timing = cleanText(d?.timing_guidance);
+  if (timing) return timing;
+  if (step.due_date) {
+    const dt = new Date(step.due_date);
+    if (!Number.isNaN(dt.getTime())) {
+      return dt.toLocaleDateString(undefined, { dateStyle: "medium" });
     }
   }
-  return { groups, orphans };
+  return null;
+}
+
+/** Single narrative paragraph: description + non-redundant action / guidance. */
+function narrativeParagraph(step: PlanStepRow, d: PlanStepDetails | undefined): string | null {
+  const desc = cleanText(step.description);
+  const actionNow = cleanText(d?.action_needed_now);
+  const fromHelper = cleanText(
+    (step.ai_helper_data as { action_needed_now?: string } | null | undefined)?.action_needed_now,
+  );
+  const detailed = cleanText(d?.detailed_instructions);
+
+  const chunks: string[] = [];
+  if (desc) chunks.push(desc);
+
+  const secondary = actionNow || fromHelper;
+  if (secondary) {
+    const dlow = desc.toLowerCase();
+    const sub = secondary.toLowerCase().slice(0, Math.min(48, secondary.length));
+    if (!desc || (sub.length > 0 && !dlow.includes(sub))) {
+      if (secondary !== desc) chunks.push(secondary);
+    }
+  }
+
+  if (detailed) {
+    const joined = chunks.join(" ").toLowerCase();
+    const dsub = detailed.toLowerCase().slice(0, Math.min(56, detailed.length));
+    if (dsub.length > 0 && !joined.includes(dsub)) {
+      chunks.push(detailed);
+    }
+  }
+
+  return cleanText(chunks.join(" ")) || null;
+}
+
+function keyActionBullets(step: PlanStepRow, d: PlanStepDetails | undefined): string[] {
+  const bullets: string[] = [];
+  const pushUnique = (line: string) => {
+    const t = cleanText(line);
+    if (!t) return;
+    if (!bullets.some((b) => b.toLowerCase() === t.toLowerCase())) bullets.push(t);
+  };
+
+  if (step.action_items?.length) {
+    const sorted = [...step.action_items].sort((a, b) =>
+      a.sort_order !== b.sort_order ? a.sort_order - b.sort_order : a.week_index - b.week_index,
+    );
+    for (const ai of sorted) {
+      const t = cleanText(ai.title);
+      if (!t) continue;
+      pushUnique(ai.week_index > 1 ? `Week ${ai.week_index}: ${t}` : t);
+    }
+  }
+
+  if (d?.checklist?.length) {
+    for (const c of d.checklist) {
+      pushUnique(c);
+    }
+  }
+
+  return bullets;
+}
+
+function documentBullets(d: PlanStepDetails | undefined): string[] {
+  if (!d) return [];
+  const out: string[] = [];
+  const push = (x: string) => {
+    const t = cleanText(x);
+    if (!t) return;
+    if (!out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
+  };
+  for (const x of d.required_documents ?? []) push(x);
+  for (const x of d.materials_needed ?? []) push(x);
+  return out;
+}
+
+function contactLines(d: PlanStepDetails | undefined): string[] {
+  if (!d?.contacts?.length) return [];
+  return d.contacts
+    .map((c) => {
+      const name = cleanText(c.name);
+      const email = cleanText(c.email);
+      const phone = cleanText(c.phone);
+      const parts = [name, email, phone].filter(Boolean);
+      return parts.length ? parts.join(" · ") : "";
+    })
+    .filter(Boolean);
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    padding: 48,
     fontSize: 10,
     fontFamily: "Helvetica",
+    color: "#111111",
   },
-  header: {
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: "#0d9488",
-  },
-  title: {
-    fontSize: 22,
+  docTitle: {
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#0f172a",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: "#64748b",
-  },
-  phaseSection: {
-    marginBottom: 20,
-  },
-  phaseHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    paddingVertical: 4,
-  },
-  phaseBadge: {
-    backgroundColor: "#0d9488",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  phaseTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#0f172a",
-  },
-  /** Document-style step block — minimal chrome for transfer to other forms. */
-  stepCard: {
     marginBottom: 14,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    color: "#000000",
   },
-  stepTitle: {
-    fontSize: 12,
+  headerLine: {
+    fontSize: 10,
+    lineHeight: 1.45,
+    marginBottom: 3,
+    color: "#333333",
+  },
+  headerBold: {
     fontWeight: "bold",
-    color: "#0f172a",
-    marginBottom: 6,
+    color: "#000000",
   },
-  stepStatus: {
-    fontSize: 8,
-    color: "#64748b",
-    marginBottom: 6,
-    textTransform: "uppercase",
+  barrierSection: {
+    marginTop: 12,
+    marginBottom: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#bfbfbf",
   },
   sectionLabel: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: "bold",
-    color: "#64748b",
-    marginTop: 8,
-    marginBottom: 4,
-    textTransform: "uppercase",
+    marginBottom: 6,
+    color: "#000000",
   },
-  bodyText: {
-    fontSize: 10,
-    color: "#334155",
-    lineHeight: 1.5,
-    marginBottom: 4,
-  },
-  listItem: {
+  barrierBulletRow: {
     flexDirection: "row",
     marginBottom: 2,
+    paddingLeft: 2,
   },
-  bullet: {
-    width: 12,
+  barrierBullet: { width: 12, fontSize: 9, color: "#333333" },
+  barrierText: { flex: 1, fontSize: 9, lineHeight: 1.4, color: "#333333" },
+  phaseHeading: {
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 16,
+    marginBottom: 8,
+    color: "#000000",
+  },
+  phaseIntro: {
     fontSize: 10,
-    color: "#0d9488",
+    lineHeight: 1.45,
+    color: "#444444",
+    marginBottom: 10,
   },
-  contactLine: {
+  stepBlock: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d9d9d9",
+  },
+  stepTitle: {
+    fontSize: 11,
+    fontWeight: "bold",
+    marginBottom: 5,
+    color: "#000000",
+  },
+  metaLine: {
     fontSize: 9,
-    color: "#334155",
+    lineHeight: 1.35,
     marginBottom: 2,
+    color: "#333333",
+  },
+  body: {
+    fontSize: 10,
+    lineHeight: 1.5,
+    color: "#222222",
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  fieldLabel: {
+    fontSize: 9,
+    fontWeight: "bold",
+    marginTop: 6,
+    marginBottom: 3,
+    color: "#000000",
+  },
+  bulletRow: {
+    flexDirection: "row",
+    marginBottom: 2,
+    paddingLeft: 2,
+  },
+  bullet: { width: 12, fontSize: 10, color: "#222222" },
+  bulletText: { flex: 1, fontSize: 10, lineHeight: 1.45, color: "#222222" },
+  statusLine: {
+    fontSize: 9,
+    marginTop: 6,
+    color: "#444444",
   },
 });
 
-function StepContent({ step }: { step: PlanStepRow }) {
-  const d = step.details as PlanStepDetails | null | undefined;
-  const w = step.workflow_data as { outcome_notes?: string; blocker_reason?: string } | null | undefined;
-  const helperData = step.ai_helper_data as { action_needed_now?: string } | null | undefined;
-  const isCompleted = step.status === "completed";
-  const isBlocked = step.status === "blocked";
+function PdfStep({ step, index }: { step: PlanStepRow; index: number }) {
+  const d = step.details as PlanStepDetails | undefined;
+  const pri = formatPriority(step.priority ?? undefined);
+  const timeline = formatTimeline(step, d);
+  const narrative = narrativeParagraph(step, d);
+  const actions = keyActionBullets(step, d);
+  const docs = documentBullets(d);
+  const contacts = contactLines(d);
+  const outcome = cleanText(d?.expected_outcome);
+  const w = step.workflow_data;
+  const blockedNote =
+    step.status === "blocked"
+      ? cleanText(w?.blocker_reason) || "On hold pending follow-up."
+      : null;
+  const completedNote =
+    step.status === "completed" ? cleanText(w?.outcome_notes ?? null) : null;
 
-  const summaryText =
-    step.description?.trim() ||
-    d?.action_needed_now?.trim() ||
-    helperData?.action_needed_now?.trim() ||
-    "";
-
-  const timingLine = d?.timing_guidance?.trim() ?? "";
-
-  const showStatusRow =
-    (step.priority && step.priority !== "medium") ||
-    (step.status && step.status !== "pending");
+  const title = cleanText(step.title) || "Untitled step";
 
   return (
-    <View style={styles.stepCard}>
-      <Text style={styles.stepTitle}>{step.title}</Text>
-
-      {showStatusRow ? (
-        <Text style={styles.stepStatus}>
-          {[
-            step.priority && step.priority !== "medium" ? `Priority: ${step.priority}` : null,
-            step.status && step.status !== "pending" ? step.status.replace("_", " ") : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+    <View style={styles.stepBlock}>
+      <Text style={styles.stepTitle}>
+        {index}. {title}
+      </Text>
+      {pri ? (
+        <Text style={styles.metaLine}>
+          Priority: {pri}
         </Text>
       ) : null}
-
-      {summaryText ? (
-        <>
-          <Text style={styles.sectionLabel}>Summary</Text>
-          <Text style={styles.bodyText}>{summaryText}</Text>
-        </>
+      {timeline ? (
+        <Text style={styles.metaLine}>
+          Timeline: {timeline}
+        </Text>
       ) : null}
-
-      {timingLine.length > 0 ? (
+      {narrative ? <Text style={styles.body}>{narrative}</Text> : null}
+      {actions.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Timing</Text>
-          <Text style={styles.bodyText}>{timingLine}</Text>
-        </>
-      ) : null}
-
-      {step.action_items && step.action_items.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Action items</Text>
-          {(() => {
-            const sorted = [...step.action_items!].sort((a, b) => a.sort_order - b.sort_order);
-            const { groups, orphans } = groupArtifactActionItemsPdf(
-              sorted as Array<{
-                id: string;
-                title: string;
-                target_date: string | null;
-                week_index: number;
-                description: string | null;
-                sort_order: number;
-              }>,
-            );
-
-            return (
-              <>
-                {groups.map((g) => (
-                  <View key={g.parent.id} style={styles.listItem}>
-                    <Text style={styles.bullet}>•</Text>
-                    <View>
-                      <Text style={styles.bodyText}>
-                        Week {g.parent.week_index}: {g.parent.title}
-                      </Text>
-                      {g.parent.description ? (
-                        <Text
-                          style={[
-                            styles.bodyText,
-                            { marginLeft: 8, color: "#64748b", fontSize: 9 },
-                          ]}
-                        >
-                          {g.parent.description}
-                        </Text>
-                      ) : null}
-                      {g.artifacts.length > 0 ? (
-                        <>
-                          {g.artifacts.map((a) => (
-                            <Text
-                              key={a.id}
-                              style={[
-                                styles.bodyText,
-                                { marginLeft: 14, color: "#475569", fontSize: 9 },
-                              ]}
-                            >
-                              • {a.title}
-                            </Text>
-                          ))}
-                        </>
-                      ) : null}
-                    </View>
-                  </View>
-                ))}
-                {orphans.length > 0 ? (
-                  <>
-                    <Text style={[styles.sectionLabel, { marginTop: 8 }]}>Additional items</Text>
-                    {orphans.map((a) => (
-                      <View key={a.id} style={styles.listItem}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.bodyText}>{a.title}</Text>
-                      </View>
-                    ))}
-                  </>
-                ) : null}
-              </>
-            );
-          })()}
-        </>
-      ) : null}
-
-      {d?.checklist && d.checklist.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Checklist</Text>
-          {d.checklist.map((item, i) => (
-            <View key={i} style={styles.listItem}>
+          <Text style={styles.fieldLabel}>Key actions</Text>
+          {actions.map((line, i) => (
+            <View key={i} style={styles.bulletRow}>
               <Text style={styles.bullet}>•</Text>
-              <Text style={styles.bodyText}>{item}</Text>
+              <Text style={styles.bulletText}>{line}</Text>
             </View>
           ))}
         </>
       ) : null}
-
-      {d?.required_documents && d.required_documents.length > 0 ? (
+      {docs.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Documents</Text>
-          <Text style={styles.bodyText}>{d.required_documents.join(", ")}</Text>
+          <Text style={styles.fieldLabel}>Required documents</Text>
+          {docs.map((line, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <Text style={styles.bullet}>•</Text>
+              <Text style={styles.bulletText}>{line}</Text>
+            </View>
+          ))}
         </>
       ) : null}
-
-      {d?.contacts && d.contacts.length > 0 ? (
+      {contacts.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Contacts</Text>
-          {d.contacts.map((c, i) => (
-            <Text key={i} style={styles.contactLine}>
-              {[c.name, c.phone, c.email].filter(Boolean).join(" · ")}
-              {c.notes ? ` — ${c.notes}` : ""}
+          <Text style={styles.fieldLabel}>Contact</Text>
+          {contacts.map((line, i) => (
+            <Text key={i} style={styles.body}>
+              {line}
             </Text>
           ))}
         </>
       ) : null}
-
-      {d?.expected_outcome ? (
+      {outcome ? (
         <>
-          <Text style={styles.sectionLabel}>Expected outcome</Text>
-          <Text style={styles.bodyText}>{d.expected_outcome}</Text>
+          <Text style={styles.fieldLabel}>Expected outcome</Text>
+          <Text style={styles.body}>{outcome}</Text>
         </>
       ) : null}
-
-      {d?.detailed_instructions?.trim() ? (
-        <>
-          <Text style={styles.sectionLabel}>Additional guidance</Text>
-          <Text style={styles.bodyText}>{d.detailed_instructions.trim()}</Text>
-        </>
-      ) : null}
-
-      {isCompleted && w?.outcome_notes ? (
-        <Text style={[styles.bodyText, { marginTop: 6, color: "#047857" }]}>
-          Completed: {w.outcome_notes}
-        </Text>
-      ) : null}
-
-      {isBlocked ? (
-        <Text style={[styles.bodyText, { marginTop: 6, color: "#b91c1c", fontStyle: "italic" }]}>
-          {w?.blocker_reason ? `Blocked: ${w.blocker_reason}` : "Currently on hold — your case manager will follow up"}
-        </Text>
-      ) : null}
+      {blockedNote ? <Text style={styles.statusLine}>Status: {blockedNote}</Text> : null}
+      {completedNote ? <Text style={styles.statusLine}>Completion notes: {completedNote}</Text> : null}
     </View>
   );
-}
-
-function phaseIntro(
-  plan: PlanWithSteps,
-  phase: "30" | "60" | "90",
-): string | null {
-  const s = plan.client_display?.phaseSummaries?.[phase]?.trim();
-  if (s) return s;
-  return null;
 }
 
 export function PlanPdfDocument({
   plan,
   familyName,
-  documentTitle,
   generatedDate,
+  barrierLabels,
 }: {
   plan: PlanWithSteps;
   familyName?: string;
-  documentTitle?: string;
   generatedDate: string;
+  barrierLabels?: string[];
 }) {
+  const phases = ["30", "60", "90"] as const;
   const stepsByPhase = {
-    "30": plan.steps.filter((s) => s.phase === "30"),
-    "60": plan.steps.filter((s) => s.phase === "60"),
-    "90": plan.steps.filter((s) => s.phase === "90"),
+    "30": plan.steps
+      .filter((s) => s.phase === "30")
+      .sort((a, b) => a.sort_order - b.sort_order),
+    "60": plan.steps
+      .filter((s) => s.phase === "60")
+      .sort((a, b) => a.sort_order - b.sort_order),
+    "90": plan.steps
+      .filter((s) => s.phase === "90")
+      .sort((a, b) => a.sort_order - b.sort_order),
   };
 
-  const mainTitle =
-    documentTitle?.trim() ||
-    plan.client_display?.title?.trim() ||
-    plan.summary?.trim() ||
-    "30 / 60 / 90 Day Plan";
-
-  const phases: Array<"30" | "60" | "90"> = ["30", "60", "90"];
+  const barriers = (barrierLabels ?? []).map(cleanText).filter(Boolean);
 
   return (
     <Document>
-      {phases.map((phase, idx) => {
-        const intro = phaseIntro(plan, phase);
-        return (
-          <Page key={phase} size="A4" style={styles.page}>
-            {idx === 0 ? (
-              <View style={styles.header}>
-                <Text style={styles.title}>{mainTitle}</Text>
-                {familyName ? (
-                  <Text style={styles.subtitle}>Case / family: {familyName}</Text>
-                ) : null}
-                <Text style={styles.subtitle}>Exported {generatedDate}</Text>
-              </View>
-            ) : (
-              <View style={{ marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#e2e8f0" }}>
-                <Text style={styles.title}>{mainTitle}</Text>
-                <Text style={styles.subtitle}>Continued — {PHASE_LABELS[phase]} section</Text>
-              </View>
-            )}
+      <Page size="A4" style={styles.page} wrap>
+        <Text style={styles.docTitle}>Case Plan</Text>
 
-            <View style={styles.phaseSection}>
-              <View style={styles.phaseHeader}>
-                <View style={styles.phaseBadge}>
-                  <Text style={{ color: "white", fontWeight: "bold" }}>{phase}</Text>
-                </View>
-                <Text style={styles.phaseTitle}>{PHASE_LABELS[phase]} horizon</Text>
+        {familyName ? (
+          <Text style={styles.headerLine}>
+            <Text style={styles.headerBold}>Family: </Text>
+            {cleanText(familyName)}
+          </Text>
+        ) : null}
+        <Text style={styles.headerLine}>
+          <Text style={styles.headerBold}>Date generated: </Text>
+          {generatedDate}
+        </Text>
+
+        {barriers.length > 0 ? (
+          <View style={styles.barrierSection}>
+            <Text style={styles.sectionLabel}>Barriers identified</Text>
+            {barriers.map((b, i) => (
+              <View key={i} style={styles.barrierBulletRow}>
+                <Text style={styles.barrierBullet}>•</Text>
+                <Text style={styles.barrierText}>{b}</Text>
               </View>
-              {intro ? (
-                <Text style={[styles.bodyText, { marginBottom: 10, fontStyle: "italic" }]}>
-                  {intro}
-                </Text>
-              ) : null}
-              {stepsByPhase[phase].length === 0 ? (
-                <Text style={[styles.bodyText, { color: "#94a3b8" }]}>No steps in this section.</Text>
-              ) : (
-                stepsByPhase[phase].map((step) => <StepContent key={step.id} step={step} />)
-              )}
-            </View>
-          </Page>
-        );
-      })}
+            ))}
+          </View>
+        ) : (
+          <View style={{ height: 8 }} />
+        )}
+
+        {phases.flatMap((phase) => {
+          const steps = stepsByPhase[phase];
+          const intro = cleanText(plan.client_display?.phaseSummaries?.[phase]);
+          if (steps.length === 0 && !intro) return [];
+
+          return [
+            <View key={phase} minPresenceAhead={72}>
+              <Text style={styles.phaseHeading}>{phase}-day period</Text>
+              {intro ? <Text style={styles.phaseIntro}>{intro}</Text> : null}
+              {steps.map((step, idx) => (
+                <PdfStep key={step.id} step={step} index={idx + 1} />
+              ))}
+            </View>,
+          ];
+        })}
+      </Page>
     </Document>
   );
 }
