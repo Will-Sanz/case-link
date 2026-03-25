@@ -101,13 +101,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#0f172a",
   },
+  /** Document-style step block — minimal chrome for transfer to other forms. */
   stepCard: {
-    marginBottom: 12,
-    padding: 12,
-    backgroundColor: "#f8fafc",
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: "#0d9488",
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
   },
   stepTitle: {
     fontSize: 12,
@@ -155,7 +154,7 @@ function StepContent({ step }: { step: PlanStepRow }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data as { outcome_notes?: string; blocker_reason?: string } | null | undefined;
   const helperData = step.ai_helper_data as { action_needed_now?: string } | null | undefined;
-  const dueDate = step.due_date
+  const dueDateFormatted = step.due_date
     ? new Date(step.due_date).toLocaleDateString(undefined, {
         month: "long",
         day: "numeric",
@@ -164,142 +163,53 @@ function StepContent({ step }: { step: PlanStepRow }) {
     : null;
   const isCompleted = step.status === "completed";
   const isBlocked = step.status === "blocked";
-  const actionNow = d?.action_needed_now ?? helperData?.action_needed_now;
+
+  const summaryText =
+    step.description?.trim() ||
+    d?.action_needed_now?.trim() ||
+    helperData?.action_needed_now?.trim() ||
+    "";
+
+  const timingLine = [d?.timing_guidance?.trim(), dueDateFormatted ? `Follow-up: ${dueDateFormatted}` : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  const showStatusRow =
+    (step.priority && step.priority !== "medium") ||
+    (step.status && step.status !== "pending");
 
   return (
     <View style={styles.stepCard}>
       <Text style={styles.stepTitle}>{step.title}</Text>
 
-      {step.status ? (
-        <Text style={styles.stepStatus}>{step.status.replace("_", " ")}</Text>
+      {showStatusRow ? (
+        <Text style={styles.stepStatus}>
+          {[
+            step.priority && step.priority !== "medium" ? `Priority: ${step.priority}` : null,
+            step.status && step.status !== "pending" ? step.status.replace("_", " ") : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </Text>
       ) : null}
 
-      {d?.priority ? (
-        <Text style={[styles.bodyText, { marginBottom: 6 }]}>Priority: {d.priority}</Text>
-      ) : null}
-
-      {actionNow ? (
+      {summaryText ? (
         <>
-          <Text style={styles.sectionLabel}>Action needed now</Text>
-          <Text style={[styles.bodyText, { fontWeight: "bold", marginBottom: 8 }]}>{actionNow}</Text>
+          <Text style={styles.sectionLabel}>Summary</Text>
+          <Text style={styles.bodyText}>{summaryText}</Text>
         </>
       ) : null}
 
-      {(d?.stage_goal || d?.why_now) ? (
+      {timingLine ? (
         <>
-          {d?.stage_goal ? (
-            <>
-              <Text style={styles.sectionLabel}>Stage focus</Text>
-              <Text style={styles.bodyText}>{d.stage_goal}</Text>
-            </>
-          ) : null}
-          {d?.why_now ? (
-            <>
-              <Text style={styles.sectionLabel}>Why now</Text>
-              <Text style={styles.bodyText}>{d.why_now}</Text>
-            </>
-          ) : null}
-        </>
-      ) : null}
-
-      {d?.rationale ? (
-        <>
-          <Text style={styles.sectionLabel}>Why this matters</Text>
-          <Text style={styles.bodyText}>{d.rationale}</Text>
-        </>
-      ) : null}
-
-      {d?.detailed_instructions ? (
-        <>
-          <Text style={styles.sectionLabel}>What to do</Text>
-          <Text style={styles.bodyText}>{d.detailed_instructions}</Text>
-        </>
-      ) : step.description ? (
-        <>
-          <Text style={styles.sectionLabel}>What to do</Text>
-          <Text style={styles.bodyText}>{step.description}</Text>
-        </>
-      ) : null}
-
-      {d?.contact_script ? (
-        <>
-          <Text style={styles.sectionLabel}>What to say (outreach script)</Text>
-          <Text style={styles.bodyText}>{d.contact_script}</Text>
-        </>
-      ) : null}
-
-      {d?.checklist && d.checklist.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Checklist</Text>
-          {d.checklist.map((item, i) => (
-            <View key={i} style={styles.listItem}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.bodyText}>{item}</Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-
-      {d?.required_documents && d.required_documents.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>What to prepare</Text>
-          <Text style={styles.bodyText}>{d.required_documents.join(", ")}</Text>
-        </>
-      ) : null}
-
-      {d?.contacts && d.contacts.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Contacts</Text>
-          {d.contacts.map((c, i) => (
-            <Text key={i} style={styles.contactLine}>
-              {[c.name, c.phone, c.email].filter(Boolean).join(" · ")}
-              {c.notes ? ` — ${c.notes}` : ""}
-            </Text>
-          ))}
-        </>
-      ) : null}
-
-      {d?.expected_outcome ? (
-        <>
-          <Text style={styles.sectionLabel}>Success looks like</Text>
-          <Text style={styles.bodyText}>{d.expected_outcome}</Text>
-        </>
-      ) : null}
-
-      {d?.blockers && d.blockers.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Common blockers</Text>
-          {d.blockers.map((b, i) => (
-            <View key={i} style={styles.listItem}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.bodyText}>{b}</Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-
-      {d?.fallback_options && d.fallback_options.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Fallback options</Text>
-          {d.fallback_options.map((f, i) => (
-            <View key={i} style={styles.listItem}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.bodyText}>{f}</Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-
-      {d?.timing_guidance ? (
-        <>
-          <Text style={styles.sectionLabel}>When</Text>
-          <Text style={styles.bodyText}>{d.timing_guidance}</Text>
+          <Text style={styles.sectionLabel}>Timing</Text>
+          <Text style={styles.bodyText}>{timingLine}</Text>
         </>
       ) : null}
 
       {step.action_items && step.action_items.length > 0 ? (
         <>
-          <Text style={styles.sectionLabel}>Weekly action items</Text>
+          <Text style={styles.sectionLabel}>Action items</Text>
           {(() => {
             const sorted = [...step.action_items!].sort((a, b) => a.sort_order - b.sort_order);
             const { groups, orphans } = groupArtifactActionItemsPdf(
@@ -373,10 +283,49 @@ function StepContent({ step }: { step: PlanStepRow }) {
         </>
       ) : null}
 
-      {dueDate ? (
-        <Text style={[styles.bodyText, { marginTop: 6, color: "#0d9488", fontWeight: "bold" }]}>
-          Follow-up date: {dueDate}
-        </Text>
+      {d?.checklist && d.checklist.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>Checklist</Text>
+          {d.checklist.map((item, i) => (
+            <View key={i} style={styles.listItem}>
+              <Text style={styles.bullet}>•</Text>
+              <Text style={styles.bodyText}>{item}</Text>
+            </View>
+          ))}
+        </>
+      ) : null}
+
+      {d?.required_documents && d.required_documents.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>Documents</Text>
+          <Text style={styles.bodyText}>{d.required_documents.join(", ")}</Text>
+        </>
+      ) : null}
+
+      {d?.contacts && d.contacts.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>Contacts</Text>
+          {d.contacts.map((c, i) => (
+            <Text key={i} style={styles.contactLine}>
+              {[c.name, c.phone, c.email].filter(Boolean).join(" · ")}
+              {c.notes ? ` — ${c.notes}` : ""}
+            </Text>
+          ))}
+        </>
+      ) : null}
+
+      {d?.expected_outcome ? (
+        <>
+          <Text style={styles.sectionLabel}>Expected outcome</Text>
+          <Text style={styles.bodyText}>{d.expected_outcome}</Text>
+        </>
+      ) : null}
+
+      {d?.detailed_instructions?.trim() ? (
+        <>
+          <Text style={styles.sectionLabel}>Additional guidance</Text>
+          <Text style={styles.bodyText}>{d.detailed_instructions.trim()}</Text>
+        </>
       ) : null}
 
       {isCompleted && w?.outcome_notes ? (
@@ -430,40 +379,47 @@ export function PlanPdfDocument({
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{mainTitle}</Text>
-          {familyName ? (
-            <Text style={styles.subtitle}>Case / family: {familyName}</Text>
-          ) : null}
-          <Text style={styles.subtitle}>Plan version {plan.version}</Text>
-          <Text style={styles.subtitle}>Exported {generatedDate}</Text>
-        </View>
+      {phases.map((phase, idx) => {
+        const intro = phaseIntro(plan, phase);
+        return (
+          <Page key={phase} size="A4" style={styles.page}>
+            {idx === 0 ? (
+              <View style={styles.header}>
+                <Text style={styles.title}>{mainTitle}</Text>
+                {familyName ? (
+                  <Text style={styles.subtitle}>Case / family: {familyName}</Text>
+                ) : null}
+                <Text style={styles.subtitle}>Plan version {plan.version}</Text>
+                <Text style={styles.subtitle}>Exported {generatedDate}</Text>
+              </View>
+            ) : (
+              <View style={{ marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#e2e8f0" }}>
+                <Text style={styles.title}>{mainTitle}</Text>
+                <Text style={styles.subtitle}>Continued — {PHASE_LABELS[phase]} section</Text>
+              </View>
+            )}
 
-        {phases.map((phase) => {
-          const intro = phaseIntro(plan, phase);
-          return (
-            <View key={phase} style={styles.phaseSection}>
+            <View style={styles.phaseSection}>
               <View style={styles.phaseHeader}>
                 <View style={styles.phaseBadge}>
                   <Text style={{ color: "white", fontWeight: "bold" }}>{phase}</Text>
                 </View>
-                <Text style={styles.phaseTitle}>
-                  {PHASE_LABELS[phase]} horizon
-                </Text>
+                <Text style={styles.phaseTitle}>{PHASE_LABELS[phase]} horizon</Text>
               </View>
               {intro ? (
                 <Text style={[styles.bodyText, { marginBottom: 10, fontStyle: "italic" }]}>
                   {intro}
                 </Text>
               ) : null}
-              {stepsByPhase[phase].map((step) => (
-                <StepContent key={step.id} step={step} />
-              ))}
+              {stepsByPhase[phase].length === 0 ? (
+                <Text style={[styles.bodyText, { color: "#94a3b8" }]}>No steps in this section.</Text>
+              ) : (
+                stepsByPhase[phase].map((step) => <StepContent key={step.id} step={step} />)
+              )}
             </View>
-          );
-        })}
-      </Page>
+          </Page>
+        );
+      })}
     </Document>
   );
 }

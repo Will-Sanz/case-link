@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { runResourceMatching } from "@/app/actions/resource-matches";
-import { generatePlan, updatePlanStepActionItem } from "@/app/actions/plans";
+import { startStagedLeanPlanGeneration, updatePlanStepActionItem } from "@/app/actions/plans";
 import { getFamilyDetail } from "@/lib/services/families";
 import {
   maxRawMatchScore,
@@ -197,7 +197,10 @@ async function upsertBarrierPlanRecord(
 
 export async function generateBarrierWorkflowAction(
   input: BarrierWorkflowInput,
-): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean }
+  | { ok: false; error: string }
+> {
   const referenceId = input.referenceId?.trim() ?? "";
   const selected = Array.from(new Set((input.selectedBarriers ?? []).map((s) => s.trim()).filter(Boolean)));
   const additionalBarriers = input.additionalBarriers?.trim() ?? "";
@@ -273,9 +276,8 @@ export async function generateBarrierWorkflowAction(
     const matchRes = await runResourceMatching({ familyId });
     if (!matchRes.ok) return { ok: false, error: matchRes.error };
 
-    const planRes = await generatePlan({
+    const planRes = await startStagedLeanPlanGeneration({
       familyId,
-      regenerateExistingPlan: true,
       regenerationFeedback:
         [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
     });
@@ -309,6 +311,7 @@ export async function generateBarrierWorkflowAction(
     return {
       ok: true,
       result: { ...mapped, lastSavedAt: savedAt },
+      stagedPolling: true,
     };
   } catch (error) {
     console.error("[barrier-workflow] generateBarrierWorkflowAction failed", error);
@@ -457,7 +460,10 @@ export async function listRecentBarrierPlanRecordsAction(
 export async function generateBarrierWorkflowForFamilyAction(
   familyId: string,
   input: Omit<BarrierWorkflowInput, "referenceId">,
-): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean }
+  | { ok: false; error: string }
+> {
   const selected = Array.from(new Set((input.selectedBarriers ?? []).map((s) => s.trim()).filter(Boolean)));
   const additionalBarriers = input.additionalBarriers?.trim() ?? "";
   const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
@@ -505,9 +511,8 @@ export async function generateBarrierWorkflowForFamilyAction(
     const matchRes = await runResourceMatching({ familyId });
     if (!matchRes.ok) return { ok: false, error: matchRes.error };
 
-    const planRes = await generatePlan({
+    const planRes = await startStagedLeanPlanGeneration({
       familyId,
-      regenerateExistingPlan: true,
       regenerationFeedback:
         [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
     });
@@ -537,7 +542,7 @@ export async function generateBarrierWorkflowForFamilyAction(
     );
     revalidatePath(`/families/${familyId}`);
     revalidatePath("/families");
-    return { ok: true, result: { ...mapped, lastSavedAt: savedAt } };
+    return { ok: true, result: { ...mapped, lastSavedAt: savedAt }, stagedPolling: true };
   } catch (error) {
     console.error("[barrier-workflow] generateBarrierWorkflowForFamilyAction failed", error);
     return { ok: false, error: toClientError(error) };

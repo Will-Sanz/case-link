@@ -1,71 +1,54 @@
 import "server-only";
 
 import type { FamilyDetail } from "@/types/family";
+import type { PlanStepDetails } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
-import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
-import type { GeneratedStepDetails } from "./types";
+import { formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import {
-  OPENAI_SINGLE_PLAN_STEP_SCHEMA,
-  aiPlanStepSchema,
-  normalizePlanStep,
-  validatePlanStepsRichness,
-  applyPlanStepDefaults,
-  type AiPlanStepParsed,
-} from "./plan-step-openai-schema";
+  buildLeanSingleStepRootJsonSchema,
+  leanSingleStepZ,
+  sparseDetailsForPersistence,
+} from "@/lib/plan-generator/lean-plan-schema";
 
 export type RefineStepResult =
-  | { ok: true; step: { title: string; description: string; details: GeneratedStepDetails } }
+  | {
+      ok: true;
+      step: {
+        title: string;
+        description: string;
+        details: PlanStepDetails;
+        /** Row-level priority when urgent/high/low/medium */
+        stepPriority?: "low" | "medium" | "high" | "urgent";
+      };
+    }
   | { ok: false; reason: string };
 
 function cloneSchema(schema: unknown): Record<string, unknown> {
   return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
 }
 
-const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant. Your job is to REFINE A SINGLE PLAN STEP based on case manager feedback. Make it an EXECUTION-READY step the case manager can act on immediately.
+const SYSTEM_PROMPT = `You are refining ONE plan step for a Philadelphia case manager drafting a submission-ready 30/60/90 outline.
 
-## GEOGRAPHIC CONTEXT
-${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
-
-## action_needed_now (mandatory)
-- Short directive or crisp factual cue for the case manager as a **plain statement**, not an answer to an imaginary question.
-- Never start with Yes, No, Sure, Correct, or "Yes – …". Use imperative or neutral declarative wording.
-
-## Action-oriented refinement
-- Use action verbs: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
-- Avoid passive starts: assess, explore, identify, connect with, review options—unless paired with an immediate same-day action.
-- Embed any assessment into a concrete task (e.g. "Call X, confirm Y, and book Z" not "Assess Y").
-
-## CRITICAL: Output is schema-enforced
-- You MUST return one JSON object matching the API schema exactly—all keys, every time.
-- Do NOT omit any field. No "TBD", "N/A", or placeholder strings.
-- Keep prose concise: 1–3 sentences per narrative field, 3–5 checklist items, 2–3 fallback options.
+## Output (JSON only, enforced schema)
+- summary: concise "what to do" (this becomes the main step text for the form).
+- timing: short due window or cadence, or null.
+- additional_guidance: optional nuance only; null if not needed.
+- action_items: 1–5 concrete tasks (titles are calendar-ready; not raw document names).
+- required_documents, contacts, expected_outcome: practical and specific.
+- priority: low | medium | high | urgent
 
 ## Rules
-- Output ONLY the revised step as the root JSON object (not wrapped in "steps").
-- Keep the step in the same phase (30, 60, or 90) unless the feedback explicitly asks to change it.
-- Make the step MORE SPECIFIC, ACTIONABLE, and EXECUTION-FRIENDLY.
-- The checklist MUST contain at least 3 concrete, checkable sub-actions.
-- You MUST include at least 2 action_items with week_index and specific titles.
-- action_items should represent the executable task (submit/schedule/gather and compile the packet),
-  not individual document/contact names. Put document names into required_documents and contact info into contacts instead.
-- Incorporate the case manager's feedback exactly where reasonable.
-- Use contact_script for outreach (exact phone script); use null if not an outreach step.
-- Include required_documents when documents are needed; be specific.
-- Include blockers (≥1) and fallback_options (≥1) with realistic content.
-- When linked resources exist, use their names and contact details practically.
+- Action verbs: call, schedule, apply, submit, gather, confirm, enroll.
+- Put document names in required_documents; agencies/people in contacts.
+- Use MATCHED_RESOURCES names only when listing programs; do not invent organizations.
+- Keep the same phase unless feedback explicitly asks to change it.
 
-## Required fields (all must be substantive)
-- phase, title, description, action_needed_now
-- why_now, rationale, stage_goal, detailed_instructions (2–4 action-focused sentences)
-- checklist (3–5 items), required_documents, contacts (1–3)
-- blockers, fallback_options (2–3), expected_outcome, success_marker, timing_guidance
-- priority: "low" | "medium" | "high"
-- action_items: array of { title, description (nullable), week_index, target_date (nullable) }
-- contact_script, depends_on, milestone_type (use null when not applicable)`;
+## Geography
+${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}`;
 
 /**
- * Refines a single plan step. Uses strict JSON Schema + richness validation.
+ * Refines a single plan step with the lean schema (faster, smaller output).
  */
 export async function refineStepWithOpenAI(
   detail: FamilyDetail,
@@ -79,20 +62,21 @@ export async function refineStepWithOpenAI(
   feedback: string,
   options?: { surroundingStepTitles?: string[]; retries?: number },
 ): Promise<RefineStepResult> {
+  const phase =
+    currentStep.phase === "30" || currentStep.phase === "60" || currentStep.phase === "90"
+      ? currentStep.phase
+      : "30";
+
   const blockerReason = currentStep.workflow_data?.blocker_reason;
   const context = [
     `Household: ${detail.name}`,
     detail.summary ? `Summary: ${detail.summary}` : null,
-    detail.household_notes ? `Circumstances: ${detail.household_notes}` : null,
-    detail.goals.length
-      ? `Goals: ${detail.goals.map((g) => g.label).join("; ")}`
-      : null,
-    detail.barriers.length
-      ? `Barriers: ${detail.barriers.map((b) => b.label).join("; ")}`
-      : null,
-    formatMatchesForAiPrompt(
+    detail.household_notes ? `Notes: ${detail.household_notes}` : null,
+    detail.goals.length ? `Goals: ${detail.goals.map((g) => g.label).join("; ")}` : null,
+    detail.barriers.length ? `Barriers: ${detail.barriers.map((b) => b.label).join("; ")}` : null,
+    formatMatchesForPlannerPrompt(
       detail.resourceMatches.filter((m) => m.status === "accepted"),
-      10,
+      5,
     ),
   ]
     .filter(Boolean)
@@ -102,9 +86,9 @@ export async function refineStepWithOpenAI(
     {
       phase: currentStep.phase,
       title: currentStep.title,
-      description: currentStep.description,
+      summary: currentStep.description,
       details: currentStep.details,
-      ...(blockerReason && { blocker_reason: blockerReason }),
+      ...(blockerReason ? { blocker_reason: blockerReason } : {}),
     },
     null,
     2,
@@ -112,43 +96,39 @@ export async function refineStepWithOpenAI(
 
   const surroundingBlock =
     (options?.surroundingStepTitles?.length ?? 0) > 0
-      ? `\n## Surrounding steps (for context, do not repeat)\n${options!.surroundingStepTitles!.join("\n")}`
+      ? `\n## Nearby steps (context only)\n${options!.surroundingStepTitles!.join("\n")}`
       : "";
 
   const baseUser = `## Case context
 ${context}
 
-## Current step (to refine)
+## Current step
 ${currentContent}${surroundingBlock}
 
-## Case manager feedback
+## Feedback
 ${feedback}
 
-Refine ONLY this step. Return the full step object with ALL schema fields filled with operational, action-oriented detail. Be concise but actionable.${blockerReason ? ` The step is BLOCKED because: ${blockerReason}. Consider workarounds, smaller first steps, or alternate approaches.` : ""}`;
+Refine this step only. phase must stay "${phase}" unless feedback explicitly requests a change.${blockerReason ? ` Step is blocked: ${blockerReason}. Offer a smaller concrete first action or alternate path.` : ""}`;
 
-  const maxAttempts = options?.retries ?? 4;
+  const maxAttempts = options?.retries ?? 3;
   let correction = "";
-  let lastNormalized: AiPlanStepParsed | null = null;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const user =
-      correction ?
-        `${baseUser}\n\n## REQUIRED FIX\n${correction}\nRegenerate the complete step JSON with substantive content in every field.`
-      : baseUser;
+      correction ? `${baseUser}\n\n## Fix\n${correction}\nReturn valid JSON for the full step object.` : baseUser;
 
     try {
       const result = await createAiResponse({
         taskType: "step_refinement",
-        instructions:
-          SYSTEM_PROMPT + "\n\nRespond with JSON only matching the enforced schema. No markdown.",
+        instructions: SYSTEM_PROMPT + "\n\nRespond with JSON only. No markdown.",
         input: user,
         structuredJsonSchema: {
-          name: "refined_plan_step",
-          schema: cloneSchema(OPENAI_SINGLE_PLAN_STEP_SCHEMA),
-          strict: true,
+          name: "lean_refined_plan_step",
+          schema: cloneSchema(buildLeanSingleStepRootJsonSchema()),
+          strict: false,
         },
-        temperature: 0.4,
-        maxTokens: 8192,
+        temperature: 0.35,
+        maxTokens: 4096,
       });
 
       if (!result.ok) {
@@ -159,109 +139,44 @@ Refine ONLY this step. Return the full step object with ALL schema fields filled
       try {
         parsed = JSON.parse(result.text);
       } catch {
-        correction = "Invalid JSON. Return one JSON object only.";
+        correction = "Invalid JSON. Return one object only.";
         continue;
       }
 
-      const validated = aiPlanStepSchema.safeParse(parsed);
+      const validated = leanSingleStepZ.safeParse(parsed);
       if (!validated.success) {
-        correction = `Validation failed: ${validated.error.message.slice(0, 600)}`;
+        correction = validated.error.message.slice(0, 600);
         continue;
       }
 
-      const normalized = normalizePlanStep(validated.data);
-      lastNormalized = normalized;
+      const s = validated.data;
+      const allowPhaseChange = /\bphase\b/i.test(feedback);
+      const body =
+        s.phase !== phase && !allowPhaseChange ? { ...s, phase: phase as "30" | "60" | "90" } : s;
 
-      const rich = validatePlanStepsRichness([normalized]);
-      if (rich.ok) {
-        const s = normalized;
-        const details: GeneratedStepDetails = {
-          action_needed_now: s.action_needed_now,
-          rationale: s.rationale,
-          detailed_instructions: s.detailed_instructions,
-          checklist: s.checklist,
-          required_documents: s.required_documents,
-          contact_script: s.contact_script?.trim() || undefined,
-          contacts: s.contacts.map((c) => ({
-            name: c.name,
-            phone: c.phone?.trim() || undefined,
-            email: c.email?.trim() || undefined,
-            notes: c.notes?.trim() || undefined,
-          })),
-          blockers: s.blockers,
-          fallback_options: s.fallback_options,
-          expected_outcome: s.expected_outcome,
-          timing_guidance: s.timing_guidance,
-          priority: s.priority,
-          stage_goal: s.stage_goal,
-          why_now: s.why_now,
-          depends_on: s.depends_on?.trim() || undefined,
-          milestone_type: s.milestone_type?.trim() || undefined,
-          success_marker: s.success_marker,
-        };
+      const details = sparseDetailsForPersistence(body);
+      const stepPriority =
+        body.priority === "urgent" ? "urgent"
+        : body.priority === "high" ? "high"
+        : body.priority === "low" ? "low"
+        : "medium";
 
-        return {
-          ok: true,
-          step: {
-            title: s.title.trim(),
-            description: s.description.trim(),
-            details,
-          },
-        };
-      }
-
-      correction = rich.reasons.slice(0, 10).join("\n");
-    } catch (e) {
-      if (attempt < maxAttempts - 1) {
-        correction = e instanceof Error ? e.message : "Retry.";
-        continue;
-      }
-      return {
-        ok: false,
-        reason: e instanceof Error ? e.message : "OpenAI request failed",
-      };
-    }
-  }
-
-  if (lastNormalized) {
-    const defaulted = applyPlanStepDefaults(lastNormalized);
-    const rich2 = validatePlanStepsRichness([defaulted]);
-    if (rich2.ok) {
-      const s = defaulted;
-      const details: GeneratedStepDetails = {
-        action_needed_now: s.action_needed_now,
-        rationale: s.rationale,
-        detailed_instructions: s.detailed_instructions,
-        checklist: s.checklist,
-        required_documents: s.required_documents,
-        contact_script: s.contact_script?.trim() || undefined,
-        contacts: s.contacts.map((c) => ({
-          name: c.name,
-          phone: c.phone?.trim() || undefined,
-          email: c.email?.trim() || undefined,
-          notes: c.notes?.trim() || undefined,
-        })),
-        blockers: s.blockers,
-        fallback_options: s.fallback_options,
-        expected_outcome: s.expected_outcome,
-        timing_guidance: s.timing_guidance,
-        priority: s.priority,
-        stage_goal: s.stage_goal,
-        why_now: s.why_now,
-        depends_on: s.depends_on?.trim() || undefined,
-        milestone_type: s.milestone_type?.trim() || undefined,
-        success_marker: s.success_marker,
-      };
       return {
         ok: true,
         step: {
-          title: s.title.trim(),
-          description: s.description.trim(),
+          title: body.title.trim(),
+          description: body.summary.trim(),
           details,
+          stepPriority,
         },
       };
+    } catch (e) {
+      correction = e instanceof Error ? e.message : "Retry";
+      if (attempt === maxAttempts - 1) {
+        return { ok: false, reason: correction };
+      }
     }
   }
 
-  return { ok: false, reason: "Failed to refine step after multiple retries" };
+  return { ok: false, reason: "Failed to refine step" };
 }

@@ -180,6 +180,7 @@ export function FamilyPlanPanel({
     title: string;
     description: string;
     details: PlanStepDetails;
+    stepPriority?: "low" | "medium" | "high" | "urgent";
   } | null>(null);
   const [aiPending, setAiPending] = useState(false);
 
@@ -444,6 +445,7 @@ export function FamilyPlanPanel({
         title: res.step.title,
         description: res.step.description,
         details: res.step.details as PlanStepDetails,
+        stepPriority: res.step.stepPriority,
       });
     });
   }
@@ -464,6 +466,7 @@ export function FamilyPlanPanel({
             title: aiPreview.title,
             description: aiPreview.description,
             details: aiPreview.details,
+            priority: aiPreview.stepPriority ?? s.priority,
             workflow_data: wd,
           };
         }),
@@ -715,6 +718,27 @@ export function FamilyPlanPanel({
         </p>
       ) : null}
 
+      {plan?.generation_state?.status === "running" ? (
+        <div className="rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2.5 text-sm text-amber-950">
+          <p className="font-medium">Building your draft plan</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-900/90">
+            {plan.generation_state.phases_complete["30"] ? "30-day section saved. " : null}
+            {plan.generation_state.phases_complete["60"] ? "60-day section saved. " : null}
+            {!plan.generation_state.phases_complete["60"]
+              ? "Drafting 60-day section in the background…"
+              : !plan.generation_state.phases_complete["90"]
+                ? "Drafting 90-day section…"
+                : "Almost done…"}
+          </p>
+        </div>
+      ) : null}
+      {plan?.generation_state?.status === "failed" ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+          {plan.generation_state.error ??
+            "Later phases could not be generated. You can edit the saved steps or regenerate from Overview."}
+        </div>
+      ) : null}
+
       {!plan ? (
         <p className="text-sm text-slate-600">
           No saved case plan yet. Use Overview to generate a plan; it will appear here for editing and export.
@@ -877,37 +901,40 @@ export function FamilyPlanPanel({
                             />
                           </div>
                           <div className="sm:col-span-2">
-                            <Label>Summary</Label>
+                            <Label>Timing</Label>
+                            <Input
+                              className="mt-1"
+                              value={d.timing_guidance ?? ""}
+                              onChange={(e) =>
+                                updateStepDetails(full.id, {
+                                  timing_guidance: e.target.value || undefined,
+                                })
+                              }
+                              placeholder="e.g. Within 2 weeks; before intake"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <Label>Summary — what to do</Label>
                             <Textarea
-                              className="mt-1 min-h-[72px] border-slate-200"
+                              className="mt-1 min-h-[88px] border-slate-200"
                               value={full.description}
                               onChange={(e) =>
                                 updateStepInDraft(full.id, { description: e.target.value })
                               }
+                              placeholder="Concise instructions for the city form or case file."
                             />
                           </div>
                           <div className="sm:col-span-2">
-                            <Label>Action needed now</Label>
+                            <Label>Additional guidance (optional)</Label>
                             <Textarea
-                              className="mt-1 min-h-[56px] border-slate-200"
-                              value={d.action_needed_now ?? ""}
-                              onChange={(e) =>
-                                updateStepDetails(full.id, {
-                                  action_needed_now: e.target.value || undefined,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label>What to do (instructions)</Label>
-                            <Textarea
-                              className="mt-1 min-h-[80px] border-slate-200"
+                              className="mt-1 min-h-[72px] border-slate-200"
                               value={d.detailed_instructions ?? ""}
                               onChange={(e) =>
                                 updateStepDetails(full.id, {
                                   detailed_instructions: e.target.value || undefined,
                                 })
                               }
+                              placeholder="Extra nuance, edge cases, or talking points — hidden by default in view."
                             />
                           </div>
                           <div className="sm:col-span-2">
@@ -997,19 +1024,6 @@ export function FamilyPlanPanel({
                                     onChange={(e) =>
                                       updateStepDetails(full.id, {
                                         why_now: e.target.value || undefined,
-                                      })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                  <Label>Timing guidance</Label>
-                                  <Textarea
-                                    className="mt-1 min-h-[56px] border-slate-200"
-                                    value={d.timing_guidance ?? ""}
-                                    onChange={(e) =>
-                                      updateStepDetails(full.id, {
-                                        timing_guidance: e.target.value || undefined,
                                       })
                                     }
                                   />
@@ -1298,59 +1312,30 @@ export function FamilyPlanPanel({
                       </div>
                     ) : (
                       <div className="space-y-3 text-sm">
-                        {(() => {
-                          const actionNow =
-                            d.action_needed_now?.trim() ||
-                            full.ai_helper_data?.action_needed_now?.trim() ||
-                            "";
-                          return actionNow ? (
-                            <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-800">
-                                Action needed now
-                              </p>
-                              <p className="mt-1 text-sm font-semibold leading-relaxed text-blue-950">
-                                {actionNow}
-                              </p>
-                            </div>
-                          ) : null;
-                        })()}
-
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h4 className="text-sm font-semibold text-slate-900">{full.title}</h4>
-                            {d.stage_goal?.trim() ? (
-                              <p className="mt-1 text-xs text-slate-600">
-                                <span className="font-semibold">Stage goal:</span> {d.stage_goal}
-                              </p>
-                            ) : null}
-                            {d.depends_on?.trim() ? (
-                              <p className="mt-1 text-xs text-slate-600">
-                                <span className="font-semibold">Depends on:</span> {d.depends_on}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-base font-semibold tracking-tight text-slate-900">
+                              {full.title}
+                            </h4>
+                            {(full.description?.trim() ||
+                              d.action_needed_now?.trim() ||
+                              full.ai_helper_data?.action_needed_now?.trim()) ? (
+                              <p className="mt-2 text-[15px] leading-relaxed text-slate-700 whitespace-pre-wrap">
+                                {full.description?.trim() ||
+                                  d.action_needed_now?.trim() ||
+                                  full.ai_helper_data?.action_needed_now}
                               </p>
                             ) : null}
                           </div>
-                          <div className="shrink-0 space-y-1 text-right">
-                            <p className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                              Priority: {(full.priority ?? d.priority ?? "medium").replace("_", " ")}
+                          <div className="shrink-0 text-left sm:text-right text-xs text-slate-500">
+                            <p className="font-medium capitalize text-slate-700">
+                              {(full.priority ?? d.priority ?? "medium").replace("_", " ")} priority
                             </p>
                             {d.timing_guidance?.trim() ? (
-                              <p className="text-[11px] text-slate-500">{d.timing_guidance}</p>
+                              <p className="mt-1 max-w-[220px] sm:ml-auto">{d.timing_guidance}</p>
                             ) : null}
                           </div>
                         </div>
-
-                        {full.description?.trim() ? (
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                              Summary
-                            </p>
-                            <p className="mt-1 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                              {full.description}
-                            </p>
-                          </div>
-                        ) : null}
-
-                        {/* Detailed instructions moved into "More context" */}
 
                         {(barrierActionItems.length > 0 || (d.checklist ?? []).some((line) => line.trim().length > 0)) ? (
                           <div>
@@ -1476,8 +1461,6 @@ export function FamilyPlanPanel({
                           </div>
                         ) : null}
 
-                        {/* Moved into "More context" for low-cognitive-load scanning */}
-
                         {d.expected_outcome?.trim() ? (
                           <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
@@ -1487,134 +1470,140 @@ export function FamilyPlanPanel({
                           </div>
                         ) : null}
 
-                        <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-600">
-                            More context
-                          </summary>
-                          <div className="mt-2 space-y-2 text-slate-700">
-                            {d.rationale?.trim() ? (
-                              <p><span className="font-semibold">Rationale:</span> {d.rationale}</p>
-                            ) : null}
-                            {d.why_now?.trim() ? (
-                              <p><span className="font-semibold">Why now:</span> {d.why_now}</p>
-                            ) : null}
-                            {d.detailed_instructions?.trim() ? (
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                  Guidance
-                                </p>
-                                <p className="mt-1 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                  {d.detailed_instructions}
-                                </p>
-                              </div>
-                            ) : null}
+                        <div className="space-y-3 text-slate-700">
+                          {d.rationale?.trim() ? (
+                            <p>
+                              <span className="font-semibold">Rationale:</span> {d.rationale}
+                            </p>
+                          ) : null}
+                          {d.why_now?.trim() ? (
+                            <p>
+                              <span className="font-semibold">Why now:</span> {d.why_now}
+                            </p>
+                          ) : null}
+                          {d.detailed_instructions?.trim() ? (
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Additional guidance
+                              </p>
+                              <p className="mt-1 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                {d.detailed_instructions}
+                              </p>
+                            </div>
+                          ) : null}
 
-                            {(d.required_documents ?? []).length > 0 ? (
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                  Required documents
-                                </p>
-                                <ul className="mt-1 list-disc pl-5">
-                                  {(d.required_documents ?? []).map((doc, i) =>
-                                    doc.trim() ? <li key={`${full.id}-doc-${i}`}>{doc.trim()}</li> : null,
-                                  )}
-                                </ul>
-                              </div>
-                            ) : null}
+                          {(d.required_documents ?? []).length > 0 ? (
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Required documents
+                              </p>
+                              <ul className="mt-1 list-disc pl-5">
+                                {(d.required_documents ?? []).map((doc, i) =>
+                                  doc.trim() ? <li key={`${full.id}-doc-${i}`}>{doc.trim()}</li> : null,
+                                )}
+                              </ul>
+                            </div>
+                          ) : null}
 
-                            {(d.contacts ?? []).length > 0 ? (
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                  Contacts
-                                </p>
-                                <ul className="mt-1 space-y-1">
-                                  {(d.contacts ?? []).map((c, i) => {
-                                    const name = c.name?.trim() || "Contact";
-                                    const phone = c.phone?.trim();
-                                    const email = c.email?.trim();
-                                    const notes = c.notes?.trim();
-                                    return (
-                                      <li key={`${full.id}-contact-${i}`} className="rounded border border-slate-200 bg-white px-2 py-1.5">
-                                        <p className="font-medium text-slate-800">{name}</p>
-                                        <div className="mt-0.5 flex flex-wrap gap-3 text-xs">
-                                          {phone ? (
-                                            <a className="text-blue-700 hover:underline" href={`tel:${phone}`}>
-                                              {phone}
-                                            </a>
-                                          ) : null}
-                                          {email ? (
-                                            <a className="text-blue-700 hover:underline" href={`mailto:${email}`}>
-                                              {email}
-                                            </a>
-                                          ) : null}
-                                        </div>
-                                        {notes ? <p className="mt-1 text-xs text-slate-600">{notes}</p> : null}
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
+                          {(d.contacts ?? []).length > 0 ? (
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Contacts
+                              </p>
+                              <ul className="mt-1 space-y-1">
+                                {(d.contacts ?? []).map((c, i) => {
+                                  const name = c.name?.trim() || "Contact";
+                                  const phone = c.phone?.trim();
+                                  const email = c.email?.trim();
+                                  const notes = c.notes?.trim();
+                                  return (
+                                    <li
+                                      key={`${full.id}-contact-${i}`}
+                                      className="rounded border border-slate-200 bg-white px-2 py-1.5"
+                                    >
+                                      <p className="font-medium text-slate-800">{name}</p>
+                                      <div className="mt-0.5 flex flex-wrap gap-3 text-xs">
+                                        {phone ? (
+                                          <a className="text-blue-700 hover:underline" href={`tel:${phone}`}>
+                                            {phone}
+                                          </a>
+                                        ) : null}
+                                        {email ? (
+                                          <a className="text-blue-700 hover:underline" href={`mailto:${email}`}>
+                                            {email}
+                                          </a>
+                                        ) : null}
+                                      </div>
+                                      {notes ? <p className="mt-1 text-xs text-slate-600">{notes}</p> : null}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
 
-                                {d.contact_script?.trim() ? (
-                                  <div className="mt-2">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                      Contact script
-                                    </p>
-                                    <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                      {d.contact_script}
-                                    </p>
-                                  </div>
-                                ) : null}
-                              </div>
-                            ) : null}
-
-                            {(full.workflow_data?.outcome_notes?.trim() ||
-                              full.workflow_data?.blocker_reason?.trim()) ? (
-                              <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2.5">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                  Case notes
-                                </p>
-                                {full.workflow_data?.outcome_notes?.trim() ? (
-                                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
-                                    {full.workflow_data.outcome_notes}
+                              {d.contact_script?.trim() ? (
+                                <div className="mt-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Contact script
                                   </p>
-                                ) : null}
-                                {full.workflow_data?.blocker_reason?.trim() ? (
-                                  <p className="mt-1 text-sm text-amber-900">
-                                    <span className="font-semibold">Blocked: </span>
-                                    {full.workflow_data.blocker_reason}
+                                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                    {d.contact_script}
                                   </p>
-                                ) : null}
-                              </div>
-                            ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
 
-                            {(d.blockers ?? []).some((b) => b.trim()) ? (
-                              <div>
-                                <p className="font-semibold">Blockers:</p>
-                                <ul className="list-disc pl-5">
-                                  {(d.blockers ?? []).map((b, i) =>
-                                    b.trim() ? <li key={`${full.id}-blocker-${i}`}>{b.trim()}</li> : null,
-                                  )}
-                                </ul>
-                              </div>
-                            ) : null}
-                            {(d.fallback_options ?? []).some((b) => b.trim()) ? (
-                              <div>
-                                <p className="font-semibold">Fallback options (if blocked):</p>
-                                <ul className="list-disc pl-5">
-                                  {(d.fallback_options ?? []).map((b, i) =>
-                                    b.trim() ? <li key={`${full.id}-fallback-${i}`}>{b.trim()}</li> : null,
-                                  )}
-                                </ul>
-                              </div>
-                            ) : null}
-                            {d.success_marker?.trim() ? (
-                              <p><span className="font-semibold">Success marker:</span> {d.success_marker}</p>
-                            ) : null}
-                            {d.milestone_type?.trim() ? (
-                              <p><span className="font-semibold">Milestone type:</span> {d.milestone_type}</p>
-                            ) : null}
-                          </div>
-                        </details>
+                          {(full.workflow_data?.outcome_notes?.trim() ||
+                            full.workflow_data?.blocker_reason?.trim()) ? (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2.5">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Case notes
+                              </p>
+                              {full.workflow_data?.outcome_notes?.trim() ? (
+                                <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
+                                  {full.workflow_data.outcome_notes}
+                                </p>
+                              ) : null}
+                              {full.workflow_data?.blocker_reason?.trim() ? (
+                                <p className="mt-1 text-sm text-amber-900">
+                                  <span className="font-semibold">Blocked: </span>
+                                  {full.workflow_data.blocker_reason}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {(d.blockers ?? []).some((b) => b.trim()) ? (
+                            <div>
+                              <p className="font-semibold">Blockers:</p>
+                              <ul className="list-disc pl-5">
+                                {(d.blockers ?? []).map((b, i) =>
+                                  b.trim() ? <li key={`${full.id}-blocker-${i}`}>{b.trim()}</li> : null,
+                                )}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {(d.fallback_options ?? []).some((b) => b.trim()) ? (
+                            <div>
+                              <p className="font-semibold">Fallback options (if blocked):</p>
+                              <ul className="list-disc pl-5">
+                                {(d.fallback_options ?? []).map((b, i) =>
+                                  b.trim() ? <li key={`${full.id}-fallback-${i}`}>{b.trim()}</li> : null,
+                                )}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {d.success_marker?.trim() ? (
+                            <p>
+                              <span className="font-semibold">Success marker:</span> {d.success_marker}
+                            </p>
+                          ) : null}
+                          {d.milestone_type?.trim() ? (
+                            <p>
+                              <span className="font-semibold">Milestone type:</span> {d.milestone_type}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     )}
                     </article>

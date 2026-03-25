@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { checkboxClass } from "@/lib/ui/form-classes";
+import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import {
   generateBarrierWorkflowAction,
   listRecentBarrierPlanRecordsAction,
@@ -98,6 +99,23 @@ export function BarrierWorkflowClient({
       setResult(r.result);
       const recents = await listRecentBarrierPlanRecordsAction();
       if (recents.ok) setRecentRecords(recents.records);
+
+      if (r.ok && r.stagedPolling && r.result) {
+        const ref = r.result.referenceId;
+        const fid = r.result.familyId;
+        void (async () => {
+          for (let i = 0; i < 40; i++) {
+            const adv = await advanceStagedLeanPlanGeneration({ familyId: fid });
+            if (!adv.ok) break;
+            const reload = await loadBarrierWorkflowByReferenceAction(ref);
+            if (reload.ok) setResult(reload.result);
+            if (adv.done) break;
+            await new Promise((res) => setTimeout(res, 1600));
+          }
+          const again = await listRecentBarrierPlanRecordsAction();
+          if (again.ok) setRecentRecords(again.records);
+        })();
+      }
     });
   }
 

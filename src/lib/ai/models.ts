@@ -15,6 +15,8 @@ import { getEnv } from "@/lib/env";
 /** Task types for model routing */
 export type AiTaskType =
   | "full_plan_generation"
+  /** Lean 30/60/90 slice generation (staged pipeline; default faster model). */
+  | "plan_phase_generation"
   | "step_refinement"
   | "case_assistant"
   | "blocker_troubleshoot"
@@ -32,12 +34,16 @@ export const MODELS = {
   CHAT_UI_EDITS: "gpt-4.1-mini",
 } as const;
 
-/** Plan create + regenerate (server action → OpenAI full plan). */
-const PLAN_TASK_TYPES: AiTaskType[] = ["full_plan_generation"];
+/** Full 15-step monolith (regenerate / legacy). */
+const PLAN_MONOLITH_TASK_TYPES: AiTaskType[] = ["full_plan_generation"];
+
+/** Per-phase lean generation — defaults to UI model unless OPENAI_PLAN_PHASE_MODEL is set. */
+const PLAN_PHASE_TASK_TYPES: AiTaskType[] = ["plan_phase_generation"];
 
 /** Tasks that use the Responses API (structured output / reasoning-heavy). */
 const RESPONSES_API_TASKS: AiTaskType[] = [
   "full_plan_generation",
+  "plan_phase_generation",
   "step_refinement",
   "case_assistant",
   "blocker_troubleshoot",
@@ -47,8 +53,15 @@ const RESPONSES_API_TASKS: AiTaskType[] = [
  * Returns the model ID for a given task type.
  */
 export function getModelForTask(taskType: AiTaskType): string {
-  if (PLAN_TASK_TYPES.includes(taskType)) {
+  if (PLAN_MONOLITH_TASK_TYPES.includes(taskType)) {
     return getEnv().OPENAI_PLAN_MODEL?.trim() || MODELS.PLAN_GENERATION;
+  }
+  if (PLAN_PHASE_TASK_TYPES.includes(taskType)) {
+    return (
+      getEnv().OPENAI_PLAN_PHASE_MODEL?.trim() ||
+      getEnv().OPENAI_UI_MODEL?.trim() ||
+      MODELS.CHAT_UI_EDITS
+    );
   }
   return getEnv().OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
 }

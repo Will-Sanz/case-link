@@ -18,6 +18,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   /** Server-only; overrides plan generation/regeneration model (default: o3). */
   OPENAI_PLAN_MODEL: z.string().optional(),
+  /** Server-only; lean per-phase plan generation (default: same as OPENAI_UI_MODEL). */
+  OPENAI_PLAN_PHASE_MODEL: z.string().optional(),
   /** Server-only; overrides chat, UI helpers, refinements, and other non-plan AI (default: gpt-4.1-mini). */
   OPENAI_UI_MODEL: z.string().optional(),
   /** Override: force this model for ALL AI tasks (e.g. gpt-4o for QA). */

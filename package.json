@@ -12,7 +12,8 @@
     "lint": "eslint",
     "db:import": "tsx scripts/import-resources.ts",
     "db:create-admin": "tsx scripts/create-admin-user.ts",
-    "db:create-test-user": "tsx scripts/create-test-user.ts"
+    "db:create-test-user": "tsx scripts/create-test-user.ts",
+    "db:apply-generation-state": "tsx scripts/apply-plans-generation-state-column.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -30,10 +31,12 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
+    "@types/pg": "^8.15.6",
     "@types/react-dom": "^19",
     "csv-parse": "^6.2.1",
     "dotenv": "^17.3.1",
     "eslint": "^9",
+    "pg": "^8.16.3",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",

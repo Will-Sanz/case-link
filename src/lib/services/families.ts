@@ -267,7 +267,7 @@ export async function getFamilyDetail(
     client
       .from("plans")
       .select(
-        "id, family_id, version, summary, generation_source, ai_model, created_at, client_display",
+        "id, family_id, version, summary, generation_source, ai_model, created_at, client_display, generation_state",
       )
       .eq("family_id", familyId)
       .order("version", { ascending: false })

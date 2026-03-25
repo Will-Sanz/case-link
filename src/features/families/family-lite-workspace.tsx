@@ -7,8 +7,10 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { checkboxClass } from "@/lib/ui/form-classes";
+import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import {
   generateBarrierWorkflowForFamilyAction,
+  loadBarrierWorkflowForFamilyAction,
   toggleBarrierWorkflowActionItemAction,
 } from "@/app/actions/barrier-workflow";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
@@ -337,6 +339,20 @@ export function FamilyLiteWorkspace({
       if (!r.ok) return setError(r.error);
       setResult(r.result);
       setHasGeneratedThisSession(true);
+
+      if (r.stagedPolling) {
+        void (async () => {
+          for (let i = 0; i < 40; i++) {
+            const adv = await advanceStagedLeanPlanGeneration({ familyId });
+            if (!adv.ok) break;
+            const reload = await loadBarrierWorkflowForFamilyAction(familyId);
+            if (reload.ok) setResult(reload.result);
+            router.refresh();
+            if (adv.done) break;
+            await new Promise((res) => setTimeout(res, 1600));
+          }
+        })();
+      }
     });
   }
 

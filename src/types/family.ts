@@ -197,6 +197,18 @@ export type PlanClientDisplay = {
   phaseSummaries?: Partial<Record<"30" | "60" | "90", string>>;
 };
 
+/** Staged lean generation progress (plans.generation_state JSONB). */
+export type PlanGenerationState = {
+  v: 1;
+  status: "running" | "complete" | "failed";
+  pending_phase: "60" | "90" | null;
+  planning_brief: string;
+  phases_complete: { "30": boolean; "60": boolean; "90": boolean };
+  models_used: string[];
+  stage_timings_ms: Partial<Record<"30" | "60" | "90", number>>;
+  error?: string;
+};
+
 export type PlanRow = {
   id: string;
   family_id: string;
@@ -207,6 +219,8 @@ export type PlanRow = {
   created_at: string;
   /** Optional display overrides edited in the family workspace. */
   client_display?: PlanClientDisplay | null;
+  /** In-progress multi-phase generation; null when idle or complete. */
+  generation_state?: PlanGenerationState | null;
 };
 
 export type PlanWithSteps = PlanRow & {

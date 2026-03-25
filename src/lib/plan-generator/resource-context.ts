@@ -169,6 +169,24 @@ export function generatedStepsFromMatches(
   });
 }
 
+/** Compact resource lines for lean / staged plan generation (smaller prompt). */
+export function formatMatchesForPlannerPrompt(
+  matches: ResourceMatchRow[],
+  max = 6,
+): string {
+  const rows = matchesForPlanContext(matches, max);
+  if (rows.length === 0) {
+    return "RESOURCES: None matched. Use general Philadelphia guidance only; do not invent programs.";
+  }
+  const lines = rows.map((m, i) => {
+    const r = m.resource!;
+    const contact = [r.primary_contact_phone, r.primary_contact_email].filter(Boolean).join(" · ");
+    const why = m.match_reason.trim().slice(0, 140);
+    return `${i + 1}. ${r.program_name} (${r.office_or_department || r.category || "service"})${contact ? ` — ${contact}` : ""} — ${why}`;
+  });
+  return `MATCHED_RESOURCES:\n${lines.join("\n")}`;
+}
+
 export function formatMatchesForAiPrompt(
   matches: ResourceMatchRow[],
   max: number,
