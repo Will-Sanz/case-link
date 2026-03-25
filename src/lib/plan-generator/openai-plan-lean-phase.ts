@@ -1,8 +1,10 @@
 import "server-only";
 
+import type { AiMode } from "@/lib/ai/ai-mode";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
+import { dedupeLeanPhaseSteps } from "@/lib/plan-generator/lean-step-dedupe";
 import {
   buildLeanPhaseRootJsonSchema,
   leanPlanPhaseResponseZ,
@@ -20,21 +22,40 @@ function shouldLog(): boolean {
   return process.env.OPENAI_DEBUG === "1" || process.env.PLAN_REGENERATE_DEBUG === "1";
 }
 
-const LEAN_PHASE_INSTRUCTIONS = `You are a Philadelphia-area case management drafting assistant. Output a lean, submission-ready ${"{PHASE}"}-day plan section only.
+const PHASE_FOCUS: Record<PlanPhase, string> = {
+  "30": `## Phase role: 30-day — immediate stabilization
+Focus on urgent, concrete next actions: safety, intake, first calls, same-week tasks, initial applications.
+Do not front-load long-term contingency planning here.`,
+  "60": `## Phase role: 60-day — follow-through and documentation
+Focus on follow-ups, documentation, appointment outcomes, status checks, backup/second-line options, and measured escalation prep.
+Do not repeat the same "first contact" or intake actions already listed under "Already covered" unless the action is clearly a different follow-up (e.g. renewal, re-verification).`,
+  "90": `## Phase role: 90-day — sustained support and contingency
+Focus on sustaining progress, renewals, consolidating supports, contingency plans, and closing remaining gaps.
+Do not re-state early crisis steps or duplicate outreach already covered in 30/60 unless materially new (e.g. annual renewal vs. initial enrollment).`,
+};
 
-## Rules
+function buildLeanPhaseInstructions(phase: PlanPhase): string {
+  const focus = PHASE_FOCUS[phase];
+  return `${focus}
+
+## Output rules
 - Return JSON only matching the schema (top-level key "steps").
-- 1–5 steps for THIS phase only. Each step must be distinct and action-oriented (call, apply, schedule, submit, gather).
-- "summary" = concise what-to-do for a case manager (replaces long narratives).
+- Aim for **2–4 strong steps** for this phase; use 5 only if the case clearly needs that many distinct actions.
+- Each step must be **materially different** from the others (no minor wording variants of the same task).
+- "summary" = concise what-to-do for a case manager.
 - "timing" = due window or cadence (short phrase or null).
 - "additional_guidance" = optional nuance only; use null if not needed.
-- action_items: 1–5 concrete tasks; titles are calendar-ready; not raw document names.
+- action_items: 1–4 concrete tasks per step when possible; titles are calendar-ready.
 - Put document names in required_documents; put people/agencies in contacts.
-- Use ONLY programs from MATCHED_RESOURCES when naming organizations; if list is empty, stay generic.
-- priority: low | medium | high | urgent
+
+## Matched resources (reference only)
+- MATCHED_RESOURCES are suggestions. **Name a program only when it is clearly relevant** to that step.
+- You **may** include generic case-management steps (document prep, internal notes, family check-ins, coordination) **without** naming a directory program.
+- **Avoid** naming the **same** organization in multiple steps unless the actions are clearly different (e.g. initial intake vs. six-week follow-up).
 
 ## Geography
 ${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}`;
+}
 
 export type LeanPhaseResult =
   | { ok: true; steps: LeanPlanPhaseStep[]; model: string }
@@ -43,13 +64,36 @@ export type LeanPhaseResult =
 export async function tryGenerateLeanPlanPhaseOpenAI(
   detail: FamilyDetail,
   phase: PlanPhase,
-  options?: { regenerationFeedback?: string; retries?: number },
+  options?: {
+    regenerationFeedback?: string;
+    retries?: number;
+    aiMode?: AiMode;
+    /** Compact lines from DB for earlier phases; avoids repeating the same actions/orgs. */
+    priorPhasesSummary?: string | null;
+  },
 ): Promise<LeanPhaseResult> {
   const brief = buildPlanningBrief(detail, options?.regenerationFeedback);
   const resources = formatMatchesForPlannerPrompt(detail.resourceMatches, 6);
-  const user = `## Planning brief\n${brief}\n\n## ${resources}\n\n## Task\nGenerate ONLY the ${phase}-day phase steps (phase field must be "${phase}" on every step). Order by urgency within the phase.`;
 
-  const instructions = LEAN_PHASE_INSTRUCTIONS.replace("{PHASE}", phase);
+  const prior = options?.priorPhasesSummary?.trim();
+  const priorBlock =
+    prior ?
+      `## Already covered in earlier phase(s) — do NOT repeat
+The following is already planned. Your new steps must add **different** work for the ${phase}-day window only.
+${prior}
+
+`
+    : "";
+
+  const user = `## Planning brief
+${brief}
+
+## ${resources}
+
+${priorBlock}## Task
+Generate ONLY the ${phase}-day phase steps (phase field must be "${phase}" on every step). Order by urgency within this phase.`;
+
+  const instructions = buildLeanPhaseInstructions(phase);
   const maxAttempts = options?.retries ?? 2;
   let correction = "";
   let lastModel = "";
@@ -69,7 +113,7 @@ export async function tryGenerateLeanPlanPhaseOpenAI(
           strict: false,
         },
         temperature: 0.35,
-        maxTokens: 6144,
+        aiMode: options?.aiMode,
       });
 
       if (!result.ok) {
@@ -91,9 +135,15 @@ export async function tryGenerateLeanPlanPhaseOpenAI(
         continue;
       }
 
-      const steps = validated.data.steps.filter((s) => s.phase === phase);
+      // Coerce phase so a mis-labeled model response still lands in the requested bucket.
+      let steps: LeanPlanPhaseStep[] = validated.data.steps.map((s) => ({
+        ...s,
+        phase,
+      }));
+
+      steps = dedupeLeanPhaseSteps(steps, prior ?? null);
       if (steps.length === 0) {
-        correction = `Every step must have phase "${phase}".`;
+        correction = `Steps were redundant with each other or with "Already covered". Return distinct ${phase}-day steps that add new work.`;
         continue;
       }
 
@@ -104,6 +154,7 @@ export async function tryGenerateLeanPlanPhaseOpenAI(
           elapsedMs: Date.now() - started,
           model: result.model,
           stepCount: steps.length,
+          hadPriorSummary: Boolean(prior),
         });
       }
 

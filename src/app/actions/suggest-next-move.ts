@@ -4,6 +4,8 @@ import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { AiMode } from "@/lib/ai/ai-mode";
+import { parseAiMode } from "@/lib/ai/ai-mode";
 import { createAiResponse } from "@/lib/ai/client";
 
 export type SuggestResult =
@@ -17,7 +19,9 @@ export type SuggestResult =
 export async function suggestNextMoveForBlockedStep(
   stepId: string,
   familyId: string,
+  aiMode?: AiMode,
 ): Promise<SuggestResult> {
+  const mode = parseAiMode(aiMode);
   try {
     await requireAppUserWithClient();
   } catch {
@@ -85,7 +89,8 @@ export async function suggestNextMoveForBlockedStep(
       input: userPrompt,
       responseFormat: "json_object",
       temperature: 0.4,
-      maxTokens: 600,
+      maxTokens: mode === "fast" ? 500 : 900,
+      aiMode: mode,
     });
 
     if (!result.ok) {

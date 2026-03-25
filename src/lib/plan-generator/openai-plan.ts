@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { AiMode } from "@/lib/ai/ai-mode";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
@@ -293,6 +294,7 @@ export type TryGeneratePlanOptions = {
   /** User clicked Regenerate — instruct model to rewrite every step from scratch. */
   fullRegeneration?: boolean;
   retries?: number;
+  aiMode?: AiMode;
 };
 
 function parsedStepsToGenerated(stepsList: AiPlanStepParsed[]): GeneratedStep[] {
@@ -524,7 +526,7 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
           strict: false,
         },
         temperature: 0.35,
-        maxTokens: 8192,
+        aiMode: options?.aiMode,
       });
 
       if (!result.ok) {
@@ -686,7 +688,7 @@ export async function previewRefinePlanStepsWithOpenAI(
     action_items: GeneratedActionItem[];
   }>,
   feedback: string,
-  options?: { retries?: number },
+  options?: { retries?: number; aiMode?: AiMode },
 ): Promise<OpenAiPlanResult> {
   const logRegen = shouldLogPlanRegenerate();
   const context = buildFamilyContext(detail);
@@ -748,7 +750,7 @@ SCHEMA OUTPUT RULES (mandatory):
           strict: false,
         },
         temperature: 0.35,
-        maxTokens: 8192,
+        aiMode: options?.aiMode,
       });
 
       if (!result.ok) {

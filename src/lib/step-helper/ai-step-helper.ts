@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { AiMode } from "@/lib/ai/ai-mode";
+import { parseAiMode } from "@/lib/ai/ai-mode";
 import type { FamilyDetail, PlanStepRow, ResourceMatchRow } from "@/types/family";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { StepHelperType } from "@/types/step-helper";
@@ -209,7 +211,9 @@ export async function generateStepHelper(
   detail: FamilyDetail,
   step: PlanStepRow,
   helperType: StepHelperType,
+  options?: { aiMode?: AiMode },
 ): Promise<StepHelperResult> {
+  const mode = parseAiMode(options?.aiMode);
   const audiencePrefix =
     helperType === "call_script" || helperType === "email_draft"
       ? `${buildOutreachAudienceBlock(detail, step)}\n\n---\n\n`
@@ -234,7 +238,8 @@ export async function generateStepHelper(
     input: userContent,
     responseFormat: needsJson ? "json_object" : undefined,
     temperature: 0.4,
-    maxTokens: 1500,
+    maxTokens: mode === "fast" ? 1200 : 2200,
+    aiMode: mode,
   });
 
   if (!result.ok) {

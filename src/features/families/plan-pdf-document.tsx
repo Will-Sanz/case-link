@@ -154,13 +154,6 @@ function StepContent({ step }: { step: PlanStepRow }) {
   const d = step.details as PlanStepDetails | null | undefined;
   const w = step.workflow_data as { outcome_notes?: string; blocker_reason?: string } | null | undefined;
   const helperData = step.ai_helper_data as { action_needed_now?: string } | null | undefined;
-  const dueDateFormatted = step.due_date
-    ? new Date(step.due_date).toLocaleDateString(undefined, {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : null;
   const isCompleted = step.status === "completed";
   const isBlocked = step.status === "blocked";
 
@@ -170,9 +163,7 @@ function StepContent({ step }: { step: PlanStepRow }) {
     helperData?.action_needed_now?.trim() ||
     "";
 
-  const timingLine = [d?.timing_guidance?.trim(), dueDateFormatted ? `Follow-up: ${dueDateFormatted}` : null]
-    .filter(Boolean)
-    .join(" · ");
+  const timingLine = d?.timing_guidance?.trim() ?? "";
 
   const showStatusRow =
     (step.priority && step.priority !== "medium") ||
@@ -200,7 +191,7 @@ function StepContent({ step }: { step: PlanStepRow }) {
         </>
       ) : null}
 
-      {timingLine ? (
+      {timingLine.length > 0 ? (
         <>
           <Text style={styles.sectionLabel}>Timing</Text>
           <Text style={styles.bodyText}>{timingLine}</Text>
@@ -231,9 +222,6 @@ function StepContent({ step }: { step: PlanStepRow }) {
                     <View>
                       <Text style={styles.bodyText}>
                         Week {g.parent.week_index}: {g.parent.title}
-                        {g.parent.target_date
-                          ? ` (${new Date(g.parent.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })})`
-                          : ""}
                       </Text>
                       {g.parent.description ? (
                         <Text
@@ -256,9 +244,6 @@ function StepContent({ step }: { step: PlanStepRow }) {
                               ]}
                             >
                               • {a.title}
-                              {a.target_date
-                                ? ` (Due ${new Date(a.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })})`
-                                : ""}
                             </Text>
                           ))}
                         </>

@@ -10,6 +10,7 @@ import {
   updatePlanStep,
   updatePlanStepActionItem,
 } from "@/app/actions/plans";
+import { useAIMode } from "@/components/providers/ai-mode-provider";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,14 +32,6 @@ const PHASE_STYLE: Record<"30" | "60" | "90", string> = {
   "60": "border-indigo-200 bg-indigo-50/40",
   "90": "border-violet-200 bg-violet-50/40",
 };
-
-function formatDue(dueDate: string | null): string {
-  if (!dueDate) return "No date";
-  return new Date(`${dueDate}T12:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function checklistToText(lines: string[] | undefined): string {
   return (lines ?? []).join("\n");
@@ -73,7 +66,6 @@ function normalizeStepForPersistCompare(step: PlanStepRow): string {
     status: step.status,
     phase: step.phase,
     priority: step.priority ?? undefined,
-    due_date: step.due_date,
     details: Object.keys(d).length > 0 ? d : undefined,
     workflow_data: wd,
   });
@@ -114,7 +106,6 @@ type DisplayWeeklyActionItem = {
   id: string;
   title: string;
   description: string | null | undefined;
-  dueDate: string | null;
   status: PlanStepActionItemRow["status"];
 };
 
@@ -194,6 +185,7 @@ export function FamilyPlanPanel({
   actionToggleDisabled?: boolean;
 }) {
   const router = useRouter();
+  const { mode: aiMode } = useAIMode();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PlanWithSteps | null>(null);
@@ -415,7 +407,6 @@ export function FamilyPlanPanel({
             status: s.status,
             phase: s.phase,
             priority: (s.priority ?? undefined) as "low" | "medium" | "high" | "urgent" | undefined,
-            due_date: s.due_date,
             details: Object.keys(d).length > 0 ? d : undefined,
             workflow_data: wd,
           });
@@ -432,7 +423,6 @@ export function FamilyPlanPanel({
             oai.title !== ai.title ||
             (oai.description ?? "") !== (ai.description ?? "") ||
             oai.week_index !== ai.week_index ||
-            (oai.target_date ?? "") !== (ai.target_date ?? "") ||
             oai.status !== ai.status;
           if (!aiChanged) continue;
           const ar = await updatePlanStepActionItem({
@@ -441,7 +431,6 @@ export function FamilyPlanPanel({
             title: ai.title,
             description: ai.description,
             week_index: ai.week_index,
-            target_date: ai.target_date,
             status: ai.status,
           });
           if (!ar.ok) {
@@ -489,7 +478,7 @@ export function FamilyPlanPanel({
     }
     setAiPending(true);
     setError(null);
-    previewRefinePlanStep({ stepId: aiStepId, familyId, feedback: instr }).then((res) => {
+    previewRefinePlanStep({ stepId: aiStepId, familyId, feedback: instr, aiMode }).then((res) => {
       setAiPending(false);
       if (!res.ok) {
         setError(res.error);
@@ -583,11 +572,11 @@ export function FamilyPlanPanel({
               week_index: ai.week_index,
               target_date: ai.target_date,
             }))
-          : [{ title: s.title, description: null, week_index: 1, target_date: s.due_date }],
+          : [{ title: s.title, description: null, week_index: 1, target_date: null }],
       })),
     };
 
-    previewRefinePlan({ familyId, feedback: instr, draft: draftForApi }).then((res) => {
+    previewRefinePlan({ familyId, feedback: instr, draft: draftForApi, aiMode }).then((res) => {
       setPlanAiPending(false);
       if (!res.ok) {
         setError(res.error);
@@ -650,7 +639,7 @@ export function FamilyPlanPanel({
               title: aiPreview.title,
               description: aiPreview.description ?? null,
               week_index: aiPreview.week_index,
-              target_date: aiPreview.target_date ?? null,
+              target_date: null,
             };
           });
 
@@ -851,7 +840,6 @@ export function FamilyPlanPanel({
                     id: ai.id,
                     title: ai.title,
                     description: ai.description,
-                    dueDate: ai.target_date,
                     status: ai.status,
                   }));
                   return (
@@ -934,25 +922,6 @@ export function FamilyPlanPanel({
                               <option value="high">High</option>
                               <option value="urgent">Urgent</option>
                             </select>
-                          </div>
-                          <div>
-                            <Label>Follow-up date</Label>
-                            <Input
-                              className="mt-1"
-                              type="date"
-                              value={
-                                full.due_date
-                                  ? full.due_date.slice(0, 10)
-                                  : ""
-                              }
-                              onChange={(e) =>
-                                updateStepInDraft(full.id, {
-                                  due_date: e.target.value
-                                    ? `${e.target.value}T12:00:00.000Z`
-                                    : null,
-                                })
-                              }
-                            />
                           </div>
                           <div className="sm:col-span-2">
                             <Label>Timing</Label>
@@ -1328,36 +1297,19 @@ export function FamilyPlanPanel({
                                     })
                                   }
                                 />
-                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                  <div>
-                                    <Label className="text-[11px]">Week #</Label>
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      className="mt-1"
-                                      value={ai.week_index}
-                                      onChange={(e) =>
-                                        updateActionItemInDraft(full.id, ai.id, {
-                                          week_index: Number(e.target.value) || 1,
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label className="text-[11px]">Target date</Label>
-                                    <Input
-                                      type="date"
-                                      className="mt-1"
-                                      value={ai.target_date ? ai.target_date.slice(0, 10) : ""}
-                                      onChange={(e) =>
-                                        updateActionItemInDraft(full.id, ai.id, {
-                                          target_date: e.target.value
-                                            ? `${e.target.value}T12:00:00.000Z`
-                                            : null,
-                                        })
-                                      }
-                                    />
-                                  </div>
+                                <div className="mt-2">
+                                  <Label className="text-[11px]">Week #</Label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    className="mt-1 max-w-[120px]"
+                                    value={ai.week_index}
+                                    onChange={(e) =>
+                                      updateActionItemInDraft(full.id, ai.id, {
+                                        week_index: Number(e.target.value) || 1,
+                                      })
+                                    }
+                                  />
                                 </div>
                               </div>
                             ))}
@@ -1427,11 +1379,6 @@ export function FamilyPlanPanel({
                                               <span className="font-medium text-slate-800">
                                                 {group.parent.title}
                                               </span>
-                                              {group.parent.dueDate ? (
-                                                <span className="ml-2 text-xs text-slate-500">
-                                                  Due {formatDue(group.parent.dueDate)}
-                                                </span>
-                                              ) : null}
                                             </span>
                                           </label>
                                         ) : (
@@ -1439,26 +1386,13 @@ export function FamilyPlanPanel({
                                             <span className="font-medium text-slate-800">
                                               {group.parent.title}
                                             </span>
-                                            {group.parent.dueDate ? (
-                                              <span className="ml-2 text-xs text-slate-500">
-                                                Due {formatDue(group.parent.dueDate)}
-                                              </span>
-                                            ) : null}
                                           </>
                                         )}
 
                                         {group.artifacts.length > 0 ? (
                                           <ul className="mt-2 ml-4 list-disc pl-2 text-sm text-slate-700">
                                             {group.artifacts.map((a) => (
-                                            <li key={a.id}>
-                                              {a.title}
-                                              {a.dueDate ? (
-                                                <span className="text-xs text-slate-500">
-                                                  {" "}
-                                                  (Due {formatDue(a.dueDate)})
-                                                </span>
-                                              ) : null}
-                                            </li>
+                                            <li key={a.id}>{a.title}</li>
                                             ))}
                                           </ul>
                                         ) : null}

@@ -105,7 +105,7 @@ export async function enrichFamiliesWithCurrentStep(
   const planIds = [...latestPlanByFamily.values()];
   const { data: steps } = await client
     .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, workflow_data")
+    .select("id, plan_id, title, phase, status, workflow_data")
     .in("plan_id", planIds)
     .order("sort_order", { ascending: true });
 
@@ -116,7 +116,7 @@ export async function enrichFamiliesWithCurrentStep(
 
   const activeStepByFamily = new Map<
     string,
-    { id: string; title: string; phase: string; status: string; due_date: string | null; workflow_data: unknown }
+    { id: string; title: string; phase: string; status: string; workflow_data: unknown }
   >();
   for (const s of steps ?? []) {
     const fid = familyIdByPlanId.get(s.plan_id);
@@ -126,32 +126,15 @@ export async function enrichFamiliesWithCurrentStep(
     }
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   return items.map((item) => {
     const step = activeStepByFamily.get(item.id);
     if (!step) {
       return { ...item, current_step: null };
     }
     const w = (step.workflow_data as { needs_escalation?: boolean }) ?? {};
-    const due = step.due_date ? new Date(step.due_date) : null;
-    const daysOverdue =
-      due && due < today
-        ? Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
-        : undefined;
 
-    let actionNeeded = step.title;
-    if (step.status === "blocked") {
-      actionNeeded = `Blocked: ${step.title}`;
-    } else if (daysOverdue != null && daysOverdue > 0) {
-      actionNeeded = `${step.title} (${daysOverdue}d overdue)`;
-    } else if (step.due_date) {
-      const dueDate = new Date(step.due_date);
-      if (dueDate.toDateString() === today.toDateString()) {
-        actionNeeded = `Due today: ${step.title}`;
-      }
-    }
+    const actionNeeded =
+      step.status === "blocked" ? `Blocked: ${step.title}` : step.title;
 
     return {
       ...item,
@@ -160,11 +143,10 @@ export async function enrichFamiliesWithCurrentStep(
         title: step.title,
         phase: step.phase,
         status: step.status,
-        due_date: step.due_date,
+        due_date: null,
         action_needed_now: actionNeeded,
         is_blocked: step.status === "blocked",
         is_escalated: !!w.needs_escalation,
-        days_overdue: daysOverdue,
       },
     };
   });

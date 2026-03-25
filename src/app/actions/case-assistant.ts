@@ -3,6 +3,7 @@
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
+import type { AiMode } from "@/lib/ai/ai-mode";
 import { askCaseAssistant } from "@/lib/case-assistant/ai-case-assistant";
 
 export type CaseAssistantResult =
@@ -12,6 +13,7 @@ export type CaseAssistantResult =
 export async function askCaseAssistantAction(
   familyId: string,
   question: string,
+  aiMode?: AiMode,
 ): Promise<CaseAssistantResult> {
   try {
     const session = await requireAppUserWithClient();
@@ -23,7 +25,7 @@ export async function askCaseAssistantAction(
       return { ok: false, error: "AI requires OPENAI_API_KEY" };
     }
 
-    return await askCaseAssistant(detail, question);
+    return await askCaseAssistant(detail, question, { aiMode });
   } catch {
     return { ok: false, error: "Unauthorized" };
   }

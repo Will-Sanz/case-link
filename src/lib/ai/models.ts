@@ -1,21 +1,17 @@
 /**
- * AI model configuration and task routing.
+ * AI model configuration and task routing (per user AI mode: fast vs thinking).
  *
- * - **o3** — 30/60/90 plan generation & regeneration (`full_plan_generation`)
- * - **gpt-4.1-mini** — chat, UI helpers, step refinement, case assistant, edits
- *
- * Overrides:
- * - OPENAI_PLAN_MODEL — overrides plan task model (default: o3)
- * - OPENAI_UI_MODEL — overrides all non-plan AI tasks (default: gpt-4.1-mini)
- * - OPENAI_MODEL_OVERRIDE — force one model for every task (`createAiResponse`)
+ * Overrides still apply: OPENAI_MODEL_OVERRIDE wins all. Per-mode env tuning:
+ * - OPENAI_PLAN_MODEL, OPENAI_PLAN_PHASE_MODEL, OPENAI_UI_MODEL
+ * - OPENAI_PLAN_PHASE_THINKING_MODEL,_OPENAI_THINKING_UI_MODEL, OPENAI_FAST_PLAN_MODEL
  */
 
+import type { AiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
 
 /** Task types for model routing */
 export type AiTaskType =
   | "full_plan_generation"
-  /** Lean 30/60/90 slice generation (staged pipeline; default faster model). */
   | "plan_phase_generation"
   | "step_refinement"
   | "case_assistant"
@@ -34,14 +30,11 @@ export const MODELS = {
   CHAT_UI_EDITS: "gpt-4.1-mini",
 } as const;
 
-/** Full 15-step monolith (regenerate / legacy). */
 const PLAN_MONOLITH_TASK_TYPES: AiTaskType[] = ["full_plan_generation"];
-
-/** Per-phase lean generation — defaults to UI model unless OPENAI_PLAN_PHASE_MODEL is set. */
 const PLAN_PHASE_TASK_TYPES: AiTaskType[] = ["plan_phase_generation"];
 
 /** Tasks that use the Responses API (structured output / reasoning-heavy). */
-const RESPONSES_API_TASKS: AiTaskType[] = [
+const RESPONSES_API_TASK_TYPES: AiTaskType[] = [
   "full_plan_generation",
   "plan_phase_generation",
   "step_refinement",
@@ -49,26 +42,70 @@ const RESPONSES_API_TASKS: AiTaskType[] = [
   "blocker_troubleshoot",
 ];
 
-/**
- * Returns the model ID for a given task type.
- */
-export function getModelForTask(taskType: AiTaskType): string {
-  if (PLAN_MONOLITH_TASK_TYPES.includes(taskType)) {
-    return getEnv().OPENAI_PLAN_MODEL?.trim() || MODELS.PLAN_GENERATION;
-  }
-  if (PLAN_PHASE_TASK_TYPES.includes(taskType)) {
+/** o-series models accept `reasoning.effort` on the Responses API. */
+export function modelSupportsReasoningEffort(modelId: string): boolean {
+  return /^o\d/i.test(modelId.trim());
+}
+
+export function getModelForTask(taskType: AiTaskType, mode: AiMode): string {
+  const env = getEnv();
+  const override = env.OPENAI_MODEL_OVERRIDE?.trim();
+  if (override) return override;
+
+  if (mode === "thinking") {
+    if (PLAN_MONOLITH_TASK_TYPES.includes(taskType)) {
+      return env.OPENAI_PLAN_MODEL?.trim() || MODELS.PLAN_GENERATION;
+    }
+    if (PLAN_PHASE_TASK_TYPES.includes(taskType)) {
+      return (
+        env.OPENAI_PLAN_PHASE_THINKING_MODEL?.trim() ||
+        env.OPENAI_PLAN_MODEL?.trim() ||
+        MODELS.PLAN_GENERATION
+      );
+    }
     return (
-      getEnv().OPENAI_PLAN_PHASE_MODEL?.trim() ||
-      getEnv().OPENAI_UI_MODEL?.trim() ||
-      MODELS.CHAT_UI_EDITS
+      env.OPENAI_THINKING_UI_MODEL?.trim() ||
+      env.OPENAI_PLAN_MODEL?.trim() ||
+      MODELS.PLAN_GENERATION
     );
   }
-  return getEnv().OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
+
+  if (PLAN_MONOLITH_TASK_TYPES.includes(taskType)) {
+    return env.OPENAI_FAST_PLAN_MODEL?.trim() || env.OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
+  }
+  if (PLAN_PHASE_TASK_TYPES.includes(taskType)) {
+    return env.OPENAI_PLAN_PHASE_MODEL?.trim() || env.OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
+  }
+  return env.OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
+}
+
+export function getDefaultMaxTokensForTask(taskType: AiTaskType, mode: AiMode): number {
+  const fast = mode === "fast";
+  switch (taskType) {
+    case "full_plan_generation":
+      return fast ? 6144 : 8192;
+    case "plan_phase_generation":
+      return fast ? 4096 : 6144;
+    case "step_refinement":
+      return fast ? 3072 : 4096;
+    default:
+      return fast ? 2048 : 3072;
+  }
+}
+
+export function augmentInstructionsForMode(
+  instructions: string,
+  mode: AiMode,
+): string {
+  if (mode === "fast") {
+    return `${instructions}\n\n## Output mode: Fast\nPrioritize brevity: tight wording, fewer redundant bullets, no filler. Stay accurate and easy to transfer to city forms.`;
+  }
+  return `${instructions}\n\n## Output mode: Thorough\nBe concrete and precise. Add nuance only where it helps the case manager; avoid repetition or padding.`;
 }
 
 /**
  * Whether this task should use the Responses API (reasoning-heavy).
  */
-export function useResponsesApi(taskType: AiTaskType): boolean {
-  return RESPONSES_API_TASKS.includes(taskType);
+export function taskUsesResponsesApi(taskType: AiTaskType): boolean {
+  return RESPONSES_API_TASK_TYPES.includes(taskType);
 }

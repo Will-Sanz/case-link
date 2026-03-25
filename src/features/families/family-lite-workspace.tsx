@@ -13,6 +13,8 @@ import {
   loadBarrierWorkflowForFamilyAction,
   toggleBarrierWorkflowActionItemAction,
 } from "@/app/actions/barrier-workflow";
+import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
+import { useAIMode } from "@/components/providers/ai-mode-provider";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
@@ -26,7 +28,6 @@ type TimelineItem = {
   id: string;
   phase: "30" | "60" | "90";
   title: string;
-  dueDate: string | null;
   done: boolean;
 };
 
@@ -50,14 +51,6 @@ const PHASE_STYLE: Record<"30" | "60" | "90", { dot: string; chip: string; ring:
 
 function phaseLabel(phase: "30" | "60" | "90"): string {
   return `${phase}-day`;
-}
-
-function formatDue(dueDate: string | null): string {
-  if (!dueDate) return "No date";
-  return new Date(`${dueDate}T12:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function formatElapsed(seconds: number): string {
@@ -248,9 +241,6 @@ function TimelineLane({
                       {item.title}
                     </p>
                   </label>
-                  <span className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600">
-                    {formatDue(item.dueDate)}
-                  </span>
                 </div>
                 <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
                   {item.done ? "Completed" : "Upcoming"}
@@ -281,6 +271,7 @@ export function FamilyLiteWorkspace({
   tab?: "overview" | "plan" | "resources" | "timeline" | "assistant";
 }) {
   const router = useRouter();
+  const { mode: aiMode } = useAIMode();
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
@@ -335,6 +326,7 @@ export function FamilyLiteWorkspace({
         selectedBarriers: selected,
         additionalBarriers,
         additionalDetails: details,
+        aiMode,
       });
       if (!r.ok) return setError(r.error);
       setResult(r.result);
@@ -343,7 +335,7 @@ export function FamilyLiteWorkspace({
       if (r.stagedPolling) {
         void (async () => {
           for (let i = 0; i < 40; i++) {
-            const adv = await advanceStagedLeanPlanGeneration({ familyId });
+            const adv = await advanceStagedLeanPlanGeneration({ familyId, aiMode });
             if (!adv.ok) break;
             const reload = await loadBarrierWorkflowForFamilyAction(familyId);
             if (reload.ok) setResult(reload.result);
@@ -385,7 +377,7 @@ export function FamilyLiteWorkspace({
     }
     setAssistantError(null);
     startAssistantTransition(async () => {
-      const r = await askCaseAssistantAction(familyId, q);
+      const r = await askCaseAssistantAction(familyId, q, aiMode);
       if (!r.ok) {
         setAssistantError(r.error);
         return;
@@ -401,12 +393,11 @@ export function FamilyLiteWorkspace({
           id: item.id,
           phase: section.phase,
           title: item.title,
-          dueDate: item.dueDate,
           done: item.status === "completed",
         })),
       ),
     )
-    .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   const timelineByPhase = {
     "30": timelineItems.filter((i) => i.phase === "30"),
@@ -431,11 +422,23 @@ export function FamilyLiteWorkspace({
               <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
               <p className="text-xs text-slate-500">Family ID: {familyId}</p>
             </div>
-            {result?.lastSavedAt ? (
-              <p className="text-xs text-slate-500">
-                Updated {new Date(result.lastSavedAt).toLocaleString()}
-              </p>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="hidden text-right sm:block">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  AI
+                </p>
+                <AiModeToggle className="mt-0.5" />
+              </div>
+              {result?.lastSavedAt ? (
+                <p className="text-xs text-slate-500">
+                  Updated {new Date(result.lastSavedAt).toLocaleString()}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 sm:hidden">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">AI</p>
+            <AiModeToggle className="mt-0.5" />
           </div>
 
           <div className="mt-5">
@@ -540,11 +543,23 @@ export function FamilyLiteWorkspace({
               <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
               <p className="text-xs text-slate-500">Family ID: {familyId}</p>
             </div>
-            {result?.lastSavedAt ? (
-              <p className="text-xs text-slate-500">
-                Updated {new Date(result.lastSavedAt).toLocaleString()}
-              </p>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="hidden text-right sm:block">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  AI
+                </p>
+                <AiModeToggle className="mt-0.5" />
+              </div>
+              {result?.lastSavedAt ? (
+                <p className="text-xs text-slate-500">
+                  Updated {new Date(result.lastSavedAt).toLocaleString()}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 sm:hidden">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">AI</p>
+            <AiModeToggle className="mt-0.5" />
           </div>
         </Card>
       ) : null}
@@ -671,10 +686,11 @@ export function FamilyLiteWorkspace({
               onChange={(e) => setAssistantQuestion(e.target.value)}
               placeholder="Ask about next steps, risks, resource outreach, or plan sequencing."
             />
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button type="button" onClick={askAssistant} disabled={assistantPending}>
                 {assistantPending ? "Thinking..." : "Ask assistant"}
               </Button>
+              <AiModeToggle />
             </div>
             {assistantError ? (
               <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

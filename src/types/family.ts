@@ -1,3 +1,5 @@
+import type { AiMode } from "@/lib/ai/ai-mode";
+
 export type FamilyListItem = {
   id: string;
   name: string;
@@ -206,6 +208,8 @@ export type PlanGenerationState = {
   phases_complete: { "30": boolean; "60": boolean; "90": boolean };
   models_used: string[];
   stage_timings_ms: Partial<Record<"30" | "60" | "90", number>>;
+  /** Locked for this run so 60/90 match the 30-day preset; missing on older rows. */
+  ai_mode?: AiMode;
   error?: string;
 };
 

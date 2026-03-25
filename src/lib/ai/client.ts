@@ -1,11 +1,16 @@
 import "server-only";
 
-import { getEnv } from "@/lib/env";
+import type { AiMode } from "@/lib/ai/ai-mode";
+import { parseAiMode } from "@/lib/ai/ai-mode";
 import {
+  augmentInstructionsForMode,
+  getDefaultMaxTokensForTask,
   getModelForTask,
-  useResponsesApi,
+  modelSupportsReasoningEffort,
+  taskUsesResponsesApi,
   type AiTaskType,
 } from "@/lib/ai/models";
+import { getEnv } from "@/lib/env";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -26,6 +31,8 @@ export type CreateResponseOptions = {
   structuredJsonSchema?: StructuredJsonSchema;
   temperature?: number;
   maxTokens?: number;
+  /** From client `useAIMode()`; defaults to fast when omitted. */
+  aiMode?: AiMode;
 };
 
 export type CreateResponseResult =
@@ -63,9 +70,13 @@ export async function createAiResponse(
     return { ok: false, error: "OPENAI_API_KEY is required" };
   }
 
+  const mode = parseAiMode(options.aiMode);
   const modelOverride = process.env.OPENAI_MODEL_OVERRIDE?.trim();
-  const model = modelOverride || getModelForTask(options.taskType);
-  const useResponses = !modelOverride && useResponsesApi(options.taskType);
+  const model = modelOverride || getModelForTask(options.taskType, mode);
+  const useResponses = !modelOverride && taskUsesResponsesApi(options.taskType);
+  const instructions = augmentInstructionsForMode(options.instructions, mode);
+  const maxTokens = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
+  const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
   const debug = process.env.OPENAI_DEBUG === "1";
   const payloadDebug = process.env.OPENAI_PAYLOAD_DEBUG === "1";
@@ -73,30 +84,35 @@ export async function createAiResponse(
 
   if (debug || payloadDebug) {
     const inputSummary = summarizeInput(options.input);
+    const reasoning =
+      modelSupportsReasoningEffort(model) ? (mode === "thinking" ? "high" : "low") : null;
     console.info("[ai] request:start", {
       taskType: options.taskType,
       model,
+      aiMode: mode,
+      reasoningEffort: reasoning,
       api: useResponses ? "responses" : "chat.completions",
       hasStructuredJsonSchema: Boolean(options.structuredJsonSchema),
       responseFormat: options.responseFormat ?? null,
       inputChars: inputSummary.chars,
-      instructionsChars: options.instructions.length,
-      maxTokens: options.maxTokens ?? 4096,
+      instructionsChars: instructions.length,
+      maxTokens,
     });
     if (payloadDebug) {
-      console.info("[ai] request:instructions", options.instructions.slice(0, 2000));
+      console.info("[ai] request:instructions", instructions.slice(0, 2000));
       console.info("[ai] request:input_preview", inputSummary.preview);
     }
   }
 
   try {
     const result = useResponses
-      ? await callResponsesApi(apiKey, model, options, debug)
-      : await callChatCompletionsApi(apiKey, model, options, debug);
+      ? await callResponsesApi(apiKey, model, resolved, debug, mode)
+      : await callChatCompletionsApi(apiKey, model, resolved, debug);
     if (debug || payloadDebug) {
       console.info("[ai] request:end", {
         taskType: options.taskType,
         model,
+        aiMode: mode,
         elapsedMs: Date.now() - startedAt,
         ok: result.ok,
         error: result.ok ? null : result.error,
@@ -122,6 +138,7 @@ async function callResponsesApi(
   model: string,
   options: CreateResponseOptions,
   debug: boolean,
+  mode: AiMode,
 ): Promise<CreateResponseResult> {
   const input =
     typeof options.input === "string"
@@ -137,6 +154,9 @@ async function callResponsesApi(
     input,
     max_output_tokens: options.maxTokens ?? 4096,
   };
+  if (modelSupportsReasoningEffort(model)) {
+    body.reasoning = { effort: mode === "thinking" ? "high" : "low" };
+  }
   if (modelSupportsTemperature(model)) {
     body.temperature = options.temperature ?? 0.4;
   }

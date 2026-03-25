@@ -1,8 +1,9 @@
 /**
- * Homepage action queue bucketing by calendar due date.
+ * Homepage action queue bucketing by optional `due_date` on actionable items.
  *
  * ## Date handling
- * Due values come from Postgres as `YYYY-MM-DD` (plan_steps.due_date, action_items.target_date).
+ * Dated buckets only apply when an attention item carries `due_date` (e.g. legacy data). Plan
+ * action items no longer set follow-up dates; those items land in `undated`.
  * We compare **UTC calendar dates** (year-month-day in UTC) so bucketing is stable on servers
  * regardless of Node default timezone. This matches typical "business date" storage without time.
  *

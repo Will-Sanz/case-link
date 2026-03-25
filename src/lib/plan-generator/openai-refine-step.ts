@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { AiMode } from "@/lib/ai/ai-mode";
 import type { FamilyDetail } from "@/types/family";
 import type { PlanStepDetails } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
@@ -60,7 +61,7 @@ export async function refineStepWithOpenAI(
     workflow_data?: { blocker_reason?: string | null };
   },
   feedback: string,
-  options?: { surroundingStepTitles?: string[]; retries?: number },
+  options?: { surroundingStepTitles?: string[]; retries?: number; aiMode?: AiMode },
 ): Promise<RefineStepResult> {
   const phase =
     currentStep.phase === "30" || currentStep.phase === "60" || currentStep.phase === "90"
@@ -128,7 +129,7 @@ Refine this step only. phase must stay "${phase}" unless feedback explicitly req
           strict: false,
         },
         temperature: 0.35,
-        maxTokens: 4096,
+        aiMode: options?.aiMode,
       });
 
       if (!result.ok) {

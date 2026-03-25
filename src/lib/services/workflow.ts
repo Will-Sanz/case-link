@@ -35,8 +35,6 @@ export type StepActivityItem = {
 };
 
 const STALE_DAYS = 7;
-const SOON_DAYS = 3;
-
 export async function getNeedsAttention(
   client: SupabaseClient,
   options?: { familyId?: string; limit?: number },
@@ -46,10 +44,6 @@ export async function getNeedsAttention(
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(today);
-  todayEnd.setDate(todayEnd.getDate() + 1);
-  const soonEnd = new Date(today);
-  soonEnd.setDate(soonEnd.getDate() + SOON_DAYS);
   const staleCutoff = new Date(today);
   staleCutoff.setDate(staleCutoff.getDate() - STALE_DAYS);
 
@@ -85,32 +79,9 @@ export async function getNeedsAttention(
 
   const { data: steps } = await client
     .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, workflow_data")
+    .select("id, plan_id, title, phase, status, workflow_data")
     .in("plan_id", planIds)
     .in("status", ["pending", "in_progress", "blocked"]);
-
-  const stepIds = (steps ?? []).map((s) => s.id);
-  let actionItems: Array<{
-    id: string;
-    plan_step_id: string;
-    title: string;
-    target_date: string | null;
-    status: string;
-  }> = [];
-  if (stepIds.length > 0) {
-    const { data: aiData } = await client
-      .from("plan_step_action_items")
-      .select("id, plan_step_id, title, target_date, status")
-      .in("plan_step_id", stepIds)
-      .neq("status", "completed");
-    actionItems = aiData ?? [];
-  }
-  const actionItemsByStep = new Map<string, typeof actionItems>();
-  for (const ai of actionItems) {
-    const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
-    list.push(ai);
-    actionItemsByStep.set(ai.plan_step_id, list);
-  }
 
   if (!steps?.length) {
     for (const f of families) {
@@ -146,8 +117,6 @@ export async function getNeedsAttention(
       if (!familyId) continue;
       const fam = familyMap.get(familyId);
       const familyName = fam?.name ?? "Unknown";
-      const stepActionItems = actionItemsByStep.get(s.id) ?? [];
-      const hasActionItems = stepActionItems.length > 0;
 
       const w = (s.workflow_data as { needs_escalation?: boolean }) ?? {};
       if (w.needs_escalation) {
@@ -170,91 +139,6 @@ export async function getNeedsAttention(
           step_title: s.title,
           step_phase: s.phase,
         });
-      }
-
-      if (hasActionItems) {
-        for (const ai of stepActionItems) {
-          if (!ai.target_date) continue;
-          const due = new Date(ai.target_date);
-          if (due < today) {
-            const daysOverdue = Math.floor(
-              (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
-            );
-            items.push({
-              type: "overdue",
-              family_id: familyId,
-              family_name: familyName,
-              step_id: s.id,
-              step_title: s.title,
-              step_phase: s.phase,
-              action_item_id: ai.id,
-              action_item_title: ai.title,
-              due_date: ai.target_date,
-              days_overdue: daysOverdue,
-            });
-          } else if (due >= today && due < todayEnd) {
-            items.push({
-              type: "follow_up_today",
-              family_id: familyId,
-              family_name: familyName,
-              step_id: s.id,
-              step_title: s.title,
-              step_phase: s.phase,
-              action_item_id: ai.id,
-              action_item_title: ai.title,
-              due_date: ai.target_date,
-            });
-          } else if (due < soonEnd) {
-            items.push({
-              type: "follow_up_soon",
-              family_id: familyId,
-              family_name: familyName,
-              step_id: s.id,
-              step_title: s.title,
-              step_phase: s.phase,
-              action_item_id: ai.id,
-              action_item_title: ai.title,
-              due_date: ai.target_date,
-            });
-          }
-        }
-      } else if (s.due_date) {
-        const due = new Date(s.due_date);
-        if (due < today) {
-          const daysOverdue = Math.floor(
-            (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          items.push({
-            type: "overdue",
-            family_id: familyId,
-            family_name: familyName,
-            step_id: s.id,
-            step_title: s.title,
-            step_phase: s.phase,
-            due_date: s.due_date,
-            days_overdue: daysOverdue,
-          });
-        } else if (due >= today && due < todayEnd) {
-          items.push({
-            type: "follow_up_today",
-            family_id: familyId,
-            family_name: familyName,
-            step_id: s.id,
-            step_title: s.title,
-            step_phase: s.phase,
-            due_date: s.due_date,
-          });
-        } else if (due < soonEnd) {
-          items.push({
-            type: "follow_up_soon",
-            family_id: familyId,
-            family_name: familyName,
-            step_id: s.id,
-            step_title: s.title,
-            step_phase: s.phase,
-            due_date: s.due_date,
-          });
-        }
       }
 
       if (s.status === "in_progress") {
@@ -296,9 +180,7 @@ export async function getNeedsAttention(
           !items.some((i) => i.family_id === f.id && i.type === "new_plan")
         ) {
           const hasInteraction = steps.some(
-            (st) =>
-              familyIdByPlanId.get(st.plan_id) === f.id &&
-              (st.status !== "pending" || st.due_date),
+            (st) => familyIdByPlanId.get(st.plan_id) === f.id && st.status !== "pending",
           );
           if (!hasInteraction) {
             items.push({
@@ -454,7 +336,7 @@ export async function getDashboardData(
   const planIds = [...latestPlanByFamily.values()];
   const { data: steps } = await client
     .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, workflow_data, details")
+    .select("id, plan_id, title, phase, status, workflow_data, details")
     .in("plan_id", planIds)
     .order("sort_order", { ascending: true });
 
@@ -469,7 +351,6 @@ export async function getDashboardData(
     title: string;
     phase: string;
     status: string;
-    due_date: string | null;
     workflow_data: unknown;
     details?: { checklist?: string[] } | null;
   };
@@ -497,10 +378,6 @@ export async function getDashboardData(
     stepById.set(s.id, s as StepRow);
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(today);
-  todayEnd.setDate(todayEnd.getDate() + 1);
   const familyMap = new Map((families ?? []).map((f) => [f.id, f]));
 
   const familiesNeedingAttention: DashboardFamilySummary[] = familyIds
@@ -534,10 +411,6 @@ export async function getDashboardData(
       }
 
       const w = (step?.workflow_data as { needs_escalation?: boolean }) ?? {};
-      const due = step?.due_date ? new Date(step.due_date) : null;
-      const daysOverdue = due && due < today
-        ? Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
-        : undefined;
 
       return {
         family_id: fid,
@@ -551,11 +424,10 @@ export async function getDashboardData(
               title: step.title,
               phase: step.phase,
               status: step.status,
-              due_date: step.due_date,
+              due_date: null,
               action_needed_now: actionNeeded,
               is_blocked: step.status === "blocked",
               is_escalated: !!w.needs_escalation,
-              days_overdue: daysOverdue,
               checklist_progress: getChecklistProgress(step),
             }
           : null,

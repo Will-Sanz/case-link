@@ -184,7 +184,7 @@ export function formatMatchesForPlannerPrompt(
     const why = m.match_reason.trim().slice(0, 140);
     return `${i + 1}. ${r.program_name} (${r.office_or_department || r.category || "service"})${contact ? ` — ${contact}` : ""} — ${why}`;
   });
-  return `MATCHED_RESOURCES:\n${lines.join("\n")}`;
+  return `MATCHED_RESOURCES (reference — cite when clearly relevant; generic case-management steps are OK):\n${lines.join("\n")}`;
 }
 
 export function formatMatchesForAiPrompt(

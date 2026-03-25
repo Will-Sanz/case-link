@@ -5,6 +5,7 @@ import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
 import { stepHelperTypeToPersistField } from "@/lib/domain/step-helper/persist-field";
+import type { AiMode } from "@/lib/ai/ai-mode";
 import type { StepHelperType } from "@/types/step-helper";
 import { generateStepHelper } from "@/lib/step-helper/ai-step-helper";
 
@@ -16,6 +17,7 @@ export async function generateStepHelperAction(
   stepId: string,
   familyId: string,
   helperType: StepHelperType,
+  aiMode?: AiMode,
 ): Promise<StepHelperActionResult> {
   try {
     const session = await requireAppUserWithClient();
@@ -30,7 +32,7 @@ export async function generateStepHelperAction(
       return { ok: false, error: "AI requires OPENAI_API_KEY" };
     }
 
-    return await generateStepHelper(detail, step, helperType);
+    return await generateStepHelper(detail, step, helperType, { aiMode });
   } catch {
     return { ok: false, error: "Unauthorized" };
   }

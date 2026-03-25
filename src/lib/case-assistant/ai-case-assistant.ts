@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { AiMode } from "@/lib/ai/ai-mode";
+import { parseAiMode } from "@/lib/ai/ai-mode";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
@@ -62,8 +64,10 @@ function buildCaseContext(detail: FamilyDetail): string {
 export async function askCaseAssistant(
   detail: FamilyDetail,
   question: string,
+  options?: { aiMode?: AiMode },
 ): Promise<{ ok: true; answer: string } | { ok: false; error: string }> {
   const context = buildCaseContext(detail);
+  const mode = parseAiMode(options?.aiMode);
 
   const instructions = `You are an experienced case manager assistant in Philadelphia. You help case managers execute 30/60/90 day plans for families facing housing instability and related challenges.
 
@@ -90,7 +94,8 @@ Answer concisely and practically.`;
     instructions,
     input,
     temperature: 0.4,
-    maxTokens: 800,
+    maxTokens: mode === "fast" ? 900 : 1600,
+    aiMode: mode,
   });
 
   if (!result.ok) return { ok: false, error: result.error };

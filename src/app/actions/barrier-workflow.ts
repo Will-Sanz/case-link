@@ -116,7 +116,6 @@ function mapFamilyToWorkflowResult(
         id: item.id,
         title: item.title,
         description: item.description,
-        dueDate: item.target_date,
         status: item.status,
       })),
     });
@@ -280,6 +279,7 @@ export async function generateBarrierWorkflowAction(
       familyId,
       regenerationFeedback:
         [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
+      aiMode: input.aiMode,
     });
     if (!planRes.ok) return { ok: false, error: planRes.error };
 
@@ -515,6 +515,7 @@ export async function generateBarrierWorkflowForFamilyAction(
       familyId,
       regenerationFeedback:
         [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
+      aiMode: input.aiMode,
     });
     if (!planRes.ok) return { ok: false, error: planRes.error };
 

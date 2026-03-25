@@ -6,6 +6,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useAIMode } from "@/components/providers/ai-mode-provider";
 import { checkboxClass } from "@/lib/ui/form-classes";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import {
@@ -27,6 +28,7 @@ export function BarrierWorkflowClient({
 }: {
   barrierOptions: readonly PresetOption[];
 }) {
+  const { mode: aiMode } = useAIMode();
   const [selected, setSelected] = useState<BarrierPresetLabel[]>([]);
   const [referenceId, setReferenceId] = useState("");
   const [additionalBarriers, setAdditionalBarriers] = useState("");
@@ -91,6 +93,7 @@ export function BarrierWorkflowClient({
         selectedBarriers: selected,
         additionalBarriers,
         additionalDetails,
+        aiMode,
       });
       if (!r.ok) {
         setError(r.error);
@@ -105,7 +108,7 @@ export function BarrierWorkflowClient({
         const fid = r.result.familyId;
         void (async () => {
           for (let i = 0; i < 40; i++) {
-            const adv = await advanceStagedLeanPlanGeneration({ familyId: fid });
+            const adv = await advanceStagedLeanPlanGeneration({ familyId: fid, aiMode });
             if (!adv.ok) break;
             const reload = await loadBarrierWorkflowByReferenceAction(ref);
             if (reload.ok) setResult(reload.result);
@@ -342,11 +345,6 @@ export function BarrierWorkflowClient({
                                         {item.description ? (
                                           <span className="block text-xs text-slate-600">
                                             {item.description}
-                                          </span>
-                                        ) : null}
-                                        {item.dueDate ? (
-                                          <span className="block text-xs text-slate-500">
-                                            Due: {new Date(`${item.dueDate}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                           </span>
                                         ) : null}
                                       </span>

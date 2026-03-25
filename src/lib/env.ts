@@ -20,6 +20,12 @@ const envSchema = z.object({
   OPENAI_PLAN_MODEL: z.string().optional(),
   /** Server-only; lean per-phase plan generation (default: same as OPENAI_UI_MODEL). */
   OPENAI_PLAN_PHASE_MODEL: z.string().optional(),
+  /** Server-only; per-phase / thinking-quality preset (default: OPENAI_PLAN_MODEL or o3). */
+  OPENAI_PLAN_PHASE_THINKING_MODEL: z.string().optional(),
+  /** Server-only; non-plan tasks in Thinking mode (default: OPENAI_PLAN_MODEL or o3). */
+  OPENAI_THINKING_UI_MODEL: z.string().optional(),
+  /** Server-only; monolithic full-plan in Fast mode (default: OPENAI_UI_MODEL). */
+  OPENAI_FAST_PLAN_MODEL: z.string().optional(),
   /** Server-only; overrides chat, UI helpers, refinements, and other non-plan AI (default: gpt-4.1-mini). */
   OPENAI_UI_MODEL: z.string().optional(),
   /** Override: force this model for ALL AI tasks (e.g. gpt-4o for QA). */

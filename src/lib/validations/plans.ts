@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const aiModeSchema = z.enum(["fast", "thinking"]).optional();
+
 const planStepDetailsSchema = z.object({
   /** Short, concrete next action for the case manager. */
   action_needed_now: z.string().optional(),
@@ -52,6 +54,7 @@ export const generatePlanSchema = z.object({
    * OpenAI plan (no rules fallback) so titles and full step content are freshly generated.
    */
   regenerateExistingPlan: z.boolean().optional(),
+  aiMode: aiModeSchema,
 });
 
 export const planClientDisplaySchema = z.object({
@@ -80,7 +83,6 @@ export const updatePlanStepSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
   details: planStepDetailsSchema.optional(),
   workflow_data: planStepWorkflowSchema.optional(),
-  due_date: z.string().nullable().optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   phase: z.enum(["30", "60", "90"]).optional(),
   sort_order: z.number().int().min(0).max(999).optional(),
@@ -139,7 +141,6 @@ export const updatePlanStepActionItemSchema = z.object({
   actionItemId: z.string().uuid(),
   familyId: z.string().uuid(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
-  target_date: z.string().nullable().optional(),
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).nullable().optional(),
   week_index: z.number().int().min(1).max(52).optional(),
@@ -149,6 +150,7 @@ export const refineStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
   feedback: z.string().min(1, "Feedback is required").max(2000),
+  aiMode: aiModeSchema,
 });
 
 const previewDraftActionItemSchema = z.object({
@@ -161,6 +163,7 @@ const previewDraftActionItemSchema = z.object({
 export const previewRefinePlanSchema = z.object({
   familyId: z.string().uuid(),
   feedback: z.string().min(1, "Feedback is required").max(2000),
+  aiMode: aiModeSchema,
   draft: z.object({
     steps: z
       .array(

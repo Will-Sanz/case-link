@@ -1,3 +1,5 @@
+import type { AiMode } from "@/lib/ai/ai-mode";
+
 export const BARRIER_PRESETS = [
   { key: "housing_instability", label: "Housing" },
   { key: "unemployment", label: "Employment" },
@@ -22,13 +24,14 @@ export type BarrierWorkflowInput = {
   selectedBarriers: BarrierPresetLabel[];
   additionalBarriers?: string;
   additionalDetails?: string;
+  /** AI quality preset from workspace toggle; defaults to fast on server. */
+  aiMode?: AiMode;
 };
 
 export type BarrierWorkflowActionItem = {
   id: string;
   title: string;
   description?: string | null;
-  dueDate: string | null;
   status: "pending" | "in_progress" | "completed" | "blocked";
 };
 
