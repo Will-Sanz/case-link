@@ -94,6 +94,7 @@ export const createManualStepSchema = z.object({
   phase: z.enum(["30", "60", "90"]),
   title: z.string().min(1, "Title is required").max(500),
   description: z.string().max(4000).optional().default(""),
+  details: planStepDetailsSchema.optional(),
 });
 
 export const deletePlanStepSchema = z.object({

@@ -114,6 +114,7 @@ export function PlanStepCaseNote({
   onBeginEdit,
   onSaveEdits,
   onCancelEdits,
+  onDeleteStep,
   stepSavePending,
   stepDirty,
   refineOpen,
@@ -135,6 +136,7 @@ export function PlanStepCaseNote({
   onBeginEdit?: () => void;
   onSaveEdits?: () => void;
   onCancelEdits?: () => void;
+  onDeleteStep?: () => void;
   stepSavePending?: boolean;
   stepDirty?: boolean;
   refineOpen: boolean;
@@ -560,6 +562,15 @@ export function PlanStepCaseNote({
             </Button>
           ) : (
             <>
+              <Button
+                type="button"
+                variant="outline"
+                className="mr-auto h-8 border-red-200 text-xs text-red-700 hover:bg-red-50 hover:text-red-800"
+                onClick={() => onDeleteStep?.()}
+                disabled={stepSavePending}
+              >
+                Delete step
+              </Button>
               <Button
                 type="button"
                 variant="ghost"

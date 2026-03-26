@@ -972,7 +972,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Unauthorized" };
   }
 
-  const { familyId, planId, phase, title, description } = parsed.data;
+  const { familyId, planId, phase, title, description, details } = parsed.data;
 
   const { data: plan } = await supabase
     .from("plans")
@@ -1002,6 +1002,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
     description: description ?? "",
     status: "pending",
     sort_order: sortOrder,
+    details: details && Object.keys(details).length > 0 ? details : null,
   }).select("id").single();
 
   if (error) {

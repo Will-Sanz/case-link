@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import {
   previewRefinePlanStep,
   previewRefinePlan,
+  createManualStep,
+  deletePlanStep,
   updatePlanStep,
   updatePlanStepActionItem,
 } from "@/app/actions/plans";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { PlanPdfExport } from "@/features/families/plan-pdf-export";
 import { PlanStepCaseNote } from "@/features/families/plan-step-case-note";
@@ -101,6 +104,20 @@ export function FamilyPlanPanel({
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [addStepPhase, setAddStepPhase] = useState<"30" | "60" | "90">("30");
+  const [addStepTitle, setAddStepTitle] = useState("");
+  const [addStepDescription, setAddStepDescription] = useState("");
+  const [addStepDocuments, setAddStepDocuments] = useState("");
+  const [addStepContact, setAddStepContact] = useState("");
+  const [addStepExpectedOutcome, setAddStepExpectedOutcome] = useState("");
+  const [addStepPending, setAddStepPending] = useState(false);
+  const [deleteStepPendingId, setDeleteStepPendingId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmDescription, setConfirmDescription] = useState("");
+  const [confirmActionLabel, setConfirmActionLabel] = useState("Confirm");
+  const [confirmDanger, setConfirmDanger] = useState(false);
+  const confirmActionRef = useRef<null | (() => void)>(null);
 
   const [planAiDraft, setPlanAiDraft] = useState<PlanWithSteps | null>(null);
 
@@ -172,18 +189,37 @@ export function FamilyPlanPanel({
     return row;
   }
 
-  function trySwitchToStepEdit(stepId: string): boolean {
+  function closeConfirmDialog() {
+    if (pending || stepSaveBusy || addStepPending || Boolean(deleteStepPendingId)) return;
+    setConfirmOpen(false);
+    confirmActionRef.current = null;
+  }
+
+  function requestConfirmation(opts: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  }) {
+    setConfirmTitle(opts.title);
+    setConfirmDescription(opts.description);
+    setConfirmActionLabel(opts.confirmLabel);
+    setConfirmDanger(Boolean(opts.danger));
+    confirmActionRef.current = opts.onConfirm;
+    setConfirmOpen(true);
+  }
+
+  function confirmAndRun() {
+    const fn = confirmActionRef.current;
+    setConfirmOpen(false);
+    confirmActionRef.current = null;
+    fn?.();
+  }
+
+  function switchToStepEdit(stepId: string): boolean {
     if (!plan) return false;
     if (editingStepId === stepId) return true;
-    if (editingStepId && stepDirty) {
-      if (
-        !window.confirm(
-          "You have unsaved edits on the current step. Discard them and edit another step?",
-        )
-      ) {
-        return false;
-      }
-    }
     const s = plan.steps.find((x) => x.id === stepId);
     if (!s) return false;
     setEditingStepId(stepId);
@@ -197,7 +233,19 @@ export function FamilyPlanPanel({
   }
 
   function beginStepEdit(stepId: string) {
-    trySwitchToStepEdit(stepId);
+    if (editingStepId === stepId) return;
+    if (editingStepId && stepDirty) {
+      requestConfirmation({
+        title: "Discard unsaved edits?",
+        description: "You have unsaved edits on the current step. Discard them and edit another step?",
+        confirmLabel: "Discard and continue",
+        onConfirm: () => {
+          switchToStepEdit(stepId);
+        },
+      });
+      return;
+    }
+    switchToStepEdit(stepId);
   }
 
   function cancelStepEdit() {
@@ -307,9 +355,133 @@ export function FamilyPlanPanel({
     });
   }
 
+  function runDeleteStep(stepId: string) {
+    if (!plan) return;
+    if (deleteStepPendingId) return;
+
+    setDeleteStepPendingId(stepId);
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      try {
+        const res = await deletePlanStep({ stepId, familyId });
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        if (editingStepId === stepId) {
+          setEditingStepId(null);
+          setStepDraft(null);
+          setAiStepId(null);
+          setAiPreview(null);
+          setAiInstruction("");
+        }
+        setSuccess("Step deleted.");
+        router.refresh();
+      } finally {
+        setDeleteStepPendingId(null);
+      }
+    });
+  }
+
+  function removeStep(stepId: string) {
+    requestConfirmation({
+      title: "Delete step?",
+      description: "This will permanently remove the step from the plan.",
+      confirmLabel: "Delete step",
+      danger: true,
+      onConfirm: () => runDeleteStep(stepId),
+    });
+  }
+
+  function createStepAtBottom(forceDiscard = false) {
+    if (!plan) return;
+    if (addStepPending) return;
+    const title = addStepTitle.trim();
+    if (!title) {
+      setError("Step title is required.");
+      return;
+    }
+    if (editingStepId && stepDirty && !forceDiscard) {
+      requestConfirmation({
+        title: "Discard unsaved edits?",
+        description: "You have unsaved step edits. Discard them and add a new step?",
+        confirmLabel: "Discard and add step",
+        onConfirm: () => createStepAtBottom(true),
+      });
+      return;
+    }
+    if (forceDiscard) {
+      cancelStepEdit();
+    }
+    setAddStepPending(true);
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      try {
+        const requiredDocuments = addStepDocuments
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+        const contactLines = addStepContact
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+        const details: PlanStepDetails = {};
+        if (requiredDocuments.length > 0) {
+          details.required_documents = requiredDocuments;
+        }
+        if (contactLines.length > 0) {
+          details.contacts = contactLines.map((line) => ({ notes: line }));
+        }
+        const expectedOutcome = addStepExpectedOutcome.trim();
+        if (expectedOutcome) {
+          details.expected_outcome = expectedOutcome;
+        }
+
+        const res = await createManualStep({
+          familyId,
+          planId: plan.id,
+          phase: addStepPhase,
+          title,
+          description: addStepDescription.trim(),
+          details: Object.keys(details).length > 0 ? details : undefined,
+        });
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        setAddStepTitle("");
+        setAddStepDescription("");
+        setAddStepDocuments("");
+        setAddStepContact("");
+        setAddStepExpectedOutcome("");
+        setSuccess(`Step added to ${addStepPhase}-day plan.`);
+        router.refresh();
+      } finally {
+        setAddStepPending(false);
+      }
+    });
+  }
+
   function openAiForStep(stepId: string) {
     if (!plan) return;
-    if (!trySwitchToStepEdit(stepId)) return;
+    if (editingStepId !== stepId && editingStepId && stepDirty) {
+      requestConfirmation({
+        title: "Discard unsaved edits?",
+        description: "You have unsaved step edits on another step. Discard them and continue?",
+        confirmLabel: "Discard and continue",
+        onConfirm: () => {
+          if (!switchToStepEdit(stepId)) return;
+          setAiStepId(stepId);
+          setAiInstruction("");
+          setAiPreview(null);
+          setError(null);
+        },
+      });
+      return;
+    }
+    if (editingStepId !== stepId && !switchToStepEdit(stepId)) return;
     setAiStepId(stepId);
     setAiInstruction("");
     setAiPreview(null);
@@ -366,12 +538,18 @@ export function FamilyPlanPanel({
     setAiInstruction("");
   }
 
-  function openPlanAiRefine() {
+  function openPlanAiRefine(forceDiscard = false) {
     if (!plan) return;
+    if (editingStepId && stepDirty && !forceDiscard) {
+      requestConfirmation({
+        title: "Discard unsaved edits?",
+        description: "Discard unsaved step edits to refine the full plan?",
+        confirmLabel: "Discard and continue",
+        onConfirm: () => openPlanAiRefine(true),
+      });
+      return;
+    }
     if (editingStepId) {
-      if (stepDirty) {
-        if (!window.confirm("Discard unsaved step edits to refine the full plan?")) return;
-      }
       cancelStepEdit();
     }
     setPlanAiInstruction("");
@@ -642,6 +820,7 @@ export function FamilyPlanPanel({
                     onBeginEdit={() => beginStepEdit(full.id)}
                     onSaveEdits={saveStepEdit}
                     onCancelEdits={cancelStepEdit}
+                    onDeleteStep={() => removeStep(full.id)}
                     stepSavePending={(stepSaveBusy || pending) && isEditingThis}
                     stepDirty={isEditingThis && stepDirty}
                     refineOpen={aiStepId === full.id}
@@ -664,6 +843,89 @@ export function FamilyPlanPanel({
               </div>
             </section>
           ))}
+          {plan ? (
+            <section className="max-w-[800px] space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="text-sm font-semibold text-slate-900">Add step</h3>
+              <p className="text-xs text-slate-500">
+                Add a manual step to the end of the selected phase.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+                <label className="space-y-1 text-xs text-slate-600">
+                  <span>Phase</span>
+                  <select
+                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-sm"
+                    value={addStepPhase}
+                    onChange={(e) => setAddStepPhase(e.target.value as "30" | "60" | "90")}
+                    disabled={addStepPending}
+                  >
+                    <option value="30">30-day</option>
+                    <option value="60">60-day</option>
+                    <option value="90">90-day</option>
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs text-slate-600">
+                  <span>Step title</span>
+                  <input
+                    type="text"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    value={addStepTitle}
+                    onChange={(e) => setAddStepTitle(e.target.value)}
+                    placeholder="e.g. Confirm documentation with utility provider"
+                    disabled={addStepPending}
+                  />
+                </label>
+              </div>
+              <label className="space-y-1 text-xs text-slate-600">
+                <span>Summary</span>
+                <Textarea
+                  className="min-h-[90px] border-slate-200"
+                  value={addStepDescription}
+                  onChange={(e) => setAddStepDescription(e.target.value)}
+                  placeholder="Add the step summary for case managers."
+                  disabled={addStepPending}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-slate-600">
+                <span>Documents</span>
+                <Textarea
+                  className="min-h-[90px] border-slate-200"
+                  value={addStepDocuments}
+                  onChange={(e) => setAddStepDocuments(e.target.value)}
+                  placeholder="One required document per line."
+                  disabled={addStepPending}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-slate-600">
+                <span>Contact</span>
+                <Textarea
+                  className="min-h-[90px] border-slate-200"
+                  value={addStepContact}
+                  onChange={(e) => setAddStepContact(e.target.value)}
+                  placeholder="One contact detail per line."
+                  disabled={addStepPending}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-slate-600">
+                <span>Expected outcome</span>
+                <Textarea
+                  className="min-h-[90px] border-slate-200"
+                  value={addStepExpectedOutcome}
+                  onChange={(e) => setAddStepExpectedOutcome(e.target.value)}
+                  placeholder="Describe the desired result for this step."
+                  disabled={addStepPending}
+                />
+              </label>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={createStepAtBottom}
+                  disabled={addStepPending || addStepTitle.trim().length === 0}
+                >
+                  {addStepPending ? "Adding…" : "Add step"}
+                </Button>
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:z-0 lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:overscroll-y-contain lg:self-start">
@@ -747,7 +1009,20 @@ export function FamilyPlanPanel({
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  if (planAiDirty && !window.confirm("Discard unsaved changes to the working copy?")) return;
+                  if (planAiDirty) {
+                    requestConfirmation({
+                      title: "Discard unsaved plan changes?",
+                      description: "You have unsaved changes in the working copy. Close and discard them?",
+                      confirmLabel: "Discard changes",
+                      onConfirm: () => {
+                        setPlanAiOpen(false);
+                        setPlanAiPreview(null);
+                        setPlanAiInstruction("");
+                        setPlanAiDraft(null);
+                      },
+                    });
+                    return;
+                  }
                   setPlanAiOpen(false);
                   setPlanAiPreview(null);
                   setPlanAiInstruction("");
@@ -815,6 +1090,16 @@ export function FamilyPlanPanel({
           </div>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={closeConfirmDialog}
+        onConfirm={confirmAndRun}
+        title={confirmTitle}
+        description={confirmDescription}
+        confirmLabel={confirmActionLabel}
+        pending={pending || stepSaveBusy || addStepPending || Boolean(deleteStepPendingId)}
+        danger={confirmDanger}
+      />
     </div>
   );
 }
