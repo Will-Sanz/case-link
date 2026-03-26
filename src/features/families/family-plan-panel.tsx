@@ -756,7 +756,7 @@ export function FamilyPlanPanel({
           {plan ? (
             <Button
               type="button"
-              onClick={openPlanAiRefine}
+              onClick={() => openPlanAiRefine()}
               variant="secondary"
               className="border-slate-200"
               disabled={planAiPending}
@@ -918,7 +918,7 @@ export function FamilyPlanPanel({
               <div className="flex justify-end">
                 <Button
                   type="button"
-                  onClick={createStepAtBottom}
+                  onClick={() => createStepAtBottom()}
                   disabled={addStepPending || addStepTitle.trim().length === 0}
                 >
                   {addStepPending ? "Adding…" : "Add step"}
