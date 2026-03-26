@@ -65,6 +65,9 @@ export type StagedPlanAdvanceResult =
   | { ok: true; done: boolean; phaseCompleted?: "60" | "90" }
   | { ok: false; error: string };
 
+/** Serialize staged advance per family so overlapping polls do not run the same phase twice. */
+const advanceStagedChainByFamilyId = new Map<string, Promise<unknown>>();
+
 async function logCaseActivity(
   supabase: SupabaseClient,
   familyId: string,
@@ -475,11 +478,20 @@ export async function startStagedLeanPlanGeneration(input: {
 
   const { data: existingPlan } = await supabase
     .from("plans")
-    .select("id, version")
+    .select("id, version, generation_state")
     .eq("family_id", input.familyId)
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  const latestGen = existingPlan?.generation_state as PlanGenerationState | null | undefined;
+  if (latestGen?.v === 1 && latestGen.status === "running") {
+    return {
+      ok: false,
+      error:
+        "A plan is already generating for this family. Wait for it to finish or refresh the page.",
+    };
+  }
 
   const nextVersion = existingPlan ? ((existingPlan.version as number) + 1) : 1;
   const brief = buildPlanningBrief(detail, input.regenerationFeedback);
@@ -557,7 +569,7 @@ export async function startStagedLeanPlanGeneration(input: {
 }
 
 /** Run the next pending phase (60 or 90) or finalize state. Idempotent if phases already inserted. */
-export async function advanceStagedLeanPlanGeneration(input: {
+async function advanceStagedLeanPlanGenerationCore(input: {
   familyId: string;
   /** Fallback when `generation_state.ai_mode` is missing (older rows). */
   aiMode?: AiMode;
@@ -775,6 +787,23 @@ export async function advanceStagedLeanPlanGeneration(input: {
   return { ok: true, done: true };
 }
 
+export async function advanceStagedLeanPlanGeneration(input: {
+  familyId: string;
+  aiMode?: AiMode;
+}): Promise<StagedPlanAdvanceResult> {
+  const familyId = input.familyId;
+  const prev = advanceStagedChainByFamilyId.get(familyId);
+  const base = prev ? prev.catch(() => {}) : Promise.resolve();
+  const next = base.then(() => advanceStagedLeanPlanGenerationCore(input)) as Promise<StagedPlanAdvanceResult>;
+  advanceStagedChainByFamilyId.set(familyId, next);
+  void next.finally(() => {
+    if (advanceStagedChainByFamilyId.get(familyId) === next) {
+      advanceStagedChainByFamilyId.delete(familyId);
+    }
+  });
+  return next;
+}
+
 export async function updatePlan(input: unknown): Promise<ActionResult> {
   const parsed = updatePlanSchema.safeParse(input);
   if (!parsed.success) {
@@ -892,14 +921,18 @@ export async function updatePlanStep(
   if (patch.phase !== undefined) updatePayload.phase = patch.phase;
   if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
 
-  const { error } = await supabase
+  const { data: updatedRows, error } = await supabase
     .from("plan_steps")
     .update(updatePayload)
     .eq("id", stepId)
-    .eq("plan_id", planRow.id);
+    .eq("plan_id", planRow.id)
+    .select("id");
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+  if (!updatedRows?.length) {
+    return { ok: false, error: "Step not found or could not be updated." };
   }
 
   if (patch.status !== undefined) {

@@ -12,6 +12,13 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
+  /**
+   * Canonical public URL of the app (e.g. https://caselink.example.com). Strongly recommended in
+   * production for password reset and signup email links. Falls back to request Host when unset.
+   */
+  NEXT_PUBLIC_SITE_URL: z.string().optional(),
+  /** @deprecated Prefer NEXT_PUBLIC_SITE_URL; still read for backwards compatibility. */
+  NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** Server-only; required for privileged scripts (e.g. resource import). Not needed for normal app runtime. */
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   /** Server-only; when set, plan generation tries OpenAI first, then rules fallback. */

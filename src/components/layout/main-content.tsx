@@ -38,7 +38,7 @@ export function MainContent({
                 ? "flex flex-col overflow-hidden"
                 : "overflow-y-auto",
             )
-          : "mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
+          : "mx-auto min-h-0 w-full max-w-5xl overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
         className,
       )}
     >

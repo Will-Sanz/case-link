@@ -1,12 +1,9 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import { signOutAction } from "@/app/actions/auth";
-import {
-  requestPasswordResetEmail,
-  updateCaseManagerProfile,
-  type ProfileSaveState,
-} from "@/app/actions/profile";
+import { updateCaseManagerProfile, type ProfileSaveState } from "@/app/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,18 +36,29 @@ function formatWorkspaceRole(role: string): string {
 }
 
 export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const passwordJustUpdated = searchParams.get("passwordUpdated") === "1";
+
+  useEffect(() => {
+    if (!passwordJustUpdated) return;
+    router.replace("/profile", { scroll: false });
+  }, [passwordJustUpdated, router]);
+
   const [saveState, formAction, isSavePending] = useActionState(
     updateCaseManagerProfile,
     initialSaveState,
   );
-  const [resetNotice, setResetNotice] = useState<{
-    ok: boolean;
-    message: string;
-  } | null>(null);
-  const [resetPending, startResetTransition] = useTransition();
-
   return (
     <div className="space-y-8">
+      {passwordJustUpdated ? (
+        <div
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
+          {`Your password was updated. The separate "password changed" email is only a security confirmation; it does not contain a reset link.`}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
         <div
           className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-blue-500/90 text-lg font-semibold text-white shadow-sm"
@@ -275,49 +283,15 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
 
         <Card className="p-5 sm:p-6">
           <CardTitle>Account actions</CardTitle>
-          <p className="mt-1 text-sm text-slate-600">
-            Password resets use email from Supabase. Add your site URL to Supabase Auth redirect
-            allow list if links are blocked.
-          </p>
-          <div className="mt-6 space-y-4">
-            <div>
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full sm:w-auto"
-                disabled={resetPending}
-                onClick={() => {
-                  setResetNotice(null);
-                  startResetTransition(async () => {
-                    const r = await requestPasswordResetEmail();
-                    setResetNotice({ ok: r.ok, message: r.message });
-                  });
-                }}
-              >
-                {resetPending ? "Sending…" : "Email me a password reset link"}
+          <div className="mt-6">
+            <form action={signOutAction}>
+              <Button type="submit" variant="outline" className="w-full sm:w-auto">
+                Sign out
               </Button>
-              {resetNotice ?
-                <p
-                  className={cn(
-                    "mt-2 text-sm",
-                    resetNotice.ok ? "text-emerald-800" : "text-red-800",
-                  )}
-                  role="status"
-                >
-                  {resetNotice.message}
-                </p>
-              : null}
-            </div>
-            <div className="border-t border-slate-200 pt-4">
-              <form action={signOutAction}>
-                <Button type="submit" variant="outline" className="w-full sm:w-auto">
-                  Sign out
-                </Button>
-              </form>
-              <p className="mt-2 text-xs text-slate-500">
-                Ends your session and returns you to the login page.
-              </p>
-            </div>
+            </form>
+            <p className="mt-2 text-xs text-slate-500">
+              Ends your session and returns you to the login page.
+            </p>
           </div>
         </Card>
       </div>

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { CaseManagerProfileClient } from "@/features/profile/case-manager-profile-client";
@@ -19,7 +20,9 @@ export default async function ProfilePage() {
 
     return (
       <div className="mx-auto w-full max-w-5xl px-4 py-6 lg:px-8">
-        <CaseManagerProfileClient profile={profile} />
+        <Suspense fallback={<p className="text-sm text-slate-500">Loading profile…</p>}>
+          <CaseManagerProfileClient profile={profile} />
+        </Suspense>
       </div>
     );
   } catch {

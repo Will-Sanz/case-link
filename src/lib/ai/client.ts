@@ -12,6 +12,26 @@ import {
 } from "@/lib/ai/models";
 import { getEnv } from "@/lib/env";
 
+/** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
+const OPENAI_FETCH_TIMEOUT_MS = 180_000;
+
+function openAiAbortSignal(): AbortSignal {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(OPENAI_FETCH_TIMEOUT_MS);
+  }
+  const c = new AbortController();
+  setTimeout(() => c.abort(new Error("timeout")), OPENAI_FETCH_TIMEOUT_MS);
+  return c.signal;
+}
+
+function isAbortOrTimeoutError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const name = (e as Error).name;
+  if (name === "AbortError" || name === "TimeoutError") return true;
+  const msg = String((e as Error).message ?? "");
+  return /aborted|timeout/i.test(msg);
+}
+
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
 /** OpenAI Structured Outputs (strict JSON Schema). Preferred over json_object for plan/steps. */
@@ -125,6 +145,11 @@ export async function createAiResponse(
     }
     return result;
   } catch (e) {
+    if (isAbortOrTimeoutError(e)) {
+      const msg = `OpenAI request timed out after ${OPENAI_FETCH_TIMEOUT_MS / 1000}s`;
+      if (debug) console.info(`[ai] task=${options.taskType} model=${model} error=`, msg);
+      return { ok: false, error: msg };
+    }
     const msg = e instanceof Error ? e.message : "Request failed";
     if (debug) {
       console.info(`[ai] task=${options.taskType} model=${model} error=`, msg);
@@ -184,6 +209,7 @@ async function callResponsesApi(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: openAiAbortSignal(),
   });
 
   if (!res.ok) {
@@ -281,6 +307,7 @@ async function callChatCompletionsApi(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: openAiAbortSignal(),
   });
 
   if (!res.ok) {

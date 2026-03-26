@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   previewRefinePlanStep,
@@ -93,6 +93,10 @@ export function FamilyPlanPanel({
   actionToggleDisabled?: boolean;
 }) {
   const router = useRouter();
+  const stepSaveLockRef = useRef(false);
+  const planBulkSaveLockRef = useRef(false);
+  const [stepSaveBusy, setStepSaveBusy] = useState(false);
+  const [planBulkSaving, setPlanBulkSaving] = useState(false);
   const [stepRefineAiMode, setStepRefineAiMode] = useState<AiMode>("fast");
   const [planRefineAiMode, setPlanRefineAiMode] = useState<AiMode>("fast");
   const [pending, startTransition] = useTransition();
@@ -278,23 +282,31 @@ export function FamilyPlanPanel({
 
   function saveStepEdit() {
     if (!plan || !editingStepId || !stepDraft) return;
+    if (stepSaveLockRef.current) return;
     const orig = plan.steps.find((s) => s.id === editingStepId);
     if (!stepNeedsPersist(orig, stepDraft)) {
       cancelStepEdit();
       return;
     }
+    stepSaveLockRef.current = true;
+    setStepSaveBusy(true);
     setError(null);
     setSuccess(null);
     startTransition(async () => {
-      const ok = await persistOneStep(orig, stepDraft);
-      if (!ok) return;
-      setSuccess("Step saved.");
-      setEditingStepId(null);
-      setStepDraft(null);
-      setAiStepId(null);
-      setAiPreview(null);
-      setAiInstruction("");
-      router.refresh();
+      try {
+        const ok = await persistOneStep(orig, stepDraft);
+        if (!ok) return;
+        setSuccess("Step saved.");
+        setEditingStepId(null);
+        setStepDraft(null);
+        setAiStepId(null);
+        setAiPreview(null);
+        setAiInstruction("");
+        router.refresh();
+      } finally {
+        stepSaveLockRef.current = false;
+        setStepSaveBusy(false);
+      }
     });
   }
 
@@ -494,20 +506,28 @@ export function FamilyPlanPanel({
 
   function savePlanAiRefinements() {
     if (!planAiDraft || !plan) return;
+    if (planBulkSaveLockRef.current) return;
+    planBulkSaveLockRef.current = true;
+    setPlanBulkSaving(true);
     setError(null);
     setSuccess(null);
     startTransition(async () => {
-      for (const s of planAiDraft.steps) {
-        const orig = plan.steps.find((x) => x.id === s.id);
-        const ok = await persistOneStep(orig, s);
-        if (!ok) return;
+      try {
+        for (const s of planAiDraft.steps) {
+          const orig = plan.steps.find((x) => x.id === s.id);
+          const ok = await persistOneStep(orig, s);
+          if (!ok) return;
+        }
+        setSuccess("Plan updates saved.");
+        setPlanAiOpen(false);
+        setPlanAiPreview(null);
+        setPlanAiInstruction("");
+        setPlanAiDraft(null);
+        router.refresh();
+      } finally {
+        planBulkSaveLockRef.current = false;
+        setPlanBulkSaving(false);
       }
-      setSuccess("Plan updates saved.");
-      setPlanAiOpen(false);
-      setPlanAiPreview(null);
-      setPlanAiInstruction("");
-      setPlanAiDraft(null);
-      router.refresh();
     });
   }
 
@@ -627,7 +647,7 @@ export function FamilyPlanPanel({
                     onBeginEdit={() => beginStepEdit(full.id)}
                     onSaveEdits={saveStepEdit}
                     onCancelEdits={cancelStepEdit}
-                    stepSavePending={pending && isEditingThis}
+                    stepSavePending={(stepSaveBusy || pending) && isEditingThis}
                     stepDirty={isEditingThis && stepDirty}
                     refineOpen={aiStepId === full.id}
                     refineInstruction={aiInstruction}
@@ -800,9 +820,9 @@ export function FamilyPlanPanel({
                 <Button
                   type="button"
                   onClick={savePlanAiRefinements}
-                  disabled={pending || planAiPending}
+                  disabled={planBulkSaving || pending || planAiPending}
                 >
-                  {pending ? "Saving…" : "Save to plan"}
+                  {planBulkSaving || pending ? "Saving…" : "Save to plan"}
                 </Button>
               </div>
             ) : null}

@@ -2,6 +2,17 @@
 
 Branded HTML templates for Supabase Auth emails. These match the CaseLink website design (teal accent, slate text, clean card layout).
 
+## Two different password emails
+
+Supabase sends **different** emails for password flows:
+
+| Email purpose | What it contains | Template in this folder |
+|---------------|------------------|-------------------------|
+| **Start** a reset | A link / “Reset password” button (`{{ .ConfirmationURL }}`) | **Reset Password** → `recovery.html` |
+| **After** you changed password | “Your password has been changed” — **no** reset link | **Password changed** → `password_changed_notification.html` |
+
+If someone expects a reset link but only sees “password changed,” they are looking at the **notification** email, not the **recovery** email. In the dashboard, confirm **Reset Password** uses `recovery.html` (with `{{ .ConfirmationURL }}`), not the password-changed template.
+
 ## How to use
 
 1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) → **Authentication** → **Email Templates**
