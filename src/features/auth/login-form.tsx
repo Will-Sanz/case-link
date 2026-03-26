@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,14 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="mt-1"
         />
+        <div className="mt-2 flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
+          >
+            Forgot Password?
+          </Link>
+        </div>
       </div>
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
