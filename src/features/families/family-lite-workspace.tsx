@@ -12,6 +12,7 @@ import {
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { CaseAssistantChat } from "@/features/families/case-assistant-chat";
+import { ArchiveFamilyFromListControl } from "@/features/families/archive-family-from-list-control";
 import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
@@ -314,27 +315,32 @@ export function FamilyLiteWorkspace({
       )}
     >
       {tab === "overview" ? (
-        <FamilyOverviewSetupCanvas
-          familyName={familyName}
-          barrierOptions={barrierOptions}
-          selectedSet={selectedSet}
-          onToggleLabel={toggleLabel}
-          customBarriers={customBarriers}
-          onAddCustomBarrier={addCustomBarrier}
-          onRemoveCustomBarrier={removeCustomBarrier}
-          additionalContext={additionalContext}
-          onAdditionalContextChange={setAdditionalContext}
-          lastSavedAt={result?.lastSavedAt}
-          error={error}
-          pending={pending}
-          generateStartedAt={generateStartedAt}
-          elapsedSeconds={elapsedSeconds}
-          onGenerate={generate}
-          hasGeneratedThisSession={hasGeneratedThisSession}
-          formatElapsed={formatElapsed}
-          generationAiMode={planGenerationAiMode}
-          onGenerationAiModeChange={setPlanGenerationAiMode}
-        />
+        <div className="space-y-3">
+          <FamilyOverviewSetupCanvas
+            familyName={familyName}
+            barrierOptions={barrierOptions}
+            selectedSet={selectedSet}
+            onToggleLabel={toggleLabel}
+            customBarriers={customBarriers}
+            onAddCustomBarrier={addCustomBarrier}
+            onRemoveCustomBarrier={removeCustomBarrier}
+            additionalContext={additionalContext}
+            onAdditionalContextChange={setAdditionalContext}
+            lastSavedAt={result?.lastSavedAt}
+            error={error}
+            pending={pending}
+            generateStartedAt={generateStartedAt}
+            elapsedSeconds={elapsedSeconds}
+            onGenerate={generate}
+            hasGeneratedThisSession={hasGeneratedThisSession}
+            formatElapsed={formatElapsed}
+            generationAiMode={planGenerationAiMode}
+            onGenerationAiModeChange={setPlanGenerationAiMode}
+          />
+          <div className="flex justify-end pt-1">
+            <ArchiveFamilyFromListControl familyId={familyId} />
+          </div>
+        </div>
       ) : null}
 
       {tab === "plan" ? (

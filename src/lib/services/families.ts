@@ -44,6 +44,7 @@ export async function listFamilies(
     `,
       { count: "exact" },
     )
+    .is("archived_at", null)
     .order("updated_at", { ascending: false });
 
   const q = filters.q?.trim();
@@ -169,6 +170,7 @@ export async function getFamilyDetail(
       created_by_id,
       created_at,
       updated_at,
+      archived_at,
       creator:app_users!families_created_by_id_fkey ( email )
     `,
     )
@@ -179,6 +181,10 @@ export async function getFamilyDetail(
     throw new Error(famErr.message);
   }
   if (!fam) {
+    return null;
+  }
+  const famRow = fam as { archived_at?: string | null };
+  if (famRow.archived_at) {
     return null;
   }
 
@@ -302,7 +308,7 @@ export async function getFamilyDetail(
     throw new Error(planRes.error.message);
   }
 
-  const f = fam as FamilyDetail & {
+  const f = fam as unknown as FamilyDetail & {
     creator: { email: string } | { email: string }[] | null;
   };
   const creatorRaw = f.creator;

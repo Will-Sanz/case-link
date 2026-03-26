@@ -31,7 +31,8 @@ export async function getCalendarEvents(
   let familyQuery = client
     .from("families")
     .select("id, name, urgency, updated_at")
-    .eq("status", "active");
+    .eq("status", "active")
+    .is("archived_at", null);
 
   if (options.familyId) {
     familyQuery = familyQuery.eq("id", options.familyId);

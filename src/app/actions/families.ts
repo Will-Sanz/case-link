@@ -281,6 +281,53 @@ export async function deleteFamily(input: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** Hides the family from lists and workspace; does not delete the row. */
+export async function archiveFamilyFromWorkspace(input: unknown): Promise<ActionResult> {
+  const parsed = z.object({ familyId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid family ID" };
+  }
+
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const now = new Date().toISOString();
+  const { data: row, error } = await supabase
+    .from("families")
+    .update({ archived_at: now })
+    .eq("id", parsed.data.familyId)
+    .is("archived_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!row) {
+    return { ok: false, error: "Family not found or already removed from your list." };
+  }
+
+  await supabase.from("activity_log").insert({
+    family_id: parsed.data.familyId,
+    actor_user_id: user.id,
+    action: "family.archived_from_list",
+    entity_type: "family",
+    entity_id: parsed.data.familyId,
+    details: { archived_at: now },
+  });
+
+  revalidatePath("/families");
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+  revalidatePath(`/families/${parsed.data.familyId}`);
+  return { ok: true };
+}
+
 export async function updateFamilyGoals(input: unknown): Promise<ActionResult> {
   await requireAppUser();
   const parsed = updateGoalsSchema.safeParse(input);

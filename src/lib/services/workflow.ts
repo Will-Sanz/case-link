@@ -53,6 +53,7 @@ export async function getNeedsAttention(
     .from("families")
     .select("id, name, updated_at")
     .eq("status", "active")
+    .is("archived_at", null)
     .match(familyFilter);
 
   if (!families?.length) return items;

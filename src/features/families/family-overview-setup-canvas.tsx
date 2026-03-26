@@ -87,7 +87,7 @@ export function FamilyOverviewSetupCanvas({
       {/* 1. Header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">{familyName}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-red-800">{familyName}</h1>
         </div>
         {lastSavedAt ? (
           <p className="text-xs text-slate-500">Updated {new Date(lastSavedAt).toLocaleString()}</p>
