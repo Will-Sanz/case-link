@@ -13,8 +13,8 @@ const envSchema = z.object({
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
   /**
-   * Canonical public URL of the app (e.g. https://caselink.example.com). Strongly recommended in
-   * production for password reset and signup email links. Falls back to request Host when unset.
+   * Canonical public URL (e.g. https://www.thecaselink.com). Recommended for signup `redirectTo`
+   * and other auth URLs when not on Vercel, or when overriding the production fallback.
    */
   NEXT_PUBLIC_SITE_URL: z.string().optional(),
   /** @deprecated Prefer NEXT_PUBLIC_SITE_URL; still read for backwards compatibility. */

@@ -2,14 +2,16 @@ import "server-only";
 
 import { headers } from "next/headers";
 
+/** When `NEXT_PUBLIC_SITE_URL` is unset on Vercel production, use this origin for auth emails. Set the env var if the app uses a different domain. */
+const CASELINK_PRODUCTION_ORIGIN = "https://www.thecaselink.com";
+
 /**
  * Canonical browser-facing origin for auth redirect URLs (`redirectTo`, `emailRedirectTo`).
  *
- * **Production:** set `NEXT_PUBLIC_SITE_URL` (e.g. `https://app.example.com`) so password reset
- * and signup links never depend on proxy headers (which can be wrong or missing in some server
- * action / cron contexts).
+ * **Production:** set `NEXT_PUBLIC_SITE_URL` (e.g. `https://www.thecaselink.com`) so signup and other
+ * auth `redirectTo` URLs never use localhost, preview URLs, or wrong hosts from server actions.
  *
- * Falls back to `Host` / `X-Forwarded-Host` + `X-Forwarded-Proto` when unset (typical local dev).
+ * Order: explicit env → Vercel production fallback → request Host headers (typical local dev).
  */
 export async function getPublicSiteOrigin(): Promise<string | null> {
   const explicitRaw =
@@ -21,6 +23,10 @@ export async function getPublicSiteOrigin(): Promise<string | null> {
     } catch {
       return null;
     }
+  }
+
+  if (process.env.VERCEL_ENV === "production") {
+    return CASELINK_PRODUCTION_ORIGIN;
   }
 
   const h = await headers();

@@ -25,7 +25,9 @@ async function createFamilyFormAction(fd: FormData) {
 export default async function FamiliesPage({ searchParams }: PageProps) {
   const parsed = parseFamilyListQuery(await searchParams);
   const supabase = await createSupabaseServerClient();
-  const { items } = await listFamilies(supabase, parsed);
+  const { items, total } = await listFamilies(supabase, parsed);
+  const showEmptyBackground =
+    total === 0 && !parsed.q?.trim();
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 lg:px-8">
@@ -53,24 +55,34 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
         <Input name="q" defaultValue={parsed.q} placeholder="Search families..." />
       </form>
 
-      <div className="space-y-3">
-        {items.map((f) => (
-          <Link
-            key={f.id}
-            href={`/families/${f.id}`}
-            className="block rounded-lg border border-slate-200 bg-white p-4 hover:bg-slate-50"
+      <div className="relative min-h-[min(52vh,28rem)]">
+        {showEmptyBackground ? (
+          <p
+            className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center px-6 text-center text-lg font-medium tracking-tight text-slate-300"
+            role="status"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-slate-900">{f.name}</p>
-              <p className="text-xs text-slate-500">
-                Updated {new Date(f.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </p>
-            </div>
-            {f.summary ? (
-              <p className="mt-2 line-clamp-2 text-xs text-slate-600">{f.summary}</p>
-            ) : null}
-          </Link>
-        ))}
+            Get started by creating your first family.
+          </p>
+        ) : null}
+        <div className={showEmptyBackground ? "relative z-10 space-y-3" : "space-y-3"}>
+          {items.map((f) => (
+            <Link
+              key={f.id}
+              href={`/families/${f.id}`}
+              className="block rounded-lg border border-slate-200 bg-white p-4 hover:bg-slate-50"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-900">{f.name}</p>
+                <p className="text-xs text-slate-500">
+                  Updated {new Date(f.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </p>
+              </div>
+              {f.summary ? (
+                <p className="mt-2 line-clamp-2 text-xs text-slate-600">{f.summary}</p>
+              ) : null}
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
