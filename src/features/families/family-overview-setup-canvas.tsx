@@ -6,8 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
-import type { AiMode } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
 import type { BarrierPresetLabel } from "@/types/barrier-workflow";
 
@@ -33,8 +31,6 @@ export function FamilyOverviewSetupCanvas({
   onGenerate,
   hasGeneratedThisSession,
   formatElapsed,
-  generationAiMode,
-  onGenerationAiModeChange,
 }: {
   familyName: string;
   barrierOptions: readonly BarrierOption[];
@@ -53,8 +49,6 @@ export function FamilyOverviewSetupCanvas({
   onGenerate: () => void;
   hasGeneratedThisSession: boolean;
   formatElapsed: (seconds: number) => string;
-  generationAiMode: AiMode;
-  onGenerationAiModeChange: (mode: AiMode) => void;
 }) {
   const [customDraft, setCustomDraft] = useState("");
 
@@ -252,7 +246,7 @@ export function FamilyOverviewSetupCanvas({
               onClick={onGenerate}
               disabled={pending}
               className={cn(
-                "h-14 min-h-[3.5rem] flex-1 text-base font-semibold tracking-tight shadow-sm sm:min-w-[min(100%,18rem)]",
+                "h-14 min-h-[3.5rem] w-full text-base font-semibold tracking-tight shadow-sm sm:min-w-[min(100%,18rem)]",
                 "bg-slate-900 text-white hover:bg-slate-800",
               )}
             >
@@ -262,12 +256,6 @@ export function FamilyOverviewSetupCanvas({
                   ? "Regenerate Plan and Match Resources"
                   : "Generate Plan and Match Resources"}
             </Button>
-            <div className="flex min-h-[3.5rem] flex-col justify-center gap-1.5 sm:min-w-0">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                AI mode
-              </span>
-              <AiModeToggle value={generationAiMode} onChange={onGenerationAiModeChange} />
-            </div>
           </div>
           {pending && generateStartedAt ? (
             <div className="flex items-center gap-2 text-sm text-slate-600">

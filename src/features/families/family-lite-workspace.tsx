@@ -14,7 +14,7 @@ import type { PlanWithSteps } from "@/types/family";
 import { CaseAssistantChat } from "@/features/families/case-assistant-chat";
 import { ArchiveFamilyFromListControl } from "@/features/families/archive-family-from-list-control";
 import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
-import type { AiMode } from "@/lib/ai/ai-mode";
+import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
 import type {
   BarrierPresetLabel,
@@ -190,7 +190,6 @@ export function FamilyLiteWorkspace({
   tab?: "overview" | "plan" | "resources" | "assistant";
 }) {
   const router = useRouter();
-  const [planGenerationAiMode, setPlanGenerationAiMode] = useState<AiMode>("fast");
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
@@ -262,7 +261,7 @@ export function FamilyLiteWorkspace({
         selectedBarriers: selected,
         additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
         additionalDetails: additionalContext.trim(),
-        aiMode: planGenerationAiMode,
+        aiMode: DEFAULT_AI_MODE,
       });
       if (!r.ok) return setError(r.error);
       setResult(r.result);
@@ -273,7 +272,7 @@ export function FamilyLiteWorkspace({
           for (let i = 0; i < 40; i++) {
             const adv = await advanceStagedLeanPlanGeneration({
               familyId,
-              aiMode: planGenerationAiMode,
+              aiMode: DEFAULT_AI_MODE,
             });
             if (!adv.ok) break;
             const reload = await loadBarrierWorkflowForFamilyAction(familyId);
@@ -334,8 +333,6 @@ export function FamilyLiteWorkspace({
             onGenerate={generate}
             hasGeneratedThisSession={hasGeneratedThisSession}
             formatElapsed={formatElapsed}
-            generationAiMode={planGenerationAiMode}
-            onGenerationAiModeChange={setPlanGenerationAiMode}
           />
           <div className="flex justify-end pt-1">
             <ArchiveFamilyFromListControl familyId={familyId} />
@@ -356,6 +353,16 @@ export function FamilyLiteWorkspace({
             ) : null}
           </div>
         </Card>
+      ) : null}
+
+      {tab === "plan" && plan?.generation_state?.status === "running" ? (
+        <p
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+          role="status"
+          aria-live="polite"
+        >
+          Plan still generating, please do not refresh this page.
+        </p>
       ) : null}
 
       {result && tab === "plan" ? (

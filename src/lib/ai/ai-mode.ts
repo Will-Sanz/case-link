@@ -3,12 +3,10 @@
  */
 export type AiMode = "fast" | "thinking";
 
-export const AI_MODE_STORAGE_KEY = "planning-companion-ai-mode";
-
 /** Default per product preference: faster, cheaper first. */
 export const DEFAULT_AI_MODE: AiMode = "fast";
 
-export function parseAiMode(value: unknown): AiMode {
-  if (value === "thinking" || value === "fast") return value;
+/** Product uses fast routing only; incoming values are normalized. */
+export function parseAiMode(_value: unknown): AiMode {
   return DEFAULT_AI_MODE;
 }

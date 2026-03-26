@@ -8,7 +8,6 @@ import {
   updatePlanStep,
   updatePlanStepActionItem,
 } from "@/app/actions/plans";
-import { AiModeToggle } from "@/components/ai/ai-mode-toggle";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +20,7 @@ import type {
   PlanStepRow,
   PlanWithSteps,
 } from "@/types/family";
-import type { AiMode } from "@/lib/ai/ai-mode";
+import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 
 function normalizeChecklistForSave(lines: string[] | undefined): string[] {
   return (lines ?? []).map((l) => l.trim()).filter((l) => l.length > 0);
@@ -97,8 +96,6 @@ export function FamilyPlanPanel({
   const planBulkSaveLockRef = useRef(false);
   const [stepSaveBusy, setStepSaveBusy] = useState(false);
   const [planBulkSaving, setPlanBulkSaving] = useState(false);
-  const [stepRefineAiMode, setStepRefineAiMode] = useState<AiMode>("fast");
-  const [planRefineAiMode, setPlanRefineAiMode] = useState<AiMode>("fast");
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
@@ -313,7 +310,6 @@ export function FamilyPlanPanel({
   function openAiForStep(stepId: string) {
     if (!plan) return;
     if (!trySwitchToStepEdit(stepId)) return;
-    setStepRefineAiMode("fast");
     setAiStepId(stepId);
     setAiInstruction("");
     setAiPreview(null);
@@ -333,7 +329,7 @@ export function FamilyPlanPanel({
       stepId: aiStepId,
       familyId,
       feedback: instr,
-      aiMode: stepRefineAiMode,
+      aiMode: DEFAULT_AI_MODE,
     }).then((res) => {
       setAiPending(false);
       if (!res.ok) {
@@ -381,7 +377,6 @@ export function FamilyPlanPanel({
     setPlanAiInstruction("");
     setPlanAiPreview(null);
     setPlanAiDraft(clonePlan(plan));
-    setPlanRefineAiMode("fast");
     setPlanAiOpen(true);
     setError(null);
   }
@@ -419,7 +414,7 @@ export function FamilyPlanPanel({
       familyId,
       feedback: instr,
       draft: draftForApi,
-      aiMode: planRefineAiMode,
+      aiMode: DEFAULT_AI_MODE,
     }).then((res) => {
       setPlanAiPending(false);
       if (!res.ok) {
@@ -663,8 +658,6 @@ export function FamilyPlanPanel({
                     }}
                     onRefineDiscardPreview={() => setAiPreview(null)}
                     onOpenRefine={() => openAiForStep(full.id)}
-                    refineAiMode={stepRefineAiMode}
-                    onRefineAiModeChange={setStepRefineAiMode}
                   />
                   );
                 })}
@@ -740,13 +733,6 @@ export function FamilyPlanPanel({
               onChange={(e) => setPlanAiInstruction(e.target.value)}
               placeholder="e.g. Make the 30-day steps more realistic for a single parent; improve chronological flow; keep all manual edits unless necessary."
             />
-
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                AI mode
-              </span>
-              <AiModeToggle value={planRefineAiMode} onChange={setPlanRefineAiMode} compact />
-            </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
