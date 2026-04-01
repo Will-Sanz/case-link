@@ -195,7 +195,7 @@ export function HomePageContent() {
               About CaseLink
             </Link>
             <Link href="/login" className={secondaryLink}>
-              Sign in to CaseLink
+              Explore CaseLink
             </Link>
           </div>
         </div>

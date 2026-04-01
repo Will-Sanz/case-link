@@ -110,7 +110,7 @@ export function AboutPageContent() {
             Back to Home
           </Link>
           <Link href="/login" className={secondaryLink}>
-            Sign in to CaseLink
+            Explore CaseLink
           </Link>
         </div>
       </article>
