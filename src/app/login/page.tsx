@@ -45,6 +45,18 @@ export default async function LoginPage({ searchParams }: PageProps) {
           Create an account
         </Link>
       </p>
+      <p className="mt-4 text-center text-xs text-slate-500">
+        <Link href="/" className="font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline">
+          Home
+        </Link>
+        {" · "}
+        <Link
+          href="/about"
+          className="font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline"
+        >
+          About CaseLink
+        </Link>
+      </p>
     </AuthShell>
   );
 }

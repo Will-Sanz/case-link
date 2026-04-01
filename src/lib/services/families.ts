@@ -273,7 +273,7 @@ export async function getFamilyDetail(
       .order("sort_order", { ascending: true });
 
     const stepIds = (stepsData ?? []).map((s) => s.id);
-    let actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
+    const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
     if (stepIds.length > 0) {
       const { data: actionItems } = await client
         .from("plan_step_action_items")

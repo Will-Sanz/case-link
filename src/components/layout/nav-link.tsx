@@ -6,6 +6,9 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 
 function isActive(pathname: string, href: string): boolean {
+  if (href === "/") {
+    return pathname === "/" || pathname === "";
+  }
   if (href === "/dashboard") {
     return pathname === "/dashboard";
   }

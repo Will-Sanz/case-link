@@ -197,7 +197,9 @@ export function PlanStepCaseNote({
     setFocus(null);
   }, [bodyDraft, commitBody]);
 
+  // Clear field focus when leaving edit mode so the next edit session starts neutral.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync local UI state when `editing` flips off
     if (!editing) setFocus(null);
   }, [editing]);
 

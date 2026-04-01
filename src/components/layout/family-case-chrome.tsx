@@ -21,13 +21,24 @@ function StandardAside({
 }) {
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/90 text-xs font-semibold text-white">
+      <Link
+        href="/"
+        className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-4 text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400/40"
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/90 text-xs font-semibold text-white">
           CL
-        </div>
-        <span className="font-semibold text-slate-900">CaseLink</span>
-      </div>
+        </span>
+        <span className="font-semibold">CaseLink</span>
+      </Link>
       <nav className="shrink-0 flex flex-col gap-0.5 p-2 pb-1" aria-label="Main">
+        <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Site
+        </p>
+        <NavLink href="/">Home</NavLink>
+        <div className="mx-1 my-2 border-t border-slate-200" role="presentation" />
+        <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Workspace
+        </p>
         <NavLink href="/families">Families</NavLink>
         <NavLink href="/profile">Profile</NavLink>
       </nav>
@@ -97,8 +108,8 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white lg:hidden">
           <div className="flex h-14 items-center justify-between gap-3 px-4">
             <Link
-              href="/families"
-              className="flex items-center gap-2 font-semibold text-slate-900"
+              href="/"
+              className="flex items-center gap-2 font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2 rounded-md"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/90 text-xs font-semibold text-white">
                 CL
@@ -115,6 +126,9 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
             className="flex gap-1 overflow-x-auto border-t border-slate-200 px-3 py-2"
             aria-label="Main"
           >
+            <NavLink href="/" className="shrink-0 whitespace-nowrap">
+              Home
+            </NavLink>
             <NavLink href="/families" className="shrink-0 whitespace-nowrap">
               Families
             </NavLink>

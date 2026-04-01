@@ -80,11 +80,11 @@ export function CalendarView({
 
   const prevHref = useMemo(
     () => toHref(view, navigate(view, currentDate, "prev")),
-    [view, currentDateKey],
+    [view, currentDate],
   );
   const nextHref = useMemo(
     () => toHref(view, navigate(view, currentDate, "next")),
-    [view, currentDateKey],
+    [view, currentDate],
   );
   const todayHref = useMemo(
     () => toHref(view, today()),

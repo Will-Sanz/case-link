@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+# Fast path on commit. Full verification runs on pre-push (see pre-push).
