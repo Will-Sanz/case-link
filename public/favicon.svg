@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" role="img" aria-label="CaseLink">
+  <!-- Matches header badge: h-10 w-10, rounded-lg, bg-blue-500/90, text-sm font-semibold, CL -->
+  <rect width="40" height="40" rx="8" fill="#3b82f6"/>
+  <text
+    x="20"
+    y="20"
+    dominant-baseline="central"
+    text-anchor="middle"
+    fill="#ffffff"
+    font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    font-size="14"
+    font-weight="600"
+    letter-spacing="-0.02em"
+  >CL</text>
+</svg>
