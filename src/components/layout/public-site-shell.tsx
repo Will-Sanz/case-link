@@ -1,14 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils/cn";
 
 export function PublicSiteShell({
   children,
-  activeNav,
   authenticated = false,
 }: {
   children: ReactNode;
-  activeNav: "home" | "about";
   /** When true, show entry to the signed-in workspace instead of Sign in. */
   authenticated?: boolean;
 }) {
@@ -42,25 +39,9 @@ export function PublicSiteShell({
           >
             <Link
               href="/"
-              className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2",
-                activeNav === "home"
-                  ? "bg-blue-50/70 text-blue-700"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-800",
-              )}
+              className="rounded-md bg-blue-50/70 px-3 py-2 text-sm font-medium text-blue-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2"
             >
               Home
-            </Link>
-            <Link
-              href="/about"
-              className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2",
-                activeNav === "about"
-                  ? "bg-blue-50/70 text-blue-700"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-800",
-              )}
-            >
-              About
             </Link>
             {authenticated ? (
               <Link
@@ -99,12 +80,6 @@ export function PublicSiteShell({
                 className="text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:underline"
               >
                 Home
-              </Link>
-              <Link
-                href="/about"
-                className="text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:underline"
-              >
-                About CaseLink
               </Link>
               {authenticated ? (
                 <Link

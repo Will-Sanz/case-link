@@ -19,7 +19,7 @@ export default async function Home() {
     // Env vars missing or Supabase unreachable: treat as unauthenticated
   }
   return (
-    <PublicSiteShell activeNav="home" authenticated={Boolean(user)}>
+    <PublicSiteShell authenticated={Boolean(user)}>
       <HomePageContent />
     </PublicSiteShell>
   );
