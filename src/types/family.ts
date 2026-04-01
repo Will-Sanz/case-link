@@ -193,7 +193,7 @@ export type PlanStepRow = {
   action_items?: PlanStepActionItemRow[];
 };
 
-/** Saved in `plans.client_display` — user-facing plan title and section intros. */
+/** Saved in `plans.client_display`, user-facing plan title and section intros. */
 export type PlanClientDisplay = {
   title?: string;
   phaseSummaries?: Partial<Record<"30" | "60" | "90", string>>;
@@ -229,7 +229,7 @@ export type PlanRow = {
 
 export type PlanWithSteps = PlanRow & {
   steps: PlanStepRow[];
-  /** Derived on the server for UI — avoids branching on raw `generation_source` in components. */
+  /** Derived on the server for UI, avoids branching on raw `generation_source` in components. */
   presentation: {
     sourceKind: "ai" | "manual" | "rules";
   };

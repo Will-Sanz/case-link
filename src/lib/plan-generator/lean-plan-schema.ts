@@ -22,7 +22,7 @@ export const leanActionItemZ = z.object({
   target_date: z.union([z.string(), z.null()]).optional(),
 });
 
-/** One step from the model (phase may be omitted in single-step refine — caller supplies). */
+/** One step from the model (phase may be omitted in single-step refine, caller supplies). */
 export const leanPlanStepBodyZ = z.object({
   title: z.string().min(1).max(500),
   summary: z.string().min(1).max(4000),

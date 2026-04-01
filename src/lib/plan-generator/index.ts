@@ -29,7 +29,7 @@ function rulesTemplateDetails(t: StepTemplate): GeneratedStepDetails {
     ],
     stage_goal: `Move forward on ${t.title} with clear documentation.`,
     expected_outcome: `Measurable progress or documented outcome related to: ${t.title}`,
-    timing_guidance: `Work this during the ${t.phase}-day window; prioritize within 1–2 weeks unless crisis factors apply.`,
+    timing_guidance: `Work this during the ${t.phase}-day window; prioritize within 1 to 2 weeks unless crisis factors apply.`,
     priority: "medium",
     success_marker: `You can mark complete when the core work for "${t.title}" is done and logged.`,
   };

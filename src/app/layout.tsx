@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "CaseLink — Case management",
+  title: "CaseLink: Case management",
   description: "Case management workspace for families and community resources.",
 };
 

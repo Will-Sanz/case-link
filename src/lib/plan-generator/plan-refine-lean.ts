@@ -175,7 +175,7 @@ export function draftRefineInputToAiParsed(wire: DraftStepRefineInput): AiPlanSt
     blockers:
       d.blockers && d.blockers.length > 0 ?
         d.blockers.map((b) => b.trim()).filter(Boolean)
-      : ["Typical: documentation delays, callbacks, or eligibility questions—note in file."],
+      : ["Typical: documentation delays, callbacks, or eligibility questions, note in file."],
     fallback_options:
       d.fallback_options && d.fallback_options.length > 0 ?
         d.fallback_options.map((b) => b.trim()).filter(Boolean)

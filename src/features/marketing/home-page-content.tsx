@@ -63,9 +63,9 @@ export function HomePageContent() {
             Practical support plans for families, shaped by the people who know the work
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
-            CaseLink helps case managers identify barriers—from housing and employment to food
-            access, transportation, childcare, and mental health—and turn them into
-            personalized plans tied to real resources in Philadelphia.
+            CaseLink helps case managers identify barriers such as housing, employment, food
+            access, transportation, childcare, and mental health, and turn them into personalized
+            plans tied to real resources in Philadelphia.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Link href="/about" className={primaryLink}>
@@ -102,12 +102,12 @@ export function HomePageContent() {
           <div className="mt-6 max-w-3xl space-y-4 text-sm leading-relaxed text-slate-600 sm:text-base">
             <p>
               In conversations at the school, administrators shared that roughly 35% of the
-              student body is facing homelessness—a stark reminder of how many families are
+              student body is facing homelessness, a stark reminder of how many families are
               navigating serious hardship alongside school and daily life.
             </p>
             <p>
-              Case managers carry both relational work—building trust and walking alongside
-              families—and heavy administrative work: tracking needs across multiple crises,
+              Case managers carry both relational work (building trust and walking alongside
+              families) and heavy administrative work: tracking needs across multiple crises,
               researching resources, documenting barriers, and building support plans. A large
               share of time goes to documentation and planning work that competes with direct
               time with families. CaseLink exists to help address that gap.
@@ -126,7 +126,7 @@ export function HomePageContent() {
         </h2>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
           CaseLink organizes what a family is facing and connects those needs to relevant local
-          resources—so plans stay specific, actionable, and grounded in Philadelphia.
+          resources, so plans stay specific, actionable, and grounded in Philadelphia.
         </p>
         <ul className="mt-8 grid list-none gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {barriers.map(({ title, text, Icon }) => (
@@ -155,7 +155,7 @@ export function HomePageContent() {
           </h2>
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
             The platform is now being deployed by the case management team at Locke. It is
-            expected to save each case manager roughly one hour of work per day—time that can go
+            expected to save each case manager roughly one hour of work per day. Time that can go
             back toward listening, coordination, and direct support for families.
           </p>
         </div>
@@ -163,7 +163,7 @@ export function HomePageContent() {
 
       <section className="mx-auto max-w-5xl px-4 py-14 sm:py-16" aria-labelledby="privacy-heading">
         <h2 id="privacy-heading" className="text-xl font-semibold text-slate-900 sm:text-2xl">
-          Built for real work—and for privacy
+          Built for real work and for privacy
         </h2>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
           CaseLink is designed to be practical, personalized, and respectful of family privacy.
@@ -187,7 +187,7 @@ export function HomePageContent() {
           </p>
           {/* TODO(caselink): When the public URL for the Alain Locke team’s post is available, add a text link or secondary button here (e.g. “Read the school’s post”) with href set to that URL. */}
           <p className="mt-4 text-sm text-slate-500">
-            The Alain Locke team shared a post about what this looks like in practice—a link will
+            The Alain Locke team shared a post about what this looks like in practice. A link will
             appear here once the URL is confirmed.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">

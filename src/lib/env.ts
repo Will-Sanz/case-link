@@ -54,7 +54,7 @@ function formatEnvError(parsed: z.ZodError): string {
 
 /**
  * Validated server-side env. Call only from Server Components, Server Actions,
- * Route Handlers, or `server-only` modules — not from client components.
+ * Route Handlers, or `server-only` modules, not from client components.
  * Requires NEXT_PUBLIC_* Supabase vars at runtime (and during `next build` on CI/Vercel).
  */
 export function getEnv(): Env {

@@ -16,7 +16,7 @@ export function AboutPageContent() {
           </h1>
           <p className="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">
             A collaboration focused on helping case managers at Alain Locke School better
-            support families—through clearer plans, local resources, and less time lost to
+            support families through clearer plans, local resources, and less time lost to
             administrative burden.
           </p>
         </div>
@@ -30,7 +30,7 @@ export function AboutPageContent() {
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
               CaseLink began after conversations at Alain Locke School in Philadelphia. School
-              administrators shared that roughly 35% of the student body is facing homelessness—a
+              administrators shared that roughly 35% of the student body is facing homelessness, a
               figure that underscored how many families are carrying heavy challenges alongside
               school and everyday life. In that context, case managers are exploring how AI can
               strengthen the support they provide to families every day.
@@ -48,9 +48,9 @@ export function AboutPageContent() {
               What we learned
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
-              Case managers are often supporting families through overlapping crises—housing
+              Case managers are often supporting families through overlapping crises: housing
               instability, employment gaps, food access, transportation, childcare, and mental
-              health needs—while also managing a significant administrative workload. Much of
+              health needs, while also managing a significant administrative workload. Much of
               that work goes toward documenting barriers, researching resources, and building out
               support plans. That effort matters, but it can pull time away from direct
               connection with families.
@@ -64,8 +64,8 @@ export function AboutPageContent() {
             <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
               CaseLink was designed to reduce that administrative burden so case managers can
               spend more time on the relational work only they can do. The product was built with
-              close collaboration from the people doing this work every day at Locke—not as a
-              generic tool, but as something grounded in their actual priorities and constraints.
+              close collaboration from the people doing this work every day at Locke, not as a
+              generic tool but as something grounded in their actual priorities and constraints.
             </p>
           </section>
 
@@ -74,9 +74,9 @@ export function AboutPageContent() {
               What CaseLink does
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
-              CaseLink helps case managers identify the barriers a family is facing—including
+              CaseLink helps case managers identify the barriers a family is facing, including
               housing, food access, employment, mental health, transportation, and
-              childcare—and generate personalized support plans connected to real local resources
+              childcare, and generate personalized support plans connected to real local resources
               in Philadelphia. The aim is practical plans families can use, not generic checklists.
             </p>
           </section>
@@ -87,7 +87,7 @@ export function AboutPageContent() {
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
               The platform is now being deployed by the case management team at Locke. It is
-              expected to save each case manager roughly one hour of work per day—time that can
+              expected to save each case manager roughly one hour of work per day. Time that can
               return to coordination, follow-through, and face-to-face support.
             </p>
           </section>
@@ -99,7 +99,7 @@ export function AboutPageContent() {
             <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
               The work continues through learning and iteration: refining the tool alongside case
               managers, listening to what helps in real situations, and looking for thoughtful
-              ways to expand impact over time—without losing sight of privacy, dignity, and the
+              ways to expand impact over time without losing sight of privacy, dignity, and the
               human side of this work.
             </p>
           </section>

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* Design tokens — clean, smooth, slightly warm */
+/* Design tokens: clean, smooth, slightly warm */
 :root {
-  /* Backgrounds — layered, not pure white */
+  /* Backgrounds: layered, not pure white */
   --background: #f4f6f8;
   --foreground: #334155;
   --surface: #ffffff;
@@ -11,14 +11,14 @@
   --muted: #64748b;
   --muted-bg: #f1f5f9;
 
-  /* Primary accent — muted blue */
+  /* Primary accent: muted blue */
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-focus: rgba(37, 99, 235, 0.15);
   --primary-bg: #eff6ff;
   --primary-bg-strong: #dbeafe;
 
-  /* Status — muted, consistent */
+  /* Status: muted, consistent */
   --success: #059669;
   --success-bg: #ecfdf5;
   --warning: #d97706;

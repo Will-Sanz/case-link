@@ -27,7 +27,7 @@ import {
 } from "@/lib/utils/calendar-date";
 
 const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
-  follow_up_due: "Follow-up due",
+  follow_up_due: "Follow up due",
   step_due: "Step due",
   overdue: "Overdue",
   blocked_review: "Blocked review",
@@ -376,7 +376,7 @@ function EventChip({
         isTiny ? "text-[11px] leading-tight" : "text-xs",
         compact && "truncate",
       )}
-      title={`${event.family_name} — ${displayTitle}`}
+      title={`${event.family_name}: ${displayTitle}`}
     >
       <span className="font-medium text-slate-800">{displayTitle}</span>
       {!compact && !isTiny && (

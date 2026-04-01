@@ -22,7 +22,7 @@ function continueToApp() {
 
 /**
  * Next.js 16+ `proxy` (Node runtime). Refreshes the Supabase session and guards protected routes.
- * Do not use this file from `middleware.ts` — Edge has stricter limits and caused Vercel failures.
+ * Do not use this file from `middleware.ts`, Edge has stricter limits and caused Vercel failures.
  */
 export async function runSupabaseProxy(request: NextRequest) {
   let supabaseResponse = continueToApp();

@@ -57,7 +57,7 @@ export async function fetchPriorPhasesSummaryForPlanner(
     const shortDesc = desc.length > 100 ? `${desc.slice(0, 97)}…` : desc;
     const ai = titlesByStep.get(s.id)?.join("; ") ?? "";
     const aiPart = ai ? ` | Actions: ${ai.length > 80 ? `${ai.slice(0, 77)}…` : ai}` : "";
-    lines.push(`- [${phase}-day] ${s.title.trim()}${shortDesc ? ` — ${shortDesc}` : ""}${aiPart}`);
+    lines.push(`- [${phase}-day] ${s.title.trim()}${shortDesc ? `, ${shortDesc}` : ""}${aiPart}`);
   }
 
   let text = lines.join("\n");

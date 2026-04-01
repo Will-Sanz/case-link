@@ -80,7 +80,7 @@ export async function createFamilyIntake(
   const v = normalizeIntakeForDb(parsed.data);
 
   // Ownership is set in the DB from auth.uid() (RPC is SECURITY DEFINER, bypasses RLS on
-  // families INSERT while still binding created_by_id to the JWT — avoids client/PostgREST
+  // families INSERT while still binding created_by_id to the JWT, avoids client/PostgREST
   // WITH CHECK mismatches).
   const { data: familyIdRaw, error: famErr } = await supabase.rpc(
     "create_family_intake_row",

@@ -109,7 +109,7 @@ export function formatOutcomeDisplay(d: PlanStepDetails | null | undefined): str
   return `Expected outcome: ${o}`;
 }
 
-/** Optional case record lines (workflow) — narrative, no section headers in UI. */
+/** Optional case record lines (workflow), narrative, no section headers in UI. */
 export function formatRecordNotes(wf: PlanStepRow["workflow_data"]): string | null {
   const parts: string[] = [];
   const on = wf?.outcome_notes?.trim();

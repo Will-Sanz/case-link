@@ -1,6 +1,6 @@
 import type { GeneratedStep, GeneratedActionItem, PlanPhase } from "./types";
 
-/** Base week index for each phase (1-indexed). 30-day = 1–4, 60-day = 5–8, 90-day = 9–12 */
+/** Base week index for each phase (1-indexed). 30-day = 1 to 4, 60-day = 5 to 8, 90-day = 9 to 12 */
 const PHASE_WEEK_START: Record<PlanPhase, number> = {
   "30": 1,
   "60": 5,
@@ -15,7 +15,7 @@ const PHASE_WEEK_END: Record<PlanPhase, number> = {
 
 /**
  * Derives action_items for a step when AI didn't provide them (rules/resource fallback).
- * Uses checklist items or step title to create 1–5 weekly action items.
+ * Uses checklist items or step title to create 1 to 5 weekly action items.
  */
 export function deriveActionItemsForStep(step: GeneratedStep): GeneratedActionItem[] {
   if (step.action_items && step.action_items.length > 0) {

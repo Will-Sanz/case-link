@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Decorative icons for barrier categories — paired with visible text labels for accessibility. */
+/** Decorative icons for barrier categories, paired with visible text labels for accessibility. */
 
 function IconWrap({ children }: { children: ReactNode }) {
   return (

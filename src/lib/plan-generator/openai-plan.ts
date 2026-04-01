@@ -113,24 +113,24 @@ function compactDraftJsonForRefine(
   );
 }
 
-const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PRIORITIZED 30-60-90 day case plan ordered by importance and urgency—NOT strict dependency chains. Steps should be in the most logical sequence for a case worker, but do not need to depend on each other.
+const SYSTEM_PROMPT = `You are an experienced housing and social services case manager assistant in Philadelphia. Your job is to produce a PRIORITIZED 30, 60, and 90 day case plan ordered by importance and urgency, NOT strict dependency chains. Steps should be in the most logical sequence for a case worker, but do not need to depend on each other.
 
 ## GEOGRAPHIC CONTEXT
 ${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
 
 ## FIELD: action_needed_now (mandatory style)
-- This is a short directive for the case manager: what to do next, or a crisp factual cue (timelines, deadlines, eligibility notes)—written as a **statement**, not an answer to a question.
-- Do **not** start with Yes, No, Sure, Correct, or similar. Do **not** phrase as Q&A (e.g. avoid leading with "Yes –" before a fact).
-- Prefer imperative or neutral declarative voice: e.g. "Submit SNAP application; decisions often within 30 days; ask about expedited SNAP (often within ~5 days) if eligible." NOT "Yes – SNAP decisions take up to 30 days…"
+- This is a short directive for the case manager: what to do next, or a crisp factual cue (timelines, deadlines, eligibility notes), written as a **statement**, not an answer to a question.
+- Do **not** start with Yes, No, Sure, Correct, or similar. Do **not** phrase as Q&A (e.g. avoid leading with "Yes," before a fact).
+- Prefer imperative or neutral declarative voice: e.g. "Submit SNAP application; decisions often within 30 days; ask about expedited SNAP (often within ~5 days) if eligible." NOT "Yes, SNAP decisions take up to 30 days…"
 
 ## CORE GOAL: Prioritized Action Plan
 Generate a prioritized action plan, not a list of similar suggestions. The first step should be the most important action to take immediately. Each subsequent step should be clearly different and lower in urgency or impact. If two steps overlap significantly, combine them into one stronger step.
 
 ## PRIORITIZATION RULES (mandatory)
 Rank steps by:
-1. **Urgency** — deadlines, immediate need for food, housing risk, eviction, crisis
-2. **Impact** — what unlocks the most support/resources (e.g., SNAP opens food access; housing application opens shelter options)
-3. **Time sensitivity** — applications with deadlines, benefits, scheduling delays
+1. **Urgency**, deadlines, immediate need for food, housing risk, eviction, crisis
+2. **Impact**, what unlocks the most support/resources (e.g., SNAP opens food access; housing application opens shelter options)
+3. **Time sensitivity**, applications with deadlines, benefits, scheduling delays
 
 - Step 1 = most important / most urgent action to take right now
 - Later steps = still valuable, but less urgent or lower impact
@@ -139,9 +139,9 @@ Rank steps by:
 
 ## DEDUPLICATION RULES (mandatory)
 Before returning steps, check for overlap in:
-- **Program names** — SNAP, WIC, food pantry, LIHEAP, etc. Do not have separate steps for "Apply for SNAP" and "Contact food pantry for SNAP referral" if they overlap in outcome
-- **Intent** — apply, contact, schedule, verify. Merge "Apply for SNAP and register with food pantry" into one well-scoped step unless there is a clear difference in timing or purpose
-- **Outcome** — food access, benefits access, housing stability. If two steps achieve the same outcome, combine them
+- **Program names**, SNAP, WIC, food pantry, LIHEAP, etc. Do not have separate steps for "Apply for SNAP" and "Contact food pantry for SNAP referral" if they overlap in outcome
+- **Intent**, apply, contact, schedule, verify. Merge "Apply for SNAP and register with food pantry" into one well-scoped step unless there is a clear difference in timing or purpose
+- **Outcome**, food access, benefits access, housing stability. If two steps achieve the same outcome, combine them
 
 If two steps are very similar: merge them into one stronger step OR keep only the more actionable / higher-impact version.
 
@@ -154,32 +154,32 @@ AVOID outputs like:
 - Titles must be meaningfully different from each other
 - Avoid repeating the same structure or wording across steps
 - Each step should answer: "Why is this a separate priority?"
-- Prefer fewer, high-quality steps over many repetitive ones (3–5 steps per phase max; 8–12 total is ideal)
+- Prefer fewer, high-quality steps over many repetitive ones (3 to 5 steps per phase max; 8 to 12 total is ideal)
 
 ## PLANNING PHILOSOPHY
 Prioritize: (1) immediate stabilization, (2) urgent action in the first week, (3) concrete progress over passive assessment, (4) meaningful outcomes as early as possible.
 
-## 30-day phase = URGENT ACTION, NOT ASSESSMENT
-- **Week 1**: immediate stabilization and scheduling—front-load actions that move the case NOW
-- **Weeks 2–4**: follow-through, documentation, attendance, approvals, backup plans
+## 30 day phase = URGENT ACTION, NOT ASSESSMENT
+- **Week 1**: immediate stabilization and scheduling, front-load actions that move the case NOW
+- **Weeks 2 to 4**: follow-through, documentation, attendance, approvals, backup plans
 
 First-week steps MUST include actions like: schedule appointments, submit applications, contact agencies, gather and send documents, enroll in services, confirm eligibility.
 
 ## ANTI-PATTERN: Do NOT produce weak or repetitive steps
-AVOID: assess, explore, identify—without immediate action. USE: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
+AVOID: assess, explore, identify, without immediate action. USE: call, schedule, apply, submit, confirm, register, request, book, gather, send, escalate, secure, enroll.
 AVOID: multiple steps that are slight rewordings of the same idea (e.g., "Apply for benefits" + "Submit SNAP application").
 
 ## URGENCY SCALING (when Urgency is high or crisis)
-For high-risk households: compress timelines; push meaningful actions into the first 3–7 days; favor immediate scheduling, filing, escalation.
+For high-risk households: compress timelines; push meaningful actions into the first 3 to 7 days; favor immediate scheduling, filing, escalation.
 
 ## Schema and output
-- Return a single JSON object with top-level key "steps" only (array of plan steps). No markdown, no SQL, no references to database tables—only that JSON object.
+- Return a single JSON object with top-level key "steps" only (array of plan steps). No markdown, no SQL, no references to database tables, only that JSON object.
 - Match the response shape (all keys on each step). No placeholders.
-- priority field: set "high" for steps 1–2, "medium" for mid-priority, "low" for later steps
+- priority field: set "high" for steps 1 to 2, "medium" for mid-priority, "low" for later steps
 - depends_on: use sparingly; prefer natural ordering by priority over explicit dependencies
 
 ## Step count
-- Aim for roughly **2–5 steps per phase** (30, 60, 90) when the case needs that depth—**not** a fixed count. Use fewer steps when fewer distinct actions are needed; use more (up to 5 per phase) when warranted. **Do not pad** with filler steps or **split** one strong step into weak fragments just to hit a number.
+- Aim for roughly **2 to 5 steps per phase** (30, 60, 90) when the case needs that depth, **not** a fixed count. Use fewer steps when fewer distinct actions are needed; use more (up to 5 per phase) when warranted. **Do not pad** with filler steps or **split** one strong step into weak fragments just to hit a number.
 - At most 5 steps per phase and 15 total. Spread work across 30 / 60 / 90 so each horizon has real content when appropriate, but respect the case: natural count beats artificial balance.
 
 ## Resource grounding
@@ -209,7 +209,7 @@ const PROGRAM_FAMILIES = [
 /** Intent verbs that indicate similar actions. */
 const INTENT_VERBS = ["apply", "contact", "schedule", "verify", "submit", "register", "enroll", "call", "reach", "outreach"];
 
-/** Title + action_needed_now similarity. Returns 0–1. */
+/** Title + action_needed_now similarity. Returns 0 to 1. */
 function stepSimilarity(
   a: { title: string; action_needed_now?: string },
   b: { title: string; action_needed_now?: string },
@@ -340,7 +340,7 @@ export function capStepsPerPhase<
 
 export type TryGeneratePlanOptions = {
   regenerationFeedback?: string;
-  /** User clicked Regenerate — instruct model to rewrite every step from scratch. */
+  /** User clicked Regenerate, instruct model to rewrite every step from scratch. */
   fullRegeneration?: boolean;
   retries?: number;
   aiMode?: AiMode;
@@ -518,17 +518,17 @@ export async function tryGeneratePlanStepsWithOpenAI(
       : "";
   const fullRegenBlock =
     options?.fullRegeneration ?
-      `\n\n## FULL PLAN REGENERATION (mandatory)\nThe case manager is replacing an existing saved plan. You must produce ENTIRELY NEW content for every single step—fresh titles, descriptions, action_needed_now, rationale, detailed_instructions, checklists, action_items (titles and descriptions), contacts, blockers, fallback_options, and all other required fields. Do not reuse generic templates; ground every step in the barriers, case notes, and matched resources below.\n`
+      `\n\n## FULL PLAN REGENERATION (mandatory)\nThe case manager is replacing an existing saved plan. You must produce ENTIRELY NEW content for every single step, fresh titles, descriptions, action_needed_now, rationale, detailed_instructions, checklists, action_items (titles and descriptions), contacts, blockers, fallback_options, and all other required fields. Do not reuse generic templates; ground every step in the barriers, case notes, and matched resources below.\n`
       : "";
-  const baseUser = `Create a 30-60-90 day case plan ordered by PRIORITY (urgency + impact), not dependency chains. Step 1 = most important action to take right now. Each step must be clearly distinct—no overlapping or repetitive steps. If SNAP, WIC, and food pantry actions overlap, merge into one well-scoped step.
+  const baseUser = `Create a 30, 60, and 90 day case plan ordered by PRIORITY (urgency + impact), not dependency chains. Step 1 = most important action to take right now. Each step must be clearly distinct, no overlapping or repetitive steps. If SNAP, WIC, and food pantry actions overlap, merge into one well-scoped step.
 
-HARD LIMIT: at most 5 steps per phase, 15 total. Target about 2–5 per phase when the case needs it; do not pad or split steps artificially.
+HARD LIMIT: at most 5 steps per phase, 15 total. Target about 2 to 5 per phase when the case needs it; do not pad or split steps artificially.
 
-The first 30-day phase must be ACTION-HEAVY—schedule, apply, submit, call, register, confirm, enroll. Avoid passive or duplicate steps.
+The first 30 day phase must be ACTION-HEAVY, schedule, apply, submit, call, register, confirm, enroll. Avoid passive or duplicate steps.
 
-Every step MUST include ALL schema fields. Set priority: "high" for top 1–2 steps, "medium"/"low" for others. Use depends_on sparingly. No placeholders.
+Every step MUST include ALL schema fields. Set priority: "high" for top 1 to 2 steps, "medium"/"low" for others. Use depends_on sparingly. No placeholders.
 
-Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sustainability. Use matched resources when details are above.${fullRegenBlock}${feedbackBlock}\n\n${context}`;
+Phases: 30 day = immediate stabilization; 60 day = follow through; 90 day = sustainability. Use matched resources when details are above.${fullRegenBlock}${feedbackBlock}\n\n${context}`;
 
   const maxAttempts = options?.retries ?? 4;
   let correction = "";
@@ -537,7 +537,7 @@ Phases: 30-day = immediate stabilization; 60-day = follow-through; 90-day = sust
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const user =
       correction ?
-        `${baseUser}\n\n## REQUIRED FIX (previous output was rejected)\n${correction}\nRegenerate the complete plan JSON. Every step must be fully filled with operational detail—not minimal or single-line fields.`
+        `${baseUser}\n\n## REQUIRED FIX (previous output was rejected)\n${correction}\nRegenerate the complete plan JSON. Every step must be fully filled with operational detail, not minimal or single-line fields.`
       : baseUser;
 
     if (logRegen) {
@@ -748,7 +748,7 @@ export async function previewRefinePlanStepsWithOpenAI(
   const user = `## Context
 ${context}
 
-## Current plan (lean view — preserve unless feedback asks to change)
+## Current plan (lean view, preserve unless feedback asks to change)
 ${draftJson}
 
 ## Instructions

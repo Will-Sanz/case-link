@@ -52,7 +52,7 @@ export type PreviewRefinePlanStepResult =
     }
   | { ok: false; error: string };
 
-/** Result of generatePlan — includes planId on success for client verification. */
+/** Result of generatePlan, includes planId on success for client verification. */
 export type GeneratePlanResult =
   | { ok: true; planId: string; version: number; stepCount: number }
   | { ok: false; error: string };
@@ -626,8 +626,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     await supabase
       .from("plans")
       .update({
-        generation_state: next,
-        ...(summaryUpdate !== undefined ? { summary: summaryUpdate } : {}),
+        generation_state: { ...next, ...(summaryUpdate !== undefined ? { summary: summaryUpdate } : {}) },
         ai_model: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
       })
       .eq("id", planId);

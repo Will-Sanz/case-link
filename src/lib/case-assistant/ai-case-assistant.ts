@@ -96,7 +96,7 @@ You have full context about:
 - Accepted and suggested resources
 - Blockers and progress
 
-Answer questions practically and specifically. Give actionable guidance. Use the family's actual data—refer to real step titles, resource names, and circumstances. Avoid generic advice. If the question is about what to do next, prioritize based on urgency and plan structure.`;
+Answer questions practically and specifically. Give actionable guidance. Use the family's actual data, refer to real step titles, resource names, and circumstances. Avoid generic advice. If the question is about what to do next, prioritize based on urgency and plan structure.`;
 
   const input = `## Case context
 ${context}

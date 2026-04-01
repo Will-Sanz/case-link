@@ -31,11 +31,11 @@ export function getNextAction(
       const suffix = top.type === "overdue" && top.days_overdue
         ? ` (${top.days_overdue}d overdue)`
         : top.type === "follow_up_today"
-          ? " — due today"
+          ? ", due today"
           : top.type === "blocked"
-            ? " — blocked"
+            ? ", blocked"
             : top.type === "in_progress"
-              ? " — in progress"
+              ? ", in progress"
               : "";
       return `${top.step_title}${suffix}`;
     }

@@ -185,7 +185,7 @@ export function FamilyLiteWorkspace({
   familyName: string;
   barrierOptions: readonly { key: string; label: string }[];
   initialResult: BarrierWorkflowResult | null;
-  /** Latest `plans` + `plan_steps` from the server — canonical for edit + PDF. */
+  /** Latest `plans` + `plan_steps` from the server, canonical for edit + PDF. */
   plan: PlanWithSteps | null;
   tab?: "overview" | "plan" | "resources" | "assistant";
 }) {

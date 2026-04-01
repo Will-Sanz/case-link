@@ -106,7 +106,7 @@ export function getVisibleRange(
     return {
       start: toKey(start),
       end: toKey(end),
-      monthLabel: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+      monthLabel: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} to ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
     };
   }
 
@@ -116,7 +116,7 @@ export function getVisibleRange(
   return {
     start: toKey(start),
     end: toKey(end),
-    monthLabel: `${start.toLocaleDateString("en-US", { month: "short", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`,
+    monthLabel: `${start.toLocaleDateString("en-US", { month: "short", year: "numeric" })} to ${end.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`,
   };
 }
 

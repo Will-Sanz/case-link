@@ -309,7 +309,7 @@ const PRESET_STEPS: Record<string, StepTemplate[]> = {
 
 /** Default steps added when no preset-driven steps exist (e.g. goals are custom only). */
 const DEFAULT_STEPS: StepTemplate[] = [
-  { phase: "30", title: "Schedule first appointments and submit priority applications", description: "Call 2–3 key programs from goals, submit applications, and book earliest intake appointments." },
+  { phase: "30", title: "Schedule first appointments and submit priority applications", description: "Call 2 to 3 key programs from goals, submit applications, and book earliest intake appointments." },
   { phase: "60", title: "Follow up on applications and attend scheduled appointments", description: "Submit missing documents, attend appointments, and document outcomes." },
   { phase: "90", title: "Confirm progress and set renewal or next-phase dates", description: "Check in on goals and update plan with next steps." },
 ];

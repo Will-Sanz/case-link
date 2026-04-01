@@ -78,9 +78,9 @@ export async function suggestNextMoveForBlockedStep(
     .filter(Boolean)
     .join("\n");
 
-  const systemPrompt = `You are an experienced case manager assistant. A plan step is blocked. Provide 3–5 brief, actionable suggestions for what the case manager could try next. Be specific and practical. Output a JSON object with a single key "suggestions" whose value is an array of strings. No markdown, no extra text.`;
+  const systemPrompt = `You are an experienced case manager assistant. A plan step is blocked. Provide 3 to 5 brief, actionable suggestions for what the case manager could try next. Be specific and practical. Output a JSON object with a single key "suggestions" whose value is an array of strings. No markdown, no extra text.`;
 
-  const userPrompt = `Blocked step context:\n${context}\n\nSuggest 3–5 concrete next moves.`;
+  const userPrompt = `Blocked step context:\n${context}\n\nSuggest 3 to 5 concrete next moves.`;
 
   try {
     const result = await createAiResponse({

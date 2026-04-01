@@ -5,7 +5,7 @@ const labeledItemSchema = z.object({
   label: z.string().min(1, "Required").max(200),
 });
 
-/** Client + server validation (no output transforms — works with react-hook-form). */
+/** Client + server validation (no output transforms, works with react-hook-form). */
 export const familyIntakeFormSchema = z.object({
   name: z.string().min(1, "Household name is required").max(200),
   summary: z.string().max(8000).optional(),

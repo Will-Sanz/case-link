@@ -26,7 +26,7 @@ function flagSummary(r: NonNullable<ResourceMatchRow["resource"]>): string {
   if (r.educational_workshops) parts.push("Workshops");
   if (r.volunteer_recruitment_support) parts.push("Volunteers");
   if (r.recruit_for_grocery_giveaways) parts.push("Grocery");
-  return parts.length ? parts.join(" · ") : "—";
+  return parts.length ? parts.join(" · ") : "None";
 }
 
 function MatchStatusBadge({ status }: { status: ResourceMatchRow["status"] }) {
@@ -353,7 +353,7 @@ export function ResourceMatchesPanel({
                   </span>
                   <span className="text-slate-600">
                     {" "}
-                    — {row.office_or_department}
+                    · {row.office_or_department}
                   </span>
                 </div>
                 <Button

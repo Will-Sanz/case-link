@@ -16,7 +16,7 @@ export type StepHelperResult =
   | { ok: false; error: string };
 
 /**
- * Organization this step is about — call scripts and emails must be FROM the case manager TO this audience.
+ * Organization this step is about, call scripts and emails must be FROM the case manager TO this audience.
  */
 function buildOutreachAudienceBlock(detail: FamilyDetail, step: PlanStepRow): string {
   const stepMatches = detail.resourceMatches
@@ -32,7 +32,7 @@ function buildOutreachAudienceBlock(detail: FamilyDetail, step: PlanStepRow): st
   const primary = stepMatches[0]?.resource;
   if (primary) {
     const lines = [
-      "OUTREACH_AUDIENCE (required framing — write/speak as the CASE MANAGER, addressing THIS organization):",
+      "OUTREACH_AUDIENCE (required framing, write/speak as the CASE MANAGER, addressing THIS organization):",
       `- Organization / program: ${primary.program_name}`,
       `- Office or department: ${primary.office_or_department}`,
       primary.primary_contact_name
@@ -45,7 +45,7 @@ function buildOutreachAudienceBlock(detail: FamilyDetail, step: PlanStepRow): st
         ? `- Their phone: ${primary.primary_contact_phone}`
         : null,
       "",
-      "The case manager is the caller/sender. The household is the client you are advocating for — do not write or speak as the family member. Greet and address the program or named staff at this organization.",
+      "The case manager is the caller/sender. The household is the client you are advocating for, do not write or speak as the family member. Greet and address the program or named staff at this organization.",
     ];
     return lines.filter((l) => l !== null).join("\n");
   }
@@ -65,7 +65,7 @@ function buildOutreachAudienceBlock(detail: FamilyDetail, step: PlanStepRow): st
     : "";
 
   return [
-    "OUTREACH_AUDIENCE (required framing — write/speak as the CASE MANAGER to the organization this step references):",
+    "OUTREACH_AUDIENCE (required framing, write/speak as the CASE MANAGER to the organization this step references):",
     `- Step / program focus: ${inferredOrg}`,
     contactHint ? `${contactHint}\n` : "",
     "No resource row is linked to this step. Still produce content from the case manager to the organization implied above (use MATCHED_COMMUNITY_RESOURCES below if a name matches). Never write as if the family is emailing the case manager.",
@@ -156,11 +156,11 @@ ${GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS}
 
 Generate a complete, USABLE EMAIL that the CASE MANAGER will send TO the organization or program in OUTREACH_AUDIENCE (To: their email if provided; otherwise use a clear placeholder like [PROGRAM INTAKE EMAIL]).
 
-VOICE: Written in first person as the case manager ("I am writing on behalf of…", "I'm reaching out from…"). The signer is the case manager — NOT the family writing to the case manager.
+VOICE: Written in first person as the case manager ("I am writing on behalf of…", "I'm reaching out from…"). The signer is the case manager, NOT the family writing to the case manager.
 
 AUDIENCE: Salutation and body must address the PROGRAM / ORGANIZATION or named staff (e.g. "Dear [Program name] Intake Team" or "Dear Ms. [Contact]"). The email is outbound from the CM to that organization.
 
-CONTENT: Brief context, reason for outreach, specific ask (intake, referral, status, documents, appointment), what you'll follow up with. Use placeholders like [CASE MANAGER NAME], [AGENCY], [CM PHONE], [CM EMAIL], [FAMILY NAME OR INITIALS], [HOUSEHOLD SIZE] where the CM would fill in — not as the family signing.
+CONTENT: Brief context, reason for outreach, specific ask (intake, referral, status, documents, appointment), what you'll follow up with. Use placeholders like [CASE MANAGER NAME], [AGENCY], [CM PHONE], [CM EMAIL], [FAMILY NAME OR INITIALS], [HOUSEHOLD SIZE] where the CM would fill in, not as the family signing.
 
 Close with a professional sign-off from the case manager.
 
@@ -172,7 +172,7 @@ Output plain text only, no markdown.`,
     userPrefix: "Generate a prep checklist for this step:\n\n",
   },
   fallback_options: {
-    system: `You are an experienced case manager assistant. The first attempt may fail. Generate 4–6 PRACTICAL fallback options such as: call a different number, send an email, visit in person, try an alternate organization, ask supervisor for escalation, request missing documents from family first, break the step into smaller actions. Use linked resources when relevant. Output a JSON object with a single key "options" whose value is an array of strings. No markdown.`,
+    system: `You are an experienced case manager assistant. The first attempt may fail. Generate 4 to 6 PRACTICAL fallback options such as: call a different number, send an email, visit in person, try an alternate organization, ask supervisor for escalation, request missing documents from family first, break the step into smaller actions. Use linked resources when relevant. Output a JSON object with a single key "options" whose value is an array of strings. No markdown.`,
     userPrefix: "Generate fallback options if the first attempt fails:\n\n",
   },
   family_explanation: {
@@ -180,7 +180,7 @@ Output plain text only, no markdown.`,
     userPrefix: "Generate a family-friendly explanation for this step:\n\n",
   },
   break_into_actions: {
-    system: `You are an experienced case manager assistant. Break this broad step into 4–8 smaller, same-day or near-term IMMEDIATE actions. Examples: check eligibility page, call main line, write down rep name, upload proof of income, set follow-up reminder. Each must be concrete and completable. Output a JSON object with a single key "actions" whose value is an array of strings. No markdown.`,
+    system: `You are an experienced case manager assistant. Break this broad step into 4 to 8 smaller, same-day or near-term IMMEDIATE actions. Examples: check eligibility page, call main line, write down rep name, upload proof of income, set follow-up reminder. Each must be concrete and completable. Output a JSON object with a single key "actions" whose value is an array of strings. No markdown.`,
     userPrefix: "Break this step into smaller immediate actions:\n\n",
   },
   what_happens_next: {
@@ -188,7 +188,7 @@ Output plain text only, no markdown.`,
     userPrefix: "Generate a 'what happens next' guide for this step:\n\n",
   },
   troubleshoot_blocker: {
-    system: `You are an experienced case manager assistant. This step is BLOCKED. Generate 4–6 practical suggestions: workarounds, alternative outreach, smaller first step, another linked resource, escalation path, what information is missing. If the blocker reason is known, address it directly (e.g. "no transportation" → suggest phone/remote options, transit assistance). Output a JSON object with a single key "suggestions" whose value is an array of strings. No markdown.`,
+    system: `You are an experienced case manager assistant. This step is BLOCKED. Generate 4 to 6 practical suggestions: workarounds, alternative outreach, smaller first step, another linked resource, escalation path, what information is missing. If the blocker reason is known, address it directly (e.g. "no transportation" → suggest phone/remote options, transit assistance). Output a JSON object with a single key "suggestions" whose value is an array of strings. No markdown.`,
     userPrefix: "This step is blocked. Generate troubleshooting suggestions:\n\n",
   },
 };

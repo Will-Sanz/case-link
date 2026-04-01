@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 
-/** Minimum substantive content — empty strings pass Zod's z.string() but fail here. */
+/** Minimum substantive content, empty strings pass Zod's z.string() but fail here. */
 const MIN_LEN = {
   action_needed_now: 12,
   rationale: 25,
@@ -191,7 +191,7 @@ export const aiPlanResponseSchema = z.object({
 
 export type AiPlanStepParsed = z.infer<typeof aiPlanStepSchema>;
 
-const PLACEHOLDER_RE = /^(n\/?a|tbd|todo|\.\.\.|—|-|none)$/i;
+const PLACEHOLDER_RE = /^(n\/?a|tbd|todo|\.\.\.|\u2014|-|none)$/i;
 
 function isPlaceholder(s: string): boolean {
   const t = s.trim();
@@ -205,7 +205,7 @@ function normStr(v: string | null | undefined): string {
 
 /**
  * Removes conversational answer prefixes the model sometimes puts in action_needed_now
- * (e.g. "Yes – SNAP timelines…" → "SNAP timelines…").
+ * (e.g. "Yes, SNAP timelines…" → "SNAP timelines…").
  */
 export function sanitizeActionNeededNow(s: string): string {
   let t = s.trim();
@@ -400,7 +400,7 @@ export function applyPlanStepDefaults(step: AiPlanStepParsed): AiPlanStepParsed 
   );
   out.timing_guidance = ensure(
     out.timing_guidance,
-    `Complete during the ${out.phase}-day window; prioritize within 3–5 business days unless crisis factors apply.`,
+    `Complete during the ${out.phase}-day window; prioritize within 3 to 5 business days unless crisis factors apply.`,
   );
 
   if (out.checklist.length < MIN_LEN.checklistCount) {
@@ -440,7 +440,7 @@ export function applyPlanStepDefaults(step: AiPlanStepParsed): AiPlanStepParsed 
   if (out.blockers.length < MIN_LEN.blockerCount) {
     out.blockers = [
       ...out.blockers,
-      "Typical: missing documents, no callback, or eligibility uncertainty—address in session notes and adjust timeline.",
+      "Typical: missing documents, no callback, or eligibility uncertainty, address in session notes and adjust timeline.",
     ];
   }
 

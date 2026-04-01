@@ -52,7 +52,7 @@ export type ActionQueueBuckets = {
   overdue: ActionableItem[];
   today: ActionableItem[];
   upcoming: ActionableItem[];
-  /** Blocked, escalation, in progress, no activity, new plan, etc. — no dated bucket */
+  /** Blocked, escalation, in progress, no activity, new plan, etc., no dated bucket */
   undated: ActionableItem[];
 };
 
@@ -83,7 +83,7 @@ export function bucketActionableItems(items: ActionableItem[]): ActionQueueBucke
     } else if (key > todayK && key <= upcomingEndK) {
       upcoming.push(item);
     }
-    // else: due beyond upcoming window — intentionally dropped from time-based queue
+    // else: due beyond upcoming window, intentionally dropped from time-based queue
   }
 
   const byDueThenFamily = (a: ActionableItem, b: ActionableItem) => {

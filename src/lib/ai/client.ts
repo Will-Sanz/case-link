@@ -45,7 +45,7 @@ export type CreateResponseOptions = {
   taskType: AiTaskType;
   instructions: string;
   input: string | ChatMessage[];
-  /** Legacy JSON mode — model returns valid JSON only; no schema enforcement. */
+  /** Legacy JSON mode, model returns valid JSON only; no schema enforcement. */
   responseFormat?: "json_object";
   /** When set, API enforces this schema (Responses: text.format; Chat: response_format json_schema). */
   structuredJsonSchema?: StructuredJsonSchema;

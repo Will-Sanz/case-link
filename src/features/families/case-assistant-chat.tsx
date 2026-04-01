@@ -212,7 +212,7 @@ export function CaseAssistantChat({
                 AI
               </div>
               <p className="max-w-md text-base leading-relaxed text-slate-700">
-                Ask for guidance on execution, sequencing, risks, barriers, resources, or outreach —
+                Ask for guidance on execution, sequencing, risks, barriers, resources, or outreach,
                 using this case&apos;s live context.
               </p>
               <p className="mt-6 text-[11px] font-medium uppercase tracking-wider text-slate-400">

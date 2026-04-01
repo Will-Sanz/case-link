@@ -23,13 +23,13 @@ function shouldLog(): boolean {
 }
 
 const PHASE_FOCUS: Record<PlanPhase, string> = {
-  "30": `## Phase role: 30-day — immediate stabilization
+  "30": `## Phase role: 30-day, immediate stabilization
 Focus on urgent, concrete next actions: safety, intake, first calls, same-week tasks, initial applications.
 Do not front-load long-term contingency planning here.`,
-  "60": `## Phase role: 60-day — follow-through and documentation
+  "60": `## Phase role: 60-day, follow-through and documentation
 Focus on follow-ups, documentation, appointment outcomes, status checks, backup/second-line options, and measured escalation prep.
 Do not repeat the same "first contact" or intake actions already listed under "Already covered" unless the action is clearly a different follow-up (e.g. renewal, re-verification).`,
-  "90": `## Phase role: 90-day — sustained support and contingency
+  "90": `## Phase role: 90-day, sustained support and contingency
 Focus on sustaining progress, renewals, consolidating supports, contingency plans, and closing remaining gaps.
 Do not re-state early crisis steps or duplicate outreach already covered in 30/60 unless materially new (e.g. annual renewal vs. initial enrollment).`,
 };
@@ -40,12 +40,12 @@ function buildLeanPhaseInstructions(phase: PlanPhase): string {
 
 ## Output rules
 - Return JSON only matching the schema (top-level key "steps").
-- Aim for **2–4 strong steps** for this phase; use 5 only if the case clearly needs that many distinct actions.
+- Aim for **2 to 4 strong steps** for this phase; use 5 only if the case clearly needs that many distinct actions.
 - Each step must be **materially different** from the others (no minor wording variants of the same task).
 - "summary" = concise what-to-do for a case manager.
 - "timing" = due window or cadence (short phrase or null).
 - "additional_guidance" = optional nuance only; use null if not needed.
-- action_items: 1–4 concrete tasks per step when possible; titles are calendar-ready.
+- action_items: 1 to 4 concrete tasks per step when possible; titles are calendar-ready.
 - Put document names in required_documents; put people/agencies in contacts.
 
 ## Matched resources (reference only)
@@ -78,7 +78,7 @@ export async function tryGenerateLeanPlanPhaseOpenAI(
   const prior = options?.priorPhasesSummary?.trim();
   const priorBlock =
     prior ?
-      `## Already covered in earlier phase(s) — do NOT repeat
+      `## Already covered in earlier phase(s), do NOT repeat
 The following is already planned. Your new steps must add **different** work for the ${phase}-day window only.
 ${prior}
 

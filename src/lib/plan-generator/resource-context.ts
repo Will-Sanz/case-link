@@ -81,8 +81,8 @@ export function generatedStepsFromMatches(
       phase === "30"
         ? {
             stage_goal: "Immediate outreach, intake scheduling, and application submission",
-            why_now: "Week 1 must include concrete action—schedule intake, submit application, or confirm next steps. Delays push back the whole timeline.",
-            detailed_instructions: `Call ${r.program_name} (${r.office_or_department}) to schedule intake or submit referral. ${contactLine ? `Use: ${contactLine}` : ""} Gather ID, proof of address, income verification before calling. During the call, book the earliest intake appointment and confirm required documents. Document representative name, date, and next steps. Follow up in 2–3 business days if no callback.`,
+            why_now: "Week 1 must include concrete action, schedule intake, submit application, or confirm next steps. Delays push back the whole timeline.",
+            detailed_instructions: `Call ${r.program_name} (${r.office_or_department}) to schedule intake or submit referral. ${contactLine ? `Use: ${contactLine}` : ""} Gather ID, proof of address, income verification before calling. During the call, book the earliest intake appointment and confirm required documents. Document representative name, date, and next steps. Follow up in 2 to 3 business days if no callback.`,
           }
         : phase === "60"
           ? {
@@ -97,8 +97,8 @@ export function generatedStepsFromMatches(
             };
 
     const details: GeneratedStepDetails = {
-      action_needed_now: `Reach out to ${r.program_name} and complete the next concrete task for this phase (call, email, or appointment).`,
       ...phaseGuidance,
+      action_needed_now: `Reach out to ${r.program_name} and complete the next concrete task for this phase (call, email, or appointment).`,
       rationale: m.match_reason
         ? `This program matches the family's needs: ${m.match_reason}`
         : `Structured outreach to ${r.program_name} advances housing and stability goals for this case.`,
@@ -108,7 +108,7 @@ export function generatedStepsFromMatches(
               "Gather ID, proof of address, and income documents",
               `Contact ${r.program_name} by phone or email`,
               "Document representative name, date, and outcome",
-              "Set follow-up reminder for 3–5 business days",
+              "Set follow-up reminder for 3 to 5 business days",
             ]
           : phase === "60"
             ? [
@@ -138,7 +138,7 @@ export function generatedStepsFromMatches(
       ],
       timing_guidance:
         phase === "30"
-          ? "Within the first 2–3 weeks of the 30-day window"
+          ? "Within the first 2 to 3 weeks of the 30-day window"
           : phase === "60"
             ? "Mid-plan: complete follow-through before day 75"
             : "Late plan: confirm sustainability and renewals before day 90",
@@ -182,9 +182,9 @@ export function formatMatchesForPlannerPrompt(
     const r = m.resource!;
     const contact = [r.primary_contact_phone, r.primary_contact_email].filter(Boolean).join(" · ");
     const why = m.match_reason.trim().slice(0, 140);
-    return `${i + 1}. ${r.program_name} (${r.office_or_department || r.category || "service"})${contact ? ` — ${contact}` : ""} — ${why}`;
+    return `${i + 1}. ${r.program_name} (${r.office_or_department || r.category || "service"})${contact ? `, ${contact}` : ""}, ${why}`;
   });
-  return `MATCHED_RESOURCES (reference — cite when clearly relevant; generic case-management steps are OK):\n${lines.join("\n")}`;
+  return `MATCHED_RESOURCES (reference, cite when clearly relevant; generic case-management steps are OK):\n${lines.join("\n")}`;
 }
 
 export function formatMatchesForAiPrompt(
@@ -211,7 +211,7 @@ export function formatMatchesForAiPrompt(
     return lines.filter(Boolean).join("\n");
   });
 
-  return `MATCHED_COMMUNITY_RESOURCES (use these real programs in your steps — primary input):\n\n${blocks.join("\n\n")}`;
+  return `MATCHED_COMMUNITY_RESOURCES (use these real programs in your steps, primary input):\n\n${blocks.join("\n\n")}`;
 }
 
 function normTitle(s: string): string {

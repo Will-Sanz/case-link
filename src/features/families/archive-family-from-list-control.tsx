@@ -48,7 +48,7 @@ export function ArchiveFamilyFromListControl({ familyId }: { familyId: string })
         }}
         onConfirm={handleConfirm}
         title="Remove family from your list?"
-        description="Nothing is deleted from the database—they will simply disappear from your Families list, dashboard, and calendar."
+        description="Nothing is deleted from the database. They will simply disappear from your Families list, dashboard, and calendar."
         cancelLabel="Cancel"
         confirmLabel={pending ? "Removing…" : "Remove from list"}
         pending={pending}

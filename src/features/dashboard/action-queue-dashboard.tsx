@@ -198,7 +198,7 @@ export function ActionQueueDashboard({ buckets }: { buckets: ActionQueueBuckets 
     <div className="space-y-5">
       <QueueSection
         title="Overdue"
-        description="Past due — handle these first."
+        description="Past due, handle these first."
         count={overdue.length}
         items={overdue}
         bucket="overdue"
@@ -211,7 +211,7 @@ export function ActionQueueDashboard({ buckets }: { buckets: ActionQueueBuckets 
 
       <QueueSection
         title="Today"
-        description="Due today — don't let these slip."
+        description="Due today, don't let these slip."
         count={today.length}
         items={today}
         bucket="today"
@@ -224,7 +224,7 @@ export function ActionQueueDashboard({ buckets }: { buckets: ActionQueueBuckets 
 
       <QueueSection
         title="Upcoming"
-        description={`Next ${UPCOMING_WINDOW_DAYS} days — plan ahead.`}
+        description={`Next ${UPCOMING_WINDOW_DAYS} days, plan ahead.`}
         count={upcoming.length}
         items={upcoming}
         bucket="upcoming"
@@ -238,7 +238,7 @@ export function ActionQueueDashboard({ buckets }: { buckets: ActionQueueBuckets 
       {undated.length > 0 ?
         <QueueSection
           title="Other attention"
-          description="No due date on file — still worth a look."
+          description="No due date on file, still worth a look."
           count={undated.length}
           items={undated}
           bucket="undated"

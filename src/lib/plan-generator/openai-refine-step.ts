@@ -35,7 +35,7 @@ const SYSTEM_PROMPT = `You are refining ONE plan step for a Philadelphia case ma
 - summary: concise "what to do" (this becomes the main step text for the form).
 - timing: short due window or cadence, or null.
 - additional_guidance: optional nuance only; null if not needed.
-- action_items: 1–5 concrete tasks (titles are calendar-ready; not raw document names).
+- action_items: 1 to 5 concrete tasks (titles are calendar-ready; not raw document names).
 - required_documents, contacts, expected_outcome: practical and specific.
 - priority: low | medium | high | urgent
 
@@ -88,8 +88,10 @@ export async function refineStepWithOpenAI(
       phase: currentStep.phase,
       title: currentStep.title,
       summary: currentStep.description,
-      details: currentStep.details,
-      ...(blockerReason ? { blocker_reason: blockerReason } : {}),
+      details: {
+        ...(currentStep.details ?? {}),
+        ...(blockerReason ? { blocker_reason: blockerReason } : {}),
+      },
     },
     null,
     2,
