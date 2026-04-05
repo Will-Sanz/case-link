@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+export { LegalDensityProvider, LegalList, LegalSection } from "./legal-doc-blocks";
+
 /**
  * Legal document body: matches marketing sections (max-w-5xl, full-width prose in that column).
  */
@@ -36,37 +38,5 @@ export function LegalDocumentBody({
         </div>
       </section>
     </>
-  );
-}
-
-export function LegalSection({
-  n,
-  title,
-  children,
-}: {
-  n: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section aria-labelledby={`legal-section-${n}`} className="scroll-mt-8">
-      <h2
-        id={`legal-section-${n}`}
-        className="text-xl font-semibold text-slate-900 sm:text-2xl"
-      >
-        {n}. {title}
-      </h2>
-      <div className="mt-4 space-y-4">{children}</div>
-    </section>
-  );
-}
-
-export function LegalList({ items }: { items: string[] }) {
-  return (
-    <ul className="list-disc space-y-2 pl-5 text-slate-600 sm:pl-6">
-      {items.map((item, i) => (
-        <li key={i}>{item}</li>
-      ))}
-    </ul>
   );
 }
