@@ -161,10 +161,11 @@ Apply files in **`supabase/migrations/`** in lexicographic filename order (`supa
 1. Apply all migrations to the target Supabase project.  
 2. Set environment variables (at minimum both `NEXT_PUBLIC_SUPABASE_*`; set `NEXT_PUBLIC_SITE_URL` for auth in production).  
 3. In Supabase: **Authentication → URL Configuration** — Site URL and redirect URLs including `/auth/callback`.  
-4. Vercel **Root Directory** = repository root (not `src`).  
-5. Session refresh uses the Node **`proxy`** (`src/proxy.ts`), not Edge middleware, for compatibility with the current Supabase + Next.js stack.
+4. Vercel **Root Directory** = repository root (**never** `src` — wrong root often yields **404** or broken builds).  
+5. **Framework preset:** Next.js. **Build:** `npm run build`. **Output:** leave default (`.next`); do not point Output Directory at a custom path unless you know you need it.  
+6. Session refresh uses the Node **`proxy`** (`src/proxy.ts`), not Edge middleware, for compatibility with the current Supabase + Next.js stack.
 
-See **`DEPLOYMENT_NOTES.md`** for operational notes (no secrets).
+**If you see 404 after deploy:** confirm root directory and framework preset first; then confirm env vars are set for that environment. This app intentionally avoids fragile `middleware.ts` + Supabase patterns on Edge; use `src/proxy.ts` as shipped.
 
 ---
 
