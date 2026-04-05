@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { alertErrorClass, alertInfoClass } from "@/lib/ui/form-classes";
+import { safeSignUpMessage } from "@/lib/auth/safe-client-auth-message";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function SignUpForm() {
@@ -60,7 +61,7 @@ export function SignUpForm() {
       });
 
       if (signError) {
-        setError(signError.message);
+        setError(safeSignUpMessage(signError.message));
         return;
       }
 

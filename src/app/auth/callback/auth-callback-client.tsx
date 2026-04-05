@@ -2,6 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  safeAuthSessionClientMessage,
+  safeOAuthRedirectMessage,
+} from "@/lib/auth/safe-client-auth-message";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /** Survives React Strict Mode remount: first effect pass may clear `location.hash` before the second pass runs. */
@@ -74,8 +78,8 @@ export function AuthCallbackClient() {
 
     void (async () => {
       if (oauthError) {
-        const msg = oauthDesc?.replace(/\+/g, " ") ?? oauthError;
-        goLoginError(msg);
+        const raw = oauthDesc?.replace(/\+/g, " ") ?? oauthError;
+        goLoginError(safeOAuthRedirectMessage(raw));
         return;
       }
 
@@ -84,7 +88,7 @@ export function AuthCallbackClient() {
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
-          goLoginError(error.message);
+          goLoginError(safeAuthSessionClientMessage(error.message));
           return;
         }
         const { data: after } = await supabase.auth.getSession();
@@ -102,7 +106,7 @@ export function AuthCallbackClient() {
           token_hash,
         });
         if (error) {
-          goLoginError(error.message);
+          goLoginError(safeAuthSessionClientMessage(error.message));
           return;
         }
         const { data: afterOtp } = await supabase.auth.getSession();
@@ -122,8 +126,8 @@ export function AuthCallbackClient() {
         const hashError = params.get("error");
         const hashErrorDesc = params.get("error_description");
         if (hashError) {
-          const msg = hashErrorDesc?.replace(/\+/g, " ") ?? hashError;
-          goLoginError(msg);
+          const raw = hashErrorDesc?.replace(/\+/g, " ") ?? hashError;
+          goLoginError(safeOAuthRedirectMessage(raw));
           return;
         }
         if (access_token && refresh_token) {
@@ -133,7 +137,7 @@ export function AuthCallbackClient() {
             refresh_token,
           });
           if (error) {
-            goLoginError(error.message);
+            goLoginError(safeAuthSessionClientMessage(error.message));
             return;
           }
           const { data: afterHash } = await supabase.auth.getSession();

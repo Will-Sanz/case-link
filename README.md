@@ -1,116 +1,110 @@
 # CaseLink
 
-**CaseLink** is a production-minded case management workspace for teams supporting families through structured **30 / 60 / 90-day plans**, resource matching, calendars, and lightweight AI assistance—all scoped per authenticated user with **Supabase Auth + Row Level Security**.
+CaseLink is a case management workspace for teams supporting families through **30 / 60 / 90-day plans**, resource matching, calendars, and optional AI assistance. Data access is **per authenticated user**, enforced with **Supabase Auth** and **Row Level Security (RLS)** on Postgres.
 
 ---
 
-## Why this exists
+## Why it exists
 
-Case managers juggle fragile timelines, referrals, and documentation. CaseLink concentrates **family context**, **actionable plans**, and a **curated resource directory** in one place, and uses AI **only where it adds clear execution value** (drafting plans, step refinements, and in-context Q&A)—not as a black box replacement for professional judgment.
-
----
-
-## What the product does
-
-- **Families & intake** — Create households, goals, barriers, members, and case notes with validation on the server.
-- **Resource directory** — Searchable programs (seeded via CSV import); deterministic matching scores suggestions without embeddings.
-- **Matched resources** — Accept, dismiss, or manually attach programs to a family; activity is logged.
-- **30 / 60 / 90 plans** — Generate from rules or (when configured) OpenAI; edit steps, checklists, and action items; PDF-oriented client display fields.
-- **Case assistant** — Chat grounded in the family’s live plan, barriers, and matches.
-- **Step helpers** — Call scripts, emails, prep checklists, troubleshooting, etc., generated on demand.
-- **Dashboard & calendar** — Queue and calendar views driven by plan steps and due dates.
+Case managers coordinate fragile timelines, referrals, and documentation. CaseLink brings **family context**, **actionable plans**, and a **resource directory** into one place. AI is used **only where it clearly helps execution** (drafting plans, refinements, in-context Q&A)—not as a substitute for professional judgment.
 
 ---
 
-## System architecture
+## What ships today
+
+- **Families and intake** — Households, goals, barriers, members, and case notes with server-side validation.
+- **Resource directory** — Searchable programs (seeded via CSV import); deterministic matching without embeddings.
+- **Matched resources** — Accept, dismiss, or attach programs; activity is logged.
+- **Plans** — Rules-based generation with optional OpenAI; editable steps, checklists, and action items; PDF-oriented client display fields.
+- **Case assistant** — Chat grounded in the family’s plan, barriers, and matches.
+- **Step helpers** — On-demand scripts, checklists, and similar artifacts.
+- **Dashboard and calendar** — Views driven by plan steps and due dates.
+
+---
+
+## Architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  Browser (React 19, Tailwind)                                │
-│  Supabase JS (anon key) + cookie session                    │
+│  Browser (React, Tailwind)                                   │
+│  Supabase JS (anon key) + cookie session                     │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Next.js 16 (App Router)                                     │
-│  • Node proxy: session refresh + route guard (src/proxy.ts) │
+│  Next.js (App Router)                                        │
+│  • Node proxy: session refresh + route guard (`src/proxy.ts`)│
 │  • Server Components + Server Actions                        │
-│  • Zod validation on inputs                                  │
+│  • Zod validation on server inputs                           │
 └───────────────┬─────────────────────────────┬───────────────┘
                 │                             │
                 ▼                             ▼
 ┌───────────────────────────┐   ┌────────────────────────────┐
-│  Supabase Postgres         │   │  OpenAI API (optional)      │
-│  RLS per family access     │   │  Server-only key            │
-│  RPC for safe family create│   │  Rate limit + size caps     │
+│  Supabase Postgres         │   │  OpenAI API (optional)     │
+│  RLS (`can_access_family`) │   │  Server-only API key         │
+│  User JWT on each query    │   │  Rate limits + size caps    │
 └───────────────────────────┘   └────────────────────────────┘
 ```
 
-- **User-scoped data** — PostgREST queries use the end-user JWT; RLS policies use `can_access_family()` (creator, assignee, or admin).
-- **No service role in the browser** — `SUPABASE_SERVICE_ROLE_KEY` is only for trusted scripts (e.g. CSV import), not the web app.
+- **Data access** — PostgREST uses the end-user JWT. RLS uses `can_access_family()` (creator, assignee, or admin) on shared family data.
+- **Service role** — `SUPABASE_SERVICE_ROLE_KEY` is for trusted scripts (for example `npm run db:import`), not for the web app or browser.
 
 ---
 
-## AI in the product
+## AI guardrails (server)
 
-- **Plans** — Full or phased generation can call OpenAI with strict JSON-shaped outputs and Zod validation; **rules-based fallback** remains when the key is absent or the model fails.
-- **Refinement** — Single-step and full-draft preview refinements use structured outputs where possible.
-- **Assistant & helpers** — Shorter completions for execution support (scripts, checklists, Q&A).
-
-**Guardrails (server-side):**
-
-- API key and model overrides are **server-only**; model IDs are validated at startup against an allowlist pattern (`src/lib/ai/model-allowlist.ts`).
-- **Per-user rate limiting** (in-memory per process; configurable via env) applies to all OpenAI-backed actions together; optional **per-IP** cap via `OPENAI_RATE_LIMIT_PER_IP_MAX`.
-- **Prompt size** and **max output tokens** caps reduce runaway cost.
-- **429-style** messaging when rate limited; generic client errors in production unless `OPENAI_DEBUG=1`.
-- Lightweight **`[openai-usage]`** logs (user id, route label, model, tokens when available, timing)—no prompt body in those lines.
+- OpenAI credentials and model overrides are **server-only**. Model IDs are validated at startup (`src/lib/ai/model-allowlist.ts`).
+- **Per-user** rate limiting (in-memory per instance) applies across OpenAI-backed actions; optional **per-IP** cap: `OPENAI_RATE_LIMIT_PER_IP_MAX`.
+- **Input size** and **max output tokens** caps limit cost and abuse.
+- User-visible failures are **generic in production**; richer detail is confined to **server logs** (and local development). Optional `OPENAI_DEBUG=1` increases server logging only—it does not expose stack traces to the browser by itself.
 
 ---
 
-## Security & privacy approach
+## Security and privacy
 
-| Area | Approach |
-|------|-----------|
-| **Secrets** | Only `NEXT_PUBLIC_*` for Supabase URL + anon key; OpenAI and service role never exposed to the client. |
-| **Auth** | Supabase Auth; server actions require `requireAppUserWithClient()` where appropriate. |
-| **RLS** | Families, plans, steps, matches, notes, activity log, barrier records, referrals, tasks—scoped to accessible families (see `supabase/migrations/`). |
-| **Input** | Zod schemas on server actions; lengths and UUIDs enforced for AI entry points (`src/lib/validations/ai-actions.ts`). |
-| **Errors** | Supabase errors mapped to safe messages (`src/lib/errors/public-action-error.ts`); AI errors sanitized for clients in production; `error.tsx` / `global-error.tsx` avoid implying misconfiguration to end users. |
-| **Headers** | `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` via `next.config.ts`. |
-| **Markdown** | Case assistant renders model output as Markdown; links only allow `http:`, `https:`, and `mailto:`. |
+| Topic | Approach |
+|--------|-----------|
+| **Secrets** | Only `NEXT_PUBLIC_*` for Supabase URL and anon key; OpenAI and service role never ship to the client. |
+| **Auth** | Supabase Auth; sensitive actions use `requireAppUserWithClient()` with the same client used for writes. |
+| **RLS** | Family-scoped tables use `can_access_family()`; see `supabase/migrations/`. |
+| **Input** | Zod on server actions; AI entry points use dedicated schemas (`src/lib/validations/ai-actions.ts`). |
+| **Errors** | `src/lib/errors/public-action-error.ts` maps many database errors to safe strings; auth forms use client sanitization in production. |
+| **Headers** | `next.config.ts` sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. |
+| **Markdown** | Assistant output allows only `http:`, `https:`, and `mailto:` links. |
 
-**Manual steps you still own:** lock down Supabase **Auth** settings, **Site URL** / redirect URLs, and ensure **RLS is enabled** on all exposed tables in hosted projects. Review **Vercel** env scopes (Production vs Preview).
-
-See **[SECURITY.md](./SECURITY.md)** for a concise public-facing security overview.
+**Operator-owned setup:** Supabase Auth URLs, Site URL, redirect allowlist, and Vercel environment scoping (Production vs Preview). Details: **[SECURITY.md](./SECURITY.md)**.
 
 ---
 
 ## Tech stack
 
-- **Framework:** Next.js 16 (App Router), React 19, TypeScript  
-- **UI:** Tailwind CSS 4  
+- **Framework:** Next.js (App Router), React, TypeScript  
+- **UI:** Tailwind CSS  
 - **Data:** Supabase (Postgres + Auth)  
 - **Validation:** Zod  
-- **AI:** OpenAI (optional), routed in `src/lib/ai/`  
-- **PDF:** `@react-pdf/renderer` (exports)
+- **AI:** OpenAI (optional), `src/lib/ai/`  
+- **PDF:** `@react-pdf/renderer`
 
 ---
 
-## Local development
+## Local setup
 
 ```bash
 npm install
 cp .env.example .env.local
-# Fill NEXT_PUBLIC_SUPABASE_* (and optionally OPENAI_API_KEY)
+# Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (see .env.example).
+# Optional: OPENAI_API_KEY for AI-backed flows.
 npm run dev
 ```
 
-Scripts (optional):
+**Optional scripts**
 
-- `npm run db:import` — Import resources CSV (requires `SUPABASE_SERVICE_ROLE_KEY`).
-- `npm run db:create-test-user` — Local test user (service role; **not for production passwords**).
+| Command | Purpose |
+|---------|---------|
+| `npm run db:import` | Import resources CSV (`SUPABASE_SERVICE_ROLE_KEY` required). |
+| `npm run db:create-test-user` | Local test user helper (service role; not for production passwords). |
 
-Quality gates:
+**Quality gate (matches typical CI):**
 
 ```bash
 npm run ci
@@ -120,73 +114,81 @@ npm run ci
 
 ## Environment variables
 
-| Variable | Required | Notes |
-|----------|----------|--------|
+Required for the app UI:
+
+| Variable | Required | Role |
+|----------|----------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public anon key (RLS enforced) |
-| `NEXT_PUBLIC_SITE_URL` | Recommended (prod) | Canonical origin for auth redirects |
-| `NEXT_PUBLIC_APP_URL` | Optional | Legacy alias for site URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Scripts only | **Never** client or `NEXT_PUBLIC_*` |
-| `OPENAI_API_KEY` | Optional | Enables AI plans & helpers |
-| `OPENAI_*_MODEL` / `OPENAI_MODEL_OVERRIDE` | Optional | Must pass model allowlist validation |
-| `OPENAI_RATE_LIMIT_MAX_PER_MINUTE` | Optional | Default 30 per user per window |
-| `OPENAI_RATE_LIMIT_WINDOW_MS` | Optional | Default 60000 |
-| `OPENAI_RATE_LIMIT_PER_IP_MAX` | Optional | Per-IP OpenAI request cap (same window; unset = disabled) |
-| `OPENAI_MAX_INPUT_CHARS` | Optional | Default 120000 |
-| `OPENAI_MAX_OUTPUT_TOKENS` | Optional | Hard cap per request (default 8192) |
-| `OPENAI_DEBUG` | Optional | Verbose **server** logs |
-| `OPENAI_PAYLOAD_DEBUG` / `PLAN_REGENERATE_DEBUG` / `PLAN_REFINE_DEBUG` | Optional | Extra server logging for AI payloads / plan flows (never exposed to the client) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon key (RLS enforced) |
 
-See `.env.example` for the full list and comments.
+Strongly recommended in production:
 
----
+| Variable | Notes |
+|----------|--------|
+| `NEXT_PUBLIC_SITE_URL` | Canonical origin for auth redirects |
+| `NEXT_PUBLIC_APP_URL` | Legacy alias if `NEXT_PUBLIC_SITE_URL` is unset |
 
-## Database & migrations
+Server-only (optional unless you use the feature):
 
-Apply SQL files in **`supabase/migrations/`** in filename order on your Supabase project (`supabase db push` or SQL Editor). Notable files:
+| Variable | Notes |
+|----------|--------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Import / admin scripts only |
+| `OPENAI_API_KEY` | Enables AI plans and helpers |
+| `OPENAI_*_MODEL`, `OPENAI_MODEL_OVERRIDE` | Must pass allowlist validation |
+| `OPENAI_RATE_LIMIT_*`, `OPENAI_MAX_*` | Throttling and caps |
+| `OPENAI_DEBUG`, `OPENAI_PAYLOAD_DEBUG`, `PLAN_*_DEBUG` | Server logging only |
 
-- `20260321000000_init_schema.sql` — Core schema + initial RLS stubs  
-- `20260321120000_family_rls.sql` — `can_access_family`, family domain policies  
-- `20260321170000_plans_rls.sql` — Plans & steps  
-- `20260405120000_referrals_tasks_rls.sql` — Referrals & tasks (family-scoped)  
-- `20260406120000_rls_policy_hardening.sql` — Tightens `barrier_plan_records` to `authenticated`, binds `plan_step_activity` inserts to `actor_user_id`, explicit deny on `resource_import_runs` for JWT roles  
-
-**Do not reorder** migrations that are already applied in production.
+Full comments: **`.env.example`**. Parsing and defaults: **`src/lib/env.ts`**.
 
 ---
 
-## Production deployment (Vercel)
+## Database migrations
 
-1. Run all migrations on Supabase.  
-2. Set env vars on Vercel (at least both `NEXT_PUBLIC_SUPABASE_*`, plus `NEXT_PUBLIC_SITE_URL` for auth).  
-3. Configure Supabase **Authentication → URL Configuration** (Site URL + redirect URLs including `/auth/callback`).  
-4. **Root directory** on Vercel must be the **repository root** (not `src`).  
-5. This app uses a **Node `proxy`** (`src/proxy.ts`) for Supabase session refresh—not Edge middleware—for compatibility with the current Supabase + Next.js combination.
+Apply files in **`supabase/migrations/`** in lexicographic filename order (`supabase db push` or SQL Editor). Do not reorder files already applied in production.
 
-Operational notes live in `DEPLOYMENT_NOTES.md` (Vercel 404 troubleshooting, no secrets).
-
----
-
-## Known limitations & future work
-
-- **Rate limiting** is in-process; horizontal scale needs a shared limiter (e.g. Redis / Upstash).  
-- **Multi-instance** deployments should treat in-memory limits as best-effort.  
-- **Referrals / tasks** tables are secured and ready for product use; UI coverage may vary.  
-- **Embeddings** are not used for matching today—weights are explicit and tunable in `src/lib/matching/engine.ts`.
+| File | Purpose |
+|------|---------|
+| `20260321000000_init_schema.sql` | Core tables and RLS enabled |
+| `20260321120000_family_rls.sql` | `can_access_family`, family domain |
+| `20260321170000_plans_rls.sql` | Plans and steps |
+| `20260405120000_referrals_tasks_rls.sql` | Referrals and tasks |
+| `20260406120000_rls_policy_hardening.sql` | Barrier workflow records, step activity insert binding, import-run JWT deny |
 
 ---
 
-## Public repository checklist
+## Deploying on Vercel
 
-- [ ] No `.env.local` or keys committed (`.gitignore` includes `.env*`; `!.env.example` is tracked).  
-- [ ] `SECURITY.md` reviewed for your deployment context.  
-- [ ] Supabase production project has RLS verified (no broad `USING (true)` on user tables).  
-- [ ] Vercel env vars set per environment; Preview URLs added to Supabase redirect allowlist if used.  
-- [ ] `OPENAI_API_KEY` rotated if it was ever exposed.  
-- [ ] Optional: lower `OPENAI_RATE_LIMIT_MAX_PER_MINUTE` for demos.
+1. Apply all migrations to the target Supabase project.  
+2. Set environment variables (at minimum both `NEXT_PUBLIC_SUPABASE_*`; set `NEXT_PUBLIC_SITE_URL` for auth in production).  
+3. In Supabase: **Authentication → URL Configuration** — Site URL and redirect URLs including `/auth/callback`.  
+4. Vercel **Root Directory** = repository root (not `src`).  
+5. Session refresh uses the Node **`proxy`** (`src/proxy.ts`), not Edge middleware, for compatibility with the current Supabase + Next.js stack.
+
+See **`DEPLOYMENT_NOTES.md`** for operational notes (no secrets).
 
 ---
 
-## License / competition context
+## Limitations and roadmap
 
-This repository is suitable for technical review (e.g. competition or grant submissions): it emphasizes **clear architecture**, **defense in depth** (RLS + server validation + AI guardrails), and **honest scope**—what ships today vs. what remains roadmap.
+- OpenAI rate limits are **in-process**; multiple instances need a shared limiter (for example Redis) for strict global caps.  
+- Referrals and tasks are secured at the database layer; product UI may not expose every table.  
+- Resource matching is **not** embedding-based; weights live in `src/lib/matching/engine.ts`.
+
+---
+
+## Public launch checklist (ordered)
+
+Use this as a single pass before opening the repo or pointing a production domain here.
+
+1. Confirm **no secrets** in git history or working tree (`.env.local` untracked; rotate any key that was ever exposed).  
+2. **Supabase:** run all migrations; verify RLS on user tables; configure Auth URLs and email templates as needed.  
+3. **Vercel:** set env vars per environment; redeploy; add Preview URLs to Supabase redirect allowlist if you use Preview deployments.  
+4. **GitHub:** enable private security reporting; add branch protection if collaborators push to `main`.  
+5. Smoke-test: sign-in, create family, plan flow, and (if enabled) one AI action.  
+6. Read **SECURITY.md** once for your deployment context.
+
+---
+
+## License and review context
+
+The repository is structured for **technical review**: clear boundaries between client and server, RLS-backed data access, validated inputs, and documented operator responsibilities. Scope is described honestly above versus future work.

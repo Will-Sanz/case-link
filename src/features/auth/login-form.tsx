@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { alertErrorClass } from "@/lib/ui/form-classes";
+import {
+  safeOAuthRedirectMessage,
+  safeSignInPasswordMessage,
+} from "@/lib/auth/safe-client-auth-message";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
@@ -27,11 +31,15 @@ export function LoginForm() {
         }
       })()
     : null;
-  const [error, setError] = useState<string | null>(
-    urlError === "auth" ?
-      "This sign-in link is invalid, expired, or was already used."
-    : urlError,
-  );
+  const [error, setError] = useState<string | null>(() => {
+    if (urlError === "auth") {
+      return "This sign-in link is invalid, expired, or was already used.";
+    }
+    if (urlError && urlError.length > 0) {
+      return safeOAuthRedirectMessage(urlError);
+    }
+    return null;
+  });
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -45,7 +53,7 @@ export function LoginForm() {
         password,
       });
       if (signError) {
-        setError(signError.message);
+        setError(safeSignInPasswordMessage(signError.message));
         return;
       }
       router.push(nextPath.startsWith("/") ? nextPath : "/dashboard");
