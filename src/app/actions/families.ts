@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { requireAppUser, requireAppUserWithClient } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
+import {
+  publicMessageFromCaughtError,
+  publicMessageFromSupabaseError,
+} from "@/lib/errors/public-action-error";
 import {
   addCaseNoteSchema,
   familyIntakeFormSchema,
@@ -170,7 +173,7 @@ export async function createFamilyIntake(
     await rollback();
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "Save failed",
+      error: publicMessageFromCaughtError("createFamilyIntake", e, "Save failed."),
     };
   }
 

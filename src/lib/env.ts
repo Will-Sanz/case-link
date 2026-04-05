@@ -40,10 +40,20 @@ const envSchema = z.object({
   OPENAI_MODEL_OVERRIDE: z.string().optional(),
   /** Set to "1" to log AI requests and model selection. */
   OPENAI_DEBUG: z.string().optional(),
+  /** Set to "1" to log OpenAI request payloads (server only). */
+  OPENAI_PAYLOAD_DEBUG: z.string().optional(),
+  /** Plan regeneration trace logs (server only). */
+  PLAN_REGENERATE_DEBUG: z.string().optional(),
+  PLAN_REFINE_DEBUG: z.string().optional(),
   /** Max OpenAI-backed requests per user per sliding window (default 30). */
   OPENAI_RATE_LIMIT_MAX_PER_MINUTE: z.coerce.number().optional(),
   /** Sliding window length in ms (default 60000, min 10000). */
   OPENAI_RATE_LIMIT_WINDOW_MS: z.coerce.number().optional(),
+  /**
+   * Optional per-IP cap for OpenAI (same window as user limit). Requires `clientIp` on request meta.
+   * Omit or set 0 to disable.
+   */
+  OPENAI_RATE_LIMIT_PER_IP_MAX: z.coerce.number().optional(),
   /** Reject prompts larger than this (character count of serialized input). Default 120000. */
   OPENAI_MAX_INPUT_CHARS: z.coerce.number().optional(),
   /** Hard cap on max_tokens / max_output_tokens per request. Default 8192. */
@@ -95,6 +105,9 @@ export function getEnv(): Env {
   cached = data;
   return cached;
 }
+
+/** Re-export for modules that must not import the full `getEnv` graph. */
+export { isDev, isProd } from "@/lib/env/runtime";
 
 export function requireServiceRoleKey(): string {
   const key = getEnv().SUPABASE_SERVICE_ROLE_KEY;

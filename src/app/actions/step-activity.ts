@@ -1,26 +1,32 @@
 "use server";
 
 import { requireAppUserWithClient } from "@/lib/auth/session";
+import { logServerError } from "@/lib/logger/server-error";
 import { getStepActivity } from "@/lib/services/workflow";
 
 export async function fetchStepActivity(stepId: string) {
-  const supabase = (await requireAppUserWithClient()).supabase;
+  try {
+    const supabase = (await requireAppUserWithClient()).supabase;
 
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("plan_id")
-    .eq("id", stepId)
-    .maybeSingle();
+    const { data: step } = await supabase
+      .from("plan_steps")
+      .select("plan_id")
+      .eq("id", stepId)
+      .maybeSingle();
 
-  if (!step) return [];
+    if (!step) return [];
 
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .maybeSingle();
+    const { data: plan } = await supabase
+      .from("plans")
+      .select("family_id")
+      .eq("id", step.plan_id)
+      .maybeSingle();
 
-  if (!plan) return [];
+    if (!plan) return [];
 
-  return getStepActivity(supabase, stepId, 30);
+    return await getStepActivity(supabase, stepId, 30);
+  } catch (e) {
+    logServerError("fetchStepActivity", e);
+    return [];
+  }
 }

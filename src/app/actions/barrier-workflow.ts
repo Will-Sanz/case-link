@@ -10,6 +10,10 @@ import {
   rawMatchScoreToPercent,
 } from "@/lib/matching/normalize-display-score";
 import {
+  publicMessageFromCaughtError,
+  publicMessageFromSupabaseError,
+} from "@/lib/errors/public-action-error";
+import {
   type BarrierPresetLabel,
   type BarrierWorkflowInput,
   type BarrierWorkflowPlanSection,
@@ -35,12 +39,7 @@ const BARRIER_KEY_BY_LABEL: Record<BarrierPresetLabel, string> = {
 };
 
 function toClientError(error: unknown): string {
-  if (error instanceof Error) {
-    const msg = error.message?.trim();
-    if (!msg) return "Unexpected error";
-    return msg;
-  }
-  return "Unexpected error";
+  return publicMessageFromCaughtError("barrier-workflow", error);
 }
 
 function formatDateRange(start: Date, daysFrom: number, daysTo: number): string {
@@ -189,7 +188,7 @@ async function upsertBarrierPlanRecord(
     .upsert(payload, { onConflict: "owner_user_id,reference_id" })
     .select("updated_at")
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(publicMessageFromSupabaseError(error, "Could not save plan data."));
   return (data?.updated_at as string | undefined) ?? now;
 }
 
@@ -259,7 +258,10 @@ export async function generateBarrierWorkflowAction(
         p_status: "active",
       });
       if (familyErr || !familyIdRaw) {
-        return { ok: false, error: familyErr?.message ?? "Could not create workflow session." };
+        return {
+          ok: false,
+          error: publicMessageFromSupabaseError(familyErr, "Could not create workflow session."),
+        };
       }
       familyId = String(familyIdRaw);
     }
@@ -280,7 +282,7 @@ export async function generateBarrierWorkflowAction(
     }
     if (barrierRows.length > 0) {
       const { error: barrierErr } = await supabase.from("family_barriers").insert(barrierRows);
-      if (barrierErr) return { ok: false, error: barrierErr.message };
+      if (barrierErr) return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
     }
 
     const matchRes = await runResourceMatching({ familyId });
@@ -407,7 +409,7 @@ export async function loadBarrierWorkflowByReferenceAction(
       .eq("owner_user_id", user.id)
       .eq("reference_id", ref)
       .maybeSingle();
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     if (!record?.family_id) return { ok: false, error: "No saved plan for this ID yet." };
 
     const detail = await getFamilyDetail(supabase, record.family_id as string);
@@ -455,7 +457,7 @@ export async function listRecentBarrierPlanRecordsAction(
       .eq("owner_user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(Math.max(1, Math.min(limit, 20)));
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     const records = (data ?? []).map((r) => ({
       referenceId: r.reference_id as string,
       familyId: r.family_id as string,
@@ -511,7 +513,7 @@ export async function generateBarrierWorkflowForFamilyAction(
     }
     if (barrierRows.length > 0) {
       const { error: barrierErr } = await supabase.from("family_barriers").insert(barrierRows);
-      if (barrierErr) return { ok: false, error: barrierErr.message };
+      if (barrierErr) return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
     }
 
     await supabase

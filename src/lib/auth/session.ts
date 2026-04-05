@@ -1,5 +1,6 @@
 import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { logServerError } from "@/lib/logger/server-error";
 import type { AppUserRow } from "@/types/database";
 import { UserRole, type UserRole as UserRoleType } from "@/types/user-role";
 
@@ -37,6 +38,7 @@ export async function ensureAppUserWithClient(
 ): Promise<AppUser> {
   const email = supabaseUser.email?.toLowerCase().trim() ?? "";
   if (!email) {
+    logServerError("ensureAppUserWithClient:no-email", new Error("missing email"));
     throw new Error("Authenticated user is missing an email address.");
   }
 
@@ -47,7 +49,8 @@ export async function ensureAppUserWithClient(
     .maybeSingle();
 
   if (fetchError) {
-    throw new Error(fetchError.message);
+    logServerError("ensureAppUserWithClient:fetch", fetchError);
+    throw new Error("Could not load your account. Please try signing in again.");
   }
 
   if (existing) {
@@ -57,7 +60,8 @@ export async function ensureAppUserWithClient(
         .update({ email })
         .eq("id", existing.id);
       if (updateError) {
-        throw new Error(updateError.message);
+        logServerError("ensureAppUserWithClient:update-email", updateError);
+        throw new Error("Could not update your account. Please try again.");
       }
       return rowToAppUser({ ...existing, email });
     }
@@ -75,7 +79,8 @@ export async function ensureAppUserWithClient(
     .single();
 
   if (insertError) {
-    throw new Error(insertError.message);
+    logServerError("ensureAppUserWithClient:insert", insertError);
+    throw new Error("Could not create your workspace profile. Please try again.");
   }
 
   return rowToAppUser(inserted as AppUserRow);

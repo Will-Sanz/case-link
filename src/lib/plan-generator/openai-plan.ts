@@ -4,6 +4,7 @@ import type { AiMode } from "@/lib/ai/ai-mode";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
+import { getEnv } from "@/lib/env";
 import { formatMatchesForAiPrompt, formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
@@ -29,7 +30,7 @@ export type OpenAiPlanResult =
   | { ok: false; reason: string };
 
 function shouldLogOpenAi(): boolean {
-  return process.env.OPENAI_DEBUG === "1";
+  return getEnv().OPENAI_DEBUG === "1";
 }
 
 /**
@@ -37,11 +38,9 @@ function shouldLogOpenAi(): boolean {
  * Off by default. Set `PLAN_REGENERATE_DEBUG=1` or `OPENAI_DEBUG=1` to enable.
  */
 export function shouldLogPlanRegenerate(): boolean {
-  if (process.env.PLAN_REGENERATE_DEBUG === "0") return false;
-  return (
-    process.env.PLAN_REGENERATE_DEBUG === "1" ||
-    process.env.OPENAI_DEBUG === "1"
-  );
+  const env = getEnv();
+  if (env.PLAN_REGENERATE_DEBUG === "0") return false;
+  return env.PLAN_REGENERATE_DEBUG === "1" || env.OPENAI_DEBUG === "1";
 }
 
 const AI_PROMPT_MATCH_LIMIT = 10;
@@ -743,7 +742,8 @@ export async function previewRefinePlanStepsWithOpenAI(
   options?: { retries?: number; aiMode?: AiMode; requestMeta?: OpenAiRequestMeta },
 ): Promise<OpenAiPlanResult> {
   void options?.retries;
-  const logRefine = process.env.PLAN_REFINE_DEBUG === "1" || process.env.OPENAI_DEBUG === "1";
+  const env = getEnv();
+  const logRefine = env.PLAN_REFINE_DEBUG === "1" || env.OPENAI_DEBUG === "1";
   const startedAt = Date.now();
   const context = buildFamilyContextForRefine(detail);
   const draftJson = compactDraftJsonForRefine(draftSteps);

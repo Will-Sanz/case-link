@@ -23,6 +23,7 @@ import { sparseDetailsForPersistence, type LeanPlanPhaseStep } from "@/lib/plan-
 import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-phase-summary";
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
+import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { getFamilyDetail } from "@/lib/services/families";
 import type { PlanGenerationState, PlanStepDetails } from "@/types/family";
 import {
@@ -154,7 +155,10 @@ async function insertLeanPhaseStepsForPlan(
     .order("sort_order", { ascending: true });
 
   if (stepsErr || !insertedSteps?.length) {
-    return { ok: false, error: stepsErr?.message ?? "Could not insert plan steps" };
+    return {
+      ok: false,
+      error: publicMessageFromSupabaseError(stepsErr, "Could not insert plan steps"),
+    };
   }
 
   const actionItemRows: Array<{
@@ -188,7 +192,7 @@ async function insertLeanPhaseStepsForPlan(
   if (actionItemRows.length > 0) {
     const { error: itemsErr } = await supabase.from("plan_step_action_items").insert(actionItemRows);
     if (itemsErr) {
-      return { ok: false, error: itemsErr.message };
+      return { ok: false, error: publicMessageFromSupabaseError(itemsErr) };
     }
   }
 
@@ -345,7 +349,10 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
 
   if (planErr || !plan) {
     console.error(`${logPrefix} plans insert failed:`, planErr?.message ?? "no row");
-    return { ok: false, error: planErr?.message ?? "Could not create plan" };
+    return {
+      ok: false,
+      error: publicMessageFromSupabaseError(planErr, "Could not create plan"),
+    };
   }
 
   if (steps.length > 0) {
@@ -368,7 +375,10 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
     if (stepsErr || !insertedSteps?.length) {
       console.error(`${logPrefix} plan_steps insert failed:`, stepsErr?.message ?? "empty result");
       if (!stepsErr) await supabase.from("plans").delete().eq("id", plan.id);
-      return { ok: false, error: stepsErr?.message ?? "Could not create steps" };
+      return {
+        ok: false,
+        error: publicMessageFromSupabaseError(stepsErr, "Could not create steps"),
+      };
     }
 
     const actionItemRows: Array<{
@@ -412,7 +422,7 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
       if (itemsErr) {
         console.error(`${logPrefix} plan_step_action_items insert failed:`, itemsErr.message);
         await supabase.from("plans").delete().eq("id", plan.id);
-        return { ok: false, error: itemsErr.message };
+        return { ok: false, error: publicMessageFromSupabaseError(itemsErr) };
       }
     }
   } else if (logRegen) {
@@ -544,7 +554,10 @@ export async function startStagedLeanPlanGeneration(input: {
     .single();
 
   if (planErr || !plan) {
-    return { ok: false, error: planErr?.message ?? "Could not create plan" };
+    return {
+      ok: false,
+      error: publicMessageFromSupabaseError(planErr, "Could not create plan"),
+    };
   }
 
   const ins = await insertLeanPhaseStepsForPlan(supabase, plan.id, steps30, 0);
@@ -872,7 +885,7 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
   const { error } = await supabase.from("plans").update(payload).eq("id", planRow.id);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   revalidatePath(`/families/${familyId}`);
@@ -936,7 +949,7 @@ export async function updatePlanStep(
     .select("id");
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
   if (!updatedRows?.length) {
     return { ok: false, error: "Step not found or could not be updated." };
@@ -1013,7 +1026,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   }).select("id").single();
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   if (newStep) {
@@ -1071,7 +1084,7 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
     .eq("id", stepId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await logCaseActivity(supabase, familyId, userId, "step.deleted", "plan_step", stepId);
@@ -1132,7 +1145,7 @@ export async function logPlanStepActivity(input: unknown): Promise<ActionResult>
   });
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await logCaseActivity(supabase, familyId, userId, "step.activity_logged", "plan_step", stepId, {
@@ -1232,7 +1245,7 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
     .eq("id", stepId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   if (statusUpdate && plan) {
@@ -1318,7 +1331,7 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
     .eq("id", actionItemId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   if (status === "completed") {
@@ -1654,7 +1667,7 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
   const { error } = await supabase.from("plan_steps").update(updatePayload).eq("id", stepId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   const session = await requireAppUserWithClient();

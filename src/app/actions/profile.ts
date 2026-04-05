@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
+import { isDev } from "@/lib/env/runtime";
 import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { parseProfileFormData, profileUpdateSchema } from "@/lib/validation/profile";
 
@@ -59,7 +60,7 @@ export async function updateCaseManagerProfile(
     revalidatePath("/profile");
     return { ok: true, message: "Profile saved." };
   } catch (e) {
-    if (process.env.NODE_ENV === "development" && e instanceof Error) {
+    if (isDev() && e instanceof Error) {
       return { ok: false, message: e.message };
     }
     return { ok: false, message: "Something went wrong." };

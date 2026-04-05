@@ -4,6 +4,7 @@ import type { AiMode } from "@/lib/ai/ai-mode";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
+import { getEnv } from "@/lib/env";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { dedupeLeanPhaseSteps } from "@/lib/plan-generator/lean-step-dedupe";
 import {
@@ -20,7 +21,8 @@ function cloneSchema(schema: unknown): Record<string, unknown> {
 }
 
 function shouldLog(): boolean {
-  return process.env.OPENAI_DEBUG === "1" || process.env.PLAN_REGENERATE_DEBUG === "1";
+  const env = getEnv();
+  return env.OPENAI_DEBUG === "1" || env.PLAN_REGENERATE_DEBUG === "1";
 }
 
 const PHASE_FOCUS: Record<PlanPhase, string> = {

@@ -60,7 +60,7 @@ Case managers juggle fragile timelines, referrals, and documentation. CaseLink c
 **Guardrails (server-side):**
 
 - API key and model overrides are **server-only**; model IDs are validated at startup against an allowlist pattern (`src/lib/ai/model-allowlist.ts`).
-- **Per-user rate limiting** (in-memory per process; configurable via env) applies to all OpenAI-backed actions together.
+- **Per-user rate limiting** (in-memory per process; configurable via env) applies to all OpenAI-backed actions together; optional **per-IP** cap via `OPENAI_RATE_LIMIT_PER_IP_MAX`.
 - **Prompt size** and **max output tokens** caps reduce runaway cost.
 - **429-style** messaging when rate limited; generic client errors in production unless `OPENAI_DEBUG=1`.
 - Lightweight **`[openai-usage]`** logs (user id, route label, model, tokens when available, timing)—no prompt body in those lines.
@@ -75,11 +75,13 @@ Case managers juggle fragile timelines, referrals, and documentation. CaseLink c
 | **Auth** | Supabase Auth; server actions require `requireAppUserWithClient()` where appropriate. |
 | **RLS** | Families, plans, steps, matches, notes, activity log, barrier records, referrals, tasks—scoped to accessible families (see `supabase/migrations/`). |
 | **Input** | Zod schemas on server actions; lengths and UUIDs enforced for AI entry points (`src/lib/validations/ai-actions.ts`). |
-| **Errors** | Supabase errors mapped to safe messages (`src/lib/errors/public-action-error.ts`); AI errors sanitized for clients in production. |
+| **Errors** | Supabase errors mapped to safe messages (`src/lib/errors/public-action-error.ts`); AI errors sanitized for clients in production; `error.tsx` / `global-error.tsx` avoid implying misconfiguration to end users. |
 | **Headers** | `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` via `next.config.ts`. |
 | **Markdown** | Case assistant renders model output as Markdown; links only allow `http:`, `https:`, and `mailto:`. |
 
 **Manual steps you still own:** lock down Supabase **Auth** settings, **Site URL** / redirect URLs, and ensure **RLS is enabled** on all exposed tables in hosted projects. Review **Vercel** env scopes (Production vs Preview).
+
+See **[SECURITY.md](./SECURITY.md)** for a concise public-facing security overview.
 
 ---
 
@@ -129,9 +131,11 @@ npm run ci
 | `OPENAI_*_MODEL` / `OPENAI_MODEL_OVERRIDE` | Optional | Must pass model allowlist validation |
 | `OPENAI_RATE_LIMIT_MAX_PER_MINUTE` | Optional | Default 30 per user per window |
 | `OPENAI_RATE_LIMIT_WINDOW_MS` | Optional | Default 60000 |
+| `OPENAI_RATE_LIMIT_PER_IP_MAX` | Optional | Per-IP OpenAI request cap (same window; unset = disabled) |
 | `OPENAI_MAX_INPUT_CHARS` | Optional | Default 120000 |
 | `OPENAI_MAX_OUTPUT_TOKENS` | Optional | Hard cap per request (default 8192) |
 | `OPENAI_DEBUG` | Optional | Verbose **server** logs |
+| `OPENAI_PAYLOAD_DEBUG` / `PLAN_REGENERATE_DEBUG` / `PLAN_REFINE_DEBUG` | Optional | Extra server logging for AI payloads / plan flows (never exposed to the client) |
 
 See `.env.example` for the full list and comments.
 
@@ -145,6 +149,7 @@ Apply SQL files in **`supabase/migrations/`** in filename order on your Supabase
 - `20260321120000_family_rls.sql` — `can_access_family`, family domain policies  
 - `20260321170000_plans_rls.sql` — Plans & steps  
 - `20260405120000_referrals_tasks_rls.sql` — Referrals & tasks (family-scoped)  
+- `20260406120000_rls_policy_hardening.sql` — Tightens `barrier_plan_records` to `authenticated`, binds `plan_step_activity` inserts to `actor_user_id`, explicit deny on `resource_import_runs` for JWT roles  
 
 **Do not reorder** migrations that are already applied in production.
 
@@ -173,7 +178,8 @@ Operational notes live in `DEPLOYMENT_NOTES.md` (Vercel 404 troubleshooting, no 
 
 ## Public repository checklist
 
-- [ ] No `.env.local` or keys committed (`.gitignore` includes `.env*`).  
+- [ ] No `.env.local` or keys committed (`.gitignore` includes `.env*`; `!.env.example` is tracked).  
+- [ ] `SECURITY.md` reviewed for your deployment context.  
 - [ ] Supabase production project has RLS verified (no broad `USING (true)` on user tables).  
 - [ ] Vercel env vars set per environment; Preview URLs added to Supabase redirect allowlist if used.  
 - [ ] `OPENAI_API_KEY` rotated if it was ever exposed.  

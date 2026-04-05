@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 
+const isDev = process.env.NODE_ENV === "development";
+
 export default function Error({
   error,
   reset,
@@ -11,7 +13,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
+    if (isDev) {
       console.error(error);
     }
   }, [error]);
@@ -20,8 +22,9 @@ export default function Error({
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
       <h1 className="text-lg font-semibold text-foreground">Something went wrong</h1>
       <p className="max-w-md text-sm text-muted-foreground">
-        Please try again. If the problem continues, check that environment variables are set
-        correctly on your host.
+        {isDev
+          ? "Please try again. If this persists, check the server console and your local configuration."
+          : "Please try again. If the problem continues, contact your administrator."}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button

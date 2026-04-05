@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+const isDev = process.env.NODE_ENV === "development";
+
 export default function GlobalError({
   error,
   reset,
@@ -10,7 +12,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
+    if (isDev) {
       console.error(error);
     }
   }, [error]);

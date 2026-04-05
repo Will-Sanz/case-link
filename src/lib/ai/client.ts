@@ -13,7 +13,10 @@ import {
 import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { getEnv } from "@/lib/env";
-import { takeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
+import { isDev } from "@/lib/env/runtime";
+import { getClientIpFromHeaders } from "@/lib/http/client-ip";
+import { takeOpenAiRateSlot, takeOpenAiRateSlotForIp } from "@/lib/rate-limit/ai-rate-limit";
+import { headers } from "next/headers";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
 const OPENAI_FETCH_TIMEOUT_MS = 180_000;
@@ -72,10 +75,10 @@ function summarizeInput(input: string | ChatMessage[]): { chars: number; preview
   return { chars: combined.length, preview: combined.slice(0, 1200) };
 }
 
-function exposeAiErrorToClient(internal: string): string {
+function exposeAiErrorToClient(internal: string, envDebug: boolean): string {
   if (internal.startsWith("Too many AI requests")) return internal;
   if (internal.startsWith("Request is too large")) return internal;
-  if (process.env.NODE_ENV === "development" || process.env.OPENAI_DEBUG === "1") {
+  if (isDev() || envDebug) {
     return internal;
   }
   if (internal === "OPENAI_API_KEY is not set") {
@@ -113,6 +116,20 @@ function modelSupportsTemperature(modelId: string): boolean {
   return true;
 }
 
+async function enrichOpenAiRequestMeta(
+  meta: OpenAiRequestMeta | undefined,
+): Promise<OpenAiRequestMeta | undefined> {
+  if (!meta) return undefined;
+  if (meta.clientIp != null && meta.clientIp !== "") return meta;
+  try {
+    const h = await headers();
+    const ip = getClientIpFromHeaders(h);
+    return ip ? { ...meta, clientIp: ip } : meta;
+  } catch {
+    return meta;
+  }
+}
+
 /**
  * Call OpenAI. Uses Responses API for core reasoning tasks, Chat Completions for helpers.
  * Supports env override: OPENAI_MODEL_OVERRIDE forces a single model for all tasks.
@@ -121,17 +138,23 @@ export async function createAiResponse(
   options: CreateResponseOptions,
 ): Promise<CreateResponseResult> {
   const env = getEnv();
+  const envDebug = env.OPENAI_DEBUG === "1";
   const apiKey = env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    return { ok: false, error: exposeAiErrorToClient("OPENAI_API_KEY is not set") };
+    return { ok: false, error: exposeAiErrorToClient("OPENAI_API_KEY is not set", envDebug) };
   }
 
-  const meta = options.requestMeta;
+  const meta = await enrichOpenAiRequestMeta(options.requestMeta);
   if (meta) {
     const allowed = takeOpenAiRateSlot(meta.userId);
     if (!allowed) {
       const msg = "Too many AI requests. Please wait a minute and try again.";
       logOpenAiUsage(meta, options.taskType, "(rate_limited)", { ok: false, error: msg }, 0);
+      return { ok: false, error: msg };
+    }
+    if (meta.clientIp && !takeOpenAiRateSlotForIp(meta.clientIp)) {
+      const msg = "Too many AI requests. Please wait a minute and try again.";
+      logOpenAiUsage(meta, options.taskType, "(ip_rate_limited)", { ok: false, error: msg }, 0);
       return { ok: false, error: msg };
     }
   }
@@ -142,7 +165,7 @@ export async function createAiResponse(
   if (!isAllowedOpenAiModelId(model)) {
     const internal = `Resolved model id is not allowed: ${model}`;
     console.error("[ai]", internal);
-    return { ok: false, error: exposeAiErrorToClient(internal) };
+    return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
   }
 
   const useResponses = !modelOverride && taskUsesResponsesApi(options.taskType);
@@ -169,13 +192,13 @@ export async function createAiResponse(
     if (meta) {
       logOpenAiUsage(meta, options.taskType, model, { ok: false, error: err }, 0);
     }
-    return { ok: false, error: exposeAiErrorToClient(err) };
+    return { ok: false, error: exposeAiErrorToClient(err, envDebug) };
   }
 
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
-  const debug = process.env.OPENAI_DEBUG === "1";
-  const payloadDebug = process.env.OPENAI_PAYLOAD_DEBUG === "1";
+  const debug = envDebug;
+  const payloadDebug = env.OPENAI_PAYLOAD_DEBUG === "1";
   const startedAt = Date.now();
 
   if (debug || payloadDebug) {
@@ -208,7 +231,7 @@ export async function createAiResponse(
         rawResult
       : {
           ok: false,
-          error: exposeAiErrorToClient(rawResult.error),
+          error: exposeAiErrorToClient(rawResult.error, envDebug),
         };
 
     if (!rawResult.ok && debug) {
@@ -240,7 +263,7 @@ export async function createAiResponse(
     if (isAbortOrTimeoutError(e)) {
       const internal = `OpenAI request timed out after ${OPENAI_FETCH_TIMEOUT_MS / 1000}s`;
       if (debug) console.info(`[ai] task=${options.taskType} model=${model} error=`, internal);
-      const out = { ok: false as const, error: exposeAiErrorToClient(internal) };
+      const out = { ok: false as const, error: exposeAiErrorToClient(internal, envDebug) };
       if (meta) {
         logOpenAiUsage(meta, options.taskType, model, { ok: false, error: internal }, Date.now() - startedAt);
       }
@@ -250,7 +273,7 @@ export async function createAiResponse(
     if (debug) {
       console.info(`[ai] task=${options.taskType} model=${model} error=`, internal);
     }
-    const out = { ok: false as const, error: exposeAiErrorToClient(internal) };
+    const out = { ok: false as const, error: exposeAiErrorToClient(internal, envDebug) };
     if (meta) {
       logOpenAiUsage(meta, options.taskType, model, { ok: false, error: internal }, Date.now() - startedAt);
     }

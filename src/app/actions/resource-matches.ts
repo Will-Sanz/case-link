@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { rankResourcesForFamily } from "@/lib/matching/engine";
 import type { FamilyMatchInput, MatchableResource } from "@/lib/matching/types";
+import { publicMessageFromCaughtError, publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { getFamilyDetail } from "@/lib/services/families";
 import { searchResourcesForPicker } from "@/lib/services/resources-picker";
 import { linkResourceToStepSchema } from "@/lib/validations/plans";
@@ -90,7 +91,7 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
     .eq("active", true);
 
   if (resErr) {
-    return { ok: false, error: resErr.message };
+    return { ok: false, error: publicMessageFromSupabaseError(resErr) };
   }
 
   const resources = (resourceRows ?? []) as MatchableResource[];
@@ -102,7 +103,7 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
     .eq("family_id", familyId);
 
   if (exErr) {
-    return { ok: false, error: exErr.message };
+    return { ok: false, error: publicMessageFromSupabaseError(exErr) };
   }
 
   const dismissed = new Set<string>();
@@ -119,7 +120,7 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
     .eq("status", "suggested");
 
   if (delErr) {
-    return { ok: false, error: delErr.message };
+    return { ok: false, error: publicMessageFromSupabaseError(delErr) };
   }
 
   const toInsert = ranked.filter(
@@ -137,7 +138,7 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
       })),
     );
     if (insErr) {
-      return { ok: false, error: insErr.message };
+      return { ok: false, error: publicMessageFromSupabaseError(insErr) };
     }
   }
 
@@ -175,7 +176,7 @@ export async function updateResourceMatchStatus(
     .eq("family_id", familyId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await logActivity(supabase, familyId, user.id, `matching.${status}`, { matchId });
@@ -211,7 +212,7 @@ export async function addManualResourceMatch(input: unknown): Promise<ActionResu
   );
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await logActivity(supabase, familyId, user.id, "matching.manual_add", { resourceId });
@@ -242,7 +243,7 @@ export async function linkResourceToStep(input: unknown): Promise<ActionResult> 
     .eq("family_id", familyId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await logActivity(supabase, familyId, user.id, "matching.linked_to_step", {
@@ -276,7 +277,7 @@ export async function unlinkResourceFromStep(input: unknown): Promise<ActionResu
     .eq("family_id", familyId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await logActivity(supabase, familyId, user.id, "matching.unlinked_from_step", { matchId });
@@ -304,7 +305,7 @@ export async function searchResourcesAction(
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "Search failed",
+      error: publicMessageFromCaughtError("searchResourcesAction", e, "Search failed."),
     };
   }
 }
