@@ -43,3 +43,6 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Operator / deployment security notes (kept locally, not published with the repo)
+SECURITY.md
