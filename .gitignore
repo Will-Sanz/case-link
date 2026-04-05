@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Operator / deployment security notes (kept locally, not published with the repo)
 SECURITY.md
+
+# Full resource directory export (partner contacts); sample CSV stays tracked
+data/resources-seed.private.csv

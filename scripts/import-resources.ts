@@ -4,8 +4,11 @@
  *
  * Usage:
  *   npx tsx scripts/import-resources.ts [path/to/file.csv]
- * Default path: data/resources-seed.csv
+ *
+ * Default CSV (when no path arg): `data/resources-seed.private.csv` if that file exists,
+ * otherwise `data/resources-seed.sample.csv` (synthetic rows safe to commit).
  */
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
@@ -15,13 +18,13 @@ loadEnv({ path: ".env" });
 import { createClient } from "@supabase/supabase-js";
 import { parseResourceCsvFromPath } from "../src/lib/db/resource-import/parse-resource-file";
 import { parsedResourceToDbRow } from "../src/lib/db/resource-import/to-db-row";
+import {
+  RESOURCE_SEED_PRIVATE_BASENAME,
+  RESOURCE_SEED_SAMPLE_BASENAME,
+  resolveDefaultResourceSeedCsvPath,
+} from "../src/lib/db/resource-import/resolve-seed-csv-path";
 
-const defaultCsvPath = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "data",
-  "resources-seed.csv",
-);
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -37,7 +40,25 @@ async function main() {
   const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   const argPath = process.argv[2];
-  const filePath = argPath ? path.resolve(argPath) : defaultCsvPath;
+  let filePath: string;
+  if (argPath) {
+    filePath = path.resolve(argPath);
+  } else {
+    const resolved = resolveDefaultResourceSeedCsvPath(repoRoot);
+    if (!fs.existsSync(resolved.absolutePath)) {
+      console.error(
+        [
+          "No default resource seed CSV found.",
+          `  Prefer (local, gitignored): data/${RESOURCE_SEED_PRIVATE_BASENAME}`,
+          `  Fallback (repo sample):     data/${RESOURCE_SEED_SAMPLE_BASENAME}`,
+          "Or pass an explicit path: npx tsx scripts/import-resources.ts path/to/file.csv",
+        ].join("\n"),
+      );
+      process.exit(1);
+    }
+    filePath = resolved.absolutePath;
+    console.info(`Using default resource seed (${resolved.source}): ${filePath}`);
+  }
 
   console.info(`Reading CSV: ${filePath}`);
   const parsed = parseResourceCsvFromPath(filePath);

@@ -112,7 +112,7 @@ The UI targets **usable density**: clear hierarchy, minimal noise, and flows tha
 - **Account lifecycle** — Full self-service account deletion may not be available in-app; some flows are still evolving.
 - **Dependence on third-party AI** — When OpenAI is enabled, content generation relies on vendor availability, policy, and pricing; the stack includes **rules-based** paths where AI is off or fails.
 - **Rate limiting** — In-memory limits do not coordinate across multiple server instances; production hardening may require a shared limiter.
-- **Resource matching** — Deliberately **not** embedding-based; weights and rules live in code for transparency and predictability, at the cost of semantic “nearest neighbor” search.
+- **Resource matching** — Deliberately **not** embedding-based; weights and rules live in code for transparency and predictability, at the cost of semantic “nearest neighbor” search. The repo ships a **small synthetic CSV** for demos; full partner exports stay **local** (see `data/README.md`).
 - **Early-stage product** — Scope is described honestly; the codebase is structured for review and iteration, not for claiming completeness.
 
 ---
