@@ -96,6 +96,18 @@ export function PublicSiteShell({
                   Sign in
                 </Link>
               )}
+              <Link
+                href="/privacy"
+                className="text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:underline"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="/terms"
+                className="text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:underline"
+              >
+                Terms of Service
+              </Link>
             </nav>
           </div>
           <p className="mt-8 border-t border-slate-200 pt-6 text-xs text-slate-500">

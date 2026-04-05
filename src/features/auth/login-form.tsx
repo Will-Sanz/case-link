@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { LegalDocumentModal } from "@/components/legal/legal-document-modal";
+import type { LegalModalDocument } from "@/components/legal/legal-document-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +43,7 @@ export function LoginForm() {
     return null;
   });
   const [pending, setPending] = useState(false);
+  const [legalModal, setLegalModal] = useState<LegalModalDocument | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +68,12 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <LegalDocumentModal
+        open={legalModal !== null}
+        document={legalModal}
+        onClose={() => setLegalModal(null)}
+        onChangeDocument={(doc) => setLegalModal(doc)}
+      />
       {error ? (
         <p className={alertErrorClass} role="alert">
           {error}
@@ -107,6 +116,25 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
       </Button>
+      <p className="text-center text-[11px] leading-relaxed text-slate-500">
+        By continuing, you agree to our{" "}
+        <button
+          type="button"
+          className="inline font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline"
+          onClick={() => setLegalModal("terms")}
+        >
+          Terms of Service
+        </button>{" "}
+        and{" "}
+        <button
+          type="button"
+          className="inline font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline"
+          onClick={() => setLegalModal("privacy")}
+        >
+          Privacy Policy
+        </button>
+        .
+      </p>
     </form>
   );
 }

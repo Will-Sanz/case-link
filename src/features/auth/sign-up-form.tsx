@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { LegalDocumentModal } from "@/components/legal/legal-document-modal";
+import type { LegalModalDocument } from "@/components/legal/legal-document-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,11 +23,20 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [legalModal, setLegalModal] = useState<LegalModalDocument | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setInfo(null);
+
+    if (!agreedToTerms) {
+      setError(
+        "You must agree to the Terms of Service and Privacy Policy to create an account.",
+      );
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -81,6 +92,12 @@ export function SignUpForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <LegalDocumentModal
+        open={legalModal !== null}
+        document={legalModal}
+        onClose={() => setLegalModal(null)}
+        onChangeDocument={(doc) => setLegalModal(doc)}
+      />
       {error ? (
         <p className={alertErrorClass} role="alert">
           {error}
@@ -137,6 +154,35 @@ export function SignUpForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           className="mt-1"
         />
+      </div>
+      <div className="flex items-start gap-2.5 rounded-md border border-slate-200/80 bg-slate-50/50 px-3 py-3">
+        <input
+          id="signup-accept-legal"
+          name="acceptTerms"
+          type="checkbox"
+          checked={agreedToTerms}
+          onChange={(e) => setAgreedToTerms(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-0"
+        />
+        <label htmlFor="signup-accept-legal" className="text-sm leading-snug text-slate-600">
+          By creating an account, you agree to the{" "}
+          <button
+            type="button"
+            className="inline font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
+            onClick={() => setLegalModal("terms")}
+          >
+            Terms of Service
+          </button>{" "}
+          and{" "}
+          <button
+            type="button"
+            className="inline font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
+            onClick={() => setLegalModal("privacy")}
+          >
+            Privacy Policy
+          </button>
+          .
+        </label>
       </div>
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Creating account…" : "Create account"}

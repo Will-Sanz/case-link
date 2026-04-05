@@ -20,7 +20,7 @@ function StandardAside({
   activeFamilyTab?: string;
 }) {
   return (
-    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white lg:flex lg:flex-col">
       <Link
         href="/"
         className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-4 text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400/40"
@@ -68,6 +68,19 @@ function StandardAside({
           </div>
         </>
       ) : null}
+      <div className="mt-auto border-t border-slate-200 px-3 py-3">
+        <p className="text-[11px] text-slate-400">
+          <Link href="/privacy" className="hover:text-slate-600 focus-visible:outline-none focus-visible:underline">
+            Privacy
+          </Link>
+          <span className="mx-1 text-slate-300" aria-hidden>
+            ·
+          </span>
+          <Link href="/terms" className="hover:text-slate-600 focus-visible:outline-none focus-visible:underline">
+            Terms
+          </Link>
+        </p>
+      </div>
     </aside>
   );
 }
@@ -141,6 +154,19 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
+          <div className="border-t border-slate-100 px-3 py-2 lg:hidden">
+            <p className="text-center text-[10px] text-slate-400">
+              <Link href="/privacy" className="hover:text-slate-600">
+                Privacy
+              </Link>
+              <span className="mx-1 text-slate-300" aria-hidden>
+                ·
+              </span>
+              <Link href="/terms" className="hover:text-slate-600">
+                Terms
+              </Link>
+            </p>
+          </div>
         </header>
 
         <MainContent>{children}</MainContent>

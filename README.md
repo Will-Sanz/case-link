@@ -177,6 +177,13 @@ Apply files in **`supabase/migrations/`** in lexicographic filename order (`supa
 
 ---
 
+## Legal
+
+- Privacy Policy: `/privacy`
+- Terms of Service: `/terms`
+
+---
+
 ## Public launch checklist (ordered)
 
 Use this as a single pass before opening the repo or pointing a production domain here.
