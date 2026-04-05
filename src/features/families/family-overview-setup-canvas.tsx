@@ -25,7 +25,7 @@ export function FamilyOverviewSetupCanvas({
   onAdditionalContextChange,
   lastSavedAt,
   error,
-  pending,
+  generateBusy,
   generateStartedAt,
   elapsedSeconds,
   onGenerate,
@@ -43,7 +43,8 @@ export function FamilyOverviewSetupCanvas({
   onAdditionalContextChange: (value: string) => void;
   lastSavedAt: string | null | undefined;
   error: string | null;
-  pending: boolean;
+  /** True while plan generation (including staged 60/90 phases) is in progress. */
+  generateBusy: boolean;
   generateStartedAt: number | null;
   elapsedSeconds: number;
   onGenerate: () => void;
@@ -244,20 +245,20 @@ export function FamilyOverviewSetupCanvas({
             <Button
               type="button"
               onClick={onGenerate}
-              disabled={pending}
+              disabled={generateBusy}
               className={cn(
                 "h-14 min-h-[3.5rem] w-full text-base font-semibold tracking-tight shadow-sm sm:min-w-[min(100%,18rem)]",
                 "bg-slate-900 text-white hover:bg-slate-800",
               )}
             >
-              {pending
+              {generateBusy
                 ? "Generating..."
                 : hasGeneratedThisSession
                   ? "Regenerate Plan and Match Resources"
                   : "Generate Plan and Match Resources"}
             </Button>
           </div>
-          {pending && generateStartedAt ? (
+          {generateBusy && generateStartedAt ? (
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span
                 className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"

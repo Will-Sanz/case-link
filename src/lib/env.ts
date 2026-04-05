@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -13,7 +14,7 @@ const envSchema = z.object({
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
   /**
-   * Canonical public URL (e.g. https://www.thecaselink.com). Recommended for signup `redirectTo`
+   * Canonical public URL (e.g. https://app.example.com). Recommended for signup `redirectTo`
    * and other auth URLs when not on Vercel, or when overriding the production fallback.
    */
   NEXT_PUBLIC_SITE_URL: z.string().optional(),
@@ -39,6 +40,14 @@ const envSchema = z.object({
   OPENAI_MODEL_OVERRIDE: z.string().optional(),
   /** Set to "1" to log AI requests and model selection. */
   OPENAI_DEBUG: z.string().optional(),
+  /** Max OpenAI-backed requests per user per sliding window (default 30). */
+  OPENAI_RATE_LIMIT_MAX_PER_MINUTE: z.coerce.number().optional(),
+  /** Sliding window length in ms (default 60000, min 10000). */
+  OPENAI_RATE_LIMIT_WINDOW_MS: z.coerce.number().optional(),
+  /** Reject prompts larger than this (character count of serialized input). Default 120000. */
+  OPENAI_MAX_INPUT_CHARS: z.coerce.number().optional(),
+  /** Hard cap on max_tokens / max_output_tokens per request. Default 8192. */
+  OPENAI_MAX_OUTPUT_TOKENS: z.coerce.number().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -57,6 +66,16 @@ function formatEnvError(parsed: z.ZodError): string {
  * Route Handlers, or `server-only` modules, not from client components.
  * Requires NEXT_PUBLIC_* Supabase vars at runtime (and during `next build` on CI/Vercel).
  */
+function assertOptionalModelEnv(name: string, value: string | undefined): void {
+  if (!value?.trim()) return;
+  const id = value.trim();
+  if (!isAllowedOpenAiModelId(id)) {
+    throw new Error(
+      `Invalid ${name}: "${id}" is not an allowed OpenAI model id pattern. See src/lib/ai/model-allowlist.ts.`,
+    );
+  }
+}
+
 export function getEnv(): Env {
   if (cached) {
     return cached;
@@ -65,8 +84,16 @@ export function getEnv(): Env {
   if (!parsed.success) {
     throw new Error(formatEnvError(parsed.error));
   }
-  cached = parsed.data;
-  return parsed.data;
+  const data = parsed.data;
+  assertOptionalModelEnv("OPENAI_MODEL_OVERRIDE", data.OPENAI_MODEL_OVERRIDE);
+  assertOptionalModelEnv("OPENAI_PLAN_MODEL", data.OPENAI_PLAN_MODEL);
+  assertOptionalModelEnv("OPENAI_PLAN_PHASE_MODEL", data.OPENAI_PLAN_PHASE_MODEL);
+  assertOptionalModelEnv("OPENAI_PLAN_PHASE_THINKING_MODEL", data.OPENAI_PLAN_PHASE_THINKING_MODEL);
+  assertOptionalModelEnv("OPENAI_THINKING_UI_MODEL", data.OPENAI_THINKING_UI_MODEL);
+  assertOptionalModelEnv("OPENAI_FAST_PLAN_MODEL", data.OPENAI_FAST_PLAN_MODEL);
+  assertOptionalModelEnv("OPENAI_UI_MODEL", data.OPENAI_UI_MODEL);
+  cached = data;
+  return cached;
 }
 
 export function requireServiceRoleKey(): string {

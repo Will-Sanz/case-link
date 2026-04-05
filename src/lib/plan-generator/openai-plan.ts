@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
+import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt, formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
@@ -344,6 +345,7 @@ export type TryGeneratePlanOptions = {
   fullRegeneration?: boolean;
   retries?: number;
   aiMode?: AiMode;
+  requestMeta?: OpenAiRequestMeta;
 };
 
 function parsedStepsToGenerated(stepsList: AiPlanStepParsed[]): GeneratedStep[] {
@@ -576,6 +578,7 @@ Phases: 30 day = immediate stabilization; 60 day = follow through; 90 day = sust
         },
         temperature: 0.35,
         aiMode: options?.aiMode,
+        requestMeta: options?.requestMeta,
       });
 
       if (!result.ok) {
@@ -737,7 +740,7 @@ export async function previewRefinePlanStepsWithOpenAI(
     action_items: GeneratedActionItem[];
   }>,
   feedback: string,
-  options?: { retries?: number; aiMode?: AiMode },
+  options?: { retries?: number; aiMode?: AiMode; requestMeta?: OpenAiRequestMeta },
 ): Promise<OpenAiPlanResult> {
   void options?.retries;
   const logRefine = process.env.PLAN_REFINE_DEBUG === "1" || process.env.OPENAI_DEBUG === "1";
@@ -781,6 +784,7 @@ ${feedback.trim()}
       },
       temperature: 0.25,
       aiMode: options?.aiMode,
+      requestMeta: options?.requestMeta,
     });
 
     if (!result.ok) {

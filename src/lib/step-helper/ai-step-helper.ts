@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
+import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import type { FamilyDetail, PlanStepRow, ResourceMatchRow } from "@/types/family";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { StepHelperType } from "@/types/step-helper";
@@ -211,7 +212,7 @@ export async function generateStepHelper(
   detail: FamilyDetail,
   step: PlanStepRow,
   helperType: StepHelperType,
-  options?: { aiMode?: AiMode },
+  options?: { aiMode?: AiMode; requestMeta?: OpenAiRequestMeta },
 ): Promise<StepHelperResult> {
   const mode = parseAiMode(options?.aiMode);
   const audiencePrefix =
@@ -240,6 +241,7 @@ export async function generateStepHelper(
     temperature: 0.4,
     maxTokens: mode === "fast" ? 1200 : 2200,
     aiMode: mode,
+    requestMeta: options?.requestMeta,
   });
 
   if (!result.ok) {

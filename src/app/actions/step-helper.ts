@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
+import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
 import { stepHelperTypeToPersistField } from "@/lib/domain/step-helper/persist-field";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import type { StepHelperType } from "@/types/step-helper";
 import { generateStepHelper } from "@/lib/step-helper/ai-step-helper";
+import { stepHelperActionInputSchema } from "@/lib/validations/ai-actions";
 
 export type StepHelperActionResult =
   | { ok: true; content: string; listContent?: string[] }
@@ -19,20 +21,33 @@ export async function generateStepHelperAction(
   helperType: StepHelperType,
   aiMode?: AiMode,
 ): Promise<StepHelperActionResult> {
+  const parsed = stepHelperActionInputSchema.safeParse({
+    stepId,
+    familyId,
+    helperType,
+    aiMode,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+  }
+
   try {
     const session = await requireAppUserWithClient();
     const supabase = session.supabase;
-    const detail = await getFamilyDetail(supabase, familyId);
+    const detail = await getFamilyDetail(supabase, parsed.data.familyId);
     if (!detail) return { ok: false, error: "Family not found" };
 
-    const step = detail.plan?.steps.find((s) => s.id === stepId);
+    const step = detail.plan?.steps.find((s) => s.id === parsed.data.stepId);
     if (!step) return { ok: false, error: "Step not found" };
 
     if (!getEnv().OPENAI_API_KEY?.trim()) {
-      return { ok: false, error: "AI requires OPENAI_API_KEY" };
+      return { ok: false, error: "AI is not configured." };
     }
 
-    return await generateStepHelper(detail, step, helperType, { aiMode });
+    return await generateStepHelper(detail, step, parsed.data.helperType, {
+      aiMode: parsed.data.aiMode,
+      requestMeta: { userId: session.user.id, route: `stepHelper:${parsed.data.helperType}` },
+    });
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -88,7 +103,7 @@ export async function saveStepHelperAction(
       .update({ ai_helper_data: next })
       .eq("id", stepId);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
 
     await supabase.from("activity_log").insert({
       family_id: familyId,

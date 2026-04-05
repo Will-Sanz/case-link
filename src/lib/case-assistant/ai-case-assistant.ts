@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
+import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
 import type { FamilyDetail } from "@/types/family";
@@ -80,7 +81,11 @@ function formatPriorConversation(history: CaseAssistantHistoryItem[]): string {
 export async function askCaseAssistant(
   detail: FamilyDetail,
   question: string,
-  options?: { aiMode?: AiMode; conversationHistory?: CaseAssistantHistoryItem[] },
+  options?: {
+    aiMode?: AiMode;
+    conversationHistory?: CaseAssistantHistoryItem[];
+    requestMeta?: OpenAiRequestMeta;
+  },
 ): Promise<{ ok: true; answer: string } | { ok: false; error: string }> {
   const context = buildCaseContext(detail);
   const mode = parseAiMode(options?.aiMode);
@@ -113,6 +118,7 @@ Answer concisely and practically. Use the prior messages only for continuity; re
     temperature: 0.4,
     maxTokens: mode === "fast" ? 900 : 1600,
     aiMode: mode,
+    requestMeta: options?.requestMeta,
   });
 
   if (!result.ok) return { ok: false, error: result.error };

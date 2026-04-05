@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardTitle } from "@/components/ui/card";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
@@ -205,17 +205,75 @@ export function FamilyLiteWorkspace({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [localPlanGenerating, setLocalPlanGenerating] = useState(false);
   const [generateStartedAt, setGenerateStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
+  const serverPlanStillGenerating = plan?.generation_state?.status === "running";
+  const planGenerateBusy = localPlanGenerating || serverPlanStillGenerating;
+
+  const stagedPollRef = useRef<Promise<void> | null>(null);
+  const resumePollStartedRef = useRef(false);
+
+  const planGenerationStatus = plan?.generation_state?.status;
+
+  const runStagedPlanPolling = useCallback(async () => {
+    if (stagedPollRef.current) {
+      await stagedPollRef.current;
+      return;
+    }
+    const promise = (async () => {
+      try {
+        for (let i = 0; i < 40; i++) {
+          const adv = await advanceStagedLeanPlanGeneration({
+            familyId,
+            aiMode: DEFAULT_AI_MODE,
+          });
+          if (!adv.ok) break;
+          const reload = await loadBarrierWorkflowForFamilyAction(familyId);
+          if (reload.ok) setResult(reload.result);
+          router.refresh();
+          if (adv.done) break;
+          await new Promise((res) => setTimeout(res, 1600));
+        }
+      } finally {
+        stagedPollRef.current = null;
+      }
+    })();
+    stagedPollRef.current = promise;
+    await promise;
+  }, [familyId, router]);
+
   useEffect(() => {
     setResult(initialResult);
   }, [initialResult]);
 
+  /**
+   * If the user landed or refreshed while a staged plan is still running, resume polling once.
+   * Ref guard avoids re-starting on every parent revalidation while status stays "running".
+   */
   useEffect(() => {
-    if (!pending) {
+    if (planGenerationStatus !== "running") {
+      resumePollStartedRef.current = false;
+      return;
+    }
+    if (resumePollStartedRef.current) return;
+    resumePollStartedRef.current = true;
+    setLocalPlanGenerating(true);
+    void (async () => {
+      try {
+        await runStagedPlanPolling();
+      } finally {
+        setLocalPlanGenerating(false);
+        resumePollStartedRef.current = false;
+      }
+    })();
+  }, [planGenerationStatus, runStagedPlanPolling]);
+
+  useEffect(() => {
+    if (!planGenerateBusy) {
       setGenerateStartedAt(null);
       setElapsedSeconds(0);
       return;
@@ -227,7 +285,7 @@ export function FamilyLiteWorkspace({
       setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [pending]);
+  }, [planGenerateBusy]);
 
   function toggleLabel(label: BarrierPresetLabel) {
     setSelected((prev) =>
@@ -256,34 +314,29 @@ export function FamilyLiteWorkspace({
 
   function generate() {
     setError(null);
-    startTransition(async () => {
-      const r = await generateBarrierWorkflowForFamilyAction(familyId, {
-        selectedBarriers: selected,
-        additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
-        additionalDetails: additionalContext.trim(),
-        aiMode: DEFAULT_AI_MODE,
-      });
-      if (!r.ok) return setError(r.error);
-      setResult(r.result);
-      setHasGeneratedThisSession(true);
+    setLocalPlanGenerating(true);
+    void (async () => {
+      try {
+        const r = await generateBarrierWorkflowForFamilyAction(familyId, {
+          selectedBarriers: selected,
+          additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
+          additionalDetails: additionalContext.trim(),
+          aiMode: DEFAULT_AI_MODE,
+        });
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
+        setResult(r.result);
+        setHasGeneratedThisSession(true);
 
-      if (r.stagedPolling) {
-        void (async () => {
-          for (let i = 0; i < 40; i++) {
-            const adv = await advanceStagedLeanPlanGeneration({
-              familyId,
-              aiMode: DEFAULT_AI_MODE,
-            });
-            if (!adv.ok) break;
-            const reload = await loadBarrierWorkflowForFamilyAction(familyId);
-            if (reload.ok) setResult(reload.result);
-            router.refresh();
-            if (adv.done) break;
-            await new Promise((res) => setTimeout(res, 1600));
-          }
-        })();
+        if (r.stagedPolling) {
+          await runStagedPlanPolling();
+        }
+      } finally {
+        setLocalPlanGenerating(false);
       }
-    });
+    })();
   }
 
   function toggleAction(actionItemId: string, done: boolean) {
@@ -327,7 +380,7 @@ export function FamilyLiteWorkspace({
             onAdditionalContextChange={setAdditionalContext}
             lastSavedAt={result?.lastSavedAt}
             error={error}
-            pending={pending}
+            generateBusy={planGenerateBusy}
             generateStartedAt={generateStartedAt}
             elapsedSeconds={elapsedSeconds}
             onGenerate={generate}

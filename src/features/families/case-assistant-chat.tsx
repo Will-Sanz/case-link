@@ -77,11 +77,19 @@ function AssistantMarkdown({ content }: { content: string }) {
               {children}
             </h4>
           ),
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const safe =
+              typeof href === "string" &&
+              (href.startsWith("https://") || href.startsWith("http://") || href.startsWith("mailto:"));
+            if (!safe) {
+              return <span className="text-slate-800">{children}</span>;
+            }
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {content}

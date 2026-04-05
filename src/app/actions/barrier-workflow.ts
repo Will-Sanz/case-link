@@ -204,6 +204,18 @@ export async function generateBarrierWorkflowAction(
   const additionalBarriers = input.additionalBarriers?.trim() ?? "";
   const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
   const details = input.additionalDetails?.trim() ?? "";
+  if (referenceId.length > 200) {
+    return { ok: false, error: "Family/Case ID is too long (max 200 characters)." };
+  }
+  if (additionalBarriers.length > 2000) {
+    return { ok: false, error: "Additional barriers text is too long (max 2000 characters)." };
+  }
+  if (details.length > 8000) {
+    return { ok: false, error: "Additional details are too long (max 8000 characters)." };
+  }
+  if (selected.length > 40) {
+    return { ok: false, error: "Too many barrier selections." };
+  }
   if (!referenceId) {
     return { ok: false, error: "Enter a Family/Case ID to save and track this plan." };
   }

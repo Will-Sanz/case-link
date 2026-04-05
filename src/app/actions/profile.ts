@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
+import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { parseProfileFormData, profileUpdateSchema } from "@/lib/validation/profile";
 
 export type ProfileSaveState = {
@@ -51,14 +52,16 @@ export async function updateCaseManagerProfile(
     if (error) {
       return {
         ok: false,
-        message: error.message || "Could not save profile. Try again.",
+        message: publicMessageFromSupabaseError(error, "Could not save profile. Try again."),
       };
     }
 
     revalidatePath("/profile");
     return { ok: true, message: "Profile saved." };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Something went wrong.";
-    return { ok: false, message: msg };
+    if (process.env.NODE_ENV === "development" && e instanceof Error) {
+      return { ok: false, message: e.message };
+    }
+    return { ok: false, message: "Something went wrong." };
   }
 }

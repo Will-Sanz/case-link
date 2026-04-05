@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
+import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
@@ -70,6 +71,7 @@ export async function tryGenerateLeanPlanPhaseOpenAI(
     aiMode?: AiMode;
     /** Compact lines from DB for earlier phases; avoids repeating the same actions/orgs. */
     priorPhasesSummary?: string | null;
+    requestMeta?: OpenAiRequestMeta;
   },
 ): Promise<LeanPhaseResult> {
   const brief = buildPlanningBrief(detail, options?.regenerationFeedback);
@@ -114,6 +116,7 @@ Generate ONLY the ${phase}-day phase steps (phase field must be "${phase}" on ev
         },
         temperature: 0.35,
         aiMode: options?.aiMode,
+        requestMeta: options?.requestMeta,
       });
 
       if (!result.ok) {

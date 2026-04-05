@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAppUser, requireAppUserWithClient } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import {
   addCaseNoteSchema,
   familyIntakeFormSchema,
@@ -42,7 +43,10 @@ export async function createSimpleFamily(
     },
   );
   if (famErr || familyIdRaw == null) {
-    return { ok: false, error: famErr?.message ?? "Could not create family" };
+    return {
+      ok: false,
+      error: publicMessageFromSupabaseError(famErr, "Could not create family"),
+    };
   }
   const familyId = familyIdRaw as string;
   await supabase.from("activity_log").insert({
@@ -94,7 +98,10 @@ export async function createFamilyIntake(
   );
 
   if (famErr || familyIdRaw == null) {
-    return { ok: false, error: famErr?.message ?? "Could not create family" };
+    return {
+      ok: false,
+      error: publicMessageFromSupabaseError(famErr, "Could not create family"),
+    };
   }
 
   const familyId = familyIdRaw as string;
@@ -192,7 +199,7 @@ export async function addCaseNote(input: unknown): Promise<ActionResult> {
     .single();
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await supabase.from("activity_log").insert({
@@ -240,7 +247,7 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
     .eq("id", familyId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   await supabase.from("activity_log").insert({
@@ -265,6 +272,12 @@ export async function deleteFamily(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Invalid family ID" };
   }
 
+  try {
+    await requireAppUser();
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("families")
@@ -272,7 +285,7 @@ export async function deleteFamily(input: unknown): Promise<ActionResult> {
     .eq("id", parsed.data.familyId);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
   revalidatePath("/families");
@@ -306,7 +319,7 @@ export async function archiveFamilyFromWorkspace(input: unknown): Promise<Action
     .maybeSingle();
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
   if (!row) {
     return { ok: false, error: "Family not found or already removed from your list." };
@@ -347,20 +360,20 @@ export async function updateFamilyGoals(input: unknown): Promise<ActionResult> {
         .from("family_goals")
         .update({ label: g.label, sort_order: goals.indexOf(g) })
         .eq("id", g.id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     } else if (!g.id) {
       const { error } = await supabase.from("family_goals").insert({
         family_id: familyId,
         label: g.label,
         sort_order: goals.indexOf(g),
       });
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     }
   }
   for (const id of existingIds) {
     if (!incomingIds.has(id)) {
       const { error } = await supabase.from("family_goals").delete().eq("id", id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     }
   }
 
@@ -387,20 +400,20 @@ export async function updateFamilyBarriers(input: unknown): Promise<ActionResult
         .from("family_barriers")
         .update({ label: b.label, sort_order: barriers.indexOf(b) })
         .eq("id", b.id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     } else if (!b.id) {
       const { error } = await supabase.from("family_barriers").insert({
         family_id: familyId,
         label: b.label,
         sort_order: barriers.indexOf(b),
       });
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     }
   }
   for (const id of existingIds) {
     if (!incomingIds.has(id)) {
       const { error } = await supabase.from("family_barriers").delete().eq("id", id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     }
   }
 
@@ -430,18 +443,18 @@ export async function updateFamilyMembers(input: unknown): Promise<ActionResult>
     };
     if (m.id && existingIds.has(m.id)) {
       const { error } = await supabase.from("family_members").update(row).eq("id", m.id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     } else if (!m.id) {
       const { error } = await supabase
         .from("family_members")
         .insert({ family_id: familyId, ...row });
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     }
   }
   for (const id of existingIds) {
     if (!incomingIds.has(id)) {
       const { error } = await supabase.from("family_members").delete().eq("id", id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
     }
   }
 

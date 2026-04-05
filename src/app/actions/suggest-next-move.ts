@@ -3,10 +3,10 @@
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { getEnv } from "@/lib/env";
 import { getFamilyDetail } from "@/lib/services/families";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
 import { createAiResponse } from "@/lib/ai/client";
+import type { AiMode } from "@/lib/ai/ai-mode";
+import { suggestNextMoveInputSchema } from "@/lib/validations/ai-actions";
 
 export type SuggestResult =
   | { ok: true; suggestions: string[] }
@@ -21,21 +21,29 @@ export async function suggestNextMoveForBlockedStep(
   familyId: string,
   aiMode?: AiMode,
 ): Promise<SuggestResult> {
-  const mode = parseAiMode(aiMode);
+  const parsed = suggestNextMoveInputSchema.safeParse({ stepId, familyId, aiMode });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+  }
+
+  const mode = parseAiMode(parsed.data.aiMode);
+  let userId: string;
+  let supabase: Awaited<ReturnType<typeof requireAppUserWithClient>>["supabase"];
   try {
-    await requireAppUserWithClient();
+    const session = await requireAppUserWithClient();
+    userId = session.user.id;
+    supabase = session.supabase;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const detail = await getFamilyDetail(supabase, familyId);
+  const detail = await getFamilyDetail(supabase, parsed.data.familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
 
   const plan = detail.plan;
-  const step = plan?.steps.find((s) => s.id === stepId);
+  const step = plan?.steps.find((s) => s.id === parsed.data.stepId);
   if (!step) {
     return { ok: false, error: "Step not found" };
   }
@@ -91,6 +99,7 @@ export async function suggestNextMoveForBlockedStep(
       temperature: 0.4,
       maxTokens: mode === "fast" ? 500 : 900,
       aiMode: mode,
+      requestMeta: { userId, route: "suggestNextMoveBlocked" },
     });
 
     if (!result.ok) {
@@ -106,8 +115,7 @@ export async function suggestNextMoveForBlockedStep(
       ok: true,
       suggestions: suggestions.length > 0 ? suggestions : fallbacks,
     };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
+  } catch {
     return {
       ok: true,
       suggestions: fallbacks.length > 0

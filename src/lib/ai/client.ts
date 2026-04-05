@@ -10,7 +10,10 @@ import {
   taskUsesResponsesApi,
   type AiTaskType,
 } from "@/lib/ai/models";
+import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
+import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { getEnv } from "@/lib/env";
+import { takeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
 const OPENAI_FETCH_TIMEOUT_MS = 180_000;
@@ -53,6 +56,8 @@ export type CreateResponseOptions = {
   maxTokens?: number;
   /** Defaults to fast when omitted. */
   aiMode?: AiMode;
+  /** When set, applies per-user rate limits and emits lightweight `[openai-usage]` logs. */
+  requestMeta?: OpenAiRequestMeta;
 };
 
 export type CreateResponseResult =
@@ -65,6 +70,37 @@ function summarizeInput(input: string | ChatMessage[]): { chars: number; preview
   }
   const combined = input.map((m) => `[${m.role}] ${m.content}`).join("\n\n");
   return { chars: combined.length, preview: combined.slice(0, 1200) };
+}
+
+function exposeAiErrorToClient(internal: string): string {
+  if (internal.startsWith("Too many AI requests")) return internal;
+  if (internal.startsWith("Request is too large")) return internal;
+  if (process.env.NODE_ENV === "development" || process.env.OPENAI_DEBUG === "1") {
+    return internal;
+  }
+  if (internal === "OPENAI_API_KEY is not set") {
+    return "AI is not configured for this environment.";
+  }
+  return "The AI service could not complete this request. Please try again.";
+}
+
+function logOpenAiUsage(
+  meta: OpenAiRequestMeta,
+  taskType: AiTaskType,
+  model: string,
+  result: CreateResponseResult,
+  elapsedMs: number,
+) {
+  console.info("[openai-usage]", {
+    userId: meta.userId,
+    route: meta.route,
+    taskType,
+    model,
+    ok: result.ok,
+    total_tokens: result.ok ? (result.usage?.total_tokens ?? null) : null,
+    elapsedMs,
+    ts: new Date().toISOString(),
+  });
 }
 
 /**
@@ -87,15 +123,55 @@ export async function createAiResponse(
   const env = getEnv();
   const apiKey = env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    return { ok: false, error: "OPENAI_API_KEY is required" };
+    return { ok: false, error: exposeAiErrorToClient("OPENAI_API_KEY is not set") };
+  }
+
+  const meta = options.requestMeta;
+  if (meta) {
+    const allowed = takeOpenAiRateSlot(meta.userId);
+    if (!allowed) {
+      const msg = "Too many AI requests. Please wait a minute and try again.";
+      logOpenAiUsage(meta, options.taskType, "(rate_limited)", { ok: false, error: msg }, 0);
+      return { ok: false, error: msg };
+    }
   }
 
   const mode = parseAiMode(options.aiMode);
-  const modelOverride = process.env.OPENAI_MODEL_OVERRIDE?.trim();
+  const modelOverride = env.OPENAI_MODEL_OVERRIDE?.trim();
   const model = modelOverride || getModelForTask(options.taskType, mode);
+  if (!isAllowedOpenAiModelId(model)) {
+    const internal = `Resolved model id is not allowed: ${model}`;
+    console.error("[ai]", internal);
+    return { ok: false, error: exposeAiErrorToClient(internal) };
+  }
+
   const useResponses = !modelOverride && taskUsesResponsesApi(options.taskType);
   const instructions = augmentInstructionsForMode(options.instructions, mode);
-  const maxTokens = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
+  const requestedMax = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
+  const outputCap =
+    typeof env.OPENAI_MAX_OUTPUT_TOKENS === "number" &&
+    Number.isFinite(env.OPENAI_MAX_OUTPUT_TOKENS) &&
+    env.OPENAI_MAX_OUTPUT_TOKENS >= 256
+      ? Math.min(32_768, Math.floor(env.OPENAI_MAX_OUTPUT_TOKENS))
+      : 8192;
+  const maxTokens = Math.min(requestedMax, outputCap);
+
+  const inputSummary = summarizeInput(options.input);
+  const maxInputChars =
+    typeof env.OPENAI_MAX_INPUT_CHARS === "number" &&
+    Number.isFinite(env.OPENAI_MAX_INPUT_CHARS) &&
+    env.OPENAI_MAX_INPUT_CHARS >= 5000
+      ? Math.min(500_000, Math.floor(env.OPENAI_MAX_INPUT_CHARS))
+      : 120_000;
+  const promptChars = inputSummary.chars + instructions.length;
+  if (promptChars > maxInputChars) {
+    const err = `Request is too large for AI processing (${promptChars} chars; max ${maxInputChars}).`;
+    if (meta) {
+      logOpenAiUsage(meta, options.taskType, model, { ok: false, error: err }, 0);
+    }
+    return { ok: false, error: exposeAiErrorToClient(err) };
+  }
+
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
   const debug = process.env.OPENAI_DEBUG === "1";
@@ -103,7 +179,6 @@ export async function createAiResponse(
   const startedAt = Date.now();
 
   if (debug || payloadDebug) {
-    const inputSummary = summarizeInput(options.input);
     const reasoning =
       modelSupportsReasoningEffort(model) ? (mode === "thinking" ? "high" : "low") : null;
     console.info("[ai] request:start", {
@@ -125,36 +200,61 @@ export async function createAiResponse(
   }
 
   try {
-    const result = useResponses
+    const rawResult = useResponses
       ? await callResponsesApi(apiKey, model, resolved, debug, mode)
       : await callChatCompletionsApi(apiKey, model, resolved, debug);
+    const result: CreateResponseResult =
+      rawResult.ok ?
+        rawResult
+      : {
+          ok: false,
+          error: exposeAiErrorToClient(rawResult.error),
+        };
+
+    if (!rawResult.ok && debug) {
+      console.info("[ai] request:error_detail", { error: rawResult.error });
+    }
+
     if (debug || payloadDebug) {
       console.info("[ai] request:end", {
         taskType: options.taskType,
         model,
         aiMode: mode,
         elapsedMs: Date.now() - startedAt,
-        ok: result.ok,
-        error: result.ok ? null : result.error,
-        tokens: result.ok ? (result.usage?.total_tokens ?? null) : null,
-        outputChars: result.ok ? result.text.length : null,
+        ok: rawResult.ok,
+        error: rawResult.ok ? null : rawResult.error,
+        tokens: rawResult.ok ? (rawResult.usage?.total_tokens ?? null) : null,
+        outputChars: rawResult.ok ? rawResult.text.length : null,
       });
-      if (payloadDebug && result.ok) {
-        console.info("[ai] response:preview", result.text.slice(0, 2500));
+      if (payloadDebug && rawResult.ok) {
+        console.info("[ai] response:preview", rawResult.text.slice(0, 2500));
       }
     }
+
+    if (meta) {
+      logOpenAiUsage(meta, options.taskType, model, rawResult, Date.now() - startedAt);
+    }
+
     return result;
   } catch (e) {
     if (isAbortOrTimeoutError(e)) {
-      const msg = `OpenAI request timed out after ${OPENAI_FETCH_TIMEOUT_MS / 1000}s`;
-      if (debug) console.info(`[ai] task=${options.taskType} model=${model} error=`, msg);
-      return { ok: false, error: msg };
+      const internal = `OpenAI request timed out after ${OPENAI_FETCH_TIMEOUT_MS / 1000}s`;
+      if (debug) console.info(`[ai] task=${options.taskType} model=${model} error=`, internal);
+      const out = { ok: false as const, error: exposeAiErrorToClient(internal) };
+      if (meta) {
+        logOpenAiUsage(meta, options.taskType, model, { ok: false, error: internal }, Date.now() - startedAt);
+      }
+      return out;
     }
-    const msg = e instanceof Error ? e.message : "Request failed";
+    const internal = e instanceof Error ? e.message : "Request failed";
     if (debug) {
-      console.info(`[ai] task=${options.taskType} model=${model} error=`, msg);
+      console.info(`[ai] task=${options.taskType} model=${model} error=`, internal);
     }
-    return { ok: false, error: msg };
+    const out = { ok: false as const, error: exposeAiErrorToClient(internal) };
+    if (meta) {
+      logOpenAiUsage(meta, options.taskType, model, { ok: false, error: internal }, Date.now() - startedAt);
+    }
+    return out;
   }
 }
 

@@ -277,6 +277,9 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
       fullRegeneration: mustUseAi,
       retries: 1,
       aiMode: planAiMode,
+      requestMeta:
+        userId ? { userId, route: "generatePlan" }
+        : undefined,
     });
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;
@@ -502,6 +505,7 @@ export async function startStagedLeanPlanGeneration(input: {
     regenerationFeedback: input.regenerationFeedback?.trim(),
     retries: 2,
     aiMode: stagedMode,
+    requestMeta: userId ? { userId, route: "stagedPlanPhase30" } : undefined,
   });
 
   if (!phase30.ok) {
@@ -575,9 +579,11 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   aiMode?: AiMode;
 }): Promise<StagedPlanAdvanceResult> {
   let supabase: SupabaseClient;
+  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -651,6 +657,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       retries: 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor60 || undefined,
+      requestMeta: userId ? { userId, route: "stagedPlanPhase60" } : undefined,
     });
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
@@ -706,6 +713,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       retries: 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor90 || undefined,
+      requestMeta: userId ? { userId, route: "stagedPlanPhase90" } : undefined,
     });
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
@@ -1372,9 +1380,11 @@ export async function previewRefinePlanStep(
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -1430,7 +1440,11 @@ export async function previewRefinePlanStep(
       workflow_data: step.workflow_data,
     },
     feedback,
-    { surroundingStepTitles: surroundingTitles, aiMode: stepMode },
+    {
+      surroundingStepTitles: surroundingTitles,
+      aiMode: stepMode,
+      requestMeta: userId ? { userId, route: "previewRefinePlanStep" } : undefined,
+    },
   );
 
   if (!result.ok) {
@@ -1467,9 +1481,11 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -1504,7 +1520,10 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
     detail,
     draftSteps as Parameters<typeof previewRefinePlanStepsWithOpenAI>[1],
     feedback,
-    { aiMode: planRefineMode },
+    {
+      aiMode: planRefineMode,
+      requestMeta: userId ? { userId, route: "previewRefinePlan" } : undefined,
+    },
   );
 
   if (!result.ok) {
@@ -1536,9 +1555,11 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
   }
 
   let supabase;
+  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
+    userId = session.user.id;
   } catch {
     return { ok: false, error: "Unauthorized" };
   }
@@ -1594,7 +1615,11 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
       workflow_data: step.workflow_data,
     },
     feedback,
-    { surroundingStepTitles: surroundingTitles, aiMode: stepMode },
+    {
+      surroundingStepTitles: surroundingTitles,
+      aiMode: stepMode,
+      requestMeta: userId ? { userId, route: "refinePlanStep" } : undefined,
+    },
   );
 
   if (!result.ok) {
