@@ -6,13 +6,21 @@
 export type CalendarView = "month" | "week" | "agenda";
 
 export function toKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function noon(d: Date): Date {
   const c = new Date(d);
   c.setHours(12, 0, 0, 0);
   return c;
+}
+
+function fromYmdLocal(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return noon(new Date(y, (m ?? 1) - 1, d ?? 1));
 }
 
 /** Add days (immutable) */
@@ -70,7 +78,7 @@ export function parseCurrentDate(
   }
 
   if ((view === "week" || view === "agenda") && dateParam) {
-    const d = noon(new Date(dateParam + "T12:00:00"));
+    const d = fromYmdLocal(dateParam);
     return view === "week" ? startOfWeek(d) : d;
   }
 
