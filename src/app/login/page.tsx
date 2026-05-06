@@ -5,23 +5,13 @@ import { AuthShell } from "@/components/layout/auth-shell";
 import { LoginForm } from "@/features/auth/login-form";
 import { getSessionUser } from "@/lib/auth/session";
 
-type PageProps = {
-  searchParams: Promise<{ next?: string }>;
-};
-
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: PageProps) {
+export default async function LoginPage() {
   const user = await getSessionUser();
   if (user) {
     redirect("/dashboard");
   }
-
-  const sp = await searchParams;
-  const next =
-    typeof sp.next === "string" && sp.next.startsWith("/") ? sp.next : "";
-  const signupHref =
-    next !== "" ? `/signup?next=${encodeURIComponent(next)}` : "/signup";
 
   return (
     <AuthShell
@@ -36,16 +26,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
           <LoginForm />
         </Suspense>
       </div>
-      <p className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-600">
-        New case manager?{" "}
-        <Link
-          href={signupHref}
-          className="font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
-        >
-          Create an account
-        </Link>
-      </p>
-      <p className="mt-4 text-center text-xs text-slate-500">
+      <p className="mt-6 text-center text-xs text-slate-500">
         <Link href="/" className="font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline">
           Home
         </Link>
