@@ -6,7 +6,7 @@ export function PublicSiteShell({
   authenticated = false,
 }: {
   children: ReactNode;
-  /** When true, show entry to the signed-in workspace instead of Sign in. */
+  /** When true, show Families link into the signed-in workspace. */
   authenticated?: boolean;
 }) {
   return (
@@ -50,14 +50,7 @@ export function PublicSiteShell({
               >
                 Families
               </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2"
-              >
-                Sign in
-              </Link>
-            )}
+            ) : null}
           </nav>
         </div>
       </header>
