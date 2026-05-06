@@ -81,14 +81,7 @@ export function PublicSiteShell({
                 >
                   Families
                 </Link>
-              ) : (
-                <Link
-                  href="/login"
-                  className="text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:underline"
-                >
-                  Sign in
-                </Link>
-              )}
+              ) : null}
               <Link
                 href="/privacy"
                 className="text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:underline"
