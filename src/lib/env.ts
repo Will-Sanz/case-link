@@ -20,7 +20,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.string().optional(),
   /** @deprecated Prefer NEXT_PUBLIC_SITE_URL; still read for backwards compatibility. */
   NEXT_PUBLIC_APP_URL: z.string().optional(),
-  /** Server-only; required for privileged scripts (e.g. resource import). Not needed for normal app runtime. */
+  /** Server-only; required for demo-request storage and privileged scripts. */
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   /** Server-only; when set, plan generation tries OpenAI first, then rules fallback. */
   OPENAI_API_KEY: z.string().optional(),
@@ -113,7 +113,7 @@ export function requireServiceRoleKey(): string {
   const key = getEnv().SUPABASE_SERVICE_ROLE_KEY;
   if (!key) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY is required for this operation (e.g. npm run db:import). It is not required for the web app on Vercel.",
+      "SUPABASE_SERVICE_ROLE_KEY is required for this server-only operation (for example demo-request storage or resource import).",
     );
   }
   return key;

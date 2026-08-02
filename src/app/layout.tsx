@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
 export const metadata: Metadata = {
-  title: "CaseLink: Case management",
-  description: "Case management workspace for families and community resources.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  title: {
+    default: "CaseLink — Family paperwork, made manageable",
+    template: "%s | CaseLink",
+  },
+  description:
+    "CaseLink helps school case managers turn family needs into structured intervention plans and completed paperwork.",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
@@ -25,7 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full`}
+      className={`${GeistSans.variable} h-full`}
     >
       <body className="flex min-h-full flex-col font-sans text-slate-700 antialiased">
         {children}

@@ -1,22 +1,20 @@
 @import "tailwindcss";
 
-/* Design tokens: clean, smooth, slightly warm */
+/* CaseLink design tokens: calm, legible, and grounded in service work. */
 :root {
-  /* Backgrounds: layered, not pure white */
-  --background: #f4f6f8;
-  --foreground: #334155;
+  --background: #f6f8f4;
+  --foreground: #183317;
   --surface: #ffffff;
-  --border: #e2e8f0;
-  --border-subtle: rgba(30, 41, 59, 0.08);
-  --muted: #64748b;
-  --muted-bg: #f1f5f9;
+  --border: #dce6d9;
+  --border-subtle: rgba(39, 98, 33, 0.1);
+  --muted: #5d705a;
+  --muted-bg: #edf4eb;
 
-  /* Primary accent: muted blue */
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-focus: rgba(37, 99, 235, 0.15);
-  --primary-bg: #eff6ff;
-  --primary-bg-strong: #dbeafe;
+  --primary: #276221;
+  --primary-hover: #1f531b;
+  --primary-focus: rgba(70, 146, 60, 0.22);
+  --primary-bg: #edf6eb;
+  --primary-bg-strong: #d8ead5;
 
   /* Status: muted, consistent */
   --success: #059669;
@@ -27,7 +25,7 @@
   --error-bg: #fef2f2;
 
   /* Typography */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --text-page-title: 1.5rem;
   --text-section-title: 1rem;
   --text-body: 0.875rem;
@@ -75,4 +73,40 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: #cce7c9;
+  color: #173a15;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes caselink-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+      filter: blur(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  .hero-reveal {
+    animation: caselink-reveal 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .hero-reveal-late {
+    animation: caselink-reveal 700ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }

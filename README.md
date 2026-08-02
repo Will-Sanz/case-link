@@ -1,6 +1,12 @@
-# CaseLink: From Scattered Case Details to Clear, Time-Bound Plans
+# CaseLink: Family Support Planning and Paperwork
 
-**CaseLink** is a case management workspace that helps teams turn family context—barriers, notes, and matched programs—into **structured 30 / 60 / 90-day plans**, trackable work, and optional AI-assisted drafting. It is built for **speed, clarity, and professional judgment**, not for replacing the case manager.
+## Product north star
+
+**CaseLink helps school case managers turn family needs into a structured intervention plan and reviewed, ready-to-submit paperwork.** A case manager creates a family profile, records barriers, generates and edits the plan, uploads a blank required form, reviews the AI-prepared draft, and downloads the completed PDF for manual submission to CitySpan.
+
+The near-term product is deliberately narrow. It is built for **speed, clarity, and professional judgment**, not for replacing case managers, CitySpan, or the city's required reporting process. Broader school-operations automation remains a future possibility only after this core workflow proves useful.
+
+The staged path from the current application to that north star is documented in the [Product Redesign Plan](docs/product-redesign-plan.md).
 
 ---
 
@@ -16,21 +22,21 @@ CaseLink exists to **reduce that fragmentation** and make the path from intake t
 
 ## The solution
 
-CaseLink brings **family records**, **resource intelligence**, and **planning** into one application. A case manager captures barriers, goals, household context, and notes in structured forms. The system **matches programs** from an internal directory (deterministic scoring—no opaque “black box” retrieval). When enabled, **OpenAI** turns that context into **phased plans** with concrete steps, checklists, and action items.
+CaseLink brings **family intake**, **barrier assessment**, **intervention planning**, and **paperwork preparation** into one focused workflow. A case manager captures the approved family context and barriers in structured forms. When enabled, **OpenAI** turns that context into a structured plan and helps map reviewed information into an uploaded blank PDF.
 
-Everything downstream is **editable**. Plans are not static PDFs in a folder—they are living records the team can adjust, refine per step, export when needed, and connect to **timelines**, **tasks**, and a **case assistant** that answers in the context of *this* family’s plan.
+Everything downstream is **editable**. Plans and populated form fields remain drafts until a case manager reviews them. CaseLink produces a completed PDF; it does not submit directly to CitySpan in the initial scope.
 
 ---
 
 ## Key features
 
-- **Phased plans (30 / 60 / 90)** — AI-assisted or rules-based generation; steps, priorities, and client-facing display fields suitable for export.
-- **Resource directory & matching** — Searchable programs; scoring-based suggestions; accept, dismiss, or attach matches with activity logged.
-- **Editable structured plans** — Update steps, checklists, and action items; per-step refinement without regenerating the whole plan.
-- **Timeline & task tracking** — Calendar-oriented views tied to plan work and due dates.
-- **Case assistant** — Chat grounded in the family’s barriers, plan, and matches; markdown output with **sanitized links** (only `http`, `https`, `mailto`).
-- **Intake & families** — Households, members, goals, barriers, and case notes with **server-side validation**.
-- **Dashboard** — Operational view across families and upcoming work.
+- **Families** — Create a family support case and reopen it from one simple list.
+- **Barrier intake** — Record the needs and context that should shape the intervention.
+- **Editable intervention plans** — Generate a structured plan, trace it to approved barriers, and edit it before approval.
+- **Paperwork preparation (planned)** — Upload a blank required PDF, map approved information into a draft, review uncertain or missing fields, and download the completed form.
+- **Human review** — Plans and forms remain drafts until the case manager approves them.
+
+The repository still contains experimental resource, timeline, task, calendar, and case-assistant capabilities. They are not part of the newly narrowed V1 product promise and should not drive the redesign unless pilot evidence brings them back into scope.
 
 ---
 
@@ -39,16 +45,18 @@ Everything downstream is **editable**. Plans are not static PDFs in a folder—t
 **Input → processing → output**, end to end:
 
 ```
-Case manager enters barriers, goals, notes, and household context
+Case manager creates a family and enters approved context and barriers
         ↓
-System scores and surfaces relevant programs from the directory
+AI drafts a structured intervention plan
         ↓
-(Optional) AI generates phased plan steps + structured fields (JSON schema, validated)
+Case manager reviews and edits the plan
         ↓
-Team edits, tracks, and exports; assistant answers using the same scoped context
+Case manager uploads a blank PDF; CaseLink drafts form entries
+        ↓
+Case manager reviews, downloads, and manually submits the PDF to CitySpan
 ```
 
-The loop is intentional: **capture → suggest → draft → human edit → track**. AI accelerates drafting; **people retain control** over what ships to the case file.
+The loop is intentional: **capture → draft → human edit → prepare form → human review → download**. AI accelerates drafting; **the case manager controls what becomes official**.
 
 ---
 

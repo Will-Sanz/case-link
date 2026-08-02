@@ -1,185 +1,159 @@
-import { Card } from "@/components/ui/card";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Check,
+  FileCheck2,
+  FileText,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
-const sectionTitle =
-  "text-xl font-semibold text-slate-900 sm:text-2xl";
-const body =
-  "text-sm leading-relaxed text-slate-600 sm:text-base";
-const bodyBlock = `mt-4 max-w-3xl space-y-4 ${body}`;
+function ProductProof() {
+  return (
+    <div className="hero-reveal-late relative mx-auto w-full max-w-[660px] lg:mx-0" aria-label="Illustration of CaseLink preparing a family form">
+      <div className="relative overflow-hidden rounded-2xl bg-white p-3 shadow-[0_30px_80px_rgba(30,70,27,0.16)] sm:p-5">
+        <div className="flex items-center justify-between border-b border-[#e2ebe0] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="grid size-9 place-items-center rounded-xl bg-[#edf6eb] text-[#276221]">
+              <FileText className="size-4.5" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#173a15]">Family support form</p>
+              <p className="text-xs text-[#687b65]">6 fields ready for review</p>
+            </div>
+          </div>
+          <span className="hidden rounded-full bg-[#edf6eb] px-3 py-1 text-xs font-semibold text-[#276221] sm:inline-flex">
+            Review ready
+          </span>
+        </div>
+
+        <div className="grid gap-4 pt-5 md:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-xl bg-[#f3f7f1] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d705a]">Approved plan</p>
+            <p className="mt-4 text-sm font-semibold text-[#173a15]">Housing stability</p>
+            <p className="mt-1 text-xs leading-5 text-[#5d705a]">
+              Connect the family with housing intake support and prepare the required documentation.
+            </p>
+            <div className="mt-4 space-y-2">
+              {["Housing barrier", "30-day action", "Case manager note"].map((item) => (
+                <div key={item} className="flex items-center gap-2 text-xs text-[#365134]">
+                  <span className="grid size-5 place-items-center rounded-full bg-[#d8ead5] text-[#276221]">
+                    <Check className="size-3" strokeWidth={2.5} aria-hidden />
+                  </span>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-[#dce6d9] p-4">
+            <div>
+              <p className="text-[11px] font-medium text-[#687b65]">Primary need</p>
+              <div className="mt-1.5 rounded-lg bg-[#f6f8f4] px-3 py-2 text-sm font-medium text-[#253f23]">
+                Housing stability
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-[#687b65]">Recommended action</p>
+              <div className="mt-1.5 rounded-lg bg-[#f6f8f4] px-3 py-2 text-sm leading-5 text-[#253f23]">
+                Complete housing intake and collect proof of residence.
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-[#e2ebe0] pt-3">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#276221]">
+                <ShieldCheck className="size-3.5" aria-hidden /> Review before download
+              </span>
+              <span className="rounded-lg bg-[#276221] px-3 py-2 text-xs font-semibold text-white">Download PDF</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute -bottom-5 -left-5 hidden items-center gap-3 rounded-xl bg-[#276221] px-4 py-3 text-white shadow-[0_18px_40px_rgba(30,70,27,0.2)] sm:flex">
+        <FileCheck2 className="size-5" aria-hidden />
+        <div>
+          <p className="text-xs font-semibold">Ready for CitySpan</p>
+          <p className="text-[11px] text-[#cce7c9]">You stay in control of the final form</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function HomePageContent() {
   return (
     <>
-      <section
-        className="border-b border-slate-200 bg-white"
-        aria-labelledby="hero-heading"
-      >
-        <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20 lg:py-24">
-          <h1
-            id="hero-heading"
-            className="max-w-3xl text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl"
-          >
-            Helping case managers turn complex family needs into clear next
-            steps.
-          </h1>
-          <p className={`mt-5 max-w-3xl ${body}`}>
-            At Alain Locke School in West Philadelphia, case managers support
-            families facing barriers such as housing instability, food access,
-            transportation, childcare, employment, and mental health
-            challenges. CaseLink is an AI-powered tool built with case managers
-            to help them create personalized action plans connected to local
-            resources in Philadelphia.
-          </p>
+      <section className="overflow-hidden bg-[#e7f1e4]" aria-labelledby="home-hero">
+        <div className="mx-auto grid min-h-[680px] max-w-7xl items-center gap-14 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[0.86fr_1.14fr] lg:px-10 lg:py-28">
+          <div className="hero-reveal max-w-2xl">
+            <h1 id="home-hero" className="text-balance text-[clamp(2.8rem,6vw,5.65rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-[#173a15]">
+              Turn family needs into finished paperwork.
+            </h1>
+            <p className="mt-7 max-w-xl text-pretty text-lg leading-8 text-[#4e664b] sm:text-xl">
+              CaseLink helps school case managers build a structured intervention plan, prepare required forms, and get back to supporting families.
+            </p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link href="/request-demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#276221] px-5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(39,98,33,0.2)] transition-[background-color,transform,box-shadow] hover:-translate-y-0.5 hover:bg-[#1f531b] hover:shadow-[0_12px_30px_rgba(39,98,33,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/40 focus-visible:ring-offset-2 active:translate-y-0">
+                Request a demo <ArrowRight className="size-4" aria-hidden />
+              </Link>
+              <Link href="/product" className="inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold text-[#276221] transition-colors hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/40">
+                See how CaseLink works
+              </Link>
+            </div>
+            <p className="mt-7 flex max-w-md items-start gap-2 text-sm leading-6 text-[#5d705a]">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden />
+              Designed for minimal family data and human review at every step.
+            </p>
+          </div>
+          <ProductProof />
         </div>
       </section>
 
-      <section
-        className="mx-auto max-w-5xl px-4 py-14 sm:py-16"
-        aria-labelledby="problem-heading"
-      >
-        <h2 id="problem-heading" className={sectionTitle}>
-          The Problem
-        </h2>
-        <div className={bodyBlock}>
-          <p>
-            Families rarely face one challenge at a time. For school case
-            managers, supporting a family can mean navigating housing issues,
-            food insecurity, transportation barriers, childcare needs,
-            employment challenges, and mental health concerns all at once.
+      <section className="border-y border-[#dce6d9] bg-white" aria-label="CaseLink recognition">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+          <p className="max-w-2xl text-sm font-medium leading-6 text-[#365134]">
+            Built with case managers at Alain Locke School in Philadelphia and selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026.
           </p>
-          <p>
-            But finding the right next step often means piecing together
-            information across multiple websites, organizations, and systems.
-            That process takes time away from the work that matters most:
-            building trust, understanding each family&apos;s situation, and
-            delivering timely, thoughtful support.
-          </p>
-          <p>
-            In high-need school communities, case managers need tools that help
-            them move from identifying a barrier to taking action quickly and
-            practically.
-          </p>
+          <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#276221]">
+            <Sparkles className="size-4" aria-hidden /> Supported by a $10,000 OpenAI grant
+          </span>
         </div>
       </section>
 
-      <section
-        className="border-y border-slate-200 bg-white"
-        aria-labelledby="what-heading"
-      >
-        <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
-          <h2 id="what-heading" className={sectionTitle}>
-            What is CaseLink?
-          </h2>
-          <div className={bodyBlock}>
+      <section className="bg-[#f8faf7] py-20 sm:py-28" aria-labelledby="home-focus">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-24 lg:px-10">
+          <div>
+            <h2 id="home-focus" className="max-w-xl text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] text-[#173a15] sm:text-5xl">
+              The administrative work should not crowd out the human work.
+            </h2>
+          </div>
+          <div className="max-w-2xl space-y-6 text-base leading-7 text-[#50644d] sm:text-lg sm:leading-8">
             <p>
-              CaseLink is an AI-powered tool designed to support school case
-              managers. It helps them identify key barriers, organize those
-              needs, and generate personalized action plans connected to relevant
-              local resources in Philadelphia.
+              Case managers already know their families. The friction is turning that understanding into a plan and then re-entering it into required paperwork.
             </p>
             <p>
-              Built in close collaboration with case managers at Alain Locke
-              School, CaseLink reflects the real needs they see every day.
-              Rather than starting from scratch each time a family needs
-              support, case managers can use CaseLink to quickly build a clearer
-              path forward.
+              CaseLink creates one dependable handoff: capture the family&apos;s current barriers, approve a structured plan, and use that approved information to prepare a fillable PDF for CitySpan submission.
             </p>
+            <Link href="/product" className="group inline-flex items-center gap-2 font-semibold text-[#276221] underline decoration-[#8bca84] decoration-2 underline-offset-4 transition-colors hover:text-[#1f531b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35">
+              Explore the product <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
+            </Link>
           </div>
         </div>
       </section>
 
-      <section
-        id="how-caselink-helps"
-        className="mx-auto max-w-5xl scroll-mt-24 px-4 py-14 sm:py-16"
-        aria-labelledby="how-heading"
-      >
-        <h2 id="how-heading" className={sectionTitle}>
-          How CaseLink Helps
-        </h2>
-        <p className={`mt-4 max-w-3xl ${body}`}>
-          CaseLink helps case managers respond more efficiently, more
-          practically, and more personally.
-        </p>
-        <ul className="mt-8 grid list-none gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <li>
-            <Card className="h-full p-5">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Identify barriers
-              </h3>
-              <p className={`mt-2 ${body}`}>
-                Case managers can quickly select areas where a family needs
-                support, from housing and employment to food access,
-                transportation, childcare, and mental health.
-              </p>
-            </Card>
-          </li>
-          <li>
-            <Card className="h-full p-5">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Generate a personalized plan
-              </h3>
-              <p className={`mt-2 ${body}`}>
-                CaseLink turns those barriers into a clear, practical action
-                plan tailored to the family&apos;s needs.
-              </p>
-            </Card>
-          </li>
-          <li>
-            <Card className="h-full p-5">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Connect to local resources
-              </h3>
-              <p className={`mt-2 ${body}`}>
-                The tool links case managers to relevant Philadelphia-based
-                resources and next steps, helping them respond faster and more
-                effectively.
-              </p>
-            </Card>
-          </li>
-        </ul>
-        <p className={`mt-10 max-w-3xl ${body}`}>
-          By reducing time spent searching for starting points and assembling
-          resource lists, CaseLink helps case managers focus more of their time
-          on supporting families.
-        </p>
-      </section>
-
-      <section
-        className="border-y border-slate-200 bg-white"
-        aria-labelledby="privacy-heading"
-      >
-        <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
-          <h2 id="privacy-heading" className={sectionTitle}>
-            Privacy Comes First
-          </h2>
-          <div className={bodyBlock}>
-            <p>
-              CaseLink is designed to make support more efficient, practical,
-              and personalized, while protecting family privacy.
-            </p>
-            <p>
-              The tool is built to help case managers think through barriers and
-              identify helpful next steps without requiring confidential or
-              sensitive information from families. In a setting where trust
-              matters deeply, privacy is not an afterthought. It is part of the
-              design.
+      <section className="bg-[#276221] py-20 text-white sm:py-24" aria-labelledby="home-cta">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 sm:px-8 lg:flex-row lg:items-end lg:px-10">
+          <div>
+            <h2 id="home-cta" className="max-w-3xl text-balance text-3xl font-semibold tracking-[-0.03em] sm:text-5xl">
+              See what one simpler paperwork workflow could give back to your team.
+            </h2>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#cce7c9]">
+              We&apos;ll learn about your current process and walk through CaseLink without requiring a technical setup.
             </p>
           </div>
+          <Link href="/request-demo" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-[#276221] shadow-[0_8px_24px_rgba(11,36,10,0.2)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(11,36,10,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#276221] active:translate-y-0">
+            Request a demo <ArrowRight className="size-4" aria-hidden />
+          </Link>
         </div>
-      </section>
-
-      <section
-        className="mx-auto max-w-5xl px-4 py-14 sm:py-16"
-        aria-labelledby="built-with-heading"
-      >
-        <h2 id="built-with-heading" className={sectionTitle}>
-          Built With the People Closest to the Work
-        </h2>
-        <p className={`mt-4 max-w-3xl ${body}`}>
-          CaseLink was created by a small team of University of Pennsylvania
-          students in close collaboration with case managers at Alain Locke
-          School. Our goal is simple: to build practical AI tools that strengthen
-          the people already doing the work of supporting families every day.
-        </p>
       </section>
     </>
   );
