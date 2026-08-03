@@ -16,6 +16,7 @@ export type AiTaskType =
   | "plan_refinement"
   | "step_refinement"
   | "case_assistant"
+  | "pdf_field_mapping"
   | "blocker_troubleshoot"
   | "call_script"
   | "email_draft"

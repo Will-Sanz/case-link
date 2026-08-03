@@ -186,8 +186,8 @@ export function IntakeForm() {
                 onClick={() => toggleGoalPreset(g.value, g.label)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "border-blue-600 bg-blue-50 text-blue-900 shadow-sm"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-[#46923c] bg-[#edf6eb] text-[#173a15]"
+                    : "border-[#dce6d9] bg-white text-[#50644d] hover:border-[#8bca84] hover:bg-[#f6f8f4]"
                 }`}
               >
                 {g.label}
@@ -250,8 +250,8 @@ export function IntakeForm() {
                 onClick={() => toggleBarrierPreset(b.value, b.label)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                   on
-                    ? "border-blue-600 bg-blue-50 text-blue-900 shadow-sm"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-[#46923c] bg-[#edf6eb] text-[#173a15]"
+                    : "border-[#dce6d9] bg-white text-[#50644d] hover:border-[#8bca84] hover:bg-[#f6f8f4]"
                 }`}
               >
                 {b.label}

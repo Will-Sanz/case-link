@@ -18,7 +18,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = searchParams.get("next") ?? "/families";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +59,7 @@ export function LoginForm() {
         setError(safeSignInPasswordMessage(signError.message));
         return;
       }
-      router.push(nextPath.startsWith("/") ? nextPath : "/dashboard");
+      router.push(nextPath.startsWith("/") ? nextPath : "/families");
       router.refresh();
     } finally {
       setPending(false);

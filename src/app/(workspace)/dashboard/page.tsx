@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function DeprecatedWorkspaceRoute() {
+export default function DashboardRedirectPage() {
   redirect("/families");
 }
