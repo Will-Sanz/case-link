@@ -2,7 +2,7 @@
 
 ## Product requirements document
 
-**Status:** Reviewed product baseline  
+**Status:** Production-ready product baseline
 **Date:** August 2, 2026  
 **Owner:** CaseLink  
 **Scope:** The family-context → intervention-plan → resource-guidance experience  
@@ -149,6 +149,33 @@ The case manager has limited time, incomplete information, multiple concurrent f
 - record outcomes and adjust the plan without starting over;
 - reuse approved information in required paperwork.
 
+Assume the primary user:
+
+- is comfortable with ordinary websites but may not know AI or case-management software terminology;
+- works from a school-issued laptop, often with many tabs and interruptions;
+- may return to a case after hours or days and should not have to remember where they stopped;
+- values time saved and accurate paperwork more than customization or novel AI features;
+- may have inconsistent source notes and should be able to start without cleaning everything first;
+- needs confidence that clicking the wrong thing will not erase work, contact anyone, or submit a form.
+
+### Usability outcome
+
+The user should experience one familiar sequence:
+
+> **Choose a family → confirm what is happening → review a draft plan → prepare the required form.**
+
+They should not need to understand prompts, models, agents, schemas, retrieval, generation jobs, or confidence scores. AI-specific controls appear only where they describe a concrete outcome, such as **Draft plan**, **Find another resource**, or **Rewrite this action**.
+
+For the core flow, usability means:
+
+- a first-time invited user can begin without a tutorial or configuration screen;
+- an existing case can be entered gradually; only information needed for the next step is required;
+- every screen has one visually dominant next action and a safe secondary exit;
+- typed information is saved automatically and remains after refresh, timeout, or recoverable error;
+- the user can undo or review AI-driven changes before they replace reviewed work;
+- returning users land on the family list and can resume an unfinished case in one click;
+- a case manager can distinguish Draft, Needs review, Ready, and Blocked without learning CaseLink-specific vocabulary.
+
 ### Secondary user: supervisor
 
 Not in the first implementation scope, but the model must allow a supervisor to review a plan, understand its sources and changes, and leave guidance without taking over the case.
@@ -171,14 +198,46 @@ The family is not a direct CaseLink user in V1, but the plan must preserve their
 8. **Every recommendation must be reviewable.** The case manager can understand why it appears, where its facts came from, and what uncertainty remains.
 9. **No silent failure.** Missing resources, partial generation, stale data, and model errors each get an explicit state and recovery action.
 10. **Approved plan data becomes paperwork data.** Do not summarize the same case twice with separate, inconsistent AI calls.
+11. **The system carries the complexity.** Never ask the case manager to choose a model, configure a workflow, format a prompt, or understand why a technical stage exists.
+12. **Work survives interruption.** Autosave, resumable generation, visible status, and safe retries are core behavior rather than convenience features.
+13. **Start small and deepen later.** Let the case manager create a useful draft from the minimum responsible context, then add detail where it improves a decision or required form.
 
 ---
 
 ## 7. Proposed experience
 
+### 7.0 First use and return use
+
+CaseLink is invitation-based. The first authenticated screen is **Families**, not a setup wizard or analytics dashboard.
+
+For a first-time user:
+
+1. Show a brief welcome panel: “CaseLink helps you turn family context into a reviewed plan and prepared paperwork.”
+2. Offer one primary action: **Add your first family**.
+3. Explain beside the action that the MVP uses a non-identifying case label and does not submit anything to school systems.
+4. Provide a short example case label without showing a real person’s name.
+5. Do not require profile completion, AI preferences, integrations, notification settings, or a product tour before beginning.
+
+For a returning user:
+
+- list families by the case label the worker recognizes;
+- show the next useful state in plain language: Add context, Draft plan, Review plan, Continue work, or Prepare paperwork;
+- preserve the last relevant family and screen, but default navigation still returns to Families;
+- allow search once the list exceeds ten families and keep recently updated cases first by default;
+- show a clear empty search result with **Clear search** rather than an empty table;
+- never use dashboard metrics as the primary way to resume work.
+
 ### 7.1 Entry: confirm the planning context
 
 The case manager reaches the plan from a family workspace after recording barriers and optional context.
+
+The minimum responsible starting context is:
+
+- a non-identifying family case label;
+- at least one case-manager-selected barrier or contributing factor;
+- a short description of the current situation in the case manager's own words.
+
+Goals, strengths, constraints, prior attempts, deadlines, and supporting notes improve the plan but are not gates unless a configured safety or form requirement makes them necessary. The screen should allow a case manager to select familiar factors from the school-form taxonomy, add Other in their own words, and paste de-identified notes without forcing those notes into many fields. CaseLink may suggest structured fields from those notes, but nothing becomes case context until the case manager reviews it.
 
 The screen first shows a compact **Planning context** summary:
 
@@ -340,6 +399,85 @@ Paperwork preparation must therefore:
 - distinguish native fillable fields from scanned forms that require a reviewed template map;
 - preserve the final case-manager-edited value separately from the source suggestion;
 - never imply that preparing or downloading a form submits it to an external system.
+
+### 7.9 Critical path and screen contract
+
+The production flow must preserve this order while allowing the user to go back without losing work:
+
+| Step | Screen | User decision | Primary action | Success state |
+| --- | --- | --- | --- | --- |
+| 1 | Families | Which case am I working on? | Open family or Add family | Family workspace opens |
+| 2 | Family context | Is the saved context accurate enough to plan from? | Continue to plan | Context is saved and summarized |
+| 3 | Context check | Are any consequential facts missing? | Draft plan | Questions are answered, marked Not sure, or skipped |
+| 4 | Drafting | Do I need to do anything while CaseLink works? | None; user may leave safely | First useful action appears and the job continues |
+| 5 | Plan review | Is each proposed action appropriate? | Finish review | Plan is marked Reviewed by the case manager |
+| 6 | Working plan | What should happen next? | Start/update the top action | Progress is saved without regenerating the plan |
+| 7 | Paperwork | Which reviewed information belongs in this form? | Download completed PDF | Editable reviewed copy downloads for manual upload |
+
+Navigation and persistence requirements:
+
+- browser Back, in-product Back, refresh, and reopening the tab preserve committed work;
+- leaving during generation does not cancel the job unless the user explicitly chooses Cancel;
+- repeated clicks on a primary action cannot create duplicate families, plans, jobs, tasks, or downloads;
+- every completed step communicates what was saved and what happens next;
+- the interface warns before discarding unsaved local text, but ordinary navigation must not produce warnings after autosave completes;
+- opening an old link routes to the closest valid screen with an explanation rather than a generic error page.
+
+### 7.10 State language and recovery contract
+
+The interface uses a small, consistent state vocabulary. Internal states may be more detailed, but case-manager labels must remain familiar.
+
+| Object | User-visible states | Required behavior |
+| --- | --- | --- |
+| Family workflow | Add context, Draft plan, Review plan, Continue work, Prepare paperwork | Exactly one appears as the recommended next step on the Families page |
+| Plan | Draft, Needs review, Reviewed, Needs attention | A plan becomes Reviewed only through an explicit case-manager action; later material changes return affected content to Needs review |
+| Action | Not started, In progress, Waiting, Completed, No longer needed | Waiting requires a plain-language reason; Completed and No longer needed require explicit user action |
+| AI job | Starting, Working, Partly ready, Ready, Could not finish | Partial output remains usable; retry resumes the failed stage without duplicating completed work |
+| Resource result | Finding services, Matches found, No matches, Needs verification, Unavailable | Resource failure never makes the rest of the plan disappear |
+| Paperwork | Not started, Needs review, Ready to download, Out of date | Any source-plan change marks only affected mappings Out of date |
+
+#### Autosave and interruption
+
+- Save field changes after a short idle period and on field blur; show quiet **Saving…**, **Saved**, or **Not saved** text near the working area.
+- Keep the latest typed value in the browser until the server confirms it, so a recoverable request failure does not clear the field.
+- If autosave fails, keep editing available, show **We couldn't save this yet**, and offer **Try again**. Do not replace the page with an error screen.
+- If the session expires, preserve local edits, ask the user to sign in again, and restore them after successful authentication.
+- If another session changed the same reviewed field, do not silently overwrite either value. Show the saved version and the current edit, then let the user choose.
+- Every create, generation, retry, and download request uses an idempotency key or equivalent server-side duplicate protection.
+
+#### Loading and long-running work
+
+- Show the existing saved content immediately, then load secondary content such as resources and provenance independently.
+- Use skeletons only when their shape matches the content. Prefer specific messages such as **Finding services** over a generic spinner.
+- After 10 seconds, tell the user they may leave and CaseLink will continue. Do not show an estimated completion time unless it is based on measured job state.
+- After 30 seconds, keep the job running and expose **Keep working elsewhere** plus a retry or support path if the job stops making progress.
+- Refresh and navigation reconnect to the existing job rather than starting a new one.
+
+#### Error and empty-state behavior
+
+| Situation | Message intent | Recovery action |
+| --- | --- | --- |
+| No families | Explain that families will appear here after the first case is added | Add your first family |
+| No plan yet | Explain the minimum context needed and what the draft will do | Review context |
+| No resource matches | State that no verified match was found for the current filters—not that no help exists | Adjust details, Search all resources, or Add a resource |
+| Resource service unavailable | Keep the action plan visible and say service matching can be retried separately | Retry resources |
+| Plan generation partially fails | Keep validated actions and identify which portion is unfinished | Continue draft |
+| Plan generation fully fails | Preserve context and explain that no draft was saved | Try again |
+| Permission denied | Explain that the account cannot view or change this family and who to contact | Back to families |
+| Family or plan not found | Avoid implying data loss; the item may have moved or access may have changed | Back to families |
+| Offline | Keep confirmed saved content readable and clearly mark edits waiting to save | Retry when connected |
+| PDF cannot be read | Preserve the upload and explain whether a clean, unlocked PDF is needed | Choose another PDF |
+| PDF mapping fails | Preserve all reviewed mappings and isolate the failed field or render stage | Retry preparation or Download review copy |
+
+Messages must say what happened, what was preserved, and what the user can do next. Do not expose stack traces, provider names, request IDs, status codes, or “contact your administrator” unless a real administrator action is required.
+
+#### Safe changes and deletion
+
+- AI suggestions never overwrite reviewed text without a visible before/after review.
+- Rejecting an AI suggestion requires no confirmation; the user can undo it.
+- Removing a family, plan, completed action, uploaded form, or reviewed paperwork draft requires a confirmation that names the exact item and explains the consequence.
+- Prefer recoverable archive states over permanent deletion. Permanent deletion behavior belongs to the approved retention policy.
+- Cancel closes a dialog without applying changes. Back returns to the prior workflow step without discarding saved work.
 
 ---
 
@@ -559,7 +697,10 @@ Performance acceptance requires at least 50 representative de-identified test ca
 ### Privacy
 
 - Continue using de-identified case labels in the MVP.
-- Block or warn on likely identifiable fields before they are sent to an AI provider until the data-governance gate is approved.
+- Do not provide name, student ID, date-of-birth, address, phone, email, or signature fields while the no-PII policy is active.
+- Give a concrete case-label example such as “Family 104” and say “Do not use a student or family member's name.”
+- Scan case labels, free text, uploads, and provider-bound content for likely identifiers. Flag the exact text in place, preserve the rest of the user's work, and require removal before saving disallowed content or sending it to an AI provider.
+- Treat automated identifier detection as a usability safeguard, not proof of de-identification. Pilot procedures, training, access controls, and data review remain necessary.
 - Define retention, deletion, encryption, audit, incident response, vendor terms, district control, and model-data handling before any pilot involving education-record PII.
 - Do not use production case content for model training or prompt optimization without explicit authorization and a documented de-identification process.
 
@@ -576,14 +717,40 @@ Performance acceptance requires at least 50 representative de-identified test ca
 
 - Meet WCAG 2.2 AA for the complete flow.
 - Support full keyboard operation, visible focus, semantic headings, and screen-reader announcements for real generation progress.
+- Move focus to the heading or first invalid field after navigation, dialog completion, validation, and recoverable errors; never drop focus to the document body.
+- Associate every instruction and error with its field, summarize submission errors at the top, and preserve all valid entries.
+- Use controls at least 24 by 24 CSS pixels and provide a larger 44-pixel target for primary actions on narrow screens.
+- Use at least 16-pixel text for inputs on narrow screens; support browser zoom and text resizing to 200% without clipped controls or lost actions.
+- Do not require hover, drag-and-drop, fine pointer control, or timed interaction. Reordering always has keyboard-accessible Move up and Move down alternatives.
+- Announce job-stage changes politely without repeatedly interrupting screen-reader speech; announce terminal success and errors assertively once.
 - Do not use color as the only indicator of priority, status, freshness, or review state.
 - The main next action must be visible before supporting explanation.
 - Use sentence-case labels and familiar terms. Avoid “horizon,” “artifact,” “confidence score,” “agent,” and technical AI language in the case-manager UI.
+- Name buttons for their result: **Draft plan**, **Save changes**, **Retry resources**, and **Download completed PDF**. Avoid vague labels such as Continue when the destination is not already obvious.
 - Prefer numbered tasks for ordered work and bullets for documents, blockers, and alternatives.
 - Keep one idea per sentence and one purpose per card.
 - Collapse optional explanation; never hide warnings, blockers, sources, or missing information.
 - Mobile layouts must preserve the same task order, though the primary design target is a school-issued laptop.
+- Allow long labels, resource names, and user-entered text to wrap without hiding the next action; design controls for at least 30% text expansion.
+- Format dates and times with the user's locale and time zone while storing unambiguous timestamps. Never rely on numeric-only dates where month/day order could be misunderstood.
 - All loading, empty, partial, error, stale-data, and success states need plain-language recovery instructions.
+
+Content review should target plain language understandable on first reading, while preserving terms case managers are required to use. A user test—not an automated reading score alone—decides whether labels and instructions are clear.
+
+Use this vocabulary consistently:
+
+| Internal or technical term | Case-manager language |
+| --- | --- |
+| Generation job | Drafting your plan |
+| Context compiler | Family context |
+| Resource retrieval/matching | Finding services |
+| Provenance | Source |
+| Model output | Suggested draft |
+| Patch or regeneration | Proposed changes |
+| Schema validation failure | We couldn't finish this part |
+| Version conflict | Newer changes were saved elsewhere |
+| Terminal state | Finished or Could not finish |
+| Artifact/export | Plan summary or Completed PDF |
 
 ---
 
@@ -633,6 +800,22 @@ After meaningful use, ask no more than three short questions:
 - “Did this plan help you decide what to do next?”
 - “How much editing did it need before it was usable?”
 - “Were the resource suggestions worth contacting?”
+
+### Usability release measures
+
+Before a broad pilot, observe at least five representative case managers completing a prepared de-identified scenario without coaching. Measure from the product UI rather than a facilitator's explanation.
+
+| Measure | Pilot target |
+| --- | --- |
+| Start first family after sign-in | Median ≤ 60 seconds |
+| Resume the correct unfinished case | At least 90% succeed on first attempt within 20 seconds |
+| Reach Draft plan from prepared scenario notes | At least 80% succeed without assistance |
+| Identify the top next action | At least 90% answer correctly after viewing the plan for 15 seconds |
+| Recover from a forced resource failure | At least 80% continue the plan without assistance |
+| Understand whether a downloaded form was submitted | 100% correctly answer “No” |
+| Critical usability errors causing lost work or wrong-family action | 0 |
+
+Record where participants hesitate, backtrack, request help, or misunderstand state. A faster task time does not compensate for incorrect context, lost edits, or false confidence.
 
 ---
 
@@ -684,7 +867,122 @@ A model, prompt, retrieval change, or schema change cannot ship solely because e
 
 ---
 
-## 15. Delivery plan
+## 15. Production implementation contract
+
+This section translates the product experience into implementation boundaries. It defines required behavior without prescribing a specific component tree or endpoint naming scheme.
+
+### 15.1 Prioritized user stories
+
+| ID | Release band | Story | Completion evidence |
+| --- | --- | --- | --- |
+| CW-01 | Core | As a case manager, I can add a family using a non-identifying label and minimum context so I can start without completing a long intake. | Family is saved, appears in Families, and can be reopened after refresh |
+| CW-02 | Core | As a returning case manager, I can see the next useful step for every family so I can resume without reconstructing my work. | Each row has exactly one correct next-step label derived from durable state |
+| CW-03 | Core | As a case manager, I can review the exact context that will be used before drafting so incorrect assumptions do not enter the plan. | Context summary contains only saved human-provided or human-approved information |
+| CW-04 | Core | As a case manager, I can start a plan and leave the page while it runs so waiting does not block other work. | One durable job resumes after navigation or refresh and cannot be duplicated by repeat clicks |
+| CW-05 | Core | As a case manager, I can use validated actions even if resources or later plan stages fail. | Partial success renders with a specific recovery action; validated work is retained |
+| CW-06 | Core | As a case manager, I can accept, edit, reject, add, and reorder actions before marking the plan Reviewed. | Each decision persists with author, timestamp, source, and plan version |
+| CW-07 | Core | As a case manager, I can update an action after outreach without regenerating the whole plan. | Status, outcome, note, and follow-up date save independently |
+| CW-08 | Next | As a case manager, I can find a credible resource and see what I still need to verify before contacting it. | Resource facts show provenance/freshness and never contain model-invented operational data |
+| CW-09 | Next | As a case manager, I can request a focused rewrite or fallback without losing my edits. | Proposed patch is scoped, diffed, and applied only after review |
+| CW-10 | Next | As a case manager, I can map reviewed plan content into a supported form without retyping it. | Every proposed form value has a source, review state, and editable final value |
+| CW-11 | Next | As a case manager, I can download the prepared form knowing it has not been submitted anywhere. | Download completes; handoff copy explicitly states manual upload remains |
+| CW-12 | Later | As a supervisor, I can review a plan and leave guidance within my permission scope. | Supervisor capability ships only after role and district-review discovery |
+
+Core is the smallest production slice. Next deepens the time-saving workflow once reliable resource data and a validated blank form are available. Later is not authorized for implementation by this PRD.
+
+### 15.2 Durable records
+
+The implementation may use normalized tables or versioned structured documents, but it must represent these concepts independently:
+
+| Record | Minimum durable fields |
+| --- | --- |
+| Family case | ID, organization/owner scope, non-identifying label, workflow state, created/updated timestamps, archived state |
+| Context item | Type, value, provenance, human-review state, created/updated author, sensitivity flag |
+| Barrier or contributing factor | Taxonomy ID or Other text, source, selected state, notes, review state |
+| Plan version | ID, family ID, schema version, objective, review state, parent version, created by, timestamps |
+| Action | ID, plan version, title, owner, priority, status, next task, timing, expected result, order, human-edit state |
+| Action detail | Tasks, documents, dependencies, blockers, fallbacks, progress signal, outcome note, provenance |
+| Resource link | Action ID, resource-record version, match reason, verification state, case-manager disposition |
+| Generation job | ID, family/plan scope, job type, idempotency key, stage, status, progress timestamps, safe error category, result version |
+| Paperwork template | Template ID/version, district scope, source-file fingerprint, field map, required review rules, active state |
+| Paperwork draft | ID, plan version, template version, mapping values, source references, review states, final edits, out-of-date fields |
+| Audit event | Actor, action, object/version, timestamp, privacy-safe change metadata |
+
+Required invariants:
+
+- all family-scoped reads and writes enforce authenticated organization/user access on the server and in database policies;
+- records are never joined or selected by a user-supplied organization ID without authorization checks;
+- reviewed plan versions are immutable snapshots; later work creates a new version or explicit patch history;
+- human-edited fields retain ownership and cannot be silently replaced by later model output;
+- deleting or archiving a family cannot orphan an active generation job or downloadable paperwork draft;
+- action ordering is deterministic and stable across refreshes;
+- resource operational facts always reference a stored resource-record version;
+- paperwork drafts pin both the plan version and template version that produced them;
+- no production record requires a real student or family name while the no-PII policy is active.
+
+### 15.3 Mutation and background-job contract
+
+All state-changing operations must:
+
+- validate input on the server with a versioned schema;
+- enforce authentication, authorization, and record ownership before work begins;
+- accept an idempotency key or otherwise prevent duplicate effects;
+- return the updated record version and a typed, safe error category;
+- use optimistic concurrency for reviewed content so stale tabs cannot overwrite newer work;
+- preserve the user's submitted value when validation or a recoverable network request fails;
+- write an audit event for review-state, source, owner, progress, and paperwork changes.
+
+Plan generation, resource matching, scoped replanning, and PDF preparation are durable jobs rather than browser-owned requests. A job must:
+
+1. persist before model or file processing begins;
+2. expose a real stage and last-progress timestamp;
+3. persist every validated partial result;
+4. resume or retry from the smallest safe stage;
+5. ignore or return the existing result for duplicate starts;
+6. stop applying results if its source plan/context version is obsolete;
+7. expose only safe user-facing failure categories while retaining diagnostic correlation in protected logs;
+8. reach a terminal Ready, Partly ready, Could not finish, Cancelled, or Superseded state.
+
+The client may receive updates through streaming, server-sent events, polling, or a platform-equivalent mechanism. The product requirement is resumable state, not a particular transport.
+
+### 15.4 Analytics and privacy contract
+
+Required events include family workflow step viewed, generation started/stage completed/finished, first action visible, review decision, action outcome, resource disposition, paperwork review completed, and PDF downloaded. Events include opaque record/version IDs, durations, state transitions, and error categories.
+
+Analytics must not include raw family narrative, copied notes, generated plan prose, form values, resource-search free text that may identify a person, filenames supplied by the user, or signed download URLs. Product analytics and protected diagnostic logs require separate schemas and access rules.
+
+### 15.5 Required test matrix
+
+| Layer | Required coverage before Core release |
+| --- | --- |
+| Unit | Workflow-state derivation, action grouping, schema validation, provenance rules, date handling, stale-version rejection, no-PII checks |
+| Database | Row-level access, cross-organization denial, immutable reviewed versions, template/version pinning, archive behavior |
+| Integration | Create/resume family, autosave recovery, durable job lifecycle, partial generation, resource failure isolation, protected human edits |
+| End to end | First-use happy path, returning-user resume, refresh during generation, expired session with unsaved text, review and action update |
+| Accessibility | Keyboard-only critical path, focus restoration, semantic headings, live progress announcements, error association, 200% zoom, contrast |
+| Adversarial input | Empty and very long text, special characters, duplicate clicks, outdated tab, malformed model output, unsupported PDF, oversized allowed upload |
+| AI evaluation | Safety, grounding, actionability, reading effort, family voice, resource-fact precision, edit preservation, latency |
+| Visual regression | Families empty/list states, context form, partial plan, review mode, each error state, laptop and narrow viewport |
+
+Test fixtures must be synthetic and de-identified. At minimum, UI fixtures cover zero, one, ten, and one hundred families; zero and many barriers; a 2,000-character allowed note; long resource names; missing optional fields; and each job terminal state.
+
+### 15.6 Definition of done
+
+A story is not complete until:
+
+- its success, loading, empty, partial, error, permission, and retry states are implemented where applicable;
+- user-entered work survives refresh and recoverable failure;
+- copy uses the approved plain-language vocabulary;
+- keyboard and screen-reader behavior is verified, not inferred from component choice;
+- server authorization, validation, idempotency, and audit behavior are tested;
+- product analytics measure the intended outcome without storing case content;
+- no public or in-product copy promises integration, automatic submission, eligibility, availability, or family outcomes;
+- relevant unit, integration, end-to-end, accessibility, and eval gates pass in CI;
+- a nontechnical reviewer can complete the story from the UI without developer instructions.
+
+---
+
+## 16. Delivery plan
 
 ### Phase 0 — Stabilize the current core
 
@@ -793,30 +1091,38 @@ Exit criteria:
 
 ---
 
-## 16. Detailed acceptance criteria for the first production slice
+## 17. Detailed acceptance criteria for the first production slice
 
-The first production slice is Phase 0 plus the smallest usable part of Phase 1.
+The first production slice is Phase 0 plus the Core stories in Section 15. The criteria below are cumulative; all must pass.
 
-1. A case manager can review the exact context used to create a plan.
-2. If critical context is missing, the system asks at most three plain-language questions and allows skipping.
-3. Generation shows real progress and produces at least one useful action before the complete draft when technically possible.
-4. The first view shows no more than three Do next actions.
-5. Every open action has a title, next task, owner, timing, expected result, and status.
-6. Supporting details are structured into lists and labeled fields, not one long paragraph.
-7. Every named program links to a resource record with source/freshness information or is clearly marked unavailable pending resource completion.
-8. Resource-matching failure produces a visible retryable state and does not erase the plan.
-9. A case manager can edit, reject, reorder, add, and approve actions.
-10. AI refinement preserves human edits and shows a change summary.
-11. Completed, blocked, and failed actions can trigger a scoped proposed update.
-12. The reviewed plan remains compatible with current PDF export while migration is underway, and its schema can supply the first factor-based form mapping without changing the operational UI into a copy of that form.
-13. Keyboard and screen-reader users can complete the full flow.
-14. No identifiable data is required or encouraged.
-15. Instrumentation records latency and quality events without raw family narrative.
-16. The release passes the expert eval safety/grounding floor and representative case-manager review.
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| AC-01 | A first-time invited case manager with no families | They sign in | Families shows one explanation, one Add your first family action, and no required setup or dashboard |
+| AC-02 | A valid non-identifying case label, one barrier, and a short description | They add a family and refresh | One family exists, all entered context remains, and the next step is Draft plan |
+| AC-03 | A likely identifying value while the no-PII policy is active | They attempt to save or send it for AI processing | The exact likely identifier is flagged in place, other work remains, saving/provider processing is blocked, and no disallowed value is persisted or transmitted |
+| AC-04 | An existing unfinished family | They return to Families | The correct next-step label is visible and opens the exact valid workflow state in one click |
+| AC-05 | Sufficient saved context | They open the planning context | The summary contains only saved human-provided or human-approved information and can be corrected before drafting |
+| AC-06 | Consequential information is missing | They continue toward drafting | Zero to three plain-language questions appear, each allows Not sure or Skip for now, and answers save as case-manager context |
+| AC-07 | A case manager starts drafting and rapidly activates the button repeatedly | The server receives the requests | Exactly one durable generation job and one draft result exist |
+| AC-08 | A generation job is running | They refresh, close, or navigate away and later return | The same job and validated partial results resume without starting over |
+| AC-09 | Resource matching fails while planning succeeds | The first actions validate | The actions remain visible, resources show a specific retry state, and no blank panel or whole-page error replaces the plan |
+| AC-10 | A partially valid generation result | A later stage cannot finish | Validated actions persist, the plan is Partly ready, and Continue draft retries only unfinished work |
+| AC-11 | A complete draft | The plan first renders | No more than three Do next actions appear; every open action has a title, next task, owner, timing, expected result, and status |
+| AC-12 | A draft plan | The case manager edits, rejects, reorders, adds, and reviews actions | Every decision persists with actor and version; the plan becomes Reviewed only after the explicit Finish review action |
+| AC-13 | Reviewed text owned by the case manager | They request a focused AI change | A before/after patch appears and no reviewed value changes until they apply it |
+| AC-14 | A reviewed action | The case manager records Started, Waiting, Completed, or No longer needed | The selected action updates without whole-plan regeneration and dependent changes remain proposed until reviewed |
+| AC-15 | An expired session during an unsaved edit | The case manager signs in again | The local edit is restored and can be saved without retyping |
+| AC-16 | Two tabs edit the same reviewed field | The older tab attempts to save | Neither value is silently overwritten; the user receives a comparison and resolution choice |
+| AC-17 | A keyboard or screen-reader user | They complete the Core critical path | Every operation is reachable, focus is managed, progress is announced, and errors are associated with their controls |
+| AC-18 | Production analytics enabled | The workflow completes or fails | Required timing/state events exist without raw case narrative, plan prose, form values, or identifying filenames |
+| AC-19 | An authenticated user outside the family record's permitted scope | They request it by URL or mutation | The server and database deny access without revealing whether the record exists |
+| AC-20 | The release candidate | CI and the evaluation suite run | Contract tests pass, safety/grounding blockers are zero, latency targets are met, and representative case-manager review is recorded |
+
+Next-release paperwork acceptance additionally requires a validated clean blank, approved template version, field-level provenance, editable mappings, out-of-date detection, explicit manual-upload language, and successful download without external submission.
 
 ---
 
-## 17. Migration considerations
+## 18. Migration considerations
 
 ### Preserve existing work
 
@@ -842,7 +1148,7 @@ For the first school form, legacy phases should migrate into adaptable actions b
 
 ---
 
-## 18. Risks and mitigations
+## 19. Risks and mitigations
 
 | Risk | Mitigation |
 | --- | --- |
@@ -862,7 +1168,7 @@ For the first school form, legacy phases should migrate into adaptable actions b
 
 ---
 
-## 19. Open decisions requiring customer discovery
+## 20. Open decisions requiring customer discovery
 
 These should not be guessed by engineering:
 
@@ -884,7 +1190,7 @@ These should not be guessed by engineering:
 
 ---
 
-## 20. Review conclusion
+## 21. Review conclusion
 
 This direction keeps CaseLink's scope narrow while making the core substantially more valuable. It does not broaden the product into a school operating system. It deepens the one workflow already connected to real work:
 
