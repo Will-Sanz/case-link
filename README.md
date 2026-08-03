@@ -8,6 +8,8 @@ The near-term product is deliberately narrow. It is built for **speed, clarity, 
 
 The staged path from the current application to that north star is documented in the [Product Redesign Plan](docs/product-redesign-plan.md).
 
+The product definition for CaseLink's core AI experience is documented in the [Adaptive Intervention Planning PRD](docs/intervention-planning-prd.md).
+
 ---
 
 ## The problem
