@@ -6,14 +6,20 @@ import {
   FileText,
   ListChecks,
   LockKeyhole,
+  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 
 const features = [
   {
     title: "A focused family record",
-    body: "Capture only the context the case manager needs for planning: a household label, current circumstances, goals, and barriers.",
+    body: "Create a de-identified household label and capture only the context the case manager needs for planning.",
     icon: UsersRound,
+  },
+  {
+    title: "Barriers in one clear step",
+    body: "Select the barriers that apply, add de-identified context, and keep the case manager in control of what shapes the plan.",
+    icon: ShieldCheck,
   },
   {
     title: "A structured intervention plan",
@@ -44,7 +50,7 @@ function PaperworkDetail() {
         <div className="border-b border-[#dce6d9] bg-[#f3f7f1] p-5 md:border-b-0 md:border-r">
           <p className="text-xs font-semibold text-[#5d705a]">Information sources</p>
           <div className="mt-4 space-y-2">
-            {["Family profile", "Current barriers", "Approved plan"].map((source) => (
+            {["Family profile", "Current barriers", "Reviewed plan"].map((source) => (
               <div key={source} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-medium text-[#365134]">
                 <span className="grid size-5 place-items-center rounded-full bg-[#d8ead5] text-[#276221]"><Check className="size-3" strokeWidth={2.5} aria-hidden /></span>
                 {source}
@@ -59,7 +65,7 @@ function PaperworkDetail() {
         <div className="space-y-4 p-5">
           {[
             ["Primary barrier", "Housing instability", "From current barriers"],
-            ["30-day objective", "Complete housing intake and gather required documents.", "From approved plan"],
+            ["30-day objective", "Complete housing intake and gather required documents.", "From reviewed plan"],
             ["Household identifier", "Review before download", "Needs your input"],
           ].map(([label, value, source], index) => (
             <div key={label} className="grid gap-2 sm:grid-cols-[150px_1fr] sm:items-start">
@@ -85,7 +91,7 @@ export function ProductPageContent() {
             The paperwork assistant built around the case manager.
           </h1>
           <p className="hero-reveal-late mt-7 max-w-3xl text-lg leading-8 text-[#50644d] sm:text-xl">
-            CaseLink does one job well: it carries approved family context from intake to intervention plan to required form—without taking judgment away from the person closest to the family.
+            CaseLink does one job well: it carries reviewed family context from intake to intervention plan to required form—without taking judgment away from the person closest to the family.
           </p>
         </div>
       </section>
@@ -141,7 +147,7 @@ export function ProductPageContent() {
               CaseLink began through work with case managers at Alain Locke School in West Philadelphia. The need was practical: staff were doing thoughtful family-support work, then spending too much time rebuilding the same information inside administrative forms.
             </p>
             <p>
-              We are a small team of University of Pennsylvania students building with those practitioners, not around them. In 2026, CaseLink was selected for OpenAI&apos;s inaugural ChatGPT Futures class and received a $10,000 grant and access to frontier models.
+              We are a small team of University of Pennsylvania students building with those practitioners, not around them. In 2026, CaseLink was selected for OpenAI&apos;s inaugural ChatGPT Futures class.
             </p>
             <p>
               Our reason for building is simple: AI should give school staff more time for trust, follow-through, and family support—not add another complicated system to maintain.

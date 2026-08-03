@@ -50,13 +50,13 @@ export function createDeterministicMappings(fields: PdfFieldDescriptor[], source
       sourceLabel = "Current circumstances";
     } else if (/summary|assessment/.test(key) && (source.familySummary || source.planSummary)) {
       value = source.familySummary || source.planSummary;
-      sourceLabel = source.familySummary ? "Family summary" : "Approved plan summary";
+      sourceLabel = source.familySummary ? "Family summary" : "Reviewed plan summary";
     } else if (/30.?day|first action|immediate action|next step/.test(key) && firstPlanAction) {
       value = firstPlanAction;
-      sourceLabel = "Approved intervention plan";
+      sourceLabel = "Reviewed intervention plan";
     } else if (/intervention|action plan|service plan|plan steps/.test(key) && (allPlanActions || source.planSummary)) {
       value = allPlanActions || source.planSummary;
-      sourceLabel = "Approved intervention plan";
+      sourceLabel = "Reviewed intervention plan";
     }
 
     return {

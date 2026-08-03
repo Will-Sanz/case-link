@@ -16,7 +16,7 @@ Assume evaluators and users have no prior technical knowledge. Product language,
 
 CaseLink is an AI-assisted workspace for school case managers. Its first service helps a case manager create a family profile, identify barriers, generate a structured intervention plan, and use that plan to prepare required paperwork for review and submission.
 
-AI reduces repetitive administrative work by organizing intake information, drafting the intervention plan, and mapping approved information into a blank PDF. Case managers retain control over every decision and edit. Success means less time copying information between systems and forms, without changing the city-mandated system of record.
+AI reduces repetitive administrative work by organizing intake information, drafting the intervention plan, and mapping reviewed information into a blank PDF. Case managers retain control over every decision and edit. Success means less time copying information between systems and forms, without changing the city-mandated system of record.
 
 ## Positioning
 

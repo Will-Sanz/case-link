@@ -40,6 +40,7 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh items-start bg-[#f6f8f4]">
+      <a href="#main-content" className="sr-only z-[100] rounded-lg bg-white px-4 py-3 font-semibold text-[#276221] focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to main content</a>
       <aside className="sticky top-0 hidden h-dvh w-[244px] shrink-0 flex-col border-r border-[#dce6d9] bg-white lg:flex">
         <Link href="/families" className="flex h-[72px] items-center border-b border-[#e2ebe0] px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#46923c]/30">
           <CaseLinkWordmark />
@@ -74,6 +75,12 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
               <WorkspaceLink href="/families" label="Families" icon={UsersRound} active={pathname === "/families"} />
               {familyTabs.map((item) => <WorkspaceLink key={item.href} {...item} active={pathname === item.href} />)}
               <WorkspaceLink href="/profile" label="Settings" icon={Settings} active={pathname === "/profile"} />
+              <div className="mt-2 border-t border-[#e2ebe0] pt-2">
+                <WorkspaceLink href="/product" label="Help & product guide" icon={CircleHelp} active={false} />
+                <form action={signOutAction}>
+                  <button type="submit" className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#5d705a] hover:bg-[#f1f6ef] hover:text-[#173a15]"><LogOut className="size-[18px]" strokeWidth={1.8} aria-hidden /> Sign out</button>
+                </form>
+              </div>
             </nav>
           </details>
         </header>

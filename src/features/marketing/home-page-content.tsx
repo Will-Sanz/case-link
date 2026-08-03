@@ -29,7 +29,7 @@ function ProductProof() {
 
         <div className="grid gap-4 pt-5 md:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-xl bg-[#f3f7f1] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d705a]">Approved plan</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d705a]">Reviewed plan</p>
             <p className="mt-4 text-sm font-semibold text-[#173a15]">Housing stability</p>
             <p className="mt-1 text-xs leading-5 text-[#5d705a]">
               Connect the family with housing intake support and prepare the required documentation.
@@ -114,7 +114,7 @@ export function HomePageContent() {
             Built with case managers at Alain Locke School in Philadelphia and selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026.
           </p>
           <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#276221]">
-            <Sparkles className="size-4" aria-hidden /> Supported by a $10,000 OpenAI grant
+            <Sparkles className="size-4" aria-hidden /> Focused on family-support paperwork
           </span>
         </div>
       </section>
@@ -131,7 +131,7 @@ export function HomePageContent() {
               Case managers already know their families. The friction is turning that understanding into a plan and then re-entering it into required paperwork.
             </p>
             <p>
-              CaseLink creates one dependable handoff: capture the family&apos;s current barriers, approve a structured plan, and use that approved information to prepare a fillable PDF for CitySpan submission.
+              CaseLink creates one dependable handoff: capture the family&apos;s current barriers, review a structured plan, and use that reviewed information to prepare a fillable PDF for CitySpan submission.
             </p>
             <Link href="/product" className="group inline-flex items-center gap-2 font-semibold text-[#276221] underline decoration-[#8bca84] decoration-2 underline-offset-4 transition-colors hover:text-[#1f531b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35">
               Explore the product <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />

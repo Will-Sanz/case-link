@@ -12,7 +12,7 @@ const requestSchema = z.object({
   organization: z.string().trim().min(2, "Enter your school or district.").max(160),
   role: z.string().trim().min(2, "Enter your role.").max(120),
   message: z.string().trim().max(1500).optional().default(""),
-  website: z.string().max(0).optional().default(""),
+  website: z.string().max(200).optional().default(""),
 });
 
 const demoLimiter = createMemorySlidingWindow({ max: 5, windowMs: 15 * 60_000 });
@@ -26,21 +26,22 @@ export async function submitDemoRequest(
   _previous: DemoRequestState,
   formData: FormData,
 ): Promise<DemoRequestState> {
+  const website = formData.get("website");
+  // Honeypot submissions get a neutral success response and are not validated or stored.
+  if (typeof website === "string" && website.trim()) return { status: "success" };
+
   const parsed = requestSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     organization: formData.get("organization"),
     role: formData.get("role"),
     message: formData.get("message"),
-    website: formData.get("website"),
+    website,
   });
 
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form and try again." };
   }
-
-  // Honeypot submissions get a neutral success response and are not stored.
-  if (parsed.data.website) return { status: "success" };
 
   const requestHeaders = await headers();
   const ip = getClientIpFromHeaders(requestHeaders) ?? "unknown";

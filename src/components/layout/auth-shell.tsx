@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { CaseLinkMark } from "@/components/brand/caselink-mark";
 
 export function AuthShell({
   title,
@@ -17,20 +18,18 @@ export function AuthShell({
   showLegalLinks?: boolean;
 }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-[#f4f6f8] px-4 py-16">
+    <div className="flex min-h-full flex-col items-center justify-center bg-[#edf4eb] px-4 py-16">
       <div className="w-full max-w-[400px]">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/90 text-sm font-semibold text-white">
-            CL
-          </div>
-          <h1 className="text-lg font-semibold text-slate-900">
+          <CaseLinkMark className="mx-auto mb-4 size-11" />
+          <h1 className="text-lg font-semibold text-[#173a15]">
             {title}
           </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+          <p className="mt-1.5 text-sm leading-relaxed text-[#5d705a]">
             {subtitle}
           </p>
         </div>
-        <Card className="p-6">
+        <Card className="border-0 p-6 shadow-[0_18px_44px_rgba(30,70,27,0.1)]">
           {children}
         </Card>
         {showLegalLinks ? (

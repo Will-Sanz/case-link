@@ -40,8 +40,10 @@ export function PlanPdfExport({
   workflow: BarrierWorkflowResult;
 }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleDownload() {
+    setError(null);
     setLoading(true);
     try {
       const generatedDate = new Date().toLocaleDateString(undefined, {
@@ -67,20 +69,24 @@ export function PlanPdfExport({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("PDF export failed:", err);
+      setError("The plan summary could not be prepared. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button
-      type="button"
-      variant="secondary"
-      className="border-slate-200"
-      onClick={handleDownload}
-      disabled={loading}
-    >
-      {loading ? "Preparing…" : "Download PDF"}
-    </Button>
+    <div>
+      <Button
+        type="button"
+        variant="secondary"
+        className="border-slate-200"
+        onClick={handleDownload}
+        disabled={loading}
+      >
+        {loading ? "Preparing…" : "Download plan summary"}
+      </Button>
+      {error ? <p className="mt-2 max-w-52 text-xs font-medium text-red-700" role="alert">{error}</p> : null}
+    </div>
   );
 }

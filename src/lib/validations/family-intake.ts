@@ -17,8 +17,8 @@ export const familyIntakeFormSchema = z.object({
       z.literal(""),
     ])
     .optional(),
-  goals: z.array(labeledItemSchema).min(1, "Add at least one goal").max(40),
-  barriers: z.array(labeledItemSchema).min(1, "Add at least one barrier").max(40),
+  goals: z.array(labeledItemSchema).max(40),
+  barriers: z.array(labeledItemSchema).max(40),
   members: z
     .array(
       z.object({

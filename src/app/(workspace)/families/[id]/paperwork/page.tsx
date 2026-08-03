@@ -15,7 +15,11 @@ export default async function FamilyPaperworkPage({ params }: PageProps) {
   if (!family) notFound();
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
-      <PaperworkWorkspace familyId={family.id} familyName={family.name} hasPlan={Boolean(family.plan)} />
+      <PaperworkWorkspace
+        familyId={family.id}
+        familyName={family.name}
+        hasPlan={Boolean(family.plan && (!family.plan.generation_state || family.plan.generation_state.status === "complete"))}
+      />
     </div>
   );
 }

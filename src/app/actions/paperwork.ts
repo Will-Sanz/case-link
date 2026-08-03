@@ -63,6 +63,9 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
 
   const family = await getFamilyDetail(supabase, parsed.data.familyId);
   if (!family) return { ok: false, error: "This family record could not be loaded." };
+  if (!family.plan || (family.plan.generation_state && family.plan.generation_state.status !== "complete")) {
+    return { ok: false, error: "Finish generating the intervention plan before preparing paperwork." };
+  }
 
   const source = buildPaperworkSource(family);
   const fallback = createDeterministicMappings(parsed.data.fields, source);
@@ -73,7 +76,7 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
     maxTokens: 4096,
     requestMeta: { userId: user.id, route: "/families/[id]/paperwork" },
     instructions: [
-      "Map approved CaseLink source information into the provided PDF form fields.",
+      "Map reviewed CaseLink source information into the provided PDF form fields.",
       "Never invent facts, infer identities, or fill signatures, consent, dates of birth, addresses, IDs, eligibility attestations, or case-manager certifications.",
       "Use only the supplied source. Preserve the requested fieldName exactly.",
       "For dropdown/radio/option-list values, use an exact supplied option or null.",
@@ -81,7 +84,7 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
       "Set needsReview true for missing, uncertain, sensitive, consent, signature, or attestation fields.",
       "The source intentionally omits the family label and household-member names.",
     ].join("\n"),
-    input: JSON.stringify({ fields: parsed.data.fields, approvedSource: source }),
+    input: JSON.stringify({ fields: parsed.data.fields, reviewedSource: source }),
     structuredJsonSchema: { name: "pdf_field_mappings", schema: jsonSchema, strict: true },
   });
 

@@ -496,41 +496,47 @@ export async function generateBarrierWorkflowForFamilyAction(
       .maybeSingle();
     if (!fam) return { ok: false, error: "Family not found." };
 
-    await supabase.from("family_barriers").delete().eq("family_id", familyId);
     const barrierRows = selected.map((label, idx) => ({
-      family_id: familyId,
       preset_key: BARRIER_KEY_BY_LABEL[label as BarrierPresetLabel] ?? null,
       label,
       sort_order: idx,
     }));
     for (const barrier of parsedAdditionalBarriers) {
       barrierRows.push({
-        family_id: familyId,
         preset_key: "other",
         label: barrier.length > 200 ? `${barrier.slice(0, 197)}...` : barrier,
         sort_order: barrierRows.length,
       });
     }
-    if (barrierRows.length > 0) {
-      const { error: barrierErr } = await supabase.from("family_barriers").insert(barrierRows);
-      if (barrierErr) return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
-    }
-
-    await supabase
-      .from("families")
-      .update({ summary: details || null, household_notes: details || null })
-      .eq("id", familyId);
-
-    const matchRes = await runResourceMatching({ familyId });
-    if (!matchRes.ok) return { ok: false, error: matchRes.error };
 
     const planRes = await startStagedLeanPlanGeneration({
       familyId,
       regenerationFeedback:
-        [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
+        [selected.join("; "), parsedAdditionalBarriers.join("; "), details]
+          .filter(Boolean)
+          .join("\n") || undefined,
       aiMode: input.aiMode,
     });
     if (!planRes.ok) return { ok: false, error: planRes.error };
+
+    // Replace the saved selections only after generation succeeds. The RPC performs
+    // the delete + insert in one transaction, so an insert error cannot erase the
+    // family's existing barriers. Additional context is planning feedback only and
+    // must never overwrite the distinct profile summary or circumstances fields.
+    const { error: barrierErr } = await supabase.rpc("replace_family_barriers", {
+      p_family_id: familyId,
+      p_barriers: barrierRows,
+    });
+    if (barrierErr) {
+      return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
+    }
+
+    // Resource suggestions are helpful but are not part of the core plan workflow;
+    // a matching outage should not turn a successfully generated plan into an error.
+    const matchRes = await runResourceMatching({ familyId });
+    if (!matchRes.ok) {
+      console.warn("[barrier-workflow] resource matching skipped", matchRes.error);
+    }
 
     const detail = await getFamilyDetail(supabase, familyId);
     if (!detail) return { ok: false, error: "Could not load generated family workflow." };
@@ -601,4 +607,3 @@ export async function loadBarrierWorkflowForFamilyAction(
     return { ok: false, error: toClientError(error) };
   }
 }
-

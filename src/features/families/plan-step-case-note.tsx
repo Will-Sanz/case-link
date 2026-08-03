@@ -215,11 +215,8 @@ export function PlanStepCaseNote({
     <article
       id={`step-${step.id}`}
       className={cn(
-        "max-w-[760px] border-l-[3px] pl-4",
-        step.phase === "30" && "border-l-teal-400/90 bg-teal-50/20",
-        step.phase === "60" && "border-l-indigo-400/80 bg-indigo-50/15",
-        step.phase === "90" && "border-l-violet-400/80 bg-violet-50/15",
-        editing && "rounded-r-xl ring-1 ring-blue-200/70 ring-offset-2 ring-offset-transparent",
+        "max-w-[760px] rounded-xl border border-[#dce6d9] bg-white px-4",
+        editing && "border-[#8bca84] ring-2 ring-[#46923c]/15 ring-offset-2 ring-offset-transparent",
       )}
     >
       <div className="space-y-5 py-4 pr-2">

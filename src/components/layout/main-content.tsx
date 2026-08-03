@@ -29,6 +29,7 @@ export function MainContent({
 
   return (
     <main
+      id="main-content"
       className={cn(
         "flex-1",
         fullWidth

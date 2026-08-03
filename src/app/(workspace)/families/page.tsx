@@ -31,8 +31,9 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
       {!empty ? (
         <div className="mt-8 flex flex-col gap-4 border-b border-[#dce6d9] pb-5 sm:flex-row sm:items-center sm:justify-between">
           <form className="relative w-full max-w-md">
+            <label htmlFor="family-search" className="sr-only">Search families</label>
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#778874]" aria-hidden />
-            <input name="q" defaultValue={parsed.q} placeholder="Search by family label or summary" className="min-h-11 w-full rounded-lg border border-[#cfdccc] bg-white pl-10 pr-4 text-sm text-[#253f23] outline-none placeholder:text-[#778874] focus:border-[#46923c] focus:ring-4 focus:ring-[#46923c]/10" />
+            <input id="family-search" name="q" defaultValue={parsed.q} placeholder="Search by family label or summary" className="min-h-11 w-full rounded-lg border border-[#cfdccc] bg-white pl-10 pr-4 text-sm text-[#253f23] outline-none placeholder:text-[#778874] focus:border-[#46923c] focus:ring-4 focus:ring-[#46923c]/10" />
           </form>
           <p className="shrink-0 text-sm text-[#687b65]">{total} {total === 1 ? "family" : "families"}</p>
         </div>

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { createFamilyIntake } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { alertErrorClass, selectInputClass } from "@/lib/ui/form-classes";
-import {
-  PRESET_BARRIERS,
-  PRESET_GOALS,
-} from "@/lib/constants/intake-options";
 import {
   familyIntakeFormSchema,
   type FamilyIntakeFormValues,
@@ -39,51 +35,6 @@ export function IntakeForm() {
     },
   });
 
-  const goalsFA = useFieldArray({ control: form.control, name: "goals" });
-  const barriersFA = useFieldArray({ control: form.control, name: "barriers" });
-  const membersFA = useFieldArray({ control: form.control, name: "members" });
-
-  const [customGoal, setCustomGoal] = useState("");
-  const [customBarrier, setCustomBarrier] = useState("");
-
-  function goalIndexByPreset(key: string) {
-    return goalsFA.fields.findIndex(
-      (f) => (f as { presetKey?: string }).presetKey === key,
-    );
-  }
-
-  function barrierIndexByPreset(key: string) {
-    return barriersFA.fields.findIndex(
-      (f) => (f as { presetKey?: string }).presetKey === key,
-    );
-  }
-
-  function toggleGoalPreset(value: string, label: string) {
-    const i = goalIndexByPreset(value);
-    if (i >= 0) goalsFA.remove(i);
-    else goalsFA.append({ presetKey: value, label });
-  }
-
-  function toggleBarrierPreset(value: string, label: string) {
-    const i = barrierIndexByPreset(value);
-    if (i >= 0) barriersFA.remove(i);
-    else barriersFA.append({ presetKey: value, label });
-  }
-
-  function addCustomGoal() {
-    const t = customGoal.trim();
-    if (!t) return;
-    goalsFA.append({ presetKey: null, label: t });
-    setCustomGoal("");
-  }
-
-  function addCustomBarrier() {
-    const t = customBarrier.trim();
-    if (!t) return;
-    barriersFA.append({ presetKey: null, label: t });
-    setCustomBarrier("");
-  }
-
   async function onSubmit(data: FamilyIntakeFormValues) {
     setServerError(null);
     const result = await createFamilyIntake(data);
@@ -92,7 +43,7 @@ export function IntakeForm() {
       return;
     }
     if (result.familyId) {
-      router.push(`/families/${result.familyId}?section=overview`);
+      router.push(`/families/${result.familyId}/overview`);
     } else {
       router.push("/families");
     }
@@ -107,17 +58,18 @@ export function IntakeForm() {
         </p>
       ) : null}
 
-      <Card>
-        <CardTitle>Household</CardTitle>
-        <p className="mt-1 text-sm text-slate-600">
-          Basic identifying information and what brought the family in today.
+      <Card className="border-[#dce6d9] bg-white p-6 shadow-[0_10px_30px_rgba(30,70,27,0.06)] sm:p-7">
+        <CardTitle>Family profile</CardTitle>
+        <p className="mt-1 text-sm text-[#5d705a]">
+          Use a non-identifying household label and only the context needed for planning. Do not include names, addresses, birth dates, student IDs, or contact information.
         </p>
         <div className="mt-5 space-y-5">
           <div>
-            <Label htmlFor="name">Household name or label</Label>
+            <Label htmlFor="name">Household label</Label>
             <Input
               id="name"
               className="mt-1"
+              placeholder="For example: Family 014"
               {...form.register("name")}
             />
             {form.formState.errors.name ? (
@@ -132,6 +84,7 @@ export function IntakeForm() {
               id="summary"
               rows={3}
               className="mt-1.5"
+              placeholder="Brief, de-identified reason for support"
               {...form.register("summary")}
             />
           </div>
@@ -155,6 +108,7 @@ export function IntakeForm() {
               id="householdNotes"
               rows={4}
               className="mt-1.5"
+              placeholder="Only include details needed to shape the intervention plan"
               {...form.register("householdNotes")}
             />
           </div>
@@ -163,7 +117,7 @@ export function IntakeForm() {
             <Textarea
               id="initialCaseNote"
               rows={3}
-              placeholder="First dated note for the file…"
+              placeholder="Optional de-identified planning note"
               className="mt-1.5"
               {...form.register("initialCaseNote")}
             />
@@ -171,210 +125,7 @@ export function IntakeForm() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Goals</CardTitle>
-        <p className="mt-1 text-sm text-slate-600">
-          Select one or more, or add your own.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {PRESET_GOALS.map((g) => {
-            const on = goalIndexByPreset(g.value) >= 0;
-            return (
-              <button
-                key={g.value}
-                type="button"
-                onClick={() => toggleGoalPreset(g.value, g.label)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  on
-                    ? "border-[#46923c] bg-[#edf6eb] text-[#173a15]"
-                    : "border-[#dce6d9] bg-white text-[#50644d] hover:border-[#8bca84] hover:bg-[#f6f8f4]"
-                }`}
-              >
-                {g.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <Input
-            placeholder="Custom goal"
-            value={customGoal}
-            onChange={(e) => setCustomGoal(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addCustomGoal();
-              }
-            }}
-          />
-          <Button type="button" variant="secondary" onClick={addCustomGoal}>
-            Add custom
-          </Button>
-        </div>
-        {goalsFA.fields.length > 0 ? (
-          <ul className="mt-3 list-inside list-disc text-sm text-slate-700">
-            {goalsFA.fields.map((field, index) => (
-              <li key={field.id} className="flex items-center justify-between gap-2">
-                <span>{form.watch(`goals.${index}.label`)}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-red-600"
-                  onClick={() => goalsFA.remove(index)}
-                >
-                  Remove
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {form.formState.errors.goals ? (
-          <p className="mt-2 text-sm text-red-600">
-            {form.formState.errors.goals.message}
-          </p>
-        ) : null}
-      </Card>
-
-      <Card>
-        <CardTitle>Barriers</CardTitle>
-        <p className="mt-1 text-sm text-slate-600">
-          Select one or more, or add your own.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {PRESET_BARRIERS.map((b) => {
-            const on = barrierIndexByPreset(b.value) >= 0;
-            return (
-              <button
-                key={b.value}
-                type="button"
-                onClick={() => toggleBarrierPreset(b.value, b.label)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  on
-                    ? "border-[#46923c] bg-[#edf6eb] text-[#173a15]"
-                    : "border-[#dce6d9] bg-white text-[#50644d] hover:border-[#8bca84] hover:bg-[#f6f8f4]"
-                }`}
-              >
-                {b.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <Input
-            placeholder="Custom barrier"
-            value={customBarrier}
-            onChange={(e) => setCustomBarrier(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addCustomBarrier();
-              }
-            }}
-          />
-          <Button type="button" variant="secondary" onClick={addCustomBarrier}>
-            Add custom
-          </Button>
-        </div>
-        {barriersFA.fields.length > 0 ? (
-          <ul className="mt-3 list-inside list-disc text-sm text-slate-700">
-            {barriersFA.fields.map((field, index) => (
-              <li key={field.id} className="flex items-center justify-between gap-2">
-                <span>{form.watch(`barriers.${index}.label`)}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-red-600"
-                  onClick={() => barriersFA.remove(index)}
-                >
-                  Remove
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {form.formState.errors.barriers ? (
-          <p className="mt-2 text-sm text-red-600">
-            {form.formState.errors.barriers.message}
-          </p>
-        ) : null}
-      </Card>
-
-      <Card>
-        <CardTitle>Household members (optional)</CardTitle>
-        <p className="mt-1 text-sm text-slate-600">
-          Add anyone else in the household you want on the record.
-        </p>
-        {membersFA.fields.map((field, index) => (
-          <div
-            key={field.id}
-            className="mt-5 space-y-4 border-t border-slate-100 pt-5 first:mt-0 first:border-0 first:pt-0"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">
-                Member {index + 1}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-red-600"
-                onClick={() => membersFA.remove(index)}
-              >
-                Remove
-              </Button>
-            </div>
-            <div>
-              <Label>Name</Label>
-              <Input
-                className="mt-1"
-                {...form.register(`members.${index}.displayName`)}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Relationship</Label>
-                <Input
-                  className="mt-1"
-                  {...form.register(`members.${index}.relationship`)}
-                />
-              </div>
-              <div>
-                <Label>Age (approx.)</Label>
-                <Input
-                  className="mt-1"
-                  type="text"
-                  inputMode="numeric"
-                  {...form.register(`members.${index}.ageApprox`)}
-                />
-              </div>
-            </div>
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                rows={2}
-                className="mt-1.5 min-h-0"
-                {...form.register(`members.${index}.notes`)}
-              />
-            </div>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="secondary"
-          className="mt-4"
-          onClick={() =>
-            membersFA.append({
-              displayName: "",
-              relationship: "",
-              notes: "",
-              ageApprox: "",
-            })
-          }
-        >
-          Add household member
-        </Button>
-      </Card>
-
-      <div className="flex flex-wrap items-center gap-3 border-t border-slate-200/80 pt-8">
+      <div className="flex flex-wrap items-center gap-3 border-t border-[#dce6d9] pt-8">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? "Saving…" : "Create family profile"}
         </Button>

@@ -14,15 +14,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  PDFCheckBox,
   PDFDocument,
-  PDFDropdown,
-  PDFOptionList,
-  PDFRadioGroup,
-  PDFTextField,
 } from "pdf-lib";
 import { mapPdfFieldsAction } from "@/app/actions/paperwork";
-import { inspectPdfFields } from "@/lib/paperwork/pdf-form";
+import { applyPdfMappings, inspectPdfFields, UnsupportedPdfFieldError } from "@/lib/paperwork/pdf-form";
 import type { PdfFieldDescriptor, PdfFieldMapping } from "@/types/paperwork";
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
@@ -75,8 +70,10 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
         setMappings(result.mappings);
         setAssistedByAi(result.assistedByAi);
       });
-    } catch {
-      setError("CaseLink could not read this PDF. It may be encrypted or damaged; try an unlocked fillable copy.");
+    } catch (caught) {
+      setError(caught instanceof UnsupportedPdfFieldError
+        ? "This form contains a field type CaseLink cannot safely review. Use a version with text fields, checkboxes, dropdowns, radio buttons, or option lists."
+        : "CaseLink could not read this PDF. It may be encrypted or damaged; try an unlocked fillable copy.");
     }
   }
 
@@ -84,24 +81,26 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
     setMappings((current) => current.map((mapping) => mapping.fieldName === fieldName ? { ...mapping, value, needsReview: false } : mapping));
   }
 
+  function confirmValue(fieldName: string) {
+    setMappings((current) => current.map((mapping) => mapping.fieldName === fieldName ? { ...mapping, needsReview: false } : mapping));
+  }
+
   async function downloadCompletedPdf() {
     if (!originalBytes) return;
+    const unresolved = mappings.filter((mapping) => mapping.needsReview).length;
+    if (unresolved > 0) {
+      setError(`Review ${unresolved} ${unresolved === 1 ? "field" : "fields"} before downloading.`);
+      return;
+    }
     setError(null);
     try {
       const document = await PDFDocument.load(originalBytes);
+      applyPdfMappings(document, fields, mappings);
       const form = document.getForm();
-      for (const mapping of mappings) {
-        const field = form.getField(mapping.fieldName);
-        if (field instanceof PDFTextField) field.setText(mapping.value);
-        else if (field instanceof PDFCheckBox) mapping.value.toLowerCase() === "true" ? field.check() : field.uncheck();
-        else if (field instanceof PDFDropdown && mapping.value) field.select(mapping.value);
-        else if (field instanceof PDFRadioGroup && mapping.value) field.select(mapping.value);
-        else if (field instanceof PDFOptionList && mapping.value) field.select(mapping.value);
-      }
       try { form.updateFieldAppearances(); } catch { /* preserve existing appearances for fonts pdf-lib cannot encode */ }
       const saved = await document.save();
       const url = URL.createObjectURL(new Blob([new Uint8Array(saved)], { type: "application/pdf" }));
-      const anchor = documentGlobal.createElement("a");
+      const anchor = window.document.createElement("a");
       anchor.href = url;
       anchor.download = downloadName(fileName);
       anchor.click();
@@ -111,16 +110,14 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
     }
   }
 
-  // Avoid shadowing the browser document with the parsed PDF document variables above.
-  const documentGlobal = typeof window !== "undefined" ? window.document : ({} as Document);
-  const reviewCount = mappings.filter((mapping) => mapping.needsReview || !mapping.value).length;
+  const reviewCount = mappings.filter((mapping) => mapping.needsReview).length;
 
   if (!hasPlan) {
     return (
       <section className="rounded-xl border border-[#dce6d9] bg-white p-7 text-center shadow-[0_10px_30px_rgba(30,70,27,0.06)]">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-[#edf4eb] text-[#276221]"><FileCheck2 className="size-5" aria-hidden /></span>
         <h2 className="mt-5 text-xl font-semibold text-[#173a15]">Create the intervention plan first</h2>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#5d705a]">The approved plan is the main source CaseLink uses to prepare the family&apos;s paperwork.</p>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#5d705a]">A completed plan is the main source CaseLink uses to prepare the family&apos;s paperwork.</p>
         <Link href={`/families/${familyId}/overview`} className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white hover:bg-[#1f531b]">Review barriers <ArrowRight className="size-4" aria-hidden /></Link>
       </section>
     );
@@ -133,11 +130,11 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
           <div>
             <p className="text-sm font-semibold text-[#5d705a]">Paperwork</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#173a15]">{familyName}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5d705a]">Upload a blank fillable PDF. CaseLink will propose entries from the approved family profile and plan, then you review every field before download.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5d705a]">Upload a blank fillable PDF. CaseLink will propose entries from the family profile and completed plan, then you review every uncertain field before download.</p>
           </div>
           {originalBytes ? <button type="button" onClick={() => { setOriginalBytes(null); setFields([]); setMappings([]); setFileName(""); setError(null); if (inputRef.current) inputRef.current.value = ""; }} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#50644d] hover:bg-[#edf4eb]"><RotateCcw className="size-4" aria-hidden /> Start over</button> : null}
         </div>
-        <div className="mt-5 flex items-start gap-2 rounded-lg bg-[#edf4eb] px-4 py-3 text-xs leading-5 text-[#50644d]"><LockKeyhole className="mt-0.5 size-4 shrink-0 text-[#276221]" aria-hidden /> Your PDF is processed in this browser and is not uploaded or stored by CaseLink. Field names and approved plan context are sent securely for suggested mappings.</div>
+        <div className="mt-5 flex items-start gap-2 rounded-lg bg-[#edf4eb] px-4 py-3 text-xs leading-5 text-[#50644d]"><LockKeyhole className="mt-0.5 size-4 shrink-0 text-[#276221]" aria-hidden /> Your PDF is processed in this browser and is not uploaded or stored by CaseLink. Field names and de-identified plan context are sent securely for suggested mappings.</div>
       </section>
 
       {!originalBytes ? (
@@ -152,7 +149,7 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
         <section className="rounded-xl border border-[#dce6d9] bg-white p-10 text-center" role="status">
           <span className="mx-auto block size-7 animate-spin rounded-full border-[3px] border-[#cfe0cc] border-t-[#276221]" aria-hidden />
           <h2 className="mt-5 text-lg font-semibold text-[#173a15]">Preparing {fields.length} form fields…</h2>
-          <p className="mt-2 text-sm text-[#5d705a]">Matching the form to the approved profile and plan.</p>
+          <p className="mt-2 text-sm text-[#5d705a]">Matching the form to the reviewed profile and completed plan.</p>
         </section>
       ) : mappings.length ? (
         <section className="overflow-hidden rounded-xl border border-[#dce6d9] bg-white shadow-[0_10px_30px_rgba(30,70,27,0.06)]">
@@ -163,21 +160,25 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
           <div className="divide-y divide-[#e2ebe0]">
             {mappings.map((mapping) => {
               const field = fields.find((item) => item.name === mapping.fieldName)!;
-              const needsReview = mapping.needsReview || !mapping.value;
+              const needsReview = mapping.needsReview;
               return (
                 <div key={mapping.fieldName} className="grid gap-3 px-5 py-5 lg:grid-cols-[220px_1fr_180px] lg:items-start">
                   <div><p className="break-words text-sm font-semibold text-[#365134]">{mapping.fieldName}</p><p className="mt-1 text-[11px] capitalize text-[#82917f]">{field.kind.replace("-", " ")}</p></div>
                   <div>
-                    {field.kind === "text" ? <textarea value={mapping.value} maxLength={field.maxLength ?? undefined} rows={mapping.value.length > 90 ? 3 : 1} onChange={(event) => updateValue(mapping.fieldName, event.target.value)} className={`w-full resize-y rounded-lg border px-3 py-2.5 text-sm leading-5 text-[#253f23] outline-none focus:border-[#46923c] focus:ring-4 focus:ring-[#46923c]/10 ${needsReview ? "border-[#d9c27e] bg-[#fffaf0]" : "border-[#cfdccc] bg-white"}`} /> : field.kind === "checkbox" ? <select value={mapping.value} onChange={(event) => updateValue(mapping.fieldName, event.target.value)} className="min-h-11 w-full rounded-lg border border-[#cfdccc] bg-white px-3 text-sm text-[#253f23]"><option value="">Select</option><option value="true">Checked</option><option value="false">Not checked</option></select> : <select value={mapping.value} onChange={(event) => updateValue(mapping.fieldName, event.target.value)} className="min-h-11 w-full rounded-lg border border-[#cfdccc] bg-white px-3 text-sm text-[#253f23]"><option value="">Select</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</select>}
+                    {field.kind === "text" ? <textarea aria-label={mapping.fieldName} value={mapping.value} maxLength={field.maxLength ?? undefined} rows={mapping.value.length > 90 ? 3 : 1} onChange={(event) => updateValue(mapping.fieldName, event.target.value)} className={`w-full resize-y rounded-lg border px-3 py-2.5 text-sm leading-5 text-[#253f23] outline-none focus:border-[#46923c] focus:ring-4 focus:ring-[#46923c]/10 ${needsReview ? "border-[#d9c27e] bg-[#fffaf0]" : "border-[#cfdccc] bg-white"}`} /> : field.kind === "checkbox" ? <select aria-label={mapping.fieldName} value={mapping.value} onChange={(event) => updateValue(mapping.fieldName, event.target.value)} className="min-h-11 w-full rounded-lg border border-[#cfdccc] bg-white px-3 text-sm text-[#253f23]"><option value="">Select</option><option value="true">Checked</option><option value="false">Not checked</option></select> : <select aria-label={mapping.fieldName} value={mapping.value} onChange={(event) => updateValue(mapping.fieldName, event.target.value)} className="min-h-11 w-full rounded-lg border border-[#cfdccc] bg-white px-3 text-sm text-[#253f23]"><option value="">Select</option>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</select>}
                   </div>
-                  <div className="text-xs leading-5"><p className={needsReview ? "font-semibold text-[#8a681c]" : "font-semibold text-[#276221]"}>{needsReview ? "Review needed" : `${mapping.confidence} confidence`}</p><p className="mt-1 text-[#687b65]">{mapping.source}</p></div>
+                  <div className="text-xs leading-5">
+                    <p className={needsReview ? "font-semibold text-[#8a681c]" : "font-semibold text-[#276221]"}>{needsReview ? "Review needed" : `${mapping.confidence} confidence`}</p>
+                    <p className="mt-1 text-[#687b65]">{mapping.source}</p>
+                    {needsReview ? <button type="button" onClick={() => confirmValue(mapping.fieldName)} className="mt-2 min-h-9 rounded-lg border border-[#a9c7a5] bg-white px-3 font-semibold text-[#276221] hover:bg-[#edf4eb]">{mapping.value ? "Accept suggestion" : "Confirm blank"}</button> : null}
+                  </div>
                 </div>
               );
             })}
           </div>
           <div className="flex flex-col gap-4 border-t border-[#dce6d9] bg-[#f6f8f4] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="flex max-w-xl items-start gap-2 text-xs leading-5 text-[#5d705a]"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#3b8132]" aria-hidden /> Check the completed PDF before uploading it to CitySpan. CaseLink does not submit it for you.</p>
-            <button type="button" onClick={() => void downloadCompletedPdf()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(39,98,33,0.16)] hover:bg-[#1f531b]"><Download className="size-4" aria-hidden /> Download completed PDF</button>
+            <button type="button" onClick={() => void downloadCompletedPdf()} disabled={reviewCount > 0} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(39,98,33,0.16)] hover:bg-[#1f531b] disabled:cursor-not-allowed disabled:bg-[#9bad98] disabled:shadow-none"><Download className="size-4" aria-hidden /> {reviewCount > 0 ? "Finish review to download" : "Download completed PDF"}</button>
           </div>
         </section>
       ) : null}

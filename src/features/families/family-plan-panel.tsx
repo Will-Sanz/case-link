@@ -716,7 +716,7 @@ export function FamilyPlanPanel({
   if (!workflow) {
     return (
       <p className="text-sm text-slate-600">
-        Generate a plan from the Overview tab to see your 30 / 60 / 90 day roadmap here.
+        Generate a plan from the Barriers tab to see your 30 / 60 / 90 day roadmap here.
       </p>
     );
   }
@@ -750,7 +750,7 @@ export function FamilyPlanPanel({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {plan && workflow ? (
+          {plan && workflow && (!plan.generation_state || plan.generation_state.status === "complete") ? (
             <PlanPdfExport plan={plan} familyName={familyName} workflow={workflow} />
           ) : null}
           {plan ? (
@@ -955,12 +955,12 @@ export function FamilyPlanPanel({
 
                   <div className="mt-3 space-y-1">
                     {r.primaryPhone ? (
-                      <a className="block text-xs text-blue-700 hover:underline" href={`tel:${r.primaryPhone}`}>
+                      <a className="block text-xs text-[#276221] hover:underline" href={`tel:${r.primaryPhone}`}>
                         {r.primaryPhone}
                       </a>
                     ) : null}
                     {r.primaryEmail ? (
-                      <a className="block text-xs text-blue-700 hover:underline break-all" href={`mailto:${r.primaryEmail}`}>
+                      <a className="block break-all text-xs text-[#276221] hover:underline" href={`mailto:${r.primaryEmail}`}>
                         {r.primaryEmail}
                       </a>
                     ) : null}
@@ -1074,7 +1074,7 @@ export function FamilyPlanPanel({
             ) : null}
 
             {planAiDirty ? (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200/80 bg-blue-50/40 px-3 py-2.5">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#cfe0cc] bg-[#edf4eb] px-3 py-2.5">
                 <p className="text-xs text-slate-700">
                   Working copy differs from the saved plan. Save to persist updated steps.
                 </p>

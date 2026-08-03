@@ -11,7 +11,7 @@ const source = {
 };
 
 describe("createDeterministicMappings", () => {
-  it("maps clearly named text fields to approved sources", () => {
+  it("maps clearly named text fields to reviewed sources", () => {
     const [mapping] = createDeterministicMappings([{ name: "Primary_Barriers", kind: "text", options: [], maxLength: null }], source);
     expect(mapping.value).toBe("Housing instability, Transportation");
     expect(mapping.needsReview).toBe(false);
