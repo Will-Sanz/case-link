@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Plus, Search, UsersRound } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -7,6 +8,10 @@ import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
 type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Families",
+};
 
 const statusLabel = { active: "Active", on_hold: "On hold", closed: "Closed" } as const;
 
