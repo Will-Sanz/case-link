@@ -177,7 +177,7 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
             })}
           </div>
           <div className="flex flex-col gap-4 border-t border-[#dce6d9] bg-[#f6f8f4] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex max-w-xl items-start gap-2 text-xs leading-5 text-[#5d705a]"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#3b8132]" aria-hidden /> Check the completed PDF before uploading it to CitySpan. CaseLink does not submit it for you.</p>
+            <p className="flex max-w-xl items-start gap-2 text-xs leading-5 text-[#5d705a]"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#3b8132]" aria-hidden /> Check the completed PDF before uploading it to your required system. CaseLink does not submit it for you.</p>
             <button type="button" onClick={() => void downloadCompletedPdf()} disabled={reviewCount > 0} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(39,98,33,0.16)] hover:bg-[#1f531b] disabled:cursor-not-allowed disabled:bg-[#9bad98] disabled:shadow-none"><Download className="size-4" aria-hidden /> {reviewCount > 0 ? "Finish review to download" : "Download completed PDF"}</button>
           </div>
         </section>

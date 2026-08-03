@@ -78,7 +78,7 @@ export function PublicSiteShell({
             <div>
               <p className="text-base font-semibold">CaseLink</p>
               <p className="mt-2 max-w-md text-sm leading-relaxed text-[#cce7c9]">
-                Less time rebuilding paperwork. More time supporting families.
+                Prepare required paperwork without rebuilding the same context.
               </p>
             </div>
             <nav className="flex flex-col gap-2 text-sm" aria-label="Footer">
@@ -117,8 +117,7 @@ export function PublicSiteShell({
             </nav>
           </div>
           <p className="mt-8 border-t border-white/15 pt-6 text-xs text-[#acd8a7]">
-            © {new Date().getFullYear()} CaseLink. Built in collaboration with
-            case managers at Alain Locke School.
+            © {new Date().getFullYear()} CaseLink. Built in collaboration with school case managers.
           </p>
         </div>
       </footer>

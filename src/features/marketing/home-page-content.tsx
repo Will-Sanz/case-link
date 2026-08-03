@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Check,
-  FileCheck2,
   FileText,
   ShieldCheck,
   Sparkles,
@@ -68,13 +67,6 @@ function ProductProof() {
           </div>
         </div>
       </div>
-      <div className="absolute -bottom-5 -left-5 hidden items-center gap-3 rounded-xl bg-[#276221] px-4 py-3 text-white shadow-[0_18px_40px_rgba(30,70,27,0.2)] sm:flex">
-        <FileCheck2 className="size-5" aria-hidden />
-        <div>
-          <p className="text-xs font-semibold">Ready for CitySpan</p>
-          <p className="text-[11px] text-[#cce7c9]">You stay in control of the final form</p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -86,10 +78,10 @@ export function HomePageContent() {
         <div className="mx-auto grid min-h-[680px] max-w-7xl items-center gap-14 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[0.86fr_1.14fr] lg:px-10 lg:py-28">
           <div className="hero-reveal max-w-2xl">
             <h1 id="home-hero" className="text-balance text-[clamp(2.8rem,6vw,5.65rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-[#173a15]">
-              Turn family needs into finished paperwork.
+              Turn family needs into clear plans and prepared paperwork.
             </h1>
             <p className="mt-7 max-w-xl text-pretty text-lg leading-8 text-[#4e664b] sm:text-xl">
-              CaseLink helps school case managers build a structured intervention plan, prepare required forms, and get back to supporting families.
+              CaseLink helps school case managers organize barriers, draft a structured intervention plan, and prepare fillable forms for manual upload to the systems their schools already use.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/request-demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#276221] px-5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(39,98,33,0.2)] transition-[background-color,transform,box-shadow] hover:-translate-y-0.5 hover:bg-[#1f531b] hover:shadow-[0_12px_30px_rgba(39,98,33,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/40 focus-visible:ring-offset-2 active:translate-y-0">
@@ -101,7 +93,7 @@ export function HomePageContent() {
             </div>
             <p className="mt-7 flex max-w-md items-start gap-2 text-sm leading-6 text-[#5d705a]">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden />
-              Designed for minimal family data and human review at every step.
+              Designed around de-identified case labels and human review at every step.
             </p>
           </div>
           <ProductProof />
@@ -111,7 +103,7 @@ export function HomePageContent() {
       <section className="border-y border-[#dce6d9] bg-white" aria-label="CaseLink recognition">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
           <p className="max-w-2xl text-sm font-medium leading-6 text-[#365134]">
-            Built with case managers at Alain Locke School in Philadelphia and selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026.
+            Built with school case managers and selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026.
           </p>
           <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#276221]">
             <Sparkles className="size-4" aria-hidden /> Supported through an OpenAI grant
@@ -131,7 +123,7 @@ export function HomePageContent() {
               Case managers already know their families. The friction is turning that understanding into a plan and then re-entering it into required paperwork.
             </p>
             <p>
-              CaseLink creates one dependable handoff: capture the family&apos;s current barriers, review a structured plan, and use that reviewed information to prepare a fillable PDF for CitySpan submission.
+              CaseLink creates one dependable handoff: capture current barriers, review a structured plan, and use that context to prepare a fillable PDF for the software your school already uses.
             </p>
             <Link href="/product" className="group inline-flex items-center gap-2 font-semibold text-[#276221] underline decoration-[#8bca84] decoration-2 underline-offset-4 transition-colors hover:text-[#1f531b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35">
               Explore the product <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
@@ -144,7 +136,7 @@ export function HomePageContent() {
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 sm:px-8 lg:flex-row lg:items-end lg:px-10">
           <div>
             <h2 id="home-cta" className="max-w-3xl text-balance text-3xl font-semibold tracking-[-0.03em] sm:text-5xl">
-              See what one simpler paperwork workflow could give back to your team.
+              See how CaseLink fits alongside your current paperwork process.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-7 text-[#cce7c9]">
               We&apos;ll learn about your current process and walk through CaseLink without requiring a technical setup.

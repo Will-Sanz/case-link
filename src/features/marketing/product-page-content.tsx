@@ -28,7 +28,7 @@ const features = [
   },
   {
     title: "A fillable-PDF workspace",
-    body: "Upload a blank fillable form, review CaseLink’s proposed entries field by field, make changes, and download the completed copy for CitySpan.",
+    body: "Upload a blank fillable form, review CaseLink’s proposed entries field by field, make changes, and download the completed copy for your existing system.",
     icon: FileCheck2,
   },
 ];
@@ -91,7 +91,7 @@ export function ProductPageContent() {
             The paperwork assistant built around the case manager.
           </h1>
           <p className="hero-reveal-late mt-7 max-w-3xl text-lg leading-8 text-[#50644d] sm:text-xl">
-            CaseLink does one job well: it carries reviewed family context from intake to intervention plan to required form—without taking judgment away from the person closest to the family.
+            CaseLink carries reviewed family context from intake to intervention plan to required form—without taking judgment away from the person closest to the family.
           </p>
         </div>
       </section>
@@ -102,7 +102,7 @@ export function ProductPageContent() {
             <div>
               <h2 id="offer-title" className="text-3xl font-semibold tracking-[-0.03em] text-[#173a15] sm:text-4xl">What CaseLink offers</h2>
               <p className="mt-4 max-w-lg text-base leading-7 text-[#5d705a]">
-                A deliberately small set of tools that removes repeated work from a mandated process.
+                A deliberately small set of tools that helps reduce repeated work in required paperwork.
               </p>
             </div>
             <div className="divide-y divide-[#dce6d9] border-y border-[#dce6d9]">
@@ -130,7 +130,7 @@ export function ProductPageContent() {
             <ul className="mt-7 space-y-3 text-sm font-medium text-[#365134]">
               <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden /> Supports fillable PDF forms</li>
               <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden /> Editable before download</li>
-              <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden /> Manual CitySpan submission stays under your control</li>
+              <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden /> Download for the software your school already uses</li>
             </ul>
           </div>
           <PaperworkDetail />
@@ -144,7 +144,7 @@ export function ProductPageContent() {
           </div>
           <div className="max-w-2xl space-y-5 text-base leading-7 text-[#50644d] sm:text-lg sm:leading-8">
             <p>
-              CaseLink began through work with case managers at Alain Locke School in West Philadelphia. The need was practical: staff were doing thoughtful family-support work, then spending too much time rebuilding the same information inside administrative forms.
+              CaseLink began through direct work with school case managers. The need was practical: staff were doing thoughtful family-support work, then spending too much time rebuilding the same information inside administrative forms.
             </p>
             <p>
               We are a small team of University of Pennsylvania students building with those practitioners, not around them. In 2026, CaseLink was selected for OpenAI&apos;s inaugural ChatGPT Futures class.

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Family paperwork, made manageable",
   description:
-    "CaseLink helps school case managers turn family needs into structured intervention plans and prepared CitySpan paperwork.",
+    "CaseLink helps school case managers turn family needs into structured intervention plans and prepared paperwork for existing school systems.",
 };
 
 export default async function Home() {

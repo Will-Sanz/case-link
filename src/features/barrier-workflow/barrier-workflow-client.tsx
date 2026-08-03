@@ -162,7 +162,7 @@ export function BarrierWorkflowClient({
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
           Select barriers, add any extra barriers, then optional case details to generate a
-          focused 30 / 60 / 90 day plan with Philadelphia resource matches.
+          focused 30 / 60 / 90 day plan with relevant resource matches.
         </p>
 
         <div className="mt-5 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
@@ -366,7 +366,7 @@ export function BarrierWorkflowClient({
           </Card>
 
           <Card className="p-5 sm:p-6">
-            <CardTitle className="text-base">Philadelphia nonprofit resources</CardTitle>
+            <CardTitle className="text-base">Matched resources</CardTitle>
             {result.resources.length === 0 ? (
               <p className="mt-3 text-sm text-slate-500">
                 No close matches yet. Try adding a little more barrier detail and regenerate.

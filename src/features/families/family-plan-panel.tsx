@@ -932,7 +932,7 @@ export function FamilyPlanPanel({
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
             <p className="mt-1 text-sm text-slate-600">
-              Curated Philadelphia nonprofit options matched to this plan.
+              Curated resource options matched to this plan.
             </p>
 
             <div className="mt-4 space-y-3">

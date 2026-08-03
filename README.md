@@ -2,9 +2,9 @@
 
 ## Product north star
 
-**CaseLink helps school case managers turn family needs into a structured intervention plan and reviewed, ready-to-submit paperwork.** A case manager creates a family profile, records barriers, generates and edits the plan, uploads a blank required form, reviews the AI-prepared draft, and downloads the completed PDF for manual submission to CitySpan.
+**CaseLink helps school case managers turn family needs into a structured intervention plan and reviewed, ready-to-submit paperwork.** A case manager creates a family profile, records barriers, generates and edits the plan, uploads a blank required form, reviews the AI-prepared draft, and downloads the completed PDF for their required school system.
 
-The near-term product is deliberately narrow. It is built for **speed, clarity, and professional judgment**, not for replacing case managers, CitySpan, or the city's required reporting process. Broader school-operations automation remains a future possibility only after this core workflow proves useful.
+The near-term product is deliberately narrow. It is built for **speed, clarity, and professional judgment**, not for replacing case managers or the school's required system of record. Broader school-operations automation remains a future possibility only after this core workflow proves useful.
 
 The staged path from the current application to that north star is documented in the [Product Redesign Plan](docs/product-redesign-plan.md).
 
@@ -24,7 +24,7 @@ CaseLink exists to **reduce that fragmentation** and make the path from intake t
 
 CaseLink brings **family intake**, **barrier assessment**, **intervention planning**, and **paperwork preparation** into one focused workflow. A case manager captures the approved family context and barriers in structured forms. When enabled, **OpenAI** turns that context into a structured plan and helps map reviewed information into an uploaded blank PDF.
 
-Everything downstream is **editable**. Plans and populated form fields remain drafts until a case manager reviews them. CaseLink produces a completed PDF; it does not submit directly to CitySpan in the initial scope.
+Everything downstream is **editable**. Plans and populated form fields remain drafts until a case manager reviews them. CaseLink produces a completed PDF; it does not submit directly to external school systems in the initial scope.
 
 ---
 
@@ -53,7 +53,7 @@ Case manager reviews and edits the plan
         ↓
 Case manager uploads a blank PDF; CaseLink drafts form entries
         ↓
-Case manager reviews, downloads, and manually submits the PDF to CitySpan
+Case manager reviews, downloads, and manually submits the PDF to the required system
 ```
 
 The loop is intentional: **capture → draft → human edit → prepare form → human review → download**. AI accelerates drafting; **the case manager controls what becomes official**.

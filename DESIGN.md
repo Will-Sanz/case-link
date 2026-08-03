@@ -283,7 +283,7 @@ The desktop rail is white on Warm Paper with one-pixel dividers. Navigation item
 
 ### Paperwork Review
 
-Paperwork review is the signature expression of The Calm Handoff. Each field row keeps the PDF field name, editable proposed value, provenance, and review state in one scan path. The final action says “Download completed PDF,” and nearby copy makes the manual CitySpan handoff explicit.
+Paperwork review is the signature expression of The Calm Handoff. Each field row keeps the PDF field name, editable proposed value, provenance, and review state in one scan path. The final action says “Download completed PDF,” and nearby copy makes the manual handoff to the school's required system explicit.
 
 **The Visible Handoff Rule.** AI-prepared values remain editable and traceable, attention states remain visible, and no completion treatment implies automatic submission.
 
@@ -302,5 +302,5 @@ Paperwork review is the signature expression of The Calm Handoff. Each field row
 - **Don't** reintroduce blue or slate as a competing primary visual system; migrate remaining legacy primitives into the green palette when touched.
 - **Don't** use gradients, decorative AI glow, or excessive floating cards to imply sophistication.
 - **Don't** turn the Families workspace into an analytics dashboard or add charts without a decision-making need.
-- **Don't** imply direct CitySpan integration, automatic submission, or AI authority over case-manager judgment.
+- **Don't** imply direct integration with required school software, automatic submission, or AI authority over case-manager judgment.
 - **Don't** use identifiable family details in public previews or demonstration fixtures.

@@ -2,9 +2,9 @@
 
 import { headers } from "next/headers";
 import { z } from "zod";
+import { sendDemoRequestEmail } from "@/lib/email/send-demo-request";
 import { getClientIpFromHeaders } from "@/lib/http/client-ip";
 import { createMemorySlidingWindow } from "@/lib/rate-limit/memory-bucket";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const requestSchema = z.object({
   name: z.string().trim().min(2, "Enter your name.").max(100),
@@ -27,7 +27,7 @@ export async function submitDemoRequest(
   formData: FormData,
 ): Promise<DemoRequestState> {
   const website = formData.get("website");
-  // Honeypot submissions get a neutral success response and are not validated or stored.
+  // Honeypot submissions get a neutral success response and are not validated or sent.
   if (typeof website === "string" && website.trim()) return { status: "success" };
 
   const parsed = requestSchema.safeParse({
@@ -50,22 +50,26 @@ export async function submitDemoRequest(
   }
 
   try {
-    const supabase = createServiceRoleClient();
-    const { error } = await supabase.from("demo_requests").insert({
+    const sent = await sendDemoRequestEmail({
       name: parsed.data.name,
       email: parsed.data.email.toLowerCase(),
       organization: parsed.data.organization,
       role: parsed.data.role,
-      message: parsed.data.message || null,
-      user_agent: requestHeaders.get("user-agent")?.slice(0, 500) ?? null,
+      message: parsed.data.message,
     });
-    if (error) {
-      console.error("[demo-request] insert failed", { code: error.code, message: error.message });
-      return { status: "error", message: "We could not save your request. Please try again in a moment." };
+    if (!sent.ok) {
+      console.error("[demo-request] email failed", sent.error);
+      return {
+        status: "error",
+        message: "We could not send your request. Please try again or email willsanz@engineering.upenn.edu directly.",
+      };
     }
     return { status: "success" };
   } catch (error) {
     console.error("[demo-request] unavailable", error instanceof Error ? error.message : "unknown error");
-    return { status: "error", message: "Demo requests are temporarily unavailable. Please try again shortly." };
+    return {
+      status: "error",
+      message: "We could not send your request. Please try again or email willsanz@engineering.upenn.edu directly.",
+    };
   }
 }
