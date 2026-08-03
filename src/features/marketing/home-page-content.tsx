@@ -75,9 +75,9 @@ export function HomePageContent() {
   return (
     <>
       <section className="overflow-hidden bg-[#e7f1e4]" aria-labelledby="home-hero">
-        <div className="mx-auto grid min-h-[680px] max-w-7xl items-center gap-14 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[0.86fr_1.14fr] lg:px-10 lg:py-28">
+        <div className="mx-auto grid min-h-[680px] max-w-7xl items-center gap-14 px-5 py-16 sm:px-8 sm:py-20 lg:min-h-[calc(100svh-7.0625rem)] lg:grid-cols-[0.95fr_1.05fr] lg:px-10 lg:py-12">
           <div className="hero-reveal max-w-2xl">
-            <h1 id="home-hero" className="text-balance text-[clamp(2.8rem,6vw,5.65rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-[#173a15]">
+            <h1 id="home-hero" className="text-balance text-[clamp(2.8rem,5vw,4.75rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-[#173a15]">
               Turn family needs into clear plans and prepared paperwork.
             </h1>
             <p className="mt-7 max-w-xl text-pretty text-lg leading-8 text-[#4e664b] sm:text-xl">
@@ -91,10 +91,6 @@ export function HomePageContent() {
                 See how CaseLink works
               </Link>
             </div>
-            <p className="mt-7 flex max-w-md items-start gap-2 text-sm leading-6 text-[#5d705a]">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden />
-              Designed around de-identified case labels and human review at every step.
-            </p>
           </div>
           <ProductProof />
         </div>
