@@ -22,10 +22,6 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** Server-only; required for privileged database scripts. */
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  /** Server-only; sends validated public demo requests to the CaseLink inbox. */
-  RESEND_API_KEY: z.string().min(1).optional(),
-  /** Server-only; must use a Resend-verified domain in production. */
-  RESEND_FROM_EMAIL: z.string().min(3).optional(),
   /** Server-only; when set, plan generation tries OpenAI first, then rules fallback. */
   OPENAI_API_KEY: z.string().optional(),
   /** Server-only; overrides plan generation/regeneration model (default: o3). */
