@@ -114,7 +114,7 @@ export function HomePageContent() {
             Built with case managers at Alain Locke School in Philadelphia and selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026.
           </p>
           <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#276221]">
-            <Sparkles className="size-4" aria-hidden /> Focused on family-support paperwork
+            <Sparkles className="size-4" aria-hidden /> Supported through an OpenAI grant
           </span>
         </div>
       </section>

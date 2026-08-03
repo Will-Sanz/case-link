@@ -56,7 +56,7 @@ CaseLink is a focused preparation layer alongside required systems such as CityS
 
 - The current working product and repository.
 - Collaboration and early product context connected to case managers at Alain Locke School in Philadelphia.
-- Acceptance into the 2026 ChatGPT Futures class and a grant, as stated by the founder. Public usage and exact attribution language remain undecided.
+- Acceptance into the 2026 ChatGPT Futures class and a grant, as stated by the founder. The public homepage may say “Supported through an OpenAI grant”; the exact amount and model-access language remain unpublished.
 - No approved testimonials, quantified outcomes, district customers, security certifications, or procurement claims are currently documented. Future work must not fabricate them.
 
 ## Product Principles
