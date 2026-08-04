@@ -206,7 +206,7 @@ const HELPER_TO_TASK: Record<StepHelperType, AiTaskType> = {
 };
 
 /**
- * Generate step helper content. Uses gpt-5.4-mini via Chat Completions for low latency.
+ * Generate step helper content. Uses the configured GPT-5.6 Luna default with no reasoning for low latency.
  */
 export async function generateStepHelper(
   detail: FamilyDetail,

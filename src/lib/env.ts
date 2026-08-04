@@ -24,17 +24,17 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   /** Server-only; when set, plan generation tries OpenAI first, then rules fallback. */
   OPENAI_API_KEY: z.string().optional(),
-  /** Server-only; overrides plan generation/regeneration model (default: o3). */
+  /** Server-only; overrides plan generation/regeneration model (default: gpt-5.6-luna). */
   OPENAI_PLAN_MODEL: z.string().optional(),
   /** Server-only; lean per-phase plan generation (default: same as OPENAI_UI_MODEL). */
   OPENAI_PLAN_PHASE_MODEL: z.string().optional(),
-  /** Server-only; per-phase / thinking-quality preset (default: OPENAI_PLAN_MODEL or o3). */
+  /** Server-only; per-phase / thinking-quality preset (default: OPENAI_PLAN_MODEL or gpt-5.6-luna). */
   OPENAI_PLAN_PHASE_THINKING_MODEL: z.string().optional(),
-  /** Server-only; non-plan tasks in Thinking mode (default: OPENAI_PLAN_MODEL or o3). */
+  /** Server-only; non-plan tasks in Thinking mode (default: OPENAI_PLAN_MODEL or gpt-5.6-luna). */
   OPENAI_THINKING_UI_MODEL: z.string().optional(),
   /** Server-only; monolithic full-plan in Fast mode (default: OPENAI_UI_MODEL). */
   OPENAI_FAST_PLAN_MODEL: z.string().optional(),
-  /** Server-only; overrides chat, UI helpers, refinements, and other non-plan AI (default: gpt-4.1-mini). */
+  /** Server-only; overrides chat, UI helpers, refinements, and other non-plan AI (default: gpt-5.6-luna). */
   OPENAI_UI_MODEL: z.string().optional(),
   /** Override: force this model for ALL AI tasks (e.g. gpt-4o for QA). */
   OPENAI_MODEL_OVERRIDE: z.string().optional(),

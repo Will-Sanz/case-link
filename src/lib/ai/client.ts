@@ -113,6 +113,7 @@ function modelSupportsTemperature(modelId: string): boolean {
   const id = modelId.toLowerCase().trim();
   // e.g. o3, o3-mini, o4-mini-2025-01-01
   if (/^o\d/.test(id)) return false;
+  if (/^gpt-5\.6(?:-|$)/.test(id)) return false;
   return true;
 }
 
@@ -225,7 +226,7 @@ export async function createAiResponse(
   try {
     const rawResult = useResponses
       ? await callResponsesApi(apiKey, model, resolved, debug, mode)
-      : await callChatCompletionsApi(apiKey, model, resolved, debug);
+      : await callChatCompletionsApi(apiKey, model, resolved, debug, mode);
     const result: CreateResponseResult =
       rawResult.ok ?
         rawResult
@@ -392,6 +393,7 @@ async function callChatCompletionsApi(
   model: string,
   options: CreateResponseOptions,
   debug: boolean,
+  mode: AiMode,
 ): Promise<CreateResponseResult> {
   const messages =
     typeof options.input === "string"
@@ -408,6 +410,9 @@ async function callChatCompletionsApi(
   };
   if (modelSupportsTemperature(model)) {
     body.temperature = options.temperature ?? 0.4;
+  }
+  if (modelSupportsReasoningEffort(model)) {
+    body.reasoning_effort = mode === "thinking" ? "high" : "none";
   }
 
   if (options.structuredJsonSchema) {

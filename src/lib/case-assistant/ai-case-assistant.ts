@@ -76,7 +76,7 @@ function formatPriorConversation(history: CaseAssistantHistoryItem[]): string {
 }
 
 /**
- * Case-level assistant. Uses gpt-5.4 via Responses API.
+ * Case-level assistant. Uses the configured GPT-5.6 Luna default via Responses API.
  */
 export async function askCaseAssistant(
   detail: FamilyDetail,
@@ -124,4 +124,3 @@ Answer concisely and practically. Use the prior messages only for continuity; re
   if (!result.ok) return { ok: false, error: result.error };
   return { ok: true, answer: result.text };
 }
-

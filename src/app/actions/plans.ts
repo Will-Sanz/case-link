@@ -23,6 +23,7 @@ import { sparseDetailsForPersistence, type LeanPlanPhaseStep } from "@/lib/plan-
 import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-phase-summary";
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
+import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
 import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { getFamilyDetail } from "@/lib/services/families";
 import type { PlanGenerationState, PlanStepDetails } from "@/types/family";
@@ -128,6 +129,7 @@ async function insertLeanPhaseStepsForPlan(
   planId: string,
   phaseSteps: LeanPlanPhaseStep[],
   sortOrderStart: number,
+  planStartDate: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (phaseSteps.length === 0) {
     return { ok: false, error: "No steps to insert for this phase" };
@@ -182,7 +184,11 @@ async function insertLeanPhaseStepsForPlan(
         title: ai.title.trim(),
         description: normAiNullable(ai.description as string | null | undefined),
         week_index: ai.week_index,
-        target_date: null,
+        target_date: resolveActionTargetDate({
+          planStartDate,
+          weekIndex: ai.week_index,
+          proposedTargetDate: ai.target_date,
+        }),
         status: "pending",
         sort_order: j,
       });
@@ -408,7 +414,11 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
           title: ai.title,
           description: ai.description ?? null,
           week_index: ai.week_index,
-          target_date: null,
+          target_date: resolveActionTargetDate({
+            planStartDate: plan.created_at,
+            weekIndex: ai.week_index,
+            proposedTargetDate: ai.target_date,
+          }),
           status: "pending",
           sort_order: j,
         });
@@ -511,11 +521,13 @@ export async function startStagedLeanPlanGeneration(input: {
   const stagedMode = parseAiMode(input.aiMode);
 
   const t30 = Date.now();
+  const planStartDate = new Date().toISOString().slice(0, 10);
   const phase30 = await tryGenerateLeanPlanPhaseOpenAI(detail, "30", {
     regenerationFeedback: input.regenerationFeedback?.trim(),
     retries: 2,
     aiMode: stagedMode,
     requestMeta: userId ? { userId, route: "stagedPlanPhase30" } : undefined,
+    planStartDate,
   });
 
   if (!phase30.ok) {
@@ -560,7 +572,13 @@ export async function startStagedLeanPlanGeneration(input: {
     };
   }
 
-  const ins = await insertLeanPhaseStepsForPlan(supabase, plan.id, steps30, 0);
+  const ins = await insertLeanPhaseStepsForPlan(
+    supabase,
+    plan.id,
+    steps30,
+    0,
+    plan.created_at,
+  );
   if (!ins.ok) {
     await supabase.from("plans").delete().eq("id", plan.id);
     return { ok: false, error: ins.error };
@@ -671,6 +689,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       aiMode: generationMode,
       priorPhasesSummary: priorFor60 || undefined,
       requestMeta: userId ? { userId, route: "stagedPlanPhase60" } : undefined,
+      planStartDate: activePlan.created_at as string,
     });
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
@@ -689,7 +708,13 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: "AI returned no steps for the 60-day phase." };
     }
     const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
-    const ins = await insertLeanPhaseStepsForPlan(supabase, planId, steps, start);
+    const ins = await insertLeanPhaseStepsForPlan(
+      supabase,
+      planId,
+      steps,
+      start,
+      activePlan.created_at as string,
+    );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
       return { ok: false, error: ins.error };
@@ -727,6 +752,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       aiMode: generationMode,
       priorPhasesSummary: priorFor90 || undefined,
       requestMeta: userId ? { userId, route: "stagedPlanPhase90" } : undefined,
+      planStartDate: activePlan.created_at as string,
     });
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
@@ -745,7 +771,13 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: "AI returned no steps for the 90-day phase." };
     }
     const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
-    const ins = await insertLeanPhaseStepsForPlan(supabase, planId, steps, start);
+    const ins = await insertLeanPhaseStepsForPlan(
+      supabase,
+      planId,
+      steps,
+      start,
+      activePlan.created_at as string,
+    );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
       return { ok: false, error: ins.error };
@@ -1320,6 +1352,7 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   if (parsed.data.title !== undefined) patch.title = parsed.data.title;
   if (parsed.data.description !== undefined) patch.description = parsed.data.description;
   if (parsed.data.week_index !== undefined) patch.week_index = parsed.data.week_index;
+  if (parsed.data.target_date !== undefined) patch.target_date = parsed.data.target_date;
 
   if (Object.keys(patch).length === 0) {
     return { ok: true };

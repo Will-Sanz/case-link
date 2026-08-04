@@ -145,6 +145,9 @@ export const updatePlanStepActionItemSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).nullable().optional(),
   week_index: z.number().int().min(1).max(52).optional(),
+  target_date: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid target date"), z.null()])
+    .optional(),
 });
 
 export const refineStepSchema = z.object({

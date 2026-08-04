@@ -45,10 +45,11 @@ function buildLeanPhaseInstructions(phase: PlanPhase): string {
 - Return JSON only matching the schema (top-level key "steps").
 - Aim for **2 to 4 strong steps** for this phase; use 5 only if the case clearly needs that many distinct actions.
 - Each step must be **materially different** from the others (no minor wording variants of the same task).
+- "goal" = a short, outcome-focused goal that can group related actions across the plan (for example, "Secure stable housing"). Reuse the exact same goal wording when steps contribute to the same outcome.
 - "summary" = concise what-to-do for a case manager.
 - "timing" = due window or cadence (short phrase or null).
 - "additional_guidance" = optional nuance only; use null if not needed.
-- action_items: 1 to 4 concrete tasks per step when possible; titles are calendar-ready.
+- action_items: 1 to 4 concrete tasks per step when possible; titles are calendar-ready. Every action must include a valid YYYY-MM-DD target_date, never null.
 - Put document names in required_documents; put people/agencies in contacts.
 
 ## Matched resources (reference only)
@@ -74,6 +75,8 @@ export async function tryGenerateLeanPlanPhaseOpenAI(
     /** Compact lines from DB for earlier phases; avoids repeating the same actions/orgs. */
     priorPhasesSummary?: string | null;
     requestMeta?: OpenAiRequestMeta;
+    /** YYYY-MM-DD used to anchor exact action dates. */
+    planStartDate?: string;
   },
 ): Promise<LeanPhaseResult> {
   const brief = buildPlanningBrief(detail, options?.regenerationFeedback);
@@ -89,13 +92,15 @@ ${prior}
 `
     : "";
 
+  const planStartDate = options?.planStartDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
   const user = `## Planning brief
 ${brief}
 
 ## ${resources}
 
 ${priorBlock}## Task
-Generate ONLY the ${phase}-day phase steps (phase field must be "${phase}" on every step). Order by urgency within this phase.`;
+Generate ONLY the ${phase}-day phase steps (phase field must be "${phase}" on every step). Order by urgency within this phase.
+The plan starts on ${planStartDate}. Set an exact target_date for every action within the 90-day plan window. Use week_index 1-4 for 30-day work, 5-8 for 60-day work, and 9-12 for 90-day work.`;
 
   const instructions = buildLeanPhaseInstructions(phase);
   const maxAttempts = options?.retries ?? 2;

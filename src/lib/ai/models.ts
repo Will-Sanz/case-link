@@ -28,8 +28,8 @@ export type AiTaskType =
   | "troubleshoot_blocker";
 
 export const MODELS = {
-  PLAN_GENERATION: "o3",
-  CHAT_UI_EDITS: "gpt-4.1-mini",
+  PLAN_GENERATION: "gpt-5.6-luna",
+  CHAT_UI_EDITS: "gpt-5.6-luna",
 } as const;
 
 const PLAN_MONOLITH_TASK_TYPES: AiTaskType[] = ["full_plan_generation"];
@@ -45,9 +45,10 @@ const RESPONSES_API_TASK_TYPES: AiTaskType[] = [
   "blocker_troubleshoot",
 ];
 
-/** o-series models accept `reasoning.effort` on the Responses API. */
+/** Models that accept configurable reasoning effort. */
 export function modelSupportsReasoningEffort(modelId: string): boolean {
-  return /^o\d/i.test(modelId.trim());
+  const id = modelId.trim();
+  return /^o\d/i.test(id) || /^gpt-5\.6(?:-|$)/i.test(id);
 }
 
 export function getModelForTask(taskType: AiTaskType, mode: AiMode): string {
