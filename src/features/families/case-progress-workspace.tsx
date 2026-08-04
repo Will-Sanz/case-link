@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, ChevronDown, History } from "lucide-react";
+import {
+  Calendar as CalendarDays,
+  CheckCircle as CheckCircle2,
+  ClockRotateRight as History,
+  NavArrowDown as ChevronDown,
+} from "iconoir-react";
 import { captureCaseProgressUpdate } from "@/app/actions/case-progress";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

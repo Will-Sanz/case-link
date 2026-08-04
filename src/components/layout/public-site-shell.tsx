@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Menu } from "lucide-react";
+import { ArrowUpRight, Menu } from "iconoir-react";
 import { PublicCaseLinkWordmark } from "@/components/brand/caselink-mark";
 
 const navigation = [

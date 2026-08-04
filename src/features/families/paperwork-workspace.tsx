@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, FileText } from "lucide-react";
+import { ArrowRight, Download, Page as FileText } from "iconoir-react";
 
 export function PaperworkWorkspace({
   familyId,

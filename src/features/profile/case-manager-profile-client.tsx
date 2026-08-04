@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect } from "react";
-import { CheckCircle2, LogOut, Save } from "lucide-react";
+import { CheckCircle as CheckCircle2, FloppyDisk as Save, LogOut } from "iconoir-react";
 import { signOutAction } from "@/app/actions/auth";
 import { updateCaseManagerProfile, type ProfileSaveState } from "@/app/actions/profile";
 import { Button } from "@/components/ui/button";

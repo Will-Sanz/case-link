@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CircleAlert, ListChecks, UsersRound } from "lucide-react";
+import {
+  ArrowRight,
+  Group as UsersRound,
+  TaskList as ListChecks,
+  WarningCircle as CircleAlert,
+} from "iconoir-react";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getFamilyDetail } from "@/lib/services/families";

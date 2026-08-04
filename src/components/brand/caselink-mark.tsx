@@ -1,4 +1,4 @@
-import { Link2 } from "lucide-react";
+import { Link as Link2 } from "iconoir-react";
 import { cn } from "@/lib/utils/cn";
 
 export function CaseLinkMark({ className }: { className?: string }) {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, CircleAlert } from "lucide-react";
+import { CheckCircle as CheckCircle2, WarningCircle as CircleAlert } from "iconoir-react";
 import {
   markPlanReviewed,
   previewRefinePlanStep,

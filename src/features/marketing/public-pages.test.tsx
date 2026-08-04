@@ -34,7 +34,7 @@ describe("public site content contract", () => {
 
     const icons = Array.from(container.querySelectorAll("svg"));
     expect(icons.length).toBeGreaterThan(0);
-    expect(icons.every((icon) => icon.classList.contains("lucide"))).toBe(true);
+    expect(icons.every((icon) => !icon.classList.contains("lucide"))).toBe(true);
 
     const workflow = container.querySelector("#workflow");
     expect(workflow).toBeTruthy();

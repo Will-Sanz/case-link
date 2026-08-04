@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Check, FileText, LockKeyhole } from "lucide-react";
+import { Check, Lock as LockKeyhole, Page as FileText } from "iconoir-react";
 
 function PlanPdfDetail() {
   return (

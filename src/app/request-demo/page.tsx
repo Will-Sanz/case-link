@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "iconoir-react";
 import { PublicSiteShell } from "@/components/layout/public-site-shell";
 import { DemoRequestForm } from "@/features/marketing/demo-request-form";
 import { getSessionUser } from "@/lib/auth/session";

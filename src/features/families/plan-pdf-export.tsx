@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { pdf } from "@react-pdf/renderer";
-import { Download } from "lucide-react";
+import { Download } from "iconoir-react";
 import { Button } from "@/components/ui/button";
 import { PlanPdfDocument } from "@/features/families/plan-pdf-document";
 import { finalizePlanPdf } from "@/lib/domain/plan/finalize-plan-pdf";

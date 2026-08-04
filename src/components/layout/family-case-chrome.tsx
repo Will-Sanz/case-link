@@ -4,15 +4,15 @@ import Link from "next/link";
 import { type ReactNode, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import {
-  CircleHelp,
   Download,
-  ListChecks,
+  Group as UsersRound,
+  HelpCircle as CircleHelp,
   Menu,
-  PanelLeftClose,
   Settings,
   ShieldCheck,
-  UsersRound,
-} from "lucide-react";
+  SidebarCollapse as PanelLeftClose,
+  TaskList as ListChecks,
+} from "iconoir-react";
 import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
 import { MainContent } from "@/components/layout/main-content";
 import { cn } from "@/lib/utils/cn";

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, FileText, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, Page as FileText, ShieldCheck } from "iconoir-react";
 
 const workflow = [
   {

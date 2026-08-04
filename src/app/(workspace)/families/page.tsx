@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, Plus, Search, UsersRound } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarRotate as CalendarClock,
+  Group as UsersRound,
+  Plus,
+  Search,
+} from "iconoir-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enrichFamiliesWithCurrentStep, listFamilies } from "@/lib/services/families";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
