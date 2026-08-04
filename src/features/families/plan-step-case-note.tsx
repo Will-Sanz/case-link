@@ -43,6 +43,61 @@ function SectionLabel({ children }: { children: ReactNode }) {
   return <p className={sectionLabelClass}>{children}</p>;
 }
 
+function RefineComparisonCard({
+  label,
+  title,
+  summary,
+  outcome,
+  documents,
+  contact,
+  proposed = false,
+}: {
+  label: string;
+  title: string;
+  summary: string;
+  outcome: string | null;
+  documents: string | null;
+  contact: string | null;
+  proposed?: boolean;
+}) {
+  const fields = [
+    ["Title", title],
+    ["Summary", summary],
+    ["Expected result", outcome],
+    ["Documents", documents],
+    ["Contact", contact],
+  ] as const;
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-3",
+        proposed
+          ? "border-[#b8d8b4] bg-[#f4faf3]"
+          : "border-slate-200 bg-slate-50/70",
+      )}
+    >
+      <p className={cn(sectionLabelClass, proposed && "text-[#397334]")}>{label}</p>
+      <dl className="mt-3 space-y-3">
+        {fields.map(([fieldLabel, value]) => (
+          <div key={fieldLabel}>
+            <dt className="text-[11px] font-medium text-slate-500">{fieldLabel}</dt>
+            <dd
+              className={cn(
+                "mt-0.5 whitespace-pre-wrap text-sm leading-relaxed",
+                value?.trim() ? "text-slate-800" : "italic text-slate-400",
+                fieldLabel === "Title" && value?.trim() && "font-semibold text-slate-900",
+              )}
+            >
+              {value?.trim() || "Not set"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function formatDateOnly(value: string | null): string | null {
   if (!value) return null;
   const [year, month, day] = value.split("-").map(Number);
@@ -201,6 +256,14 @@ export function PlanStepCaseNote({
   const documentsDisplay = useMemo(() => formatDocumentsDisplay(d), [d]);
   const contactDisplay = useMemo(() => formatContactDisplay(d), [d]);
   const outcomeDisplay = useMemo(() => formatOutcomeDisplay(d), [d]);
+  const refineDocumentsDisplay = useMemo(
+    () => (refinePreview ? formatDocumentsDisplay(refinePreview.details) : null),
+    [refinePreview],
+  );
+  const refineContactDisplay = useMemo(
+    () => (refinePreview ? formatContactDisplay(refinePreview.details) : null),
+    [refinePreview],
+  );
   const recordNotes = useMemo(() => formatRecordNotes(step.workflow_data), [step.workflow_data]);
   const actions = useMemo(
     () =>
@@ -802,25 +865,33 @@ export function PlanStepCaseNote({
                   </Button>
                 </div>
                 {refinePreview ? (
-                  <div className="space-y-3 border-t border-slate-200 pt-3">
-                    <div className="space-y-1.5">
-                      <SectionLabel>Preview title</SectionLabel>
-                      <p className="text-[15px] font-semibold text-slate-900">{refinePreview.title}</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <SectionLabel>Preview summary</SectionLabel>
-                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
-                        {refinePreview.description}
+                  <div className="space-y-3 border-t border-slate-200 pt-3" aria-live="polite">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Review changes</p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                        Compare the proposal with your current draft. Nothing changes until you apply
+                        it, and <strong>Save edits</strong> is still required.
                       </p>
                     </div>
-                    {refinePreview.details.expected_outcome?.trim() ? (
-                      <div className="space-y-1.5">
-                        <SectionLabel>Preview outcome</SectionLabel>
-                        <p className="text-[15px] leading-relaxed text-slate-700">
-                          {refinePreview.details.expected_outcome}
-                        </p>
-                      </div>
-                    ) : null}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <RefineComparisonCard
+                        label="Current draft"
+                        title={step.title}
+                        summary={mainParagraphRead}
+                        outcome={outcomeDisplay}
+                        documents={documentsDisplay}
+                        contact={contactDisplay}
+                      />
+                      <RefineComparisonCard
+                        label="Proposed draft"
+                        title={refinePreview.title}
+                        summary={refinePreview.description}
+                        outcome={refinePreview.details.expected_outcome?.trim() || null}
+                        documents={refineDocumentsDisplay}
+                        contact={refineContactDisplay}
+                        proposed
+                      />
+                    </div>
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button type="button" className="h-8 text-xs" onClick={onRefineApply}>
                         Apply to draft
