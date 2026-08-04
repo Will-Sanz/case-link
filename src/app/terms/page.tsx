@@ -5,7 +5,7 @@ import { TermsOfServiceSections } from "@/features/legal/legal-document-sections
 import { getSessionUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | CaseLink",
+  title: "Terms of Service",
   description: "Terms governing use of the CaseLink case management application.",
 };
 

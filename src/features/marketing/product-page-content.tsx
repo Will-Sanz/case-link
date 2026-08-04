@@ -1,7 +1,7 @@
 import Image from "next/image";
-import { Check, FileText, LockKeyhole } from "lucide-react";
+import { Check, Lock as LockKeyhole, Page as FileText } from "iconoir-react";
 
-function PaperworkDetail() {
+function PlanPdfDetail() {
   return (
     <div className="overflow-hidden rounded-2xl bg-[var(--public-surface)] [box-shadow:var(--public-shadow-decision)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--public-rule)] px-5 py-4">
@@ -10,20 +10,20 @@ function PaperworkDetail() {
             <FileText className="size-4" aria-hidden />
           </span>
           <div>
-            <p className="text-sm font-semibold text-[var(--public-ink)]">Family intake form.pdf</p>
-            <p className="text-xs text-[var(--public-ink-3)]">Review proposed entries</p>
+            <p className="text-sm font-semibold text-[var(--public-ink)]">Family support plan.pdf</p>
+            <p className="text-xs text-[var(--public-ink-3)]">Reviewed plan export</p>
           </div>
         </div>
         <span className="rounded-full bg-[var(--public-attention-bg)] px-3 py-1 text-xs font-semibold text-[var(--public-attention)]">
-          2 need review
+          Ready to download
         </span>
       </div>
 
       <div className="grid md:grid-cols-[220px_1fr]">
         <div className="border-b border-[var(--public-rule)] bg-[var(--public-paper-2)] p-5 md:border-b-0 md:border-r">
-          <p className="text-xs font-semibold text-[var(--public-ink-muted)]">Information sources</p>
+          <p className="text-xs font-semibold text-[var(--public-ink-muted)]">Included in the PDF</p>
           <div className="mt-4 divide-y divide-[var(--public-rule)] border-y border-[var(--public-rule)]">
-            {["Family profile", "Current barriers", "Reviewed plan"].map((source) => (
+            {["Current barriers", "Reviewed goals", "Dated actions"].map((source) => (
               <div key={source} className="flex items-center gap-2 py-3 text-xs font-medium text-[var(--public-ink-strong)]">
                 <span className="grid size-5 place-items-center rounded-full bg-[var(--public-surface)] text-[var(--public-accent)]">
                   <Check className="size-3" strokeWidth={2.5} aria-hidden />
@@ -34,23 +34,23 @@ function PaperworkDetail() {
           </div>
           <div className="mt-5 flex items-start gap-2 text-xs leading-5 text-[var(--public-ink-muted)]">
             <LockKeyhole className="mt-0.5 size-3.5 shrink-0 text-[var(--public-accent)]" aria-hidden />
-            The PDF stays in your browser while you review and download it.
+            The case manager reviews the plan before creating the PDF.
           </div>
         </div>
 
         <div className="space-y-4 p-5">
           {[
-            ["Primary barrier", "Housing instability", "From current barriers"],
-            ["30-day objective", "Complete housing intake and gather required documents.", "From reviewed plan"],
-            ["Household identifier", "Review before download", "Needs your input"],
+            ["Primary goal", "Maintain stable housing", "Reviewed"],
+            ["Next action", "Complete housing intake and gather required documents.", "Case manager owned"],
+            ["Target date", "August 14, 2026", "Confirmed"],
           ].map(([label, value, source], index) => (
             <div key={label} className="grid gap-2 sm:grid-cols-[150px_1fr] sm:items-start">
               <p className="pt-2 text-xs font-semibold text-[var(--public-ink-muted)]">{label}</p>
               <div
                 className={`rounded-lg px-3 py-2.5 text-sm leading-5 ${
-                  index === 2 ?
-                    "bg-[var(--public-attention-surface)] text-[var(--public-attention)] ring-1 ring-inset ring-[var(--public-attention-rule)]"
-                  : "bg-[var(--public-paper-2)] text-[var(--public-ink-strong)]"
+                  index === 2
+                    ? "bg-[var(--public-accent-soft)] text-[var(--public-accent)] ring-1 ring-inset ring-[var(--public-accent-rule)]"
+                    : "bg-[var(--public-paper-2)] text-[var(--public-ink-strong)]"
                 }`}
               >
                 <p>{value}</p>
@@ -74,14 +74,14 @@ export function ProductPageContent() {
               A review process, not a black box.
             </h1>
             <p className="mt-6 text-base leading-7 text-[var(--public-ink-2)] sm:text-lg sm:leading-8">
-              CaseLink proposes entries and shows where they came from. Uncertain or missing fields are called out. Nothing is final until the case manager reviews it.
+              CaseLink turns a reviewed intervention plan into a clear PDF. Nothing is submitted automatically, and the case manager remains responsible for the final plan.
             </p>
             <ul className="mt-7 space-y-3 text-sm font-medium text-[var(--public-ink-strong)]">
               <li className="flex gap-3">
-                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Supports fillable PDF forms
+                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Professional black-and-white plan PDF
               </li>
               <li className="flex gap-3">
-                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Editable before download
+                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Reviewed goals, actions, owners, and dates
               </li>
               <li className="flex gap-3">
                 <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Download for the software your school already uses
@@ -90,7 +90,7 @@ export function ProductPageContent() {
           </div>
 
           <div className="public-hero-visual">
-            <PaperworkDetail />
+            <PlanPdfDetail />
           </div>
         </div>
       </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "iconoir-react";
 
 const DEMO_EMAIL = "willsanz@engineering.upenn.edu";
 

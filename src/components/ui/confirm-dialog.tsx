@@ -58,7 +58,7 @@ export function ConfirmDialog({
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descId}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-[1px]"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-0 shadow-xl backdrop:bg-[var(--color-ink)]/45 backdrop:backdrop-blur-[1px]"
       onCancel={(event) => {
         event.preventDefault();
         if (!pending) onClose();
@@ -71,10 +71,10 @@ export function ConfirmDialog({
         className="p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId} className="text-base font-semibold text-slate-900">
+        <h2 id={titleId} className="text-base font-semibold text-[var(--color-ink)]">
           {title}
         </h2>
-        <p id={descId} className="mt-2 text-sm leading-relaxed text-slate-600">
+        <p id={descId} className="mt-2 text-sm leading-relaxed text-[var(--color-ink-muted)]">
           {description}
         </p>
         {error ? (

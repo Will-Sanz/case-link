@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getFamilyDetail } from "@/lib/services/families";
 import { PaperworkWorkspace } from "@/features/families/paperwork-workspace";
+import { PlanPdfExport } from "@/features/families/plan-pdf-export";
 import { isPlanReviewed } from "@/lib/domain/plan/review-status";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -15,13 +16,18 @@ export default async function FamilyPaperworkPage({ params }: PageProps) {
   const family = await getFamilyDetail(supabase, parsed.data);
   if (!family) notFound();
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
+    <div className="mx-auto w-full max-w-none px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
       <PaperworkWorkspace
         familyId={family.id}
         familyName={family.name}
         hasReviewedPlan={isPlanReviewed(family.plan)}
-        planId={family.plan?.id ?? null}
-        reviewedAt={family.plan?.client_display?.reviewedAt ?? null}
+        planDownload={family.plan ? (
+          <PlanPdfExport
+            plan={family.plan}
+            familyName={family.name}
+            barrierLabels={family.barriers.map((barrier) => barrier.label)}
+          />
+        ) : null}
       />
     </div>
   );

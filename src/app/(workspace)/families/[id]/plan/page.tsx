@@ -25,6 +25,8 @@ export default async function FamilyPlanPage({ params }: PageProps) {
       barrierOptions={BARRIER_PRESETS}
       initialResult={loaded.ok ? loaded.result : null}
       plan={family.plan}
+      progressUpdates={family.progressUpdates}
+      caseNotes={family.caseNotes}
       tab="plan"
     />
   );

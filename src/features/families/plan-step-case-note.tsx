@@ -37,7 +37,7 @@ import {
 type FocusField = "title" | "body" | "documents" | "contact" | "outcome" | null;
 
 const sectionLabelClass =
-  "text-[11px] font-semibold uppercase tracking-wider text-slate-500";
+  "text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]";
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return <p className={sectionLabelClass}>{children}</p>;
@@ -73,20 +73,20 @@ function RefineComparisonCard({
       className={cn(
         "rounded-lg border p-3",
         proposed
-          ? "border-[#b8d8b4] bg-[#f4faf3]"
-          : "border-slate-200 bg-slate-50/70",
+          ? "border-[var(--color-positive-rule)] bg-[var(--color-positive-bg)]"
+          : "border-[var(--color-rule)] bg-[var(--color-paper)]",
       )}
     >
-      <p className={cn(sectionLabelClass, proposed && "text-[#397334]")}>{label}</p>
+      <p className={cn(sectionLabelClass, proposed && "text-[var(--color-positive)]")}>{label}</p>
       <dl className="mt-3 space-y-3">
         {fields.map(([fieldLabel, value]) => (
           <div key={fieldLabel}>
-            <dt className="text-[11px] font-medium text-slate-500">{fieldLabel}</dt>
+            <dt className="text-[11px] font-medium text-[var(--color-ink-faint)]">{fieldLabel}</dt>
             <dd
               className={cn(
                 "mt-0.5 whitespace-pre-wrap text-sm leading-relaxed",
-                value?.trim() ? "text-slate-800" : "italic text-slate-400",
-                fieldLabel === "Title" && value?.trim() && "font-semibold text-slate-900",
+                value?.trim() ? "text-[var(--color-ink-strong)]" : "italic text-[var(--color-ink-faint)]",
+                fieldLabel === "Title" && value?.trim() && "font-semibold text-[var(--color-ink)]",
               )}
             >
               {value?.trim() || "Not set"}
@@ -153,12 +153,12 @@ function DocumentField({
   const { ref, rows } = useAutosizeTextarea(value, 2);
   if (!editing) {
     if (!displayText) return null;
-    return <p className="text-[15px] leading-relaxed text-slate-700">{displayText}</p>;
+    return <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{displayText}</p>;
   }
   if (focused) {
     return (
       <div className="space-y-1.5">
-        <p className="text-xs text-slate-400">One item per line</p>
+        <p className="text-xs text-[var(--color-ink-faint)]">One item per line</p>
         <textarea
           ref={ref}
           rows={rows}
@@ -167,7 +167,7 @@ function DocumentField({
           onBlur={onBlur}
           className={cn(
             textareaClass,
-            "min-h-[3rem] w-full resize-y border-0 border-b border-slate-200 bg-transparent px-0 py-1 text-[15px] leading-relaxed text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+            "min-h-[3rem] w-full resize-y border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-1 text-[15px] leading-relaxed text-[var(--color-ink-strong)] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
           )}
           autoFocus
         />
@@ -178,10 +178,10 @@ function DocumentField({
     <button
       type="button"
       onClick={onFocus}
-      className="w-full text-left text-[15px] leading-relaxed text-slate-700 hover:bg-slate-50/80"
+      className="w-full text-left text-[15px] leading-relaxed text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
     >
       {displayText ?? (
-        <span className="text-slate-400 italic">Add documents the client will need…</span>
+        <span className="text-[var(--color-ink-faint)] italic">Add documents the client will need…</span>
       )}
     </button>
   );
@@ -326,8 +326,8 @@ export function PlanStepCaseNote({
     <article
       id={`step-${step.id}`}
       className={cn(
-        "max-w-[760px] rounded-xl border border-[#dce6d9] bg-white px-4",
-        editing && "border-[#8bca84] ring-2 ring-[#46923c]/15 ring-offset-2 ring-offset-transparent",
+        "max-w-[760px] rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] px-4",
+        editing && "border-[var(--color-accent-rule)] ring-2 ring-[var(--color-focus)]/15 ring-offset-2 ring-offset-transparent",
       )}
     >
       <div className="space-y-5 py-4 pr-2">
@@ -343,7 +343,7 @@ export function PlanStepCaseNote({
               rows={2}
               className={cn(
                 textareaClass,
-                "w-full resize-none border-0 border-b border-slate-200 bg-transparent px-0 py-0 text-lg font-semibold leading-snug text-slate-900 shadow-none focus-visible:ring-0",
+                "w-full resize-none border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-0 text-lg font-semibold leading-snug text-[var(--color-ink)] shadow-none focus-visible:ring-0",
               )}
               autoFocus
             />
@@ -352,23 +352,23 @@ export function PlanStepCaseNote({
               type="button"
               className={cn(
                 "w-full text-left",
-                editing && "rounded-sm hover:bg-slate-50/80",
+                editing && "rounded-sm hover:bg-[var(--color-paper)]",
               )}
               onClick={() => editing && setFocus("title")}
               aria-labelledby={titleId}
             >
-              <h4 className="text-lg font-semibold tracking-tight text-slate-900">{step.title}</h4>
+              <h4 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">{step.title}</h4>
             </button>
           )}
 
-          <p className="text-xs text-slate-500">{metaLine}</p>
+          <p className="text-xs text-[var(--color-ink-faint)]">{metaLine}</p>
 
           {editing ? (
             <div className="flex flex-wrap gap-3 pt-1 text-xs">
-            <label className="inline-flex items-center gap-1.5 text-slate-600">
-              <span className="text-slate-500">Status</span>
+            <label className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)]">
+              <span className="text-[var(--color-ink-faint)]">Status</span>
               <select
-                className="rounded border border-slate-200 bg-white px-2 py-1"
+                className="rounded border border-[var(--color-rule)] bg-[var(--color-surface)] px-2 py-1"
                 value={step.status}
                 onChange={(e) => onPatchStep({ status: e.target.value as PlanStepRow["status"] })}
               >
@@ -378,10 +378,10 @@ export function PlanStepCaseNote({
                 <option value="blocked">Waiting</option>
               </select>
             </label>
-            <label className="inline-flex items-center gap-1.5 text-slate-600">
-              <span className="text-slate-500">Owner</span>
+            <label className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)]">
+              <span className="text-[var(--color-ink-faint)]">Owner</span>
               <select
-                className="rounded border border-slate-200 bg-white px-2 py-1"
+                className="rounded border border-[var(--color-rule)] bg-[var(--color-surface)] px-2 py-1"
                 value={d.owner ?? "case_manager"}
                 onChange={(e) =>
                   onPatchDetails({ owner: e.target.value as NonNullable<PlanStepDetails["owner"]> })
@@ -393,10 +393,10 @@ export function PlanStepCaseNote({
                 <option value="family">Family</option>
               </select>
             </label>
-            <label className="inline-flex items-center gap-1.5 text-slate-600">
-              <span className="text-slate-500">Priority</span>
+            <label className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)]">
+              <span className="text-[var(--color-ink-faint)]">Priority</span>
               <select
-                className="rounded border border-slate-200 bg-white px-2 py-1"
+                className="rounded border border-[var(--color-rule)] bg-[var(--color-surface)] px-2 py-1"
                 value={step.priority ?? "medium"}
                 onChange={(e) => {
                   const p = e.target.value as PlanStepRow["priority"];
@@ -427,7 +427,7 @@ export function PlanStepCaseNote({
               onBlur={blurBody}
               className={cn(
                 textareaClass,
-                "w-full resize-y border-0 border-b border-slate-200 bg-transparent px-0 py-1 text-[15px] leading-relaxed text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                "w-full resize-y border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-1 text-[15px] leading-relaxed text-[var(--color-ink-strong)] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
               )}
               autoFocus
             />
@@ -436,34 +436,34 @@ export function PlanStepCaseNote({
               type="button"
               className={cn(
                 "w-full text-left",
-                editing && "rounded-sm hover:bg-slate-50/80",
+                editing && "rounded-sm hover:bg-[var(--color-paper)]",
               )}
               onClick={() => editing && startBodyEdit()}
             >
               {mainParagraphRead ? (
-                <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
+                <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-ink-strong)]">
                   {mainParagraphRead}
                 </p>
               ) : editing ? (
-                <span className="text-slate-400 italic">Click to write the case note for this action…</span>
+                <span className="text-[var(--color-ink-faint)] italic">Click to write the case note for this action…</span>
               ) : (
-                <span className="text-slate-500">No narrative entered for this action.</span>
+                <span className="text-[var(--color-ink-faint)]">No narrative entered for this action.</span>
               )}
             </button>
           )}
         </section>
 
-        <section className="space-y-3 border-t border-slate-200/70 pt-5">
+        <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <SectionLabel>Actions and target dates</SectionLabel>
             {actions.length > 0 ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--color-ink-faint)]">
                 {completedActionCount} of {actions.length} complete
               </p>
             ) : null}
           </div>
           {editing && actions.length > 1 ? (
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-[var(--color-ink-faint)]">
               Actions stay in target-date order. Change a date to move an action earlier or later.
             </p>
           ) : null}
@@ -477,9 +477,9 @@ export function PlanStepCaseNote({
               {actions.map((action, actionIndex) => (
                 <div
                   key={action.id}
-                  className="space-y-3 rounded-lg border border-slate-200 bg-[#fafcf9] p-3"
+                  className="space-y-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] p-3"
                 >
-                  <label className="block space-y-1 text-xs text-slate-600">
+                  <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>Action {actionIndex + 1}</span>
                     <input
                       type="text"
@@ -487,11 +487,11 @@ export function PlanStepCaseNote({
                       onChange={(event) =>
                         onPatchActionItem(action.id, { title: event.target.value })
                       }
-                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                      className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                     />
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-1 text-xs text-slate-600">
+                    <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                       <span>Target date</span>
                       <input
                         type="date"
@@ -501,11 +501,11 @@ export function PlanStepCaseNote({
                             target_date: event.target.value || null,
                           })
                         }
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                         required={action.status !== "completed"}
                       />
                     </label>
-                    <label className="block space-y-1 text-xs text-slate-600">
+                    <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                       <span>Status</span>
                       <select
                         value={actionUiStatus(action)}
@@ -525,7 +525,7 @@ export function PlanStepCaseNote({
                             follow_up_date: next === "waiting" ? action.follow_up_date : null,
                           });
                         }}
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                       >
                         <option value="pending">Not started</option>
                         <option value="in_progress">In progress</option>
@@ -535,7 +535,7 @@ export function PlanStepCaseNote({
                       </select>
                     </label>
                   </div>
-                  <label className="block space-y-1 text-xs text-slate-600">
+                  <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>How to do it (optional)</span>
                     <Textarea
                       rows={2}
@@ -545,11 +545,11 @@ export function PlanStepCaseNote({
                           description: event.target.value || null,
                         })
                       }
-                      className="min-h-[64px] border-slate-200 bg-white text-sm"
+                      className="min-h-[64px] border-[var(--color-rule)] bg-[var(--color-surface)] text-sm"
                     />
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-1 text-xs text-slate-600">
+                    <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                       <span>
                         {action.status === "blocked" ? "Why is this waiting?" : "Progress note (optional)"}
                       </span>
@@ -564,11 +564,11 @@ export function PlanStepCaseNote({
                             ),
                           })
                         }
-                        className="min-h-[64px] border-slate-200 bg-white text-sm"
+                        className="min-h-[64px] border-[var(--color-rule)] bg-[var(--color-surface)] text-sm"
                         required={action.status === "blocked"}
                       />
                     </label>
-                    <label className="block space-y-1 text-xs text-slate-600">
+                    <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                       <span>
                         {action.status === "blocked" ? "Next follow-up date" : "Follow-up date (optional)"}
                       </span>
@@ -580,12 +580,12 @@ export function PlanStepCaseNote({
                             follow_up_date: event.target.value || null,
                           })
                         }
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                         required={action.status === "blocked"}
                       />
                     </label>
                   </div>
-                  <label className="block space-y-1 text-xs text-slate-600">
+                  <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>Outcome (optional)</span>
                     <Textarea
                       rows={2}
@@ -596,7 +596,7 @@ export function PlanStepCaseNote({
                         })
                       }
                       placeholder="What happened after outreach or completion?"
-                      className="min-h-[64px] border-slate-200 bg-white text-sm"
+                      className="min-h-[64px] border-[var(--color-rule)] bg-[var(--color-surface)] text-sm"
                     />
                   </label>
                 </div>
@@ -613,7 +613,7 @@ export function PlanStepCaseNote({
                 return (
                   <li
                     key={action.id}
-                    className="rounded-lg border border-slate-200 bg-[#fafcf9] px-3 py-3"
+                    className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-3"
                   >
                     <label className="flex cursor-pointer items-start gap-3">
                       <input
@@ -627,31 +627,31 @@ export function PlanStepCaseNote({
                           )
                         }
                         disabled={actionToggleDisabled || !onToggleActionItem}
-                        className="mt-0.5 size-4 shrink-0 accent-[#276221]"
+                        className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent)]"
                         aria-label={`${done ? "Reopen" : "Complete"} ${action.title}`}
                       />
                       <span className="min-w-0 flex-1">
                         <span
                           className={cn(
-                            "block text-sm font-medium text-slate-900",
-                            done && !noLongerNeeded && "text-slate-500 line-through",
-                            noLongerNeeded && "text-slate-500",
+                            "block text-sm font-medium text-[var(--color-ink)]",
+                            done && !noLongerNeeded && "text-[var(--color-ink-faint)] line-through",
+                            noLongerNeeded && "text-[var(--color-ink-faint)]",
                           )}
                         >
                           {action.title}
                         </span>
                         {action.description?.trim() ? (
-                          <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                          <span className="mt-1 block text-xs leading-relaxed text-[var(--color-ink-muted)]">
                             {action.description}
                           </span>
                         ) : null}
                         {userNotes ? (
-                          <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                          <span className="mt-1 block text-xs leading-relaxed text-[var(--color-ink-muted)]">
                             {userNotes}
                           </span>
                         ) : null}
                         {action.outcome?.trim() ? (
-                          <span className="mt-1 block text-xs leading-relaxed text-slate-700">
+                          <span className="mt-1 block text-xs leading-relaxed text-[var(--color-ink-2)]">
                             <span className="font-semibold">Outcome:</span> {action.outcome}
                           </span>
                         ) : null}
@@ -659,7 +659,7 @@ export function PlanStepCaseNote({
                           {targetLabel ? (
                             <time
                               dateTime={action.target_date ?? undefined}
-                              className="font-medium text-[#276221]"
+                              className="font-medium text-[var(--color-accent)]"
                             >
                               Target {targetLabel}
                             </time>
@@ -671,16 +671,16 @@ export function PlanStepCaseNote({
                               Waiting
                             </span>
                           ) : noLongerNeeded ? (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+                            <span className="rounded-full bg-[var(--color-paper-2)] px-2 py-0.5 font-medium text-[var(--color-ink-2)]">
                               No longer needed
                             </span>
                           ) : action.status === "in_progress" ? (
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-800">
+                            <span className="rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 font-medium text-[var(--color-accent)]">
                               In progress
                             </span>
                           ) : null}
                           {followUpLabel ? (
-                            <time dateTime={action.follow_up_date ?? undefined} className="text-slate-600">
+                            <time dateTime={action.follow_up_date ?? undefined} className="text-[var(--color-ink-muted)]">
                               Follow up {followUpLabel}
                             </time>
                           ) : null}
@@ -720,7 +720,7 @@ export function PlanStepCaseNote({
             <SectionLabel>Contact</SectionLabel>
             {editing && focus === "contact" ? (
               <div className="space-y-1.5">
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[var(--color-ink-faint)]">
                   One contact per line; separate name, phone, email, and notes with ·
                 </p>
                 <Textarea
@@ -728,17 +728,17 @@ export function PlanStepCaseNote({
                   value={contactEditable}
                   onChange={(e) => onPatchDetails({ contacts: contactsFromEditable(e.target.value) })}
                   onBlur={() => setFocus(null)}
-                  className="min-h-[3rem] w-full resize-y border-0 border-b border-slate-200 bg-transparent px-0 py-1 text-[15px] leading-relaxed text-slate-800 shadow-none focus-visible:ring-0"
+                  className="min-h-[3rem] w-full resize-y border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-1 text-[15px] leading-relaxed text-[var(--color-ink-strong)] shadow-none focus-visible:ring-0"
                   autoFocus
                 />
               </div>
             ) : !editing && contactDisplay ? (
-              <p className="text-[15px] leading-relaxed text-slate-700">{contactDisplay}</p>
+              <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{contactDisplay}</p>
             ) : editing && !contactDisplay && focus !== "contact" ? (
               <button
                 type="button"
                 onClick={() => setFocus("contact")}
-                className="w-full text-left text-slate-400 italic hover:bg-slate-50/80"
+                className="w-full text-left text-[var(--color-ink-faint)] italic hover:bg-[var(--color-paper)]"
               >
                 Add primary contact…
               </button>
@@ -746,7 +746,7 @@ export function PlanStepCaseNote({
               <button
                 type="button"
                 onClick={() => setFocus("contact")}
-                className="w-full text-left text-[15px] leading-relaxed text-slate-700 hover:bg-slate-50/80"
+                className="w-full text-left text-[15px] leading-relaxed text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
               >
                 {contactDisplay}
               </button>
@@ -763,16 +763,16 @@ export function PlanStepCaseNote({
                 value={outcomeEditable}
                 onChange={(e) => onPatchDetails({ expected_outcome: e.target.value || undefined })}
                 onBlur={() => setFocus(null)}
-                className="min-h-[3rem] w-full resize-y border-0 border-b border-slate-200 bg-transparent px-0 py-1 text-[15px] leading-relaxed text-slate-800 shadow-none focus-visible:ring-0"
+                className="min-h-[3rem] w-full resize-y border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-1 text-[15px] leading-relaxed text-[var(--color-ink-strong)] shadow-none focus-visible:ring-0"
                 autoFocus
               />
             ) : !editing && outcomeDisplay ? (
-              <p className="text-[15px] leading-relaxed text-slate-700">{outcomeDisplay}</p>
+              <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{outcomeDisplay}</p>
             ) : editing && !outcomeDisplay && focus !== "outcome" ? (
               <button
                 type="button"
                 onClick={() => setFocus("outcome")}
-                className="w-full text-left text-slate-400 italic hover:bg-slate-50/80"
+                className="w-full text-left text-[var(--color-ink-faint)] italic hover:bg-[var(--color-paper)]"
               >
                 Add expected outcome…
               </button>
@@ -780,7 +780,7 @@ export function PlanStepCaseNote({
               <button
                 type="button"
                 onClick={() => setFocus("outcome")}
-                className="w-full text-left text-[15px] leading-relaxed text-slate-700 hover:bg-slate-50/80"
+                className="w-full text-left text-[15px] leading-relaxed text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
               >
                 {outcomeDisplay}
               </button>
@@ -789,14 +789,14 @@ export function PlanStepCaseNote({
         )}
 
         {recordNotes ? (
-          <section className="space-y-1.5 border-t border-slate-200/80 pt-5">
+          <section className="space-y-1.5 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Updates</SectionLabel>
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-600">{recordNotes}</p>
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-ink-muted)]">{recordNotes}</p>
           </section>
         ) : null}
 
         {editing && onPatchWorkflow ? (
-          <section className="space-y-3 border-t border-slate-200/80 pt-5">
+          <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Case record</SectionLabel>
             <Textarea
               rows={3}
@@ -808,7 +808,7 @@ export function PlanStepCaseNote({
                 })
               }
               placeholder="Outcomes, attempts, or follow-up notes…"
-              className="w-full resize-y border-slate-200/90 text-sm"
+              className="w-full resize-y border-[var(--color-rule)] text-sm"
             />
             <Textarea
               rows={2}
@@ -820,13 +820,13 @@ export function PlanStepCaseNote({
                 })
               }
               placeholder="If blocked, describe why…"
-              className="w-full resize-y border-slate-200/90 text-sm"
+              className="w-full resize-y border-[var(--color-rule)] text-sm"
             />
           </section>
         ) : null}
 
         {editing ? (
-          <section className="space-y-3 border-t border-slate-200/80 pt-5">
+          <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Assist</SectionLabel>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onOpenRefine}>
@@ -835,11 +835,11 @@ export function PlanStepCaseNote({
             </div>
             {refineOpen ? (
               <div
-                className="space-y-3 rounded-lg border border-slate-200/90 bg-white/80 p-3 shadow-sm"
+                className="space-y-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] p-3 shadow-sm"
                 role="region"
                 aria-label="Refine action with AI"
               >
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-[var(--color-ink-muted)]">
                   Describe how this action should read. Preview updates this action&apos;s draft only until
                   you apply; use <strong>Save edits</strong> to persist.
                 </p>
@@ -848,7 +848,7 @@ export function PlanStepCaseNote({
                   value={refineInstruction}
                   onChange={(e) => onRefineInstruction(e.target.value)}
                   placeholder="e.g. Shorten for a city intake form; keep contacts and documents."
-                  className="border-slate-200 text-sm"
+                  className="border-[var(--color-rule)] text-sm"
                 />
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -865,10 +865,10 @@ export function PlanStepCaseNote({
                   </Button>
                 </div>
                 {refinePreview ? (
-                  <div className="space-y-3 border-t border-slate-200 pt-3" aria-live="polite">
+                  <div className="space-y-3 border-t border-[var(--color-rule)] pt-3" aria-live="polite">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Review changes</p>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                      <p className="text-sm font-semibold text-[var(--color-ink)]">Review changes</p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--color-ink-muted)]">
                         Compare the proposal with your current draft. Nothing changes until you apply
                         it, and <strong>Save edits</strong> is still required.
                       </p>
@@ -912,12 +912,12 @@ export function PlanStepCaseNote({
           </section>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/60 pt-4">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-rule)] pt-4">
           {!editing ? (
             <Button
               type="button"
               variant="outline"
-              className="h-8 border-slate-200/90 text-xs"
+              className="h-8 border-[var(--color-rule)] text-xs"
               onClick={() => onBeginEdit?.()}
             >
               Edit action
@@ -936,7 +936,7 @@ export function PlanStepCaseNote({
               <Button
                 type="button"
                 variant="ghost"
-                className="h-8 text-xs text-slate-600"
+                className="h-8 text-xs text-[var(--color-ink-muted)]"
                 onClick={() => onCancelEdits?.()}
                 disabled={stepSavePending}
               >

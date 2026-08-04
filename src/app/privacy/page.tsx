@@ -5,7 +5,7 @@ import { PrivacyPolicySections } from "@/features/legal/legal-document-sections"
 import { getSessionUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | CaseLink",
+  title: "Privacy Policy",
   description:
     "How CaseLink collects, uses, and protects information for case managers.",
 };

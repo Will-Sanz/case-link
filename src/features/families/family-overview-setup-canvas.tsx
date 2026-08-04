@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Xmark } from "iconoir-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,19 +75,19 @@ export function FamilyOverviewSetupCanvas({
 
   const selectedTileClass = cn(
     "min-h-[52px] rounded-xl border-2 px-4 py-3 text-left text-sm font-medium leading-snug transition-colors",
-    "border-[#46923c] bg-[#edf6eb] text-[#173a15]",
+    "border-[var(--color-focus)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]",
   );
 
   return (
-    <Card className="border-[#dce6d9] bg-white p-5 shadow-[0_10px_30px_rgba(30,70,27,0.06)] sm:p-7">
+    <Card className="border-[var(--color-rule)] bg-[var(--color-surface)] p-5 [box-shadow:var(--shadow-surface)] sm:p-7">
       {/* 1. Header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold text-[#5d705a]">Barriers</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#173a15]">{familyName}</h1>
+          <p className="text-sm font-semibold text-[var(--color-ink-muted)]">Barriers</p>
+          <h1 className="workspace-display mt-1 text-2xl text-[var(--color-ink)]">{familyName}</h1>
         </div>
         {lastSavedAt ? (
-          <p className="text-xs text-[#687b65]">Updated {new Date(lastSavedAt).toLocaleString()}</p>
+          <p className="text-xs text-[var(--color-ink-faint)]">Updated {new Date(lastSavedAt).toLocaleString()}</p>
         ) : null}
       </header>
 
@@ -97,11 +97,11 @@ export function FamilyOverviewSetupCanvas({
           <div>
             <h2
               id="setup-barriers-heading"
-              className="text-sm font-semibold tracking-tight text-[#173a15]"
+              className="text-sm font-semibold tracking-tight text-[var(--color-ink)]"
             >
               Barriers
             </h2>
-            <p className="mt-1 text-sm text-[#5d705a]">
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
               Choose everything that applies. You can adjust before generating.
             </p>
           </div>
@@ -116,10 +116,10 @@ export function FamilyOverviewSetupCanvas({
                   onClick={() => onToggleLabel(opt.label as BarrierPresetLabel)}
                   className={cn(
                     "min-h-[52px] rounded-xl border-2 px-4 py-3 text-left text-sm font-medium leading-snug transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35 focus-visible:ring-offset-2",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/35 focus-visible:ring-offset-2",
                     on
                       ? selectedTileClass
-                      : "border-[#dce6d9] bg-white text-[#50644d] hover:border-[#8bca84] hover:bg-[#f6f8f4]",
+                      : "border-[var(--color-rule)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-accent-rule)] hover:bg-[var(--color-paper)]",
                   )}
                 >
                   <span className="flex items-start gap-2.5">
@@ -127,12 +127,16 @@ export function FamilyOverviewSetupCanvas({
                       className={cn(
                         "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[10px] font-bold",
                         on
-                          ? "border-[#3b8132] bg-[#3b8132] text-white"
-                          : "border-[#bfd0bc] bg-white text-transparent",
+                          ? "border-[var(--color-positive)] bg-[var(--color-positive)] text-[var(--color-accent-ink)]"
+                          : "border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-transparent",
                       )}
-                      aria-hidden
+                      aria-hidden="true"
                     >
-                      <Check className="size-3" strokeWidth={3} />
+                      <Check
+                        className="h-4 w-4"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
                     </span>
                     <span>{opt.label}</span>
                   </span>
@@ -143,18 +147,22 @@ export function FamilyOverviewSetupCanvas({
               <div key={row.id} className={cn("relative", selectedTileClass, "pr-10")}>
                 <button
                   type="button"
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-[#687b65] transition-colors hover:bg-[#d8ead5] hover:text-[#173a15]"
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-ink-faint)] transition-colors hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)]"
                   aria-label={`Remove barrier: ${row.text}`}
                   onClick={() => onRemoveCustomBarrier(row.id)}
                 >
-                  <X className="size-4" aria-hidden />
+                  <Xmark className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
                 </button>
                 <div className="flex items-start gap-2.5">
                   <span
-                    className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-[#3b8132] bg-[#3b8132] text-[10px] font-bold text-white"
-                    aria-hidden
+                    className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-[var(--color-positive)] bg-[var(--color-positive)] text-[10px] font-bold text-[var(--color-accent-ink)]"
+                    aria-hidden="true"
                   >
-                    <Check className="size-3" strokeWidth={3} />
+                    <Check
+                      className="h-4 w-4"
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    />
                   </span>
                   <span className="min-w-0 break-words">{row.text}</span>
                 </div>
@@ -165,7 +173,7 @@ export function FamilyOverviewSetupCanvas({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
             <Input
               id="setup-add-custom-barrier"
-              className="min-h-[52px] flex-1 border-[#cfdccc] py-3 text-sm"
+              className="min-h-[52px] flex-1 border-[var(--color-rule-strong)] py-3 text-sm"
               value={customDraft}
               onChange={(e) => setCustomDraft(e.target.value)}
               onKeyDown={onCustomKeyDown}
@@ -187,18 +195,18 @@ export function FamilyOverviewSetupCanvas({
 
         {/* 3. Additional context */}
         <section className="space-y-3">
-          <Label htmlFor="family-additional-context" className="text-sm font-semibold text-[#173a15]">
+          <Label htmlFor="family-additional-context" className="text-sm font-semibold text-[var(--color-ink)]">
             Additional context
           </Label>
           <Textarea
             id="family-additional-context"
-            className="min-h-[120px] resize-y border-[#cfdccc] bg-white text-sm leading-relaxed text-[#253f23] placeholder:text-[#778874] focus-visible:border-[#46923c] focus-visible:ring-[#46923c]/15"
+            className="min-h-[120px] resize-y border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-sm leading-relaxed text-[var(--color-ink-strong)] placeholder:text-[var(--color-ink-faint)] focus-visible:border-[var(--color-focus)] focus-visible:ring-[var(--color-focus)]/15"
             value={additionalContext}
             onChange={(e) => onAdditionalContextChange(e.target.value)}
             placeholder="Describe anything important about the situation..."
             aria-describedby="family-additional-context-help"
           />
-          <p id="family-additional-context-help" className="text-xs leading-5 text-[#687b65]">
+          <p id="family-additional-context-help" className="text-xs leading-5 text-[var(--color-ink-faint)]">
             Keep this de-identified. Do not include names, addresses, birth dates, student IDs,
             contact details, or signatures.
           </p>
@@ -207,7 +215,7 @@ export function FamilyOverviewSetupCanvas({
         {/* 5. Live setup preview */}
         {showLivePreview ? (
           <section className="space-y-3" aria-live="polite">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#778874]">Context</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">Context</p>
             {selectedSet.size > 0 || customBarriers.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {barrierOptions
@@ -215,7 +223,7 @@ export function FamilyOverviewSetupCanvas({
                   .map((o) => (
                     <span
                       key={o.key}
-                      className="rounded-lg bg-[#edf4eb] px-3 py-1.5 text-xs font-medium text-[#365134]"
+                      className="rounded-lg bg-[var(--color-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-2)]"
                     >
                       {o.label}
                     </span>
@@ -223,7 +231,7 @@ export function FamilyOverviewSetupCanvas({
                 {customBarriers.map((row) => (
                   <span
                     key={row.id}
-                    className="rounded-lg bg-[#edf4eb] px-3 py-1.5 text-xs font-medium text-[#365134]"
+                    className="rounded-lg bg-[var(--color-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-2)]"
                   >
                     {row.text}
                   </span>
@@ -231,7 +239,7 @@ export function FamilyOverviewSetupCanvas({
               </div>
             ) : null}
             {additionalContext.trim() ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#5d705a]">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-ink-muted)]">
                 {additionalContext.trim()}
               </p>
             ) : null}
@@ -253,7 +261,7 @@ export function FamilyOverviewSetupCanvas({
               disabled={generateBusy}
               className={cn(
                 "h-14 min-h-[3.5rem] w-full text-base font-semibold tracking-tight shadow-sm sm:min-w-[min(100%,18rem)]",
-                "bg-[#276221] text-white hover:bg-[#1f531b]",
+                "bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:bg-[var(--color-accent-hover)]",
               )}
             >
               {generateBusy
@@ -264,9 +272,9 @@ export function FamilyOverviewSetupCanvas({
             </Button>
           </div>
           {generateBusy && generateStartedAt ? (
-            <div className="flex items-center gap-2 text-sm text-[#5d705a]">
+            <div className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
               <span
-                className="h-4 w-4 animate-spin rounded-full border-2 border-[#cfdccc] border-t-[#276221]"
+                className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-rule-strong)] border-t-[var(--color-accent)]"
                 aria-hidden
               />
               <span>Preparing actions and target dates… {formatElapsed(elapsedSeconds)}</span>

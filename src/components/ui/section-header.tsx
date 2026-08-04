@@ -20,9 +20,9 @@ export function SectionHeader({
       )}
     >
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <h2 className="text-sm font-semibold text-[var(--color-ink)]">{title}</h2>
         {description ? (
-          <p className="mt-0.5 text-sm text-slate-600">{description}</p>
+          <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{description}</p>
         ) : null}
       </div>
       {actions ? (

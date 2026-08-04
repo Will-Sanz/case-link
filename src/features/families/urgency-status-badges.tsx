@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 
 const urgencyClass: Record<string, string> = {
-  low: "border-slate-200 bg-slate-100 text-slate-700",
+  low: "border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-2)]",
   medium: "border-amber-200 bg-amber-50 text-amber-900",
   high: "border-amber-300 bg-amber-50 text-amber-900",
   crisis: "border-red-200 bg-red-50 text-red-800",
@@ -10,7 +10,7 @@ const urgencyClass: Record<string, string> = {
 const statusClass: Record<string, string> = {
   active: "border-emerald-200 bg-emerald-50 text-emerald-800",
   on_hold: "border-amber-200 bg-amber-50 text-amber-800",
-  closed: "border-slate-200 bg-slate-100 text-slate-600",
+  closed: "border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-muted)]",
 };
 
 export function UrgencyBadge({
@@ -20,7 +20,7 @@ export function UrgencyBadge({
 }) {
   if (!urgency) {
     return (
-      <Badge className="border-slate-200 bg-slate-50 font-normal text-slate-500">
+      <Badge className="border-[var(--color-rule)] bg-[var(--color-paper)] font-normal text-[var(--color-ink-faint)]">
         Urgency not set
       </Badge>
     );

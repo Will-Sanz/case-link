@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type KeyboardEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { Check, X } from "lucide-react";
+import { Check, Xmark as X } from "iconoir-react";
 import { createFamilyIntake } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -135,11 +135,11 @@ export function IntakeForm() {
         </p>
       ) : null}
 
-      <Card className="border-[#dce6d9] bg-white p-6 shadow-[0_10px_30px_rgba(30,70,27,0.06)] sm:p-8">
-        <CardTitle className="text-xl tracking-[-0.02em] text-[#173a15]">
+      <Card className="border-[var(--color-rule)] bg-[var(--color-surface)] p-6 [box-shadow:var(--shadow-surface)] sm:p-8">
+        <CardTitle className="text-xl tracking-[-0.02em] text-[var(--color-ink)]">
           Start with what you know
         </CardTitle>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5d705a]">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-ink-muted)]">
           A label and at least one barrier are enough. You can add details or adjust the plan later.
         </p>
         <div className="mt-7 space-y-8">
@@ -147,13 +147,13 @@ export function IntakeForm() {
             <Label htmlFor="name">Family label</Label>
             <Input
               id="name"
-              className="mt-2 min-h-12 border-[#cfdccc] bg-white text-base placeholder:text-[#778874] focus-visible:border-[#46923c] focus-visible:ring-[#46923c]/15"
+              className="mt-2 min-h-12 border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-base placeholder:text-[var(--color-ink-faint)] focus-visible:border-[var(--color-focus)] focus-visible:ring-[var(--color-focus)]/15"
               placeholder="For example: Family 014"
               aria-describedby={form.formState.errors.name ? "name-error" : "family-label-help"}
               autoFocus
               {...form.register("name")}
             />
-            <p id="family-label-help" className="mt-2 text-xs leading-5 text-[#687b65]">
+            <p id="family-label-help" className="mt-2 text-xs leading-5 text-[var(--color-ink-faint)]">
               Use a non-identifying label your team will recognize.
             </p>
             {form.formState.errors.name ? (
@@ -164,8 +164,8 @@ export function IntakeForm() {
           </div>
 
           <fieldset>
-            <legend className="text-sm font-medium text-[#253f23]">Barriers</legend>
-            <p className="mt-1 text-sm leading-6 text-[#5d705a]">
+            <legend className="text-sm font-medium text-[var(--color-ink-strong)]">Barriers</legend>
+            <p className="mt-1 text-sm leading-6 text-[var(--color-ink-muted)]">
               Choose everything the family needs support with.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -178,18 +178,18 @@ export function IntakeForm() {
                     aria-pressed={selected}
                     onClick={() => togglePreset(barrier.value, barrier.label)}
                     className={cn(
-                      "flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-medium transition-[border-color,background-color,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35 focus-visible:ring-offset-2",
+                      "flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-medium transition-[border-color,background-color,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/35 focus-visible:ring-offset-2",
                       selected
-                        ? "border-[#46923c] bg-[#edf6eb] text-[#173a15]"
-                        : "border-[#cfdccc] bg-white text-[#50644d] hover:border-[#8bca84] hover:bg-[#f6f8f4]",
+                        ? "border-[var(--color-focus)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
+                        : "border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-accent-rule)] hover:bg-[var(--color-paper)]",
                     )}
                   >
                     <span
                       className={cn(
                         "grid size-5 shrink-0 place-items-center rounded-md border-2",
                         selected
-                          ? "border-[#3b8132] bg-[#3b8132] text-white"
-                          : "border-[#bfd0bc] bg-white text-transparent",
+                          ? "border-[var(--color-positive)] bg-[var(--color-positive)] text-[var(--color-accent-ink)]"
+                          : "border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-transparent",
                       )}
                       aria-hidden
                     >
@@ -206,13 +206,13 @@ export function IntakeForm() {
                 {customBarriers.map((barrier) => (
                   <span
                     key={barrier.label}
-                    className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#edf4eb] px-3 text-sm font-medium text-[#365134]"
+                    className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--color-accent-soft)] px-3 text-sm font-medium text-[var(--color-ink-2)]"
                   >
                     {barrier.label}
                     <button
                       type="button"
                       onClick={() => updateBarriers(barriers.filter((item) => item !== barrier))}
-                      className="grid size-6 place-items-center rounded-md text-[#5d705a] hover:bg-[#d8ead5] hover:text-[#173a15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35"
+                      className="grid size-6 place-items-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/35"
                       aria-label={`Remove ${barrier.label}`}
                     >
                       <X className="size-3.5" aria-hidden />
@@ -230,7 +230,7 @@ export function IntakeForm() {
                   setCustomBarrierError(null);
                 }}
                 onKeyDown={onCustomBarrierKeyDown}
-                className="min-h-11 flex-1 border-[#cfdccc] bg-white placeholder:text-[#778874] focus-visible:border-[#46923c] focus-visible:ring-[#46923c]/15"
+                className="min-h-11 flex-1 border-[var(--color-rule-strong)] bg-[var(--color-surface)] placeholder:text-[var(--color-ink-faint)] focus-visible:border-[var(--color-focus)] focus-visible:ring-[var(--color-focus)]/15"
                 placeholder="Add another barrier"
                 maxLength={200}
                 aria-label="Another barrier"
@@ -263,7 +263,7 @@ export function IntakeForm() {
             <Textarea
               id="summary"
               rows={4}
-              className="mt-2 resize-y border-[#cfdccc] bg-white text-sm leading-6 placeholder:text-[#778874] focus-visible:border-[#46923c] focus-visible:ring-[#46923c]/15"
+              className="mt-2 resize-y border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-sm leading-6 placeholder:text-[var(--color-ink-faint)] focus-visible:border-[var(--color-focus)] focus-visible:ring-[var(--color-focus)]/15"
               placeholder="Add only the context needed to shape the first plan."
               aria-describedby={
                 form.formState.errors.summary
@@ -273,7 +273,7 @@ export function IntakeForm() {
               aria-invalid={Boolean(form.formState.errors.summary)}
               {...form.register("summary")}
             />
-            <p id="description-help" className="mt-2 text-xs leading-5 text-[#687b65]">
+            <p id="description-help" className="mt-2 text-xs leading-5 text-[var(--color-ink-faint)]">
               Do not enter names, addresses, birth dates, student IDs, contact details, or signatures.
             </p>
             {form.formState.errors.summary ? (
@@ -285,7 +285,7 @@ export function IntakeForm() {
         </div>
       </Card>
 
-      <div className="flex flex-col-reverse gap-3 border-t border-[#dce6d9] pt-6 sm:flex-row sm:items-center">
+      <div className="flex flex-col-reverse gap-3 border-t border-[var(--color-rule)] pt-6 sm:flex-row sm:items-center">
         <Link href="/families" className="sm:mr-auto">
           <Button type="button" variant="outline" className="w-full sm:w-auto">
             Cancel

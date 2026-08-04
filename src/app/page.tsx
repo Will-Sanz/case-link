@@ -6,9 +6,9 @@ import { getSessionUser } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Family paperwork, made manageable",
+  title: "Family support plans, made manageable",
   description:
-    "CaseLink helps school case managers turn family needs into structured intervention plans and prepared paperwork for existing school systems.",
+    "CaseLink helps school case managers turn family needs into reviewed intervention plans and professional PDF exports.",
 };
 
 export default async function Home() {

@@ -4,6 +4,8 @@
 **Primary user:** School case manager  
 **Buyer:** District or school administrator
 
+> **Scope update — August 4, 2026:** V1 downloads the reviewed intervention plan as a professional PDF. Uploading and filling arbitrary PDF forms is deferred. The earlier workflow below is retained as research context. See `docs/agentic-pdf-service-research.md`.
+
 ## The job to be done
 
 Help a case manager move from learning about a family's needs to producing reviewed paperwork for the city-mandated system with much less repetitive copying and formatting.

@@ -12,7 +12,12 @@ import {
   toggleBarrierWorkflowActionItemAction,
 } from "@/app/actions/barrier-workflow";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
-import type { PlanWithSteps } from "@/types/family";
+import { CaseProgressWorkspace } from "@/features/families/case-progress-workspace";
+import type {
+  CaseNoteRow,
+  CaseProgressUpdateRow,
+  PlanWithSteps,
+} from "@/types/family";
 import { CaseAssistantChat } from "@/features/families/case-assistant-chat";
 import { ArchiveFamilyFromListControl } from "@/features/families/archive-family-from-list-control";
 import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
@@ -83,43 +88,43 @@ function ResourceMatchCard({
         : null;
 
   return (
-    <article className="group rounded-xl border border-slate-200/80 bg-white/90 p-4 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors hover:border-slate-300/80">
+    <article className="group rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-4 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors hover:border-[var(--color-rule-strong)]">
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold tracking-tight text-slate-900">{title}</h3>
+        <h3 className="text-sm font-semibold tracking-tight text-[var(--color-ink)]">{title}</h3>
         {contextLine ? (
-          <p className="mt-0.5 text-xs text-slate-500">{contextLine}</p>
+          <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">{contextLine}</p>
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/55 p-3">
+      <div className="mt-4 grid gap-2 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-3">
         <div className="grid grid-cols-[70px_1fr] gap-2 text-xs">
-          <span className="font-medium text-slate-500">Phone</span>
-          <span className="text-slate-800">
+          <span className="font-medium text-[var(--color-ink-faint)]">Phone</span>
+          <span className="text-[var(--color-ink-strong)]">
             {resource.primaryPhone || "-"}
             {resource.secondaryPhone ? ` · ${resource.secondaryPhone}` : ""}
           </span>
         </div>
         <div className="grid grid-cols-[70px_1fr] gap-2 text-xs">
-          <span className="font-medium text-slate-500">Email</span>
-          <span className="break-all text-slate-800">
+          <span className="font-medium text-[var(--color-ink-faint)]">Email</span>
+          <span className="break-all text-[var(--color-ink-strong)]">
             {resource.primaryEmail || "-"}
             {resource.secondaryEmail ? ` · ${resource.secondaryEmail}` : ""}
           </span>
         </div>
         {resource.address ? (
           <div className="grid grid-cols-[70px_1fr] gap-2 text-xs">
-            <span className="font-medium text-slate-500">Address</span>
-            <span className="text-slate-800">{resource.address}</span>
+            <span className="font-medium text-[var(--color-ink-faint)]">Address</span>
+            <span className="text-[var(--color-ink-strong)]">{resource.address}</span>
           </div>
         ) : null}
         {resource.website ? (
           <div className="grid grid-cols-[70px_1fr] gap-2 text-xs">
-            <span className="font-medium text-slate-500">Website</span>
+            <span className="font-medium text-[var(--color-ink-faint)]">Website</span>
             <a
               href={resource.website}
               target="_blank"
               rel="noreferrer"
-              className="truncate text-blue-700 underline-offset-2 hover:underline"
+              className="truncate text-[var(--color-accent)] underline-offset-2 hover:underline"
             >
               {resource.website}
             </a>
@@ -131,7 +136,7 @@ function ResourceMatchCard({
         {resource.primaryPhone ? (
           <button
             type="button"
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
             onClick={() => onCopy(`phone-${resource.id}`, resource.primaryPhone)}
           >
             {copied === `phone-${resource.id}` ? "Copied phone" : "Copy phone"}
@@ -140,7 +145,7 @@ function ResourceMatchCard({
         {resource.primaryEmail ? (
           <button
             type="button"
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
             onClick={() => onCopy(`email-${resource.id}`, resource.primaryEmail)}
           >
             {copied === `email-${resource.id}` ? "Copied email" : "Copy email"}
@@ -149,7 +154,7 @@ function ResourceMatchCard({
         {(resource.primaryPhone || resource.primaryEmail) && hasPrimaryContact ? (
           <button
             type="button"
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
             onClick={() =>
               onCopy(
                 `all-${resource.id}`,
@@ -183,6 +188,8 @@ export function FamilyLiteWorkspace({
   barrierOptions,
   initialResult,
   plan,
+  progressUpdates = [],
+  caseNotes = [],
   tab = "plan",
 }: {
   familyId: string;
@@ -191,6 +198,8 @@ export function FamilyLiteWorkspace({
   initialResult: BarrierWorkflowResult | null;
   /** Latest `plans` + `plan_steps` from the server, canonical for edit + PDF. */
   plan: PlanWithSteps | null;
+  progressUpdates?: CaseProgressUpdateRow[];
+  caseNotes?: CaseNoteRow[];
   tab?: "overview" | "plan" | "resources" | "assistant";
 }) {
   const router = useRouter();
@@ -489,14 +498,14 @@ export function FamilyLiteWorkspace({
       ) : null}
 
       {tab === "plan" ? (
-        <Card className="border-[#dce6d9] bg-white p-5 shadow-[0_10px_30px_rgba(30,70,27,0.06)] sm:p-6">
+        <Card className="border-[var(--color-rule)] bg-[var(--color-surface)] p-5 [box-shadow:var(--shadow-surface)] sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-[#5d705a]">Intervention plan</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#173a15]">{familyName}</h1>
+              <p className="text-sm font-semibold text-[var(--color-ink-muted)]">Intervention plan</p>
+              <h1 className="workspace-display mt-1 text-2xl text-[var(--color-ink)]">{familyName}</h1>
             </div>
             {result?.lastSavedAt ? (
-              <p className="text-xs text-[#687b65]">
+              <p className="text-xs text-[var(--color-ink-faint)]">
                 Updated {new Date(result.lastSavedAt).toLocaleString()}
               </p>
             ) : null}
@@ -504,33 +513,42 @@ export function FamilyLiteWorkspace({
         </Card>
       ) : null}
 
+      {tab === "plan" && plan ? (
+        <CaseProgressWorkspace
+          key={`${plan.id}:${progressUpdates[0]?.id ?? plan.created_at}`}
+          familyId={familyId}
+          plan={plan}
+          updates={progressUpdates}
+          earlierNotes={caseNotes}
+        />
+      ) : null}
+
       {tab === "plan" && planGenerateBusy ? (
         <div
-          className="rounded-xl border border-[#cfe0cc] bg-[#f3f8f1] px-4 py-3 text-sm text-[#173a15]"
+          className="rounded-xl border border-[var(--color-rule-strong)] bg-[var(--color-accent-soft)] px-4 py-3 text-sm text-[var(--color-ink)]"
           role="status"
           aria-live="polite"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-medium">{generationStageLabel}…</p>
-            <p className="text-xs text-[#5d705a]">{savedGenerationStages} of 3 stages safely saved</p>
+            <p className="text-xs text-[var(--color-ink-muted)]">{savedGenerationStages} of 3 stages safely saved</p>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dce9d9]" aria-hidden>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-rule)]" aria-hidden>
             <div
-              className="h-full rounded-full bg-[#3f8a36] transition-[width] duration-500"
-              style={{ width: `${(savedGenerationStages / 3) * 100}%` }}
+              className="h-full origin-left rounded-full bg-[var(--color-positive)] transition-transform duration-500"
+              style={{ transform: `scaleX(${savedGenerationStages / 3})` }}
             />
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-[#5d705a]">
+          <p className="mt-2 text-xs leading-relaxed text-[var(--color-ink-muted)]">
             You can leave this page and return. Each completed pass is saved automatically.
           </p>
         </div>
       ) : null}
 
       {(result || plan) && tab === "plan" ? (
-        <Card className="border-[#dce6d9] bg-white p-5 shadow-[0_10px_30px_rgba(30,70,27,0.06)] sm:p-6">
+        <Card className="border-[var(--color-rule)] bg-[var(--color-surface)] p-5 [box-shadow:var(--shadow-surface)] sm:p-6">
           <FamilyPlanPanel
             familyId={familyId}
-            familyName={familyName}
             plan={plan}
             workflow={result}
             onToggleActionItem={toggleAction}
@@ -545,15 +563,15 @@ export function FamilyLiteWorkspace({
 
       {result && tab === "resources" ? (
         <div className="space-y-4">
-          <Card className="border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-5 sm:p-6">
+          <Card className="border-[var(--color-rule)] bg-gradient-to-b from-[var(--color-paper)] to-white p-5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <CardTitle className="text-base">Resource matches</CardTitle>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
                   Options from your organization&apos;s resource directory matched to this family&apos;s barriers.
                 </p>
               </div>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">
+              <span className="rounded-full border border-[var(--color-rule)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-ink-muted)]">
                 {result.resources.length} matches
               </span>
             </div>
@@ -578,7 +596,7 @@ export function FamilyLiteWorkspace({
             </Card>
           ) : result.resources.length === 0 ? (
             <Card className="p-5 sm:p-6">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-[var(--color-ink-muted)]">
                 No directory matches were found. Do not treat this as confirmation that no service exists.
               </p>
               <Button

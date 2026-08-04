@@ -19,7 +19,7 @@ describe("public site content contract", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Turn family needs into clear plans and prepared paperwork.",
+        name: "Turn family needs into clear plans and ready-to-use PDFs.",
       }),
     ).toBeTruthy();
     expect(
@@ -34,7 +34,7 @@ describe("public site content contract", () => {
 
     const icons = Array.from(container.querySelectorAll("svg"));
     expect(icons.length).toBeGreaterThan(0);
-    expect(icons.every((icon) => icon.classList.contains("lucide"))).toBe(true);
+    expect(icons.every((icon) => !icon.classList.contains("lucide"))).toBe(true);
 
     const workflow = container.querySelector("#workflow");
     expect(workflow).toBeTruthy();
