@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
-import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
+import { ArrowUpRight, Menu } from "lucide-react";
+import { PublicCaseLinkWordmark } from "@/components/brand/caselink-mark";
+
+const navigation = [
+  { href: "/product", label: "Product" },
+];
+
+const navLinkClass =
+  "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-[var(--public-ink-strong)] transition-colors hover:bg-[var(--public-accent-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-focus)]";
 
 export function PublicSiteShell({
   children,
@@ -11,112 +18,126 @@ export function PublicSiteShell({
   /** When true, show Families link into the signed-in workspace. */
   authenticated?: boolean;
 }) {
+  const accountLink = authenticated ?
+    { href: "/families", label: "Families" }
+  : { href: "/login", label: "Sign in" };
+
   return (
-    <div className="flex min-h-full flex-col bg-[#f6f8f4]">
+    <div className="public-site flex min-h-full flex-col bg-[var(--public-paper)] text-[var(--public-ink)]">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-[#173a15] focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#46923c]/30"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-[var(--public-surface)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--public-ink)] focus:[box-shadow:var(--public-shadow-action)] focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--public-focus)]"
       >
         Skip to main content
       </a>
+
       <a
         href="https://openai.com/index/introducing-chatgpt-futures-class-of-2026/"
         target="_blank"
         rel="noreferrer"
-        className="group flex min-h-10 items-center justify-center gap-1.5 bg-[#173a15] px-4 py-2 text-center text-xs font-medium text-[#e7f3e5] transition-colors hover:bg-[#214d1e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 sm:text-sm"
+        aria-label="Selected for OpenAI's inaugural ChatGPT Futures Class of 2026"
+        className="flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap bg-[var(--public-ink)] px-4 py-2 text-center text-xs font-medium text-[var(--public-paper-2)] transition-colors hover:bg-[var(--public-ink-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-[var(--public-accent-ink)] sm:text-sm"
       >
-        Selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026
-        <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+        <span className="sm:hidden">OpenAI ChatGPT Futures Class of 2026</span>
+        <span className="hidden sm:inline">Selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026</span>
+        <ArrowUpRight
+          className="size-3.5 shrink-0"
+          aria-hidden
+        />
       </a>
-      <header className="sticky top-0 z-40 border-b border-[#dce6d9]/90 bg-white/94 backdrop-blur-sm">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
+
+      <header className="sticky top-0 z-40 bg-[var(--public-paper-2)]">
+        <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
           <Link
             href="/"
-            className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35 focus-visible:ring-offset-4"
+            aria-label="CaseLink home"
+            className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-focus)]"
           >
-            <CaseLinkWordmark />
+            <PublicCaseLinkWordmark />
           </Link>
-          <nav
-            className="flex items-center gap-1 sm:gap-2"
-            aria-label="Primary"
-          >
-            <Link
-              href="/"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-[#4e664b] transition-colors hover:bg-[#edf4eb] hover:text-[#173a15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35 sm:inline-flex"
-            >
-              Home
-            </Link>
-            <Link
-              href="/product"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-[#4e664b] transition-colors hover:bg-[#edf4eb] hover:text-[#173a15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35 sm:inline-flex"
-            >
-              Product
-            </Link>
-            {authenticated ? (
-              <Link
-                href="/families"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-[#4e664b] transition-colors hover:bg-[#edf4eb] hover:text-[#173a15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35"
-              >
-                Families
+
+          <nav className="ml-auto hidden items-center gap-2 lg:flex" aria-label="Primary">
+            {navigation.map((item) => (
+              <Link key={item.href} href={item.href} className={navLinkClass}>
+                {item.label}
               </Link>
-            ) : null}
-            <Link
-              href="/request-demo"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(39,98,33,0.2)] transition-[background-color,transform,box-shadow] hover:-translate-y-0.5 hover:bg-[#1f531b] hover:shadow-[0_8px_22px_rgba(39,98,33,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/35 focus-visible:ring-offset-2 active:translate-y-0"
-            >
+            ))}
+            <Link href={accountLink.href} className={navLinkClass}>
+              {accountLink.label}
+            </Link>
+            <Link href="/request-demo" className="public-primary-action min-h-11 px-5">
               Request a demo
             </Link>
           </nav>
+
+          <details className="group relative lg:hidden">
+            <summary
+              className="grid size-11 cursor-pointer place-items-center rounded-lg text-[var(--public-ink)] transition-colors hover:bg-[var(--public-accent-soft)]"
+              aria-label="Open navigation menu"
+            >
+              <Menu className="size-5" aria-hidden />
+            </summary>
+            <nav
+              className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-[min(18rem,calc(100vw-2.5rem))] rounded-xl bg-[var(--public-surface)] p-3 [box-shadow:var(--public-shadow-menu)] ring-1 ring-[var(--public-rule)]"
+              aria-label="Mobile primary"
+            >
+              <div className="flex flex-col gap-1">
+                {navigation.map((item) => (
+                  <Link key={item.href} href={item.href} className={`${navLinkClass} min-h-11`}>
+                    {item.label}
+                  </Link>
+                ))}
+                <Link href={accountLink.href} className={`${navLinkClass} min-h-11`}>
+                  {accountLink.label}
+                </Link>
+                <Link href="/request-demo" className="public-primary-action mt-2 w-full">
+                  Request a demo
+                </Link>
+              </div>
+            </nav>
+          </details>
         </div>
       </header>
+
       <main id="main-content" className="flex-1">
         {children}
       </main>
-      <footer className="border-t border-[#dce6d9] bg-[#173a15] text-white">
-        <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 lg:px-10">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+
+      <footer className="border-t border-[var(--public-rule)] bg-[var(--public-paper-2)]">
+        <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 lg:px-10 lg:py-14">
+          <div className="grid gap-10 lg:grid-cols-[1fr_auto_auto] lg:gap-16">
             <div>
-              <p className="text-base font-semibold">CaseLink</p>
-              <p className="mt-2 max-w-md text-sm leading-relaxed text-[#cce7c9]">
+              <PublicCaseLinkWordmark className="scale-90 origin-left" />
+              <p className="mt-4 max-w-md text-sm leading-6 text-[var(--public-ink-muted)]">
                 Prepare required paperwork without rebuilding the same context.
               </p>
             </div>
-            <nav className="flex flex-col gap-2 text-sm" aria-label="Footer">
-              <Link
-                href="/"
-                className="text-[#cce7c9] hover:text-white focus-visible:outline-none focus-visible:underline"
-              >
-                Home
+
+            <nav className="grid content-start gap-2 text-sm" aria-label="Footer navigation">
+              <p className="mb-1 font-semibold text-[var(--public-ink)]">Explore</p>
+              <Link href="/product" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+                Product
               </Link>
-              <Link href="/product" className="text-[#cce7c9] hover:text-white focus-visible:outline-none focus-visible:underline">
-                Product &amp; about
-              </Link>
-              <Link href="/request-demo" className="text-[#cce7c9] hover:text-white focus-visible:outline-none focus-visible:underline">
+              <Link href="/request-demo" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
                 Request a demo
               </Link>
-              {authenticated ? (
-                <Link
-                  href="/families"
-                  className="text-[#cce7c9] hover:text-white focus-visible:outline-none focus-visible:underline"
-                >
-                  Families
-                </Link>
-              ) : null}
-              <Link
-                href="/privacy"
-                className="text-[#cce7c9] hover:text-white focus-visible:outline-none focus-visible:underline"
-              >
+              <Link href={accountLink.href} className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+                {accountLink.label}
+              </Link>
+            </nav>
+
+            <nav className="grid content-start gap-2 text-sm" aria-label="Legal">
+              <p className="mb-1 font-semibold text-[var(--public-ink)]">Legal</p>
+              <Link href="/privacy" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
                 Privacy Policy
               </Link>
-              <Link
-                href="/terms"
-                className="text-[#cce7c9] hover:text-white focus-visible:outline-none focus-visible:underline"
-              >
+              <Link href="/terms" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
                 Terms of Service
               </Link>
             </nav>
           </div>
-          <p className="mt-8 border-t border-white/15 pt-6 text-xs text-[#acd8a7]">
+
+          <p className="mt-10 border-t border-[var(--public-rule-faint)] pt-6 text-xs text-[var(--public-ink-3)]">
             © {new Date().getFullYear()} CaseLink. Built in collaboration with school case managers.
           </p>
         </div>

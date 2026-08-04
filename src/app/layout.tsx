@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   description:
     "CaseLink helps school case managers turn family needs into structured intervention plans and completed paperwork.",
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-    shortcut: "/favicon.svg",
+    icon: [{ url: "/favicon.svg?v=2", type: "image/svg+xml" }],
+    shortcut: "/favicon.svg?v=2",
   },
 };
 

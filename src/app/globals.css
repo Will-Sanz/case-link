@@ -1,3 +1,4 @@
+@import "@fontsource-variable/newsreader";
 @import "tailwindcss";
 
 /* CaseLink design tokens: calm, legible, and grounded in service work. */
@@ -75,6 +76,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
+
 ::selection {
   background: #cce7c9;
   color: #173a15;
@@ -108,5 +114,200 @@ select {
 
   .hero-reveal-late {
     animation: caselink-reveal 700ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
+/* Hallmark · genre: editorial · macrostructure: narrative-workflow / review-led-product · theme: studied-DNA (source: user-provided option 4) · design-system: DESIGN.md · designed-as-app · nav: N1a · footer: Ft4 · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: text-led process + Lucide functional (30) · mobile: pass (34, 49, 50–57) */
+.public-site,
+.public-auth {
+  --public-paper: #fbfaff;
+  --public-paper-2: #f4f0ff;
+  --public-paper-3: #ebe6fb;
+  --public-paper-hero: #f8f6ff;
+  --public-surface: #fffefe;
+  --public-ink: #102052;
+  --public-ink-hover: #182b67;
+  --public-ink-strong: #303b68;
+  --public-ink-2: #3f496d;
+  --public-ink-muted: #4b557a;
+  --public-ink-3: #626b8b;
+  --public-placeholder: #646d91;
+  --public-ink-on-dark-muted: #d9d5ed;
+  --public-rule: #ded8f4;
+  --public-rule-strong: #c8bee9;
+  --public-rule-soft: #ece8f8;
+  --public-rule-faint: #d3caed;
+  --public-rule-divider: #b7afd8;
+  --public-rule-mark: #8576cf;
+  --public-accent: #4932c6;
+  --public-accent-hover: #3823a7;
+  --public-accent-ink: #fffefe;
+  --public-accent-soft: #eeeaff;
+  --public-accent-rule: #a99ce9;
+  --public-focus: #5c47da;
+  --public-positive: #356a53;
+  --public-positive-bg: #e8f2ec;
+  --public-attention: #75571b;
+  --public-attention-bg: #fff5d9;
+  --public-attention-surface: #fff8e7;
+  --public-attention-rule: #ead6a2;
+  --public-shadow-action: 0 8px 22px rgba(55, 38, 161, 0.2);
+  --public-shadow-surface: 0 20px 54px rgba(31, 25, 86, 0.13);
+  --public-shadow-menu: 0 18px 50px rgba(31, 25, 86, 0.16);
+  --public-shadow-proof: 0 26px 70px rgba(31, 25, 86, 0.16);
+  --public-shadow-decision: 0 24px 60px rgba(31, 25, 86, 0.14);
+  --public-shadow-dark-action: 0 9px 24px rgba(5, 10, 37, 0.22);
+  --public-font-display: "Newsreader Variable", Georgia, serif;
+  --public-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color: var(--public-ink);
+}
+
+.public-site {
+  background: var(--public-paper);
+}
+
+.public-display {
+  font-family: var(--public-font-display);
+  font-weight: 560;
+  letter-spacing: -0.028em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.public-primary-action,
+.public-secondary-action {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  transition: background-color 220ms var(--public-ease-out);
+}
+
+.public-primary-action {
+  background: var(--public-accent);
+  color: var(--public-accent-ink);
+  box-shadow: var(--public-shadow-action);
+}
+
+.public-primary-action:hover {
+  background: var(--public-accent-hover);
+}
+
+.public-secondary-action {
+  color: var(--public-accent);
+}
+
+.public-secondary-action:hover {
+  background: var(--public-accent-soft);
+}
+
+.public-primary-action:active {
+  background: var(--public-accent);
+}
+
+.public-secondary-action:active {
+  background: var(--public-paper-3);
+}
+
+.public-primary-action:disabled,
+.public-secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.public-primary-action:focus-visible,
+.public-secondary-action:focus-visible,
+.public-text-link:focus-visible,
+.public-site summary:focus-visible {
+  outline: 3px solid var(--public-focus);
+  outline-offset: 3px;
+}
+
+.public-text-link {
+  color: var(--public-accent);
+  font-weight: 650;
+  text-decoration-color: var(--public-accent-rule);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+
+.public-text-link:hover {
+  text-decoration-line: underline;
+}
+
+.public-icon-tile {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+  border-radius: 0.75rem;
+  background: var(--public-accent-soft);
+  color: var(--public-accent);
+}
+
+.public-site summary {
+  list-style: none;
+}
+
+.public-site summary::-webkit-details-marker {
+  display: none;
+}
+
+.public-site ::selection,
+.public-auth ::selection {
+  background: var(--public-rule-strong);
+  color: var(--public-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes public-hero-copy-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+      filter: blur(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes public-hero-visual-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(22px) scale(0.985);
+      filter: blur(7px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  .public-hero-copy {
+    animation: public-hero-copy-reveal 760ms var(--public-ease-out) both;
+  }
+
+  .public-hero-visual {
+    animation: public-hero-visual-reveal 820ms 90ms var(--public-ease-out) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-hero-copy,
+  .public-hero-visual {
+    animation: none;
   }
 }

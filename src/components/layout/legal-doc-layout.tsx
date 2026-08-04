@@ -17,23 +17,23 @@ export function LegalDocumentBody({
   return (
     <>
       <section
-        className="border-b border-slate-200 bg-white"
+        className="border-b border-[var(--public-rule)] bg-[var(--public-paper-2)]"
         aria-labelledby="legal-doc-title"
       >
-        <div className="mx-auto max-w-5xl px-4 py-12 sm:py-14 lg:py-16">
+        <div className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-18 lg:py-20">
           <h1
             id="legal-doc-title"
-            className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl"
+            className="public-display text-4xl leading-none text-[var(--public-ink)] sm:text-5xl"
           >
             {title}
           </h1>
-          <p className="mt-3 text-sm text-slate-500 sm:text-base">
+          <p className="mt-4 text-sm text-[var(--public-ink-3)] sm:text-base">
             Last updated: {lastUpdated}
           </p>
         </div>
       </section>
-      <section className="mx-auto w-full max-w-5xl px-4 py-12 sm:py-14 lg:py-16">
-        <div className="w-full space-y-8 text-sm leading-relaxed text-slate-600 sm:space-y-10 sm:text-base">
+      <section className="mx-auto w-full max-w-5xl px-5 py-14 sm:px-8 sm:py-18 lg:py-20">
+        <div className="w-full max-w-[72ch] space-y-10 text-sm leading-7 text-[var(--public-ink-2)] sm:space-y-12 sm:text-base sm:leading-8">
           {children}
         </div>
       </section>
