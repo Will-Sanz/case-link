@@ -14,6 +14,7 @@ import {
   updatePlanStepActionItem,
   type PlanEditConflict,
 } from "@/app/actions/plans";
+import { recordCaseWorkflowEvent } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -380,6 +381,22 @@ export function FamilyPlanPanel({
   );
 
   const actionDraftStorageKey = plan ? localActionDraftKey(plan.id) : null;
+
+  useEffect(() => {
+    if (!plan) return;
+    const events: Array<"plan_viewed" | "first_action_visible"> = ["plan_viewed"];
+    if (plan.steps.length > 0) events.push("first_action_visible");
+    for (const event of events) {
+      const key = `caselink:workflow-event:${event}:${plan.id}:${plan.version}`;
+      try {
+        if (window.sessionStorage.getItem(key)) continue;
+        window.sessionStorage.setItem(key, "1");
+      } catch {
+        // Recording still works when session storage is restricted; this mount sends once.
+      }
+      void recordCaseWorkflowEvent({ familyId, planId: plan.id, event });
+    }
+  }, [familyId, plan]);
 
   useEffect(() => {
     if (!plan || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {

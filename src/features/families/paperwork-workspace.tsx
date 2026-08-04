@@ -21,6 +21,7 @@ import {
   authorizePaperworkDownloadAction,
   mapPdfFieldsAction,
 } from "@/app/actions/paperwork";
+import { recordCaseWorkflowEvent } from "@/app/actions/families";
 import {
   applyPdfMappings,
   applyPdfOverlayMappings,
@@ -145,6 +146,18 @@ export function PaperworkWorkspace({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (!hasReviewedPlan || !planId) return;
+    const key = `caselink:workflow-event:paperwork_viewed:${planId}`;
+    try {
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, "1");
+    } catch {
+      // Recording still works when session storage is restricted; this mount sends once.
+    }
+    void recordCaseWorkflowEvent({ familyId, planId, event: "paperwork_viewed" });
+  }, [familyId, hasReviewedPlan, planId]);
 
   const refreshDraftAgainstPlan = useCallback(
     async (draft: LocalPaperworkDraft, bytes: Uint8Array) => {

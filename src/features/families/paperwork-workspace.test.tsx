@@ -11,6 +11,10 @@ vi.mock("@/app/actions/paperwork", () => ({
   mapPdfFieldsAction: vi.fn(),
 }));
 
+vi.mock("@/app/actions/families", () => ({
+  recordCaseWorkflowEvent: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 vi.mock("@/lib/paperwork/local-paperwork-draft", () => ({
   deleteLocalPaperworkDraft: vi.fn().mockResolvedValue(undefined),
   loadLocalPaperworkDraft: vi.fn(),

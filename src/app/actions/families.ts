@@ -24,6 +24,52 @@ export type ActionResult =
   | { ok: true; familyId?: string }
   | { ok: false; error: string };
 
+const workflowEventSchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+  event: z.enum(["plan_viewed", "first_action_visible", "paperwork_viewed"]),
+});
+
+/** Privacy-safe product telemetry. No family label, narrative, plan prose, or form value is accepted. */
+export async function recordCaseWorkflowEvent(input: unknown): Promise<ActionResult> {
+  const parsed = workflowEventSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid workflow event" };
+
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("id, version")
+    .eq("id", parsed.data.planId)
+    .eq("family_id", parsed.data.familyId)
+    .maybeSingle();
+  if (!plan) return { ok: false, error: "Family workflow not found" };
+
+  const action =
+    parsed.data.event === "first_action_visible"
+      ? "plan.first_action_visible"
+      : "family.workflow_step_viewed";
+  const workflowStep = parsed.data.event === "paperwork_viewed" ? "paperwork" : "plan";
+  await supabase.from("activity_log").insert({
+    family_id: parsed.data.familyId,
+    actor_user_id: user.id,
+    action,
+    entity_type: "plan",
+    entity_id: plan.id,
+    details: {
+      plan_version: plan.version,
+      ...(action === "family.workflow_step_viewed" ? { workflow_step: workflowStep } : {}),
+    },
+  });
+  return { ok: true };
+}
+
 function privacyError(fields: PrivacyFieldInput[]): ActionResult | null {
   const result = validateNoPii(fields);
   return result.ok ? null : { ok: false, error: result.error ?? "Remove identifying text." };

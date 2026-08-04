@@ -22,6 +22,10 @@ vi.mock("@/app/actions/plans", () => ({
   updatePlanStepActionItem: vi.fn(),
 }));
 
+vi.mock("@/app/actions/families", () => ({
+  recordCaseWorkflowEvent: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 const plan: PlanWithSteps = {
   id: "10000000-0000-4000-8000-000000000001",
   family_id: "20000000-0000-4000-8000-000000000002",
