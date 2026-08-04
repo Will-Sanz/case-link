@@ -1,11 +1,11 @@
-# CaseLink Adaptive Intervention Planning
+# CaseLink Structured Intervention Planning and Agentic Paperwork
 
 ## Product requirements document
 
 **Status:** Production-ready product baseline
-**Date:** August 2, 2026  
+**Date:** August 3, 2026
 **Owner:** CaseLink  
-**Scope:** The family-context → intervention-plan → resource-guidance experience  
+**Scope:** The family-context → dated intervention-plan → agentic-paperwork experience
 **Primary user:** A school case manager supporting individual families  
 **Related product principle:** Perfect the family intake → barriers → intervention plan → paperwork workflow before expanding into broader school operations.
 
@@ -13,9 +13,9 @@
 
 ## 1. Executive decision
 
-CaseLink should stop treating the intervention plan as a long AI-generated document divided into fixed 30-, 60-, and 90-day sections. The product should become an **adaptive action-planning workspace** that helps a case manager decide what to do next, find credible services, prepare for outreach, record what happened, and update only the affected parts of the plan.
+CaseLink should stop treating the intervention plan as a long AI-generated document divided into fixed 30-, 60-, and 90-day sections. The product should become a **structured goal-and-date planning workspace** that helps a case manager decide what to do, when to do it, find credible services, prepare for outreach, record what happened, and update only the affected parts of the plan.
 
-The plan is not the AI's recommendation to a family. It is a **case-manager-reviewed working draft** built from the family's stated goals, strengths, barriers, current circumstances, the case manager's professional judgment, and verified resource data. The first useful view should be a short set of prioritized actions. Supporting details—documents, contacts, scripts, eligibility notes, rationale, and fallbacks—should be available exactly where they are needed without turning every step into a wall of prose.
+The plan is not the AI's recommendation to a family. It is a **case-manager-reviewed working draft** built from the family's stated goals, strengths, barriers, current circumstances, the case manager's professional judgment, and verified resource data. The first useful view should show clear goals and the earliest target dates. Supporting details—documents, contacts, scripts, eligibility notes, rationale, and fallbacks—should be available exactly where they are needed without turning every step into a wall of prose.
 
 The core product promise is:
 
@@ -189,7 +189,7 @@ The family is not a direct CaseLink user in V1, but the plan must preserve their
 ## 6. Product principles for this experience
 
 1. **The next action comes first.** Do not make a case manager read a report to discover what to do.
-2. **Adaptive time, not arbitrary buckets.** Operational actions use real dates or meaningful windows such as Today, This week, Waiting, and Later. If a required form needs 30/60/90 language, transform the approved plan at export time.
+2. **Goals and dates provide the structure.** Organize the plan by reviewed goal and give every action a concrete target date. Status describes progress; it does not determine where the action lives. If a required form needs 30/60/90 language, transform the approved dated plan at export time.
 3. **Facts and suggestions look different.** User-provided facts, directory facts, AI inferences, and missing information must be visibly distinguishable.
 4. **Ask only high-value questions.** Clarify missing information only when it could materially change safety, priority, eligibility, or the next action.
 5. **The plan is shared work.** Reflect family voice and case-manager judgment; avoid commands that imply the family has no choice.
@@ -234,10 +234,9 @@ The case manager reaches the plan from a family workspace after recording barrie
 The minimum responsible starting context is:
 
 - a non-identifying family case label;
-- at least one case-manager-selected barrier or contributing factor;
-- a short description of the current situation in the case manager's own words.
+- one or more case-manager-selected barriers or contributing factors.
 
-Goals, strengths, constraints, prior attempts, deadlines, and supporting notes improve the plan but are not gates unless a configured safety or form requirement makes them necessary. The screen should allow a case manager to select familiar factors from the school-form taxonomy, add Other in their own words, and paste de-identified notes without forcing those notes into many fields. CaseLink may suggest structured fields from those notes, but nothing becomes case context until the case manager reviews it.
+A short description of the current situation is optional. Goals, strengths, constraints, prior attempts, deadlines, and supporting notes improve the plan but are not gates unless a configured safety or form requirement makes them necessary. The screen should allow a case manager to select multiple familiar factors from the school-form taxonomy, add Other in their own words, and optionally paste de-identified notes without forcing those notes into many fields. CaseLink may suggest structured fields from those notes, but nothing becomes case context until the case manager reviews it.
 
 The screen first shows a compact **Planning context** summary:
 
@@ -278,9 +277,9 @@ After the case manager selects **Draft action plan**, the UI displays actual pip
 
 The first actionable section should appear as soon as it is valid. Resource matching and lower-priority planning may continue in parallel. The interface must not display fake progress percentages.
 
-### 7.4 Default plan view: a prioritized action workspace
+### 7.4 Default plan view: a structured, dated service plan
 
-The default view is not a document. It is a short operational list.
+The default view is not a long document and is not divided into Do next, Upcoming, Waiting, and Later buckets. It is a service plan organized by goals, with concrete actions ordered by target date.
 
 #### Plan header
 
@@ -288,18 +287,21 @@ The default view is not a document. It is a short operational list.
 - family-stated goals represented in the plan;
 - plan state: Draft, Reviewed, or Needs attention;
 - last updated and who last edited it;
-- count of open actions and blocked actions;
+- count of open actions, overdue actions, and goals;
 - actions: Review plan, Add action, Prepare paperwork.
 
-#### Action groups
+#### Goal sections
 
-- **Do next** — the one to three highest-value actions that can begin now;
-- **Upcoming** — actions with a future date or a dependency that is expected to clear;
-- **Waiting or blocked** — actions waiting on a callback, document, decision, or other condition;
-- **Later** — valid longer-term actions that should not distract from current work;
-- **Completed** — collapsed by default.
+Each goal section contains:
 
-These are display states derived from priority, dates, dependencies, and status. They are not permanent AI-authored phases.
+- the contributing barrier or factor;
+- a concise, observable goal statement;
+- the expected result;
+- a progress summary;
+- actions ordered by target date, earliest first;
+- completed actions, visually secondary but available in context.
+
+A compact **Next due** summary at the top may show the nearest three open target dates across all goals. It is a shortcut into the same goal-based plan, not a separate planning structure.
 
 #### Compact action card
 
@@ -307,7 +309,7 @@ Every action card shows, without expansion:
 
 - a specific action title beginning with a verb;
 - who is responsible: Case manager, Family, Program, or Shared;
-- target date or meaningful time window;
+- an exact target date;
 - status and priority;
 - the immediate next task;
 - a short expected result;
@@ -327,6 +329,15 @@ Expanded content may show:
 - provenance for important facts.
 
 Long narrative paragraphs are not the primary representation of a step.
+
+Date requirements:
+
+- CaseLink proposes a target date for every drafted action using supplied deadlines, dependencies, urgency, resource requirements, and the plan start date.
+- A proposed date is visibly a suggestion until the case manager reviews it.
+- The case manager can edit every date directly during review.
+- Every reviewed open action must have an exact target date.
+- Waiting or blocked actions retain a target date representing the next follow-up or review, so they do not disappear indefinitely.
+- A target date structures work; it never represents a guaranteed family or service outcome.
 
 ### 7.5 Review and approval
 
@@ -389,15 +400,29 @@ Only reviewed plan fields become the primary source for paperwork mapping. Each 
 - a verified resource record;
 - an explicit model-written narrative reviewed by the case manager.
 
-The operational plan remains adaptive while a versioned, form-specific formatter maps actions into whatever time-horizon or section structure the required form expects. The first observed school form uses contributing factors, goals, case-worker objectives, client objectives, progress, and dates—not 30/60/90 phases.
+The operational plan remains goal-based and date-driven while a versioned, form-specific formatter maps actions into whatever time-horizon or section structure the required form expects. The first observed school form uses contributing factors, goals, case-worker objectives, client objectives, progress, and dates—not 30/60/90 phases.
+
+Paperwork preparation is part of the Core release, not an optional follow-on. The user uploads a clean blank PDF, and a document agent:
+
+1. identifies pages, labels, native fields, writing areas, checkboxes, tables, and repeated sections;
+2. proposes a structured field map between the form and reviewed CaseLink context, goals, actions, dates, and outcomes;
+3. populates only mappings that meet the configured confidence and safety rules;
+4. marks ambiguous, unsupported, or missing values for human attention;
+5. renders a reviewable draft while preserving the original blank form;
+6. produces a completed PDF only after field-by-field human review.
+
+Known, versioned templates provide the most reliable path. Previously unseen forms may use agentic form analysis, but CaseLink must not promise that every PDF can be completed automatically. When a form cannot be mapped safely, the user keeps all detected fields and reviewed work, can enter or map remaining values manually, and receives a specific explanation rather than a failed blank screen.
 
 Paperwork preparation must therefore:
 
+- accept clean blank PDFs only while the no-PII policy is active and warn against uploading completed or signed forms;
 - show the destination field beside its proposed source and allow edit, accept, reject, or leave blank;
 - treat family/client objectives as explicit commitments that require case-manager confirmation;
 - keep identity and signature fields blank and manual under the current no-identifiable-information policy;
 - distinguish native fillable fields from scanned forms that require a reviewed template map;
+- show the original page beside or directly behind the mapped review values so placement can be visually checked;
 - preserve the final case-manager-edited value separately from the source suggestion;
+- rerun only affected mappings when reviewed plan content changes and mark the prior paperwork fields Out of date;
 - never imply that preparing or downloading a form submits it to an external system.
 
 ### 7.9 Critical path and screen contract
@@ -574,15 +599,23 @@ The durable plan should separate goals, actions, tasks, resources, and evidence.
 Plan
 ├── objective
 ├── family_stated_goals[]
+├── goals[]
+│   ├── contributing_factor_ids[]
+│   ├── statement
+│   ├── expected_result
+│   └── progress_summary
 ├── assumptions_or_unknowns[]
 ├── review_state
 └── actions[]
+    ├── goal_id
     ├── title
     ├── rationale
     ├── owner
     ├── priority
     ├── status
-    ├── start_after / target_date / time_window
+    ├── target_date
+    ├── target_date_source
+    ├── target_date_review_state
     ├── dependencies[]
     ├── tasks[]
     ├── required_documents[]
@@ -600,12 +633,14 @@ Required semantic checks:
 - one primary objective per action;
 - a concrete next task for every open action;
 - a named owner or Shared;
+- a goal association and exact target date for every reviewed open action;
 - no circular dependencies;
 - no duplicate actions with the same intent and outcome;
 - no resource fact without a resource-record field or approved external source;
 - no guaranteed outcome language;
 - no invented deadline, eligibility determination, or family preference;
-- exact dates only when supplied, calculated from an approved rule, or confirmed by the case manager.
+- AI-proposed target dates remain Suggested until confirmed or edited by the case manager;
+- a target date cannot be described as a guaranteed completion or outcome date.
 
 ### 9.3 Model routing
 
@@ -884,11 +919,11 @@ This section translates the product experience into implementation boundaries. I
 | CW-07 | Core | As a case manager, I can update an action after outreach without regenerating the whole plan. | Status, outcome, note, and follow-up date save independently |
 | CW-08 | Next | As a case manager, I can find a credible resource and see what I still need to verify before contacting it. | Resource facts show provenance/freshness and never contain model-invented operational data |
 | CW-09 | Next | As a case manager, I can request a focused rewrite or fallback without losing my edits. | Proposed patch is scoped, diffed, and applied only after review |
-| CW-10 | Next | As a case manager, I can map reviewed plan content into a supported form without retyping it. | Every proposed form value has a source, review state, and editable final value |
-| CW-11 | Next | As a case manager, I can download the prepared form knowing it has not been submitted anywhere. | Download completes; handoff copy explicitly states manual upload remains |
+| CW-10 | Core | As a case manager, I can upload a clean blank PDF and have CaseLink propose mappings from reviewed plan content without retyping it. | Detected and proposed fields remain editable, uncertain fields require attention, and the original blank is preserved |
+| CW-11 | Core | As a case manager, I can review and download the prepared form knowing it has not been submitted anywhere. | Every mapped value has a source and review state; download completes and handoff copy explicitly states manual upload remains |
 | CW-12 | Later | As a supervisor, I can review a plan and leave guidance within my permission scope. | Supervisor capability ships only after role and district-review discovery |
 
-Core is the smallest production slice. Next deepens the time-saving workflow once reliable resource data and a validated blank form are available. Later is not authorized for implementation by this PRD.
+Core is the smallest production slice and includes the complete family → dated plan → reviewed paperwork → download workflow. The first release may support a bounded set of PDF structures and one validated school template, but it must include the agentic upload-and-review path rather than treating paperwork as a future add-on. Next deepens resource intelligence and focused replanning. Later is not authorized for implementation by this PRD.
 
 ### 15.2 Durable records
 
@@ -900,7 +935,7 @@ The implementation may use normalized tables or versioned structured documents, 
 | Context item | Type, value, provenance, human-review state, created/updated author, sensitivity flag |
 | Barrier or contributing factor | Taxonomy ID or Other text, source, selected state, notes, review state |
 | Plan version | ID, family ID, schema version, objective, review state, parent version, created by, timestamps |
-| Action | ID, plan version, title, owner, priority, status, next task, timing, expected result, order, human-edit state |
+| Action | ID, plan version, goal ID, title, owner, priority, status, next task, target date, date source/review state, expected result, order, human-edit state |
 | Action detail | Tasks, documents, dependencies, blockers, fallbacks, progress signal, outcome note, provenance |
 | Resource link | Action ID, resource-record version, match reason, verification state, case-manager disposition |
 | Generation job | ID, family/plan scope, job type, idempotency key, stage, status, progress timestamps, safe error category, result version |
@@ -955,16 +990,16 @@ Analytics must not include raw family narrative, copied notes, generated plan pr
 
 | Layer | Required coverage before Core release |
 | --- | --- |
-| Unit | Workflow-state derivation, action grouping, schema validation, provenance rules, date handling, stale-version rejection, no-PII checks |
-| Database | Row-level access, cross-organization denial, immutable reviewed versions, template/version pinning, archive behavior |
-| Integration | Create/resume family, autosave recovery, durable job lifecycle, partial generation, resource failure isolation, protected human edits |
-| End to end | First-use happy path, returning-user resume, refresh during generation, expired session with unsaved text, review and action update |
+| Unit | Workflow-state derivation, goal/action ordering, required target dates, schema validation, provenance rules, date handling, field-map rules, stale-version rejection, no-PII checks |
+| Database | Row-level access, cross-organization denial, immutable reviewed versions, template/version pinning, paperwork out-of-date behavior, archive behavior |
+| Integration | Create/resume family, autosave recovery, durable job lifecycle, partial generation, resource failure isolation, protected human edits, PDF inspection/mapping/rendering |
+| End to end | First-use happy path through downloaded PDF, returning-user resume, refresh during generation, expired session with unsaved text, review and action update |
 | Accessibility | Keyboard-only critical path, focus restoration, semantic headings, live progress announcements, error association, 200% zoom, contrast |
-| Adversarial input | Empty and very long text, special characters, duplicate clicks, outdated tab, malformed model output, unsupported PDF, oversized allowed upload |
+| Adversarial input | Empty and very long text, special characters, duplicate clicks, outdated tab, malformed model output, unsupported/encrypted/rotated/scanned PDF, oversized allowed upload |
 | AI evaluation | Safety, grounding, actionability, reading effort, family voice, resource-fact precision, edit preservation, latency |
-| Visual regression | Families empty/list states, context form, partial plan, review mode, each error state, laptop and narrow viewport |
+| Visual regression | Families empty/list states, context form, dated goal plan, partial plan, review mode, PDF field review/render, each error state, laptop and narrow viewport |
 
-Test fixtures must be synthetic and de-identified. At minimum, UI fixtures cover zero, one, ten, and one hundred families; zero and many barriers; a 2,000-character allowed note; long resource names; missing optional fields; and each job terminal state.
+Test fixtures must be synthetic and de-identified. At minimum, UI fixtures cover zero, one, ten, and one hundred families; one and many barriers; missing and 2,000-character optional descriptions; long resource names; every job terminal state; and fillable, scanned, rotated, multi-page, partially detected, unsupported, and password-protected blank PDFs. Paperwork tests must compare both extracted values and rendered page placement so a technically populated but visually unusable PDF cannot pass.
 
 ### 15.6 Definition of done
 
@@ -1005,27 +1040,59 @@ Exit criteria:
 - baseline latency and plan-quality metrics exist;
 - current high-risk failure modes have automated tests.
 
-### Phase 1 — Adaptive action plan
+### Phase 1 — Structured, dated service plan
 
-**Goal:** Replace fixed operational phases with a structured, prioritized working plan.
+**Goal:** Replace fixed 30/60/90 output with a goal-based working plan whose actions have reviewed target dates.
 
 Requirements:
 
-- new action schema with owners, dates/windows, dependencies, progress signals, and provenance;
-- Do next, Upcoming, Waiting/blocked, Later, and Completed views;
+- new goal and action schema with owners, exact target dates, dependencies, progress signals, and provenance;
+- goal sections with chronologically ordered actions and a compact Next due summary;
 - zero-to-three clarification flow;
 - streamed or progressively persisted draft;
-- guided review and approval;
+- guided review including confirmation or editing of every proposed target date;
 - selective replanning with a change summary;
 - compatibility formatters for existing 30/60/90 outputs and factor-based service-plan forms during migration.
 
 Exit criteria:
 
-- a case manager can draft, review, execute, and update a plan without reading or regenerating a long document;
+- a case manager can draft, review, execute, and update a dated plan without reading or regenerating a long document;
+- every reviewed open action belongs to a goal and has an exact target date;
 - existing approved plans remain readable and exportable;
 - the plan meets the latency and eval floors.
 
-### Phase 2 — Trusted resource layer
+### Phase 2 — Agentic paperwork handoff
+
+**Goal:** Make blank-form upload, agent-assisted mapping, human review, and PDF download part of the Core product.
+
+Requirements:
+
+- clean blank PDF upload with no-PII guidance;
+- native-field and scanned-layout inspection;
+- agentic detection of labels, controls, writing regions, tables, and repeated sections;
+- field-level provenance from plan to PDF;
+- attention state for uncertain or missing fields;
+- revalidation warning when the plan changes after paperwork preparation;
+- district/form-specific formatting separated from the operational plan model;
+- a versioned field map for each supported form, including source field, transformation, destination, required review, and blank-field behavior;
+- a reviewed template-authoring path for known scanned forms using fixed field coordinates;
+- a bounded agentic mapping path for previously unseen forms with manual completion when confidence is insufficient;
+- OCR limited to assisting label and layout discovery, never final approval;
+- explicit mapping for contributing factor, goal, case-worker objectives, client objectives, progress status, and date for the first observed school form;
+- identity and signature fields left blank while CaseLink remains de-identified, with signatures always completed outside AI generation;
+- automated tests over fillable, scanned, rotated, multi-page, partially detected, unsupported, and password-protected PDFs;
+- end-to-end measurement of time saved.
+
+Exit criteria:
+
+- a case manager can move from reviewed plan to reviewed PDF without retyping approved content;
+- the first factor-based form mapping can be previewed and reviewed without implying that the supplied annotated scan is a production template;
+- an unseen but supported blank PDF either produces a reviewable mapping or a specific, recoverable manual-mapping state;
+- no form field implies automatic submission;
+- all generated entries remain editable and traceable;
+- rendered placement and extracted-value tests pass for the supported PDF fixture set.
+
+### Phase 3 — Trusted resource layer
 
 **Goal:** Make resource guidance a defensible product capability.
 
@@ -1044,31 +1111,6 @@ Exit criteria:
 - stale and incomplete records are labeled;
 - resource usefulness and incorrect-data rates are measurable;
 - the product can operate in a new district without code-level category rewrites.
-
-### Phase 3 — Plan-to-paperwork handoff
-
-**Goal:** Make the reviewed plan the dependable source for required forms.
-
-Requirements:
-
-- field-level provenance from plan to PDF;
-- attention state for uncertain or missing fields;
-- revalidation warning when the plan changes after paperwork preparation;
-- district/form-specific formatting separated from the operational plan model;
-- a versioned field map for each supported form, including source field, transformation, destination, required review, and blank-field behavior;
-- detection of native fillable PDF fields versus scanned-image forms;
-- a reviewed template-authoring path for scanned forms, using a clean blank form and fixed field coordinates rather than an unconstrained generation step;
-- OCR limited to assisting label and layout discovery, with a human-approved map before production use;
-- explicit mapping for contributing factor, goal, case-worker objectives, client objectives, progress status, and date for the first observed school form;
-- identity and signature fields left blank while CaseLink remains de-identified, with signatures always completed outside AI generation;
-- end-to-end measurement of time saved.
-
-Exit criteria:
-
-- a case manager can move from reviewed plan to reviewed PDF without retyping approved content;
-- the first factor-based form mapping can be previewed and reviewed without implying that the supplied annotated scan is a production template;
-- no form field implies automatic submission;
-- all generated entries remain editable and traceable.
 
 ### Phase 4 — Pilot learning and governance
 
@@ -1093,12 +1135,12 @@ Exit criteria:
 
 ## 17. Detailed acceptance criteria for the first production slice
 
-The first production slice is Phase 0 plus the Core stories in Section 15. The criteria below are cumulative; all must pass.
+The first production slice includes Phases 0–2 and every Core story in Section 15. Paperwork is part of the release gate. The criteria below are cumulative; all must pass.
 
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
 | AC-01 | A first-time invited case manager with no families | They sign in | Families shows one explanation, one Add your first family action, and no required setup or dashboard |
-| AC-02 | A valid non-identifying case label, one barrier, and a short description | They add a family and refresh | One family exists, all entered context remains, and the next step is Draft plan |
+| AC-02 | A valid non-identifying case label and one or more selected barriers, with no description | They add a family and refresh | One family exists, all selected barriers remain, and the next step is Draft plan |
 | AC-03 | A likely identifying value while the no-PII policy is active | They attempt to save or send it for AI processing | The exact likely identifier is flagged in place, other work remains, saving/provider processing is blocked, and no disallowed value is persisted or transmitted |
 | AC-04 | An existing unfinished family | They return to Families | The correct next-step label is visible and opens the exact valid workflow state in one click |
 | AC-05 | Sufficient saved context | They open the planning context | The summary contains only saved human-provided or human-approved information and can be corrected before drafting |
@@ -1107,18 +1149,22 @@ The first production slice is Phase 0 plus the Core stories in Section 15. The c
 | AC-08 | A generation job is running | They refresh, close, or navigate away and later return | The same job and validated partial results resume without starting over |
 | AC-09 | Resource matching fails while planning succeeds | The first actions validate | The actions remain visible, resources show a specific retry state, and no blank panel or whole-page error replaces the plan |
 | AC-10 | A partially valid generation result | A later stage cannot finish | Validated actions persist, the plan is Partly ready, and Continue draft retries only unfinished work |
-| AC-11 | A complete draft | The plan first renders | No more than three Do next actions appear; every open action has a title, next task, owner, timing, expected result, and status |
+| AC-11 | A complete draft | The plan first renders | Actions are grouped by goal and ordered by exact target date; every open action has a title, next task, owner, target date, expected result, and status |
 | AC-12 | A draft plan | The case manager edits, rejects, reorders, adds, and reviews actions | Every decision persists with actor and version; the plan becomes Reviewed only after the explicit Finish review action |
 | AC-13 | Reviewed text owned by the case manager | They request a focused AI change | A before/after patch appears and no reviewed value changes until they apply it |
-| AC-14 | A reviewed action | The case manager records Started, Waiting, Completed, or No longer needed | The selected action updates without whole-plan regeneration and dependent changes remain proposed until reviewed |
+| AC-14 | A reviewed action | The case manager records Started, Waiting, Completed, or No longer needed | The selected action updates without whole-plan regeneration; Waiting retains a next follow-up date and dependent changes remain proposed until reviewed |
 | AC-15 | An expired session during an unsaved edit | The case manager signs in again | The local edit is restored and can be saved without retyping |
 | AC-16 | Two tabs edit the same reviewed field | The older tab attempts to save | Neither value is silently overwritten; the user receives a comparison and resolution choice |
 | AC-17 | A keyboard or screen-reader user | They complete the Core critical path | Every operation is reachable, focus is managed, progress is announced, and errors are associated with their controls |
 | AC-18 | Production analytics enabled | The workflow completes or fails | Required timing/state events exist without raw case narrative, plan prose, form values, or identifying filenames |
 | AC-19 | An authenticated user outside the family record's permitted scope | They request it by URL or mutation | The server and database deny access without revealing whether the record exists |
 | AC-20 | The release candidate | CI and the evaluation suite run | Contract tests pass, safety/grounding blockers are zero, latency targets are met, and representative case-manager review is recorded |
-
-Next-release paperwork acceptance additionally requires a validated clean blank, approved template version, field-level provenance, editable mappings, out-of-date detection, explicit manual-upload language, and successful download without external submission.
+| AC-21 | A clean supported fillable or scanned PDF | The case manager uploads it | CaseLink preserves the original, detects its structure, and produces proposed fields or a specific manual-mapping state |
+| AC-22 | A proposed paperwork mapping | The case manager reviews it | Every value shows its source and review state and can be accepted, edited, rejected, or left blank |
+| AC-23 | A form field with missing or ambiguous source data | Agentic mapping runs | The field remains blank or Needs attention; the agent does not invent a value |
+| AC-24 | Reviewed paperwork with no unresolved required fields | The case manager downloads it | The resulting PDF contains the reviewed values in usable visual positions and the UI states that no external submission occurred |
+| AC-25 | A source plan changes after paperwork preparation | The case manager reopens the draft | Only affected mapped fields are Out of date and can be regenerated without losing unrelated manual edits |
+| AC-26 | The supported PDF fixture suite | CI prepares and renders every fixture | Expected extracted values, page count, rotation, field placement, failure state, and downloadable-file integrity all pass |
 
 ---
 
@@ -1128,7 +1174,7 @@ Next-release paperwork acceptance additionally requires a validated clean blank,
 
 - Keep existing plans readable.
 - Introduce a versioned plan schema rather than rewriting old JSON in place.
-- Map legacy 30/60/90 steps to actions with derived display groups.
+- Map legacy 30/60/90 steps to reviewed goals and actions with proposed target dates.
 - Preserve original phase as import metadata for export compatibility.
 - Keep human edits and status history.
 
@@ -1161,7 +1207,7 @@ For the first school form, legacy phases should migrate into adaptable actions b
 | Replanning overwrites professional judgment | Field ownership, protected edits, diff review, patch-based updates |
 | The product drifts into automated decision-making | Explicit non-goals, permission boundaries, human approval, NIST-aligned review |
 | Pilot data expands beyond the current privacy posture | Keep de-identified MVP; separate approval gate before PII |
-| Fixed form requirements pull the UI toward one form's timeline or headings | Versioned compatibility formatters at export, adaptive operational model internally |
+| Fixed form requirements pull the UI toward one form's timeline or headings | Versioned compatibility formatters at export, goal-and-date operational model internally |
 | A scanned or outdated form is treated as a production template | Require a clean blank, confirm purpose/version/required fields, and approve a deterministic template map |
 | Family responsibilities are inferred from AI-written text | Explicit owner, case-manager confirmation, and blank-by-default client-objective fields |
 | Resource feedback encodes bias | Treat outcomes as data-quality signals; require review before global ranking changes |
@@ -1198,4 +1244,4 @@ This direction keeps CaseLink's scope narrow while making the core substantially
 
 The most important product change is not adopting a newer model. It is designing a trustworthy system in which current models can do focused reasoning, retrieval, drafting, and replanning while the case manager retains control and the resource facts remain verifiable.
 
-The first implementation priority should therefore be: **make resources and failures visible, measure the current latency and quality, then replace the 30/60/90 document with an adaptive action plan while preserving compatibility through form-specific exports—including the first factor-based service-plan mapping once the school supplies and validates a clean blank.**
+The first implementation priority should therefore be: **make resources and failures visible, measure current latency and quality, replace the 30/60/90 document with a goal-based plan containing reviewed target dates, and complete the Core loop with agentic blank-PDF mapping, human review, and download. The first known school form becomes a validated template once the school supplies a clean blank; supported unseen forms use the bounded agentic mapping path.**
