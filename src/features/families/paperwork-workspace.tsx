@@ -1,17 +1,17 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, Page as FileText } from "iconoir-react";
+import { ArrowRight, Page as FileText } from "iconoir-react";
 
 export function PaperworkWorkspace({
   familyId,
   familyName,
   hasReviewedPlan,
-  planDownload,
+  planReview,
 }: {
   familyId: string;
   familyName: string;
   hasReviewedPlan: boolean;
-  planDownload?: ReactNode;
+  planReview?: ReactNode;
 }) {
   if (!hasReviewedPlan) {
     return (
@@ -24,7 +24,7 @@ export function PaperworkWorkspace({
         </h1>
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[var(--color-ink-muted)]">
           Check each goal, action, and target date, then mark the plan reviewed before
-          downloading it as a PDF.
+          opening its PDF.
         </p>
         <Link
           href={`/families/${familyId}/plan`}
@@ -37,37 +37,19 @@ export function PaperworkWorkspace({
   }
 
   return (
-    <div className="space-y-6">
-      <header className="border-b border-[var(--color-rule)] pb-6">
+    <div className="space-y-5">
+      <header className="border-b border-[var(--color-rule)] pb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-faint)]">
-          PDF export
+          {familyName}
         </p>
         <h1 className="workspace-display mt-2 text-2xl text-[var(--color-ink)]">
-          {familyName}
+          Review PDF
         </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-ink-muted)]">
+          CaseLink generates this document automatically from the reviewed plan. Check the PDF below, then download it when ready.
+        </p>
       </header>
-
-      <section
-        className="grid gap-6 rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] px-5 py-7 [box-shadow:var(--shadow-surface)] sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
-        aria-labelledby="download-plan-heading"
-      >
-        <div className="flex gap-4">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-            <Download className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h2 id="download-plan-heading" className="text-lg font-semibold text-[var(--color-ink)]">
-              Download the reviewed plan
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-ink-muted)]">
-              Create a professional black-and-white PDF containing the reviewed goals,
-              actions, owners, and target dates. CaseLink does not submit the file to another
-              system.
-            </p>
-          </div>
-        </div>
-        <div className="w-full sm:w-auto lg:justify-self-end">{planDownload}</div>
-      </section>
+      {planReview}
     </div>
   );
 }

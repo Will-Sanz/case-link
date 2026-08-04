@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Product",
-  description: "See how CaseLink helps school case managers move from family context to a reviewed intervention plan and professional PDF export.",
+  description: "See how CaseLink guides school case managers from family intake and barriers through a reviewed intervention plan and finished PDF.",
 };
 
 export default async function ProductPage() {

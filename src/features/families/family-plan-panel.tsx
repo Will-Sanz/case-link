@@ -1416,7 +1416,7 @@ export function FamilyPlanPanel({
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="plan-review-heading" className="text-sm font-semibold text-[var(--color-ink)]">
                 {reviewStatus.state === "reviewed"
-                  ? "Plan ready to download"
+                  ? "Plan ready for PDF review"
                   : reviewStatus.state === "needs_review"
                     ? "Check and approve this plan"
                     : reviewStatus.state === "needs_attention"
@@ -1447,7 +1447,7 @@ export function FamilyPlanPanel({
               href={`/families/${familyId}/paperwork`}
               className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-focus)]/25"
             >
-              Download plan PDF
+              Review PDF
             </Link>
           ) : reviewStatus.state === "needs_review" ? (
             <Button

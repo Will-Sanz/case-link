@@ -9,7 +9,7 @@ export default function ResetPasswordPage() {
       title="CaseLink"
       subtitle="Set a new password to secure your account."
     >
-      <h2 className="text-base font-semibold text-slate-900">Reset password</h2>
+      <h2 className="text-base font-semibold text-[var(--public-ink)]">Reset password</h2>
       <div className="mt-5">
         <ResetPasswordForm />
       </div>

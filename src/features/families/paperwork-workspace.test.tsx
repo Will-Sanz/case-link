@@ -5,21 +5,20 @@ import { describe, expect, it } from "vitest";
 import { PaperworkWorkspace } from "@/features/families/paperwork-workspace";
 
 describe("PaperworkWorkspace", () => {
-  it("offers only the reviewed plan PDF download", () => {
+  it("opens the reviewed plan PDF for review", () => {
     render(
       <PaperworkWorkspace
         familyId="20000000-0000-4000-8000-000000000002"
         familyName="Family 014"
         hasReviewedPlan
-        planDownload={<button type="button">Download plan PDF</button>}
+        planReview={<div aria-label="Reviewed plan PDF">PDF preview</div>}
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Download the reviewed plan" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Download plan PDF" })).toBeTruthy();
-    expect(screen.getByText(/black-and-white PDF/i)).toBeTruthy();
-    expect(screen.queryByText(/upload/i)).toBeNull();
-    expect(screen.queryByLabelText(/PDF file/i)).toBeNull();
+    expect(screen.getByRole("heading", { name: "Review PDF" })).toBeTruthy();
+    expect(screen.getByLabelText("Reviewed plan PDF")).toBeTruthy();
+    expect(screen.getByText(/generates this document automatically/i)).toBeTruthy();
+    expect(screen.queryByText(/Download the reviewed plan/i)).toBeNull();
   });
 
   it("sends an unreviewed plan back for review", () => {

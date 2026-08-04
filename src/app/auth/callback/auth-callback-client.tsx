@@ -144,7 +144,7 @@ export function AuthCallbackClient() {
   }, [router, searchParams]);
 
   return (
-    <p className="text-center text-sm text-slate-600" role="status">
+    <p className="text-center text-sm text-[var(--public-ink-muted)]" role="status">
       {status}
     </p>
   );

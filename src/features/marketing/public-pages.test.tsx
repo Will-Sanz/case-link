@@ -19,7 +19,7 @@ describe("public site content contract", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Turn family needs into clear plans and ready-to-use PDFs.",
+        name: "Helping school case managers turn complex family needs into clear next steps.",
       }),
     ).toBeTruthy();
     expect(
@@ -40,7 +40,7 @@ describe("public site content contract", () => {
     expect(workflow).toBeTruthy();
     expect(workflow?.querySelectorAll("svg")).toHaveLength(0);
 
-    expect(screen.getByRole("link", { name: "Learn More" }).getAttribute("href")).toBe("/product");
+    expect(screen.getByRole("link", { name: "See how it works" }).getAttribute("href")).toBe("/product");
     expect(screen.getByRole("link", { name: "Request a Demo" }).getAttribute("href")).toBe("/request-demo");
 
     const primaryNavigation = screen.getByRole("navigation", { name: "Primary" });
@@ -76,7 +76,7 @@ describe("public site content contract", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "A review process, not a black box.",
+        name: "One guided workflow, from intake to PDF.",
       }),
     ).toBeTruthy();
     expect(screen.queryByText("What CaseLink offers")).toBeNull();

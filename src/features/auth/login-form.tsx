@@ -117,11 +117,11 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <p className="text-center text-[11px] leading-relaxed text-slate-500">
+      <p className="text-center text-[11px] leading-relaxed text-[var(--public-ink-3)]">
         By continuing, you agree to our{" "}
         <button
           type="button"
-          className="inline font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline"
+          className="inline font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline"
           onClick={() => setLegalModal("terms")}
         >
           Terms of Service
@@ -129,7 +129,7 @@ export function LoginForm() {
         and{" "}
         <button
           type="button"
-          className="inline font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline"
+          className="inline font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline"
           onClick={() => setLegalModal("privacy")}
         >
           Privacy Policy

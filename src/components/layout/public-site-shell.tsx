@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Menu } from "iconoir-react";
-import { PublicCaseLinkWordmark } from "@/components/brand/caselink-mark";
+import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
 
 const navigation = [
   { href: "/product", label: "Product" },
@@ -53,7 +53,7 @@ export function PublicSiteShell({
             aria-label="CaseLink home"
             className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-focus)]"
           >
-            <PublicCaseLinkWordmark />
+            <CaseLinkWordmark />
           </Link>
 
           <nav className="ml-auto hidden items-center gap-2 lg:flex" aria-label="Primary">
@@ -107,9 +107,9 @@ export function PublicSiteShell({
         <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 lg:px-10 lg:py-14">
           <div className="grid gap-10 lg:grid-cols-[1fr_auto_auto] lg:gap-16">
             <div>
-              <PublicCaseLinkWordmark className="scale-90 origin-left" />
+              <CaseLinkWordmark />
               <p className="mt-4 max-w-md text-sm leading-6 text-[var(--public-ink-muted)]">
-                Download reviewed plans without rebuilding the same context.
+                Back-office support for school case managers.
               </p>
             </div>
 

@@ -17,16 +17,6 @@
   box-shadow: var(--public-shadow-surface);
 }
 
-.shell h1 {
-  font-family: var(--public-font-display);
-  font-size: 1.75rem;
-  font-weight: 560;
-  letter-spacing: -0.025em;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--public-ink);
-}
-
 .shell h2 {
   color: var(--public-ink);
 }
@@ -39,7 +29,7 @@
   min-height: 2.875rem;
   border-color: var(--public-rule-strong);
   color: var(--public-ink);
-  font-size: 1rem;
+  font-size: var(--text-base);
   outline: 2px solid transparent;
   outline-offset: 1px;
 }

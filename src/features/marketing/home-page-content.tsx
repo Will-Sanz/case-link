@@ -107,20 +107,20 @@ export function HomePageContent() {
   return (
     <>
       <section className="overflow-hidden border-b border-[var(--public-rule)] bg-[var(--public-paper-hero)]" aria-labelledby="home-hero">
-        <div className="mx-auto grid min-h-[720px] max-w-7xl items-center gap-12 px-5 pb-18 pt-12 sm:px-8 sm:pb-24 sm:pt-16 lg:min-h-[calc(100svh-7.25rem)] lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-8 lg:px-10 lg:pb-12 lg:pt-8">
+        <div className="mx-auto grid max-w-7xl items-center gap-11 px-5 py-14 sm:px-8 sm:py-18 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-8 lg:px-10 lg:py-16">
           <div className="public-hero-copy max-w-[650px]">
             <h1
               id="home-hero"
-              className="public-display text-balance text-[clamp(3.15rem,5vw,5.25rem)] leading-[0.93] text-[var(--public-ink)]"
+              className="public-display max-w-[12ch] text-balance text-[clamp(2.5rem,4.4vw,4.25rem)] font-[520] leading-[1.02] tracking-[-0.02em] text-[var(--public-ink)]"
             >
-              Turn family needs into clear plans and ready-to-use PDFs.
+              Helping school case managers turn complex family needs into clear next steps.
             </h1>
-            <p className="mt-7 max-w-[60ch] text-pretty text-lg leading-8 text-[var(--public-ink-2)] sm:text-xl">
-              CaseLink helps school case managers organize barriers, draft and review a structured intervention plan, and download a professional PDF for the systems their schools already use.
+            <p className="mt-6 max-w-[58ch] text-pretty text-base leading-7 text-[var(--public-ink-2)] sm:text-lg sm:leading-8">
+              CaseLink is an AI-assisted workspace that helps case managers organize family context, identify barriers, build structured intervention plans, and prepare review-ready PDFs. Case managers spend less time piecing together administrative work and more time supporting families.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/product" className="public-primary-action">
-                Learn More <ArrowRight className="size-4" aria-hidden />
+                See how it works <ArrowRight className="size-4" aria-hidden />
               </Link>
               <Link href="/request-demo" className="public-secondary-action">
                 Request a Demo <ArrowRight className="size-4" aria-hidden />
@@ -136,7 +136,7 @@ export function HomePageContent() {
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,1.45fr)] lg:gap-20 lg:px-10">
           <div>
             <h2 id="workflow-title" className="public-display max-w-md text-balance text-4xl leading-[0.98] text-[var(--public-ink)] sm:text-5xl">
-              A clear path from context to a reviewed plan.
+              Four steps, one continuous record.
             </h2>
           </div>
 

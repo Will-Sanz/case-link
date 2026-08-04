@@ -18,16 +18,16 @@ export default async function LoginPage() {
       title="CaseLink"
       subtitle="Sign in to manage family plans and PDF exports."
     >
-      <h2 className="text-base font-semibold text-slate-900">Case manager login</h2>
+      <h2 className="text-base font-semibold text-[var(--public-ink)]">Case manager login</h2>
       <div className="mt-5">
         <Suspense
-          fallback={<p className="text-sm text-slate-500">Loading…</p>}
+          fallback={<p className="text-sm text-[var(--public-ink-muted)]">Loading…</p>}
         >
           <LoginForm />
         </Suspense>
       </div>
-      <p className="mt-6 text-center text-xs text-slate-500">
-        <Link href="/" className="font-medium text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline">
+      <p className="mt-6 text-center text-xs text-[var(--public-ink-muted)]">
+        <Link href="/" className="font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline">
           Home
         </Link>
       </p>

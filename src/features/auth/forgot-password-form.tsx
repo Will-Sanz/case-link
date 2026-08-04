@@ -78,11 +78,11 @@ export function ForgotPasswordForm() {
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Sending reset link…" : "Send reset link"}
       </Button>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-[var(--public-ink-muted)]">
         Remembered your password?{" "}
         <Link
           href="/login"
-          className="font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
+          className="font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline"
         >
           Back to sign in
         </Link>

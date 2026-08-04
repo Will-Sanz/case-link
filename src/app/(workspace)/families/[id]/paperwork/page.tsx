@@ -21,7 +21,7 @@ export default async function FamilyPaperworkPage({ params }: PageProps) {
         familyId={family.id}
         familyName={family.name}
         hasReviewedPlan={isPlanReviewed(family.plan)}
-        planDownload={family.plan ? (
+        planReview={family.plan ? (
           <PlanPdfExport
             plan={family.plan}
             familyName={family.name}

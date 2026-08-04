@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { PublicCaseLinkMark } from "@/components/brand/caselink-mark";
+import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
 import styles from "./auth-shell.module.css";
 
 export function AuthShell({
@@ -21,12 +21,10 @@ export function AuthShell({
   return (
     <div className={`${styles.shell} public-auth flex min-h-svh flex-col items-center justify-center px-4 py-16`}>
       <div className={`${styles.content} w-full max-w-[400px]`}>
-        <div className="mb-6 text-center">
-          <PublicCaseLinkMark className="mx-auto mb-4 size-11" />
-          <h1>
-            {title}
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-[var(--public-ink-muted)]">
+        <div className="mb-7 text-center">
+          <CaseLinkWordmark className="justify-center" />
+          <h1 className="sr-only">{title}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--public-ink-muted)]">
             {subtitle}
           </p>
         </div>

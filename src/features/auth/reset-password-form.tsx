@@ -86,7 +86,7 @@ export function ResetPasswordForm() {
   }
 
   if (status === "checking") {
-    return <p className="text-sm text-slate-500">Loading reset session…</p>;
+    return <p className="text-sm text-[var(--public-ink-muted)]">Loading reset session…</p>;
   }
 
   if (status === "invalid") {
@@ -99,7 +99,7 @@ export function ResetPasswordForm() {
         <div className="flex justify-center">
           <Link
             href="/forgot-password"
-            className="font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
+            className="font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline"
           >
             Request a new reset link
           </Link>
@@ -133,7 +133,7 @@ export function ResetPasswordForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="mt-1"
         />
-        <p className="mt-1 text-xs text-slate-500">At least 14 characters.</p>
+        <p className="mt-1 text-xs text-[var(--public-ink-3)]">At least 14 characters.</p>
       </div>
       <div>
         <Label htmlFor="reset-confirm-password">Confirm new password</Label>
@@ -151,11 +151,11 @@ export function ResetPasswordForm() {
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Updating password…" : "Update password"}
       </Button>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-[var(--public-ink-muted)]">
         Return to{" "}
         <Link
           href="/login"
-          className="font-medium text-blue-600/90 underline-offset-2 hover:text-blue-600 hover:underline"
+          className="font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline"
         >
           sign in
         </Link>

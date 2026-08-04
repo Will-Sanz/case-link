@@ -67,26 +67,15 @@ function PlanPdfDetail() {
 export function ProductPageContent() {
   return (
     <>
-      <section className="border-b border-[var(--public-rule)] bg-[var(--public-paper-2)] pb-20 pt-14 sm:pb-28 sm:pt-20 lg:flex lg:min-h-[calc(100svh-7.25rem)] lg:items-center lg:pb-16 lg:pt-12" aria-labelledby="paperwork-title">
-        <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 sm:px-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:px-10">
+      <section className="border-b border-[var(--public-rule)] bg-[var(--public-paper-2)] py-14 sm:py-18 lg:py-16" aria-labelledby="paperwork-title">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:px-10">
           <div className="public-hero-copy">
-            <h1 id="paperwork-title" className="public-display text-balance text-[clamp(3.25rem,6vw,5.75rem)] leading-[0.94] text-[var(--public-ink)]">
-              A review process, not a black box.
+            <h1 id="paperwork-title" className="public-display max-w-[10ch] text-balance text-[clamp(2.5rem,4.4vw,4.25rem)] font-[520] leading-[1.02] tracking-[-0.02em] text-[var(--public-ink)]">
+              One guided workflow, from intake to PDF.
             </h1>
-            <p className="mt-6 text-base leading-7 text-[var(--public-ink-2)] sm:text-lg sm:leading-8">
-              CaseLink turns a reviewed intervention plan into a clear PDF. Nothing is submitted automatically, and the case manager remains responsible for the final plan.
+            <p className="mt-6 max-w-[54ch] text-base leading-7 text-[var(--public-ink-2)] sm:text-lg sm:leading-8">
+              Capture family context once. Identify barriers, generate and refine the intervention plan, review each goal and action, and download the finished PDF for the school system already in place.
             </p>
-            <ul className="mt-7 space-y-3 text-sm font-medium text-[var(--public-ink-strong)]">
-              <li className="flex gap-3">
-                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Professional black-and-white plan PDF
-              </li>
-              <li className="flex gap-3">
-                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Reviewed goals, actions, owners, and dates
-              </li>
-              <li className="flex gap-3">
-                <Check className="mt-0.5 size-4 shrink-0 text-[var(--public-accent)]" aria-hidden /> Download for the software your school already uses
-              </li>
-            </ul>
           </div>
 
           <div className="public-hero-visual">
