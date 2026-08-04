@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
@@ -37,47 +37,38 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId = useId();
   const descId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !pending) onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, pending]);
-
-  useEffect(() => {
-    if (!open || typeof document === "undefined") return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
     return () => {
-      document.body.style.overflow = prev;
+      if (dialog.open) dialog.close();
     };
   }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="presentation"
+    <dialog
+      ref={dialogRef}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descId}
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-[1px]"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!pending) onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !pending) onClose();
+      }}
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-slate-900/45 backdrop-blur-[1px]"
-        aria-label="Dismiss"
-        disabled={pending}
-        onClick={() => {
-          if (!pending) onClose();
-        }}
-      />
       <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descId}
-        className="relative z-[1] w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+        className="p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="text-base font-semibold text-slate-900">
@@ -92,7 +83,7 @@ export function ConfirmDialog({
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" disabled={pending} onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={pending} onClick={onClose} autoFocus>
             {cancelLabel}
           </Button>
           <Button
@@ -108,7 +99,7 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }
