@@ -144,6 +144,8 @@ export function FamilyPlanPanel({
   actionToggleDisabled,
   onRetryResources,
   resourceRetrying,
+  onContinueDraft,
+  continueDraftPending,
 }: {
   familyId: string;
   familyName: string;
@@ -153,6 +155,8 @@ export function FamilyPlanPanel({
   actionToggleDisabled?: boolean;
   onRetryResources?: () => void;
   resourceRetrying?: boolean;
+  onContinueDraft?: () => void;
+  continueDraftPending?: boolean;
 }) {
   const router = useRouter();
   const stepSaveLockRef = useRef(false);
@@ -1056,9 +1060,25 @@ export function FamilyPlanPanel({
       ) : null}
 
       {plan?.generation_state?.status === "failed" ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-          {plan.generation_state.error ??
-            "Part of the plan could not be generated. Your saved actions are still available; retry from Barriers when you are ready."}
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">
+            {plan.steps.length > 0 ? "Part of this draft is ready" : "Plan drafting paused"}
+          </p>
+          <p className="mt-1 leading-relaxed">
+            {plan.generation_state.error ??
+              "The unfinished part could not be prepared. Any actions already shown below are safely saved."}
+          </p>
+          {onContinueDraft ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3"
+              onClick={onContinueDraft}
+              disabled={continueDraftPending}
+            >
+              {continueDraftPending ? "Continuing…" : "Continue draft"}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 

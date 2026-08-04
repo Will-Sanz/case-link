@@ -610,11 +610,16 @@ export async function startStagedLeanPlanGeneration(input: {
     .maybeSingle();
 
   const latestGen = existingPlan?.generation_state as PlanGenerationState | null | undefined;
-  if (latestGen?.v === 1 && latestGen.status === "running") {
+  if (existingPlan && latestGen?.v === 1 && latestGen.status === "running") {
+    const { count } = await supabase
+      .from("plan_steps")
+      .select("id", { count: "exact", head: true })
+      .eq("plan_id", existingPlan.id);
     return {
-      ok: false,
-      error:
-        "A plan is already generating for this family. Wait for it to finish or refresh the page.",
+      ok: true,
+      planId: existingPlan.id as string,
+      version: existingPlan.version as number,
+      stepCount: count ?? 0,
     };
   }
 
@@ -645,6 +650,22 @@ export async function startStagedLeanPlanGeneration(input: {
     .single();
 
   if (planErr || !plan) {
+    const { data: racedPlan } = await supabase
+      .from("plans")
+      .select("id, version, generation_state")
+      .eq("family_id", input.familyId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const racedState = racedPlan?.generation_state as PlanGenerationState | null | undefined;
+    if (racedPlan && racedState?.v === 1 && racedState.status === "running") {
+      return {
+        ok: true,
+        planId: racedPlan.id as string,
+        version: racedPlan.version as number,
+        stepCount: 0,
+      };
+    }
     return {
       ok: false,
       error: publicMessageFromSupabaseError(planErr, "Could not create plan"),
@@ -710,12 +731,55 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   if (rawState.status === "complete") {
     return { ok: true, done: true };
   }
-  if (rawState.status === "failed") {
-    return { ok: false, error: rawState.error ?? "Generation failed" };
-  }
-
   const planId = activePlan.id as string;
   let state = { ...rawState };
+
+  if (state.status === "failed") {
+    const n30 = await countStepsInPhase(supabase, planId, "30");
+    const n60 = await countStepsInPhase(supabase, planId, "60");
+    const n90 = await countStepsInPhase(supabase, planId, "90");
+    const recoveredPendingPhase = pendingPhaseFromPersistedCounts({
+      "30": n30,
+      "60": n60,
+      "90": n90,
+    });
+    if (recoveredPendingPhase === null) {
+      await supabase
+        .from("plans")
+        .update({
+          generation_state: {
+            ...state,
+            status: "complete",
+            pending_phase: null,
+            phases_complete: { "30": true, "60": true, "90": true },
+            error: undefined,
+          },
+        })
+        .eq("id", planId);
+      return { ok: true, done: true };
+    }
+    state = {
+      ...state,
+      status: "running",
+      pending_phase: recoveredPendingPhase,
+      phases_complete: {
+        "30": n30 > 0,
+        "60": n60 > 0,
+        "90": n90 > 0,
+      },
+      error: undefined,
+    };
+    await supabase.from("plans").update({ generation_state: state }).eq("id", planId);
+    await logCaseActivity(
+      supabase,
+      input.familyId,
+      userId,
+      "plan.generation_resumed",
+      "plan",
+      planId,
+      { pending_stage: recoveredPendingPhase },
+    );
+  }
   const generationMode = parseAiMode(state.ai_mode ?? input.aiMode);
   const detail = await getFamilyDetail(supabase, input.familyId);
   if (!detail) {

@@ -418,6 +418,17 @@ export function FamilyLiteWorkspace({
     }
   }
 
+  async function continueDraft() {
+    if (planGenerateBusy) return;
+    setError(null);
+    setLocalPlanGenerating(true);
+    try {
+      await runStagedPlanPolling();
+    } finally {
+      setLocalPlanGenerating(false);
+    }
+  }
+
   async function copyText(key: string, text: string | null) {
     if (!text) return;
     try {
@@ -521,6 +532,8 @@ export function FamilyLiteWorkspace({
             actionToggleDisabled={pending}
             onRetryResources={retryResources}
             resourceRetrying={resourceRetrying}
+            onContinueDraft={continueDraft}
+            continueDraftPending={planGenerateBusy}
           />
         </Card>
       ) : null}
