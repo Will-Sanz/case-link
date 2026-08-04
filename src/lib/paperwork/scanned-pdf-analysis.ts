@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { toStructuredJsonSchema } from "@/lib/ai/structured-json-schema";
 import type { ScannedPdfAnalysis } from "@/types/paperwork";
 
 export const MAX_SCANNED_PDF_PAGES = 12;
@@ -28,60 +29,7 @@ export const scannedPdfModelAnalysisSchema = z.object({
 
 export type ScannedPdfModelAnalysis = z.infer<typeof scannedPdfModelAnalysisSchema>;
 
-export const scannedPdfAnalysisJsonSchema = {
-  type: "object",
-  properties: {
-    documentTitle: { type: "string" },
-    appearsBlank: { type: "boolean" },
-    containsLikelyPersonalData: { type: "boolean" },
-    warnings: { type: "array", maxItems: 20, items: { type: "string" } },
-    fields: {
-      type: "array",
-      minItems: 1,
-      maxItems: 150,
-      items: {
-        type: "object",
-        properties: {
-          fieldName: { type: "string" },
-          label: { type: "string" },
-          pageIndex: { type: "integer" },
-          kind: { type: "string", enum: ["text", "checkbox"] },
-          x: { type: "number" },
-          y: { type: "number" },
-          width: { type: "number" },
-          height: { type: "number" },
-          value: { type: ["string", "null"] },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          source: { type: "string" },
-          needsReview: { type: "boolean" },
-        },
-        required: [
-          "fieldName",
-          "label",
-          "pageIndex",
-          "kind",
-          "x",
-          "y",
-          "width",
-          "height",
-          "value",
-          "confidence",
-          "source",
-          "needsReview",
-        ],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: [
-    "documentTitle",
-    "appearsBlank",
-    "containsLikelyPersonalData",
-    "warnings",
-    "fields",
-  ],
-  additionalProperties: false,
-} as const;
+export const scannedPdfAnalysisJsonSchema = toStructuredJsonSchema(scannedPdfModelAnalysisSchema);
 
 const MANUAL_ONLY_FIELD =
   /\b(name|signature|initials?|date of birth|dob|address|phone|e-?mail|student id|participant id|social security|ssn|consent|attest|certif|site name)\b/i;

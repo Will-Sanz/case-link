@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { createAiResponse } from "@/lib/ai/client";
+import { toStructuredJsonSchema } from "@/lib/ai/structured-json-schema";
 import { getFamilyDetail } from "@/lib/services/families";
 import { buildPaperworkSource, createDeterministicMappings } from "@/lib/paperwork/pdf-field-mapper";
 import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
@@ -36,29 +37,7 @@ const aiMappingSchema = z.object({
   })).max(150),
 });
 
-const jsonSchema = {
-  type: "object",
-  properties: {
-    mappings: {
-      type: "array",
-      maxItems: 150,
-      items: {
-        type: "object",
-        properties: {
-          fieldName: { type: "string" },
-          value: { type: ["string", "null"] },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          source: { type: "string" },
-          needsReview: { type: "boolean" },
-        },
-        required: ["fieldName", "value", "confidence", "source", "needsReview"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["mappings"],
-  additionalProperties: false,
-} as const;
+const jsonSchema = toStructuredJsonSchema(aiMappingSchema);
 
 export async function authorizePaperworkDownloadAction(
   input: unknown,
