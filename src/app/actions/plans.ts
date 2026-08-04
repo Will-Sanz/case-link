@@ -25,6 +25,7 @@ import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
 import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
+import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import {
   validateFamilyNoPii,
@@ -42,6 +43,7 @@ import {
   deletePlanStepSchema,
   generatePlanSchema,
   logPlanStepActivitySchema,
+  markPlanReviewedSchema,
   previewRefineStepSchema,
   previewRefinePlanSchema,
   refineStepSchema,
@@ -139,6 +141,31 @@ async function logCaseActivity(
     details: details ?? null,
   });
   void error;
+}
+
+async function clearPlanReview(supabase: SupabaseClient, planId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("plans")
+    .select("client_display")
+    .eq("id", planId)
+    .maybeSingle();
+  if (error) return publicMessageFromSupabaseError(error);
+  if (!data) return "Plan not found";
+
+  const raw = data.client_display;
+  const display =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? { ...(raw as Record<string, unknown>) }
+      : {};
+  if (!("reviewedAt" in display) && !("reviewedById" in display)) return null;
+  delete display.reviewedAt;
+  delete display.reviewedById;
+
+  const { error: updateError } = await supabase
+    .from("plans")
+    .update({ client_display: Object.keys(display).length > 0 ? display : null })
+    .eq("id", planId);
+  return updateError ? publicMessageFromSupabaseError(updateError) : null;
 }
 
 function normAiNullable(v: string | null | undefined): string | null {
@@ -1026,31 +1053,35 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Plan not found" };
   }
 
-  const payload: Record<string, unknown> = {};
+  const existingRaw = planRow.client_display;
+  const display =
+    existingRaw && typeof existingRaw === "object" && !Array.isArray(existingRaw)
+      ? { ...(existingRaw as Record<string, unknown>) }
+      : {};
+  delete display.reviewedAt;
+  delete display.reviewedById;
+
+  const payload: Record<string, unknown> = {
+    client_display: Object.keys(display).length > 0 ? display : null,
+  };
   if (summary !== undefined) {
     payload.summary = summary;
   }
 
   if (clientDisplay !== undefined) {
-    const existingRaw = planRow.client_display;
-    const existing =
-      existingRaw && typeof existingRaw === "object" && !Array.isArray(existingRaw)
-        ? (existingRaw as Record<string, unknown>)
-        : {};
-    const merged: Record<string, unknown> = { ...existing };
     if (clientDisplay.title !== undefined) {
-      merged.title = clientDisplay.title;
+      display.title = clientDisplay.title;
     }
     if (clientDisplay.phaseSummaries !== undefined) {
-      const prev = (merged.phaseSummaries as Record<string, unknown> | undefined) ?? {};
-      merged.phaseSummaries = {
+      const prev = (display.phaseSummaries as Record<string, unknown> | undefined) ?? {};
+      display.phaseSummaries = {
         ...prev,
         ...Object.fromEntries(
           Object.entries(clientDisplay.phaseSummaries).filter(([, v]) => v !== undefined),
         ),
       };
     }
-    payload.client_display = merged;
+    payload.client_display = display;
   }
 
   const { error } = await supabase.from("plans").update(payload).eq("id", planRow.id);
@@ -1062,6 +1093,57 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
   revalidatePath(`/families/${familyId}`);
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
+  const parsed = markPlanReviewedSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid request" };
+
+  let supabase;
+  let userId: string;
+  try {
+    const session = await requireAppUserWithClient();
+    supabase = session.supabase;
+    userId = session.user.id;
+  } catch {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const { familyId, planId } = parsed.data;
+  const family = await getFamilyDetail(supabase, familyId);
+  if (!family?.plan || family.plan.id !== planId) {
+    return { ok: false, error: "Plan not found" };
+  }
+
+  const reviewStatus = getPlanReviewStatus(family.plan);
+  if (reviewStatus.state === "reviewed") return { ok: true };
+  if (reviewStatus.state !== "needs_review") {
+    return { ok: false, error: reviewStatus.issue ?? "This plan is not ready for review." };
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const clientDisplay = {
+    ...(family.plan.client_display ?? {}),
+    reviewedAt,
+    reviewedById: userId,
+  };
+  const { data: updated, error } = await supabase
+    .from("plans")
+    .update({ client_display: clientDisplay })
+    .eq("id", planId)
+    .eq("family_id", familyId)
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
+  if (!updated) return { ok: false, error: "Plan not found or could not be reviewed." };
+
+  await logCaseActivity(supabase, familyId, userId, "plan.reviewed", "plan", planId, {
+    reviewed_at: reviewedAt,
+  });
+  revalidatePath(`/families/${familyId}`);
+  revalidatePath(`/families/${familyId}/plan`);
+  revalidatePath(`/families/${familyId}/paperwork`);
   return { ok: true };
 }
 
@@ -1114,6 +1196,18 @@ export async function updatePlanStep(
 
   if (!planRow) {
     return { ok: false, error: "Plan not found" };
+  }
+
+  const changesReviewedContent =
+    patch.title !== undefined ||
+    patch.description !== undefined ||
+    patch.details !== undefined ||
+    patch.priority !== undefined ||
+    patch.phase !== undefined ||
+    patch.sort_order !== undefined;
+  if (changesReviewedContent) {
+    const reviewError = await clearPlanReview(supabase, planRow.id);
+    if (reviewError) return { ok: false, error: reviewError };
   }
 
   const updatePayload: Record<string, unknown> = {};
@@ -1198,6 +1292,9 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   if (!plan) {
     return { ok: false, error: "Plan not found" };
   }
+
+  const reviewError = await clearPlanReview(supabase, planId);
+  if (reviewError) return { ok: false, error: reviewError };
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -1303,6 +1400,9 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
   if (!plan) {
     return { ok: false, error: "Step not found" };
   }
+
+  const reviewError = await clearPlanReview(supabase, step.plan_id);
+  if (reviewError) return { ok: false, error: reviewError };
 
   const { error } = await supabase
     .from("plan_steps")
@@ -1552,6 +1652,16 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
 
   if (!plan) {
     return { ok: false, error: "Action item not found" };
+  }
+
+  const changesReviewedContent =
+    parsed.data.title !== undefined ||
+    parsed.data.description !== undefined ||
+    parsed.data.week_index !== undefined ||
+    parsed.data.target_date !== undefined;
+  if (changesReviewedContent) {
+    const reviewError = await clearPlanReview(supabase, step.plan_id);
+    if (reviewError) return { ok: false, error: reviewError };
   }
 
   const patch: Record<string, unknown> = {};
@@ -1949,6 +2059,9 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
   if (stepPriority) {
     updatePayload.priority = stepPriority;
   }
+
+  const reviewError = await clearPlanReview(supabase, step.plan_id);
+  if (reviewError) return { ok: false, error: reviewError };
 
   const { error } = await supabase.from("plan_steps").update(updatePayload).eq("id", stepId);
 

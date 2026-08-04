@@ -46,7 +46,15 @@ function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
-export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId: string; familyName: string; hasPlan: boolean }) {
+export function PaperworkWorkspace({
+  familyId,
+  familyName,
+  hasReviewedPlan,
+}: {
+  familyId: string;
+  familyName: string;
+  hasReviewedPlan: boolean;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [originalBytes, setOriginalBytes] = useState<Uint8Array | null>(null);
@@ -280,13 +288,13 @@ export function PaperworkWorkspace({ familyId, familyName, hasPlan }: { familyId
 
   const reviewCount = mappings.filter((mapping) => mapping.needsReview).length;
 
-  if (!hasPlan) {
+  if (!hasReviewedPlan) {
     return (
       <section className="rounded-xl border border-[#dce6d9] bg-white p-7 text-center shadow-[0_10px_30px_rgba(30,70,27,0.06)]">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-[#edf4eb] text-[#276221]"><FileCheck2 className="size-5" aria-hidden /></span>
-        <h2 className="mt-5 text-xl font-semibold text-[#173a15]">Create the intervention plan first</h2>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#5d705a]">A completed plan is the main source CaseLink uses to prepare the family&apos;s paperwork.</p>
-        <Link href={`/families/${familyId}/overview`} className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white hover:bg-[#1f531b]">Review barriers <ArrowRight className="size-4" aria-hidden /></Link>
+        <h2 className="mt-5 text-xl font-semibold text-[#173a15]">Review the intervention plan first</h2>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#5d705a]">Check each goal, action, and target date, then mark the plan reviewed. Only reviewed plan information can be carried into paperwork.</p>
+        <Link href={`/families/${familyId}/plan`} className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white hover:bg-[#1f531b]">Review plan <ArrowRight className="size-4" aria-hidden /></Link>
       </section>
     );
   }

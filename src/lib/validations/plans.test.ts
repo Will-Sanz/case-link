@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createManualStepSchema } from "@/lib/validations/plans";
+import { createManualStepSchema, markPlanReviewedSchema } from "@/lib/validations/plans";
 
 const baseInput = {
   familyId: "7f58e830-7ba1-4f78-9e0c-d1fde9b814b7",
@@ -22,5 +22,17 @@ describe("createManualStepSchema", () => {
   it("rejects an action without a date-shaped target", () => {
     const result = createManualStepSchema.safeParse({ ...baseInput, target_date: "next week" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("markPlanReviewedSchema", () => {
+  it("accepts only family and plan identifiers", () => {
+    expect(
+      markPlanReviewedSchema.safeParse({
+        familyId: baseInput.familyId,
+        planId: baseInput.planId,
+      }).success,
+    ).toBe(true);
+    expect(markPlanReviewedSchema.safeParse({ familyId: "not-a-family", planId: baseInput.planId }).success).toBe(false);
   });
 });

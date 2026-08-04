@@ -75,6 +75,11 @@ export const updatePlanSchema = z.object({
   clientDisplay: planClientDisplaySchema.optional(),
 });
 
+export const markPlanReviewedSchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+});
+
 export const updatePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),

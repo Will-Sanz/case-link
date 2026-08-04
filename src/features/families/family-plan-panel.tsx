@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, CircleAlert } from "lucide-react";
 import {
+  markPlanReviewed,
   previewRefinePlanStep,
   previewRefinePlan,
   createManualStep,
@@ -25,6 +28,7 @@ import type {
 } from "@/types/family";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
+import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 
 function dateInputValueAfterDays(days: number): string {
   const value = new Date();
@@ -128,6 +132,7 @@ export function FamilyPlanPanel({
   const planBulkSaveLockRef = useRef(false);
   const [stepSaveBusy, setStepSaveBusy] = useState(false);
   const [planBulkSaving, setPlanBulkSaving] = useState(false);
+  const [reviewPending, setReviewPending] = useState(false);
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
@@ -781,6 +786,32 @@ export function FamilyPlanPanel({
     return [...new Set(titles)];
   }, [planAiPreview]);
 
+  const reviewStatus = getPlanReviewStatus(plan);
+
+  function reviewPlan() {
+    if (!plan || reviewPending) return;
+    if (stepDirty || planAiDirty) {
+      setError("Save or discard your current edits before marking the plan reviewed.");
+      return;
+    }
+    setReviewPending(true);
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      try {
+        const result = await markPlanReviewed({ familyId, planId: plan.id });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setSuccess("Plan marked reviewed. Paperwork is ready.");
+        router.refresh();
+      } finally {
+        setReviewPending(false);
+      }
+    });
+  }
+
   if (!plan) {
     return (
       <p className="text-sm text-slate-600">
@@ -848,6 +879,81 @@ export function FamilyPlanPanel({
             "Part of the plan could not be generated. Your saved actions are still available; retry from Overview when you are ready."}
         </div>
       ) : null}
+
+      <section
+        aria-labelledby="plan-review-heading"
+        className={`rounded-xl border p-4 sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-5 ${
+          reviewStatus.state === "reviewed"
+            ? "border-[#b8d6b3] bg-[#edf4eb]"
+            : reviewStatus.state === "needs_attention"
+              ? "border-[#ead69b] bg-[#fff8e5]"
+              : "border-[#dce6d9] bg-white"
+        }`}
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg ${
+              reviewStatus.state === "reviewed"
+                ? "bg-white text-[#276221]"
+                : reviewStatus.state === "needs_attention"
+                  ? "bg-white text-[#765a16]"
+                  : "bg-[#edf4eb] text-[#276221]"
+            }`}
+          >
+            {reviewStatus.state === "reviewed" ? (
+              <CheckCircle2 className="size-5" aria-hidden />
+            ) : (
+              <CircleAlert className="size-5" aria-hidden />
+            )}
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="plan-review-heading" className="text-sm font-semibold text-[#173a15]">
+                {reviewStatus.state === "reviewed"
+                  ? "Plan approved for paperwork"
+                  : reviewStatus.state === "needs_review"
+                    ? "Check and approve this plan"
+                    : reviewStatus.state === "needs_attention"
+                      ? "Resolve plan details"
+                      : "Plan is being prepared"}
+              </h2>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#50644d]">
+                {reviewStatus.label}
+              </span>
+            </div>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[#5d705a]">
+              {reviewStatus.state === "reviewed"
+                ? `Reviewed ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(plan.client_display!.reviewedAt!))}. Material edits will return the plan to Needs review.`
+                : reviewStatus.state === "needs_review"
+                  ? "Read each goal, action, and target date. Mark reviewed when the plan reflects your judgment; only then can CaseLink use it for paperwork."
+                  : reviewStatus.issue}
+            </p>
+            {(stepDirty || planAiDirty) && reviewStatus.state === "needs_review" ? (
+              <p className="mt-1 text-xs font-medium text-[#765a16]">
+                Save or discard the current edits before approving the plan.
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-4 shrink-0 sm:mt-0">
+          {reviewStatus.state === "reviewed" ? (
+            <Link
+              href={`/families/${familyId}/paperwork`}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(39,98,33,0.14)] hover:bg-[#1f531b] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#46923c]/25"
+            >
+              Prepare paperwork
+            </Link>
+          ) : reviewStatus.state === "needs_review" ? (
+            <Button
+              type="button"
+              onClick={reviewPlan}
+              disabled={reviewPending || pending || stepDirty || planAiDirty}
+            >
+              {reviewPending ? "Marking reviewed…" : "Mark plan reviewed"}
+            </Button>
+          ) : null}
+        </div>
+      </section>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-5">

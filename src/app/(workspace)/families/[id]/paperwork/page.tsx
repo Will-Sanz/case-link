@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getFamilyDetail } from "@/lib/services/families";
 import { PaperworkWorkspace } from "@/features/families/paperwork-workspace";
+import { isPlanReviewed } from "@/lib/domain/plan/review-status";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -18,7 +19,7 @@ export default async function FamilyPaperworkPage({ params }: PageProps) {
       <PaperworkWorkspace
         familyId={family.id}
         familyName={family.name}
-        hasPlan={Boolean(family.plan && (!family.plan.generation_state || family.plan.generation_state.status === "complete"))}
+        hasReviewedPlan={isPlanReviewed(family.plan)}
       />
     </div>
   );

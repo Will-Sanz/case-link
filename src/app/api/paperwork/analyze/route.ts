@@ -13,6 +13,7 @@ import {
 } from "@/lib/paperwork/scanned-pdf-analysis";
 import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 import { getFamilyDetail } from "@/lib/services/families";
+import { isPlanReviewed } from "@/lib/domain/plan/review-status";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -64,12 +65,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!family) {
     return noStoreJson({ error: "This family record could not be loaded." }, { status: 404 });
   }
-  if (
-    !family.plan ||
-    (family.plan.generation_state && family.plan.generation_state.status !== "complete")
-  ) {
+  if (!isPlanReviewed(family.plan)) {
     return noStoreJson(
-      { error: "Finish generating and reviewing the intervention plan first." },
+      { error: "Review the intervention plan before preparing paperwork." },
       { status: 409 },
     );
   }

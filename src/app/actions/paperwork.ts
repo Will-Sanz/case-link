@@ -7,6 +7,7 @@ import { getFamilyDetail } from "@/lib/services/families";
 import { buildPaperworkSource, createDeterministicMappings } from "@/lib/paperwork/pdf-field-mapper";
 import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 import { isManualOnlyPaperworkField } from "@/lib/paperwork/scanned-pdf-analysis";
+import { isPlanReviewed } from "@/lib/domain/plan/review-status";
 import type { PdfFieldMapping } from "@/types/paperwork";
 
 const fieldSchema = z.object({
@@ -65,8 +66,8 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
 
   const family = await getFamilyDetail(supabase, parsed.data.familyId);
   if (!family) return { ok: false, error: "This family record could not be loaded." };
-  if (!family.plan || (family.plan.generation_state && family.plan.generation_state.status !== "complete")) {
-    return { ok: false, error: "Finish generating the intervention plan before preparing paperwork." };
+  if (!isPlanReviewed(family.plan)) {
+    return { ok: false, error: "Review the intervention plan before preparing paperwork." };
   }
   const privacy = validateFamilyNoPii(family);
   if (!privacy.ok) {
