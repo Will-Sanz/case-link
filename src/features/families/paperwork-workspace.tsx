@@ -16,7 +16,10 @@ import {
 import {
   PDFDocument,
 } from "pdf-lib";
-import { mapPdfFieldsAction } from "@/app/actions/paperwork";
+import {
+  authorizePaperworkDownloadAction,
+  mapPdfFieldsAction,
+} from "@/app/actions/paperwork";
 import {
   applyPdfMappings,
   applyPdfOverlayMappings,
@@ -50,10 +53,14 @@ export function PaperworkWorkspace({
   familyId,
   familyName,
   hasReviewedPlan,
+  planId,
+  reviewedAt,
 }: {
   familyId: string;
   familyName: string;
   hasReviewedPlan: boolean;
+  planId: string | null;
+  reviewedAt: string | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -68,6 +75,7 @@ export function PaperworkWorkspace({
   const [previewConfirmed, setPreviewConfirmed] = useState(false);
   const [blankTemplateConfirmed, setBlankTemplateConfirmed] = useState(false);
   const [assistedByAi, setAssistedByAi] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -98,6 +106,7 @@ export function PaperworkWorkspace({
     setError(null);
     setAssistedByAi(false);
     setBlankTemplateConfirmed(false);
+    setDownloaded(false);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -220,12 +229,50 @@ export function PaperworkWorkspace({
 
   function updateValue(fieldName: string, value: string) {
     clearPreview();
-    setMappings((current) => current.map((mapping) => mapping.fieldName === fieldName ? { ...mapping, value, needsReview: false } : mapping));
+    setDownloaded(false);
+    setMappings((current) =>
+      current.map((mapping) =>
+        mapping.fieldName === fieldName
+          ? {
+              ...mapping,
+              value,
+              confidence: "high",
+              source: "Edited by case manager",
+              needsReview: false,
+            }
+          : mapping,
+      ),
+    );
   }
 
   function confirmValue(fieldName: string) {
     clearPreview();
-    setMappings((current) => current.map((mapping) => mapping.fieldName === fieldName ? { ...mapping, needsReview: false } : mapping));
+    setDownloaded(false);
+    setMappings((current) =>
+      current.map((mapping) =>
+        mapping.fieldName === fieldName
+          ? { ...mapping, source: `Confirmed from ${mapping.source}`, needsReview: false }
+          : mapping,
+      ),
+    );
+  }
+
+  function leaveFieldBlank(fieldName: string) {
+    clearPreview();
+    setDownloaded(false);
+    setMappings((current) =>
+      current.map((mapping) =>
+        mapping.fieldName === fieldName
+          ? {
+              ...mapping,
+              value: "",
+              confidence: "high",
+              source: "Left blank by case manager",
+              needsReview: false,
+            }
+          : mapping,
+      ),
+    );
   }
 
   async function completedPdfBytes(): Promise<Uint8Array> {
@@ -275,12 +322,26 @@ export function PaperworkWorkspace({
     setError(null);
     try {
       const saved = await completedPdfBytes();
+      if (!planId || !reviewedAt) {
+        setError("Review the current plan again before downloading this paperwork.");
+        return;
+      }
+      const authorization = await authorizePaperworkDownloadAction({
+        familyId,
+        planId,
+        reviewedAt,
+      });
+      if (!authorization.ok) {
+        setError(authorization.error);
+        return;
+      }
       const url = URL.createObjectURL(new Blob([ownedArrayBuffer(saved)], { type: "application/pdf" }));
       const anchor = window.document.createElement("a");
       anchor.href = url;
       anchor.download = downloadName(fileName);
       anchor.click();
       URL.revokeObjectURL(url);
+      setDownloaded(true);
     } catch {
       setError("CaseLink could not write the reviewed fields into this PDF. Reload the original fillable form and try again.");
     }
@@ -450,9 +511,21 @@ export function PaperworkWorkspace({
                     )}
                   </div>
                   <div className="text-xs leading-5">
-                    <p className={needsReview ? "font-semibold text-[#8a681c]" : "font-semibold text-[#276221]"}>{needsReview ? "Review needed" : `${mapping.confidence} confidence`}</p>
+                    <p className={needsReview ? "font-semibold text-[#8a681c]" : "font-semibold text-[#276221]"}>{needsReview ? "Review needed" : "Ready"}</p>
                     <p className="mt-1 text-[#687b65]">{mapping.source}</p>
-                    {needsReview ? <button type="button" onClick={() => confirmValue(mapping.fieldName)} className="mt-2 min-h-9 rounded-lg border border-[#a9c7a5] bg-white px-3 font-semibold text-[#276221] hover:bg-[#edf4eb]">{mapping.value ? "Accept suggestion" : "Leave blank"}</button> : null}
+                    <p className="mt-1 capitalize text-[#82917f]">{mapping.confidence} confidence</p>
+                    {needsReview ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {mapping.value ? (
+                          <button type="button" onClick={() => confirmValue(mapping.fieldName)} className="min-h-9 rounded-lg border border-[#a9c7a5] bg-white px-3 font-semibold text-[#276221] hover:bg-[#edf4eb]">Accept suggestion</button>
+                        ) : null}
+                        <button type="button" onClick={() => leaveFieldBlank(mapping.fieldName)} className="min-h-9 rounded-lg px-3 font-semibold text-[#50644d] hover:bg-[#edf4eb]">
+                          {mapping.value ? "Reject and leave blank" : "Confirm blank"}
+                        </button>
+                      </div>
+                    ) : mapping.value ? (
+                      <button type="button" onClick={() => leaveFieldBlank(mapping.fieldName)} className="mt-2 min-h-9 rounded-lg px-3 font-semibold text-[#50644d] hover:bg-[#edf4eb]">Leave blank instead</button>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -515,6 +588,12 @@ export function PaperworkWorkspace({
             className="h-[72vh] min-h-[560px] w-full bg-slate-100"
           />
         </section>
+      ) : null}
+
+      {downloaded ? (
+        <p className="rounded-lg border border-[#b8d6b3] bg-[#edf4eb] px-4 py-3 text-sm font-medium text-[#276221]" role="status">
+          Completed PDF downloaded. CaseLink did not submit it anywhere; upload it manually to your required system after your final check.
+        </p>
       ) : null}
 
       {error ? <p className="rounded-lg bg-[#fef2f2] px-4 py-3 text-sm font-medium text-[#a32929]" role="alert">{error}</p> : null}

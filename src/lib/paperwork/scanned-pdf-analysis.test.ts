@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isManualOnlyPaperworkField,
   normalizeScannedPdfAnalysis,
   scannedPdfModelAnalysisSchema,
 } from "@/lib/paperwork/scanned-pdf-analysis";
@@ -73,6 +74,17 @@ describe("normalizeScannedPdfAnalysis", () => {
       source: "Complete manually outside CaseLink",
       needsReview: true,
     });
+  });
+
+  it("allows service-plan objectives while keeping case-manager identity fields manual", () => {
+    expect(
+      isManualOnlyPaperworkField(
+        "strategy_case_manager_objective_1",
+        "Case manager objective",
+      ),
+    ).toBe(false);
+    expect(isManualOnlyPaperworkField("case_manager_name", "Case manager name")).toBe(true);
+    expect(isManualOnlyPaperworkField("case_manager_signature", "Signature")).toBe(true);
   });
 
   it("drops duplicate and out-of-page model fields", () => {

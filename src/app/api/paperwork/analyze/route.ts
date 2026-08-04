@@ -115,6 +115,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       "Detect only writable blanks and meaningful checkboxes that a case manager might complete. Coordinates must be normalized 0 to 1 relative to the DISPLAYED page, with x/y at the top-left of the writable area. pageIndex is zero-based.",
       "Use only reviewedSource to suggest values. Never infer identity, eligibility, consent, signatures, attestations, dates of birth, addresses, IDs, contact information, case-manager identity, or site identity.",
       "Keep identity, signature, consent, certification, and attestation values null and mark them for review.",
+      "Fill a client/family/participant objective only when a reviewedSource action is explicitly owned by family or shared; otherwise leave it null and mark it for review.",
       "For checkboxes, return 'true', 'false', or null only when directly supported by reviewedSource.",
       "Use a stable descriptive fieldName such as page_1_housing_concern; fieldName values must be unique.",
       "Add a warning when layout, handwriting detection, or a writable area is uncertain.",
@@ -160,13 +161,36 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const analysis = normalizeScannedPdfAnalysis(parsed, pageCount);
-  if (!analysis) {
+  const normalizedAnalysis = normalizeScannedPdfAnalysis(parsed, pageCount);
+  if (!normalizedAnalysis) {
     return noStoreJson(
       { error: "No writable areas could be identified in this scanned form." },
       { status: 422 },
     );
   }
+
+  const hasExplicitFamilyAction = source.planActions.some(
+    (action) => action.owner === "family" || action.owner === "shared",
+  );
+  const analysis = hasExplicitFamilyAction
+    ? normalizedAnalysis
+    : {
+        ...normalizedAnalysis,
+        mappings: normalizedAnalysis.mappings.map((mapping) => {
+          const overlay = normalizedAnalysis.overlayFields.find(
+            (field) => field.fieldName === mapping.fieldName,
+          );
+          const label = `${mapping.fieldName} ${overlay?.label ?? ""}`.replace(/[_\-.]+/g, " ");
+          if (!/\b(client|family|participant)\s+objective\b/i.test(label)) return mapping;
+          return {
+            ...mapping,
+            value: "",
+            confidence: "low" as const,
+            source: "No family-owned action was explicitly confirmed",
+            needsReview: true,
+          };
+        }),
+      };
 
   return noStoreJson(analysis);
 }

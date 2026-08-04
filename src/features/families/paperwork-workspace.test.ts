@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, degrees } from "pdf-lib";
 import {
   applyPdfMappings,
   applyPdfOverlayMappings,
@@ -120,5 +120,43 @@ describe("inspectPdfFields", () => {
     const reloaded = await PDFDocument.load(bytes);
     expect(reloaded.getPageCount()).toBe(1);
     expect(bytes.byteLength).toBeGreaterThan(500);
+  });
+
+  it("preserves page count and rotation when writing a later scanned page", async () => {
+    const document = await PDFDocument.create();
+    document.addPage([612, 792]);
+    const rotatedPage = document.addPage([612, 792]);
+    rotatedPage.setRotation(degrees(90));
+
+    await applyPdfOverlayMappings(
+      document,
+      [
+        {
+          fieldName: "page_2_goal",
+          label: "Goal",
+          pageIndex: 1,
+          kind: "text",
+          x: 0.15,
+          y: 0.2,
+          width: 0.6,
+          height: 0.08,
+        },
+      ],
+      [
+        {
+          fieldName: "page_2_goal",
+          value: "Complete a reviewed intake action",
+          confidence: "high",
+          source: "Reviewed plan action",
+          needsReview: false,
+        },
+      ],
+    );
+
+    const bytes = await document.save();
+    const reloaded = await PDFDocument.load(bytes);
+    expect(reloaded.getPageCount()).toBe(2);
+    expect(reloaded.getPage(1).getRotation().angle).toBe(90);
+    expect(bytes.byteLength).toBeGreaterThan(700);
   });
 });

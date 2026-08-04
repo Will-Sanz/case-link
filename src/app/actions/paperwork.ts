@@ -18,6 +18,11 @@ const fieldSchema = z.object({
 });
 
 const inputSchema = z.object({ familyId: z.string().uuid(), fields: z.array(fieldSchema).min(1).max(150) });
+const downloadSchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+  reviewedAt: z.string().datetime(),
+});
 const aiMappingSchema = z.object({
   mappings: z.array(z.object({
     fieldName: z.string().min(1).max(200),
@@ -51,6 +56,52 @@ const jsonSchema = {
   required: ["mappings"],
   additionalProperties: false,
 } as const;
+
+export async function authorizePaperworkDownloadAction(
+  input: unknown,
+): Promise<{ ok: true } | { ok: false; error: string; outOfDate?: boolean }> {
+  const parsed = downloadSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "The paperwork source is invalid." };
+
+  let user;
+  let supabase;
+  try {
+    ({ user, supabase } = await requireAppUserWithClient());
+  } catch {
+    return { ok: false, error: "Your session expired. Sign in again; your browser still has the current edits." };
+  }
+
+  const family = await getFamilyDetail(supabase, parsed.data.familyId);
+  if (!family?.plan) return { ok: false, error: "This family record could not be loaded." };
+  const currentReviewedAt = family.plan.client_display?.reviewedAt;
+  if (
+    !isPlanReviewed(family.plan) ||
+    family.plan.id !== parsed.data.planId ||
+    currentReviewedAt !== parsed.data.reviewedAt
+  ) {
+    return {
+      ok: false,
+      outOfDate: true,
+      error:
+        "The reviewed plan changed after this paperwork was prepared. Keep this page open, review the updated plan, then start a fresh form so old values are not downloaded.",
+    };
+  }
+
+  const privacy = validateFamilyNoPii(family);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before downloading paperwork." };
+  }
+
+  await supabase.from("activity_log").insert({
+    family_id: family.id,
+    actor_user_id: user.id,
+    action: "paperwork.downloaded",
+    entity_type: "plan",
+    entity_id: family.plan.id,
+    details: { plan_version: family.plan.version },
+  });
+  return { ok: true };
+}
 
 export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; mappings: PdfFieldMapping[]; assistedByAi: boolean } | { ok: false; error: string }> {
   const parsed = inputSchema.safeParse(input);
@@ -89,6 +140,7 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
       "For dropdown/radio/option-list values, use an exact supplied option or null.",
       "For checkboxes, return 'true', 'false', or null only when directly supported.",
       "Set needsReview true for missing, uncertain, sensitive, consent, signature, or attestation fields.",
+      "Fill a client/family/participant objective only when the source action owner is explicitly family or shared; otherwise leave it null for review.",
       "The source intentionally omits the family label and household-member names.",
     ].join("\n"),
     input: JSON.stringify({ fields: parsed.data.fields, reviewedSource: source }),
@@ -104,6 +156,12 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
     const mappings = fallback.map((base) => {
       const proposed = aiByName.get(base.fieldName);
       const field = fieldsByName.get(base.fieldName)!;
+      const normalizedFieldName = field.name.toLowerCase().replace(/[_\-.]+/g, " ");
+      const isFamilyObjective = /\b(client|family|participant)\s+objective\b/.test(normalizedFieldName);
+      const hasExplicitFamilyAction = source.planActions.some(
+        (action) => action.owner === "family" || action.owner === "shared",
+      );
+      if (isFamilyObjective && !hasExplicitFamilyAction) return base;
       if (isManualOnlyPaperworkField(field.name, field.name)) {
         return {
           ...base,

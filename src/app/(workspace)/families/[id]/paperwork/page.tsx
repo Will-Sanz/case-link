@@ -20,6 +20,8 @@ export default async function FamilyPaperworkPage({ params }: PageProps) {
         familyId={family.id}
         familyName={family.name}
         hasReviewedPlan={isPlanReviewed(family.plan)}
+        planId={family.plan?.id ?? null}
+        reviewedAt={family.plan?.client_display?.reviewedAt ?? null}
       />
     </div>
   );
