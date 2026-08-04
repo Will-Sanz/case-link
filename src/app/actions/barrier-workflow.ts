@@ -63,6 +63,73 @@ function parseAdditionalBarriers(input: string): string[] {
   );
 }
 
+type BarrierReplacementRow = {
+  preset_key: string | null;
+  label: string;
+  sort_order: number;
+};
+
+type AppSupabaseClient = Awaited<ReturnType<typeof requireAppUserWithClient>>["supabase"];
+type SupabaseOperationError = { code?: string; message?: string };
+
+function isMissingBarrierReplacementRpc(error: SupabaseOperationError): boolean {
+  return error.code === "PGRST202"
+    || error.message?.includes("Could not find the function public.replace_family_barriers") === true;
+}
+
+async function replaceFamilyBarriers(
+  supabase: AppSupabaseClient,
+  familyId: string,
+  barriers: BarrierReplacementRow[],
+): Promise<SupabaseOperationError | null> {
+  const { error: rpcError } = await supabase.rpc("replace_family_barriers", {
+    p_family_id: familyId,
+    p_barriers: barriers,
+  });
+  if (!rpcError) return null;
+  if (!isMissingBarrierReplacementRpc(rpcError)) return rpcError;
+
+  // ponytail: compatibility path for projects missing the atomic RPC migration;
+  // remove after every deployed database includes 20260802143000.
+  const { data: currentRows, error: readError } = await supabase
+    .from("family_barriers")
+    .select("id")
+    .eq("family_id", familyId);
+  if (readError) return readError;
+
+  let insertedIds: string[] = [];
+  if (barriers.length > 0) {
+    const { data: insertedRows, error: insertError } = await supabase
+      .from("family_barriers")
+      .insert(barriers.map((barrier) => ({ ...barrier, family_id: familyId })))
+      .select("id");
+    if (insertError) return insertError;
+    insertedIds = (insertedRows ?? []).map((row) => row.id as string);
+  }
+
+  const previousIds = (currentRows ?? []).map((row) => row.id as string);
+  if (previousIds.length === 0) return null;
+
+  const { error: deleteError } = await supabase
+    .from("family_barriers")
+    .delete()
+    .eq("family_id", familyId)
+    .in("id", previousIds);
+  if (!deleteError) return null;
+
+  if (insertedIds.length > 0) {
+    const { error: rollbackError } = await supabase
+      .from("family_barriers")
+      .delete()
+      .eq("family_id", familyId)
+      .in("id", insertedIds);
+    if (rollbackError) {
+      console.error("[barrier-workflow] barrier replacement rollback failed", rollbackError);
+    }
+  }
+  return deleteError;
+}
+
 function mapFamilyToWorkflowResult(
   referenceId: string,
   familyId: string,
@@ -291,10 +358,7 @@ export async function generateBarrierWorkflowAction(
       label: barrier.label,
       sort_order: barrier.sort_order,
     }));
-    const { error: barrierErr } = await supabase.rpc("replace_family_barriers", {
-      p_family_id: familyId,
-      p_barriers: replacementRows,
-    });
+    const barrierErr = await replaceFamilyBarriers(supabase, familyId, replacementRows);
     if (barrierErr) {
       return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
     }
@@ -549,13 +613,9 @@ export async function generateBarrierWorkflowForFamilyAction(
       });
     }
 
-    // Save the case manager's selections first. The RPC performs the replacement in
-    // one transaction, and the saved context remains useful even if AI generation is
-    // temporarily unavailable.
-    const { error: barrierErr } = await supabase.rpc("replace_family_barriers", {
-      p_family_id: familyId,
-      p_barriers: barrierRows,
-    });
+    // Save the case manager's selections first. The saved context remains useful even
+    // if AI generation is temporarily unavailable.
+    const barrierErr = await replaceFamilyBarriers(supabase, familyId, barrierRows);
     if (barrierErr) {
       return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
     }

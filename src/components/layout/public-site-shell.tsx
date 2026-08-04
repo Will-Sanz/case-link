@@ -12,14 +12,14 @@ const navLinkClass =
 
 export function PublicSiteShell({
   children,
-  authenticated = false,
+  authenticated,
 }: {
   children: ReactNode;
-  /** When true, show Families link into the signed-in workspace. */
-  authenticated?: boolean;
+  /** When true, show the signed-in workspace link. */
+  authenticated: boolean;
 }) {
   const accountLink = authenticated ?
-    { href: "/families", label: "Families" }
+    { href: "/families", label: "Workspace" }
   : { href: "/login", label: "Sign in" };
 
   return (

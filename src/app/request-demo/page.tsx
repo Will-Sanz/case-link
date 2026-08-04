@@ -2,15 +2,25 @@ import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { PublicSiteShell } from "@/components/layout/public-site-shell";
 import { DemoRequestForm } from "@/features/marketing/demo-request-form";
+import { getSessionUser } from "@/lib/auth/session";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Request a demo",
   description: "Request a guided CaseLink demo for your school or district.",
 };
 
-export default function RequestDemoPage() {
+export default async function RequestDemoPage() {
+  let user = null;
+  try {
+    user = await getSessionUser();
+  } catch {
+    // Env vars missing or Supabase unreachable: treat as unauthenticated
+  }
+
   return (
-    <PublicSiteShell>
+    <PublicSiteShell authenticated={Boolean(user)}>
       <section id="for-districts" className="scroll-mt-24 bg-[var(--public-paper-2)] py-16 sm:py-24" aria-labelledby="demo-title">
         <div className="mx-auto grid max-w-6xl items-start gap-12 px-5 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
           <div className="pt-2 lg:sticky lg:top-32">

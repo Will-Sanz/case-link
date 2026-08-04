@@ -257,7 +257,10 @@ export function FamilyLiteWorkspace({
           const reload = await loadBarrierWorkflowForFamilyAction(familyId);
           if (reload.ok) setResult(reload.result);
           router.refresh();
-          if (adv.done) break;
+          if (adv.done) {
+            if (tab === "overview") router.push(`/families/${familyId}/plan`);
+            break;
+          }
           await new Promise((res) => setTimeout(res, 250));
         }
       } finally {
@@ -266,7 +269,7 @@ export function FamilyLiteWorkspace({
     })();
     stagedPollRef.current = promise;
     await promise;
-  }, [familyId, router]);
+  }, [familyId, router, tab]);
 
   useEffect(() => {
     setResult(initialResult);
@@ -375,6 +378,8 @@ export function FamilyLiteWorkspace({
 
         if (r.stagedPolling) {
           await runStagedPlanPolling();
+        } else {
+          router.push(`/families/${familyId}/plan`);
         }
       } finally {
         setLocalPlanGenerating(false);

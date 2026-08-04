@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LegalDocumentBody } from "@/components/layout/legal-doc-layout";
 import { PublicSiteShell } from "@/components/layout/public-site-shell";
@@ -11,7 +11,7 @@ import { ProductPageContent } from "@/features/marketing/product-page-content";
 describe("public site content contract", () => {
   it("keeps the approved homepage language and OpenAI recognition without the rejected warning", () => {
     const { container } = render(
-      <PublicSiteShell>
+      <PublicSiteShell authenticated={false}>
         <HomePageContent />
       </PublicSiteShell>,
     );
@@ -56,6 +56,18 @@ describe("public site content contract", () => {
       }),
     ).toBeNull();
     expect(screen.getAllByRole("link", { name: "Request a demo" }).length).toBeGreaterThan(0);
+  });
+
+  it("links authenticated users to their workspace", () => {
+    render(
+      <PublicSiteShell authenticated>
+        <div />
+      </PublicSiteShell>,
+    );
+
+    const primaryNavigation = screen.getByRole("navigation", { name: "Primary" });
+    expect(within(primaryNavigation).getByRole("link", { name: "Workspace" }).getAttribute("href")).toBe("/families");
+    expect(within(primaryNavigation).queryByRole("link", { name: "Sign in" })).toBeNull();
   });
 
   it("keeps the current product, demo, and legal page language", () => {
