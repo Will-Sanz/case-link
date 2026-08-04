@@ -24,6 +24,7 @@ import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-ph
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
+import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
 import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
 import { getFamilyDetail } from "@/lib/services/families";
 import type { PlanGenerationState, PlanStepDetails } from "@/types/family";
@@ -64,7 +65,7 @@ export type StagedPlanStartResult =
   | { ok: false; error: string };
 
 export type StagedPlanAdvanceResult =
-  | { ok: true; done: boolean; phaseCompleted?: "60" | "90" }
+  | { ok: true; done: boolean; phaseCompleted?: "30" | "60" | "90" }
   | { ok: false; error: string };
 
 /** Serialize staged advance per family so overlapping polls do not run the same phase twice. */
@@ -472,13 +473,16 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   };
 }
 
-/** Lean staged pipeline: persist 30-day first; client calls `advanceStagedLeanPlanGeneration` for 60/90. */
+/**
+ * Start a durable generation job without waiting for a model response. The client
+ * advances each stage independently, so navigation or a dropped request never
+ * discards already-saved work.
+ */
 export async function startStagedLeanPlanGeneration(input: {
   familyId: string;
   regenerationFeedback?: string;
   aiMode?: AiMode;
 }): Promise<StagedPlanStartResult> {
-  const logPrefix = "[startStagedLeanPlanGeneration]";
   let supabase: SupabaseClient;
   let userId: string | null = null;
   try {
@@ -520,29 +524,6 @@ export async function startStagedLeanPlanGeneration(input: {
   const brief = buildPlanningBrief(detail, input.regenerationFeedback);
   const stagedMode = parseAiMode(input.aiMode);
 
-  const t30 = Date.now();
-  const planStartDate = new Date().toISOString().slice(0, 10);
-  const phase30 = await tryGenerateLeanPlanPhaseOpenAI(detail, "30", {
-    regenerationFeedback: input.regenerationFeedback?.trim(),
-    retries: 2,
-    aiMode: stagedMode,
-    requestMeta: userId ? { userId, route: "stagedPlanPhase30" } : undefined,
-    planStartDate,
-  });
-
-  if (!phase30.ok) {
-    console.error(logPrefix, "phase 30 failed", phase30.reason);
-    return { ok: false, error: phase30.reason };
-  }
-
-  const steps30 = phase30.steps
-    .filter((s) => s.phase === "30")
-    .slice(0, MAX_PLAN_STEPS_PER_PHASE);
-
-  if (steps30.length === 0) {
-    return { ok: false, error: "AI returned no 30-day steps" };
-  }
-
   const { data: plan, error: planErr } = await supabase
     .from("plans")
     .insert({
@@ -550,15 +531,15 @@ export async function startStagedLeanPlanGeneration(input: {
       version: nextVersion,
       summary: null,
       generation_source: "openai",
-      ai_model: phase30.model,
+      ai_model: null,
       generation_state: {
         v: 1,
         status: "running",
-        pending_phase: "60",
+        pending_phase: "30",
         planning_brief: brief,
-        phases_complete: { "30": true, "60": false, "90": false },
-        models_used: [phase30.model],
-        stage_timings_ms: { "30": Date.now() - t30 },
+        phases_complete: { "30": false, "60": false, "90": false },
+        models_used: [],
+        stage_timings_ms: {},
         ai_mode: stagedMode,
       } satisfies PlanGenerationState,
     })
@@ -572,23 +553,9 @@ export async function startStagedLeanPlanGeneration(input: {
     };
   }
 
-  const ins = await insertLeanPhaseStepsForPlan(
-    supabase,
-    plan.id,
-    steps30,
-    0,
-    plan.created_at,
-  );
-  if (!ins.ok) {
-    await supabase.from("plans").delete().eq("id", plan.id);
-    return { ok: false, error: ins.error };
-  }
-
-  await logCaseActivity(supabase, input.familyId, userId, "plan.generated", "plan", plan.id, {
+  await logCaseActivity(supabase, input.familyId, userId, "plan.generation_started", "plan", plan.id, {
     version: nextVersion,
     staged: true,
-    phase: "30",
-    steps: steps30.length,
   });
 
   revalidatePath(`/families/${input.familyId}`, "page");
@@ -599,7 +566,7 @@ export async function startStagedLeanPlanGeneration(input: {
     ok: true,
     planId: plan.id,
     version: nextVersion,
-    stepCount: steps30.length,
+    stepCount: 0,
   };
 }
 
@@ -669,6 +636,71 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       .eq("id", planId);
   }
 
+  if (state.pending_phase === "30") {
+    const n30 = await countStepsInPhase(supabase, planId, "30");
+    if (n30 > 0) {
+      await persistState({
+        pending_phase: "60",
+        phases_complete: { ...state.phases_complete, "30": true },
+      });
+      revalidatePath(`/families/${input.familyId}`, "page");
+      return { ok: true, done: false, phaseCompleted: "30" };
+    }
+
+    const t = Date.now();
+    const res = await tryGenerateLeanPlanPhaseOpenAI(detail, "30", {
+      regenerationFeedback: state.planning_brief,
+      retries: generationMode === "fast" ? 1 : 2,
+      aiMode: generationMode,
+      requestMeta: userId ? { userId, route: "stagedPlanPhase30" } : undefined,
+      planStartDate: activePlan.created_at as string,
+    });
+    if (!res.ok) {
+      await persistState({ status: "failed", error: res.reason });
+      revalidatePath(`/families/${input.familyId}`, "page");
+      return { ok: false, error: res.reason };
+    }
+    const steps = res.steps
+      .map((step) => ({ ...step, phase: "30" as const }))
+      .slice(0, MAX_PLAN_STEPS_PER_PHASE);
+    if (steps.length === 0) {
+      const error = "The planning assistant returned no initial actions.";
+      await persistState({ status: "failed", error });
+      revalidatePath(`/families/${input.familyId}`, "page");
+      return { ok: false, error };
+    }
+    const ins = await insertLeanPhaseStepsForPlan(
+      supabase,
+      planId,
+      steps,
+      0,
+      activePlan.created_at as string,
+    );
+    if (!ins.ok) {
+      await persistState({ status: "failed", error: ins.error });
+      return { ok: false, error: ins.error };
+    }
+    const modelsUsed = [...state.models_used, res.model];
+    await persistState({
+      pending_phase: "60",
+      phases_complete: { ...state.phases_complete, "30": true },
+      models_used: modelsUsed,
+      stage_timings_ms: { ...state.stage_timings_ms, "30": Date.now() - t },
+    });
+    await logCaseActivity(
+      supabase,
+      input.familyId,
+      userId,
+      "plan.stage_generated",
+      "plan",
+      planId,
+      { stage: "initial", steps: steps.length },
+    );
+    revalidatePath(`/families/${input.familyId}`, "page");
+    revalidatePath("/calendar");
+    return { ok: true, done: false, phaseCompleted: "30" };
+  }
+
   // Heal: if DB already has steps for pending phase, advance state only
   if (state.pending_phase === "60") {
     const n60 = await countStepsInPhase(supabase, planId, "60");
@@ -685,7 +717,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     const t = Date.now();
     const res = await tryGenerateLeanPlanPhaseOpenAI(detail, "60", {
       regenerationFeedback: state.planning_brief,
-      retries: 2,
+      retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor60 || undefined,
       requestMeta: userId ? { userId, route: "stagedPlanPhase60" } : undefined,
@@ -734,7 +766,6 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   if (state.pending_phase === "90") {
     const n90 = await countStepsInPhase(supabase, planId, "90");
     if (n90 > 0) {
-      const models_used = state.models_used;
       await persistState({
         pending_phase: null,
         status: "complete",
@@ -748,7 +779,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     const t = Date.now();
     const res = await tryGenerateLeanPlanPhaseOpenAI(detail, "90", {
       regenerationFeedback: state.planning_brief,
-      retries: 2,
+      retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor90 || undefined,
       requestMeta: userId ? { userId, route: "stagedPlanPhase90" } : undefined,
@@ -796,13 +827,18 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     return { ok: true, done: true, phaseCompleted: "90" };
   }
 
-  // Running but pending_phase is not 60/90 (corrupt state, race, or legacy row): recover from DB counts.
+  // Corrupt, raced, or legacy state: recover from the rows already persisted.
   if (state.status === "running") {
     const n30 = await countStepsInPhase(supabase, planId, "30");
     const n60 = await countStepsInPhase(supabase, planId, "60");
     const n90 = await countStepsInPhase(supabase, planId, "90");
+    const recoveredPendingPhase = pendingPhaseFromPersistedCounts({
+      "30": n30,
+      "60": n60,
+      "90": n90,
+    });
 
-    if (n90 > 0) {
+    if (recoveredPendingPhase === null) {
       await persistState({
         pending_phase: null,
         status: "complete",
@@ -811,7 +847,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       revalidatePath(`/families/${input.familyId}`, "page");
       return { ok: true, done: true };
     }
-    if (n60 > 0) {
+    if (recoveredPendingPhase === "90") {
       await persistState({
         pending_phase: "90",
         phases_complete: { ...state.phases_complete, "60": true },
@@ -819,7 +855,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       revalidatePath(`/families/${input.familyId}`, "page");
       return { ok: true, done: false };
     }
-    if (n30 > 0) {
+    if (recoveredPendingPhase === "60") {
       await persistState({
         pending_phase: "60",
         phases_complete: { ...state.phases_complete, "30": true },
@@ -828,11 +864,12 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: true, done: false };
     }
 
-    const msg =
-      "Plan generation stopped in an inconsistent state. Please regenerate the plan.";
-    await persistState({ status: "failed", error: msg });
+    await persistState({
+      pending_phase: recoveredPendingPhase,
+      phases_complete: { "30": false, "60": false, "90": false },
+    });
     revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: false, error: msg };
+    return { ok: true, done: false };
   }
 
   revalidatePath(`/families/${input.familyId}`, "page");

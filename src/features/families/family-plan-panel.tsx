@@ -1058,11 +1058,12 @@ export function FamilyPlanPanel({
             </p>
 
             <div className="mt-4 space-y-3">
-              {!workflow ? (
+              {!workflow || workflow.resourceStatus === "unavailable" ? (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                  Resource matches could not be loaded. Your plan is still available, and no resource information was added to it.
+                  {workflow?.resourceStatusMessage?.trim() ||
+                    "Resource matches could not be loaded."} Your plan is still available, and no resource information was added to it.
                 </p>
-              ) : workflow.resources.length === 0 ? (
+              ) : workflow.resourceStatus === "empty" || workflow.resources.length === 0 ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
                   No resource matches are available yet. Review the plan without relying on a resource recommendation.
                 </p>

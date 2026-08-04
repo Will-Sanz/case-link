@@ -82,6 +82,8 @@ export type BarrierWorkflowResult = {
   additionalDetails: string;
   sections: BarrierWorkflowPlanSection[];
   resources: BarrierWorkflowResource[];
+  resourceStatus: "ready" | "empty" | "unavailable";
+  resourceStatusMessage?: string | null;
   lastSavedAt: string | null;
   /** User-editable plan title from `plans.client_display.title`, if set. */
   planDisplayTitle?: string | null;

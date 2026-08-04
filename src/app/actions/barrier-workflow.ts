@@ -70,6 +70,8 @@ function mapFamilyToWorkflowResult(
   additionalDetails: string,
   lastSavedAt: string | null,
   detail: NonNullable<Awaited<ReturnType<typeof getFamilyDetail>>>,
+  resourceStatusOverride?: "ready" | "empty" | "unavailable",
+  resourceStatusMessage?: string | null,
 ): BarrierWorkflowResult {
   const createdAt = detail.plan?.created_at ? new Date(detail.plan.created_at) : new Date();
   const phaseSummaries = detail.plan?.client_display?.phaseSummaries;
@@ -156,6 +158,9 @@ function mapFamilyToWorkflowResult(
     additionalDetails,
     sections,
     resources,
+    resourceStatus:
+      resourceStatusOverride ?? (resources.length > 0 ? "ready" : "empty"),
+    resourceStatusMessage: resourceStatusMessage ?? null,
     lastSavedAt,
     planDisplayTitle: detail.plan?.client_display?.title?.trim() || null,
   };
@@ -227,7 +232,6 @@ export async function generateBarrierWorkflowAction(
 
   try {
     const { supabase, user } = await requireAppUserWithClient();
-    const now = new Date();
     const { data: existingRecord } = await supabase
       .from("barrier_plan_records")
       .select("family_id")
@@ -286,7 +290,9 @@ export async function generateBarrierWorkflowAction(
     }
 
     const matchRes = await runResourceMatching({ familyId });
-    if (!matchRes.ok) return { ok: false, error: matchRes.error };
+    if (!matchRes.ok) {
+      console.warn("[barrier-workflow] resource matching skipped", matchRes.error);
+    }
 
     const planRes = await startStagedLeanPlanGeneration({
       familyId,
@@ -307,6 +313,8 @@ export async function generateBarrierWorkflowAction(
       details,
       null,
       detail,
+      matchRes.ok ? undefined : "unavailable",
+      matchRes.ok ? null : matchRes.error,
     );
     const savedAt = await upsertBarrierPlanRecord(
       user.id,
@@ -509,20 +517,9 @@ export async function generateBarrierWorkflowForFamilyAction(
       });
     }
 
-    const planRes = await startStagedLeanPlanGeneration({
-      familyId,
-      regenerationFeedback:
-        [selected.join("; "), parsedAdditionalBarriers.join("; "), details]
-          .filter(Boolean)
-          .join("\n") || undefined,
-      aiMode: input.aiMode,
-    });
-    if (!planRes.ok) return { ok: false, error: planRes.error };
-
-    // Replace the saved selections only after generation succeeds. The RPC performs
-    // the delete + insert in one transaction, so an insert error cannot erase the
-    // family's existing barriers. Additional context is planning feedback only and
-    // must never overwrite the distinct profile summary or circumstances fields.
+    // Save the case manager's selections first. The RPC performs the replacement in
+    // one transaction, and the saved context remains useful even if AI generation is
+    // temporarily unavailable.
     const { error: barrierErr } = await supabase.rpc("replace_family_barriers", {
       p_family_id: familyId,
       p_barriers: barrierRows,
@@ -531,11 +528,27 @@ export async function generateBarrierWorkflowForFamilyAction(
       return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
     }
 
-    // Resource suggestions are helpful but are not part of the core plan workflow;
-    // a matching outage should not turn a successfully generated plan into an error.
+    // Match before generation so the planner can use current directory facts. A
+    // matching outage is explicit in the UI but never blocks the core plan.
     const matchRes = await runResourceMatching({ familyId });
     if (!matchRes.ok) {
       console.warn("[barrier-workflow] resource matching skipped", matchRes.error);
+    }
+
+    const planRes = await startStagedLeanPlanGeneration({
+      familyId,
+      regenerationFeedback:
+        [selected.join("; "), parsedAdditionalBarriers.join("; "), details]
+          .filter(Boolean)
+          .join("\n") || undefined,
+      aiMode: input.aiMode,
+    });
+    if (!planRes.ok) {
+      revalidatePath(`/families/${familyId}`);
+      return {
+        ok: false,
+        error: `Your barriers were saved, but the plan could not be prepared. ${planRes.error}`,
+      };
     }
 
     const detail = await getFamilyDetail(supabase, familyId);
@@ -549,6 +562,8 @@ export async function generateBarrierWorkflowForFamilyAction(
       details,
       null,
       detail,
+      matchRes.ok ? undefined : "unavailable",
+      matchRes.ok ? null : matchRes.error,
     );
     const savedAt = await upsertBarrierPlanRecord(
       user.id,

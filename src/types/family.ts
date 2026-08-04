@@ -203,7 +203,7 @@ export type PlanClientDisplay = {
 export type PlanGenerationState = {
   v: 1;
   status: "running" | "complete" | "failed";
-  pending_phase: "60" | "90" | null;
+  pending_phase: "30" | "60" | "90" | null;
   planning_brief: string;
   phases_complete: { "30": boolean; "60": boolean; "90": boolean };
   models_used: string[];

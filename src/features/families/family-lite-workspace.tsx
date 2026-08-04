@@ -16,6 +16,7 @@ import { ArchiveFamilyFromListControl } from "@/features/families/archive-family
 import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
+import { completedGenerationStageCount } from "@/lib/domain/plan/generation-progress";
 import type {
   BarrierPresetLabel,
   BarrierWorkflowResult,
@@ -213,6 +214,7 @@ export function FamilyLiteWorkspace({
 
   const serverPlanStillGenerating = plan?.generation_state?.status === "running";
   const planGenerateBusy = localPlanGenerating || serverPlanStillGenerating;
+  const savedGenerationStages = completedGenerationStageCount(plan?.generation_state);
 
   const stagedPollRef = useRef<Promise<void> | null>(null);
   const resumePollStartedRef = useRef(false);
@@ -226,17 +228,25 @@ export function FamilyLiteWorkspace({
     }
     const promise = (async () => {
       try {
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < 6; i++) {
           const adv = await advanceStagedLeanPlanGeneration({
             familyId,
             aiMode: DEFAULT_AI_MODE,
           });
-          if (!adv.ok) break;
+          if (!adv.ok) {
+            setError(
+              `Plan preparation paused. Your completed work is saved. ${adv.error}`,
+            );
+            const reload = await loadBarrierWorkflowForFamilyAction(familyId);
+            if (reload.ok) setResult(reload.result);
+            router.refresh();
+            break;
+          }
           const reload = await loadBarrierWorkflowForFamilyAction(familyId);
           if (reload.ok) setResult(reload.result);
           router.refresh();
           if (adv.done) break;
-          await new Promise((res) => setTimeout(res, 1600));
+          await new Promise((res) => setTimeout(res, 250));
         }
       } finally {
         stagedPollRef.current = null;
@@ -325,6 +335,7 @@ export function FamilyLiteWorkspace({
         });
         if (!r.ok) {
           setError(r.error);
+          router.refresh();
           return;
         }
         setResult(r.result);
@@ -410,14 +421,26 @@ export function FamilyLiteWorkspace({
         </Card>
       ) : null}
 
-      {tab === "plan" && plan?.generation_state?.status === "running" ? (
-        <p
-          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+      {tab === "plan" && planGenerateBusy ? (
+        <div
+          className="rounded-xl border border-[#cfe0cc] bg-[#f3f8f1] px-4 py-3 text-sm text-[#173a15]"
           role="status"
           aria-live="polite"
         >
-          Your plan is still being prepared. You can leave this page and return; completed work will be saved.
-        </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium">Preparing and checking the family action plan…</p>
+            <p className="text-xs text-[#5d705a]">{savedGenerationStages} of 3 planning passes saved</p>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dce9d9]" aria-hidden>
+            <div
+              className="h-full rounded-full bg-[#3f8a36] transition-[width] duration-500"
+              style={{ width: `${Math.max(8, (savedGenerationStages / 3) * 100)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-[#5d705a]">
+            You can leave this page and return. Each completed pass is saved automatically.
+          </p>
+        </div>
       ) : null}
 
       {(result || plan) && tab === "plan" ? (
@@ -440,7 +463,7 @@ export function FamilyLiteWorkspace({
               <div>
                 <CardTitle className="text-base">Resource matches</CardTitle>
                 <p className="mt-1 text-sm text-slate-600">
-                  Curated nonprofit options matched to this family&apos;s current barriers.
+                  Options from your organization&apos;s resource directory matched to this family&apos;s barriers.
                 </p>
               </div>
               <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">
@@ -449,9 +472,19 @@ export function FamilyLiteWorkspace({
             </div>
           </Card>
 
-          {result.resources.length === 0 ? (
+          {result.resourceStatus === "unavailable" ? (
+            <Card className="border-amber-200 bg-amber-50 p-5 sm:p-6">
+              <p className="text-sm font-medium text-amber-950">Resource matching is unavailable.</p>
+              <p className="mt-1 text-sm leading-relaxed text-amber-900">
+                {result.resourceStatusMessage?.trim() ||
+                  "The plan is saved, but the resource directory could not be checked."}
+              </p>
+            </Card>
+          ) : result.resources.length === 0 ? (
             <Card className="p-5 sm:p-6">
-              <p className="text-sm text-slate-600">No resource matches yet for this family.</p>
+              <p className="text-sm text-slate-600">
+                No directory matches were found. Do not treat this as confirmation that no service exists.
+              </p>
             </Card>
           ) : (
             <div className="grid gap-3 xl:grid-cols-2">
