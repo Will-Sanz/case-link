@@ -2,29 +2,11 @@
 
 import { useState } from "react";
 import { pdf } from "@react-pdf/renderer";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlanPdfDocument } from "@/features/families/plan-pdf-document";
-import type { BarrierWorkflowResult } from "@/types/barrier-workflow";
+import { finalizePlanPdf } from "@/lib/domain/plan/finalize-plan-pdf";
 import type { PlanWithSteps } from "@/types/family";
-
-/** Preset + custom barriers for the case plan PDF header (deduped, order preserved). */
-export function planPdfBarrierLabels(workflow: BarrierWorkflowResult): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const push = (raw: string) => {
-    const t = raw.trim();
-    if (!t) return;
-    const k = t.toLowerCase();
-    if (seen.has(k)) return;
-    seen.add(k);
-    out.push(t);
-  };
-  for (const b of workflow.selectedBarriers ?? []) push(b);
-  for (const part of (workflow.additionalBarriers ?? "").split(/\r?\n|,|;/)) {
-    push(part);
-  }
-  return out;
-}
 
 function sanitizeFilenamePart(name: string): string {
   return name.replace(/[^\w\-]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
@@ -33,11 +15,11 @@ function sanitizeFilenamePart(name: string): string {
 export function PlanPdfExport({
   plan,
   familyName,
-  workflow,
+  barrierLabels,
 }: {
   plan: PlanWithSteps;
   familyName?: string;
-  workflow: BarrierWorkflowResult;
+  barrierLabels: string[];
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +31,7 @@ export function PlanPdfExport({
       const generatedDate = new Date().toLocaleDateString(undefined, {
         dateStyle: "medium",
       });
-      const barrierLabels = planPdfBarrierLabels(workflow);
-      const blob = await pdf(
+      const renderedBlob = await pdf(
         <PlanPdfDocument
           plan={plan}
           familyName={familyName}
@@ -58,18 +39,24 @@ export function PlanPdfExport({
           barrierLabels={barrierLabels}
         />,
       ).toBlob();
+      const finalizedBytes = await finalizePlanPdf(
+        new Uint8Array(await renderedBlob.arrayBuffer()),
+      );
+      const blob = new Blob([new Uint8Array(finalizedBytes).buffer], {
+        type: "application/pdf",
+      });
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       const namePart = familyName ? `${sanitizeFilenamePart(familyName)}-` : "";
       const datePart = sanitizeFilenamePart(generatedDate.replace(/\s+/g, "-"));
-      a.download = `case-plan-${namePart}${datePart}.pdf`;
+      a.download = `family-support-plan-${namePart}${datePart}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("PDF export failed:", err);
-      setError("The plan summary could not be prepared. Please try again.");
+      setError("The plan PDF could not be prepared. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -79,14 +66,19 @@ export function PlanPdfExport({
     <div>
       <Button
         type="button"
-        variant="secondary"
-        className="border-slate-200"
+        variant="outline"
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 sm:w-auto"
         onClick={handleDownload}
         disabled={loading}
       >
-        {loading ? "Preparing…" : "Download plan summary"}
+        <Download className="size-4" aria-hidden />
+        {loading ? "Preparing…" : "Download plan PDF"}
       </Button>
-      {error ? <p className="mt-2 max-w-52 text-xs font-medium text-red-700" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="mt-2 max-w-52 text-xs font-medium text-red-700" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

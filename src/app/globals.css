@@ -1,32 +1,33 @@
 @import "@fontsource-variable/newsreader";
+@import "../../tokens.css";
 @import "tailwindcss";
 
-/* CaseLink design tokens: calm, legible, and grounded in service work. */
+/* CaseLink compatibility aliases. New UI should use the semantic tokens in tokens.css. */
 :root {
-  --background: #f6f8f4;
-  --foreground: #183317;
-  --surface: #ffffff;
-  --border: #dce6d9;
-  --border-subtle: rgba(39, 98, 33, 0.1);
-  --muted: #5d705a;
-  --muted-bg: #edf4eb;
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --surface: var(--color-surface);
+  --border: var(--color-rule);
+  --border-subtle: var(--color-rule-soft);
+  --muted: var(--color-ink-muted);
+  --muted-bg: var(--color-paper-2);
 
-  --primary: #276221;
-  --primary-hover: #1f531b;
-  --primary-focus: rgba(70, 146, 60, 0.22);
-  --primary-bg: #edf6eb;
-  --primary-bg-strong: #d8ead5;
+  --primary: var(--color-accent);
+  --primary-hover: var(--color-accent-hover);
+  --primary-focus: var(--color-focus);
+  --primary-bg: var(--color-accent-soft);
+  --primary-bg-strong: var(--color-paper-3);
 
   /* Status: muted, consistent */
-  --success: #059669;
-  --success-bg: #ecfdf5;
-  --warning: #d97706;
-  --warning-bg: #fffbeb;
-  --error: #dc2626;
-  --error-bg: #fef2f2;
+  --success: var(--color-positive);
+  --success-bg: var(--color-positive-bg);
+  --warning: var(--color-attention);
+  --warning-bg: var(--color-attention-bg);
+  --error: var(--color-error);
+  --error-bg: var(--color-error-bg);
 
   /* Typography */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body);
   --text-page-title: 1.5rem;
   --text-section-title: 1rem;
   --text-body: 0.875rem;
@@ -52,8 +53,8 @@
   --radius-lg: 0.5rem;
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 200ms ease;
+  --transition-fast: var(--dur-micro) var(--ease-out);
+  --transition-normal: var(--dur-short) var(--ease-out);
 }
 
 @theme inline {
@@ -62,7 +63,7 @@
   --color-primary: var(--primary);
   --color-border: var(--border);
   --color-muted-foreground: var(--muted);
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: var(--color-accent-ink);
   --font-sans: var(--font-sans);
 }
 
@@ -82,8 +83,8 @@ body {
 }
 
 ::selection {
-  background: #cce7c9;
-  color: #173a15;
+  background: var(--color-rule-strong);
+  color: var(--color-ink);
 }
 
 button,
@@ -121,45 +122,45 @@ select {
 /* Hallmark · genre: editorial · macrostructure: narrative-workflow / review-led-product · theme: studied-DNA (source: user-provided option 4) · design-system: DESIGN.md · designed-as-app · nav: N1a · footer: Ft4 · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: text-led process + Lucide functional (30) · mobile: pass (34, 49, 50–57) */
 .public-site,
 .public-auth {
-  --public-paper: #fbfaff;
-  --public-paper-2: #f4f0ff;
-  --public-paper-3: #ebe6fb;
-  --public-paper-hero: #f8f6ff;
-  --public-surface: #fffefe;
-  --public-ink: #102052;
-  --public-ink-hover: #182b67;
-  --public-ink-strong: #303b68;
-  --public-ink-2: #3f496d;
-  --public-ink-muted: #4b557a;
-  --public-ink-3: #626b8b;
-  --public-placeholder: #646d91;
-  --public-ink-on-dark-muted: #d9d5ed;
-  --public-rule: #ded8f4;
-  --public-rule-strong: #c8bee9;
-  --public-rule-soft: #ece8f8;
-  --public-rule-faint: #d3caed;
-  --public-rule-divider: #b7afd8;
-  --public-rule-mark: #8576cf;
-  --public-accent: #4932c6;
-  --public-accent-hover: #3823a7;
-  --public-accent-ink: #fffefe;
-  --public-accent-soft: #eeeaff;
-  --public-accent-rule: #a99ce9;
-  --public-focus: #5c47da;
-  --public-positive: #356a53;
-  --public-positive-bg: #e8f2ec;
-  --public-attention: #75571b;
-  --public-attention-bg: #fff5d9;
-  --public-attention-surface: #fff8e7;
-  --public-attention-rule: #ead6a2;
-  --public-shadow-action: 0 8px 22px rgba(55, 38, 161, 0.2);
-  --public-shadow-surface: 0 20px 54px rgba(31, 25, 86, 0.13);
-  --public-shadow-menu: 0 18px 50px rgba(31, 25, 86, 0.16);
-  --public-shadow-proof: 0 26px 70px rgba(31, 25, 86, 0.16);
-  --public-shadow-decision: 0 24px 60px rgba(31, 25, 86, 0.14);
-  --public-shadow-dark-action: 0 9px 24px rgba(5, 10, 37, 0.22);
-  --public-font-display: "Newsreader Variable", Georgia, serif;
-  --public-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --public-paper: var(--color-paper);
+  --public-paper-2: var(--color-paper-2);
+  --public-paper-3: var(--color-paper-3);
+  --public-paper-hero: var(--color-paper-hero);
+  --public-surface: var(--color-surface);
+  --public-ink: var(--color-ink);
+  --public-ink-hover: var(--color-ink-hover);
+  --public-ink-strong: var(--color-ink-strong);
+  --public-ink-2: var(--color-ink-2);
+  --public-ink-muted: var(--color-ink-muted);
+  --public-ink-3: var(--color-ink-faint);
+  --public-placeholder: var(--color-ink-faint);
+  --public-ink-on-dark-muted: var(--color-ink-on-dark-muted);
+  --public-rule: var(--color-rule);
+  --public-rule-strong: var(--color-rule-strong);
+  --public-rule-soft: var(--color-rule-soft);
+  --public-rule-faint: var(--color-rule-faint);
+  --public-rule-divider: var(--color-rule-divider);
+  --public-rule-mark: var(--color-rule-mark);
+  --public-accent: var(--color-accent);
+  --public-accent-hover: var(--color-accent-hover);
+  --public-accent-ink: var(--color-accent-ink);
+  --public-accent-soft: var(--color-accent-soft);
+  --public-accent-rule: var(--color-accent-rule);
+  --public-focus: var(--color-focus);
+  --public-positive: var(--color-positive);
+  --public-positive-bg: var(--color-positive-bg);
+  --public-attention: var(--color-attention);
+  --public-attention-bg: var(--color-attention-bg);
+  --public-attention-surface: var(--color-attention-surface);
+  --public-attention-rule: var(--color-attention-rule);
+  --public-shadow-action: var(--shadow-action);
+  --public-shadow-surface: var(--shadow-surface);
+  --public-shadow-menu: var(--shadow-menu);
+  --public-shadow-proof: var(--shadow-proof);
+  --public-shadow-decision: var(--shadow-decision);
+  --public-shadow-dark-action: var(--shadow-dark-action);
+  --public-font-display: var(--font-display);
+  --public-ease-out: var(--ease-out);
 
   color: var(--public-ink);
 }
@@ -174,6 +175,39 @@ select {
   letter-spacing: -0.028em;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.workspace-shell {
+  background: var(--workspace-background);
+  color: var(--color-ink);
+}
+
+.workspace-display {
+  font-family: var(--font-display);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-shell :where(a, button, input, textarea, select, summary):focus-visible {
+  outline-color: var(--color-focus);
+}
+
+.workspace-shell :where(input, textarea, select):focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell *,
+  .workspace-shell *::before,
+  .workspace-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .public-primary-action,

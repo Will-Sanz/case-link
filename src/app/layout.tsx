@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s | CaseLink",
   },
   description:
-    "CaseLink helps school case managers turn family needs into structured intervention plans and completed paperwork.",
+    "CaseLink helps school case managers turn family needs into structured intervention plans and professional PDF exports.",
   icons: {
     icon: [{ url: "/favicon.svg?v=2", type: "image/svg+xml" }],
     shortcut: "/favicon.svg?v=2",
@@ -26,7 +26,7 @@ export default function RootLayout({
       lang="en"
       className={`${GeistSans.variable} h-full`}
     >
-      <body className="flex min-h-full flex-col font-sans text-slate-700 antialiased">
+      <body className="flex min-h-full flex-col font-sans antialiased">
         {children}
       </body>
     </html>

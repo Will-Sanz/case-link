@@ -62,38 +62,38 @@ export function CaseActivityTimeline({
   const visible = items.slice(0, maxItems);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-medium text-slate-500">
+    <section className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)]">
+      <div className="border-b border-[var(--color-rule-soft)] px-4 py-3 sm:px-5">
+        <h2 className="text-sm font-medium text-[var(--color-ink-faint)]">
           Case activity
         </h2>
-        <p className="mt-0.5 text-sm text-slate-600">
+        <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
           Chronological record of actions on this case.
         </p>
       </div>
       {visible.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
+        <p className="px-4 py-6 text-center text-sm text-[var(--color-ink-faint)] sm:px-5">
           No activity recorded yet.
         </p>
       ) : (
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-[var(--color-rule-soft)]">
         {visible.map((item) => (
           <li key={item.id} className="px-4 py-3 sm:px-5">
             <div className="flex gap-3">
-              <div className="mt-1 size-2 shrink-0 rounded-full bg-blue-500" />
+              <div className="mt-1 size-2 shrink-0 rounded-full bg-[var(--color-accent)]" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-slate-800">
+                <p className="text-sm text-[var(--color-ink-strong)]">
                   {ACTION_LABELS[item.action] ?? item.action.replace(/\./g, " ")}
                   {item.actor_email ? (
-                    <span className="text-slate-500"> · {item.actor_email}</span>
+                    <span className="text-[var(--color-ink-faint)]"> · {item.actor_email}</span>
                   ) : null}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">
                   {formatRelative(item.created_at)}
                   <span className="sr-only"> ({formatDt(item.created_at)})</span>
                 </p>
                 {item.details && Object.keys(item.details).length > 0 ? (
-                  <p className="mt-1 text-xs text-slate-600">
+                  <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
                     {JSON.stringify(item.details)
                       .replace(/[{}"]/g, " ")
                       .replace(/,/g, " · ")

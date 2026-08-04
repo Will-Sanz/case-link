@@ -1,29 +1,20 @@
 "use client";
 
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import type { PlanWithSteps, PlanStepRow, PlanStepDetails } from "@/types/family";
+import { Fragment } from "react";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { actionUiStatus } from "@/lib/domain/plan/action-state";
+import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
+import type { PlanStepDetails, PlanStepRow, PlanWithSteps } from "@/types/family";
 
-// --- Text normalization (client-side PDF only; no PII logging) ---
+export const PLAN_PDF_TITLE = "Family Support Intervention Plan";
+export const PLAN_PDF_PALETTE = { ink: "#000000", paper: "#FFFFFF" } as const;
 
-function cleanText(s: string | null | undefined): string {
-  if (!s) return "";
-  return s
+function cleanText(value: string | null | undefined): string {
+  return (value ?? "")
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+([.,;:!?])/g, "$1")
     .trim();
-}
-
-function capitalizeWord(w: string): string {
-  if (!w) return w;
-  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-}
-
-function formatPriority(p: PlanStepRow["priority"] | null | undefined): string | null {
-  if (!p || p === "medium") return null;
-  if (p === "urgent") return "Urgent";
-  return capitalizeWord(p);
 }
 
 function formatOwner(owner: PlanStepDetails["owner"]): string {
@@ -33,297 +24,291 @@ function formatOwner(owner: PlanStepDetails["owner"]): string {
   return "Case manager";
 }
 
-function formatActionDate(value: string | null): string | null {
-  if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
+function formatPriority(priority: PlanStepRow["priority"]): string {
+  if (priority === "urgent") return "Urgent";
+  if (priority === "high") return "High";
+  if (priority === "low") return "Low";
+  return "Standard";
+}
+
+function formatDateOnly(value: string | null): string {
+  if (!value) return "Not set";
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, { dateStyle: "medium" });
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-function formatTimeline(step: PlanStepRow, d: PlanStepDetails | undefined): string | null {
-  const timing = cleanText(d?.timing_guidance);
-  if (timing) return timing;
-  if (step.due_date) {
-    const dt = new Date(step.due_date);
-    if (!Number.isNaN(dt.getTime())) {
-      return dt.toLocaleDateString(undefined, { dateStyle: "medium" });
-    }
-  }
-  return null;
-}
-
-/** Single narrative paragraph: description + non-redundant action / guidance. */
-function narrativeParagraph(step: PlanStepRow, d: PlanStepDetails | undefined): string | null {
-  const desc = cleanText(step.description);
-  const actionNow = cleanText(d?.action_needed_now);
-  const fromHelper = cleanText(
-    (step.ai_helper_data as { action_needed_now?: string } | null | undefined)?.action_needed_now,
+function narrative(step: PlanStepRow): string | null {
+  const details = step.details ?? {};
+  const values = [
+    cleanText(step.description),
+    cleanText(details.action_needed_now),
+    cleanText(details.detailed_instructions),
+  ].filter(Boolean);
+  const unique = values.filter(
+    (value, index) =>
+      values.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index,
   );
-  const detailed = cleanText(d?.detailed_instructions);
-
-  const chunks: string[] = [];
-  if (desc) chunks.push(desc);
-
-  const secondary = actionNow || fromHelper;
-  if (secondary) {
-    const dlow = desc.toLowerCase();
-    const sub = secondary.toLowerCase().slice(0, Math.min(48, secondary.length));
-    if (!desc || (sub.length > 0 && !dlow.includes(sub))) {
-      if (secondary !== desc) chunks.push(secondary);
-    }
-  }
-
-  if (detailed) {
-    const joined = chunks.join(" ").toLowerCase();
-    const dsub = detailed.toLowerCase().slice(0, Math.min(56, detailed.length));
-    if (dsub.length > 0 && !joined.includes(dsub)) {
-      chunks.push(detailed);
-    }
-  }
-
-  return cleanText(chunks.join(" ")) || null;
+  return unique.join(" ") || null;
 }
 
-function keyActionBullets(step: PlanStepRow, d: PlanStepDetails | undefined): string[] {
-  const bullets: string[] = [];
-  const pushUnique = (line: string) => {
-    const t = cleanText(line);
-    if (!t) return;
-    if (!bullets.some((b) => b.toLowerCase() === t.toLowerCase())) bullets.push(t);
-  };
-
-  if (step.action_items?.length) {
-    const sorted = [...step.action_items].sort((a, b) => {
-      if (a.target_date && b.target_date && a.target_date !== b.target_date) {
-        return a.target_date.localeCompare(b.target_date);
-      }
-      if (a.target_date && !b.target_date) return -1;
-      if (!a.target_date && b.target_date) return 1;
-      return a.sort_order - b.sort_order;
-    });
-    for (const ai of sorted) {
-      const t = cleanText(ai.title);
-      if (!t) continue;
-      const date = formatActionDate(ai.target_date);
-      const status = actionUiStatus(ai).replaceAll("_", " ");
-      pushUnique([date, t, status].filter(Boolean).join(" — "));
-    }
-  }
-
-  if (d?.checklist?.length) {
-    for (const c of d.checklist) {
-      pushUnique(c);
-    }
-  }
-
-  return bullets;
-}
-
-function documentBullets(d: PlanStepDetails | undefined): string[] {
-  if (!d) return [];
-  const out: string[] = [];
-  const push = (x: string) => {
-    const t = cleanText(x);
-    if (!t) return;
-    if (!out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
-  };
-  for (const x of d.required_documents ?? []) push(x);
-  for (const x of d.materials_needed ?? []) push(x);
-  return out;
-}
-
-function contactLines(d: PlanStepDetails | undefined): string[] {
-  if (!d?.contacts?.length) return [];
-  return d.contacts
-    .map((c) => {
-      const name = cleanText(c.name);
-      const email = cleanText(c.email);
-      const phone = cleanText(c.phone);
-      const parts = [name, email, phone].filter(Boolean);
-      return parts.length ? parts.join(" · ") : "";
-    })
-    .filter(Boolean);
+function uniqueLines(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  return values.flatMap((raw) => {
+    const value = cleanText(raw);
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) return [];
+    seen.add(key);
+    return [value];
+  });
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 48,
-    fontSize: 10,
+    paddingTop: 42,
+    paddingRight: 42,
+    paddingBottom: 52,
+    paddingLeft: 42,
+    backgroundColor: PLAN_PDF_PALETTE.paper,
+    color: PLAN_PDF_PALETTE.ink,
     fontFamily: "Helvetica",
-    color: "#111111",
+    fontSize: 9.5,
+    lineHeight: 1.4,
   },
-  docTitle: {
+  title: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 14,
-    color: "#000000",
+    lineHeight: 1.15,
   },
-  headerLine: {
-    fontSize: 10,
-    lineHeight: 1.45,
-    marginBottom: 3,
-    color: "#333333",
+  titleRule: {
+    marginTop: 11,
+    borderBottomWidth: 1.5,
+    borderBottomColor: PLAN_PDF_PALETTE.ink,
   },
-  headerBold: {
-    fontWeight: "bold",
-    color: "#000000",
-  },
-  barrierSection: {
-    marginTop: 12,
-    marginBottom: 20,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#bfbfbf",
-  },
-  sectionLabel: {
-    fontSize: 9,
-    fontWeight: "bold",
-    marginBottom: 6,
-    color: "#000000",
-  },
-  barrierBulletRow: {
+  metadata: {
+    marginTop: 11,
     flexDirection: "row",
-    marginBottom: 2,
-    paddingLeft: 2,
+    flexWrap: "wrap",
   },
-  barrierBullet: { width: 12, fontSize: 9, color: "#333333" },
-  barrierText: { flex: 1, fontSize: 9, lineHeight: 1.4, color: "#333333" },
-  phaseHeading: {
-    fontSize: 12,
+  metadataItem: {
+    width: "50%",
+    paddingRight: 12,
+    marginBottom: 5,
+  },
+  label: {
     fontWeight: "bold",
-    marginTop: 16,
-    marginBottom: 8,
-    color: "#000000",
   },
-  phaseIntro: {
-    fontSize: 10,
-    lineHeight: 1.45,
-    color: "#444444",
-    marginBottom: 10,
+  section: {
+    marginTop: 18,
   },
-  stepBlock: {
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#d9d9d9",
+  sectionHeading: {
+    fontWeight: "bold",
+    fontSize: 11,
+    marginBottom: 7,
+  },
+  barrierList: {
+    borderTopWidth: 0.75,
+    borderTopColor: PLAN_PDF_PALETTE.ink,
+  },
+  barrierRow: {
+    flexDirection: "row",
+    paddingTop: 4,
+    paddingBottom: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: PLAN_PDF_PALETTE.ink,
+  },
+  bullet: {
+    width: 14,
+  },
+  grow: {
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+  goal: {
+    marginTop: 20,
+  },
+  goalHeader: {
+    paddingTop: 7,
+    paddingRight: 8,
+    paddingBottom: 7,
+    paddingLeft: 8,
+    borderTopWidth: 1.25,
+    borderBottomWidth: 0.75,
+    borderTopColor: PLAN_PDF_PALETTE.ink,
+    borderBottomColor: PLAN_PDF_PALETTE.ink,
+  },
+  goalTitle: {
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  goalProgress: {
+    marginTop: 3,
+    fontSize: 8.5,
+  },
+  step: {
+    paddingTop: 11,
+    paddingRight: 8,
+    paddingBottom: 11,
+    paddingLeft: 8,
+    borderBottomWidth: 0.75,
+    borderBottomColor: PLAN_PDF_PALETTE.ink,
   },
   stepTitle: {
-    fontSize: 11,
     fontWeight: "bold",
-    marginBottom: 5,
-    color: "#000000",
+    fontSize: 10.5,
   },
-  metaLine: {
-    fontSize: 9,
-    lineHeight: 1.35,
-    marginBottom: 2,
-    color: "#333333",
+  meta: {
+    marginTop: 3,
+    fontSize: 8.5,
   },
-  body: {
-    fontSize: 10,
-    lineHeight: 1.5,
-    color: "#222222",
-    marginTop: 4,
-    marginBottom: 6,
+  narrative: {
+    marginTop: 7,
   },
-  fieldLabel: {
-    fontSize: 9,
-    fontWeight: "bold",
-    marginTop: 6,
+  fieldHeading: {
+    marginTop: 8,
     marginBottom: 3,
-    color: "#000000",
+    fontWeight: "bold",
+    fontSize: 8.5,
   },
-  bulletRow: {
+  actionTable: {
+    marginTop: 8,
+    borderTopWidth: 0.75,
+    borderLeftWidth: 0.75,
+    borderRightWidth: 0.75,
+    borderColor: PLAN_PDF_PALETTE.ink,
+  },
+  actionHeader: {
     flexDirection: "row",
-    marginBottom: 2,
-    paddingLeft: 2,
+    borderBottomWidth: 0.75,
+    borderBottomColor: PLAN_PDF_PALETTE.ink,
+    fontWeight: "bold",
+    fontSize: 8,
   },
-  bullet: { width: 12, fontSize: 10, color: "#222222" },
-  bulletText: { flex: 1, fontSize: 10, lineHeight: 1.45, color: "#222222" },
-  statusLine: {
-    fontSize: 9,
-    marginTop: 6,
-    color: "#444444",
+  actionRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.75,
+    borderBottomColor: PLAN_PDF_PALETTE.ink,
+  },
+  actionCell: {
+    width: "58%",
+    paddingTop: 5,
+    paddingRight: 6,
+    paddingBottom: 5,
+    paddingLeft: 6,
+  },
+  dateCell: {
+    width: "22%",
+    paddingTop: 5,
+    paddingRight: 5,
+    paddingBottom: 5,
+    paddingLeft: 5,
+    borderLeftWidth: 0.5,
+    borderLeftColor: PLAN_PDF_PALETTE.ink,
+  },
+  statusCell: {
+    width: "20%",
+    paddingTop: 5,
+    paddingRight: 5,
+    paddingBottom: 5,
+    paddingLeft: 5,
+    borderLeftWidth: 0.5,
+    borderLeftColor: PLAN_PDF_PALETTE.ink,
+  },
+  actionDetail: {
+    marginTop: 2,
+    fontSize: 8,
+  },
+  listRow: {
+    flexDirection: "row",
+    marginTop: 2,
   },
 });
 
-function PdfStep({ step, index }: { step: PlanStepRow; index: number }) {
-  const d = step.details as PlanStepDetails | undefined;
-  const pri = formatPriority(step.priority ?? undefined);
-  const timeline = formatTimeline(step, d);
-  const narrative = narrativeParagraph(step, d);
-  const actions = keyActionBullets(step, d);
-  const docs = documentBullets(d);
-  const contacts = contactLines(d);
-  const outcome = cleanText(d?.expected_outcome);
-  const w = step.workflow_data;
-  const blockedNote =
-    step.status === "blocked"
-      ? cleanText(w?.blocker_reason) || "On hold pending follow-up."
-      : null;
-  const completedNote =
-    step.status === "completed" ? cleanText(w?.outcome_notes ?? null) : null;
-
-  const title = cleanText(step.title) || "Untitled step";
+function PdfActionTable({ step }: { step: PlanStepRow }) {
+  const actions = [...(step.action_items ?? [])].sort((a, b) => {
+    const aDate = a.status === "blocked" ? a.follow_up_date ?? a.target_date : a.target_date;
+    const bDate = b.status === "blocked" ? b.follow_up_date ?? b.target_date : b.target_date;
+    if (aDate && bDate && aDate !== bDate) return aDate.localeCompare(bDate);
+    if (aDate && !bDate) return -1;
+    if (!aDate && bDate) return 1;
+    return a.sort_order - b.sort_order;
+  });
+  if (actions.length === 0) return null;
 
   return (
-    <View style={styles.stepBlock}>
-      <Text style={styles.stepTitle}>
-        {index}. {title}
-      </Text>
-      {pri ? (
-        <Text style={styles.metaLine}>
-          Priority: {pri}
-        </Text>
-      ) : null}
-      <Text style={styles.metaLine}>Owner: {formatOwner(d?.owner)}</Text>
-      {timeline ? (
-        <Text style={styles.metaLine}>
-          Timeline: {timeline}
-        </Text>
-      ) : null}
-      {narrative ? <Text style={styles.body}>{narrative}</Text> : null}
-      {actions.length > 0 ? (
-        <>
-          <Text style={styles.fieldLabel}>Key actions</Text>
-          {actions.map((line, i) => (
-            <View key={i} style={styles.bulletRow}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.bulletText}>{line}</Text>
+    <View style={styles.actionTable}>
+      <View style={styles.actionHeader}>
+        <Text style={styles.actionCell}>Action</Text>
+        <Text style={styles.dateCell}>Target / follow-up</Text>
+        <Text style={styles.statusCell}>Status</Text>
+      </View>
+      {actions.map((action) => {
+        const displayDate =
+          action.status === "blocked"
+            ? action.follow_up_date ?? action.target_date
+            : action.target_date;
+        return (
+          <View key={action.id} style={styles.actionRow}>
+            <View style={styles.actionCell}>
+              <Text style={styles.label}>{cleanText(action.title) || "Untitled action"}</Text>
+              {cleanText(action.description) ? <Text style={styles.actionDetail}>{cleanText(action.description)}</Text> : null}
+              {cleanText(action.notes) ? <Text style={styles.actionDetail}>Progress: {cleanText(action.notes)}</Text> : null}
+              {cleanText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanText(action.outcome)}</Text> : null}
             </View>
-          ))}
-        </>
-      ) : null}
-      {docs.length > 0 ? (
-        <>
-          <Text style={styles.fieldLabel}>Required documents</Text>
-          {docs.map((line, i) => (
-            <View key={i} style={styles.bulletRow}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.bulletText}>{line}</Text>
-            </View>
-          ))}
-        </>
+            <Text style={styles.dateCell}>{formatDateOnly(displayDate)}</Text>
+            <Text style={styles.statusCell}>{actionUiStatus(action).replaceAll("_", " ")}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function PdfStep({ step }: { step: PlanStepRow }) {
+  const details = step.details ?? {};
+  const documents = uniqueLines([
+    ...(details.required_documents ?? []),
+    ...(details.materials_needed ?? []),
+  ]);
+  const contacts = uniqueLines(
+    (details.contacts ?? []).map((contact) =>
+      [contact.name, contact.phone, contact.email, contact.notes]
+        .map(cleanText)
+        .filter(Boolean)
+        .join(" · "),
+    ),
+  );
+  const body = narrative(step);
+
+  return (
+    <View style={styles.step} minPresenceAhead={80}>
+      <Text style={styles.stepTitle}>{cleanText(step.title) || "Plan action"}</Text>
+      <Text style={styles.meta}>Owner: {formatOwner(details.owner)} · Priority: {formatPriority(step.priority)}</Text>
+      {body ? <Text style={styles.narrative}>{body}</Text> : null}
+      <PdfActionTable step={step} />
+      {documents.length > 0 ? (
+        <View>
+          <Text style={styles.fieldHeading}>Documents or materials</Text>
+          {documents.map((line) => <View key={line} style={styles.listRow}><Text style={styles.bullet}>•</Text><Text style={styles.grow}>{line}</Text></View>)}
+        </View>
       ) : null}
       {contacts.length > 0 ? (
-        <>
-          <Text style={styles.fieldLabel}>Contact</Text>
-          {contacts.map((line, i) => (
-            <Text key={i} style={styles.body}>
-              {line}
-            </Text>
-          ))}
-        </>
+        <View>
+          <Text style={styles.fieldHeading}>Contacts</Text>
+          {contacts.map((line) => <Text key={line}>{line}</Text>)}
+        </View>
       ) : null}
-      {outcome ? (
-        <>
-          <Text style={styles.fieldLabel}>Expected outcome</Text>
-          <Text style={styles.body}>{outcome}</Text>
-        </>
+      {cleanText(details.expected_outcome) ? (
+        <View>
+          <Text style={styles.fieldHeading}>Expected outcome</Text>
+          <Text>{cleanText(details.expected_outcome)}</Text>
+        </View>
       ) : null}
-      {blockedNote ? <Text style={styles.statusLine}>Status: {blockedNote}</Text> : null}
-      {completedNote ? <Text style={styles.statusLine}>Completion notes: {completedNote}</Text> : null}
     </View>
   );
 }
@@ -332,73 +317,57 @@ export function PlanPdfDocument({
   plan,
   familyName,
   generatedDate,
-  barrierLabels,
+  barrierLabels = [],
 }: {
   plan: PlanWithSteps;
   familyName?: string;
   generatedDate: string;
   barrierLabels?: string[];
 }) {
-  const phases = ["30", "60", "90"] as const;
-  const stepsByPhase = {
-    "30": plan.steps
-      .filter((s) => s.phase === "30")
-      .sort((a, b) => a.sort_order - b.sort_order),
-    "60": plan.steps
-      .filter((s) => s.phase === "60")
-      .sort((a, b) => a.sort_order - b.sort_order),
-    "90": plan.steps
-      .filter((s) => s.phase === "90")
-      .sort((a, b) => a.sort_order - b.sort_order),
-  };
-
-  const barriers = (barrierLabels ?? []).map(cleanText).filter(Boolean);
+  const goals = groupPlanStepsByGoal(plan.steps);
+  const barriers = uniqueLines(barrierLabels);
 
   return (
-    <Document>
+    <Document title={PLAN_PDF_TITLE} subject="Reviewed family-support intervention plan">
       <Page size="A4" style={styles.page} wrap>
-        <Text style={styles.docTitle}>Case Plan</Text>
+        <Text style={styles.title}>{PLAN_PDF_TITLE}</Text>
+        <View style={styles.titleRule} />
+        <View style={styles.metadata}>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Family label: </Text>{cleanText(familyName) || "Not provided"}</Text>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Prepared: </Text>{generatedDate}</Text>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Plan version: </Text>{plan.version}</Text>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Plan status: </Text>{plan.client_display?.reviewedAt ? "Reviewed" : "Draft"}</Text>
+        </View>
 
-        {familyName ? (
-          <Text style={styles.headerLine}>
-            <Text style={styles.headerBold}>Family: </Text>
-            {cleanText(familyName)}
-          </Text>
+        {cleanText(plan.summary) ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeading}>Plan summary</Text>
+            <Text>{cleanText(plan.summary)}</Text>
+          </View>
         ) : null}
-        <Text style={styles.headerLine}>
-          <Text style={styles.headerBold}>Date generated: </Text>
-          {generatedDate}
-        </Text>
 
         {barriers.length > 0 ? (
-          <View style={styles.barrierSection}>
-            <Text style={styles.sectionLabel}>Barriers identified</Text>
-            {barriers.map((b, i) => (
-              <View key={i} style={styles.barrierBulletRow}>
-                <Text style={styles.barrierBullet}>•</Text>
-                <Text style={styles.barrierText}>{b}</Text>
-              </View>
-            ))}
+          <View style={styles.section}>
+            <Text style={styles.sectionHeading}>Current barriers</Text>
+            <View style={styles.barrierList}>
+              {barriers.map((barrier) => <View key={barrier} style={styles.barrierRow}><Text style={styles.bullet}>•</Text><Text style={styles.grow}>{barrier}</Text></View>)}
+            </View>
           </View>
-        ) : (
-          <View style={{ height: 8 }} />
-        )}
+        ) : null}
 
-        {phases.flatMap((phase) => {
-          const steps = stepsByPhase[phase];
-          const intro = cleanText(plan.client_display?.phaseSummaries?.[phase]);
-          if (steps.length === 0 && !intro) return [];
+        {goals.map((goal, goalIndex) => (
+          <Fragment key={goal.key}>
+            <View style={[styles.goal, styles.goalHeader]} minPresenceAhead={160}>
+              <Text style={styles.goalTitle}>Goal {goalIndex + 1}: {goal.title}</Text>
+              <Text style={styles.goalProgress}>
+                {goal.completedActionCount} of {goal.actionCount} dated actions complete
+                {goal.earliestOpenTargetDate ? ` · Next target ${formatDateOnly(goal.earliestOpenTargetDate)}` : ""}
+              </Text>
+            </View>
+            {goal.steps.map((step) => <PdfStep key={step.id} step={step} />)}
+          </Fragment>
+        ))}
 
-          return [
-            <View key={phase} minPresenceAhead={72}>
-              <Text style={styles.phaseHeading}>{phase}-day period</Text>
-              {intro ? <Text style={styles.phaseIntro}>{intro}</Text> : null}
-              {steps.map((step, idx) => (
-                <PdfStep key={step.id} step={step} index={idx + 1} />
-              ))}
-            </View>,
-          ];
-        })}
       </Page>
     </Document>
   );

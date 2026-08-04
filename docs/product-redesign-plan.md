@@ -3,6 +3,8 @@
 **Status:** Scope reset for the first useful product  
 **Current wedge:** Family intake → barriers → intervention plan → required paperwork
 
+> **Scope update — August 4, 2026:** Uploaded-PDF filling is deferred. The current workflow ends with a professional PDF export of the reviewed intervention plan. The earlier form-filling phases below are retained as research context. See `docs/agentic-pdf-service-research.md`.
+
 ## 1. What CaseLink must accomplish now
 
 CaseLink should do one repeated job exceptionally well for school case managers:

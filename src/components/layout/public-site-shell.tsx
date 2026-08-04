@@ -109,7 +109,7 @@ export function PublicSiteShell({
             <div>
               <PublicCaseLinkWordmark className="scale-90 origin-left" />
               <p className="mt-4 max-w-md text-sm leading-6 text-[var(--public-ink-muted)]">
-                Prepare required paperwork without rebuilding the same context.
+                Download reviewed plans without rebuilding the same context.
               </p>
             </div>
 

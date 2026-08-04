@@ -1,0 +1,122 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
+/* Hallmark · genre: editorial · macrostructure: Workbench · design-system: DESIGN.md · designed-as-app · nav: N3 side-rail · footer: none-in-workspace · tone: editorial-friendly ed-tech · anchor hue: violet · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
+
+:root {
+  /* Primitive color tokens */
+  --violet-paper-0: oklch(99.78% 0.0011 17.18);
+  --violet-paper-1: oklch(98.73% 0.0067 295.45);
+  --violet-paper-2: oklch(96.26% 0.0204 298.2);
+  --violet-paper-3: oklch(93.51% 0.0286 296.74);
+  --violet-rule-1: oklch(93.88% 0.0218 297.41);
+  --violet-rule-2: oklch(89.55% 0.0385 295.43);
+  --violet-rule-3: oklch(82.37% 0.0606 295.7);
+  --violet-500: oklch(51.18% 0.2133 282.31);
+  --violet-600: oklch(44.93% 0.2146 280.43);
+  --violet-700: oklch(38.54% 0.1952 279.25);
+  --navy-900: oklch(26.48% 0.0939 266.47);
+  --navy-800: oklch(31.3% 0.1083 266.72);
+  --navy-700: oklch(36.58% 0.0789 271.66);
+  --navy-600: oklch(41.28% 0.0619 271.61);
+  --navy-500: oklch(45.68% 0.0619 272.15);
+  --navy-400: oklch(53.26% 0.0516 272.35);
+  --sage-700: oklch(48.05% 0.0686 163.64);
+  --sage-100: oklch(95.2% 0.0132 159.91);
+  --amber-800: oklch(47.66% 0.085 81.02);
+  --amber-100: oklch(97.07% 0.0381 90.65);
+  --amber-50: oklch(98% 0.0235 88.23);
+  --amber-300: oklch(88% 0.071 89.46);
+  --red-700: oklch(47.59% 0.1586 25.61);
+  --red-50: oklch(97.05% 0.0129 17.38);
+
+  /* Semantic tokens */
+  --color-paper: var(--violet-paper-1);
+  --color-paper-2: var(--violet-paper-2);
+  --color-paper-3: var(--violet-paper-3);
+  --color-paper-hero: oklch(97.72% 0.0121 296.36);
+  --color-surface: var(--violet-paper-0);
+  --color-ink: var(--navy-900);
+  --color-ink-hover: var(--navy-800);
+  --color-ink-strong: var(--navy-700);
+  --color-ink-2: var(--navy-600);
+  --color-ink-muted: var(--navy-500);
+  --color-ink-faint: var(--navy-400);
+  --color-ink-on-dark-muted: oklch(88.72% 0.031 294.8);
+  --color-rule-soft: var(--violet-rule-1);
+  --color-rule: var(--violet-rule-2);
+  --color-rule-strong: var(--violet-rule-3);
+  --color-rule-faint: oklch(85.73% 0.0489 297.13);
+  --color-rule-divider: oklch(77.43% 0.0584 293.94);
+  --color-rule-mark: oklch(61.82% 0.1319 289.71);
+  --color-accent: var(--violet-600);
+  --color-accent-hover: var(--violet-700);
+  --color-accent-ink: var(--violet-paper-0);
+  --color-accent-soft: oklch(94.64% 0.0284 294.59);
+  --color-accent-rule: oklch(73.31% 0.1105 291.16);
+  --color-focus: var(--violet-500);
+  --color-positive: var(--sage-700);
+  --color-positive-bg: var(--sage-100);
+  --color-positive-rule: color-mix(in oklab, var(--color-positive) 35%, var(--color-surface));
+  --color-attention: var(--amber-800);
+  --color-attention-bg: var(--amber-100);
+  --color-attention-surface: var(--amber-50);
+  --color-attention-rule: var(--amber-300);
+  --color-error: var(--red-700);
+  --color-error-bg: var(--red-50);
+  --color-error-rule: color-mix(in oklab, var(--color-error) 28%, var(--color-surface));
+
+  /* Typography tokens */
+  --font-display: "Newsreader Variable", Georgia, serif;
+  --font-body: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
+
+  /* Spacing tokens — 4px grid */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+
+  /* Motion, depth, and geometry */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-feature: 1rem;
+  --radius-pill: 9999px;
+  --shadow-action: 0 8px 22px oklch(30% 0.14 282 / 0.18);
+  --shadow-surface: 0 18px 48px oklch(24% 0.05 275 / 0.1);
+  --shadow-menu: 0 18px 50px oklch(24% 0.05 275 / 0.14);
+  --shadow-proof: 0 26px 70px oklch(24% 0.05 275 / 0.16);
+  --shadow-decision: 0 24px 60px oklch(24% 0.05 275 / 0.14);
+  --shadow-dark-action: 0 9px 24px oklch(12% 0.06 266 / 0.22);
+  --workspace-background:
+    radial-gradient(circle at 92% 2%, color-mix(in oklab, var(--color-accent-soft) 70%, transparent), transparent 24rem),
+    var(--color-paper);
+
+  /* Component tokens */
+  --button-bg: var(--color-accent);
+  --button-fg: var(--color-accent-ink);
+  --button-bg-hover: var(--color-accent-hover);
+  --button-radius: var(--radius-control);
+  --input-bg: var(--color-surface);
+  --input-border: var(--color-rule-strong);
+  --input-focus: var(--color-focus);
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-rule);
+  --card-radius: var(--radius-card);
+}

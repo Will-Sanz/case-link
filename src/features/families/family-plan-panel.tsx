@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { PlanPdfExport } from "@/features/families/plan-pdf-export";
 import { PlanStepCaseNote } from "@/features/families/plan-step-case-note";
 import type { BarrierWorkflowResult } from "@/types/barrier-workflow";
 import type {
@@ -32,6 +31,28 @@ import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
+import {
+  localActionDraftKey,
+  parseLocalActionDraft,
+  serializeLocalActionDraft,
+  type LocalActionDraft,
+} from "@/lib/domain/plan/local-action-draft";
+
+function readStoredActionDraft(key: string): LocalActionDraft | null {
+  try {
+    return parseLocalActionDraft(window.localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function removeStoredActionDraft(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Draft recovery is optional when browser storage is restricted.
+  }
+}
 
 function dateInputValueAfterDays(days: number): string {
   const value = new Date();
@@ -272,7 +293,6 @@ function planPageTitle(...candidates: (string | null | undefined)[]): string {
 
 export function FamilyPlanPanel({
   familyId,
-  familyName,
   plan,
   workflow,
   onToggleActionItem,
@@ -283,7 +303,6 @@ export function FamilyPlanPanel({
   continueDraftPending,
 }: {
   familyId: string;
-  familyName: string;
   plan: PlanWithSteps | null;
   workflow: BarrierWorkflowResult | null;
   onToggleActionItem?: (actionItemId: string, done: boolean, expectedUpdatedAt: string) => void;
@@ -302,6 +321,8 @@ export function FamilyPlanPanel({
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
+  const [recoverableDraft, setRecoverableDraft] = useState<LocalActionDraft | null>(null);
+  const draftRecoveryLoadedPlanIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editConflict, setEditConflict] = useState<PlanEditConflict | null>(null);
@@ -372,6 +393,8 @@ export function FamilyPlanPanel({
     [editConflict, stepDraft],
   );
 
+  const actionDraftStorageKey = plan ? localActionDraftKey(plan.id) : null;
+
   useEffect(() => {
     if (!plan) return;
     const events: Array<"plan_viewed" | "first_action_visible"> = ["plan_viewed"];
@@ -389,6 +412,23 @@ export function FamilyPlanPanel({
   }, [familyId, plan]);
 
   useEffect(() => {
+    if (!plan || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {
+      return;
+    }
+    draftRecoveryLoadedPlanIdRef.current = plan.id;
+    const stored = readStoredActionDraft(actionDraftStorageKey);
+    if (!stored || stored.planId !== plan.id) {
+      removeStoredActionDraft(actionDraftStorageKey);
+      return;
+    }
+    if (!plan.steps.some((step) => step.id === stored.step.id)) {
+      removeStoredActionDraft(actionDraftStorageKey);
+      return;
+    }
+    setRecoverableDraft(stored);
+  }, [actionDraftStorageKey, plan]);
+
+  useEffect(() => {
     if (conflictResolution !== "keep_draft" || !editConflict || !plan) return;
     const latestTimestamp =
       editConflict.kind === "step"
@@ -402,6 +442,21 @@ export function FamilyPlanPanel({
     setConflictResolution(null);
     setSuccess("The latest version is loaded and your draft is still open. Review it, then save again.");
   }, [conflictResolution, editConflict, plan]);
+
+  useEffect(() => {
+    if (!actionDraftStorageKey || !stepDirty || !stepDraft || !plan) return;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          actionDraftStorageKey,
+          serializeLocalActionDraft(plan.id, stepDraft),
+        );
+      } catch {
+        // The in-memory draft remains available when browser storage is unavailable.
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [actionDraftStorageKey, plan, stepDirty, stepDraft]);
 
   useEffect(() => {
     if (!stepDirty) return;
@@ -452,11 +507,30 @@ export function FamilyPlanPanel({
     fn?.();
   }
 
+  function clearLocalActionDraft() {
+    if (actionDraftStorageKey) removeStoredActionDraft(actionDraftStorageKey);
+    setRecoverableDraft(null);
+  }
+
+  function restoreLocalActionDraft() {
+    if (!recoverableDraft || !plan) return;
+    if (!plan.steps.some((step) => step.id === recoverableDraft.step.id)) {
+      clearLocalActionDraft();
+      return;
+    }
+    setEditingStepId(recoverableDraft.step.id);
+    setStepDraft(cloneStep(recoverableDraft.step));
+    setRecoverableDraft(null);
+    setError(null);
+    setSuccess("Unsaved action edit restored. Review it before saving.");
+  }
+
   function switchToStepEdit(stepId: string): boolean {
     if (!plan) return false;
     if (editingStepId === stepId) return true;
     const s = plan.steps.find((x) => x.id === stepId);
     if (!s) return false;
+    clearLocalActionDraft();
     setEditingStepId(stepId);
     setStepDraft(cloneStep(s));
     setAiStepId(null);
@@ -486,6 +560,7 @@ export function FamilyPlanPanel({
   }
 
   function cancelStepEdit() {
+    clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
     setAiStepId(null);
@@ -504,6 +579,7 @@ export function FamilyPlanPanel({
   }
 
   function useLatestConflictVersion() {
+    clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
     setAiStepId(null);
@@ -684,6 +760,7 @@ export function FamilyPlanPanel({
         setSuccess("Action saved.");
         setEditConflict(null);
         setConflictResolution(null);
+        clearLocalActionDraft();
         setEditingStepId(null);
         setStepDraft(null);
         setAiStepId(null);
@@ -712,6 +789,7 @@ export function FamilyPlanPanel({
           return;
         }
         if (editingStepId === stepId) {
+          clearLocalActionDraft();
           setEditingStepId(null);
           setStepDraft(null);
           setAiStepId(null);
@@ -1136,7 +1214,7 @@ export function FamilyPlanPanel({
 
   if (!plan) {
     return (
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-[var(--color-ink-muted)]">
         Add at least one barrier on the Barriers page, then draft a plan to see clear goals and dated actions here.
       </p>
     );
@@ -1157,13 +1235,13 @@ export function FamilyPlanPanel({
               {workflow.selectedBarriers.slice(0, 6).map((b) => (
                 <span
                   key={b}
-                  className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700"
+                  className="rounded-full border border-[var(--color-rule)] bg-[var(--color-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-ink-2)]"
                 >
                   {b}
                 </span>
               ))}
               {workflow.selectedBarriers.length > 6 ? (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                <span className="rounded-full border border-[var(--color-rule)] bg-[var(--color-paper)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-ink-muted)]">
                   +{workflow.selectedBarriers.length - 6} more
                 </span>
               ) : null}
@@ -1171,14 +1249,11 @@ export function FamilyPlanPanel({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {workflow && (!plan.generation_state || plan.generation_state.status === "complete") ? (
-            <PlanPdfExport plan={plan} familyName={familyName} workflow={workflow} />
-          ) : null}
           <Button
             type="button"
             onClick={() => openPlanAiRefine()}
             variant="secondary"
-            className="border-slate-200"
+            className="border-[var(--color-rule)]"
             disabled={planAiPending}
           >
             {planAiPending ? "Refining…" : "Refine plan with AI"}
@@ -1213,20 +1288,20 @@ export function FamilyPlanPanel({
               {editConflictRows.map((row) => (
                 <div
                   key={row.label}
-                  className="grid gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:grid-cols-2"
+                  className="grid gap-2 rounded-lg border border-amber-200 bg-[var(--color-surface)] p-3 sm:grid-cols-2"
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 sm:col-span-2">
                     {row.label}
                   </p>
                   <div>
-                    <p className="text-[11px] font-medium text-slate-500">Your draft</p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-900">
+                    <p className="text-[11px] font-medium text-[var(--color-ink-faint)]">Your draft</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-ink)]">
                       {row.mine}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium text-slate-500">Latest saved</p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-900">
+                    <p className="text-[11px] font-medium text-[var(--color-ink-faint)]">Latest saved</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-ink)]">
                       {row.latest}
                     </p>
                   </div>
@@ -1271,6 +1346,23 @@ export function FamilyPlanPanel({
         </p>
       ) : null}
 
+      {recoverableDraft && !editingStepId ? (
+        <section className="rounded-lg border border-[var(--color-rule-strong)] bg-[var(--color-accent-soft)] px-4 py-3" role="status">
+          <p className="text-sm font-semibold text-[var(--color-ink)]">Unsaved action edit found</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--color-ink-muted)]">
+            Restore “{recoverableDraft.step.title}” to continue where you left off.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" onClick={restoreLocalActionDraft}>
+              Restore edit
+            </Button>
+            <Button type="button" variant="ghost" onClick={clearLocalActionDraft}>
+              Discard saved edit
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       {plan?.generation_state?.status === "failed" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <p className="font-semibold">
@@ -1298,20 +1390,20 @@ export function FamilyPlanPanel({
         aria-labelledby="plan-review-heading"
         className={`rounded-xl border p-4 sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-5 ${
           reviewStatus.state === "reviewed"
-            ? "border-[#b8d6b3] bg-[#edf4eb]"
+            ? "border-[var(--color-accent-rule)] bg-[var(--color-accent-soft)]"
             : reviewStatus.state === "needs_attention"
-              ? "border-[#ead69b] bg-[#fff8e5]"
-              : "border-[#dce6d9] bg-white"
+              ? "border-[var(--color-attention-rule)] bg-[var(--color-attention-bg)]"
+              : "border-[var(--color-rule)] bg-[var(--color-surface)]"
         }`}
       >
         <div className="flex min-w-0 items-start gap-3">
           <span
             className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg ${
               reviewStatus.state === "reviewed"
-                ? "bg-white text-[#276221]"
+                ? "bg-[var(--color-surface)] text-[var(--color-accent)]"
                 : reviewStatus.state === "needs_attention"
-                  ? "bg-white text-[#765a16]"
-                  : "bg-[#edf4eb] text-[#276221]"
+                  ? "bg-[var(--color-surface)] text-[var(--color-attention)]"
+                  : "bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
             }`}
           >
             {reviewStatus.state === "reviewed" ? (
@@ -1322,28 +1414,28 @@ export function FamilyPlanPanel({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 id="plan-review-heading" className="text-sm font-semibold text-[#173a15]">
+              <h2 id="plan-review-heading" className="text-sm font-semibold text-[var(--color-ink)]">
                 {reviewStatus.state === "reviewed"
-                  ? "Plan approved for paperwork"
+                  ? "Plan ready to download"
                   : reviewStatus.state === "needs_review"
                     ? "Check and approve this plan"
                     : reviewStatus.state === "needs_attention"
                       ? "Resolve plan details"
                       : "Plan is being prepared"}
               </h2>
-              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#50644d]">
+              <span className="rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-ink-muted)]">
                 {reviewStatus.label}
               </span>
             </div>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-[#5d705a]">
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--color-ink-muted)]">
               {reviewStatus.state === "reviewed"
                 ? `Reviewed ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(plan.client_display!.reviewedAt!))}. Material edits will return the plan to Needs review.`
                 : reviewStatus.state === "needs_review"
-                  ? "Read each goal, action, and target date. Mark reviewed when the plan reflects your judgment; only then can CaseLink use it for paperwork."
+                  ? "Read each goal, action, and target date. Mark reviewed when the plan reflects your judgment; only then can CaseLink create the PDF."
                   : reviewStatus.issue}
             </p>
             {(stepDirty || planAiDirty) && reviewStatus.state === "needs_review" ? (
-              <p className="mt-1 text-xs font-medium text-[#765a16]">
+              <p className="mt-1 text-xs font-medium text-[var(--color-attention)]">
                 Save or discard the current edits before approving the plan.
               </p>
             ) : null}
@@ -1353,9 +1445,9 @@ export function FamilyPlanPanel({
           {reviewStatus.state === "reviewed" ? (
             <Link
               href={`/families/${familyId}/paperwork`}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(39,98,33,0.14)] hover:bg-[#1f531b] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#46923c]/25"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-focus)]/25"
             >
-              Prepare paperwork
+              Download plan PDF
             </Link>
           ) : reviewStatus.state === "needs_review" ? (
             <Button
@@ -1376,22 +1468,22 @@ export function FamilyPlanPanel({
               const nextTargetDate = formatTargetDate(group.earliestOpenTargetDate);
               return (
                 <section key={group.key} className="max-w-[800px] space-y-4">
-                  <div className="rounded-xl border border-[#dce6d9] bg-[#f6f9f5] px-4 py-3 sm:px-5">
+                  <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 py-3 sm:px-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#687b65]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-ink-faint)]">
                           Goal {groupIndex + 1}
                         </p>
-                        <h3 className="mt-1 text-lg font-semibold tracking-tight text-[#173a15]">
+                        <h3 className="mt-1 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
                           {group.title}
                         </h3>
                       </div>
-                      <div className="text-left text-xs text-[#5d705a] sm:text-right">
+                      <div className="text-left text-xs text-[var(--color-ink-muted)] sm:text-right">
                         <p>
                           {group.completedActionCount} of {group.actionCount} actions complete
                         </p>
                         {nextTargetDate ? (
-                          <p className="mt-1 font-medium text-[#276221]">
+                          <p className="mt-1 font-medium text-[var(--color-accent)]">
                             Next target: <time dateTime={group.earliestOpenTargetDate ?? undefined}>{nextTargetDate}</time>
                           </p>
                         ) : null}
@@ -1456,22 +1548,22 @@ export function FamilyPlanPanel({
               );
             })
           ) : (
-            <p className="max-w-[800px] rounded-xl border border-dashed border-[#cfe0cc] bg-[#f8faf7] px-4 py-6 text-sm text-[#5d705a]">
+            <p className="max-w-[800px] rounded-xl border border-dashed border-[var(--color-rule-strong)] bg-[var(--color-paper)] px-4 py-6 text-sm text-[var(--color-ink-muted)]">
               This plan does not have any actions yet. Add the first action below.
             </p>
           )}
-          <section className="max-w-[800px] space-y-4 rounded-xl border border-[#dce6d9] bg-white p-4 sm:p-5">
-              <h3 className="text-sm font-semibold text-[#173a15]">Add an action</h3>
-              <p className="text-xs text-slate-500">
+          <section className="max-w-[800px] space-y-4 rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-4 sm:p-5">
+              <h3 className="text-sm font-semibold text-[var(--color-ink)]">Add an action</h3>
+              <p className="text-xs text-[var(--color-ink-faint)]">
                 Put the action under a clear goal and give it one exact target date.
               </p>
               <div className="grid gap-3 sm:grid-cols-3">
-                <label className="space-y-1 text-xs text-slate-600">
+                <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                   <span>Goal</span>
                   <input
                     type="text"
                     list="caselink-plan-goals"
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                     value={addStepGoal}
                     onChange={(e) => setAddStepGoal(e.target.value)}
                     placeholder="e.g. Stabilize housing"
@@ -1483,21 +1575,21 @@ export function FamilyPlanPanel({
                     ))}
                   </datalist>
                 </label>
-                <label className="space-y-1 text-xs text-slate-600">
+                <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                   <span>Target date</span>
                   <input
                     type="date"
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                     min={dateInputValueAfterDays(0)}
                     value={addStepTargetDate}
                     onChange={(e) => setAddStepTargetDate(e.target.value)}
                     disabled={addStepPending}
                   />
                 </label>
-                <label className="space-y-1 text-xs text-slate-600">
+                <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                   <span>Owner</span>
                   <select
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                     value={addStepOwner}
                     onChange={(event) =>
                       setAddStepOwner(event.target.value as NonNullable<PlanStepDetails["owner"]>)
@@ -1511,31 +1603,31 @@ export function FamilyPlanPanel({
                   </select>
                 </label>
               </div>
-              <label className="space-y-1 text-xs text-slate-600">
+              <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                   <span>Action</span>
                   <input
                     type="text"
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
                     value={addStepTitle}
                     onChange={(e) => setAddStepTitle(e.target.value)}
                     placeholder="e.g. Confirm documentation with utility provider"
                     disabled={addStepPending}
                   />
               </label>
-              <label className="space-y-1 text-xs text-slate-600">
+              <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                 <span>Notes (optional)</span>
                 <Textarea
-                  className="min-h-[90px] border-slate-200"
+                  className="min-h-[90px] border-[var(--color-rule)]"
                   value={addStepDescription}
                   onChange={(e) => setAddStepDescription(e.target.value)}
                   placeholder="Add context that will help complete this action."
                   disabled={addStepPending}
                 />
               </label>
-              <label className="space-y-1 text-xs text-slate-600">
+              <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                 <span>Expected result</span>
                 <Textarea
-                  className="min-h-[72px] border-slate-200 bg-white"
+                  className="min-h-[72px] border-[var(--color-rule)] bg-[var(--color-surface)]"
                   value={addStepExpectedOutcome}
                   onChange={(e) => setAddStepExpectedOutcome(e.target.value)}
                   placeholder="What should be true when this action succeeds?"
@@ -1543,25 +1635,25 @@ export function FamilyPlanPanel({
                   required
                 />
               </label>
-              <details className="rounded-lg border border-slate-200 bg-[#fafcf9] px-3 py-2">
-                <summary className="cursor-pointer text-xs font-medium text-[#5d705a]">
+              <details className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2">
+                <summary className="cursor-pointer text-xs font-medium text-[var(--color-ink-muted)]">
                   Add documents or contact details
                 </summary>
                 <div className="mt-3 space-y-3">
-                  <label className="space-y-1 text-xs text-slate-600">
+                  <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>Documents</span>
                     <Textarea
-                      className="min-h-[72px] border-slate-200 bg-white"
+                      className="min-h-[72px] border-[var(--color-rule)] bg-[var(--color-surface)]"
                       value={addStepDocuments}
                       onChange={(e) => setAddStepDocuments(e.target.value)}
                       placeholder="One required document per line."
                       disabled={addStepPending}
                     />
                   </label>
-                  <label className="space-y-1 text-xs text-slate-600">
+                  <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>Contact</span>
                     <Textarea
-                      className="min-h-[72px] border-slate-200 bg-white"
+                      className="min-h-[72px] border-[var(--color-rule)] bg-[var(--color-surface)]"
                       value={addStepContact}
                       onChange={(e) => setAddStepContact(e.target.value)}
                       placeholder="One contact detail per line."
@@ -1589,9 +1681,9 @@ export function FamilyPlanPanel({
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:z-0 lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:overscroll-y-contain lg:self-start">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
-            <p className="mt-1 text-sm text-slate-600">
+          <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Resources</p>
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
               Matches from your organization&apos;s resource directory.
             </p>
 
@@ -1615,7 +1707,7 @@ export function FamilyPlanPanel({
                   ) : null}
                 </div>
               ) : workflow.resourceStatus === "empty" || workflow.resources.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                <div className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-xs leading-relaxed text-[var(--color-ink-muted)]">
                   <p>No resource matches are available yet. Review the plan without relying on a resource recommendation.</p>
                   {onRetryResources ? (
                     <Button
@@ -1632,28 +1724,28 @@ export function FamilyPlanPanel({
               ) : workflow.resources.slice(0, 10).map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-lg border border-slate-200 bg-white p-3"
+                  className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] p-3"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-[var(--color-ink)]">
                       {(r.programName || r.name).trim()}
                     </p>
                     {r.name.trim() && r.name.trim() !== (r.programName || r.name).trim() ? (
-                      <p className="mt-0.5 text-xs text-slate-500">{r.name}</p>
+                      <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">{r.name}</p>
                     ) : r.description?.trim() &&
                       r.description.trim() !== (r.programName || r.name).trim() ? (
-                      <p className="mt-0.5 text-xs text-slate-500">{r.description}</p>
+                      <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">{r.description}</p>
                     ) : null}
                   </div>
 
                   <div className="mt-3 space-y-1">
                     {r.primaryPhone ? (
-                      <a className="block text-xs text-[#276221] hover:underline" href={`tel:${r.primaryPhone}`}>
+                      <a className="block text-xs text-[var(--color-accent)] hover:underline" href={`tel:${r.primaryPhone}`}>
                         {r.primaryPhone}
                       </a>
                     ) : null}
                     {r.primaryEmail ? (
-                      <a className="block break-all text-xs text-[#276221] hover:underline" href={`mailto:${r.primaryEmail}`}>
+                      <a className="block break-all text-xs text-[var(--color-accent)] hover:underline" href={`mailto:${r.primaryEmail}`}>
                         {r.primaryEmail}
                       </a>
                     ) : null}
@@ -1673,27 +1765,27 @@ export function FamilyPlanPanel({
           aria-modal="true"
           aria-labelledby="plan-ai-title"
           aria-describedby="plan-ai-description"
-          className="m-auto max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-[1px]"
+          className="m-auto max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-0 shadow-xl backdrop:bg-[var(--color-ink)]/45 backdrop:backdrop-blur-[1px]"
           onCancel={(event) => {
             event.preventDefault();
             closePlanAiRefine();
           }}
         >
           <div className="p-5">
-            <h2 id="plan-ai-title" className="text-base font-semibold text-slate-900">
+            <h2 id="plan-ai-title" className="text-base font-semibold text-[var(--color-ink)]">
               Refine full plan with AI
             </h2>
-            <p id="plan-ai-description" className="mt-1 text-xs text-slate-500">
+            <p id="plan-ai-description" className="mt-1 text-xs text-[var(--color-ink-faint)]">
               Preview updates a working copy of this plan. After you apply a preview, use{" "}
               <strong>Save to plan</strong> to write only the actions that changed.
             </p>
 
-            <label htmlFor="plan-ai-instruction" className="mt-4 block text-sm font-medium text-slate-800">
+            <label htmlFor="plan-ai-instruction" className="mt-4 block text-sm font-medium text-[var(--color-ink-strong)]">
               What should change?
             </label>
             <Textarea
               id="plan-ai-instruction"
-              className="mt-2 min-h-[120px] border-slate-200"
+              className="mt-2 min-h-[120px] border-[var(--color-rule)]"
               value={planAiInstruction}
               onChange={(e) => setPlanAiInstruction(e.target.value)}
               placeholder="e.g. Make the first actions more realistic for one case manager, keep the target dates, and preserve my manual edits."
@@ -1741,15 +1833,15 @@ export function FamilyPlanPanel({
             ) : null}
 
             {planAiPreview ? (
-              <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-                <p className="text-sm font-semibold text-slate-900">
+              <div className="mt-4 space-y-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-3 text-sm">
+                <p className="text-sm font-semibold text-[var(--color-ink)]">
                   Preview ready ({planAiPreview.steps.length} steps)
                 </p>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
                     Goals in this preview
                   </p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-700">
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[var(--color-ink-2)]">
                     {planAiPreviewGoals.map((goal) => (
                       <li key={goal}>{goal}</li>
                     ))}
@@ -1771,8 +1863,8 @@ export function FamilyPlanPanel({
             ) : null}
 
             {planAiDirty ? (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#cfe0cc] bg-[#edf4eb] px-3 py-2.5">
-                <p className="text-xs text-slate-700">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-rule-strong)] bg-[var(--color-accent-soft)] px-3 py-2.5">
+                <p className="text-xs text-[var(--color-ink-2)]">
                   Working copy differs from the saved plan. Save to persist updated steps.
                 </p>
                 <Button

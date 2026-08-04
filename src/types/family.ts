@@ -65,6 +65,35 @@ export type CaseNoteRow = {
   author: { email: string } | null;
 };
 
+export type CaseProgressActionSnapshot = {
+  status: "pending" | "in_progress" | "completed" | "blocked";
+  target_date: string | null;
+  follow_up_date: string | null;
+  notes: string | null;
+  outcome: string | null;
+};
+
+export type CaseProgressPlanChange = {
+  action_item_id: string;
+  plan_step_id: string;
+  title: string;
+  previous: CaseProgressActionSnapshot;
+  current: CaseProgressActionSnapshot;
+};
+
+/** Append-only meeting record saved with the exact plan changes made at that time. */
+export type CaseProgressUpdateRow = {
+  id: string;
+  family_id: string;
+  plan_id: string | null;
+  author_id: string;
+  occurred_on: string;
+  summary: string;
+  plan_changes: CaseProgressPlanChange[];
+  created_at: string;
+  author: { email: string } | null;
+};
+
 export type MatchedResourceSummary = {
   id: string;
   slug: string;
@@ -199,7 +228,7 @@ export type PlanStepRow = {
 export type PlanClientDisplay = {
   title?: string;
   phaseSummaries?: Partial<Record<"30" | "60" | "90", string>>;
-  /** Explicit case-manager approval required before plan content can feed paperwork. */
+  /** Explicit case-manager approval required before the plan can be exported. */
   reviewedAt?: string;
   reviewedById?: string;
 };
@@ -255,6 +284,7 @@ export type FamilyDetail = {
   barriers: FamilyBarrierRow[];
   members: FamilyMemberRow[];
   caseNotes: CaseNoteRow[];
+  progressUpdates: CaseProgressUpdateRow[];
   resourceMatches: ResourceMatchRow[];
   plan: PlanWithSteps | null;
   needsAttention?: import("@/lib/services/workflow").NeedsAttentionItem[];

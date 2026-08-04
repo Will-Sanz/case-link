@@ -16,7 +16,7 @@ export default async function LoginPage() {
   return (
     <AuthShell
       title="CaseLink"
-      subtitle="Sign in to manage family plans and paperwork."
+      subtitle="Sign in to manage family plans and PDF exports."
     >
       <h2 className="text-base font-semibold text-slate-900">Case manager login</h2>
       <div className="mt-5">

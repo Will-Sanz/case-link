@@ -34,7 +34,7 @@ function MatchStatusBadge({ status }: { status: ResourceMatchRow["status"] }) {
     status === "accepted"
       ? "bg-emerald-100 text-emerald-900"
       : status === "dismissed"
-        ? "bg-slate-200 text-slate-600"
+        ? "bg-[var(--color-rule)] text-[var(--color-ink-muted)]"
         : "bg-amber-100 text-amber-900";
   return <Badge className={cls}>{status}</Badge>;
 }
@@ -167,12 +167,12 @@ export function ResourceMatchesPanel({
       ) : null}
 
       {matches.length === 0 ? (
-        <p className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
+        <p className="mt-5 rounded-lg border border-dashed border-[var(--color-rule)] bg-[var(--color-paper)] px-4 py-3 text-sm text-[var(--color-ink-muted)]">
           No matches yet. Run matching to populate suggestions from the
           resource directory.
         </p>
       ) : actionableMatches.length === 0 ? (
-        <p className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
+        <p className="mt-5 rounded-lg border border-dashed border-[var(--color-rule)] bg-[var(--color-paper)] px-4 py-3 text-sm text-[var(--color-ink-muted)]">
           All matches are dismissed. Run matching again for fresh suggestions,
           or add a program manually below.
         </p>
@@ -180,7 +180,7 @@ export function ResourceMatchesPanel({
         <>
           {!showAllMatches &&
           actionableMatches.length > MAX_VISIBLE_MATCHES ? (
-            <p className="mt-5 text-sm text-slate-600">
+            <p className="mt-5 text-sm text-[var(--color-ink-muted)]">
               Showing the first {MAX_VISIBLE_MATCHES} suggestions. Use &quot;Show all&quot; to see the
               full list.
             </p>
@@ -191,7 +191,7 @@ export function ResourceMatchesPanel({
             return (
               <li
                 key={m.id}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -199,16 +199,16 @@ export function ResourceMatchesPanel({
                       <>
                         <Link
                           href={`/resources/${r.id}`}
-                          className="font-semibold text-slate-900 underline-offset-2 hover:text-blue-900 hover:underline"
+                          className="font-semibold text-[var(--color-ink)] underline-offset-2 hover:text-[var(--color-accent)] hover:underline"
                         >
                           {r.program_name}
                         </Link>
-                        <p className="text-sm text-slate-600">
+                        <p className="text-sm text-[var(--color-ink-muted)]">
                           {r.office_or_department}
                         </p>
                       </>
                     ) : (
-                      <p className="font-medium text-slate-800">Resource unavailable</p>
+                      <p className="font-medium text-[var(--color-ink-strong)]">Resource unavailable</p>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +216,7 @@ export function ResourceMatchesPanel({
                   </div>
                 </div>
                 {r ? (
-                  <div className="mt-2 text-sm text-slate-600">
+                  <div className="mt-2 text-sm text-[var(--color-ink-muted)]">
                     {r.primary_contact_name ? (
                       <p>{r.primary_contact_name}</p>
                     ) : null}
@@ -226,7 +226,7 @@ export function ResourceMatchesPanel({
                     {r.primary_contact_phone ? (
                       <p className="tabular-nums">{r.primary_contact_phone}</p>
                     ) : null}
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
                       Services: {flagSummary(r)}
                     </p>
                   </div>
@@ -255,13 +255,13 @@ export function ResourceMatchesPanel({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {m.plan_step_id ? (
                       <>
-                        <Badge className="bg-blue-100 text-blue-900">
+                        <Badge className="border-[var(--color-accent-rule)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
                           Used in plan
                         </Badge>
                         {steps.find((s) => s.id === m.plan_step_id) ? (
                           <Link
                             href={`#step-${m.plan_step_id}`}
-                            className="text-xs text-blue-700 hover:underline"
+                            className="text-xs text-[var(--color-accent)] hover:underline"
                           >
                             → {steps.find((s) => s.id === m.plan_step_id)?.title}
                           </Link>
@@ -269,7 +269,7 @@ export function ResourceMatchesPanel({
                         <Button
                           type="button"
                           variant="ghost"
-                          className="h-6 px-2 text-xs text-slate-600"
+                          className="h-6 px-2 text-xs text-[var(--color-ink-muted)]"
                           onClick={() => doUnlink(m.id)}
                           disabled={pending}
                         >
@@ -278,7 +278,7 @@ export function ResourceMatchesPanel({
                       </>
                     ) : steps.length > 0 ? (
                       <select
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+                        className="rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-ink-2)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                         value=""
                         onChange={(e) => {
                           const stepId = e.target.value;
@@ -318,9 +318,9 @@ export function ResourceMatchesPanel({
         </>
       )}
 
-      <div className="mt-8 border-t border-slate-200/80 pt-6">
+      <div className="mt-8 border-t border-[var(--color-rule)] pt-6">
         <CardTitle className="text-base">Add resource manually</CardTitle>
-        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+        <p className="mt-1 text-sm leading-relaxed text-[var(--color-ink-muted)]">
           Search the directory and add as <strong>accepted</strong> (updates
           if this program was already matched).
         </p>
@@ -341,17 +341,17 @@ export function ResourceMatchesPanel({
           </Button>
         </form>
         {searchResults.length > 0 ? (
-          <ul className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+          <ul className="mt-4 space-y-2 rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] p-3">
             {searchResults.map((row) => (
               <li
                 key={row.id}
                 className="flex flex-wrap items-center justify-between gap-2 text-sm"
               >
                 <div>
-                  <span className="font-medium text-slate-900">
+                  <span className="font-medium text-[var(--color-ink)]">
                     {row.program_name}
                   </span>
-                  <span className="text-slate-600">
+                  <span className="text-[var(--color-ink-muted)]">
                     {" "}
                     · {row.office_or_department}
                   </span>

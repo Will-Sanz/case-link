@@ -28,6 +28,9 @@ vi.mock("@/features/families/archive-family-from-list-control", () => ({
   ArchiveFamilyFromListControl: () => null,
 }));
 vi.mock("@/features/families/case-assistant-chat", () => ({ CaseAssistantChat: () => null }));
+vi.mock("@/features/families/case-progress-workspace", () => ({
+  CaseProgressWorkspace: () => null,
+}));
 vi.mock("@/features/families/family-plan-panel", () => ({ FamilyPlanPanel: () => null }));
 
 const familyId = "20000000-0000-4000-8000-000000000002";

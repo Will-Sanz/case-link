@@ -9,6 +9,8 @@
 **Primary user:** A school case manager supporting individual families  
 **Related product principle:** Perfect the family intake → barriers → intervention plan → paperwork workflow before expanding into broader school operations.
 
+> **Scope update — August 4, 2026:** Agentic blank-PDF upload and filling are deferred. The current product ends with a professional PDF export of the reviewed intervention plan. The agentic-paperwork sections below are retained as prior research, not current implementation scope. See `docs/agentic-pdf-service-research.md`.
+
 ---
 
 ## 1. Executive decision

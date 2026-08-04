@@ -114,7 +114,6 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     render(
       <FamilyPlanPanel
         familyId={plan.family_id}
-        familyName="Family 014"
         plan={plan}
         workflow={null}
       />,
@@ -158,7 +157,6 @@ describe("FamilyPlanPanel stale edit recovery", () => {
         render(
           <FamilyPlanPanel
             familyId={plan.family_id}
-            familyName="Family 014"
             plan={plan}
             workflow={null}
           />,
