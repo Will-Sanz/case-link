@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
-import type { PlanStepDetails, PlanStepRow } from "@/types/family";
+import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 import {
   buildMainParagraph,
   contactsFromEditable,
@@ -34,6 +34,19 @@ const sectionLabelClass =
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return <p className={sectionLabelClass}>{children}</p>;
+}
+
+function formatDateOnly(value: string | null): string | null {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  }).format(parsed);
 }
 
 function useAutosizeTextarea(value: string, minRows = 3) {
@@ -110,6 +123,9 @@ export function PlanStepCaseNote({
   editing,
   onPatchStep,
   onPatchDetails,
+  onPatchActionItem,
+  onToggleActionItem,
+  actionToggleDisabled,
   onPatchWorkflow,
   onBeginEdit,
   onSaveEdits,
@@ -132,6 +148,9 @@ export function PlanStepCaseNote({
   editing: boolean;
   onPatchStep: (patch: Partial<PlanStepRow>) => void;
   onPatchDetails: (patch: Partial<PlanStepDetails>) => void;
+  onPatchActionItem: (actionItemId: string, patch: Partial<PlanStepActionItemRow>) => void;
+  onToggleActionItem?: (actionItemId: string, done: boolean) => void;
+  actionToggleDisabled?: boolean;
   onPatchWorkflow?: (patch: NonNullable<PlanStepRow["workflow_data"]>) => void;
   onBeginEdit?: () => void;
   onSaveEdits?: () => void;
@@ -155,7 +174,7 @@ export function PlanStepCaseNote({
   onRefineDiscardPreview: () => void;
   onOpenRefine: () => void;
 }) {
-  const d = (step.details ?? {}) as PlanStepDetails;
+  const d = useMemo(() => (step.details ?? {}) as PlanStepDetails, [step.details]);
   const [focus, setFocus] = useState<FocusField>(null);
   const titleId = useId();
   const bodyId = useId();
@@ -169,6 +188,19 @@ export function PlanStepCaseNote({
   const contactDisplay = useMemo(() => formatContactDisplay(d), [d]);
   const outcomeDisplay = useMemo(() => formatOutcomeDisplay(d), [d]);
   const recordNotes = useMemo(() => formatRecordNotes(step.workflow_data), [step.workflow_data]);
+  const actions = useMemo(
+    () =>
+      [...(step.action_items ?? [])].sort((a, b) => {
+        if (a.target_date && b.target_date && a.target_date !== b.target_date) {
+          return a.target_date.localeCompare(b.target_date);
+        }
+        if (a.target_date && !b.target_date) return -1;
+        if (!a.target_date && b.target_date) return 1;
+        return a.sort_order - b.sort_order;
+      }),
+    [step.action_items],
+  );
+  const completedActionCount = actions.filter((action) => action.status === "completed").length;
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const { ref: bodyRef, rows: bodyRows } = useAutosizeTextarea(
@@ -205,9 +237,10 @@ export function PlanStepCaseNote({
 
   const metaLine = [
     step.status.replace("_", " "),
-    `${step.phase}-day`,
     (step.priority ?? d.priority ?? "medium").replace("_", " ") + " priority",
+    actions.length > 0 ? `${completedActionCount} of ${actions.length} actions complete` : null,
   ]
+    .filter((value): value is string => Boolean(value))
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
     .join(" · ");
 
@@ -254,18 +287,6 @@ export function PlanStepCaseNote({
 
           {editing ? (
             <div className="flex flex-wrap gap-3 pt-1 text-xs">
-            <label className="inline-flex items-center gap-1.5 text-slate-600">
-              <span className="text-slate-500">Phase</span>
-              <select
-                className="rounded border border-slate-200 bg-white px-2 py-1"
-                value={step.phase}
-                onChange={(e) => onPatchStep({ phase: e.target.value as PlanStepRow["phase"] })}
-              >
-                <option value="30">30-day</option>
-                <option value="60">60-day</option>
-                <option value="90">90-day</option>
-              </select>
-            </label>
             <label className="inline-flex items-center gap-1.5 text-slate-600">
               <span className="text-slate-500">Status</span>
               <select
@@ -336,6 +357,152 @@ export function PlanStepCaseNote({
                 <span className="text-slate-500">No narrative entered for this step.</span>
               )}
             </button>
+          )}
+        </section>
+
+        <section className="space-y-3 border-t border-slate-200/70 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionLabel>Actions and target dates</SectionLabel>
+            {actions.length > 0 ? (
+              <p className="text-xs text-slate-500">
+                {completedActionCount} of {actions.length} complete
+              </p>
+            ) : null}
+          </div>
+
+          {actions.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-950">
+              This older step has no scheduled action. Add a dated action below the plan so it can be tracked.
+            </p>
+          ) : editing ? (
+            <div className="space-y-3">
+              {actions.map((action, actionIndex) => (
+                <div
+                  key={action.id}
+                  className="space-y-3 rounded-lg border border-slate-200 bg-[#fafcf9] p-3"
+                >
+                  <label className="block space-y-1 text-xs text-slate-600">
+                    <span>Action {actionIndex + 1}</span>
+                    <input
+                      type="text"
+                      value={action.title}
+                      onChange={(event) =>
+                        onPatchActionItem(action.id, { title: event.target.value })
+                      }
+                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    />
+                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block space-y-1 text-xs text-slate-600">
+                      <span>Target date</span>
+                      <input
+                        type="date"
+                        value={action.target_date ?? ""}
+                        onChange={(event) =>
+                          onPatchActionItem(action.id, {
+                            target_date: event.target.value || null,
+                          })
+                        }
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        required={action.status !== "completed"}
+                      />
+                    </label>
+                    <label className="block space-y-1 text-xs text-slate-600">
+                      <span>Status</span>
+                      <select
+                        value={action.status}
+                        onChange={(event) =>
+                          onPatchActionItem(action.id, {
+                            status: event.target.value as PlanStepActionItemRow["status"],
+                          })
+                        }
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                      >
+                        <option value="pending">Not started</option>
+                        <option value="in_progress">In progress</option>
+                        <option value="blocked">Blocked</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className="block space-y-1 text-xs text-slate-600">
+                    <span>Action notes (optional)</span>
+                    <Textarea
+                      rows={2}
+                      value={action.description ?? ""}
+                      onChange={(event) =>
+                        onPatchActionItem(action.id, {
+                          description: event.target.value || null,
+                        })
+                      }
+                      className="min-h-[64px] border-slate-200 bg-white text-sm"
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {actions.map((action) => {
+                const done = action.status === "completed";
+                const targetLabel = formatDateOnly(action.target_date);
+                return (
+                  <li
+                    key={action.id}
+                    className="rounded-lg border border-slate-200 bg-[#fafcf9] px-3 py-3"
+                  >
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={done}
+                        onChange={(event) =>
+                          onToggleActionItem?.(action.id, event.target.checked)
+                        }
+                        disabled={actionToggleDisabled || !onToggleActionItem}
+                        className="mt-0.5 size-4 shrink-0 accent-[#276221]"
+                        aria-label={`${done ? "Reopen" : "Complete"} ${action.title}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            "block text-sm font-medium text-slate-900",
+                            done && "text-slate-500 line-through",
+                          )}
+                        >
+                          {action.title}
+                        </span>
+                        {action.description?.trim() ? (
+                          <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                            {action.description}
+                          </span>
+                        ) : null}
+                        <span className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          {targetLabel ? (
+                            <time
+                              dateTime={action.target_date ?? undefined}
+                              className="font-medium text-[#276221]"
+                            >
+                              Target {targetLabel}
+                            </time>
+                          ) : (
+                            <span className="font-medium text-amber-800">Target date needed</span>
+                          )}
+                          {action.status === "blocked" ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900">
+                              Blocked
+                            </span>
+                          ) : action.status === "in_progress" ? (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-800">
+                              In progress
+                            </span>
+                          ) : null}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </section>
 

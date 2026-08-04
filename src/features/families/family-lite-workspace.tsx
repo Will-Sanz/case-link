@@ -340,9 +340,8 @@ export function FamilyLiteWorkspace({
   }
 
   function toggleAction(actionItemId: string, done: boolean) {
-    if (!result) return;
     startTransition(async () => {
-      const r = await toggleBarrierWorkflowActionItemAction(result.familyId, actionItemId, done);
+      const r = await toggleBarrierWorkflowActionItemAction(familyId, actionItemId, done);
       if (!r.ok) return setError(r.error);
       setResult(r.result);
       router.refresh();
@@ -417,11 +416,11 @@ export function FamilyLiteWorkspace({
           role="status"
           aria-live="polite"
         >
-          Plan still generating, please do not refresh this page.
+          Your plan is still being prepared. You can leave this page and return; completed work will be saved.
         </p>
       ) : null}
 
-      {result && tab === "plan" ? (
+      {(result || plan) && tab === "plan" ? (
         <Card className="border-[#dce6d9] bg-white p-5 shadow-[0_10px_30px_rgba(30,70,27,0.06)] sm:p-6">
           <FamilyPlanPanel
             familyId={familyId}

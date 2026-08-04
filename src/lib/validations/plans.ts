@@ -91,9 +91,10 @@ export const updatePlanStepSchema = z.object({
 export const createManualStepSchema = z.object({
   familyId: z.string().uuid(),
   planId: z.string().uuid(),
-  phase: z.enum(["30", "60", "90"]),
+  goal: z.string().trim().min(1, "Goal is required").max(500),
   title: z.string().min(1, "Title is required").max(500),
   description: z.string().max(4000).optional().default(""),
+  target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Target date is required"),
   details: planStepDetailsSchema.optional(),
 });
 

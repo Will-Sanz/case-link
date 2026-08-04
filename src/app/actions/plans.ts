@@ -1024,7 +1024,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Unauthorized" };
   }
 
-  const { familyId, planId, phase, title, description, details } = parsed.data;
+  const { familyId, planId, goal, title, description, target_date, details } = parsed.data;
 
   const { data: plan } = await supabase
     .from("plans")
@@ -1037,6 +1037,16 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Plan not found" };
   }
 
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const target = new Date(`${target_date}T00:00:00.000Z`);
+  if (Number.isNaN(target.getTime())) {
+    return { ok: false, error: "Choose a valid target date." };
+  }
+  const daysFromToday = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+  const phase: "30" | "60" | "90" =
+    daysFromToday <= 30 ? "30" : daysFromToday <= 60 ? "60" : "90";
+
   const { data: maxOrder } = await supabase
     .from("plan_steps")
     .select("sort_order")
@@ -1047,6 +1057,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
 
   const sortOrder = (maxOrder?.sort_order ?? -1) + 1;
 
+  const stepDetails = { ...(details ?? {}), stage_goal: goal };
   const { data: newStep, error } = await supabase.from("plan_steps").insert({
     plan_id: planId,
     phase,
@@ -1054,16 +1065,37 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
     description: description ?? "",
     status: "pending",
     sort_order: sortOrder,
-    details: details && Object.keys(details).length > 0 ? details : null,
+    details: stepDetails,
   }).select("id").single();
 
   if (error) {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
-  if (newStep) {
-    await logCaseActivity(supabase, familyId, userId, "step.added", "plan_step", newStep.id, { title });
+  if (!newStep) {
+    return { ok: false, error: "The action could not be created." };
   }
+
+  const { error: actionError } = await supabase.from("plan_step_action_items").insert({
+    plan_step_id: newStep.id,
+    title,
+    description: description?.trim() || null,
+    week_index: 1,
+    target_date,
+    status: "pending",
+    sort_order: 0,
+  });
+
+  if (actionError) {
+    await supabase.from("plan_steps").delete().eq("id", newStep.id);
+    return { ok: false, error: publicMessageFromSupabaseError(actionError) };
+  }
+
+  await logCaseActivity(supabase, familyId, userId, "step.added", "plan_step", newStep.id, {
+    title,
+    goal,
+    target_date,
+  });
 
   revalidatePath(`/families/${familyId}`);
   revalidatePath("/calendar");

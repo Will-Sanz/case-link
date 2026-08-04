@@ -24,6 +24,28 @@ import type {
   PlanWithSteps,
 } from "@/types/family";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
+import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
+
+function dateInputValueAfterDays(days: number): string {
+  const value = new Date();
+  value.setDate(value.getDate() + days);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatTargetDate(value: string | null): string | null {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  }).format(parsed);
+}
 
 function normalizeChecklistForSave(lines: string[] | undefined): string[] {
   return (lines ?? []).map((l) => l.trim()).filter((l) => l.length > 0);
@@ -51,6 +73,14 @@ function normalizeStepForPersistCompare(step: PlanStepRow): string {
     priority: step.priority ?? undefined,
     details: Object.keys(d).length > 0 ? d : undefined,
     workflow_data: wd,
+    action_items: (step.action_items ?? []).map((action) => ({
+      id: action.id,
+      title: action.title,
+      description: action.description,
+      week_index: action.week_index,
+      target_date: action.target_date,
+      status: action.status,
+    })),
   });
 }
 
@@ -75,7 +105,7 @@ function planPageTitle(...candidates: (string | null | undefined)[]): string {
     const t = c?.trim();
     if (t && !LEGACY_PLAN_VERSION_TITLE.test(t)) return t;
   }
-  return "30 / 60 / 90 day plan";
+  return "Family support plan";
 }
 
 export function FamilyPlanPanel({
@@ -83,14 +113,13 @@ export function FamilyPlanPanel({
   familyName,
   plan,
   workflow,
-  onToggleActionItem: _onToggleActionItem,
-  actionToggleDisabled: _actionToggleDisabled,
+  onToggleActionItem,
+  actionToggleDisabled,
 }: {
   familyId: string;
   familyName: string;
   plan: PlanWithSteps | null;
   workflow: BarrierWorkflowResult | null;
-  /** @deprecated Plan UI no longer shows action-item checkboxes; kept for API compatibility. */
   onToggleActionItem?: (actionItemId: string, done: boolean) => void;
   actionToggleDisabled?: boolean;
 }) {
@@ -104,8 +133,9 @@ export function FamilyPlanPanel({
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [addStepPhase, setAddStepPhase] = useState<"30" | "60" | "90">("30");
+  const [addStepGoal, setAddStepGoal] = useState("");
   const [addStepTitle, setAddStepTitle] = useState("");
+  const [addStepTargetDate, setAddStepTargetDate] = useState(() => dateInputValueAfterDays(7));
   const [addStepDescription, setAddStepDescription] = useState("");
   const [addStepDocuments, setAddStepDocuments] = useState("");
   const [addStepContact, setAddStepContact] = useState("");
@@ -169,17 +199,8 @@ export function FamilyPlanPanel({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [stepDirty]);
 
-  const stepsByPhase = useMemo(() => {
-    const src = plan?.steps ?? [];
-    const grouped: Record<"30" | "60" | "90", PlanStepRow[]> = {
-      "30": [],
-      "60": [],
-      "90": [],
-    };
-    for (const s of [...src].sort((a, b) => a.sort_order - b.sort_order)) {
-      grouped[s.phase].push(s);
-    }
-    return grouped;
+  const goalGroups = useMemo(() => {
+    return groupPlanStepsByGoal(plan?.steps ?? []);
   }, [plan]);
 
   function stepRowForDisplay(stepId: string, row: PlanStepRow): PlanStepRow {
@@ -269,8 +290,35 @@ export function FamilyPlanPanel({
     });
   }
 
+  function patchEditingActionItem(
+    actionItemId: string,
+    patch: Partial<PlanStepActionItemRow>,
+  ) {
+    setStepDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        action_items: (prev.action_items ?? []).map((action) =>
+          action.id === actionItemId ? { ...action, ...patch } : action,
+        ),
+      };
+    });
+  }
+
   async function persistOneStep(orig: PlanStepRow | undefined, s: PlanStepRow): Promise<boolean> {
     if (!stepNeedsPersist(orig, s)) return true;
+    const untitledAction = (s.action_items ?? []).find((action) => !action.title.trim());
+    if (untitledAction) {
+      setError("Every action needs a short title before saving.");
+      return false;
+    }
+    const unscheduledAction = (s.action_items ?? []).find(
+      (action) => action.status !== "completed" && !action.target_date,
+    );
+    if (unscheduledAction) {
+      setError(`Choose a target date for “${unscheduledAction.title}” before saving.`);
+      return false;
+    }
     const d = { ...(s.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
     const normalizedChecklist = normalizeChecklistForSave(d.checklist);
     if (normalizedChecklist.length > 0) {
@@ -307,6 +355,7 @@ export function FamilyPlanPanel({
         oai.title !== ai.title ||
         (oai.description ?? "") !== (ai.description ?? "") ||
         oai.week_index !== ai.week_index ||
+        oai.target_date !== ai.target_date ||
         oai.status !== ai.status;
       if (!aiChanged) continue;
       const ar = await updatePlanStepActionItem({
@@ -315,6 +364,7 @@ export function FamilyPlanPanel({
         title: ai.title,
         description: ai.description,
         week_index: ai.week_index,
+        target_date: ai.target_date,
         status: ai.status,
       });
       if (!ar.ok) {
@@ -398,8 +448,17 @@ export function FamilyPlanPanel({
     if (!plan) return;
     if (addStepPending) return;
     const title = addStepTitle.trim();
+    const goal = addStepGoal.trim();
+    if (!goal) {
+      setError("Goal is required.");
+      return;
+    }
     if (!title) {
-      setError("Step title is required.");
+      setError("Action title is required.");
+      return;
+    }
+    if (!addStepTargetDate) {
+      setError("Target date is required.");
       return;
     }
     if (editingStepId && stepDirty && !forceDiscard) {
@@ -442,9 +501,10 @@ export function FamilyPlanPanel({
         const res = await createManualStep({
           familyId,
           planId: plan.id,
-          phase: addStepPhase,
+          goal,
           title,
           description: addStepDescription.trim(),
+          target_date: addStepTargetDate,
           details: Object.keys(details).length > 0 ? details : undefined,
         });
         if (!res.ok) {
@@ -453,10 +513,11 @@ export function FamilyPlanPanel({
         }
         setAddStepTitle("");
         setAddStepDescription("");
+        setAddStepTargetDate(dateInputValueAfterDays(7));
         setAddStepDocuments("");
         setAddStepContact("");
         setAddStepExpectedOutcome("");
-        setSuccess(`Step added to ${addStepPhase}-day plan.`);
+        setSuccess("Action added to the plan.");
         router.refresh();
       } finally {
         setAddStepPending(false);
@@ -656,7 +717,7 @@ export function FamilyPlanPanel({
               title: aiPreviewRow.title,
               description: aiPreviewRow.description ?? null,
               week_index: aiPreviewRow.week_index,
-              target_date: null,
+              target_date: aiPreviewRow.target_date ?? ai.target_date,
             };
           });
 
@@ -713,17 +774,24 @@ export function FamilyPlanPanel({
     return false;
   }, [planAiDraft, plan]);
 
-  if (!workflow) {
+  const planAiPreviewGoals = useMemo(() => {
+    const titles = (planAiPreview?.steps ?? []).map(
+      (step) => step.details.stage_goal?.trim() || step.title,
+    );
+    return [...new Set(titles)];
+  }, [planAiPreview]);
+
+  if (!plan) {
     return (
       <p className="text-sm text-slate-600">
-        Generate a plan from the Barriers tab to see your 30 / 60 / 90 day roadmap here.
+        Add at least one barrier on Overview, then create a plan to see clear goals and dated actions here.
       </p>
     );
   }
 
   const displayTitle = planPageTitle(
-    workflow.planDisplayTitle,
-    plan?.client_display?.title,
+    workflow?.planDisplayTitle,
+    plan.client_display?.title,
   );
 
   return (
@@ -750,20 +818,18 @@ export function FamilyPlanPanel({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {plan && workflow && (!plan.generation_state || plan.generation_state.status === "complete") ? (
+          {workflow && (!plan.generation_state || plan.generation_state.status === "complete") ? (
             <PlanPdfExport plan={plan} familyName={familyName} workflow={workflow} />
           ) : null}
-          {plan ? (
-            <Button
-              type="button"
-              onClick={() => openPlanAiRefine()}
-              variant="secondary"
-              className="border-slate-200"
-              disabled={planAiPending}
-            >
-              {planAiPending ? "Refining…" : "Refine plan with AI"}
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            onClick={() => openPlanAiRefine()}
+            variant="secondary"
+            className="border-slate-200"
+            disabled={planAiPending}
+          >
+            {planAiPending ? "Refining…" : "Refine plan with AI"}
+          </Button>
         </div>
       </div>
 
@@ -779,92 +845,138 @@ export function FamilyPlanPanel({
       {plan?.generation_state?.status === "failed" ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           {plan.generation_state.error ??
-            "Later phases could not be generated. You can edit the saved steps or regenerate from Overview."}
+            "Part of the plan could not be generated. Your saved actions are still available; retry from Overview when you are ready."}
         </div>
       ) : null}
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-5">
-          {workflow.sections.map((section) => (
-            <section key={section.phase} className="max-w-[800px] space-y-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200/80 pb-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  {section.phase}-day horizon
-                </h3>
-                <p className="text-xs text-slate-400">{section.dueRangeLabel}</p>
-              </div>
-              <p className="text-sm leading-relaxed text-slate-600">{section.summary}</p>
-              <div className="mt-4 space-y-8">
-                {stepsByPhase[section.phase].map((full) => {
+          {goalGroups.length > 0 ? (
+            goalGroups.map((group, groupIndex) => {
+              const nextTargetDate = formatTargetDate(group.earliestOpenTargetDate);
+              return (
+                <section key={group.key} className="max-w-[800px] space-y-4">
+                  <div className="rounded-xl border border-[#dce6d9] bg-[#f6f9f5] px-4 py-3 sm:px-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#687b65]">
+                          Goal {groupIndex + 1}
+                        </p>
+                        <h3 className="mt-1 text-lg font-semibold tracking-tight text-[#173a15]">
+                          {group.title}
+                        </h3>
+                      </div>
+                      <div className="text-left text-xs text-[#5d705a] sm:text-right">
+                        <p>
+                          {group.completedActionCount} of {group.actionCount} actions complete
+                        </p>
+                        {nextTargetDate ? (
+                          <p className="mt-1 font-medium text-[#276221]">
+                            Next target: <time dateTime={group.earliestOpenTargetDate ?? undefined}>{nextTargetDate}</time>
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-5">
+                    {group.steps.map((full) => {
                   const display = stepRowForDisplay(full.id, full);
                   const isEditingThis = editingStepId === full.id;
                   return (
-                  <PlanStepCaseNote
-                    key={full.id}
-                    step={display}
-                    editing={isEditingThis}
-                    onPatchStep={(patch) => {
-                      if (editingStepId === full.id) patchEditingStep(patch);
-                    }}
-                    onPatchDetails={(patch) => {
-                      if (editingStepId === full.id) patchEditingStepDetails(patch);
-                    }}
-                    onPatchWorkflow={
-                      isEditingThis
-                        ? (next) =>
-                            patchEditingStep({
-                              workflow_data: next,
-                            })
-                        : undefined
-                    }
-                    onBeginEdit={() => beginStepEdit(full.id)}
-                    onSaveEdits={saveStepEdit}
-                    onCancelEdits={cancelStepEdit}
-                    onDeleteStep={() => removeStep(full.id)}
-                    stepSavePending={(stepSaveBusy || pending) && isEditingThis}
-                    stepDirty={isEditingThis && stepDirty}
-                    refineOpen={aiStepId === full.id}
-                    refineInstruction={aiInstruction}
-                    refinePreview={aiPreview}
-                    refinePending={aiPending}
-                    onRefineInstruction={setAiInstruction}
-                    onRefineRun={runAiPreview}
-                    onRefineApply={applyAiToDraft}
-                    onRefineClose={() => {
-                      setAiStepId(null);
-                      setAiPreview(null);
-                      setAiInstruction("");
-                    }}
-                    onRefineDiscardPreview={() => setAiPreview(null)}
-                    onOpenRefine={() => openAiForStep(full.id)}
-                  />
+                            <PlanStepCaseNote
+                              key={full.id}
+                              step={display}
+                              editing={isEditingThis}
+                              onPatchStep={(patch) => {
+                                if (editingStepId === full.id) patchEditingStep(patch);
+                              }}
+                              onPatchDetails={(patch) => {
+                                if (editingStepId === full.id) patchEditingStepDetails(patch);
+                              }}
+                              onPatchActionItem={(actionItemId, patch) => {
+                                if (editingStepId === full.id) {
+                                  patchEditingActionItem(actionItemId, patch);
+                                }
+                              }}
+                              onToggleActionItem={onToggleActionItem}
+                              actionToggleDisabled={actionToggleDisabled}
+                              onPatchWorkflow={
+                                isEditingThis
+                                  ? (next) =>
+                                      patchEditingStep({
+                                        workflow_data: next,
+                                      })
+                                  : undefined
+                              }
+                              onBeginEdit={() => beginStepEdit(full.id)}
+                              onSaveEdits={saveStepEdit}
+                              onCancelEdits={cancelStepEdit}
+                              onDeleteStep={() => removeStep(full.id)}
+                              stepSavePending={(stepSaveBusy || pending) && isEditingThis}
+                              stepDirty={isEditingThis && stepDirty}
+                              refineOpen={aiStepId === full.id}
+                              refineInstruction={aiInstruction}
+                              refinePreview={aiPreview}
+                              refinePending={aiPending}
+                              onRefineInstruction={setAiInstruction}
+                              onRefineRun={runAiPreview}
+                              onRefineApply={applyAiToDraft}
+                              onRefineClose={() => {
+                                setAiStepId(null);
+                                setAiPreview(null);
+                                setAiInstruction("");
+                              }}
+                              onRefineDiscardPreview={() => setAiPreview(null)}
+                              onOpenRefine={() => openAiForStep(full.id)}
+                            />
                   );
-                })}
-              </div>
-            </section>
-          ))}
-          {plan ? (
-            <section className="max-w-[800px] space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-              <h3 className="text-sm font-semibold text-slate-900">Add step</h3>
+                    })}
+                  </div>
+                </section>
+              );
+            })
+          ) : (
+            <p className="max-w-[800px] rounded-xl border border-dashed border-[#cfe0cc] bg-[#f8faf7] px-4 py-6 text-sm text-[#5d705a]">
+              This plan does not have any actions yet. Add the first action below.
+            </p>
+          )}
+          <section className="max-w-[800px] space-y-4 rounded-xl border border-[#dce6d9] bg-white p-4 sm:p-5">
+              <h3 className="text-sm font-semibold text-[#173a15]">Add an action</h3>
               <p className="text-xs text-slate-500">
-                Add a manual step to the end of the selected phase.
+                Put the action under a clear goal and give it one exact target date.
               </p>
-              <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1 text-xs text-slate-600">
-                  <span>Phase</span>
-                  <select
-                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-sm"
-                    value={addStepPhase}
-                    onChange={(e) => setAddStepPhase(e.target.value as "30" | "60" | "90")}
+                  <span>Goal</span>
+                  <input
+                    type="text"
+                    list="caselink-plan-goals"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    value={addStepGoal}
+                    onChange={(e) => setAddStepGoal(e.target.value)}
+                    placeholder="e.g. Stabilize housing"
                     disabled={addStepPending}
-                  >
-                    <option value="30">30-day</option>
-                    <option value="60">60-day</option>
-                    <option value="90">90-day</option>
-                  </select>
+                  />
+                  <datalist id="caselink-plan-goals">
+                    {goalGroups.map((group) => (
+                      <option key={group.key} value={group.title} />
+                    ))}
+                  </datalist>
                 </label>
                 <label className="space-y-1 text-xs text-slate-600">
-                  <span>Step title</span>
+                  <span>Target date</span>
+                  <input
+                    type="date"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    min={dateInputValueAfterDays(0)}
+                    value={addStepTargetDate}
+                    onChange={(e) => setAddStepTargetDate(e.target.value)}
+                    disabled={addStepPending}
+                  />
+                </label>
+              </div>
+              <label className="space-y-1 text-xs text-slate-600">
+                  <span>Action</span>
                   <input
                     type="text"
                     className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
@@ -873,70 +985,88 @@ export function FamilyPlanPanel({
                     placeholder="e.g. Confirm documentation with utility provider"
                     disabled={addStepPending}
                   />
-                </label>
-              </div>
+              </label>
               <label className="space-y-1 text-xs text-slate-600">
-                <span>Summary</span>
+                <span>Notes (optional)</span>
                 <Textarea
                   className="min-h-[90px] border-slate-200"
                   value={addStepDescription}
                   onChange={(e) => setAddStepDescription(e.target.value)}
-                  placeholder="Add the step summary for case managers."
+                  placeholder="Add context that will help complete this action."
                   disabled={addStepPending}
                 />
               </label>
-              <label className="space-y-1 text-xs text-slate-600">
-                <span>Documents</span>
-                <Textarea
-                  className="min-h-[90px] border-slate-200"
-                  value={addStepDocuments}
-                  onChange={(e) => setAddStepDocuments(e.target.value)}
-                  placeholder="One required document per line."
-                  disabled={addStepPending}
-                />
-              </label>
-              <label className="space-y-1 text-xs text-slate-600">
-                <span>Contact</span>
-                <Textarea
-                  className="min-h-[90px] border-slate-200"
-                  value={addStepContact}
-                  onChange={(e) => setAddStepContact(e.target.value)}
-                  placeholder="One contact detail per line."
-                  disabled={addStepPending}
-                />
-              </label>
-              <label className="space-y-1 text-xs text-slate-600">
-                <span>Expected outcome</span>
-                <Textarea
-                  className="min-h-[90px] border-slate-200"
-                  value={addStepExpectedOutcome}
-                  onChange={(e) => setAddStepExpectedOutcome(e.target.value)}
-                  placeholder="Describe the desired result for this step."
-                  disabled={addStepPending}
-                />
-              </label>
+              <details className="rounded-lg border border-slate-200 bg-[#fafcf9] px-3 py-2">
+                <summary className="cursor-pointer text-xs font-medium text-[#5d705a]">
+                  Add documents, contact, or expected outcome
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <label className="space-y-1 text-xs text-slate-600">
+                    <span>Documents</span>
+                    <Textarea
+                      className="min-h-[72px] border-slate-200 bg-white"
+                      value={addStepDocuments}
+                      onChange={(e) => setAddStepDocuments(e.target.value)}
+                      placeholder="One required document per line."
+                      disabled={addStepPending}
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs text-slate-600">
+                    <span>Contact</span>
+                    <Textarea
+                      className="min-h-[72px] border-slate-200 bg-white"
+                      value={addStepContact}
+                      onChange={(e) => setAddStepContact(e.target.value)}
+                      placeholder="One contact detail per line."
+                      disabled={addStepPending}
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs text-slate-600">
+                    <span>Expected outcome</span>
+                    <Textarea
+                      className="min-h-[72px] border-slate-200 bg-white"
+                      value={addStepExpectedOutcome}
+                      onChange={(e) => setAddStepExpectedOutcome(e.target.value)}
+                      placeholder="Describe the desired result."
+                      disabled={addStepPending}
+                    />
+                  </label>
+                </div>
+              </details>
               <div className="flex justify-end">
                 <Button
                   type="button"
                   onClick={() => createStepAtBottom()}
-                  disabled={addStepPending || addStepTitle.trim().length === 0}
+                  disabled={
+                    addStepPending ||
+                    addStepGoal.trim().length === 0 ||
+                    addStepTitle.trim().length === 0 ||
+                    !addStepTargetDate
+                  }
                 >
-                  {addStepPending ? "Adding…" : "Add step"}
+                  {addStepPending ? "Adding…" : "Add action"}
                 </Button>
               </div>
             </section>
-          ) : null}
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:z-0 lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:overscroll-y-contain lg:self-start">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
             <p className="mt-1 text-sm text-slate-600">
-              Curated resource options matched to this plan.
+              Matches from your organization&apos;s resource directory.
             </p>
 
             <div className="mt-4 space-y-3">
-              {(workflow.resources ?? []).slice(0, 10).map((r) => (
+              {!workflow ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
+                  Resource matches could not be loaded. Your plan is still available, and no resource information was added to it.
+                </p>
+              ) : workflow.resources.length === 0 ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                  No resource matches are available yet. Review the plan without relying on a resource recommendation.
+                </p>
+              ) : workflow.resources.slice(0, 10).map((r) => (
                 <div
                   key={r.id}
                   className="rounded-lg border border-slate-200 bg-white p-3"
@@ -993,7 +1123,7 @@ export function FamilyPlanPanel({
               className="mt-3 min-h-[120px] border-slate-200"
               value={planAiInstruction}
               onChange={(e) => setPlanAiInstruction(e.target.value)}
-              placeholder="e.g. Make the 30-day steps more realistic for a single parent; improve chronological flow; keep all manual edits unless necessary."
+              placeholder="e.g. Make the first actions more realistic for one case manager, keep the target dates, and preserve my manual edits."
             />
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1038,25 +1168,15 @@ export function FamilyPlanPanel({
                 <p className="text-sm font-semibold text-slate-900">
                   Preview ready ({planAiPreview.steps.length} steps)
                 </p>
-                <div className="grid gap-2 md:grid-cols-3">
-                  {(["30", "60", "90"] as const).map((ph) => {
-                    const titles = planAiPreview.steps
-                      .filter((s) => s.phase === ph)
-                      .map((s) => s.title)
-                      .slice(0, 3);
-                    return (
-                      <div key={ph}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          {ph}-day
-                        </p>
-                        <ul className="mt-1 list-disc pl-5 text-slate-700">
-                          {titles.map((t, i) => (
-                            <li key={`${ph}-${i}`}>{t}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Goals in this preview
+                  </p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-700">
+                    {planAiPreviewGoals.map((goal) => (
+                      <li key={goal}>{goal}</li>
+                    ))}
+                  </ul>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={applyPlanAiToDraft}>
