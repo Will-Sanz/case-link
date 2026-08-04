@@ -27,7 +27,7 @@ export type ActionResult =
 const workflowEventSchema = z.object({
   familyId: z.string().uuid(),
   planId: z.string().uuid(),
-  event: z.enum(["plan_viewed", "first_action_visible", "paperwork_viewed"]),
+  event: z.enum(["plan_viewed", "first_action_visible"]),
 });
 
 /** Privacy-safe product telemetry. No family label, narrative, plan prose, or form value is accepted. */
@@ -55,7 +55,6 @@ export async function recordCaseWorkflowEvent(input: unknown): Promise<ActionRes
     parsed.data.event === "first_action_visible"
       ? "plan.first_action_visible"
       : "family.workflow_step_viewed";
-  const workflowStep = parsed.data.event === "paperwork_viewed" ? "paperwork" : "plan";
   await supabase.from("activity_log").insert({
     family_id: parsed.data.familyId,
     actor_user_id: user.id,
@@ -64,7 +63,7 @@ export async function recordCaseWorkflowEvent(input: unknown): Promise<ActionRes
     entity_id: plan.id,
     details: {
       plan_version: plan.version,
-      ...(action === "family.workflow_step_viewed" ? { workflow_step: workflowStep } : {}),
+      ...(action === "family.workflow_step_viewed" ? { workflow_step: "plan" } : {}),
     },
   });
   return { ok: true };

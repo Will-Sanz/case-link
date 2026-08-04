@@ -11,7 +11,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[#dce6d9] bg-white p-5 transition-colors duration-150",
+        "rounded-xl border border-[var(--color-rule)] bg-[var(--card-bg)] p-5 transition-colors duration-[var(--dur-short)]",
         className,
       )}
     >
@@ -28,7 +28,7 @@ export function CardTitle({
   children: ReactNode;
 }) {
   return (
-    <h2 className={cn("text-sm font-semibold text-[#173a15]", className)}>
+    <h2 className={cn("text-sm font-semibold text-[var(--color-ink)]", className)}>
       {children}
     </h2>
   );

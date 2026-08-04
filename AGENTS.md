@@ -19,12 +19,12 @@ Every non-trivial logic change must include the smallest runnable automated test
 
 # Product north star
 
-CaseLink's first product is a focused family-support planning and paperwork workflow for school case managers. The case manager creates a family profile, records barriers, generates and edits a structured intervention plan, uploads a blank required PDF, reviews the AI-populated draft, and downloads the completed form for manual submission to the school's required system. CitySpan is one current example, not the general product definition. CaseLink does not replace the required system or the case manager's judgment. Broader school-operations automation is a future possibility, not the current product promise.
+CaseLink's first product is a focused family-support planning and PDF-export workflow for school case managers. The case manager creates a family profile, records barriers, generates and edits a structured intervention plan, reviews it, and downloads a professional PDF for records or manual use in the school's required system. CitySpan is one current example, not the general product definition. CaseLink does not replace the required system or the case manager's judgment. Broader school-operations automation is a future possibility, not the current product promise.
 
 Use this north star when making product, design, and technical decisions:
 
-- Prioritize the family intake → barriers → intervention plan → paperwork workflow.
-- Automate repetitive plan and form preparation, not human judgment, relationships, or final submission.
+- Prioritize the family intake → barriers → intervention plan → PDF export workflow.
+- Automate repetitive plan preparation and export, not human judgment, relationships, or final submission.
 - Prefer one simple Families page and one coherent Family workspace over dashboards or speculative navigation.
 - Do not imply direct CitySpan integration, autonomous submission, district analytics, or unsupported capabilities.
 - Build the narrow casework wedge cleanly so it can expand later without prematurely becoming a generic school-management suite.
@@ -35,5 +35,6 @@ Current product decisions:
 - Family creation requires only a non-identifying label and one or more selected barriers. The short description is optional.
 - Plans are organized by goals and exact target dates, not Do next / Upcoming / Waiting / Later buckets.
 - Every reviewed open action has a case-manager-confirmed target date; Waiting uses the next follow-up or review date.
-- Agentic blank-PDF analysis, proposed field mapping, human review, and download are required in the Core release.
-- Identity and signature fields remain manual while the no-PII policy is active, and CaseLink never submits forms automatically.
+- The Core release downloads the reviewed intervention plan as a professional black-and-white PDF.
+- Agentic blank-PDF upload, field detection, and form filling are deferred pending user validation and a suitable service; they are not part of the current product.
+- CaseLink never submits files automatically.

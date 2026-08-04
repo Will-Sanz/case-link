@@ -8,7 +8,7 @@ export function Label({
 }: LabelHTMLAttributes<HTMLLabelElement> & { children: ReactNode }) {
   return (
     <label
-      className={cn("block text-sm font-medium text-[#365134]", className)}
+      className={cn("block text-sm font-medium text-[var(--color-ink-2)]", className)}
       {...props}
     >
       {children}

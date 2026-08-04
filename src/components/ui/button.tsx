@@ -8,13 +8,13 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variants: Record<NonNullable<Props["variant"]>, string> = {
   primary:
-    "rounded-lg bg-[#276221] px-4 py-2 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(39,98,33,0.14)] transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-[#1f531b] hover:shadow-[0_7px_18px_rgba(39,98,33,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30 focus-visible:ring-offset-2 active:translate-y-0 disabled:pointer-events-none disabled:opacity-50",
+    "whitespace-nowrap rounded-lg bg-[var(--button-bg)] px-4 py-2 text-sm font-semibold text-[var(--button-fg)] [box-shadow:var(--shadow-action)] transition-colors duration-[var(--dur-short)] [transition-timing-function:var(--ease-out)] hover:bg-[var(--button-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 active:bg-[var(--button-bg)] disabled:cursor-not-allowed disabled:opacity-50",
   secondary:
-    "rounded-lg bg-[#edf4eb] px-4 py-2 text-sm font-semibold text-[#276221] transition-colors duration-150 hover:bg-[#dfeedd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/25 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+    "whitespace-nowrap rounded-lg bg-[var(--color-accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--color-accent)] transition-colors duration-[var(--dur-short)] hover:bg-[var(--color-paper-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 active:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
   outline:
-    "rounded-lg border border-[#cfdccc] bg-white px-4 py-2 text-sm font-semibold text-[#365134] transition-colors duration-150 hover:bg-[#f3f7f1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/25 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+    "whitespace-nowrap rounded-lg border border-[var(--color-rule-strong)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-ink-2)] transition-colors duration-[var(--dur-short)] hover:bg-[var(--color-paper-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 active:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50",
   ghost:
-    "rounded-lg px-3 py-2 text-sm font-medium text-[#5d705a] transition-colors duration-150 hover:bg-[#edf4eb] hover:text-[#173a15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/25 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+    "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors duration-[var(--dur-short)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 active:bg-[var(--color-paper-3)] disabled:cursor-not-allowed disabled:opacity-50",
 };
 
 export function Button({

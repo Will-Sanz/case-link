@@ -272,6 +272,25 @@ export function familyPrivacyFields(detail: FamilyDetail): PrivacyFieldInput[] {
       label: "Case note",
       value: note.body,
     })),
+    ...(detail.progressUpdates ?? []).flatMap((update, updateIndex) => [
+      {
+        field: `progressUpdates.${updateIndex}.summary`,
+        label: "Progress update",
+        value: update.summary,
+      },
+      ...update.plan_changes.flatMap((change, changeIndex) => [
+        {
+          field: `progressUpdates.${updateIndex}.changes.${changeIndex}.notes`,
+          label: "Progress action note",
+          value: change.current.notes,
+        },
+        {
+          field: `progressUpdates.${updateIndex}.changes.${changeIndex}.outcome`,
+          label: "Progress action outcome",
+          value: change.current.outcome,
+        },
+      ]),
+    ]),
   ];
 }
 

@@ -13,8 +13,8 @@ const STATUS_LABELS: Record<StepStatus, string> = {
 };
 
 const STATUS_CLASSES: Record<StepStatus, string> = {
-  pending: "border-slate-200 bg-slate-50 text-slate-700",
-  in_progress: "border-blue-200/70 bg-blue-50/50 text-blue-700",
+  pending: "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)]",
+  in_progress: "border-[var(--color-accent-rule)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]",
   completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
   blocked: "border-red-200 bg-red-50 text-red-800",
 };
@@ -39,7 +39,7 @@ export function StepStatusBadge({
         value={status}
         onChange={(e) => onChange(e.target.value as StepStatus)}
         className={cn(
-          "rounded-md border px-2 py-0.5 text-xs font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20",
+          "rounded-md border px-2 py-0.5 text-xs font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]",
           cls,
           className,
         )}
@@ -78,19 +78,19 @@ export function ChecklistProgressBadge({
       <span
         className={cn(
           "text-xs font-medium",
-          allDone ? "text-emerald-700" : "text-slate-600",
+          allDone ? "text-emerald-700" : "text-[var(--color-ink-muted)]",
         )}
       >
         {completed} of {total}
       </span>
       {showBar && (
-        <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--color-rule)]">
           <div
             className={cn(
-              "h-full rounded-full transition-all duration-200",
-              allDone ? "bg-emerald-500" : "bg-blue-400",
+              "h-full origin-left rounded-full transition-transform duration-200",
+              allDone ? "bg-emerald-500" : "bg-[var(--color-accent)]",
             )}
-            style={{ width: `${pct}%` }}
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
       )}

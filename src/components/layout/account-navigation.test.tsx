@@ -21,6 +21,7 @@ import { CaseManagerProfileClient } from "@/features/profile/case-manager-profil
 
 describe("account navigation", () => {
   it("keeps Settings and Help at the bottom without a sidebar sign-out action", () => {
+    navigation.pathname = "/families";
     render(<FamilyCaseChrome>Content</FamilyCaseChrome>);
 
     expect(within(screen.getByRole("navigation", { name: "Workspace" })).getAllByRole("link")).toHaveLength(1);
@@ -30,6 +31,17 @@ describe("account navigation", () => {
         .map((link) => link.textContent?.trim()),
     ).toEqual(["Settings", "Help & product guide"]);
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+  });
+
+  it("marks only the current family destination as active", () => {
+    const familyId = "11111111-1111-4111-8111-111111111111";
+    navigation.pathname = `/families/${familyId}/profile`;
+    render(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+
+    const workspace = within(screen.getByRole("navigation", { name: "Workspace" }));
+    const familyWorkspace = within(screen.getByRole("navigation", { name: "Family workspace" }));
+    expect(workspace.getByRole("link", { name: "Families" }).getAttribute("aria-current")).toBeNull();
+    expect(familyWorkspace.getByRole("link", { name: "Family profile" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("hides technical identifiers while keeping sign out on the profile", () => {

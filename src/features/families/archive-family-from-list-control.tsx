@@ -31,7 +31,7 @@ export function ArchiveFamilyFromListControl({ familyId }: { familyId: string })
       <Button
         type="button"
         variant="ghost"
-        className="h-auto py-1.5 text-xs font-normal text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        className="h-auto py-1.5 text-xs font-normal text-[var(--color-ink-faint)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink-strong)]"
         disabled={pending}
         onClick={() => {
           setError(null);

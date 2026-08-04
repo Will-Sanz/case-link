@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildPlanPresentation } from "@/lib/domain/plan/presentation";
 import type {
   CaseNoteRow,
+  CaseProgressPlanChange,
+  CaseProgressUpdateRow,
   FamilyBarrierRow,
   FamilyDetail,
   FamilyGoalRow,
@@ -197,7 +199,7 @@ export async function getFamilyDetail(
     return null;
   }
 
-  const [goalsRes, barriersRes, membersRes, notesRes, matchesRes, planRes] =
+  const [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
     await Promise.all([
     client
       .from("family_goals")
@@ -227,6 +229,25 @@ export async function getFamilyDetail(
       `,
       )
       .eq("family_id", familyId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    client
+      .from("case_progress_updates")
+      .select(
+        `
+        id,
+        family_id,
+        plan_id,
+        author_id,
+        occurred_on,
+        summary,
+        plan_changes,
+        created_at,
+        author:app_users!case_progress_updates_author_id_fkey ( email )
+      `,
+      )
+      .eq("family_id", familyId)
+      .order("occurred_on", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(50),
     client.from("resource_matches").select(
@@ -308,7 +329,7 @@ export async function getFamilyDetail(
     };
   }
 
-  for (const res of [goalsRes, barriersRes, membersRes, notesRes, matchesRes]) {
+  for (const res of [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes]) {
     if (res.error) {
       throw new Error(res.error.message);
     }
@@ -340,6 +361,7 @@ export async function getFamilyDetail(
     barriers: (barriersRes.data ?? []) as FamilyBarrierRow[],
     members: (membersRes.data ?? []) as FamilyMemberRow[],
     caseNotes: normalizeCaseNotes(notesRes.data ?? []),
+    progressUpdates: normalizeProgressUpdates(progressRes.data ?? []),
     resourceMatches: sortResourceMatches(
       normalizeResourceMatches(matchesRes.data ?? []),
     ),
@@ -402,6 +424,30 @@ function normalizeCaseNotes(rows: unknown[]): CaseNoteRow[] {
       family_id: row.family_id,
       author_id: row.author_id,
       body: row.body,
+      created_at: row.created_at,
+      author,
+    };
+  });
+}
+
+function normalizeProgressUpdates(rows: unknown[]): CaseProgressUpdateRow[] {
+  return rows.map((raw) => {
+    const row = raw as Omit<CaseProgressUpdateRow, "author" | "plan_changes"> & {
+      author?: { email: string } | { email: string }[] | null;
+      plan_changes?: unknown;
+    };
+    const a = row.author;
+    const author = Array.isArray(a) ? a[0] ?? null : a ?? null;
+    return {
+      id: row.id,
+      family_id: row.family_id,
+      plan_id: row.plan_id,
+      author_id: row.author_id,
+      occurred_on: row.occurred_on,
+      summary: row.summary,
+      plan_changes: Array.isArray(row.plan_changes)
+        ? (row.plan_changes as CaseProgressPlanChange[])
+        : [],
       created_at: row.created_at,
       author,
     };

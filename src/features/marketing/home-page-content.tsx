@@ -12,12 +12,12 @@ const workflow = [
     body: "Draft goals and actions with exact target dates.",
   },
   {
-    title: "Review paperwork",
-    body: "Check each proposed entry and make changes.",
+    title: "Review the plan",
+    body: "Confirm every goal, action, owner, and target date.",
   },
   {
     title: "Download the PDF",
-    body: "Export a completed copy for your school’s system.",
+    body: "Export a clean copy for your records or required system.",
   },
 ];
 
@@ -113,10 +113,10 @@ export function HomePageContent() {
               id="home-hero"
               className="public-display text-balance text-[clamp(3.15rem,5vw,5.25rem)] leading-[0.93] text-[var(--public-ink)]"
             >
-              Turn family needs into clear plans and prepared paperwork.
+              Turn family needs into clear plans and ready-to-use PDFs.
             </h1>
             <p className="mt-7 max-w-[60ch] text-pretty text-lg leading-8 text-[var(--public-ink-2)] sm:text-xl">
-              CaseLink helps school case managers organize barriers, draft a structured intervention plan, and prepare fillable forms for manual upload to the systems their schools already use.
+              CaseLink helps school case managers organize barriers, draft and review a structured intervention plan, and download a professional PDF for the systems their schools already use.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/product" className="public-primary-action">
@@ -136,7 +136,7 @@ export function HomePageContent() {
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,1.45fr)] lg:gap-20 lg:px-10">
           <div>
             <h2 id="workflow-title" className="public-display max-w-md text-balance text-4xl leading-[0.98] text-[var(--public-ink)] sm:text-5xl">
-              A clear path from context to paperwork.
+              A clear path from context to a reviewed plan.
             </h2>
           </div>
 
