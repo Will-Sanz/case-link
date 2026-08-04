@@ -39,6 +39,22 @@ import {
   type LocalActionDraft,
 } from "@/lib/domain/plan/local-action-draft";
 
+function readStoredActionDraft(key: string): LocalActionDraft | null {
+  try {
+    return parseLocalActionDraft(window.localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function removeStoredActionDraft(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Draft recovery is optional when browser storage is restricted.
+  }
+}
+
 function dateInputValueAfterDays(days: number): string {
   const value = new Date();
   value.setDate(value.getDate() + days);
@@ -403,13 +419,13 @@ export function FamilyPlanPanel({
       return;
     }
     draftRecoveryLoadedPlanIdRef.current = plan.id;
-    const stored = parseLocalActionDraft(window.localStorage.getItem(actionDraftStorageKey));
+    const stored = readStoredActionDraft(actionDraftStorageKey);
     if (!stored || stored.planId !== plan.id) {
-      window.localStorage.removeItem(actionDraftStorageKey);
+      removeStoredActionDraft(actionDraftStorageKey);
       return;
     }
     if (!plan.steps.some((step) => step.id === stored.step.id)) {
-      window.localStorage.removeItem(actionDraftStorageKey);
+      removeStoredActionDraft(actionDraftStorageKey);
       return;
     }
     setRecoverableDraft(stored);
@@ -495,7 +511,7 @@ export function FamilyPlanPanel({
   }
 
   function clearLocalActionDraft() {
-    if (actionDraftStorageKey) window.localStorage.removeItem(actionDraftStorageKey);
+    if (actionDraftStorageKey) removeStoredActionDraft(actionDraftStorageKey);
     setRecoverableDraft(null);
   }
 

@@ -145,4 +145,30 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     ).toBeTruthy();
     await waitFor(() => expect(updatePlanStep).toHaveBeenCalledTimes(1));
   });
+
+  it("keeps the plan usable when browser draft storage is restricted", () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Storage is unavailable", "SecurityError");
+    });
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new DOMException("Storage is unavailable", "SecurityError");
+    });
+
+    try {
+      expect(() =>
+        render(
+          <FamilyPlanPanel
+            familyId={plan.family_id}
+            familyName="Family 014"
+            plan={plan}
+            workflow={null}
+          />,
+        ),
+      ).not.toThrow();
+      expect(screen.getByRole("button", { name: "Edit action" })).toBeTruthy();
+    } finally {
+      getItem.mockRestore();
+      removeItem.mockRestore();
+    }
+  });
 });
