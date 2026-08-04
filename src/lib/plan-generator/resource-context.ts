@@ -98,6 +98,7 @@ export function generatedStepsFromMatches(
 
     const details: GeneratedStepDetails = {
       ...phaseGuidance,
+      owner: "case_manager",
       action_needed_now: `Reach out to ${r.program_name} and complete the next concrete task for this phase (call, email, or appointment).`,
       rationale: m.match_reason
         ? `This program matches the family's needs: ${m.match_reason}`

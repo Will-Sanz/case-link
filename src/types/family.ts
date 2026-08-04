@@ -100,6 +100,8 @@ export type ResourceMatchRow = {
 
 /** Rich structured content for plan steps (checklist, contacts, blockers, etc.) */
 export type PlanStepDetails = {
+  /** Explicit responsibility. AI-generated plans default to the case manager. */
+  owner?: "case_manager" | "family" | "school_program" | "shared";
   /** Short, concrete next action (e.g. "Call PECO and ask about CAP enrollment") */
   action_needed_now?: string;
   rationale?: string;

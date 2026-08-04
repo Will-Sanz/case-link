@@ -1,5 +1,6 @@
 import type { FamilyDetail } from "@/types/family";
 import type { PdfFieldDescriptor, PdfFieldMapping } from "@/types/paperwork";
+import { actionUiStatus } from "@/lib/domain/plan/action-state";
 
 export type PaperworkSource = {
   familySummary: string;
@@ -14,6 +15,7 @@ export type PaperworkSource = {
     targetDate: string;
     status: string;
     expectedOutcome: string;
+    owner: "case_manager" | "family" | "school_program" | "shared";
   }>;
 };
 
@@ -30,6 +32,7 @@ export function buildPaperworkSource(family: FamilyDetail): PaperworkSource {
     planActions: (family.plan?.steps ?? []).flatMap((step) => {
       const goal = step.details?.stage_goal?.trim() || step.title.trim();
       const expectedOutcome = step.details?.expected_outcome?.trim() ?? "";
+      const owner = step.details?.owner ?? "case_manager";
       const actions = step.action_items ?? [];
       if (actions.length === 0) {
         return [{
@@ -37,8 +40,9 @@ export function buildPaperworkSource(family: FamilyDetail): PaperworkSource {
           title: step.details?.action_needed_now?.trim() || step.title.trim(),
           description: step.description.trim(),
           targetDate: step.due_date?.slice(0, 10) ?? "",
-          status: step.status,
+          status: step.status === "blocked" ? "waiting" : step.status,
           expectedOutcome,
+          owner,
         }];
       }
       return actions.map((action) => ({
@@ -46,8 +50,9 @@ export function buildPaperworkSource(family: FamilyDetail): PaperworkSource {
         title: action.title.trim(),
         description: action.description?.trim() ?? step.description.trim(),
         targetDate: action.target_date ?? "",
-        status: action.status,
+        status: actionUiStatus(action),
         expectedOutcome,
+        owner,
       }));
     }),
   };
@@ -90,6 +95,13 @@ export function createDeterministicMappings(fields: PdfFieldDescriptor[], source
     } else if (/case worker objective|case manager objective|strategy/.test(key) && indexedAction) {
       value = indexedAction.title;
       sourceLabel = "Reviewed plan action";
+    } else if (/client objective|family objective|participant objective/.test(key) && indexedAction) {
+      const explicitFamilyOwner =
+        indexedAction.owner === "family" || indexedAction.owner === "shared";
+      value = explicitFamilyOwner ? indexedAction.title : "";
+      sourceLabel = explicitFamilyOwner
+        ? "Reviewed action explicitly assigned to the family"
+        : "No family-owned action was explicitly confirmed";
     } else if (/progress status|action status/.test(key) && indexedAction) {
       value = indexedAction.status.replace("_", " ");
       sourceLabel = "Current action status";

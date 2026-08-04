@@ -21,6 +21,7 @@ function plan(overrides: Partial<PlanWithSteps> = {}): PlanWithSteps {
         phase: "30",
         title: "Confirm housing options",
         description: "",
+        details: { owner: "case_manager", expected_outcome: "Options are confirmed." },
         status: "pending",
         due_date: null,
         assigned_to_id: null,
@@ -112,5 +113,22 @@ describe("getPlanReviewStatus", () => {
         }),
       ).label,
     ).toBe("Needs attention");
+  });
+
+  it("requires an expected result and complete waiting details", () => {
+    const missingResult = plan();
+    missingResult.steps[0].details = { owner: "case_manager" };
+    expect(getPlanReviewStatus(missingResult).issue).toBe(
+      "Give every action a clear title and expected result before reviewing the plan.",
+    );
+
+    const waiting = plan();
+    waiting.steps[0].action_items![0].status = "blocked";
+    waiting.steps[0].action_items![0].notes = "Awaiting a callback.";
+    expect(getPlanReviewStatus(waiting).issue).toBe(
+      "Every waiting action needs a reason and next follow-up date.",
+    );
+    waiting.steps[0].action_items![0].follow_up_date = "2026-08-12";
+    expect(getPlanReviewStatus(waiting).state).toBe("needs_review");
   });
 });

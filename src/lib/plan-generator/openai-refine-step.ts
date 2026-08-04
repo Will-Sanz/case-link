@@ -163,7 +163,11 @@ Refine this step only. phase must stay "${phase}" unless feedback explicitly req
       const body =
         s.phase !== phase && !allowPhaseChange ? { ...s, phase: phase as "30" | "60" | "90" } : s;
 
-      const details = sparseDetailsForPersistence(body);
+      const details = {
+        ...sparseDetailsForPersistence(body),
+        owner:
+          (currentStep.details as PlanStepDetails | null | undefined)?.owner ?? "case_manager",
+      } satisfies PlanStepDetails;
       const stepPriority =
         body.priority === "urgent" ? "urgent"
         : body.priority === "high" ? "high"

@@ -62,6 +62,7 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase):
   const detailsPriority = pri === "urgent" ? "high" : pri;
 
   return {
+    owner: "case_manager",
     timing_guidance: timing ?? `Within the ${phase}-day window; confirm dates with each agency.`,
     detailed_instructions: guidance,
     expected_outcome: lean.expected_outcome.trim(),
@@ -96,6 +97,7 @@ export function leanPhaseStepToGeneratedStep(
 
   const summary = lean.summary.trim();
   const fullDetails: GeneratedStepDetails = {
+    owner: "case_manager",
     action_needed_now: actionItems[0]?.title ?? summary.slice(0, 200),
     rationale: "",
     detailed_instructions: sparse.detailed_instructions ?? "",

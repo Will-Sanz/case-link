@@ -24,6 +24,11 @@ import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-ph
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
+import {
+  actionUserNotes,
+  encodeActionNotes,
+  isActionNoLongerNeeded,
+} from "@/lib/domain/plan/action-state";
 import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
@@ -1236,6 +1241,16 @@ export async function updatePlanStep(
     return { ok: false, error: "Step not found or could not be updated." };
   }
 
+  await logCaseActivity(
+    supabase,
+    familyId,
+    userId,
+    "step.updated",
+    "plan_step",
+    stepId,
+    { plan_id: planRow.id, changed_fields: Object.keys(updatePayload) },
+  );
+
   if (patch.status !== undefined) {
     await logCaseActivity(
       supabase,
@@ -1293,15 +1308,20 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Plan not found" };
   }
 
-  const reviewError = await clearPlanReview(supabase, planId);
-  if (reviewError) return { ok: false, error: reviewError };
-
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const target = new Date(`${target_date}T00:00:00.000Z`);
-  if (Number.isNaN(target.getTime())) {
+  const [targetYear, targetMonth, targetDay] = target_date.split("-").map(Number);
+  if (
+    Number.isNaN(target.getTime()) ||
+    target.getUTCFullYear() !== targetYear ||
+    target.getUTCMonth() !== targetMonth - 1 ||
+    target.getUTCDate() !== targetDay
+  ) {
     return { ok: false, error: "Choose a valid target date." };
   }
+  const reviewError = await clearPlanReview(supabase, planId);
+  if (reviewError) return { ok: false, error: reviewError };
   const daysFromToday = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
   const phase: "30" | "60" | "90" =
     daysFromToday <= 30 ? "30" : daysFromToday <= 60 ? "60" : "90";
@@ -1316,7 +1336,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
 
   const sortOrder = (maxOrder?.sort_order ?? -1) + 1;
 
-  const stepDetails = { ...(details ?? {}), stage_goal: goal };
+  const stepDetails = { owner: "case_manager", ...(details ?? {}), stage_goal: goal };
   const { data: newStep, error } = await supabase.from("plan_steps").insert({
     plan_id: planId,
     phase,
@@ -1608,6 +1628,8 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
       label: "Action description",
       value: parsed.data.description,
     },
+    { field: "outcome", label: "Action outcome", value: parsed.data.outcome },
+    { field: "notes", label: "Action note", value: actionUserNotes(parsed.data.notes) },
   ]);
   if (actionPrivacyError) return { ok: false, error: actionPrivacyError };
 
@@ -1625,7 +1647,7 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
 
   const { data: ai } = await supabase
     .from("plan_step_action_items")
-    .select("plan_step_id")
+    .select("plan_step_id, status, notes, follow_up_date")
     .eq("id", actionItemId)
     .maybeSingle();
 
@@ -1654,6 +1676,26 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
     return { ok: false, error: "Action item not found" };
   }
 
+  const nextStatus = status ?? ai.status;
+  let nextNotes = parsed.data.notes !== undefined ? parsed.data.notes : ai.notes;
+  const nextFollowUpDate =
+    parsed.data.follow_up_date !== undefined
+      ? parsed.data.follow_up_date
+      : ai.follow_up_date;
+
+  if (status !== undefined && status !== "completed" && isActionNoLongerNeeded(ai)) {
+    nextNotes = encodeActionNotes(ai.notes, false);
+  }
+
+  if (nextStatus === "blocked") {
+    if (!actionUserNotes(nextNotes).trim()) {
+      return { ok: false, error: "Add a short waiting reason before saving." };
+    }
+    if (!nextFollowUpDate) {
+      return { ok: false, error: "Choose the next follow-up date before saving." };
+    }
+  }
+
   const changesReviewedContent =
     parsed.data.title !== undefined ||
     parsed.data.description !== undefined ||
@@ -1670,6 +1712,10 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   if (parsed.data.description !== undefined) patch.description = parsed.data.description;
   if (parsed.data.week_index !== undefined) patch.week_index = parsed.data.week_index;
   if (parsed.data.target_date !== undefined) patch.target_date = parsed.data.target_date;
+  if (parsed.data.outcome !== undefined) patch.outcome = parsed.data.outcome;
+  if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes;
+  if (parsed.data.follow_up_date !== undefined) patch.follow_up_date = parsed.data.follow_up_date;
+  if (nextNotes !== ai.notes && parsed.data.notes === undefined) patch.notes = nextNotes;
 
   if (Object.keys(patch).length === 0) {
     return { ok: true };
@@ -1684,12 +1730,27 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
     return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
 
+  await logCaseActivity(
+    supabase,
+    familyId,
+    userId,
+    "step.action_item_updated",
+    "plan_step_action_item",
+    actionItemId,
+    {
+      plan_id: step.plan_id,
+      changed_fields: Object.keys(patch),
+      status: nextStatus,
+    },
+  );
+
   if (status === "completed") {
+    const noLongerNeeded = isActionNoLongerNeeded({ status: nextStatus, notes: nextNotes });
     await logCaseActivity(
       supabase,
       familyId,
       userId,
-      "step.action_item_completed",
+      noLongerNeeded ? "step.action_item_no_longer_needed" : "step.action_item_completed",
       "plan_step_action_item",
       actionItemId,
       {},

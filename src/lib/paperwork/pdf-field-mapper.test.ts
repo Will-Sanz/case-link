@@ -14,6 +14,7 @@ const source = {
     targetDate: "2026-08-10",
     status: "in_progress",
     expectedOutcome: "Housing intake submitted",
+    owner: "case_manager" as const,
   }],
 };
 
@@ -51,5 +52,23 @@ describe("createDeterministicMappings", () => {
       "Complete the housing intake",
       "2026-08-10",
     ]);
+  });
+
+  it("leaves family objectives blank unless responsibility was explicitly confirmed", () => {
+    const field = {
+      name: "Client_Objective_1",
+      kind: "text" as const,
+      options: [],
+      maxLength: null,
+    };
+    const [unconfirmed] = createDeterministicMappings([field], source);
+    const [confirmed] = createDeterministicMappings([field], {
+      ...source,
+      planActions: [{ ...source.planActions[0], owner: "family" as const }],
+    });
+
+    expect(unconfirmed.value).toBe("");
+    expect(unconfirmed.needsReview).toBe(true);
+    expect(confirmed.value).toBe("Complete the housing intake");
   });
 });

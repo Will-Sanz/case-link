@@ -1,8 +1,23 @@
 import { z } from "zod";
 
+const dateOnlySchema = (message: string) =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, message)
+    .refine((value) => {
+      const [year, month, day] = value.split("-").map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() === month - 1 &&
+        date.getUTCDate() === day
+      );
+    }, message);
+
 export const aiModeSchema = z.enum(["fast", "thinking"]).optional();
 
 const planStepDetailsSchema = z.object({
+  owner: z.enum(["case_manager", "family", "school_program", "shared"]).optional(),
   /** Short, concrete next action for the case manager. */
   action_needed_now: z.string().optional(),
   rationale: z.string().optional(),
@@ -93,15 +108,25 @@ export const updatePlanStepSchema = z.object({
   sort_order: z.number().int().min(0).max(999).optional(),
 });
 
-export const createManualStepSchema = z.object({
-  familyId: z.string().uuid(),
-  planId: z.string().uuid(),
-  goal: z.string().trim().min(1, "Goal is required").max(500),
-  title: z.string().min(1, "Title is required").max(500),
-  description: z.string().max(4000).optional().default(""),
-  target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Target date is required"),
-  details: planStepDetailsSchema.optional(),
-});
+export const createManualStepSchema = z
+  .object({
+    familyId: z.string().uuid(),
+    planId: z.string().uuid(),
+    goal: z.string().trim().min(1, "Goal is required").max(500),
+    title: z.string().min(1, "Title is required").max(500),
+    description: z.string().max(4000).optional().default(""),
+    target_date: dateOnlySchema("Choose a valid target date"),
+    details: planStepDetailsSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.details?.expected_outcome?.trim()) {
+      context.addIssue({
+        code: "custom",
+        path: ["details", "expected_outcome"],
+        message: "Expected result is required",
+      });
+    }
+  });
 
 export const deletePlanStepSchema = z.object({
   stepId: z.string().uuid(),
@@ -152,7 +177,12 @@ export const updatePlanStepActionItemSchema = z.object({
   description: z.string().max(4000).nullable().optional(),
   week_index: z.number().int().min(1).max(52).optional(),
   target_date: z
-    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid target date"), z.null()])
+    .union([dateOnlySchema("Use a valid target date"), z.null()])
+    .optional(),
+  outcome: z.string().max(2000).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  follow_up_date: z
+    .union([dateOnlySchema("Use a valid follow-up date"), z.null()])
     .optional(),
 });
 

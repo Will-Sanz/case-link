@@ -13,6 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
+import {
+  actionUiStatus,
+  actionUserNotes,
+  encodeActionNotes,
+  isActionNoLongerNeeded,
+  type ActionUiStatus,
+} from "@/lib/domain/plan/action-state";
 import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 import {
   buildMainParagraph,
@@ -47,6 +54,13 @@ function formatDateOnly(value: string | null): string | null {
     day: "numeric",
     year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
   }).format(parsed);
+}
+
+function ownerLabel(owner: PlanStepDetails["owner"]): string {
+  if (owner === "family") return "Family";
+  if (owner === "school_program") return "School / program";
+  if (owner === "shared") return "Shared";
+  return "Case manager";
 }
 
 function useAutosizeTextarea(value: string, minRows = 3) {
@@ -236,7 +250,8 @@ export function PlanStepCaseNote({
   }, [editing]);
 
   const metaLine = [
-    step.status.replace("_", " "),
+    step.status === "blocked" ? "Waiting" : step.status.replace("_", " "),
+    `Owner: ${ownerLabel(d.owner)}`,
     (step.priority ?? d.priority ?? "medium").replace("_", " ") + " priority",
     actions.length > 0 ? `${completedActionCount} of ${actions.length} actions complete` : null,
   ]
@@ -297,7 +312,22 @@ export function PlanStepCaseNote({
                 <option value="pending">Pending</option>
                 <option value="in_progress">In progress</option>
                 <option value="completed">Completed</option>
-                <option value="blocked">Blocked</option>
+                <option value="blocked">Waiting</option>
+              </select>
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-slate-600">
+              <span className="text-slate-500">Owner</span>
+              <select
+                className="rounded border border-slate-200 bg-white px-2 py-1"
+                value={d.owner ?? "case_manager"}
+                onChange={(e) =>
+                  onPatchDetails({ owner: e.target.value as NonNullable<PlanStepDetails["owner"]> })
+                }
+              >
+                <option value="case_manager">Case manager</option>
+                <option value="shared">Shared</option>
+                <option value="school_program">School / program</option>
+                <option value="family">Family</option>
               </select>
             </label>
             <label className="inline-flex items-center gap-1.5 text-slate-600">
@@ -352,9 +382,9 @@ export function PlanStepCaseNote({
                   {mainParagraphRead}
                 </p>
               ) : editing ? (
-                <span className="text-slate-400 italic">Click to write the case note for this step…</span>
+                <span className="text-slate-400 italic">Click to write the case note for this action…</span>
               ) : (
-                <span className="text-slate-500">No narrative entered for this step.</span>
+                <span className="text-slate-500">No narrative entered for this action.</span>
               )}
             </button>
           )}
@@ -369,10 +399,15 @@ export function PlanStepCaseNote({
               </p>
             ) : null}
           </div>
+          {editing && actions.length > 1 ? (
+            <p className="text-xs leading-relaxed text-slate-500">
+              Actions stay in target-date order. Change a date to move an action earlier or later.
+            </p>
+          ) : null}
 
           {actions.length === 0 ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-950">
-              This older step has no scheduled action. Add a dated action below the plan so it can be tracked.
+              This older plan item has no scheduled task. Add a dated action below the plan so it can be tracked.
             </p>
           ) : editing ? (
             <div className="space-y-3">
@@ -410,23 +445,35 @@ export function PlanStepCaseNote({
                     <label className="block space-y-1 text-xs text-slate-600">
                       <span>Status</span>
                       <select
-                        value={action.status}
-                        onChange={(event) =>
+                        value={actionUiStatus(action)}
+                        onChange={(event) => {
+                          const next = event.target.value as ActionUiStatus;
+                          if (next === "no_longer_needed") {
+                            onPatchActionItem(action.id, {
+                              status: "completed",
+                              notes: encodeActionNotes(action.notes, true),
+                              follow_up_date: null,
+                            });
+                            return;
+                          }
                           onPatchActionItem(action.id, {
-                            status: event.target.value as PlanStepActionItemRow["status"],
-                          })
-                        }
+                            status: next === "waiting" ? "blocked" : next,
+                            notes: encodeActionNotes(action.notes, false),
+                            follow_up_date: next === "waiting" ? action.follow_up_date : null,
+                          });
+                        }}
                         className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                       >
                         <option value="pending">Not started</option>
                         <option value="in_progress">In progress</option>
-                        <option value="blocked">Blocked</option>
+                        <option value="waiting">Waiting</option>
                         <option value="completed">Completed</option>
+                        <option value="no_longer_needed">No longer needed</option>
                       </select>
                     </label>
                   </div>
                   <label className="block space-y-1 text-xs text-slate-600">
-                    <span>Action notes (optional)</span>
+                    <span>How to do it (optional)</span>
                     <Textarea
                       rows={2}
                       value={action.description ?? ""}
@@ -438,6 +485,57 @@ export function PlanStepCaseNote({
                       className="min-h-[64px] border-slate-200 bg-white text-sm"
                     />
                   </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block space-y-1 text-xs text-slate-600">
+                      <span>
+                        {action.status === "blocked" ? "Why is this waiting?" : "Progress note (optional)"}
+                      </span>
+                      <Textarea
+                        rows={2}
+                        value={actionUserNotes(action.notes)}
+                        onChange={(event) =>
+                          onPatchActionItem(action.id, {
+                            notes: encodeActionNotes(
+                              event.target.value || null,
+                              isActionNoLongerNeeded(action),
+                            ),
+                          })
+                        }
+                        className="min-h-[64px] border-slate-200 bg-white text-sm"
+                        required={action.status === "blocked"}
+                      />
+                    </label>
+                    <label className="block space-y-1 text-xs text-slate-600">
+                      <span>
+                        {action.status === "blocked" ? "Next follow-up date" : "Follow-up date (optional)"}
+                      </span>
+                      <input
+                        type="date"
+                        value={action.follow_up_date ?? ""}
+                        onChange={(event) =>
+                          onPatchActionItem(action.id, {
+                            follow_up_date: event.target.value || null,
+                          })
+                        }
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        required={action.status === "blocked"}
+                      />
+                    </label>
+                  </div>
+                  <label className="block space-y-1 text-xs text-slate-600">
+                    <span>Outcome (optional)</span>
+                    <Textarea
+                      rows={2}
+                      value={action.outcome ?? ""}
+                      onChange={(event) =>
+                        onPatchActionItem(action.id, {
+                          outcome: event.target.value || null,
+                        })
+                      }
+                      placeholder="What happened after outreach or completion?"
+                      className="min-h-[64px] border-slate-200 bg-white text-sm"
+                    />
+                  </label>
                 </div>
               ))}
             </div>
@@ -445,7 +543,10 @@ export function PlanStepCaseNote({
             <ul className="space-y-2">
               {actions.map((action) => {
                 const done = action.status === "completed";
+                const noLongerNeeded = isActionNoLongerNeeded(action);
                 const targetLabel = formatDateOnly(action.target_date);
+                const followUpLabel = formatDateOnly(action.follow_up_date);
+                const userNotes = actionUserNotes(action.notes);
                 return (
                   <li
                     key={action.id}
@@ -466,7 +567,8 @@ export function PlanStepCaseNote({
                         <span
                           className={cn(
                             "block text-sm font-medium text-slate-900",
-                            done && "text-slate-500 line-through",
+                            done && !noLongerNeeded && "text-slate-500 line-through",
+                            noLongerNeeded && "text-slate-500",
                           )}
                         >
                           {action.title}
@@ -474,6 +576,16 @@ export function PlanStepCaseNote({
                         {action.description?.trim() ? (
                           <span className="mt-1 block text-xs leading-relaxed text-slate-600">
                             {action.description}
+                          </span>
+                        ) : null}
+                        {userNotes ? (
+                          <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                            {userNotes}
+                          </span>
+                        ) : null}
+                        {action.outcome?.trim() ? (
+                          <span className="mt-1 block text-xs leading-relaxed text-slate-700">
+                            <span className="font-semibold">Outcome:</span> {action.outcome}
                           </span>
                         ) : null}
                         <span className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -489,12 +601,21 @@ export function PlanStepCaseNote({
                           )}
                           {action.status === "blocked" ? (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900">
-                              Blocked
+                              Waiting
+                            </span>
+                          ) : noLongerNeeded ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+                              No longer needed
                             </span>
                           ) : action.status === "in_progress" ? (
                             <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-800">
                               In progress
                             </span>
+                          ) : null}
+                          {followUpLabel ? (
+                            <time dateTime={action.follow_up_date ?? undefined} className="text-slate-600">
+                              Follow up {followUpLabel}
+                            </time>
                           ) : null}
                         </span>
                       </span>
@@ -642,17 +763,17 @@ export function PlanStepCaseNote({
             <SectionLabel>Assist</SectionLabel>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onOpenRefine}>
-                Refine step
+                Refine action
               </Button>
             </div>
             {refineOpen ? (
               <div
                 className="space-y-3 rounded-lg border border-slate-200/90 bg-white/80 p-3 shadow-sm"
                 role="region"
-                aria-label="Refine step with AI"
+                aria-label="Refine action with AI"
               >
                 <p className="text-xs text-slate-600">
-                  Describe how this step should read. Preview updates this step&apos;s draft only until
+                  Describe how this action should read. Preview updates this action&apos;s draft only until
                   you apply; use <strong>Save edits</strong> to persist.
                 </p>
                 <Textarea
@@ -724,7 +845,7 @@ export function PlanStepCaseNote({
               className="h-8 border-slate-200/90 text-xs"
               onClick={() => onBeginEdit?.()}
             >
-              Edit step
+              Edit action
             </Button>
           ) : (
             <>
@@ -735,7 +856,7 @@ export function PlanStepCaseNote({
                 onClick={() => onDeleteStep?.()}
                 disabled={stepSavePending}
               >
-                Delete step
+                Remove action
               </Button>
               <Button
                 type="button"

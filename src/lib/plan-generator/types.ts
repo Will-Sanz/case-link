@@ -25,6 +25,8 @@ export type GeneratedActionItem = {
 
 /** Rich content for generated plan steps */
 export type GeneratedStepDetails = {
+  /** Explicit responsibility; generated plans default to the case manager. */
+  owner: "case_manager" | "family" | "school_program" | "shared";
   /** Short, concrete next action (e.g. "Call PECO and ask about CAP enrollment") */
   action_needed_now: string;
   rationale: string;

@@ -1,4 +1,5 @@
 import type { PlanWithSteps } from "@/types/family";
+import { actionUserNotes } from "@/lib/domain/plan/action-state";
 
 export type PlanReviewState = "draft" | "needs_review" | "reviewed" | "needs_attention";
 
@@ -44,6 +45,20 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
     };
   }
   if (
+    plan.steps.some(
+      (step) =>
+        !step.title.trim() ||
+        !(step.details?.expected_outcome?.trim()),
+    ) ||
+    actions.some((action) => !action.title.trim())
+  ) {
+    return {
+      state: "needs_attention",
+      label: "Needs attention",
+      issue: "Give every action a clear title and expected result before reviewing the plan.",
+    };
+  }
+  if (
     actions.some(
       (action) =>
         action.status !== "completed" &&
@@ -54,6 +69,19 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
       state: "needs_attention",
       label: "Needs attention",
       issue: "Add a target date to every open action before reviewing the plan.",
+    };
+  }
+  if (
+    actions.some(
+      (action) =>
+        action.status === "blocked" &&
+        (!actionUserNotes(action.notes).trim() || !isValidDateOnly(action.follow_up_date)),
+    )
+  ) {
+    return {
+      state: "needs_attention",
+      label: "Needs attention",
+      issue: "Every waiting action needs a reason and next follow-up date.",
     };
   }
 

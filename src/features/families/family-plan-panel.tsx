@@ -28,6 +28,7 @@ import type {
 } from "@/types/family";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
+import { actionUserNotes } from "@/lib/domain/plan/action-state";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 
 function dateInputValueAfterDays(days: number): string {
@@ -58,6 +59,7 @@ function normalizeChecklistForSave(lines: string[] | undefined): string[] {
 /** Snapshot of what we persist in `updatePlanStep`, for dirty detection only. */
 function normalizeStepForPersistCompare(step: PlanStepRow): string {
   const d = { ...(step.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
+  d.owner ??= "case_manager";
   const normalizedChecklist = normalizeChecklistForSave(d.checklist);
   if (normalizedChecklist.length > 0) {
     d.checklist = normalizedChecklist;
@@ -84,6 +86,9 @@ function normalizeStepForPersistCompare(step: PlanStepRow): string {
       week_index: action.week_index,
       target_date: action.target_date,
       status: action.status,
+      outcome: action.outcome,
+      notes: action.notes,
+      follow_up_date: action.follow_up_date,
     })),
   });
 }
@@ -119,6 +124,8 @@ export function FamilyPlanPanel({
   workflow,
   onToggleActionItem,
   actionToggleDisabled,
+  onRetryResources,
+  resourceRetrying,
 }: {
   familyId: string;
   familyName: string;
@@ -126,6 +133,8 @@ export function FamilyPlanPanel({
   workflow: BarrierWorkflowResult | null;
   onToggleActionItem?: (actionItemId: string, done: boolean) => void;
   actionToggleDisabled?: boolean;
+  onRetryResources?: () => void;
+  resourceRetrying?: boolean;
 }) {
   const router = useRouter();
   const stepSaveLockRef = useRef(false);
@@ -145,6 +154,9 @@ export function FamilyPlanPanel({
   const [addStepDocuments, setAddStepDocuments] = useState("");
   const [addStepContact, setAddStepContact] = useState("");
   const [addStepExpectedOutcome, setAddStepExpectedOutcome] = useState("");
+  const [addStepOwner, setAddStepOwner] = useState<NonNullable<PlanStepDetails["owner"]>>(
+    "case_manager",
+  );
   const [addStepPending, setAddStepPending] = useState(false);
   const [deleteStepPendingId, setDeleteStepPendingId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -265,7 +277,7 @@ export function FamilyPlanPanel({
     if (editingStepId && stepDirty) {
       requestConfirmation({
         title: "Discard unsaved edits?",
-        description: "You have unsaved edits on the current step. Discard them and edit another step?",
+        description: "You have unsaved edits on the current action. Discard them and edit another action?",
         confirmLabel: "Discard and continue",
         onConfirm: () => {
           switchToStepEdit(stepId);
@@ -326,7 +338,19 @@ export function FamilyPlanPanel({
       setError(`Choose a target date for “${unscheduledAction.title}” before saving.`);
       return false;
     }
+    const incompleteWaitingAction = (s.action_items ?? []).find(
+      (action) =>
+        action.status === "blocked" &&
+        (!actionUserNotes(action.notes).trim() || !action.follow_up_date),
+    );
+    if (incompleteWaitingAction) {
+      setError(
+        `Add a waiting reason and next follow-up date for “${incompleteWaitingAction.title}”.`,
+      );
+      return false;
+    }
     const d = { ...(s.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
+    d.owner ??= "case_manager";
     const normalizedChecklist = normalizeChecklistForSave(d.checklist);
     if (normalizedChecklist.length > 0) {
       d.checklist = normalizedChecklist;
@@ -363,7 +387,10 @@ export function FamilyPlanPanel({
         (oai.description ?? "") !== (ai.description ?? "") ||
         oai.week_index !== ai.week_index ||
         oai.target_date !== ai.target_date ||
-        oai.status !== ai.status;
+        oai.status !== ai.status ||
+        oai.outcome !== ai.outcome ||
+        oai.notes !== ai.notes ||
+        oai.follow_up_date !== ai.follow_up_date;
       if (!aiChanged) continue;
       const ar = await updatePlanStepActionItem({
         actionItemId: ai.id,
@@ -373,6 +400,9 @@ export function FamilyPlanPanel({
         week_index: ai.week_index,
         target_date: ai.target_date,
         status: ai.status,
+        outcome: ai.outcome,
+        notes: ai.notes,
+        follow_up_date: ai.follow_up_date,
       });
       if (!ar.ok) {
         setError(ar.error);
@@ -390,6 +420,24 @@ export function FamilyPlanPanel({
       cancelStepEdit();
       return;
     }
+    const missingTarget = (stepDraft.action_items ?? []).find(
+      (action) => action.status !== "completed" && !action.target_date,
+    );
+    if (missingTarget) {
+      setError(`Choose a target date for “${missingTarget.title}” before saving.`);
+      return;
+    }
+    const incompleteWaitingAction = (stepDraft.action_items ?? []).find(
+      (action) =>
+        action.status === "blocked" &&
+        (!actionUserNotes(action.notes).trim() || !action.follow_up_date),
+    );
+    if (incompleteWaitingAction) {
+      setError(
+        `Add a waiting reason and next follow-up date for “${incompleteWaitingAction.title}”.`,
+      );
+      return;
+    }
     stepSaveLockRef.current = true;
     setStepSaveBusy(true);
     setError(null);
@@ -398,7 +446,7 @@ export function FamilyPlanPanel({
       try {
         const ok = await persistOneStep(orig, stepDraft);
         if (!ok) return;
-        setSuccess("Step saved.");
+        setSuccess("Action saved.");
         setEditingStepId(null);
         setStepDraft(null);
         setAiStepId(null);
@@ -433,7 +481,7 @@ export function FamilyPlanPanel({
           setAiPreview(null);
           setAiInstruction("");
         }
-        setSuccess("Step deleted.");
+        setSuccess("Action removed from the plan.");
         router.refresh();
       } finally {
         setDeleteStepPendingId(null);
@@ -443,9 +491,9 @@ export function FamilyPlanPanel({
 
   function removeStep(stepId: string) {
     requestConfirmation({
-      title: "Delete step?",
-      description: "This will permanently remove the step from the plan.",
-      confirmLabel: "Delete step",
+      title: "Remove this action?",
+      description: "This action will be removed from the current plan and the change will be recorded.",
+      confirmLabel: "Remove action",
       danger: true,
       onConfirm: () => runDeleteStep(stepId),
     });
@@ -468,11 +516,16 @@ export function FamilyPlanPanel({
       setError("Target date is required.");
       return;
     }
+    const expectedOutcome = addStepExpectedOutcome.trim();
+    if (!expectedOutcome) {
+      setError("Expected result is required.");
+      return;
+    }
     if (editingStepId && stepDirty && !forceDiscard) {
       requestConfirmation({
         title: "Discard unsaved edits?",
-        description: "You have unsaved step edits. Discard them and add a new step?",
-        confirmLabel: "Discard and add step",
+        description: "You have unsaved action edits. Discard them and add a new action?",
+        confirmLabel: "Discard and add action",
         onConfirm: () => createStepAtBottom(true),
       });
       return;
@@ -493,17 +546,14 @@ export function FamilyPlanPanel({
           .split(/\r?\n/)
           .map((line) => line.trim())
           .filter((line) => line.length > 0);
-        const details: PlanStepDetails = {};
+        const details: PlanStepDetails = { owner: addStepOwner };
         if (requiredDocuments.length > 0) {
           details.required_documents = requiredDocuments;
         }
         if (contactLines.length > 0) {
           details.contacts = contactLines.map((line) => ({ notes: line }));
         }
-        const expectedOutcome = addStepExpectedOutcome.trim();
-        if (expectedOutcome) {
-          details.expected_outcome = expectedOutcome;
-        }
+        details.expected_outcome = expectedOutcome;
 
         const res = await createManualStep({
           familyId,
@@ -524,6 +574,7 @@ export function FamilyPlanPanel({
         setAddStepDocuments("");
         setAddStepContact("");
         setAddStepExpectedOutcome("");
+        setAddStepOwner("case_manager");
         setSuccess("Action added to the plan.");
         router.refresh();
       } finally {
@@ -537,7 +588,7 @@ export function FamilyPlanPanel({
     if (editingStepId !== stepId && editingStepId && stepDirty) {
       requestConfirmation({
         title: "Discard unsaved edits?",
-        description: "You have unsaved step edits on another step. Discard them and continue?",
+        description: "You have unsaved edits on another action. Discard them and continue?",
         confirmLabel: "Discard and continue",
         onConfirm: () => {
           if (!switchToStepEdit(stepId)) return;
@@ -560,7 +611,7 @@ export function FamilyPlanPanel({
     if (!aiStepId) return;
     const instr = aiInstruction.trim();
     if (!instr) {
-      setError("Describe what you want changed for this step.");
+      setError("Describe what you want changed for this action.");
       return;
     }
     setAiPending(true);
@@ -596,7 +647,11 @@ export function FamilyPlanPanel({
         ...prev,
         title: aiPreview.title,
         description: aiPreview.description,
-        details: aiPreview.details,
+        details: {
+          ...aiPreview.details,
+          owner:
+            (prev.details as PlanStepDetails | null | undefined)?.owner ?? "case_manager",
+        },
         priority: aiPreview.stepPriority ?? prev.priority,
         workflow_data: wd,
       };
@@ -611,7 +666,7 @@ export function FamilyPlanPanel({
     if (editingStepId && stepDirty && !forceDiscard) {
       requestConfirmation({
         title: "Discard unsaved edits?",
-        description: "Discard unsaved step edits to refine the full plan?",
+        description: "Discard unsaved action edits to refine the full plan?",
         confirmLabel: "Discard and continue",
         onConfirm: () => openPlanAiRefine(true),
       });
@@ -679,12 +734,12 @@ export function FamilyPlanPanel({
     const baseSteps = planAiDraft.steps;
 
     if (previewSteps.length !== baseSteps.length) {
-      setError("AI refinement changed step count. Please try again or adjust your instructions.");
+      setError("AI refinement changed the action count. Please try again or adjust your instructions.");
       return;
     }
     for (let i = 0; i < baseSteps.length; i++) {
       if (previewSteps[i].phase !== baseSteps[i].phase) {
-        setError("AI refinement changed step phase assignment. Please try again.");
+        setError("AI refinement changed the plan structure. Please try again.");
         return;
       }
     }
@@ -694,7 +749,7 @@ export function FamilyPlanPanel({
       const previewAisLen = previewSteps[i].action_items?.length ?? 0;
       if (baseAisLen !== previewAisLen) {
         setError(
-          "AI refinement changed the weekly action item count per step. Please try again or specify smaller changes.",
+          "AI refinement changed the task count inside an action. Please try again or request a smaller change.",
         );
         return;
       }
@@ -706,7 +761,10 @@ export function FamilyPlanPanel({
         ...prev,
         steps: prev.steps.map((s, i) => {
           const aiStep = previewSteps[i];
-          const newDetails = aiStep.details;
+          const newDetails: PlanStepDetails = {
+            ...aiStep.details,
+            owner: (s.details as PlanStepDetails | null | undefined)?.owner ?? "case_manager",
+          };
           const checklistLen = (newDetails.checklist ?? []).length;
 
           const existingWd = { ...(s.workflow_data ?? {}) };
@@ -842,7 +900,7 @@ export function FamilyPlanPanel({
   if (!plan) {
     return (
       <p className="text-sm text-slate-600">
-        Add at least one barrier on Overview, then create a plan to see clear goals and dated actions here.
+        Add at least one barrier on the Barriers page, then draft a plan to see clear goals and dated actions here.
       </p>
     );
   }
@@ -903,7 +961,7 @@ export function FamilyPlanPanel({
       {plan?.generation_state?.status === "failed" ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           {plan.generation_state.error ??
-            "Part of the plan could not be generated. Your saved actions are still available; retry from Overview when you are ready."}
+            "Part of the plan could not be generated. Your saved actions are still available; retry from Barriers when you are ready."}
         </div>
       ) : null}
 
@@ -1078,7 +1136,7 @@ export function FamilyPlanPanel({
               <p className="text-xs text-slate-500">
                 Put the action under a clear goal and give it one exact target date.
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <label className="space-y-1 text-xs text-slate-600">
                   <span>Goal</span>
                   <input
@@ -1107,6 +1165,22 @@ export function FamilyPlanPanel({
                     disabled={addStepPending}
                   />
                 </label>
+                <label className="space-y-1 text-xs text-slate-600">
+                  <span>Owner</span>
+                  <select
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    value={addStepOwner}
+                    onChange={(event) =>
+                      setAddStepOwner(event.target.value as NonNullable<PlanStepDetails["owner"]>)
+                    }
+                    disabled={addStepPending}
+                  >
+                    <option value="case_manager">Case manager</option>
+                    <option value="shared">Shared</option>
+                    <option value="school_program">School / program</option>
+                    <option value="family">Family</option>
+                  </select>
+                </label>
               </div>
               <label className="space-y-1 text-xs text-slate-600">
                   <span>Action</span>
@@ -1129,9 +1203,20 @@ export function FamilyPlanPanel({
                   disabled={addStepPending}
                 />
               </label>
+              <label className="space-y-1 text-xs text-slate-600">
+                <span>Expected result</span>
+                <Textarea
+                  className="min-h-[72px] border-slate-200 bg-white"
+                  value={addStepExpectedOutcome}
+                  onChange={(e) => setAddStepExpectedOutcome(e.target.value)}
+                  placeholder="What should be true when this action succeeds?"
+                  disabled={addStepPending}
+                  required
+                />
+              </label>
               <details className="rounded-lg border border-slate-200 bg-[#fafcf9] px-3 py-2">
                 <summary className="cursor-pointer text-xs font-medium text-[#5d705a]">
-                  Add documents, contact, or expected outcome
+                  Add documents or contact details
                 </summary>
                 <div className="mt-3 space-y-3">
                   <label className="space-y-1 text-xs text-slate-600">
@@ -1154,16 +1239,6 @@ export function FamilyPlanPanel({
                       disabled={addStepPending}
                     />
                   </label>
-                  <label className="space-y-1 text-xs text-slate-600">
-                    <span>Expected outcome</span>
-                    <Textarea
-                      className="min-h-[72px] border-slate-200 bg-white"
-                      value={addStepExpectedOutcome}
-                      onChange={(e) => setAddStepExpectedOutcome(e.target.value)}
-                      placeholder="Describe the desired result."
-                      disabled={addStepPending}
-                    />
-                  </label>
                 </div>
               </details>
               <div className="flex justify-end">
@@ -1174,6 +1249,7 @@ export function FamilyPlanPanel({
                     addStepPending ||
                     addStepGoal.trim().length === 0 ||
                     addStepTitle.trim().length === 0 ||
+                    addStepExpectedOutcome.trim().length === 0 ||
                     !addStepTargetDate
                   }
                 >
@@ -1192,14 +1268,38 @@ export function FamilyPlanPanel({
 
             <div className="mt-4 space-y-3">
               {!workflow || workflow.resourceStatus === "unavailable" ? (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                  {workflow?.resourceStatusMessage?.trim() ||
-                    "Resource matches could not be loaded."} Your plan is still available, and no resource information was added to it.
-                </p>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
+                  <p>
+                    {workflow?.resourceStatusMessage?.trim() ||
+                      "Resource matches could not be loaded."} Your plan is still available, and no resource information was added to it.
+                  </p>
+                  {onRetryResources ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-3 h-9"
+                      onClick={onRetryResources}
+                      disabled={resourceRetrying}
+                    >
+                      {resourceRetrying ? "Trying again…" : "Retry resources"}
+                    </Button>
+                  ) : null}
+                </div>
               ) : workflow.resourceStatus === "empty" || workflow.resources.length === 0 ? (
-                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-                  No resource matches are available yet. Review the plan without relying on a resource recommendation.
-                </p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                  <p>No resource matches are available yet. Review the plan without relying on a resource recommendation.</p>
+                  {onRetryResources ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-3 h-9"
+                      onClick={onRetryResources}
+                      disabled={resourceRetrying}
+                    >
+                      {resourceRetrying ? "Checking again…" : "Check again"}
+                    </Button>
+                  ) : null}
+                </div>
               ) : workflow.resources.slice(0, 10).map((r) => (
                 <div
                   key={r.id}
@@ -1256,7 +1356,7 @@ export function FamilyPlanPanel({
             </h2>
             <p id="plan-ai-description" className="mt-1 text-xs text-slate-500">
               Preview updates a working copy of this plan. After you apply a preview, use{" "}
-              <strong>Save to plan</strong> to write only the steps that changed to the database.
+              <strong>Save to plan</strong> to write only the actions that changed.
             </p>
 
             <label htmlFor="plan-ai-instruction" className="mt-4 block text-sm font-medium text-slate-800">

@@ -360,6 +360,7 @@ function parsedStepsToGenerated(stepsList: AiPlanStepParsed[]): GeneratedStep[] 
       : undefined;
 
     const details: GeneratedStepDetails = {
+      owner: "case_manager",
       action_needed_now: s.action_needed_now,
       rationale: s.rationale,
       detailed_instructions: s.detailed_instructions,

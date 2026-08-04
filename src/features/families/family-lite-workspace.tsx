@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
+import { runResourceMatching } from "@/app/actions/resource-matches";
 import {
   generateBarrierWorkflowForFamilyAction,
   loadBarrierWorkflowForFamilyAction,
@@ -211,11 +213,20 @@ export function FamilyLiteWorkspace({
   const [generateStartedAt, setGenerateStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
+  const [resourceRetrying, setResourceRetrying] = useState(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const serverPlanStillGenerating = plan?.generation_state?.status === "running";
   const planGenerateBusy = localPlanGenerating || serverPlanStillGenerating;
   const savedGenerationStages = completedGenerationStageCount(plan?.generation_state);
+  const generationStageLabel =
+    savedGenerationStages === 0
+      ? "Drafting the first actions"
+      : savedGenerationStages === 1
+        ? "Adding follow-up actions"
+        : savedGenerationStages === 2
+          ? "Checking the complete plan"
+          : "Plan ready";
 
   const stagedPollRef = useRef<Promise<void> | null>(null);
   const resumePollStartedRef = useRef(false);
@@ -380,6 +391,28 @@ export function FamilyLiteWorkspace({
     });
   }
 
+  async function retryResources() {
+    if (resourceRetrying) return;
+    setResourceRetrying(true);
+    setError(null);
+    try {
+      const match = await runResourceMatching({ familyId });
+      if (!match.ok) {
+        setError(match.error);
+        return;
+      }
+      const reload = await loadBarrierWorkflowForFamilyAction(familyId);
+      if (!reload.ok) {
+        setError(reload.error);
+        return;
+      }
+      setResult(reload.result);
+      router.refresh();
+    } finally {
+      setResourceRetrying(false);
+    }
+  }
+
   async function copyText(key: string, text: string | null) {
     if (!text) return;
     try {
@@ -399,6 +432,14 @@ export function FamilyLiteWorkspace({
           : "mx-auto w-full max-w-6xl space-y-6 px-4 py-7 sm:px-6 lg:px-8 lg:py-10",
       )}
     >
+      {tab !== "overview" && error ? (
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
       {tab === "overview" ? (
         <div className="space-y-3">
           <FamilyOverviewSetupCanvas
@@ -449,13 +490,13 @@ export function FamilyLiteWorkspace({
           aria-live="polite"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-medium">Preparing and checking the family action plan…</p>
-            <p className="text-xs text-[#5d705a]">{savedGenerationStages} of 3 planning passes saved</p>
+            <p className="font-medium">{generationStageLabel}…</p>
+            <p className="text-xs text-[#5d705a]">{savedGenerationStages} of 3 stages safely saved</p>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dce9d9]" aria-hidden>
             <div
               className="h-full rounded-full bg-[#3f8a36] transition-[width] duration-500"
-              style={{ width: `${Math.max(8, (savedGenerationStages / 3) * 100)}%` }}
+              style={{ width: `${(savedGenerationStages / 3) * 100}%` }}
             />
           </div>
           <p className="mt-2 text-xs leading-relaxed text-[#5d705a]">
@@ -473,6 +514,8 @@ export function FamilyLiteWorkspace({
             workflow={result}
             onToggleActionItem={toggleAction}
             actionToggleDisabled={pending}
+            onRetryResources={retryResources}
+            resourceRetrying={resourceRetrying}
           />
         </Card>
       ) : null}
@@ -500,12 +543,30 @@ export function FamilyLiteWorkspace({
                 {result.resourceStatusMessage?.trim() ||
                   "The plan is saved, but the resource directory could not be checked."}
               </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-4"
+                onClick={retryResources}
+                disabled={resourceRetrying}
+              >
+                {resourceRetrying ? "Trying again…" : "Retry resource matching"}
+              </Button>
             </Card>
           ) : result.resources.length === 0 ? (
             <Card className="p-5 sm:p-6">
               <p className="text-sm text-slate-600">
                 No directory matches were found. Do not treat this as confirmation that no service exists.
               </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-4"
+                onClick={retryResources}
+                disabled={resourceRetrying}
+              >
+                {resourceRetrying ? "Checking again…" : "Check resources again"}
+              </Button>
             </Card>
           ) : (
             <div className="grid gap-3 xl:grid-cols-2">

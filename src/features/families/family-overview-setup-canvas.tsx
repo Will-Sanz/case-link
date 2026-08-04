@@ -257,10 +257,10 @@ export function FamilyOverviewSetupCanvas({
               )}
             >
               {generateBusy
-                ? "Generating..."
+                ? "Drafting action plan…"
                 : hasGeneratedThisSession
-                  ? "Regenerate Plan and Match Resources"
-                  : "Generate Plan and Match Resources"}
+                  ? "Draft a new action plan"
+                  : "Draft action plan"}
             </Button>
           </div>
           {generateBusy && generateStartedAt ? (
@@ -269,7 +269,7 @@ export function FamilyOverviewSetupCanvas({
                 className="h-4 w-4 animate-spin rounded-full border-2 border-[#cfdccc] border-t-[#276221]"
                 aria-hidden
               />
-              <span>Building plan… {formatElapsed(elapsedSeconds)}</span>
+              <span>Preparing actions and target dates… {formatElapsed(elapsedSeconds)}</span>
             </div>
           ) : null}
         </div>
