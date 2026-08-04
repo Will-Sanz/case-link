@@ -40,6 +40,9 @@ describe("public site content contract", () => {
     expect(workflow).toBeTruthy();
     expect(workflow?.querySelectorAll("svg")).toHaveLength(0);
 
+    expect(screen.getByRole("link", { name: "Learn More" }).getAttribute("href")).toBe("/product");
+    expect(screen.getByRole("link", { name: "Request a Demo" }).getAttribute("href")).toBe("/request-demo");
+
     const primaryNavigation = screen.getByRole("navigation", { name: "Primary" });
     expect(primaryNavigation.textContent).not.toContain("How it works");
     expect(primaryNavigation.textContent).not.toContain("For districts");

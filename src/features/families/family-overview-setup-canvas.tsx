@@ -207,7 +207,7 @@ export function FamilyOverviewSetupCanvas({
         {/* 5. Live setup preview */}
         {showLivePreview ? (
           <section className="space-y-3" aria-live="polite">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#778874]">Your setup</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-[#778874]">Context</p>
             {selectedSet.size > 0 || customBarriers.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {barrierOptions

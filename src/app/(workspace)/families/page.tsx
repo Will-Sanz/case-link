@@ -75,7 +75,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
       ) : (
         <div className="mt-2 divide-y divide-[#dce6d9]">
           {items.map((family) => (
-            <Link key={family.id} href={`/families/${family.id}/overview`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30 sm:grid-cols-[1fr_auto] sm:items-center">
+            <Link key={family.id} href={`/families/${family.id}/profile`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="truncate text-lg font-semibold tracking-[-0.015em] text-[#173a15] group-hover:text-[#276221]">{family.name}</h2>

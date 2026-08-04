@@ -87,11 +87,6 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
             </div>
           </dl>
 
-          <details className="group border-b border-[#e2ebe0] py-3.5 text-xs text-[#687b65]">
-            <summary className="cursor-pointer font-semibold text-[#5d705a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30">Technical account details</summary>
-            <p className="mt-2 break-all font-mono text-[11px] leading-5">User ID: {profile.id}</p>
-          </details>
-
           <form action={signOutAction} className="mt-5">
             <Button type="submit" variant="outline" className="flex min-h-10 w-full items-center justify-center gap-2">
               <LogOut className="size-4" aria-hidden /> Sign out

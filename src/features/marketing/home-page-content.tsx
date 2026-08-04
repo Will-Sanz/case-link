@@ -119,11 +119,11 @@ export function HomePageContent() {
               CaseLink helps school case managers organize barriers, draft a structured intervention plan, and prepare fillable forms for manual upload to the systems their schools already use.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link href="/request-demo" className="public-primary-action">
-                Request a demo <ArrowRight className="size-4" aria-hidden />
+              <Link href="/product" className="public-primary-action">
+                Learn More <ArrowRight className="size-4" aria-hidden />
               </Link>
-              <Link href="#workflow" className="public-secondary-action">
-                View the workflow <ArrowRight className="size-4" aria-hidden />
+              <Link href="/request-demo" className="public-secondary-action">
+                Request a Demo <ArrowRight className="size-4" aria-hidden />
               </Link>
             </div>
           </div>

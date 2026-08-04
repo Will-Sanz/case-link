@@ -7,14 +7,12 @@ import {
   CircleHelp,
   FileCheck2,
   ListChecks,
-  LogOut,
   Menu,
   PanelLeftClose,
   Settings,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { signOutAction } from "@/app/actions/auth";
 import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
 import { MainContent } from "@/components/layout/main-content";
 import { cn } from "@/lib/utils/cn";
@@ -48,7 +46,6 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
         <nav className="space-y-1 p-3" aria-label="Workspace">
           <p className="px-3 pb-2 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#82917f]">Workspace</p>
           <WorkspaceLink href="/families" label="Families" icon={UsersRound} active={pathname === "/families" || Boolean(familyId)} />
-          <WorkspaceLink href="/profile" label="Settings" icon={Settings} active={pathname === "/profile"} />
         </nav>
         {familyTabs.length ? (
           <nav className="mx-3 border-t border-[#e2ebe0] pt-4" aria-label="Family workspace">
@@ -58,12 +55,10 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
             </div>
           </nav>
         ) : null}
-        <div className="mt-auto border-t border-[#e2ebe0] p-3">
-          <Link href="/product" className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#5d705a] hover:bg-[#f1f6ef] hover:text-[#173a15]"><CircleHelp className="size-[18px]" strokeWidth={1.8} aria-hidden /> Help &amp; product guide</Link>
-          <form action={signOutAction}>
-            <button type="submit" className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#5d705a] hover:bg-[#f1f6ef] hover:text-[#173a15]"><LogOut className="size-[18px]" strokeWidth={1.8} aria-hidden /> Sign out</button>
-          </form>
-        </div>
+        <nav className="mt-auto space-y-1 border-t border-[#e2ebe0] p-3" aria-label="Account and help">
+          <WorkspaceLink href="/profile" label="Settings" icon={Settings} active={pathname === "/profile"} />
+          <WorkspaceLink href="/product" label="Help & product guide" icon={CircleHelp} active={false} />
+        </nav>
       </aside>
 
       <div className="flex h-dvh max-h-dvh min-w-0 flex-1 flex-col overflow-hidden">
@@ -74,12 +69,9 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
             <nav className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-[#dce6d9] bg-white p-2 shadow-[0_16px_40px_rgba(30,70,27,0.14)]" aria-label="Mobile workspace">
               <WorkspaceLink href="/families" label="Families" icon={UsersRound} active={pathname === "/families"} />
               {familyTabs.map((item) => <WorkspaceLink key={item.href} {...item} active={pathname === item.href} />)}
-              <WorkspaceLink href="/profile" label="Settings" icon={Settings} active={pathname === "/profile"} />
               <div className="mt-2 border-t border-[#e2ebe0] pt-2">
+                <WorkspaceLink href="/profile" label="Settings" icon={Settings} active={pathname === "/profile"} />
                 <WorkspaceLink href="/product" label="Help & product guide" icon={CircleHelp} active={false} />
-                <form action={signOutAction}>
-                  <button type="submit" className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#5d705a] hover:bg-[#f1f6ef] hover:text-[#173a15]"><LogOut className="size-[18px]" strokeWidth={1.8} aria-hidden /> Sign out</button>
-                </form>
               </div>
             </nav>
           </details>
