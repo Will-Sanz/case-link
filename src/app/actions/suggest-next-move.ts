@@ -7,6 +7,7 @@ import { parseAiMode } from "@/lib/ai/ai-mode";
 import { createAiResponse } from "@/lib/ai/client";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { suggestNextMoveInputSchema } from "@/lib/validations/ai-actions";
+import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 
 export type SuggestResult =
   | { ok: true; suggestions: string[] }
@@ -74,9 +75,14 @@ export async function suggestNextMoveForBlockedStep(
           ],
     };
   }
+  const privacy = validateFamilyNoPii(detail, [
+    { field: "blockerReason", label: "Blocker reason", value: blockerReason },
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+  }
 
   const context = [
-    `Family: ${detail.name}`,
     detail.summary ? `Summary: ${detail.summary}` : null,
     `Step: ${step.title}`,
     step.description ? `Description: ${step.description}` : null,

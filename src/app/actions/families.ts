@@ -8,6 +8,7 @@ import {
   publicMessageFromCaughtError,
   publicMessageFromSupabaseError,
 } from "@/lib/errors/public-action-error";
+import { validateNoPii, type PrivacyFieldInput } from "@/lib/privacy/no-pii";
 import {
   addCaseNoteSchema,
   familyIntakeFormSchema,
@@ -23,6 +24,11 @@ export type ActionResult =
   | { ok: true; familyId?: string }
   | { ok: false; error: string };
 
+function privacyError(fields: PrivacyFieldInput[]): ActionResult | null {
+  const result = validateNoPii(fields);
+  return result.ok ? null : { ok: false, error: result.error ?? "Remove identifying text." };
+}
+
 export async function createSimpleFamily(
   input: { name?: string },
 ): Promise<ActionResult> {
@@ -35,6 +41,11 @@ export async function createSimpleFamily(
   }
 
   const name = input.name?.trim() || `Family ${new Date().toLocaleDateString("en-US")}`;
+  const privacyFailure = privacyError([
+    { field: "name", label: "Family label", value: name, mode: "label" },
+  ]);
+  if (privacyFailure) return privacyFailure;
+
   const { data: familyIdRaw, error: famErr } = await supabase.rpc(
     "create_family_intake_row",
     {
@@ -58,7 +69,7 @@ export async function createSimpleFamily(
     action: "family.created",
     entity_type: "family",
     entity_id: familyId,
-    details: { name },
+    details: { source: "simple" },
   });
   revalidatePath("/families");
   return { ok: true, familyId };
@@ -85,6 +96,36 @@ export async function createFamilyIntake(
   }
 
   const v = normalizeIntakeForDb(parsed.data);
+  const privacyFailure = privacyError([
+    { field: "name", label: "Family label", value: v.name, mode: "label" },
+    { field: "summary", label: "Short description", value: v.summary },
+    { field: "householdNotes", label: "Current circumstances", value: v.householdNotes },
+    { field: "initialCaseNote", label: "Initial note", value: v.initialCaseNote },
+    ...v.goals.map((goal, index) => ({
+      field: `goals.${index}.label`,
+      label: "Goal",
+      value: goal.label,
+    })),
+    ...v.barriers.map((barrier, index) => ({
+      field: `barriers.${index}.label`,
+      label: "Barrier",
+      value: barrier.label,
+    })),
+    ...v.members.flatMap((member, index) => [
+      {
+        field: `members.${index}.displayName`,
+        label: "Household member label",
+        value: member.displayName,
+        mode: "label" as const,
+      },
+      {
+        field: `members.${index}.notes`,
+        label: "Household member notes",
+        value: member.notes,
+      },
+    ]),
+  ]);
+  if (privacyFailure) return privacyFailure;
 
   // Ownership is set in the DB from auth.uid() (RPC is SECURITY DEFINER, bypasses RLS on
   // families INSERT while still binding created_by_id to the JWT, avoids client/PostgREST
@@ -166,7 +207,11 @@ export async function createFamilyIntake(
       action: "family.created",
       entity_type: "family",
       entity_id: familyId,
-      details: { name: v.name },
+      details: {
+        barrier_count: v.barriers.length,
+        goal_count: v.goals.length,
+        has_description: Boolean(v.summary || v.householdNotes),
+      },
     });
     if (logErr) throw new Error(logErr.message);
   } catch (e) {
@@ -189,6 +234,10 @@ export async function addCaseNote(input: unknown): Promise<ActionResult> {
   if (!parsed.success) {
     return { ok: false, error: "Invalid note" };
   }
+  const privacyFailure = privacyError([
+    { field: "body", label: "Case note", value: parsed.data.body },
+  ]);
+  if (privacyFailure) return privacyFailure;
 
   const supabase = await createSupabaseServerClient();
   const { data: note, error } = await supabase
@@ -223,6 +272,15 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
   if (!parsed.success) {
     return { ok: false, error: "Invalid update" };
   }
+  const privacyFailure = privacyError([
+    { field: "summary", label: "Summary", value: parsed.data.summary },
+    {
+      field: "householdNotes",
+      label: "Current circumstances",
+      value: parsed.data.householdNotes,
+    },
+  ]);
+  if (privacyFailure) return privacyFailure;
 
   const { familyId, ...rest } = parsed.data;
   const patch: Record<string, unknown> = {};
@@ -259,7 +317,7 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
     action: "context.updated",
     entity_type: "family",
     entity_id: familyId,
-    details: patch,
+    details: { fields: Object.keys(patch) },
   });
 
   revalidatePath("/families");
@@ -351,6 +409,14 @@ export async function updateFamilyGoals(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "Invalid goals data" };
   }
   const { familyId, goals } = parsed.data;
+  const privacyFailure = privacyError(
+    goals.map((goal, index) => ({
+      field: `goals.${index}.label`,
+      label: "Goal",
+      value: goal.label,
+    })),
+  );
+  if (privacyFailure) return privacyFailure;
   const supabase = await createSupabaseServerClient();
 
   const existing = await supabase.from("family_goals").select("id").eq("family_id", familyId);
@@ -391,6 +457,14 @@ export async function updateFamilyBarriers(input: unknown): Promise<ActionResult
     return { ok: false, error: "Invalid barriers data" };
   }
   const { familyId, barriers } = parsed.data;
+  const privacyFailure = privacyError(
+    barriers.map((barrier, index) => ({
+      field: `barriers.${index}.label`,
+      label: "Barrier",
+      value: barrier.label,
+    })),
+  );
+  if (privacyFailure) return privacyFailure;
   const supabase = await createSupabaseServerClient();
 
   const existing = await supabase.from("family_barriers").select("id").eq("family_id", familyId);
@@ -431,6 +505,22 @@ export async function updateFamilyMembers(input: unknown): Promise<ActionResult>
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
   const { familyId, members } = parsed.data;
+  const privacyFailure = privacyError(
+    members.flatMap((member, index) => [
+      {
+        field: `members.${index}.display_name`,
+        label: "Household member label",
+        value: member.display_name,
+        mode: "label" as const,
+      },
+      {
+        field: `members.${index}.notes`,
+        label: "Household member notes",
+        value: member.notes,
+      },
+    ]),
+  );
+  if (privacyFailure) return privacyFailure;
   const supabase = await createSupabaseServerClient();
 
   const existing = await supabase.from("family_members").select("id").eq("family_id", familyId);

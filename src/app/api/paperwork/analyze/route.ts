@@ -11,6 +11,7 @@ import {
   scannedPdfModelAnalysisSchema,
   type ScannedPdfModelAnalysis,
 } from "@/lib/paperwork/scanned-pdf-analysis";
+import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 import { getFamilyDetail } from "@/lib/services/families";
 
 export const runtime = "nodejs";
@@ -70,6 +71,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return noStoreJson(
       { error: "Finish generating and reviewing the intervention plan first." },
       { status: 409 },
+    );
+  }
+  const privacy = validateFamilyNoPii(family);
+  if (!privacy.ok) {
+    return noStoreJson(
+      { error: privacy.error ?? "Remove identifying text before preparing paperwork." },
+      { status: 422 },
     );
   }
 

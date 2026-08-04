@@ -5,6 +5,8 @@ import { requireAppUserWithClient } from "@/lib/auth/session";
 import { createAiResponse } from "@/lib/ai/client";
 import { getFamilyDetail } from "@/lib/services/families";
 import { buildPaperworkSource, createDeterministicMappings } from "@/lib/paperwork/pdf-field-mapper";
+import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
+import { isManualOnlyPaperworkField } from "@/lib/paperwork/scanned-pdf-analysis";
 import type { PdfFieldMapping } from "@/types/paperwork";
 
 const fieldSchema = z.object({
@@ -66,6 +68,10 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
   if (!family.plan || (family.plan.generation_state && family.plan.generation_state.status !== "complete")) {
     return { ok: false, error: "Finish generating the intervention plan before preparing paperwork." };
   }
+  const privacy = validateFamilyNoPii(family);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before preparing paperwork." };
+  }
 
   const source = buildPaperworkSource(family);
   const fallback = createDeterministicMappings(parsed.data.fields, source);
@@ -97,6 +103,15 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
     const mappings = fallback.map((base) => {
       const proposed = aiByName.get(base.fieldName);
       const field = fieldsByName.get(base.fieldName)!;
+      if (isManualOnlyPaperworkField(field.name, field.name)) {
+        return {
+          ...base,
+          value: "",
+          confidence: "low" as const,
+          source: "Complete manually outside CaseLink",
+          needsReview: true,
+        };
+      }
       if (!proposed || proposed.value == null) return base;
       let value = proposed.value;
       if (field.maxLength) value = value.slice(0, field.maxLength);

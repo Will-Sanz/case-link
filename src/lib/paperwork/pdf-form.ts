@@ -31,6 +31,18 @@ export function inspectPdfFields(document: PDFDocument): PdfFieldDescriptor[] {
   });
 }
 
+/** Returns field names that already contain a value; MVP paperwork accepts blank templates only. */
+export function findCompletedPdfFields(document: PDFDocument): string[] {
+  return document.getForm().getFields().flatMap((field) => {
+    if (field instanceof PDFTextField) return field.getText()?.trim() ? [field.getName()] : [];
+    if (field instanceof PDFCheckBox) return field.isChecked() ? [field.getName()] : [];
+    if (field instanceof PDFDropdown) return field.getSelected().length > 0 ? [field.getName()] : [];
+    if (field instanceof PDFRadioGroup) return field.getSelected() ? [field.getName()] : [];
+    if (field instanceof PDFOptionList) return field.getSelected().length > 0 ? [field.getName()] : [];
+    return [field.getName()];
+  });
+}
+
 /** Clears every supported field before applying the reviewed mapping values. */
 export function applyPdfMappings(
   document: PDFDocument,

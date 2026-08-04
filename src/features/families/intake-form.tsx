@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PRESET_BARRIERS } from "@/lib/constants/intake-options";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 import { alertErrorClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -24,6 +25,7 @@ export function IntakeForm() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [customBarrier, setCustomBarrier] = useState("");
+  const [customBarrierError, setCustomBarrierError] = useState<string | null>(null);
 
   const form = useForm<FamilyIntakeFormValues>({
     resolver: zodResolver(familyIntakeFormSchema),
@@ -67,6 +69,13 @@ export function IntakeForm() {
   function addCustomBarrier() {
     const label = customBarrier.trim();
     if (!label) return;
+    const privacy = validateNoPii([
+      { field: "customBarrier", label: "Barrier", value: label },
+    ]);
+    if (!privacy.ok) {
+      setCustomBarrierError(privacy.error);
+      return;
+    }
 
     const alreadyAdded = barriers.some(
       (barrier) => barrier.label.trim().toLocaleLowerCase() === label.toLocaleLowerCase(),
@@ -75,6 +84,7 @@ export function IntakeForm() {
       updateBarriers([...barriers, { presetKey: null, label }]);
     }
     setCustomBarrier("");
+    setCustomBarrierError(null);
   }
 
   function onCustomBarrierKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -85,6 +95,25 @@ export function IntakeForm() {
 
   async function onSubmit(data: FamilyIntakeFormValues) {
     setServerError(null);
+    form.clearErrors(["name", "summary"]);
+    const privacy = validateNoPii([
+      { field: "name", label: "Family label", value: data.name, mode: "label" },
+      { field: "summary", label: "Short description", value: data.summary },
+      ...data.barriers.map((barrier, index) => ({
+        field: `barriers.${index}.label`,
+        label: "Barrier",
+        value: barrier.label,
+      })),
+    ]);
+    if (!privacy.ok) {
+      for (const finding of privacy.findings) {
+        const message = `Remove likely identifying text: “${finding.value}”.`;
+        if (finding.field === "name") form.setError("name", { message });
+        if (finding.field === "summary") form.setError("summary", { message });
+      }
+      setServerError(privacy.error);
+      return;
+    }
     const result = await createFamilyIntake(data);
     if (!result.ok) {
       setServerError(result.error);
@@ -196,12 +225,16 @@ export function IntakeForm() {
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Input
                 value={customBarrier}
-                onChange={(event) => setCustomBarrier(event.target.value)}
+                onChange={(event) => {
+                  setCustomBarrier(event.target.value);
+                  setCustomBarrierError(null);
+                }}
                 onKeyDown={onCustomBarrierKeyDown}
                 className="min-h-11 flex-1 border-[#cfdccc] bg-white placeholder:text-[#778874] focus-visible:border-[#46923c] focus-visible:ring-[#46923c]/15"
                 placeholder="Add another barrier"
                 maxLength={200}
                 aria-label="Another barrier"
+                aria-describedby={customBarrierError ? "custom-barrier-error" : undefined}
               />
               <Button
                 type="button"
@@ -213,6 +246,11 @@ export function IntakeForm() {
                 Add barrier
               </Button>
             </div>
+            {customBarrierError ? (
+              <p id="custom-barrier-error" className="mt-2 text-sm text-red-700" role="alert">
+                {customBarrierError}
+              </p>
+            ) : null}
             {form.formState.errors.barriers ? (
               <p className="mt-3 text-sm text-red-700" role="alert">
                 {form.formState.errors.barriers.message}
@@ -227,12 +265,22 @@ export function IntakeForm() {
               rows={4}
               className="mt-2 resize-y border-[#cfdccc] bg-white text-sm leading-6 placeholder:text-[#778874] focus-visible:border-[#46923c] focus-visible:ring-[#46923c]/15"
               placeholder="Add only the context needed to shape the first plan."
-              aria-describedby="description-help"
+              aria-describedby={
+                form.formState.errors.summary
+                  ? "description-help description-error"
+                  : "description-help"
+              }
+              aria-invalid={Boolean(form.formState.errors.summary)}
               {...form.register("summary")}
             />
             <p id="description-help" className="mt-2 text-xs leading-5 text-[#687b65]">
               Do not enter names, addresses, birth dates, student IDs, contact details, or signatures.
             </p>
+            {form.formState.errors.summary ? (
+              <p id="description-error" className="mt-2 text-sm text-red-700" role="alert">
+                {form.formState.errors.summary.message}
+              </p>
+            ) : null}
           </div>
         </div>
       </Card>

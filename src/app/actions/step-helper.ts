@@ -10,6 +10,7 @@ import type { AiMode } from "@/lib/ai/ai-mode";
 import type { StepHelperType } from "@/types/step-helper";
 import { generateStepHelper } from "@/lib/step-helper/ai-step-helper";
 import { stepHelperActionInputSchema } from "@/lib/validations/ai-actions";
+import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 
 export type StepHelperActionResult =
   | { ok: true; content: string; listContent?: string[] }
@@ -42,6 +43,21 @@ export async function generateStepHelperAction(
 
     if (!getEnv().OPENAI_API_KEY?.trim()) {
       return { ok: false, error: "AI is not configured." };
+    }
+    const privacy = validateFamilyNoPii(detail, [
+      {
+        field: "blockerReason",
+        label: "Blocker reason",
+        value: step.workflow_data?.blocker_reason,
+      },
+      {
+        field: "outcomeNotes",
+        label: "Outcome notes",
+        value: step.workflow_data?.outcome_notes,
+      },
+    ]);
+    if (!privacy.ok) {
+      return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
     }
 
     return await generateStepHelper(detail, step, parsed.data.helperType, {

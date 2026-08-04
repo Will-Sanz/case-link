@@ -7,6 +7,7 @@ import { askCaseAssistant } from "@/lib/case-assistant/ai-case-assistant";
 import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { askCaseAssistantInputSchema } from "@/lib/validations/ai-actions";
+import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 
 export type CaseAssistantResult =
   | { ok: true; answer: string }
@@ -35,6 +36,17 @@ export async function askCaseAssistantAction(
     const supabase = session.supabase;
     const detail = await getFamilyDetail(supabase, parsed.data.familyId);
     if (!detail) return { ok: false, error: "Family not found" };
+    const privacy = validateFamilyNoPii(detail, [
+      { field: "question", label: "Assistant question", value: parsed.data.question },
+      ...(parsed.data.conversationHistory ?? []).map((message, index) => ({
+        field: `conversationHistory.${index}.content`,
+        label: "Assistant conversation",
+        value: message.content,
+      })),
+    ]);
+    if (!privacy.ok) {
+      return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+    }
 
     if (!getEnv().OPENAI_API_KEY?.trim()) {
       return { ok: false, error: "AI is not configured." };

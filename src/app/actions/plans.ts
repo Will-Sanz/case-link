@@ -26,6 +26,11 @@ import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
 import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
 import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
+import {
+  validateFamilyNoPii,
+  validateNoPii,
+  type PrivacyFieldInput,
+} from "@/lib/privacy/no-pii";
 import { getFamilyDetail } from "@/lib/services/families";
 import type { PlanGenerationState, PlanStepDetails } from "@/types/family";
 import {
@@ -47,6 +52,51 @@ import {
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+function noPiiError(fields: PrivacyFieldInput[]): string | null {
+  const result = validateNoPii(fields);
+  return result.ok ? null : (result.error ?? "Remove identifying text before continuing.");
+}
+
+function planDetailsPrivacyFields(
+  details: PlanStepDetails | null | undefined,
+  prefix: string,
+): PrivacyFieldInput[] {
+  if (!details) return [];
+  const singular: Array<[keyof PlanStepDetails, string]> = [
+    ["action_needed_now", "Immediate action"],
+    ["rationale", "Rationale"],
+    ["detailed_instructions", "Instructions"],
+    ["expected_outcome", "Expected outcome"],
+    ["timing_guidance", "Timing guidance"],
+    ["stage_goal", "Goal"],
+    ["why_now", "Why now"],
+    ["depends_on", "Dependency"],
+    ["success_marker", "Success marker"],
+  ];
+  const fields: PrivacyFieldInput[] = singular.map(([key, label]) => ({
+    field: `${prefix}.${key}`,
+    label,
+    value: typeof details[key] === "string" ? details[key] as string : null,
+  }));
+  const lists: Array<[keyof PlanStepDetails, string]> = [
+    ["checklist", "Checklist item"],
+    ["required_documents", "Required document"],
+    ["materials_needed", "Required material"],
+    ["blockers", "Blocker"],
+    ["fallback_options", "Fallback option"],
+  ];
+  for (const [key, label] of lists) {
+    const values = details[key];
+    if (!Array.isArray(values)) continue;
+    values.forEach((value, index) => {
+      if (typeof value === "string") {
+        fields.push({ field: `${prefix}.${key}.${index}`, label, value });
+      }
+    });
+  }
+  return fields;
+}
 
 export type PreviewRefinePlanStepResult =
   | {
@@ -232,13 +282,22 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
       regenerateExistingPlan: Boolean(regenerateExistingPlan),
       hasRegenerationFeedback: Boolean(fb),
       regenerationFeedbackChars: fb?.length ?? 0,
-      regenerationFeedback: fb ?? null,
     });
   }
 
   const detail = await getFamilyDetail(supabase, familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
+  }
+  const privacy = validateFamilyNoPii(detail, [
+    {
+      field: "regenerationFeedback",
+      label: "Plan instructions",
+      value: regenerationFeedback,
+    },
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
   const logPrefix = "[generatePlan]";
@@ -300,7 +359,6 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
         console.info("[generatePlan] using OpenAI steps", {
           model: ai.model,
           stepCount: ai.steps.length,
-          titles: ai.steps.map((s) => s.title),
         });
       }
     } else if (mustUseAi) {
@@ -332,7 +390,6 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
     console.info("[generatePlan] steps after AI/rules (before cap/sort)", {
       generationSource,
       stepCount: steps.length,
-      titles: steps.map((s) => s.title),
     });
   }
 
@@ -461,7 +518,6 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
       version: nextVersion,
       stepCount: steps.length,
       generationSource,
-      titles: steps.map((s) => s.title),
     });
   }
 
@@ -501,6 +557,16 @@ export async function startStagedLeanPlanGeneration(input: {
   const detail = await getFamilyDetail(supabase, input.familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
+  }
+  const privacy = validateFamilyNoPii(detail, [
+    {
+      field: "regenerationFeedback",
+      label: "Plan instructions",
+      value: input.regenerationFeedback,
+    },
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
   const { data: existingPlan } = await supabase
@@ -622,6 +688,26 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   const detail = await getFamilyDetail(supabase, input.familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
+  }
+  const privacy = validateFamilyNoPii(detail, [
+    {
+      field: "planningBrief",
+      label: "Plan context",
+      value: state.planning_brief,
+    },
+  ]);
+  if (!privacy.ok) {
+    await supabase
+      .from("plans")
+      .update({
+        generation_state: {
+          ...state,
+          status: "failed",
+          error: "Remove identifying text from the family record before generating the plan.",
+        },
+      })
+      .eq("id", planId);
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
   async function persistState(updates: Partial<PlanGenerationState>, summaryUpdate?: string | null) {
@@ -898,6 +984,22 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
+  const planPrivacyError = noPiiError([
+    { field: "summary", label: "Plan summary", value: parsed.data.summary },
+    {
+      field: "clientDisplay.title",
+      label: "Plan title",
+      value: parsed.data.clientDisplay?.title,
+    },
+    ...Object.entries(parsed.data.clientDisplay?.phaseSummaries ?? {}).map(
+      ([phase, value]) => ({
+        field: `clientDisplay.phaseSummaries.${phase}`,
+        label: "Plan section summary",
+        value,
+      }),
+    ),
+  ]);
+  if (planPrivacyError) return { ok: false, error: planPrivacyError };
 
   let supabase;
   try {
@@ -970,6 +1072,22 @@ export async function updatePlanStep(
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
+  const stepPrivacyError = noPiiError([
+    { field: "title", label: "Action title", value: parsed.data.title },
+    { field: "description", label: "Action description", value: parsed.data.description },
+    ...planDetailsPrivacyFields(parsed.data.details as PlanStepDetails | undefined, "details"),
+    {
+      field: "workflow_data.blocker_reason",
+      label: "Blocker reason",
+      value: parsed.data.workflow_data?.blocker_reason,
+    },
+    {
+      field: "workflow_data.outcome_notes",
+      label: "Outcome notes",
+      value: parsed.data.workflow_data?.outcome_notes,
+    },
+  ]);
+  if (stepPrivacyError) return { ok: false, error: stepPrivacyError };
 
   let supabase;
   let userId: string | null = null;
@@ -1050,6 +1168,13 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
   }
+  const manualStepPrivacyError = noPiiError([
+    { field: "goal", label: "Goal", value: parsed.data.goal },
+    { field: "title", label: "Action title", value: parsed.data.title },
+    { field: "description", label: "Action description", value: parsed.data.description },
+    ...planDetailsPrivacyFields(parsed.data.details as PlanStepDetails | undefined, "details"),
+  ]);
+  if (manualStepPrivacyError) return { ok: false, error: manualStepPrivacyError };
 
   let supabase;
   let userId: string | null = null;
@@ -1201,6 +1326,10 @@ export async function logPlanStepActivity(input: unknown): Promise<ActionResult>
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
+  const activityPrivacyError = noPiiError([
+    { field: "notes", label: "Activity note", value: parsed.data.notes },
+  ]);
+  if (activityPrivacyError) return { ok: false, error: activityPrivacyError };
 
   let supabase;
   let userId: string | null = null;
@@ -1372,6 +1501,15 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
   }
+  const actionPrivacyError = noPiiError([
+    { field: "title", label: "Action title", value: parsed.data.title },
+    {
+      field: "description",
+      label: "Action description",
+      value: parsed.data.description,
+    },
+  ]);
+  if (actionPrivacyError) return { ok: false, error: actionPrivacyError };
 
   let supabase;
   let userId: string | null = null;
@@ -1511,6 +1649,12 @@ export async function previewRefinePlanStep(
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
+  const privacy = validateFamilyNoPii(detail, [
+    { field: "feedback", label: "AI revision instructions", value: feedback },
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+  }
 
   const { data: step } = await supabase
     .from("plan_steps")
@@ -1612,6 +1756,40 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
+  const privacy = validateFamilyNoPii(detail, [
+    { field: "feedback", label: "AI revision instructions", value: feedback },
+    ...draft.steps.flatMap((step, stepIndex) => [
+      {
+        field: `draft.steps.${stepIndex}.title`,
+        label: "Action title",
+        value: step.title,
+      },
+      {
+        field: `draft.steps.${stepIndex}.description`,
+        label: "Action description",
+        value: step.description,
+      },
+      ...planDetailsPrivacyFields(
+        (step.details ?? {}) as PlanStepDetails,
+        `draft.steps.${stepIndex}.details`,
+      ),
+      ...step.action_items.flatMap((action, actionIndex) => [
+        {
+          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.title`,
+          label: "Action title",
+          value: action.title,
+        },
+        {
+          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.description`,
+          label: "Action description",
+          value: action.description,
+        },
+      ]),
+    ]),
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+  }
 
   const env = getEnv();
   if (!env.OPENAI_API_KEY?.trim()) {
@@ -1685,6 +1863,12 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
   const detail = await getFamilyDetail(supabase, familyId);
   if (!detail) {
     return { ok: false, error: "Family not found" };
+  }
+  const privacy = validateFamilyNoPii(detail, [
+    { field: "feedback", label: "AI revision instructions", value: feedback },
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
   const { data: step } = await supabase
@@ -1778,7 +1962,8 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
     family_id: familyId,
     actor_user_id: session.user.id,
     action: "step.refined",
-    notes: feedback,
+    notes: null,
+    details: { instruction_chars: feedback.length },
   });
 
   await logCaseActivity(
@@ -1788,7 +1973,7 @@ export async function refinePlanStep(input: unknown): Promise<ActionResult> {
     "step.refined",
     "plan_step",
     stepId,
-    { feedback: feedback.slice(0, 200) },
+    { instruction_chars: feedback.length },
   );
 
   revalidatePath(`/families/${familyId}`);

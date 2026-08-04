@@ -27,7 +27,6 @@ function buildCaseContext(detail: FamilyDetail): string {
   );
 
   const lines = [
-    `Family: ${detail.name}`,
     detail.summary ? `Summary: ${detail.summary}` : null,
     detail.urgency ? `Urgency: ${detail.urgency}` : null,
     detail.household_notes ? `Circumstances: ${detail.household_notes}` : null,
@@ -36,9 +35,6 @@ function buildCaseContext(detail: FamilyDetail): string {
       : null,
     detail.barriers.length
       ? `Barriers: ${detail.barriers.map((b) => b.label).join("; ")}`
-      : null,
-    detail.members?.length
-      ? `Household: ${detail.members.map((m) => m.display_name).join(", ")}`
       : null,
     "---",
     `Plan: ${plan ? `${steps.length} steps` : "No plan yet"}`,

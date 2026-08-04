@@ -56,6 +56,25 @@ describe("normalizeScannedPdfAnalysis", () => {
     });
   });
 
+  it("recognizes machine field names that use underscores", () => {
+    const parsed = scannedPdfModelAnalysisSchema.parse({
+      ...base,
+      fields: [
+        {
+          ...base.fields[0],
+          fieldName: "student_name",
+          label: "Student",
+          value: "Suggested identity",
+        },
+      ],
+    });
+    expect(normalizeScannedPdfAnalysis(parsed, 1)?.mappings[0]).toMatchObject({
+      value: "",
+      source: "Complete manually outside CaseLink",
+      needsReview: true,
+    });
+  });
+
   it("drops duplicate and out-of-page model fields", () => {
     const parsed = scannedPdfModelAnalysisSchema.parse({
       ...base,

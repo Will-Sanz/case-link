@@ -17,6 +17,7 @@ import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-s
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
 import { completedGenerationStageCount } from "@/lib/domain/plan/generation-progress";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 import type {
   BarrierPresetLabel,
   BarrierWorkflowResult,
@@ -306,6 +307,13 @@ export function FamilyLiteWorkspace({
   function addCustomBarrier(raw: string) {
     const text = raw.trim().slice(0, 200);
     if (!text) return;
+    const privacy = validateNoPii([
+      { field: "customBarrier", label: "Barrier", value: text },
+    ]);
+    if (!privacy.ok) {
+      setError(privacy.error);
+      return;
+    }
     const key = text.toLowerCase();
     const matchingPreset = barrierOptions.find((o) => o.label.toLowerCase() === key);
     if (matchingPreset) {
@@ -324,6 +332,19 @@ export function FamilyLiteWorkspace({
 
   function generate() {
     setError(null);
+    const privacy = validateNoPii([
+      { field: "name", label: "Family label", value: familyName, mode: "label" },
+      { field: "additionalContext", label: "Additional context", value: additionalContext },
+      ...customBarriers.map((barrier, index) => ({
+        field: `customBarriers.${index}`,
+        label: "Barrier",
+        value: barrier.text,
+      })),
+    ]);
+    if (!privacy.ok) {
+      setError(privacy.error);
+      return;
+    }
     setLocalPlanGenerating(true);
     void (async () => {
       try {

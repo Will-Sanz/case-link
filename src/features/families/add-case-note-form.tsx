@@ -5,6 +5,7 @@ import { addCaseNote } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 
 export function AddCaseNoteForm({ familyId }: { familyId: string }) {
   const [body, setBody] = useState("");
@@ -14,6 +15,13 @@ export function AddCaseNoteForm({ familyId }: { familyId: string }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const privacy = validateNoPii([
+      { field: "body", label: "Case note", value: body },
+    ]);
+    if (!privacy.ok) {
+      setError(privacy.error);
+      return;
+    }
     setPending(true);
     try {
       const r = await addCaseNote({ familyId, body });
@@ -43,7 +51,10 @@ export function AddCaseNoteForm({ familyId }: { familyId: string }) {
         rows={3}
         required
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => {
+          setBody(e.target.value);
+          setError(null);
+        }}
         className="mt-1.5"
         placeholder="Dated entry for the case file…"
       />

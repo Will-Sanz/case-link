@@ -76,7 +76,6 @@ export async function refineStepWithOpenAI(
 
   const blockerReason = currentStep.workflow_data?.blocker_reason;
   const context = [
-    `Household: ${detail.name}`,
     detail.summary ? `Summary: ${detail.summary}` : null,
     detail.household_notes ? `Notes: ${detail.household_notes}` : null,
     detail.goals.length ? `Goals: ${detail.goals.map((g) => g.label).join("; ")}` : null,

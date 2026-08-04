@@ -100,7 +100,6 @@ function buildStepContext(detail: FamilyDetail, step: PlanStepRow): string {
       : formatMatchesForAiPrompt(detail.resourceMatches, 5);
 
   const lines = [
-    `Family: ${detail.name}`,
     detail.summary ? `Summary: ${detail.summary}` : null,
     detail.urgency ? `Urgency: ${detail.urgency}` : null,
     detail.household_notes ? `Circumstances: ${detail.household_notes}` : null,

@@ -5,6 +5,7 @@ import {
   applyPdfOverlayMappings,
   displayedPdfPageSize,
   displayedPointToPdfPoint,
+  findCompletedPdfFields,
   inspectPdfFields,
   UnsupportedPdfFieldError,
 } from "@/lib/paperwork/pdf-form";
@@ -55,6 +56,24 @@ describe("inspectPdfFields", () => {
     expect(form.getTextField("Family_Summary").getText()).toBe("Reviewed context");
     expect(form.getCheckBox("Confirmed").isChecked()).toBe(false);
     expect(form.getDropdown("Priority").getSelected()).toEqual([]);
+  });
+
+  it("detects completed fields before a form can leave the browser", async () => {
+    const document = await PDFDocument.create();
+    const page = document.addPage();
+    const form = document.getForm();
+    form.createTextField("Blank_Field").addToPage(page);
+    const completed = form.createTextField("Completed_Field");
+    completed.setText("already entered");
+    completed.addToPage(page);
+    const checked = form.createCheckBox("Completed_Checkbox");
+    checked.check();
+    checked.addToPage(page);
+
+    expect(findCompletedPdfFields(document)).toEqual([
+      "Completed_Field",
+      "Completed_Checkbox",
+    ]);
   });
 
   it("rejects unsupported form controls instead of silently omitting them", async () => {

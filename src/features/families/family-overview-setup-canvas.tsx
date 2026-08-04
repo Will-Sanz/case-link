@@ -196,7 +196,12 @@ export function FamilyOverviewSetupCanvas({
             value={additionalContext}
             onChange={(e) => onAdditionalContextChange(e.target.value)}
             placeholder="Describe anything important about the situation..."
+            aria-describedby="family-additional-context-help"
           />
+          <p id="family-additional-context-help" className="text-xs leading-5 text-[#687b65]">
+            Keep this de-identified. Do not include names, addresses, birth dates, student IDs,
+            contact details, or signatures.
+          </p>
         </section>
 
         {/* 5. Live setup preview */}

@@ -75,12 +75,12 @@ export type CreateResponseResult =
   | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
   | { ok: false; error: string };
 
-function summarizeInput(input: string | ChatMessage[]): { chars: number; preview: string } {
+function summarizeInput(input: string | ChatMessage[]): { chars: number } {
   if (typeof input === "string") {
-    return { chars: input.length, preview: input.slice(0, 1200) };
+    return { chars: input.length };
   }
   const combined = input.map((m) => `[${m.role}] ${m.content}`).join("\n\n");
-  return { chars: combined.length, preview: combined.slice(0, 1200) };
+  return { chars: combined.length };
 }
 
 function exposeAiErrorToClient(internal: string, envDebug: boolean): string {
@@ -232,8 +232,11 @@ export async function createAiResponse(
       fileCount: options.fileInputs?.length ?? 0,
     });
     if (payloadDebug) {
-      console.info("[ai] request:instructions", instructions.slice(0, 2000));
-      console.info("[ai] request:input_preview", inputSummary.preview);
+      console.info("[ai] request:payload_summary", {
+        inputChars: inputSummary.chars,
+        instructionsChars: instructions.length,
+        fileCount: options.fileInputs?.length ?? 0,
+      });
     }
   }
 
@@ -264,9 +267,6 @@ export async function createAiResponse(
         tokens: rawResult.ok ? (rawResult.usage?.total_tokens ?? null) : null,
         outputChars: rawResult.ok ? rawResult.text.length : null,
       });
-      if (payloadDebug && rawResult.ok) {
-        console.info("[ai] response:preview", rawResult.text.slice(0, 2500));
-      }
     }
 
     if (meta) {

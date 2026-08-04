@@ -13,6 +13,7 @@ import {
   publicMessageFromCaughtError,
   publicMessageFromSupabaseError,
 } from "@/lib/errors/public-action-error";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 import {
   type BarrierPresetLabel,
   type BarrierWorkflowInput,
@@ -228,6 +229,18 @@ export async function generateBarrierWorkflowAction(
       ok: false,
       error: "Select at least one barrier or add supporting details below.",
     };
+  }
+  const privacy = validateNoPii([
+    { field: "referenceId", label: "Family label", value: referenceId, mode: "label" },
+    { field: "additionalDetails", label: "Short description", value: details },
+    ...parsedAdditionalBarriers.map((barrier, index) => ({
+      field: `additionalBarriers.${index}`,
+      label: "Barrier",
+      value: barrier,
+    })),
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
   try {
@@ -495,6 +508,17 @@ export async function generateBarrierWorkflowForFamilyAction(
       error: "Select at least one barrier or add supporting details below.",
     };
   }
+  const privacy = validateNoPii([
+    { field: "additionalDetails", label: "Short description", value: details },
+    ...parsedAdditionalBarriers.map((barrier, index) => ({
+      field: `additionalBarriers.${index}`,
+      label: "Barrier",
+      value: barrier,
+    })),
+  ]);
+  if (!privacy.ok) {
+    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+  }
   try {
     const { supabase, user } = await requireAppUserWithClient();
     const { data: fam } = await supabase
@@ -503,6 +527,15 @@ export async function generateBarrierWorkflowForFamilyAction(
       .eq("id", familyId)
       .maybeSingle();
     if (!fam) return { ok: false, error: "Family not found." };
+    const labelPrivacy = validateNoPii([
+      { field: "name", label: "Family label", value: fam.name, mode: "label" },
+    ]);
+    if (!labelPrivacy.ok) {
+      return {
+        ok: false,
+        error: labelPrivacy.error ?? "Replace the family label with a non-identifying label.",
+      };
+    }
 
     const barrierRows = selected.map((label, idx) => ({
       preset_key: BARRIER_KEY_BY_LABEL[label as BarrierPresetLabel] ?? null,
