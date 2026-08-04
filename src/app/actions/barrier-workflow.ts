@@ -255,17 +255,6 @@ export async function generateBarrierWorkflowAction(
     let familyId: string;
     if (existingRecord?.family_id) {
       familyId = existingRecord.family_id as string;
-      await supabase
-        .from("families")
-        .update({
-          name: referenceId,
-          summary: details || null,
-          household_notes: details || null,
-          urgency: "medium",
-          status: "active",
-        })
-        .eq("id", familyId);
-      await supabase.from("family_barriers").delete().eq("family_id", familyId);
     } else {
       const { data: familyIdRaw, error: familyErr } = await supabase.rpc("create_family_intake_row", {
         p_name: referenceId,
@@ -297,9 +286,17 @@ export async function generateBarrierWorkflowAction(
         sort_order: barrierRows.length,
       });
     }
-    if (barrierRows.length > 0) {
-      const { error: barrierErr } = await supabase.from("family_barriers").insert(barrierRows);
-      if (barrierErr) return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
+    const replacementRows = barrierRows.map((barrier) => ({
+      preset_key: barrier.preset_key,
+      label: barrier.label,
+      sort_order: barrier.sort_order,
+    }));
+    const { error: barrierErr } = await supabase.rpc("replace_family_barriers", {
+      p_family_id: familyId,
+      p_barriers: replacementRows,
+    });
+    if (barrierErr) {
+      return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
     }
 
     const matchRes = await runResourceMatching({ familyId });
