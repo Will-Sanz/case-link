@@ -13,6 +13,16 @@ export type PdfFieldMapping = {
   confidence: "high" | "medium" | "low";
   source: string;
   needsReview: boolean;
+  /** Human review state for a browser-local paperwork draft. */
+  reviewState?: "ready" | "suggested" | "accepted" | "edited" | "left_blank" | "out_of_date";
+  /** Suggestion that was current when this draft field was first prepared. */
+  baselineValue?: string;
+  baselineSource?: string;
+  /** Updated suggestion retained separately so manual work is never silently replaced. */
+  proposedValue?: string;
+  proposedSource?: string;
+  proposedConfidence?: "high" | "medium" | "low";
+  proposedNeedsReview?: boolean;
 };
 
 /** AI-detected writable area in a scanned or flattened PDF. Coordinates are normalized. */

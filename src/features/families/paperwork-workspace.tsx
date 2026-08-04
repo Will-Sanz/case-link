@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   PDFDocument,
 } from "pdf-lib";
@@ -34,6 +35,20 @@ import type {
   ScannedPdfAnalysis,
 } from "@/types/paperwork";
 import { isManualOnlyPaperworkField } from "@/lib/paperwork/scanned-pdf-analysis";
+import {
+  acceptUpdatedPaperworkSuggestion,
+  keepCurrentPaperworkValue,
+  normalizePaperworkMappings,
+  paperworkOutOfDateCount,
+  reconcilePaperworkMappings,
+} from "@/lib/paperwork/paperwork-draft-reconciliation";
+import {
+  deleteLocalPaperworkDraft,
+  loadLocalPaperworkDraft,
+  saveLocalPaperworkBlank,
+  saveLocalPaperworkDraft,
+  type LocalPaperworkDraft,
+} from "@/lib/paperwork/local-paperwork-draft";
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_SCANNED_FILE_BYTES = 3_500_000;
@@ -47,6 +62,47 @@ function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   return copy.buffer;
+}
+
+function acknowledgeCurrentPlan(mapping: PdfFieldMapping): PdfFieldMapping {
+  return mapping.reviewState === "out_of_date"
+    ? keepCurrentPaperworkValue(mapping)
+    : mapping;
+}
+
+async function analyzeScannedBlank(
+  familyId: string,
+  bytes: Uint8Array,
+): Promise<ScannedPdfAnalysis | { error: string }> {
+  try {
+    const body = new FormData();
+    body.set("familyId", familyId);
+    body.set(
+      "file",
+      new File([ownedArrayBuffer(bytes)], "blank-form.pdf", { type: "application/pdf" }),
+      "blank-form.pdf",
+    );
+    const response = await fetch("/api/paperwork/analyze", {
+      method: "POST",
+      body,
+      cache: "no-store",
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | ScannedPdfAnalysis
+      | { error?: string }
+      | null;
+    if (!response.ok || !payload || !("overlayFields" in payload)) {
+      return {
+        error:
+          payload && "error" in payload && payload.error
+            ? payload.error
+            : "CaseLink could not analyze this scanned form.",
+      };
+    }
+    return payload;
+  } catch {
+    return { error: "CaseLink could not analyze this scanned form. Check your connection and try again." };
+  }
 }
 
 export function PaperworkWorkspace({
@@ -77,6 +133,11 @@ export function PaperworkWorkspace({
   const [assistedByAi, setAssistedByAi] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftSource, setDraftSource] = useState<{ planId: string; reviewedAt: string } | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+  const [sourceCheckError, setSourceCheckError] = useState<string | null>(null);
+  const [sourceCheckPending, setSourceCheckPending] = useState(false);
+  const restoreAttemptedFamilyRef = useRef<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -84,6 +145,141 @@ export function PaperworkWorkspace({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  const refreshDraftAgainstPlan = useCallback(
+    async (draft: LocalPaperworkDraft, bytes: Uint8Array) => {
+      if (!planId || !reviewedAt) return;
+      setSourceCheckPending(true);
+      setSourceCheckError(null);
+      clearPreview();
+      try {
+        let currentMappings: PdfFieldMapping[];
+        if (draft.paperworkMode === "fillable") {
+          const result = await mapPdfFieldsAction({ familyId, fields: draft.fields });
+          if (!result.ok) {
+            setSourceCheckError(result.error);
+            return;
+          }
+          currentMappings = result.mappings;
+          setAssistedByAi(result.assistedByAi);
+        } else {
+          const analysis = await analyzeScannedBlank(familyId, bytes);
+          if ("error" in analysis) {
+            setSourceCheckError(analysis.error);
+            return;
+          }
+          currentMappings = analysis.mappings;
+          setOverlayFields(analysis.overlayFields);
+          setFields(
+            analysis.overlayFields.map((field) => ({
+              name: field.fieldName,
+              kind: field.kind,
+              options: [],
+              maxLength: null,
+            })),
+          );
+          setDocumentTitle(analysis.documentTitle);
+          setWarnings(analysis.warnings);
+          setAssistedByAi(true);
+        }
+
+        const reconciled = reconcilePaperworkMappings(draft.mappings, currentMappings);
+        const changedCount = paperworkOutOfDateCount(reconciled);
+        setMappings(reconciled);
+        setDraftSource({ planId, reviewedAt });
+        setDownloaded(false);
+        setDraftNotice(
+          changedCount > 0
+            ? `${changedCount} ${changedCount === 1 ? "field is" : "fields are"} out of date after the plan changed. Your prior entries are still here.`
+            : "Paperwork draft restored. The reviewed plan changed, but these field suggestions are still current.",
+        );
+      } finally {
+        setSourceCheckPending(false);
+      }
+    },
+    [familyId, planId, reviewedAt],
+  );
+
+  useEffect(() => {
+    if (
+      !hasReviewedPlan ||
+      !planId ||
+      !reviewedAt ||
+      restoreAttemptedFamilyRef.current === familyId
+    ) {
+      return;
+    }
+    restoreAttemptedFamilyRef.current = familyId;
+    let cancelled = false;
+    void loadLocalPaperworkDraft(familyId)
+      .then(async ({ draft, bytes }) => {
+        if (cancelled || !draft || !bytes || draft.mappings.length === 0) return;
+        setOriginalBytes(bytes);
+        setFileName("blank-form.pdf");
+        setFields(draft.fields);
+        setOverlayFields(draft.overlayFields);
+        setMappings(normalizePaperworkMappings(draft.mappings));
+        setPaperworkMode(draft.paperworkMode);
+        setDocumentTitle(draft.documentTitle);
+        setWarnings(draft.warnings);
+        setAssistedByAi(draft.assistedByAi);
+        setBlankTemplateConfirmed(true);
+        setDraftSource({ planId: draft.planId, reviewedAt: draft.reviewedAt });
+        setDraftNotice("Paperwork draft restored from this browser.");
+        if (draft.planId !== planId || draft.reviewedAt !== reviewedAt) {
+          await refreshDraftAgainstPlan(draft, bytes);
+        }
+      })
+      .catch(() => {
+        // Browser storage can be unavailable in private or restricted browsing.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [familyId, hasReviewedPlan, planId, refreshDraftAgainstPlan, reviewedAt]);
+
+  useEffect(() => {
+    if (
+      !draftSource ||
+      !originalBytes ||
+      !paperworkMode ||
+      mappings.length === 0
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void saveLocalPaperworkDraft({
+        v: 1,
+        familyId,
+        planId: draftSource.planId,
+        reviewedAt: draftSource.reviewedAt,
+        paperworkMode,
+        fields,
+        overlayFields,
+        mappings,
+        documentTitle,
+        warnings,
+        assistedByAi,
+        updatedAt: new Date().toISOString(),
+      }).catch(() => {
+        setDraftNotice(
+          "This draft is still open, but this browser could not save it for a later return.",
+        );
+      });
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    assistedByAi,
+    documentTitle,
+    draftSource,
+    familyId,
+    fields,
+    mappings,
+    originalBytes,
+    overlayFields,
+    paperworkMode,
+    warnings,
+  ]);
 
   function clearPreview() {
     setPreviewConfirmed(false);
@@ -94,6 +290,7 @@ export function PaperworkWorkspace({
   }
 
   function resetPaperwork() {
+    void deleteLocalPaperworkDraft(familyId).catch(() => {});
     clearPreview();
     setOriginalBytes(null);
     setFields([]);
@@ -107,11 +304,19 @@ export function PaperworkWorkspace({
     setAssistedByAi(false);
     setBlankTemplateConfirmed(false);
     setDownloaded(false);
+    setDraftSource(null);
+    setDraftNotice(null);
+    setSourceCheckError(null);
+    setSourceCheckPending(false);
     if (inputRef.current) inputRef.current.value = "";
   }
 
   async function handleFile(file: File | undefined) {
     setError(null);
+    setDraftNotice(null);
+    setSourceCheckError(null);
+    setDraftSource(null);
+    setDownloaded(false);
     setMappings([]);
     setOverlayFields([]);
     setWarnings([]);
@@ -148,6 +353,13 @@ export function PaperworkWorkspace({
       setFileName(file.name);
       setOriginalBytes(bytes);
       if (discovered.length > 0) {
+        try {
+          await saveLocalPaperworkBlank(familyId, bytes);
+        } catch {
+          setDraftNotice(
+            "This form is open, but this browser could not save the draft for a later return.",
+          );
+        }
         setPaperworkMode("fillable");
         setFields(discovered);
         startTransition(async () => {
@@ -156,8 +368,9 @@ export function PaperworkWorkspace({
             setError(result.error);
             return;
           }
-          setMappings(result.mappings);
+          setMappings(normalizePaperworkMappings(result.mappings));
           setAssistedByAi(result.assistedByAi);
+          if (planId && reviewedAt) setDraftSource({ planId, reviewedAt });
         });
         return;
       }
@@ -171,54 +384,39 @@ export function PaperworkWorkspace({
         return;
       }
 
+      try {
+        await saveLocalPaperworkBlank(familyId, bytes);
+      } catch {
+        setDraftNotice(
+          "This form is open, but this browser could not save the draft for a later return.",
+        );
+      }
       setPaperworkMode("scanned");
       setFields([]);
       startTransition(async () => {
-        try {
-          const body = new FormData();
-          body.set("familyId", familyId);
-          body.set("file", file, "blank-form.pdf");
-          const response = await fetch("/api/paperwork/analyze", {
-            method: "POST",
-            body,
-            cache: "no-store",
-          });
-          const payload = (await response.json().catch(() => null)) as
-            | ScannedPdfAnalysis
-            | { error?: string }
-            | null;
-          if (!response.ok || !payload || !("overlayFields" in payload)) {
-            setOriginalBytes(null);
-            setFileName("");
-            setPaperworkMode(null);
-            setError(
-              payload && "error" in payload && payload.error
-                ? payload.error
-                : "CaseLink could not analyze this scanned form.",
-            );
-            if (inputRef.current) inputRef.current.value = "";
-            return;
-          }
-          setOverlayFields(payload.overlayFields);
-          setFields(
-            payload.overlayFields.map((field) => ({
-              name: field.fieldName,
-              kind: field.kind,
-              options: [],
-              maxLength: null,
-            })),
-          );
-          setMappings(payload.mappings);
-          setDocumentTitle(payload.documentTitle);
-          setWarnings(payload.warnings);
-          setAssistedByAi(true);
-        } catch {
+        const payload = await analyzeScannedBlank(familyId, bytes);
+        if ("error" in payload) {
           setOriginalBytes(null);
           setFileName("");
           setPaperworkMode(null);
-          setError("CaseLink could not analyze this scanned form. Check your connection and try again.");
+          setError(payload.error);
           if (inputRef.current) inputRef.current.value = "";
+          return;
         }
+        setOverlayFields(payload.overlayFields);
+        setFields(
+          payload.overlayFields.map((field) => ({
+            name: field.fieldName,
+            kind: field.kind,
+            options: [],
+            maxLength: null,
+          })),
+        );
+        setMappings(normalizePaperworkMappings(payload.mappings));
+        setDocumentTitle(payload.documentTitle);
+        setWarnings(payload.warnings);
+        setAssistedByAi(true);
+        if (planId && reviewedAt) setDraftSource({ planId, reviewedAt });
       });
     } catch (caught) {
       setError(caught instanceof UnsupportedPdfFieldError
@@ -234,11 +432,12 @@ export function PaperworkWorkspace({
       current.map((mapping) =>
         mapping.fieldName === fieldName
           ? {
-              ...mapping,
+              ...acknowledgeCurrentPlan(mapping),
               value,
               confidence: "high",
               source: "Edited by case manager",
               needsReview: false,
+              reviewState: "edited" as const,
             }
           : mapping,
       ),
@@ -251,7 +450,14 @@ export function PaperworkWorkspace({
     setMappings((current) =>
       current.map((mapping) =>
         mapping.fieldName === fieldName
-          ? { ...mapping, source: `Confirmed from ${mapping.source}`, needsReview: false }
+          ? {
+              ...mapping,
+              source: mapping.source.startsWith("Confirmed from ")
+                ? mapping.source
+                : `Confirmed from ${mapping.source}`,
+              needsReview: false,
+              reviewState: "accepted",
+            }
           : mapping,
       ),
     );
@@ -264,14 +470,58 @@ export function PaperworkWorkspace({
       current.map((mapping) =>
         mapping.fieldName === fieldName
           ? {
-              ...mapping,
+              ...acknowledgeCurrentPlan(mapping),
               value: "",
               confidence: "high",
               source: "Left blank by case manager",
               needsReview: false,
+              reviewState: "left_blank" as const,
             }
           : mapping,
       ),
+    );
+  }
+
+  function acceptUpdatedValue(fieldName: string) {
+    clearPreview();
+    setDownloaded(false);
+    setMappings((current) =>
+      current.map((mapping) =>
+        mapping.fieldName === fieldName
+          ? acceptUpdatedPaperworkSuggestion(mapping)
+          : mapping,
+      ),
+    );
+  }
+
+  function keepCurrentValue(fieldName: string) {
+    clearPreview();
+    setDownloaded(false);
+    setMappings((current) =>
+      current.map((mapping) =>
+        mapping.fieldName === fieldName ? keepCurrentPaperworkValue(mapping) : mapping,
+      ),
+    );
+  }
+
+  function retryPaperworkSourceCheck() {
+    if (!originalBytes || !paperworkMode || !draftSource) return;
+    void refreshDraftAgainstPlan(
+      {
+        v: 1,
+        familyId,
+        planId: draftSource.planId,
+        reviewedAt: draftSource.reviewedAt,
+        paperworkMode,
+        fields,
+        overlayFields,
+        mappings,
+        documentTitle,
+        warnings,
+        assistedByAi,
+        updatedAt: new Date().toISOString(),
+      },
+      originalBytes,
     );
   }
 
@@ -289,6 +539,10 @@ export function PaperworkWorkspace({
   }
 
   async function openPreview() {
+    if (sourceCheckPending || sourceCheckError) {
+      setError("Finish checking this draft against the current reviewed plan before previewing.");
+      return;
+    }
     const unresolved = mappings.filter((mapping) => mapping.needsReview).length;
     if (unresolved > 0) {
       setError(`Review ${unresolved} ${unresolved === 1 ? "field" : "fields"} before previewing.`);
@@ -310,6 +564,10 @@ export function PaperworkWorkspace({
 
   async function downloadCompletedPdf() {
     if (!originalBytes) return;
+    if (sourceCheckPending || sourceCheckError) {
+      setError("Finish checking this draft against the current reviewed plan before downloading.");
+      return;
+    }
     const unresolved = mappings.filter((mapping) => mapping.needsReview).length;
     if (unresolved > 0) {
       setError(`Review ${unresolved} ${unresolved === 1 ? "field" : "fields"} before downloading.`);
@@ -330,9 +588,16 @@ export function PaperworkWorkspace({
         familyId,
         planId,
         reviewedAt,
+        fieldCount: mappings.length,
+        assistedByAi,
+        paperworkMode: paperworkMode ?? "fillable",
       });
       if (!authorization.ok) {
-        setError(authorization.error);
+        setError(
+          authorization.outOfDate
+            ? "The reviewed plan changed after this form was prepared. Return to the plan, complete its review, then reopen Paperwork; this browser will preserve your entries and flag only affected fields."
+            : authorization.error,
+        );
         return;
       }
       const url = URL.createObjectURL(new Blob([ownedArrayBuffer(saved)], { type: "application/pdf" }));
@@ -348,6 +613,9 @@ export function PaperworkWorkspace({
   }
 
   const reviewCount = mappings.filter((mapping) => mapping.needsReview).length;
+  const outOfDateCount = paperworkOutOfDateCount(mappings);
+  const sourceCheckBlocked = sourceCheckPending || Boolean(sourceCheckError);
+  const paperworkBlocked = reviewCount > 0 || sourceCheckBlocked;
 
   if (!hasReviewedPlan) {
     return (
@@ -373,6 +641,48 @@ export function PaperworkWorkspace({
         </div>
         <div className="mt-5 flex items-start gap-2 rounded-lg bg-[#edf4eb] px-4 py-3 text-xs leading-5 text-[#50644d]"><LockKeyhole className="mt-0.5 size-4 shrink-0 text-[#276221]" aria-hidden /> Upload only a blank template—never a completed form or identifying attachment. Fillable forms stay in your browser; blank scanned forms are sent temporarily for AI layout analysis and are not written to CaseLink storage.</div>
       </section>
+
+      {draftNotice ? (
+        <p
+          className="rounded-lg border border-[#cfe0cc] bg-[#f3f8f1] px-4 py-3 text-sm text-[#365134]"
+          role="status"
+        >
+          {draftNotice}
+        </p>
+      ) : null}
+
+      {sourceCheckPending ? (
+        <div
+          className="flex items-center gap-3 rounded-lg border border-[#dce6d9] bg-white px-4 py-3 text-sm text-[#50644d]"
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            className="size-4 shrink-0 animate-spin rounded-full border-2 border-[#cfe0cc] border-t-[#276221]"
+            aria-hidden
+          />
+          Checking this saved draft against the current reviewed plan…
+        </div>
+      ) : null}
+
+      {sourceCheckError ? (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3" role="alert">
+          <p className="text-sm font-semibold text-amber-950">Could not check the updated plan</p>
+          <p className="mt-1 text-sm leading-6 text-amber-900">
+            Your paperwork entries are still saved in this browser. Retry before downloading so
+            CaseLink can identify only the fields that changed.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3"
+            onClick={retryPaperworkSourceCheck}
+            disabled={sourceCheckPending}
+          >
+            Retry plan check
+          </Button>
+        </section>
+      ) : null}
 
       {!originalBytes ? (
         <section className="rounded-xl border border-dashed border-[#a9c7a5] bg-[#edf4eb] p-8 text-center sm:p-12">
@@ -444,8 +754,17 @@ export function PaperworkWorkspace({
                     : "Rule-based fillable fields"} · {reviewCount} {reviewCount === 1 ? "field" : "fields"} need attention
               </p>
             </div>
-            <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${reviewCount ? "bg-[#fff5da] text-[#765a16]" : "bg-[#edf4eb] text-[#276221]"}`}>{reviewCount ? <AlertCircle className="size-3.5" aria-hidden /> : <CheckCircle2 className="size-3.5" aria-hidden />}{reviewCount ? `${reviewCount} to review` : "Ready to download"}</span>
+            <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${paperworkBlocked ? "bg-[#fff5da] text-[#765a16]" : "bg-[#edf4eb] text-[#276221]"}`}>{paperworkBlocked ? <AlertCircle className="size-3.5" aria-hidden /> : <CheckCircle2 className="size-3.5" aria-hidden />}{sourceCheckBlocked ? "Plan check needed" : outOfDateCount ? `${outOfDateCount} out of date` : reviewCount ? `${reviewCount} to review` : "Ready to download"}</span>
           </div>
+          {outOfDateCount > 0 ? (
+            <div className="border-b border-[#eadcae] bg-[#fffaf0] px-5 py-4 text-sm leading-6 text-[#765a16]">
+              <p className="font-semibold">The reviewed plan changed</p>
+              <p className="mt-1">
+                Only affected suggestions are marked below. Your manual entries and every unchanged
+                field remain in place until you choose what to keep.
+              </p>
+            </div>
+          ) : null}
           {warnings.length > 0 ? (
             <div className="border-b border-[#eadcae] bg-[#fffaf0] px-5 py-3 text-xs leading-5 text-[#765a16]">
               <p className="font-semibold">Check these layout notes in the preview</p>
@@ -463,6 +782,7 @@ export function PaperworkWorkspace({
               const overlay = overlayFields.find((item) => item.fieldName === mapping.fieldName);
               const displayLabel = overlay?.label || mapping.fieldName;
               const needsReview = mapping.needsReview;
+              const outOfDate = mapping.reviewState === "out_of_date";
               const manualOnly = isManualOnlyPaperworkField(mapping.fieldName, displayLabel);
               return (
                 <div key={mapping.fieldName} className="grid gap-3 px-5 py-5 lg:grid-cols-[220px_1fr_180px] lg:items-start">
@@ -511,10 +831,41 @@ export function PaperworkWorkspace({
                     )}
                   </div>
                   <div className="text-xs leading-5">
-                    <p className={needsReview ? "font-semibold text-[#8a681c]" : "font-semibold text-[#276221]"}>{needsReview ? "Review needed" : "Ready"}</p>
-                    <p className="mt-1 text-[#687b65]">{mapping.source}</p>
-                    <p className="mt-1 capitalize text-[#82917f]">{mapping.confidence} confidence</p>
-                    {needsReview ? (
+                    <p className={needsReview ? "font-semibold text-[#8a681c]" : "font-semibold text-[#276221]"}>{outOfDate ? "Out of date" : needsReview ? "Review needed" : "Ready"}</p>
+                    <p className="mt-1 text-[#687b65]">
+                      {outOfDate ? `Current entry: ${mapping.source}` : mapping.source}
+                    </p>
+                    {outOfDate ? (
+                      <div className="mt-2 rounded-md border border-[#eadcae] bg-[#fffaf0] p-2.5 text-[#765a16]">
+                        <p className="font-semibold">Updated suggestion</p>
+                        <p className="mt-1 whitespace-pre-wrap">
+                          {mapping.proposedValue?.trim() || "Leave blank"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-[#8a7948]">
+                          {mapping.proposedSource ?? "Current reviewed plan"}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-1 capitalize text-[#82917f]">{mapping.confidence} confidence</p>
+                    )}
+                    {outOfDate ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => acceptUpdatedValue(mapping.fieldName)}
+                          className="min-h-9 rounded-lg border border-[#a9c7a5] bg-white px-3 font-semibold text-[#276221] hover:bg-[#edf4eb]"
+                        >
+                          Use updated suggestion
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => keepCurrentValue(mapping.fieldName)}
+                          className="min-h-9 rounded-lg px-3 font-semibold text-[#50644d] hover:bg-[#edf4eb]"
+                        >
+                          Keep current entry
+                        </button>
+                      </div>
+                    ) : needsReview ? (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {mapping.value ? (
                           <button type="button" onClick={() => confirmValue(mapping.fieldName)} className="min-h-9 rounded-lg border border-[#a9c7a5] bg-white px-3 font-semibold text-[#276221] hover:bg-[#edf4eb]">Accept suggestion</button>
@@ -538,7 +889,7 @@ export function PaperworkWorkspace({
                 <button
                   type="button"
                   onClick={() => void openPreview()}
-                  disabled={reviewCount > 0}
+                  disabled={reviewCount > 0 || sourceCheckBlocked}
                   className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#a9c7a5] bg-white px-4 text-sm font-semibold text-[#276221] hover:bg-[#edf4eb] disabled:cursor-not-allowed disabled:text-[#9bad98]"
                 >
                   <FileCheck2 className="size-4" aria-hidden />
@@ -548,11 +899,17 @@ export function PaperworkWorkspace({
               <button
                 type="button"
                 onClick={() => void downloadCompletedPdf()}
-                disabled={reviewCount > 0 || (paperworkMode === "scanned" && !previewConfirmed)}
+                disabled={
+                  reviewCount > 0 ||
+                  sourceCheckBlocked ||
+                  (paperworkMode === "scanned" && !previewConfirmed)
+                }
                 className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(39,98,33,0.16)] hover:bg-[#1f531b] disabled:cursor-not-allowed disabled:bg-[#9bad98] disabled:shadow-none"
               >
                 <Download className="size-4" aria-hidden />
-                {reviewCount > 0
+                {sourceCheckBlocked
+                  ? "Check current plan"
+                  : reviewCount > 0
                   ? "Finish field review"
                   : paperworkMode === "scanned" && !previewConfirmed
                     ? "Confirm preview to download"

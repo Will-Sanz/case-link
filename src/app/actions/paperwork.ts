@@ -22,6 +22,9 @@ const downloadSchema = z.object({
   familyId: z.string().uuid(),
   planId: z.string().uuid(),
   reviewedAt: z.string().datetime(),
+  fieldCount: z.number().int().min(0).max(150),
+  assistedByAi: z.boolean(),
+  paperworkMode: z.enum(["fillable", "scanned"]),
 });
 const aiMappingSchema = z.object({
   mappings: z.array(z.object({
@@ -92,14 +95,33 @@ export async function authorizePaperworkDownloadAction(
     return { ok: false, error: privacy.error ?? "Remove identifying text before downloading paperwork." };
   }
 
-  await supabase.from("activity_log").insert({
-    family_id: family.id,
-    actor_user_id: user.id,
-    action: "paperwork.downloaded",
-    entity_type: "plan",
-    entity_id: family.plan.id,
-    details: { plan_version: family.plan.version },
-  });
+  await supabase.from("activity_log").insert([
+    {
+      family_id: family.id,
+      actor_user_id: user.id,
+      action: "paperwork.review_completed",
+      entity_type: "plan",
+      entity_id: family.plan.id,
+      details: {
+        plan_version: family.plan.version,
+        field_count: parsed.data.fieldCount,
+        assisted_by_ai: parsed.data.assistedByAi,
+        paperwork_mode: parsed.data.paperworkMode,
+      },
+    },
+    {
+      family_id: family.id,
+      actor_user_id: user.id,
+      action: "paperwork.downloaded",
+      entity_type: "plan",
+      entity_id: family.plan.id,
+      details: {
+        plan_version: family.plan.version,
+        field_count: parsed.data.fieldCount,
+        paperwork_mode: parsed.data.paperworkMode,
+      },
+    },
+  ]);
   return { ok: true };
 }
 

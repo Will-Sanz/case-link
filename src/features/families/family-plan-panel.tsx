@@ -408,7 +408,6 @@ export function FamilyPlanPanel({
             .find((action) => action.id === editConflict.entityId)?.updated_at;
     if (latestTimestamp !== editConflict.currentUpdatedAt) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resolve after refreshed server props confirm the latest version is loaded
     setEditConflict(null);
     setConflictResolution(null);
     setSuccess("The latest version is loaded and your draft is still open. Review it, then save again.");
