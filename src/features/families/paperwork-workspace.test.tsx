@@ -22,10 +22,29 @@ vi.mock("@/lib/paperwork/local-paperwork-draft", () => ({
   saveLocalPaperworkDraft: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe("PaperworkWorkspace restored draft review", () => {
+describe("PaperworkWorkspace", () => {
   beforeEach(() => {
     vi.mocked(loadLocalPaperworkDraft).mockReset();
     vi.mocked(mapPdfFieldsAction).mockReset();
+  });
+
+  it("offers PDF upload without a blank-template confirmation", async () => {
+    vi.mocked(loadLocalPaperworkDraft).mockResolvedValue({ draft: null, bytes: null });
+
+    render(
+      <PaperworkWorkspace
+        familyId="20000000-0000-4000-8000-000000000002"
+        familyName="Family 014"
+        hasReviewedPlan
+        planId="50000000-0000-4000-8000-000000000005"
+        reviewedAt="2026-08-03T13:00:00.000Z"
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Upload a PDF" })).toBeTruthy();
+    expect((screen.getByLabelText("Upload PDF") as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByText(/clean blank template/i)).toBeNull();
   });
 
   it("preserves the existing entry and flags only a changed suggestion", async () => {

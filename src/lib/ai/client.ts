@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
+import { pdfBase64DataUrl } from "@/lib/ai/file-input";
 import {
   augmentInstructionsForMode,
   getDefaultMaxTokensForTask,
@@ -313,7 +314,7 @@ async function callResponsesApi(
               ...options.fileInputs.map((file) => ({
                 type: "input_file",
                 filename: file.filename,
-                file_data: file.fileDataBase64,
+                file_data: pdfBase64DataUrl(file.fileDataBase64),
               })),
             ],
           },

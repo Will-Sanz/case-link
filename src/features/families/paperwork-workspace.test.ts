@@ -31,7 +31,7 @@ describe("inspectPdfFields", () => {
     ]);
   });
 
-  it("clears stale values and writes the reviewed mapping", async () => {
+  it("preserves completed fields and fills only empty fields", async () => {
     const document = await PDFDocument.create();
     const page = document.addPage();
     const form = document.getForm();
@@ -43,19 +43,22 @@ describe("inspectPdfFields", () => {
     approved.addToPage(page);
     const priority = form.createDropdown("Priority");
     priority.addOptions(["Low", "High"]);
-    priority.select("High");
     priority.addToPage(page);
+    const nextStep = form.createTextField("Next_Step");
+    nextStep.addToPage(page);
     const fields = inspectPdfFields(document);
 
     applyPdfMappings(document, fields, [
       { fieldName: "Family_Summary", value: "Reviewed context", confidence: "high", source: "Family summary", needsReview: false },
       { fieldName: "Confirmed", value: "false", confidence: "high", source: "Manual review", needsReview: false },
-      { fieldName: "Priority", value: "", confidence: "low", source: "Confirmed blank", needsReview: false },
+      { fieldName: "Priority", value: "High", confidence: "high", source: "Reviewed plan", needsReview: false },
+      { fieldName: "Next_Step", value: "Call the housing office", confidence: "high", source: "Reviewed plan", needsReview: false },
     ]);
 
-    expect(form.getTextField("Family_Summary").getText()).toBe("Reviewed context");
-    expect(form.getCheckBox("Confirmed").isChecked()).toBe(false);
-    expect(form.getDropdown("Priority").getSelected()).toEqual([]);
+    expect(form.getTextField("Family_Summary").getText()).toBe("stale value");
+    expect(form.getCheckBox("Confirmed").isChecked()).toBe(true);
+    expect(form.getDropdown("Priority").getSelected()).toEqual(["High"]);
+    expect(form.getTextField("Next_Step").getText()).toBe("Call the housing office");
   });
 
   it("detects completed fields before a form can leave the browser", async () => {

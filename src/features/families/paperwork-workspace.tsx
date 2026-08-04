@@ -9,7 +9,6 @@ import {
   Download,
   FileCheck2,
   FileUp,
-  LockKeyhole,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
@@ -71,7 +70,7 @@ function acknowledgeCurrentPlan(mapping: PdfFieldMapping): PdfFieldMapping {
     : mapping;
 }
 
-async function analyzeScannedBlank(
+async function analyzeScannedPdf(
   familyId: string,
   bytes: Uint8Array,
 ): Promise<ScannedPdfAnalysis | { error: string }> {
@@ -80,8 +79,8 @@ async function analyzeScannedBlank(
     body.set("familyId", familyId);
     body.set(
       "file",
-      new File([ownedArrayBuffer(bytes)], "blank-form.pdf", { type: "application/pdf" }),
-      "blank-form.pdf",
+      new File([ownedArrayBuffer(bytes)], "form.pdf", { type: "application/pdf" }),
+      "form.pdf",
     );
     const response = await fetch("/api/paperwork/analyze", {
       method: "POST",
@@ -130,7 +129,6 @@ export function PaperworkWorkspace({
   const [warnings, setWarnings] = useState<string[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewConfirmed, setPreviewConfirmed] = useState(false);
-  const [blankTemplateConfirmed, setBlankTemplateConfirmed] = useState(false);
   const [assistedByAi, setAssistedByAi] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,7 +174,7 @@ export function PaperworkWorkspace({
           currentMappings = result.mappings;
           setAssistedByAi(result.assistedByAi);
         } else {
-          const analysis = await analyzeScannedBlank(familyId, bytes);
+          const analysis = await analyzeScannedPdf(familyId, bytes);
           if ("error" in analysis) {
             setSourceCheckError(analysis.error);
             return;
@@ -228,7 +226,7 @@ export function PaperworkWorkspace({
       .then(async ({ draft, bytes }) => {
         if (cancelled || !draft || !bytes || draft.mappings.length === 0) return;
         setOriginalBytes(bytes);
-        setFileName("blank-form.pdf");
+        setFileName("form.pdf");
         setFields(draft.fields);
         setOverlayFields(draft.overlayFields);
         setMappings(normalizePaperworkMappings(draft.mappings));
@@ -236,7 +234,6 @@ export function PaperworkWorkspace({
         setDocumentTitle(draft.documentTitle);
         setWarnings(draft.warnings);
         setAssistedByAi(draft.assistedByAi);
-        setBlankTemplateConfirmed(true);
         setDraftSource({ planId: draft.planId, reviewedAt: draft.reviewedAt });
         setDraftNotice("Paperwork draft restored from this browser.");
         if (draft.planId !== planId || draft.reviewedAt !== reviewedAt) {
@@ -315,7 +312,6 @@ export function PaperworkWorkspace({
     setFileName("");
     setError(null);
     setAssistedByAi(false);
-    setBlankTemplateConfirmed(false);
     setDownloaded(false);
     setDraftSource(null);
     setDraftNotice(null);
@@ -338,11 +334,6 @@ export function PaperworkWorkspace({
     clearPreview();
     setAssistedByAi(false);
     if (!file) return;
-    if (!blankTemplateConfirmed) {
-      setError("Confirm that the PDF is a clean blank template before selecting it.");
-      if (inputRef.current) inputRef.current.value = "";
-      return;
-    }
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setError("Choose a PDF file.");
       return;
@@ -355,17 +346,18 @@ export function PaperworkWorkspace({
       const bytes = new Uint8Array(await file.arrayBuffer());
       const document = await PDFDocument.load(bytes);
       const discovered = inspectPdfFields(document);
-      const completedFields = findCompletedPdfFields(document);
-      if (completedFields.length > 0) {
-        setError(
-          `This form already contains ${completedFields.length} completed ${completedFields.length === 1 ? "field" : "fields"}. Upload a clean blank template.`,
-        );
-        if (inputRef.current) inputRef.current.value = "";
-        return;
-      }
+      const completedFields = new Set(findCompletedPdfFields(document));
+      const emptyFields = discovered.filter((field) => !completedFields.has(field.name));
       setFileName(file.name);
       setOriginalBytes(bytes);
       if (discovered.length > 0) {
+        if (emptyFields.length === 0) {
+          setOriginalBytes(null);
+          setFileName("");
+          setError("This PDF does not have any empty form fields for CaseLink to fill.");
+          if (inputRef.current) inputRef.current.value = "";
+          return;
+        }
         try {
           await saveLocalPaperworkBlank(familyId, bytes);
         } catch {
@@ -374,9 +366,9 @@ export function PaperworkWorkspace({
           );
         }
         setPaperworkMode("fillable");
-        setFields(discovered);
+        setFields(emptyFields);
         startTransition(async () => {
-          const result = await mapPdfFieldsAction({ familyId, fields: discovered });
+          const result = await mapPdfFieldsAction({ familyId, fields: emptyFields });
           if (!result.ok) {
             setError(result.error);
             return;
@@ -407,7 +399,7 @@ export function PaperworkWorkspace({
       setPaperworkMode("scanned");
       setFields([]);
       startTransition(async () => {
-        const payload = await analyzeScannedBlank(familyId, bytes);
+        const payload = await analyzeScannedPdf(familyId, bytes);
         if ("error" in payload) {
           setOriginalBytes(null);
           setFileName("");
@@ -648,11 +640,10 @@ export function PaperworkWorkspace({
           <div>
             <p className="text-sm font-semibold text-[#5d705a]">Paperwork</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#173a15]">{familyName}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5d705a]">Upload a clean blank PDF. CaseLink proposes entries from the reviewed family plan, then you check uncertain fields and the completed document before download.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5d705a]">Upload a PDF to be filled out. CaseLink fills empty fields from the reviewed family plan and leaves existing entries unchanged.</p>
           </div>
           {originalBytes ? <button type="button" onClick={resetPaperwork} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#50644d] hover:bg-[#edf4eb]"><RotateCcw className="size-4" aria-hidden /> Start over</button> : null}
         </div>
-        <div className="mt-5 flex items-start gap-2 rounded-lg bg-[#edf4eb] px-4 py-3 text-xs leading-5 text-[#50644d]"><LockKeyhole className="mt-0.5 size-4 shrink-0 text-[#276221]" aria-hidden /> Upload only a blank template—never a completed form or identifying attachment. Fillable forms stay in your browser; blank scanned forms are sent temporarily for AI layout analysis and are not written to CaseLink storage.</div>
       </section>
 
       {draftNotice ? (
@@ -700,23 +691,8 @@ export function PaperworkWorkspace({
       {!originalBytes ? (
         <section className="rounded-xl border border-dashed border-[#a9c7a5] bg-[#edf4eb] p-8 text-center sm:p-12">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-white text-[#276221] shadow-[0_8px_24px_rgba(39,98,33,0.1)]"><FileUp className="size-6" aria-hidden /></span>
-          <h2 className="mt-5 text-xl font-semibold text-[#173a15]">Choose a clean blank PDF</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#5d705a]">Fillable forms up to 15 MB are completed in your browser. Scanned or flattened forms up to 3.5 MB can use the reviewed AI overlay.</p>
-          <label className="mx-auto mt-5 flex max-w-lg cursor-pointer items-start gap-3 rounded-xl border border-[#cfe0cc] bg-white px-4 py-3 text-left text-sm leading-5 text-[#365134]">
-            <input
-              type="checkbox"
-              checked={blankTemplateConfirmed}
-              onChange={(event) => {
-                setBlankTemplateConfirmed(event.target.checked);
-                setError(null);
-              }}
-              className="mt-0.5 size-4 shrink-0 accent-[#276221]"
-            />
-            <span>
-              I confirm this is a clean blank template with no names, handwriting, completed
-              checkmarks, contact details, IDs, or signatures.
-            </span>
-          </label>
+          <h2 className="mt-5 text-xl font-semibold text-[#173a15]">Upload a PDF</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#5d705a]">CaseLink fills empty fields and leaves existing entries unchanged. Fillable PDFs up to 15 MB and scanned or flattened PDFs up to 3.5 MB are supported.</p>
           <input
             ref={inputRef}
             type="file"
@@ -724,18 +700,12 @@ export function PaperworkWorkspace({
             onChange={(event) => void handleFile(event.target.files?.[0])}
             className="sr-only"
             id="paperwork-pdf"
-            disabled={!blankTemplateConfirmed}
           />
           <label
             htmlFor="paperwork-pdf"
-            aria-disabled={!blankTemplateConfirmed}
-            className={`mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white focus-within:ring-2 focus-within:ring-[#46923c]/30 focus-within:ring-offset-2 ${
-              blankTemplateConfirmed
-                ? "cursor-pointer bg-[#276221] shadow-[0_6px_18px_rgba(39,98,33,0.16)] hover:bg-[#1f531b]"
-                : "cursor-not-allowed bg-[#9bad98]"
-            }`}
+            className="mt-5 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(39,98,33,0.16)] hover:bg-[#1f531b] focus-within:ring-2 focus-within:ring-[#46923c]/30 focus-within:ring-offset-2"
           >
-            <FileUp className="size-4" aria-hidden /> Select PDF
+            <FileUp className="size-4" aria-hidden /> Upload PDF
           </label>
         </section>
       ) : pending ? (
@@ -743,7 +713,7 @@ export function PaperworkWorkspace({
           <span className="mx-auto block size-7 animate-spin rounded-full border-[3px] border-[#cfe0cc] border-t-[#276221]" aria-hidden />
           <h2 className="mt-5 text-lg font-semibold text-[#173a15]">
             {paperworkMode === "scanned"
-              ? "Reading the blank form layout…"
+              ? "Reading the PDF layout…"
               : `Preparing ${fields.length} form fields…`}
           </h2>
           <p className="mt-2 text-sm text-[#5d705a]">

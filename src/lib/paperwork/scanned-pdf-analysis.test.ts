@@ -37,6 +37,14 @@ describe("normalizeScannedPdfAnalysis", () => {
     });
   });
 
+  it("keeps empty writable areas from a partially completed form", () => {
+    const parsed = scannedPdfModelAnalysisSchema.parse({
+      ...base,
+      appearsBlank: false,
+    });
+    expect(normalizeScannedPdfAnalysis(parsed, 1)?.overlayFields).toHaveLength(1);
+  });
+
   it("forces identity and signature fields blank for manual completion", () => {
     const parsed = scannedPdfModelAnalysisSchema.parse({
       ...base,

@@ -110,9 +110,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     maxTokens: 8_192,
     requestMeta: { userId: session.user.id, route: "/api/paperwork/analyze" },
     instructions: [
-      "Analyze a blank scanned or flattened school-service PDF and prepare a reviewable overlay.",
-      "First determine whether the document appears blank. If handwriting, completed checkmarks, names, signatures, IDs, addresses, phone numbers, email addresses, or other likely personal data are present, set appearsBlank false and containsLikelyPersonalData true.",
-      "Detect only writable blanks and meaningful checkboxes that a case manager might complete. Coordinates must be normalized 0 to 1 relative to the DISPLAYED page, with x/y at the top-left of the writable area. pageIndex is zero-based.",
+      "Analyze a scanned or flattened school-service PDF and prepare a reviewable overlay for only the areas that are still empty.",
+      "The PDF may be partially completed. Existing non-identifying text, handwriting, checkmarks, or other marks do not disqualify it, but never place an overlay on top of them.",
+      "Set containsLikelyPersonalData true if names, signatures, IDs, addresses, phone numbers, email addresses, or other likely identifying data are present. appearsBlank should indicate whether all detected writable areas are empty.",
+      "Detect only writable areas and meaningful checkboxes that visually appear empty. Coordinates must be normalized 0 to 1 relative to the DISPLAYED page, with x/y at the top-left of the writable area. pageIndex is zero-based.",
       "Use only reviewedSource to suggest values. Never infer identity, eligibility, consent, signatures, attestations, dates of birth, addresses, IDs, contact information, case-manager identity, or site identity.",
       "Keep identity, signature, consent, certification, and attestation values null and mark them for review.",
       "Fill a client/family/participant objective only when a reviewedSource action is explicitly owned by family or shared; otherwise leave it null and mark it for review.",
@@ -123,7 +124,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     input: JSON.stringify({ pageCount, reviewedSource: source }),
     fileInputs: [
       {
-        filename: "blank-form.pdf",
+        filename: "form.pdf",
         fileDataBase64: Buffer.from(bytes).toString("base64"),
       },
     ],
@@ -136,7 +137,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (!ai.ok) {
     return noStoreJson(
-      { error: "CaseLink could not analyze this scanned form. Try again or use a fillable PDF." },
+      { error: ai.error },
       { status: 502 },
     );
   }
@@ -151,11 +152,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!parsed.appearsBlank || parsed.containsLikelyPersonalData) {
+  if (parsed.containsLikelyPersonalData) {
     return noStoreJson(
       {
         error:
-          "This PDF appears to contain completed or identifying information. For this MVP, upload only a clean blank template.",
+          "This PDF appears to contain identifying information. Use a de-identified copy.",
       },
       { status: 422 },
     );

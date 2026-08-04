@@ -2,6 +2,7 @@ import {
   PDFCheckBox,
   PDFDocument,
   PDFDropdown,
+  type PDFField,
   PDFOptionList,
   PDFRadioGroup,
   StandardFonts,
@@ -31,19 +32,23 @@ export function inspectPdfFields(document: PDFDocument): PdfFieldDescriptor[] {
   });
 }
 
-/** Returns field names that already contain a value; MVP paperwork accepts blank templates only. */
-export function findCompletedPdfFields(document: PDFDocument): string[] {
-  return document.getForm().getFields().flatMap((field) => {
-    if (field instanceof PDFTextField) return field.getText()?.trim() ? [field.getName()] : [];
-    if (field instanceof PDFCheckBox) return field.isChecked() ? [field.getName()] : [];
-    if (field instanceof PDFDropdown) return field.getSelected().length > 0 ? [field.getName()] : [];
-    if (field instanceof PDFRadioGroup) return field.getSelected() ? [field.getName()] : [];
-    if (field instanceof PDFOptionList) return field.getSelected().length > 0 ? [field.getName()] : [];
-    return [field.getName()];
-  });
+function pdfFieldHasValue(field: PDFField): boolean {
+  if (field instanceof PDFTextField) return Boolean(field.getText()?.trim());
+  if (field instanceof PDFCheckBox) return field.isChecked();
+  if (field instanceof PDFDropdown) return field.getSelected().length > 0;
+  if (field instanceof PDFRadioGroup) return Boolean(field.getSelected());
+  if (field instanceof PDFOptionList) return field.getSelected().length > 0;
+  return true;
 }
 
-/** Clears every supported field before applying the reviewed mapping values. */
+/** Returns field names that already contain a value so they can be preserved. */
+export function findCompletedPdfFields(document: PDFDocument): string[] {
+  return document.getForm().getFields().flatMap((field) =>
+    pdfFieldHasValue(field) ? [field.getName()] : [],
+  );
+}
+
+/** Applies reviewed values only to empty fields, preserving anything already completed. */
 export function applyPdfMappings(
   document: PDFDocument,
   fields: PdfFieldDescriptor[],
@@ -54,6 +59,7 @@ export function applyPdfMappings(
 
   for (const descriptor of fields) {
     const field = form.getField(descriptor.name);
+    if (pdfFieldHasValue(field)) continue;
     const value = mappingByName.get(descriptor.name)?.value ?? "";
     if (field instanceof PDFTextField) field.setText(value);
     else if (field instanceof PDFCheckBox) {
