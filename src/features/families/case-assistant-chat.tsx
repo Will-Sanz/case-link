@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import ReactMarkdown from "react-markdown";
+import { SendDiagonal, Spark } from "iconoir-react";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
 import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
 import { Button } from "@/components/ui/button";
@@ -217,7 +218,7 @@ export function CaseAssistantChat({
                 className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-paper-2)] text-sm font-semibold text-[var(--color-ink-faint)]"
                 aria-hidden
               >
-                AI
+                <Spark className="h-6 w-6" strokeWidth={2} aria-hidden="true" />
               </div>
               <p className="max-w-md text-base leading-relaxed text-[var(--color-ink-2)]">
                 Ask for guidance on execution, sequencing, risks, barriers, resources, or outreach,
@@ -314,10 +315,13 @@ export function CaseAssistantChat({
               </span>
               <Button
                 type="button"
-                className="h-9 rounded-xl px-4 text-sm font-medium"
+                className="h-9 gap-2 rounded-xl px-4 text-sm font-medium"
                 onClick={submitFromInput}
                 disabled={pending || !draft.trim()}
               >
+                {!pending ? (
+                  <SendDiagonal className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+                ) : null}
                 {pending ? "Sending…" : "Send"}
               </Button>
             </div>

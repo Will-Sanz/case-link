@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Xmark } from "iconoir-react";
 import { LegalDensityProvider } from "@/components/layout/legal-doc-layout";
 import {
   PrivacyPolicySections,
@@ -95,17 +96,11 @@ export function LegalDocumentModal({
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/35 focus-visible:ring-offset-2"
             aria-label="Close"
           >
-            <svg
+            <Xmark
               className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              aria-hidden
-            >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+              strokeWidth={2}
+              aria-hidden="true"
+            />
           </button>
         </header>
 

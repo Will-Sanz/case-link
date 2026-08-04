@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight } from "iconoir-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -261,9 +262,14 @@ export function ResourceMatchesPanel({
                         {steps.find((s) => s.id === m.plan_step_id) ? (
                           <Link
                             href={`#step-${m.plan_step_id}`}
-                            className="text-xs text-[var(--color-accent)] hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:underline"
                           >
-                            → {steps.find((s) => s.id === m.plan_step_id)?.title}
+                            <ArrowRight
+                              className="h-4 w-4 shrink-0"
+                              strokeWidth={2.5}
+                              aria-hidden="true"
+                            />
+                            {steps.find((s) => s.id === m.plan_step_id)?.title}
                           </Link>
                         ) : null}
                         <Button

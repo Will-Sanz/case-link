@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "iconoir-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import type { ResourceDetailRecord } from "@/types/resource-detail";
@@ -47,9 +48,10 @@ export function ResourceDetailView({ r }: { r: ResourceDetailRecord }) {
       <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Link
           href="/resources"
-          className="text-sm font-medium text-blue-800 underline-offset-2 hover:text-blue-900 hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-800 underline-offset-2 hover:text-blue-900 hover:underline"
         >
-          ← Back to resources
+          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+          Back to resources
         </Link>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
           {r.program_name}

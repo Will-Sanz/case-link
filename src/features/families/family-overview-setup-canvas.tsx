@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Xmark } from "iconoir-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -130,9 +130,13 @@ export function FamilyOverviewSetupCanvas({
                           ? "border-[var(--color-positive)] bg-[var(--color-positive)] text-[var(--color-accent-ink)]"
                           : "border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-transparent",
                       )}
-                      aria-hidden
+                      aria-hidden="true"
                     >
-                      <Check className="size-3" strokeWidth={3} />
+                      <Check
+                        className="h-4 w-4"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
                     </span>
                     <span>{opt.label}</span>
                   </span>
@@ -147,14 +151,18 @@ export function FamilyOverviewSetupCanvas({
                   aria-label={`Remove barrier: ${row.text}`}
                   onClick={() => onRemoveCustomBarrier(row.id)}
                 >
-                  <X className="size-4" aria-hidden />
+                  <Xmark className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
                 </button>
                 <div className="flex items-start gap-2.5">
                   <span
                     className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-[var(--color-positive)] bg-[var(--color-positive)] text-[10px] font-bold text-[var(--color-accent-ink)]"
-                    aria-hidden
+                    aria-hidden="true"
                   >
-                    <Check className="size-3" strokeWidth={3} />
+                    <Check
+                      className="h-4 w-4"
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    />
                   </span>
                   <span className="min-w-0 break-words">{row.text}</span>
                 </div>
