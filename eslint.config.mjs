@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Project-local design tooling and generated visual artifacts.
     ".agents/**",
     ".impeccable/**",
+    "supabase/.branches/**",
+    "supabase/.temp/**",
   ]),
 ]);
 

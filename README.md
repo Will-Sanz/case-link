@@ -35,10 +35,10 @@ Everything downstream is **editable**. Plans and populated form fields remain dr
 - **Families** — Create a family support case and reopen it from one simple list.
 - **Barrier intake** — Record the needs and context that should shape the intervention.
 - **Editable intervention plans** — Generate a structured plan, trace it to approved barriers, and edit it before approval.
-- **Paperwork preparation (planned)** — Upload a blank required PDF, map approved information into a draft, review uncertain or missing fields, and download the completed form.
+- **Paperwork preparation** — Upload a blank required PDF, map approved information into a draft, review uncertain or missing fields, and download the completed form.
 - **Human review** — Plans and forms remain drafts until the case manager approves them.
 
-The repository still contains experimental resource, timeline, task, calendar, and case-assistant capabilities. They are not part of the newly narrowed V1 product promise and should not drive the redesign unless pilot evidence brings them back into scope.
+Supporting resource, timeline, task, and case-assistant capabilities remain subordinate to that narrow V1 workflow. They should expand only when pilot evidence justifies it.
 
 ---
 
@@ -94,18 +94,19 @@ Design principles:
 - **Human-in-the-loop** — Outputs are **editable**; the product assumes review before reliance, especially for high-stakes decisions.
 - **Support, not substitution** — CaseLink is a **tool for case managers**, not an autonomous agent making decisions for families.
 
-Operational guardrails include **per-user (and optional per-IP) rate limiting**, **payload and output token caps**, and **generic user-facing errors in production** with detail confined to server logs.
+Operational guardrails include **shared atomic per-user and deployment AI budgets**, **one-owner generation claims**, **payload and output token caps**, and **generic user-facing errors in production** with privacy-filtered diagnostics in server logs.
 
 ---
 
 ## Security & privacy approach
 
 - **Secrets stay server-side** — Only public Supabase URL + anon key belong in the browser; OpenAI and service-role credentials never ship to the client.
-- **RLS by default** — Shared tables are family-scoped; access is enforced in Postgres, not only in UI checks.
-- **Validated inputs** — Server actions and AI entry points reject malformed or oversized input early.
-- **Throttled AI** — Rate limits and size caps limit abuse and runaway cost (limits are **per instance** today; strict global caps would need a shared store such as Redis).
+- **RLS and narrow RPCs** — Family access, value constraints, immutable ownership, cross-family integrity, and consequential transactions are enforced in Postgres, not only in UI checks.
+- **Validated inputs** — Server actions, AI entry points, and critical database boundaries reject malformed, identifying, or oversized input.
+- **Throttled AI** — Database-backed minute, hour, and deployment-day budgets coordinate across application instances and fail closed in production.
+- **Bounded paperwork** — Only blank, unlocked, fillable PDFs are accepted; the file remains in the active browser tab, while only bounded field metadata may be sent for mapping.
 - **No ads, no third-party analytics baked into the product narrative** — The app is built for case work, not ad profiles.
-- **Sensitive data** — The model assumes **real-world sensitivity**; prompts are scoped to what the case manager already recorded, and operators remain responsible for Auth URLs, redirects, environments, and compliance in their own deployments.
+- **Sensitive data** — The V1 pilot permits de-identified case context only and requires one dedicated environment per school or district. Operators must complete the hosted controls and exercises in the production runbook.
 
 HTTP security headers (e.g. frame options, content-type options, referrer and permissions policies) are set at the framework layer to reduce common browser-level risks.
 
@@ -119,9 +120,9 @@ The UI targets **usable density**: clear hierarchy, minimal noise, and flows tha
 
 ## Limitations & future work
 
-- **Account lifecycle** — Full self-service account deletion may not be available in-app; some flows are still evolving.
+- **Account lifecycle** — Accounts are invitation-only; access, offboarding, archive retention, and deletion are operator-controlled.
 - **Dependence on third-party AI** — When OpenAI is enabled, content generation relies on vendor availability, policy, and pricing; the stack includes **rules-based** paths where AI is off or fails.
-- **Rate limiting** — In-memory limits do not coordinate across multiple server instances; production hardening may require a shared limiter.
+- **Paperwork profile** — V1 supports blank standard AcroForm PDFs only; scanned, completed, signed, encrypted, XFA, attached, or active-content documents are rejected.
 - **Resource matching** — Deliberately **not** embedding-based; weights and rules live in code for transparency and predictability, at the cost of semantic “nearest neighbor” search. The repo ships a **small synthetic CSV** for demos; full partner exports stay **local** (see `data/README.md`).
 - **Early-stage product** — Scope is described honestly; the codebase is structured for review and iteration, not for claiming completeness.
 
@@ -131,3 +132,9 @@ The UI targets **usable density**: clear hierarchy, minimal noise, and flows tha
 
 - **Privacy Policy:** `/privacy`
 - **Terms of Service:** `/terms`
+
+## Production readiness
+
+- [Production hardening audit](docs/production-hardening-audit.md)
+- [Remediation and finding closure](docs/production-hardening-remediation.md)
+- [Production operations runbook](docs/production-operations-runbook.md)

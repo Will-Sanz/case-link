@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/dist/server/web/spec-extension/request";
 import { NextResponse } from "next/dist/server/web/spec-extension/response";
+import { applyRuntimeHsts } from "@/lib/security/response-headers";
 
 // Import NextRequest/NextResponse from spec-extension paths, not `next/server`, so we do not load
 // user-agent / ua-parser-js (uses `__dirname`, which is undefined in some proxy bundles).
@@ -18,6 +19,16 @@ const PROTECTED_PREFIXES = ["/dashboard", "/families", "/resources", "/admin", "
  */
 function continueToApp() {
   return NextResponse.next();
+}
+
+function finalizeResponse(response: NextResponse): NextResponse {
+  applyRuntimeHsts(response.headers, {
+    productionDeployment:
+      process.env.VERCEL_ENV === "production"
+      || process.env.CASELINK_ENVIRONMENT === "production",
+    enableHsts: process.env.CASELINK_HSTS === "1",
+  });
+  return response;
 }
 
 /**
@@ -39,9 +50,9 @@ export async function runSupabaseProxy(request: NextRequest) {
     if (isProtected) {
       const login = new URL("/login", request.url);
       login.searchParams.set("next", pathname);
-      return NextResponse.redirect(login);
+      return finalizeResponse(NextResponse.redirect(login));
     }
-    return supabaseResponse;
+    return finalizeResponse(supabaseResponse);
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -74,8 +85,8 @@ export async function runSupabaseProxy(request: NextRequest) {
   if (isProtected && !claims) {
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname);
-    return NextResponse.redirect(login);
+    return finalizeResponse(NextResponse.redirect(login));
   }
 
-  return supabaseResponse;
+  return finalizeResponse(supabaseResponse);
 }

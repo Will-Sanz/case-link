@@ -1,8 +1,12 @@
 import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logServerError } from "@/lib/logger/server-error";
+import {
+  AuthenticationRequiredError,
+  SessionUnavailableError,
+} from "@/lib/auth/session-errors";
 import type { AppUserRow } from "@/types/database";
-import { UserRole, type UserRole as UserRoleType } from "@/types/user-role";
+import type { UserRole as UserRoleType } from "@/types/user-role";
 
 export type AppUser = {
   id: string;
@@ -22,7 +26,12 @@ export async function getSessionUser(): Promise<SupabaseUser | null> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+  if (error && ![400, 401, 403].includes(error.status ?? 0)) {
+    logServerError("getSessionUser:auth", error);
+    throw new SessionUnavailableError();
+  }
   return user;
 }
 
@@ -55,28 +64,17 @@ export async function ensureAppUserWithClient(
 
   if (existing) {
     if (existing.email !== email) {
-      const { error: updateError } = await supabase
-        .from("app_users")
-        .update({ email })
-        .eq("id", existing.id);
-      if (updateError) {
-        logServerError("ensureAppUserWithClient:update-email", updateError);
+      const { data: synced, error: syncError } = await supabase.rpc("ensure_app_user");
+      if (syncError || !synced) {
+        logServerError("ensureAppUserWithClient:sync-email", syncError ?? new Error("empty row"));
         throw new Error("Could not update your account. Please try again.");
       }
-      return rowToAppUser({ ...existing, email });
+      return rowToAppUser(synced as AppUserRow);
     }
     return rowToAppUser(existing as AppUserRow);
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from("app_users")
-    .insert({
-      id: supabaseUser.id,
-      email,
-      role: UserRole.CaseManager,
-    })
-    .select("id, email, role, created_at, updated_at")
-    .single();
+  const { data: inserted, error: insertError } = await supabase.rpc("ensure_app_user");
 
   if (insertError) {
     logServerError("ensureAppUserWithClient:insert", insertError);
@@ -102,7 +100,7 @@ export async function getAppUser(): Promise<AppUser | null> {
 export async function requireAppUser(): Promise<AppUser> {
   const user = await getAppUser();
   if (!user) {
-    throw new Error("Unauthorized");
+    throw new AuthenticationRequiredError();
   }
   return user;
 }
@@ -117,17 +115,16 @@ export async function requireAppUserWithClient(): Promise<{
     data: { user: authUser },
     error,
   } = await supabase.auth.getUser();
-  if (error || !authUser) {
-    throw new Error("Unauthorized");
+  if (error) {
+    if (error.status === 400 || error.status === 401 || error.status === 403) {
+      throw new AuthenticationRequiredError();
+    }
+    logServerError("requireAppUserWithClient:auth", error);
+    throw new SessionUnavailableError();
+  }
+  if (!authUser) {
+    throw new AuthenticationRequiredError();
   }
   const user = await ensureAppUserWithClient(supabase, authUser);
   return { user, supabase };
-}
-
-export async function requireAdmin(): Promise<AppUser> {
-  const user = await requireAppUser();
-  if (user.role !== UserRole.Admin) {
-    throw new Error("Forbidden");
-  }
-  return user;
 }

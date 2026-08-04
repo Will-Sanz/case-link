@@ -72,6 +72,17 @@ export const generatePlanSchema = z.object({
   aiMode: aiModeSchema,
 });
 
+export const stagedPlanStartSchema = generatePlanSchema.pick({
+  familyId: true,
+  regenerationFeedback: true,
+  aiMode: true,
+});
+
+export const stagedPlanAdvanceSchema = z.object({
+  familyId: z.string().uuid(),
+  aiMode: aiModeSchema,
+});
+
 export const planClientDisplaySchema = z.object({
   title: z.string().max(200).optional(),
   phaseSummaries: z
@@ -132,29 +143,6 @@ export const createManualStepSchema = z
 export const deletePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
-});
-
-export const ACTIVITY_TYPES = [
-  "call_attempted",
-  "voicemail_left",
-  "email_sent",
-  "text_sent",
-  "appointment_scheduled",
-  "attended_appointment",
-  "documents_requested",
-  "documents_submitted",
-  "no_response",
-  "completed",
-  "other",
-] as const;
-
-export const logPlanStepActivitySchema = z.object({
-  stepId: z.string().uuid(),
-  familyId: z.string().uuid(),
-  action: z.string().min(1).max(100),
-  activity_type: z.string().max(50).optional(),
-  notes: z.string().max(2000).optional(),
-  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const linkResourceToStepSchema = z.object({

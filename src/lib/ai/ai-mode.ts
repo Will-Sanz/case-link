@@ -7,6 +7,7 @@ export type AiMode = "fast" | "thinking";
 export const DEFAULT_AI_MODE: AiMode = "fast";
 
 /** Product uses fast routing only; incoming values are normalized. */
-export function parseAiMode(_value: unknown): AiMode {
+export function parseAiMode(value: unknown): AiMode {
+  void value;
   return DEFAULT_AI_MODE;
 }

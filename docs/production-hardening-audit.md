@@ -7,6 +7,8 @@
 **Base:** `codex/caselink-v1-redesign` at `bb39330`
 **Recommendation:** **No-go for a production pilot until PH-01 and PH-02 are fixed and verified.**
 
+> **Remediation update (2026-08-04):** Repository changes addressing this audit are documented in [production-hardening-remediation.md](./production-hardening-remediation.md). Hosted-environment and exercise gates remain in [production-operations-runbook.md](./production-operations-runbook.md).
+
 ## Executive summary
 
 CaseLink already has a stronger baseline than a typical prototype: authentication is checked in the workspace and server actions, family data is protected by Postgres RLS, AI calls are centralized, AI inputs and outputs are bounded, PDF uploads have byte/page/type checks, OpenAI requests use `store: false`, sensitive server errors are generally hidden in production, CI runs the full verification suite, and the core no-PII and PDF logic has unit tests.

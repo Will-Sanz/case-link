@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, v1-redesign]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -16,10 +19,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "20"
           cache: npm
@@ -27,5 +30,47 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
       - name: Typecheck, lint, and production build
         run: npm run ci
+        env:
+          VERCEL_ENV: production
+          CASELINK_ENVIRONMENT: production
+          CASELINK_TENANCY_MODE: single-tenant
+          CASELINK_PDF_MODE: fillable-only
+          CASELINK_INVITE_ONLY: "1"
+          CASELINK_HSTS: "1"
+          NEXT_PUBLIC_SITE_URL: https://caselink.example
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-placeholder
+          OPENAI_API_KEY: ci-openai-placeholder
+
+  database-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start isolated Supabase and apply migrations
+        run: |
+          npx --yes supabase@2.111.0 start
+          npx --yes supabase@2.111.0 db reset --local
+
+      - name: Verify grants, RLS, transactions, and concurrent limits
+        run: npm run test:db-security
+
+      - name: Stop isolated Supabase
+        if: always()
+        run: npx --yes supabase@2.111.0 stop --no-backup

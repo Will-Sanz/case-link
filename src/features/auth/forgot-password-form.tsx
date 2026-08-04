@@ -6,30 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { alertErrorClass, alertInfoClass } from "@/lib/ui/form-classes";
+import { getBrowserPublicSiteOrigin } from "@/lib/auth/public-site-url-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function resolveAuthEmailOrigin() {
-  const host = window.location.hostname.toLowerCase();
-  const isLocalHost = host === "localhost" || host === "127.0.0.1";
-  if (isLocalHost) {
-    return window.location.origin;
-  }
-
-  const envOrigin =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (envOrigin) {
-    try {
-      const u = new URL(envOrigin.includes("://") ? envOrigin : `https://${envOrigin}`);
-      return `${u.protocol}//${u.host}`;
-    } catch {
-      /* fallback */
-    }
-  }
-
-  return window.location.origin;
-}
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -53,22 +33,18 @@ export function ForgotPasswordForm() {
     setPending(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const baseUrl = resolveAuthEmailOrigin();
-      const emailRedirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent("/dashboard")}`;
-      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo,
-        },
+      const baseUrl = getBrowserPublicSiteOrigin();
+      const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent("/reset-password?mode=recovery")}`;
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo,
       });
 
-      if (magicLinkError) {
-        setError("We couldn't send a sign-in link right now. Please try again.");
+      if (resetError) {
+        setError("We couldn't send a reset link right now. Please try again.");
         return;
       }
 
-      setInfo("If an account exists for that email, we've sent a secure sign-in link.");
+      setInfo("If an account exists for that email, we've sent a secure reset link.");
     } finally {
       setPending(false);
     }
@@ -100,7 +76,7 @@ export function ForgotPasswordForm() {
         />
       </div>
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Sending sign-in link…" : "Send sign-in link"}
+        {pending ? "Sending reset link…" : "Send reset link"}
       </Button>
       <p className="text-center text-sm text-slate-600">
         Remembered your password?{" "}

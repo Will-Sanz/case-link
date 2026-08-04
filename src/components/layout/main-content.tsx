@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 
 function isFullWidthPath(pathname: string): boolean {
-  if (pathname === "/calendar") return true;
   if (pathname.startsWith("/families/") && pathname !== "/families" && pathname !== "/families/new") {
     return true;
   }

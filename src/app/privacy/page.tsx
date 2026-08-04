@@ -22,7 +22,7 @@ export default async function PrivacyPolicyPage() {
 
   return (
     <PublicSiteShell authenticated={Boolean(user)}>
-      <LegalDocumentBody title="Privacy Policy" lastUpdated="April 2026">
+      <LegalDocumentBody title="Privacy Policy" lastUpdated="August 2026">
         <PrivacyPolicySections />
       </LegalDocumentBody>
     </PublicSiteShell>

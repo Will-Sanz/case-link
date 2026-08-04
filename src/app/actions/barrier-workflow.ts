@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { runResourceMatching } from "@/app/actions/resource-matches";
 import { startStagedLeanPlanGeneration, updatePlanStepActionItem } from "@/app/actions/plans";
@@ -14,11 +15,11 @@ import {
   publicMessageFromSupabaseError,
 } from "@/lib/errors/public-action-error";
 import { validateNoPii } from "@/lib/privacy/no-pii";
+import { logServerError } from "@/lib/logger/server-error";
 import {
   type BarrierPresetLabel,
-  type BarrierWorkflowInput,
+  BARRIER_PRESETS,
   type BarrierWorkflowPlanSection,
-  type BarrierWorkflowRecentRecord,
   type BarrierWorkflowResource,
   type BarrierWorkflowResult,
 } from "@/types/barrier-workflow";
@@ -38,6 +39,18 @@ const BARRIER_KEY_BY_LABEL: Record<BarrierPresetLabel, string> = {
   "Domestic violence": "legal_matter",
   "Financial hardship": "utility_debt",
 };
+
+const familyIdSchema = z.string().uuid();
+const barrierLabelSchema = z.string().refine(
+  (value) => BARRIER_PRESETS.some((barrier) => barrier.label === value),
+  "Unknown barrier",
+);
+const familyWorkflowInputSchema = z.object({
+  selectedBarriers: z.array(barrierLabelSchema).max(20),
+  additionalBarriers: z.string().max(2000).optional(),
+  additionalDetails: z.string().max(4000).optional(),
+  aiMode: z.enum(["fast", "thinking"]).optional(),
+}).strict();
 
 function toClientError(error: unknown): string {
   return publicMessageFromCaughtError("barrier-workflow", error);
@@ -70,64 +83,16 @@ type BarrierReplacementRow = {
 };
 
 type AppSupabaseClient = Awaited<ReturnType<typeof requireAppUserWithClient>>["supabase"];
-type SupabaseOperationError = { code?: string; message?: string };
-
-function isMissingBarrierReplacementRpc(error: SupabaseOperationError): boolean {
-  return error.code === "PGRST202"
-    || error.message?.includes("Could not find the function public.replace_family_barriers") === true;
-}
-
 async function replaceFamilyBarriers(
   supabase: AppSupabaseClient,
   familyId: string,
   barriers: BarrierReplacementRow[],
-): Promise<SupabaseOperationError | null> {
-  const { error: rpcError } = await supabase.rpc("replace_family_barriers", {
+): Promise<{ code?: string; message?: string } | null> {
+  const { error } = await supabase.rpc("replace_family_barriers", {
     p_family_id: familyId,
     p_barriers: barriers,
   });
-  if (!rpcError) return null;
-  if (!isMissingBarrierReplacementRpc(rpcError)) return rpcError;
-
-  // ponytail: compatibility path for projects missing the atomic RPC migration;
-  // remove after every deployed database includes 20260802143000.
-  const { data: currentRows, error: readError } = await supabase
-    .from("family_barriers")
-    .select("id")
-    .eq("family_id", familyId);
-  if (readError) return readError;
-
-  let insertedIds: string[] = [];
-  if (barriers.length > 0) {
-    const { data: insertedRows, error: insertError } = await supabase
-      .from("family_barriers")
-      .insert(barriers.map((barrier) => ({ ...barrier, family_id: familyId })))
-      .select("id");
-    if (insertError) return insertError;
-    insertedIds = (insertedRows ?? []).map((row) => row.id as string);
-  }
-
-  const previousIds = (currentRows ?? []).map((row) => row.id as string);
-  if (previousIds.length === 0) return null;
-
-  const { error: deleteError } = await supabase
-    .from("family_barriers")
-    .delete()
-    .eq("family_id", familyId)
-    .in("id", previousIds);
-  if (!deleteError) return null;
-
-  if (insertedIds.length > 0) {
-    const { error: rollbackError } = await supabase
-      .from("family_barriers")
-      .delete()
-      .eq("family_id", familyId)
-      .in("id", insertedIds);
-    if (rollbackError) {
-      console.error("[barrier-workflow] barrier replacement rollback failed", rollbackError);
-    }
-  }
-  return deleteError;
+  return error;
 }
 
 function mapFamilyToWorkflowResult(
@@ -234,208 +199,29 @@ function mapFamilyToWorkflowResult(
   };
 }
 
-async function upsertBarrierPlanRecord(
-  userId: string,
-  referenceId: string,
-  familyId: string,
-  selectedBarriers: string[],
-  additionalDetails: string,
-  sections: BarrierWorkflowPlanSection[],
-  resources: BarrierWorkflowResource[],
-  supabase: Awaited<ReturnType<typeof requireAppUserWithClient>>["supabase"],
-): Promise<string | null> {
-  const now = new Date().toISOString();
-  const payload = {
-    owner_user_id: userId,
-    reference_id: referenceId,
-    family_id: familyId,
-    selected_barriers: selectedBarriers,
-    additional_details: additionalDetails || null,
-    generated_plan_json: sections,
-    matched_resources_json: resources,
-    status: "active",
-    updated_at: now,
-  };
-  const { data, error } = await supabase
-    .from("barrier_plan_records")
-    .upsert(payload, { onConflict: "owner_user_id,reference_id" })
-    .select("updated_at")
-    .maybeSingle();
-  if (error) throw new Error(publicMessageFromSupabaseError(error, "Could not save plan data."));
-  return (data?.updated_at as string | undefined) ?? now;
-}
-
-export async function generateBarrierWorkflowAction(
-  input: BarrierWorkflowInput,
-): Promise<
-  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean }
-  | { ok: false; error: string }
-> {
-  const referenceId = input.referenceId?.trim() ?? "";
-  const selected = Array.from(new Set((input.selectedBarriers ?? []).map((s) => s.trim()).filter(Boolean)));
-  const additionalBarriers = input.additionalBarriers?.trim() ?? "";
-  const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
-  const details = input.additionalDetails?.trim() ?? "";
-  if (referenceId.length > 200) {
-    return { ok: false, error: "Family/Case ID is too long (max 200 characters)." };
-  }
-  if (additionalBarriers.length > 2000) {
-    return { ok: false, error: "Additional barriers text is too long (max 2000 characters)." };
-  }
-  if (details.length > 8000) {
-    return { ok: false, error: "Additional details are too long (max 8000 characters)." };
-  }
-  if (selected.length > 40) {
-    return { ok: false, error: "Too many barrier selections." };
-  }
-  if (!referenceId) {
-    return { ok: false, error: "Enter a Family/Case ID to save and track this plan." };
-  }
-  if (selected.length === 0 && parsedAdditionalBarriers.length === 0 && !details) {
-    return {
-      ok: false,
-      error: "Select at least one barrier or add supporting details below.",
-    };
-  }
-  const privacy = validateNoPii([
-    { field: "referenceId", label: "Family label", value: referenceId, mode: "label" },
-    { field: "additionalDetails", label: "Short description", value: details },
-    ...parsedAdditionalBarriers.map((barrier, index) => ({
-      field: `additionalBarriers.${index}`,
-      label: "Barrier",
-      value: barrier,
-    })),
-  ]);
-  if (!privacy.ok) {
-    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
-  }
-
-  try {
-    const { supabase, user } = await requireAppUserWithClient();
-    const { data: existingRecord } = await supabase
-      .from("barrier_plan_records")
-      .select("family_id")
-      .eq("owner_user_id", user.id)
-      .eq("reference_id", referenceId)
-      .maybeSingle();
-
-    let familyId: string;
-    if (existingRecord?.family_id) {
-      familyId = existingRecord.family_id as string;
-    } else {
-      const { data: familyIdRaw, error: familyErr } = await supabase.rpc("create_family_intake_row", {
-        p_name: referenceId,
-        p_summary: details || null,
-        p_urgency: "medium",
-        p_household_notes: details || null,
-        p_status: "active",
-      });
-      if (familyErr || !familyIdRaw) {
-        return {
-          ok: false,
-          error: publicMessageFromSupabaseError(familyErr, "Could not create workflow session."),
-        };
-      }
-      familyId = String(familyIdRaw);
-    }
-
-    const barrierRows = selected.map((label, idx) => ({
-      family_id: familyId,
-      preset_key: BARRIER_KEY_BY_LABEL[label as BarrierPresetLabel] ?? null,
-      label,
-      sort_order: idx,
-    }));
-    for (const barrier of parsedAdditionalBarriers) {
-      barrierRows.push({
-        family_id: familyId,
-        preset_key: "other",
-        label: barrier.length > 200 ? `${barrier.slice(0, 197)}...` : barrier,
-        sort_order: barrierRows.length,
-      });
-    }
-    const replacementRows = barrierRows.map((barrier) => ({
-      preset_key: barrier.preset_key,
-      label: barrier.label,
-      sort_order: barrier.sort_order,
-    }));
-    const barrierErr = await replaceFamilyBarriers(supabase, familyId, replacementRows);
-    if (barrierErr) {
-      return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
-    }
-
-    const matchRes = await runResourceMatching({ familyId });
-    if (!matchRes.ok) {
-      console.warn("[barrier-workflow] resource matching skipped", matchRes.error);
-    }
-
-    const planRes = await startStagedLeanPlanGeneration({
-      familyId,
-      regenerationFeedback:
-        [parsedAdditionalBarriers.join("; "), details].filter(Boolean).join("\n") || undefined,
-      aiMode: input.aiMode,
-    });
-    if (!planRes.ok) return { ok: false, error: planRes.error };
-
-    const detail = await getFamilyDetail(supabase, familyId);
-    if (!detail) return { ok: false, error: "Could not load generated workflow." };
-
-    const mapped = mapFamilyToWorkflowResult(
-      referenceId,
-      familyId,
-      selected,
-      additionalBarriers,
-      details,
-      null,
-      detail,
-      matchRes.ok ? undefined : "unavailable",
-      matchRes.ok ? null : matchRes.error,
-    );
-    const savedAt = await upsertBarrierPlanRecord(
-      user.id,
-      referenceId,
-      familyId,
-      mapped.selectedBarriers,
-      mapped.additionalDetails,
-      mapped.sections,
-      mapped.resources,
-      supabase,
-    );
-
-    revalidatePath("/families");
-    revalidatePath("/calendar");
-    return {
-      ok: true,
-      result: { ...mapped, lastSavedAt: savedAt },
-      stagedPolling: true,
-    };
-  } catch (error) {
-    console.error("[barrier-workflow] generateBarrierWorkflowAction failed", error);
-    return { ok: false, error: toClientError(error) };
-  }
-}
-
 export async function toggleBarrierWorkflowActionItemAction(
   familyId: string,
   actionItemId: string,
   completed: boolean,
   expectedUpdatedAt?: string,
 ): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
+  const parsed = z.object({
+    familyId: familyIdSchema,
+    actionItemId: z.string().uuid(),
+    completed: z.boolean(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
+  }).safeParse({ familyId, actionItemId, completed, expectedUpdatedAt });
+  if (!parsed.success) return { ok: false, error: "Invalid action-item update." };
   const update = await updatePlanStepActionItem({
-    familyId,
-    actionItemId,
-    status: completed ? "completed" : "pending",
-    expectedUpdatedAt,
+    familyId: parsed.data.familyId,
+    actionItemId: parsed.data.actionItemId,
+    status: parsed.data.completed ? "completed" : "pending",
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
   });
   if (!update.ok) return { ok: false, error: update.error };
 
   try {
-    const { supabase, user } = await requireAppUserWithClient();
-    const { data: record } = await supabase
-      .from("barrier_plan_records")
-      .select("reference_id")
-      .eq("owner_user_id", user.id)
-      .eq("family_id", familyId)
-      .maybeSingle();
+    const { supabase } = await requireAppUserWithClient();
     const detail = await getFamilyDetail(supabase, familyId);
     if (!detail) return { ok: false, error: "Workflow session not found." };
 
@@ -447,7 +233,7 @@ export async function toggleBarrierWorkflowActionItemAction(
       .map((b) => b.label)
       .join("; ");
     const details = detail.summary ?? detail.household_notes ?? "";
-    const referenceId = (record?.reference_id as string | undefined) ?? familyId;
+    const referenceId = detail.name;
     const mapped = mapFamilyToWorkflowResult(
       referenceId,
       familyId,
@@ -457,119 +243,41 @@ export async function toggleBarrierWorkflowActionItemAction(
       null,
       detail,
     );
-    const savedAt = await upsertBarrierPlanRecord(
-      user.id,
-      referenceId,
-      familyId,
-      mapped.selectedBarriers,
-      mapped.additionalDetails,
-      mapped.sections,
-      mapped.resources,
-      supabase,
-    );
-
     revalidatePath("/families");
-    revalidatePath("/calendar");
     return {
       ok: true,
-      result: { ...mapped, lastSavedAt: savedAt },
+      result: mapped,
     };
   } catch (error) {
-    console.error("[barrier-workflow] toggleBarrierWorkflowActionItemAction failed", error);
-    return { ok: false, error: toClientError(error) };
-  }
-}
-
-export async function loadBarrierWorkflowByReferenceAction(
-  referenceId: string,
-): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
-  const ref = referenceId.trim();
-  if (!ref) return { ok: false, error: "Enter a Family/Case ID." };
-  try {
-    const { supabase, user } = await requireAppUserWithClient();
-    const { data: record, error } = await supabase
-      .from("barrier_plan_records")
-      .select("family_id, selected_barriers, additional_details, updated_at")
-      .eq("owner_user_id", user.id)
-      .eq("reference_id", ref)
-      .maybeSingle();
-    if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
-    if (!record?.family_id) return { ok: false, error: "No saved plan for this ID yet." };
-
-    const detail = await getFamilyDetail(supabase, record.family_id as string);
-    if (!detail) return { ok: false, error: "Saved plan record could not be loaded." };
-
-    const selected = Array.isArray(record.selected_barriers)
-      ? (record.selected_barriers as string[])
-      : detail.barriers.filter((b) => b.preset_key !== "other").map((b) => b.label);
-    const additionalBarriers = detail.barriers
-      .filter((b) => b.preset_key === "other")
-      .map((b) => b.label)
-      .join("; ");
-    const details =
-      (record.additional_details as string | null | undefined) ??
-      detail.summary ??
-      detail.household_notes ??
-      "";
-
-    return {
-      ok: true,
-      result: mapFamilyToWorkflowResult(
-        ref,
-        record.family_id as string,
-        selected,
-        additionalBarriers,
-        details,
-        (record.updated_at as string | null | undefined) ?? null,
-        detail,
-      ),
-    };
-  } catch (error) {
-    console.error("[barrier-workflow] loadBarrierWorkflowByReferenceAction failed", error);
-    return { ok: false, error: toClientError(error) };
-  }
-}
-
-export async function listRecentBarrierPlanRecordsAction(
-  limit = 8,
-): Promise<{ ok: true; records: BarrierWorkflowRecentRecord[] } | { ok: false; error: string }> {
-  try {
-    const { supabase, user } = await requireAppUserWithClient();
-    const { data, error } = await supabase
-      .from("barrier_plan_records")
-      .select("reference_id, family_id, updated_at")
-      .eq("owner_user_id", user.id)
-      .order("updated_at", { ascending: false })
-      .limit(Math.max(1, Math.min(limit, 20)));
-    if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
-    const records = (data ?? []).map((r) => ({
-      referenceId: r.reference_id as string,
-      familyId: r.family_id as string,
-      updatedAt: r.updated_at as string,
-    }));
-    return { ok: true, records };
-  } catch (error) {
-    console.error("[barrier-workflow] listRecentBarrierPlanRecordsAction failed", error);
     return { ok: false, error: toClientError(error) };
   }
 }
 
 export async function generateBarrierWorkflowForFamilyAction(
   familyId: string,
-  input: Omit<BarrierWorkflowInput, "referenceId">,
+  input: unknown,
 ): Promise<
   | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean }
   | { ok: false; error: string }
 > {
-  const selected = Array.from(new Set((input.selectedBarriers ?? []).map((s) => s.trim()).filter(Boolean)));
-  const additionalBarriers = input.additionalBarriers?.trim() ?? "";
+  const parsed = z.object({
+    familyId: familyIdSchema,
+    input: familyWorkflowInputSchema,
+  }).safeParse({ familyId, input });
+  if (!parsed.success) return { ok: false, error: "Check the selected barriers and description." };
+  familyId = parsed.data.familyId;
+  const selected = Array.from(new Set(parsed.data.input.selectedBarriers.map((s) => s.trim()).filter(Boolean)));
+  const additionalBarriers = parsed.data.input.additionalBarriers?.trim() ?? "";
   const parsedAdditionalBarriers = parseAdditionalBarriers(additionalBarriers);
-  const details = input.additionalDetails?.trim() ?? "";
-  if (selected.length === 0 && parsedAdditionalBarriers.length === 0 && !details) {
+  const details = parsed.data.input.additionalDetails?.trim() ?? "";
+  if (selected.length + parsedAdditionalBarriers.length === 0) {
     return {
       ok: false,
-      error: "Select at least one barrier or add supporting details below.",
+      error: "Select at least one barrier.",
     };
+  }
+  if (selected.length + parsedAdditionalBarriers.length > 20) {
+    return { ok: false, error: "Choose no more than 20 barriers." };
   }
   const privacy = validateNoPii([
     { field: "additionalDetails", label: "Short description", value: details },
@@ -583,7 +291,7 @@ export async function generateBarrierWorkflowForFamilyAction(
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
   try {
-    const { supabase, user } = await requireAppUserWithClient();
+    const { supabase } = await requireAppUserWithClient();
     const { data: fam } = await supabase
       .from("families")
       .select("id, name")
@@ -624,7 +332,7 @@ export async function generateBarrierWorkflowForFamilyAction(
     // matching outage is explicit in the UI but never blocks the core plan.
     const matchRes = await runResourceMatching({ familyId });
     if (!matchRes.ok) {
-      console.warn("[barrier-workflow] resource matching skipped", matchRes.error);
+      logServerError("barrier-workflow:resource-matching", new Error(matchRes.error));
     }
 
     const planRes = await startStagedLeanPlanGeneration({
@@ -633,7 +341,7 @@ export async function generateBarrierWorkflowForFamilyAction(
         [selected.join("; "), parsedAdditionalBarriers.join("; "), details]
           .filter(Boolean)
           .join("\n") || undefined,
-      aiMode: input.aiMode,
+      aiMode: parsed.data.input.aiMode,
     });
     if (!planRes.ok) {
       revalidatePath(`/families/${familyId}`);
@@ -657,21 +365,10 @@ export async function generateBarrierWorkflowForFamilyAction(
       matchRes.ok ? undefined : "unavailable",
       matchRes.ok ? null : matchRes.error,
     );
-    const savedAt = await upsertBarrierPlanRecord(
-      user.id,
-      familyId,
-      familyId,
-      mapped.selectedBarriers,
-      mapped.additionalDetails,
-      mapped.sections,
-      mapped.resources,
-      supabase,
-    );
     revalidatePath(`/families/${familyId}`);
     revalidatePath("/families");
-    return { ok: true, result: { ...mapped, lastSavedAt: savedAt }, stagedPolling: true };
+    return { ok: true, result: mapped, stagedPolling: true };
   } catch (error) {
-    console.error("[barrier-workflow] generateBarrierWorkflowForFamilyAction failed", error);
     return { ok: false, error: toClientError(error) };
   }
 }
@@ -679,24 +376,21 @@ export async function generateBarrierWorkflowForFamilyAction(
 export async function loadBarrierWorkflowForFamilyAction(
   familyId: string,
 ): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
+  const parsed = familyIdSchema.safeParse(familyId);
+  if (!parsed.success) return { ok: false, error: "Invalid family." };
+  familyId = parsed.data;
   try {
-    const { supabase, user } = await requireAppUserWithClient();
+    const { supabase } = await requireAppUserWithClient();
     const detail = await getFamilyDetail(supabase, familyId);
     if (!detail) return { ok: false, error: "Family not found." };
-    const { data: record } = await supabase
-      .from("barrier_plan_records")
-      .select("updated_at, additional_details, selected_barriers")
-      .eq("owner_user_id", user.id)
-      .eq("family_id", familyId)
-      .maybeSingle();
-    const selected = Array.isArray(record?.selected_barriers)
-      ? (record?.selected_barriers as string[])
-      : detail.barriers.filter((b) => b.preset_key !== "other").map((b) => b.label);
+    const selected = detail.barriers
+      .filter((b) => b.preset_key !== "other")
+      .map((b) => b.label);
     const additionalBarriers = detail.barriers
       .filter((b) => b.preset_key === "other")
       .map((b) => b.label)
       .join("; ");
-    const details = (record?.additional_details as string | null | undefined) ?? detail.summary ?? "";
+    const details = detail.summary ?? "";
     return {
       ok: true,
       result: mapFamilyToWorkflowResult(
@@ -705,12 +399,11 @@ export async function loadBarrierWorkflowForFamilyAction(
         selected,
         additionalBarriers,
         details,
-        (record?.updated_at as string | null | undefined) ?? null,
+        null,
         detail,
       ),
     };
   } catch (error) {
-    console.error("[barrier-workflow] loadBarrierWorkflowForFamilyAction failed", error);
     return { ok: false, error: toClientError(error) };
   }
 }
