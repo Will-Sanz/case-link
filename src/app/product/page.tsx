@@ -3,7 +3,7 @@ import { PublicSiteShell } from "@/components/layout/public-site-shell";
 import { ProductPageContent } from "@/features/marketing/product-page-content";
 
 export const metadata: Metadata = {
-  title: "Product and about",
+  title: "Product",
   description: "See how CaseLink helps school case managers move from family context to a reviewed intervention plan and prepared fillable PDF.",
 };
 

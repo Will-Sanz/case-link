@@ -22,6 +22,35 @@ colors:
   error-ink: "#a32929"
   print-ink: "#000000"
   print-muted: "#333333"
+publicSite:
+  genre: "editorial-friendly ed-tech"
+  macrostructure:
+    marketing: "narrative workflow with custom illustration centerpiece and text-led process timeline"
+    content: "long document"
+    auth: "focused editorial entry"
+  colors:
+    paper: "#fbfaff"
+    paper-2: "#f4f0ff"
+    paper-3: "#ebe6fb"
+    surface: "#fffefe"
+    ink: "#102052"
+    body-ink: "#3f496d"
+    muted-ink: "#626b8b"
+    rule: "#ded8f4"
+    rule-strong: "#c8bee9"
+    accent: "#4932c6"
+    accent-hover: "#3823a7"
+    accent-ink: "#fffefe"
+    accent-soft: "#eeeaff"
+    focus: "#5c47da"
+  typography:
+    display: "Newsreader Variable, Georgia, serif"
+    displayWeight: 560
+    body: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
+  motion:
+    easeOut: "cubic-bezier(0.16, 1, 0.3, 1)"
+    hero: "copy rise plus visual rise; no repeated section reveals"
+    reducedMotion: "no reveal animation"
 typography:
   display:
     fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
@@ -145,13 +174,30 @@ components:
 
 # Design System: CaseLink
 
+## Public Site Variant: The Guided Table
+
+The public site uses the approved friendly ed-tech direction: deep navy editorial typography, pale lavender paper fields, one restrained violet action color, and an original illustration of a case manager working with a family. It should feel like a trusted school publication made operational—humane, civic, composed, and never juvenile.
+
+- **Genre:** Editorial-friendly ed-tech
+- **Marketing macrostructure:** Narrative workflow, with a custom illustration centerpiece on the homepage, a text-led process timeline, and the product review experience used as the product-page opening
+- **Content macrostructure:** Long document with a bookish heading voice and restrained measure
+- **Auth macrostructure:** Focused editorial entry surface
+- **Display:** Self-hosted Newsreader Variable at weight 560, normal style
+- **Body:** Geist Sans
+- **CTA voice:** Compact violet rectangles with a quiet lift; secondary actions remain typographic
+- **Icon language:** No decorative storytelling icons. Use text and connective rules for process narratives; reserve Lucide line icons for functional controls, product-state demonstrations, and the link-shaped public brand mark.
+- **Imagery:** Original, softly painted editorial scenes with natural proportions, muted ochre/coral/sage support colors, and no text embedded in the art; real team photography stays documentary and minimally framed
+- **Motion:** One hero reveal using the system ease-out curve; reduced-motion users receive the fully visible state without animation
+
+The public palette is scoped under `.public-site` and `.public-auth`; it does not change the authenticated workspace palette while product work is underway. Marketing, legal, and auth pages share the public wordmark, type pairing, action color, focus treatment, and section-heading rhythm.
+
 ## Overview
 
 **Creative North Star: "The Calm Handoff"**
 
-CaseLink should feel like a well-prepared folder passed between trusted colleagues: ordered, legible, and ready for the next responsible action. The interface uses warm paper fields, crisp white working surfaces, quiet green structure, and concise language so a school case manager can move from family intake to reviewed plan to paperwork without needing software expertise.
+CaseLink should feel like a well-prepared folder passed between trusted colleagues: ordered, legible, and ready for the next responsible action. The authenticated interface uses warm paper fields, crisp white working surfaces, quiet green structure, and concise language so a school case manager can move from family intake to reviewed plan to paperwork without needing software expertise. The public site uses the separate, explicitly scoped Guided Table variant above.
 
-Polish comes from proportion, steady alignment, and visible review boundaries—not visual spectacle. Public surfaces are spacious and reassuring; the authenticated workspace is denser and more operational. Both share the same restrained green palette, Geist Sans, gently curved geometry, and explicit human-control cues.
+Polish comes from proportion, steady alignment, and visible review boundaries—not visual spectacle. Public surfaces are spacious and editorial; the authenticated workspace is denser and more operational. Both share Geist Sans for body copy, gently curved geometry, and explicit human-control cues, while their scoped display and color systems remain distinct.
 
 **Key Characteristics:**
 
@@ -162,7 +208,7 @@ Polish comes from proportion, steady alignment, and visible review boundaries—
 - Clear provenance, review state, and manual handoff language
 - Motion that confirms interaction without turning AI into spectacle
 
-## Colors
+## Authenticated Workspace Colors
 
 The palette moves from Forest Action Green through Soft Leaf, supported by paper whites and green-gray inks; amber and red appear only for states that require attention.
 
@@ -193,20 +239,22 @@ The palette moves from Forest Action Green through Soft Leaf, supported by paper
 
 ### Named Rules
 
-**The Verdant Restraint Rule.** Forest Action Green marks the next action, current location, or a purposeful public emphasis; it does not flood routine working surfaces.
+**The Verdant Restraint Rule.** Inside the authenticated workspace, Forest Action Green marks the next action, current location, or purposeful emphasis; it does not flood routine working surfaces.
 
 **The Written State Rule.** Review, success, and error colors always travel with plain-language labels or icons; color is never the only signal.
 
 ## Typography
 
-**Display Font:** Geist Sans (with `ui-sans-serif`, `system-ui`, `sans-serif` fallbacks)
+**Public Display Font:** Newsreader Variable (self-hosted, with `Georgia`, `serif` fallbacks)
+**Authenticated Display Font:** Geist Sans (with `ui-sans-serif`, `system-ui`, `sans-serif` fallbacks)
 **Body Font:** Geist Sans (with `ui-sans-serif`, `system-ui`, `sans-serif` fallbacks)
 
-**Character:** Geist Sans keeps the product contemporary without feeling technical. Tight, confident display tracking gives the public site authority; compact body and label styles keep daily casework readable and efficient.
+**Character:** Newsreader gives the public site the civic, bookish authority of a considered school publication. Geist Sans keeps body copy and the product contemporary without feeling technical; compact body and label styles keep daily casework readable and efficient.
 
 ### Hierarchy
 
-- **Display** (600, `clamp(2.8rem, 6vw, 5.65rem)`, 0.98): Public hero statements only; keep copy short enough to preserve the broad, editorial silhouette.
+- **Public Display** (560, `clamp(3rem, 6vw, 6rem)`, 0.93–0.98): Public hero and major section statements only; keep copy short enough to preserve the broad, editorial silhouette.
+- **Authenticated Display** (600, `clamp(2.8rem, 6vw, 5.65rem)`, 0.98): Product welcome and high-emphasis empty states only.
 - **Headline** (600, `3rem`, 1.25): Major public section statements at wide breakpoints; step down to `1.875rem` on small screens.
 - **Title** (600, `1.5rem`, 1.25): Workspace page titles, family names, and form completion states.
 - **Body** (400, `0.875rem`, 1.6): Default workspace copy; public explanatory copy may step up to `1rem`, `1.125rem`, or `1.25rem` with relaxed leading.
@@ -299,7 +347,7 @@ Paperwork review is the signature expression of The Calm Handoff. Each field row
 
 ### Don't:
 
-- **Don't** reintroduce blue or slate as a competing primary visual system; migrate remaining legacy primitives into the green palette when touched.
+- **Don't** reintroduce blue or slate as a competing primary visual system inside the authenticated workspace. The public site's scoped navy/violet system is the approved exception.
 - **Don't** use gradients, decorative AI glow, or excessive floating cards to imply sophistication.
 - **Don't** turn the Families workspace into an analytics dashboard or add charts without a decision-making need.
 - **Don't** imply direct integration with required school software, automatic submission, or AI authority over case-manager judgment.

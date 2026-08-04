@@ -1,0 +1,99 @@
+.shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--public-paper-2);
+  color: var(--public-ink);
+}
+
+.content {
+  position: relative;
+}
+
+.card {
+  border: 1px solid var(--public-rule);
+  border-radius: 1rem;
+  background: var(--public-surface);
+  box-shadow: var(--public-shadow-surface);
+}
+
+.shell h1 {
+  font-family: var(--public-font-display);
+  font-size: 1.75rem;
+  font-weight: 560;
+  letter-spacing: -0.025em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--public-ink);
+}
+
+.shell h2 {
+  color: var(--public-ink);
+}
+
+.shell :global(label) {
+  color: var(--public-ink-strong);
+}
+
+.shell :global(input) {
+  min-height: 2.875rem;
+  border-color: var(--public-rule-strong);
+  color: var(--public-ink);
+  font-size: 1rem;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+}
+
+.shell :global(input::placeholder) {
+  color: var(--public-placeholder);
+}
+
+.shell :global(input:focus) {
+  border-color: var(--public-focus);
+  box-shadow: none;
+  outline-color: var(--public-focus);
+}
+
+.shell :global(button[type="submit"]) {
+  min-height: 2.875rem;
+  background: var(--public-accent);
+  color: var(--public-accent-ink);
+  box-shadow: var(--public-shadow-action);
+  transition-property: background-color;
+}
+
+.shell :global(button[type="submit"]:hover) {
+  background: var(--public-accent-hover);
+  box-shadow: var(--public-shadow-action);
+  transform: none;
+}
+
+.shell :global(button[type="submit"]:active) {
+  background: var(--public-accent);
+  transform: none;
+}
+
+.shell :global(button[type="submit"]:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.shell :global(button[type="submit"]:focus-visible) {
+  outline: 3px solid var(--public-focus);
+  outline-offset: 2px;
+}
+
+.shell :global(a),
+.shell :global(form button[type="button"]) {
+  color: var(--public-accent);
+}
+
+.shell :global(a:hover),
+.shell :global(form button[type="button"]:hover) {
+  color: var(--public-accent-hover);
+}
+
+.shell :global(a:focus-visible) {
+  outline: 3px solid var(--public-focus);
+  outline-offset: 2px;
+}
