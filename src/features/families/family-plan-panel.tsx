@@ -12,6 +12,7 @@ import {
   deletePlanStep,
   updatePlanStep,
   updatePlanStepActionItem,
+  type PlanEditConflict,
 } from "@/app/actions/plans";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
@@ -56,6 +57,145 @@ function formatTargetDate(value: string | null): string | null {
     day: "numeric",
     year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
   }).format(parsed);
+}
+
+function workflowStatusLabel(value: string | null | undefined): string {
+  if (!value) return "Not set";
+  if (value === "in_progress") return "Started";
+  if (value === "blocked") return "Waiting";
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function ownerDisplay(value: PlanStepDetails["owner"]): string {
+  if (value === "family") return "Family";
+  if (value === "school_program") return "School / program";
+  if (value === "shared") return "Shared";
+  return "Case manager";
+}
+
+type ConflictComparisonRow = { label: string; mine: string; latest: string };
+
+function listDisplay(values: string[] | undefined): string {
+  return (values ?? []).map((value) => value.trim()).filter(Boolean).join("; ") || "Not set";
+}
+
+function contactDisplay(details: PlanStepDetails): string {
+  return (
+    (details.contacts ?? [])
+      .map((contact) =>
+        [contact.name, contact.phone, contact.email, contact.notes]
+          .map((value) => value?.trim())
+          .filter(Boolean)
+          .join(" · "),
+      )
+      .filter(Boolean)
+      .join("; ") || "Not set"
+  );
+}
+
+function conflictComparisonRows(
+  conflict: PlanEditConflict,
+  draft: PlanStepRow | null,
+): ConflictComparisonRow[] {
+  if (!draft) return [];
+
+  let rows: ConflictComparisonRow[];
+  if (conflict.kind === "step") {
+    const mineDetails = (draft.details ?? {}) as PlanStepDetails;
+    const latestDetails = conflict.current.details ?? {};
+    rows = [
+      { label: "Title", mine: draft.title, latest: conflict.current.title },
+      { label: "Summary", mine: draft.description, latest: conflict.current.description },
+      {
+        label: "Status",
+        mine: workflowStatusLabel(draft.status),
+        latest: workflowStatusLabel(conflict.current.status),
+      },
+      {
+        label: "Owner",
+        mine: ownerDisplay(mineDetails.owner),
+        latest: ownerDisplay(latestDetails.owner),
+      },
+      {
+        label: "Priority",
+        mine: workflowStatusLabel(draft.priority ?? mineDetails.priority),
+        latest: workflowStatusLabel(conflict.current.priority ?? latestDetails.priority),
+      },
+      {
+        label: "Goal",
+        mine: mineDetails.stage_goal?.trim() || "Not set",
+        latest: latestDetails.stage_goal?.trim() || "Not set",
+      },
+      {
+        label: "Next task",
+        mine: mineDetails.action_needed_now?.trim() || "Not set",
+        latest: latestDetails.action_needed_now?.trim() || "Not set",
+      },
+      {
+        label: "Expected result",
+        mine: mineDetails.expected_outcome?.trim() || "Not set",
+        latest: latestDetails.expected_outcome?.trim() || "Not set",
+      },
+      {
+        label: "Documents",
+        mine: listDisplay(mineDetails.required_documents ?? mineDetails.materials_needed),
+        latest: listDisplay(
+          latestDetails.required_documents ?? latestDetails.materials_needed,
+        ),
+      },
+      {
+        label: "Contact",
+        mine: contactDisplay(mineDetails),
+        latest: contactDisplay(latestDetails),
+      },
+      {
+        label: "Case notes",
+        mine: draft.workflow_data?.outcome_notes?.trim() || "Not set",
+        latest: conflict.current.workflow_data?.outcome_notes?.trim() || "Not set",
+      },
+      {
+        label: "Waiting reason",
+        mine: draft.workflow_data?.blocker_reason?.trim() || "Not set",
+        latest: conflict.current.workflow_data?.blocker_reason?.trim() || "Not set",
+      },
+    ];
+  } else {
+    const mine = (draft.action_items ?? []).find((action) => action.id === conflict.entityId);
+    if (!mine) return [];
+    rows = [
+      { label: "Action", mine: mine.title, latest: conflict.current.title },
+      {
+        label: "Target date",
+        mine: formatTargetDate(mine.target_date) ?? "Not set",
+        latest: formatTargetDate(conflict.current.target_date) ?? "Not set",
+      },
+      {
+        label: "Status",
+        mine: workflowStatusLabel(mine.status),
+        latest: workflowStatusLabel(conflict.current.status),
+      },
+      {
+        label: "Outcome",
+        mine: mine.outcome?.trim() || "Not set",
+        latest: conflict.current.outcome?.trim() || "Not set",
+      },
+      {
+        label: "Notes",
+        mine: actionUserNotes(mine.notes).trim() || "Not set",
+        latest: actionUserNotes(conflict.current.notes).trim() || "Not set",
+      },
+      {
+        label: "Follow-up",
+        mine: formatTargetDate(mine.follow_up_date) ?? "Not set",
+        latest: formatTargetDate(conflict.current.follow_up_date) ?? "Not set",
+      },
+    ];
+  }
+
+  return rows.filter((row) => row.mine !== row.latest);
 }
 
 function normalizeChecklistForSave(lines: string[] | undefined): string[] {
@@ -171,6 +311,8 @@ export function FamilyPlanPanel({
   const draftRecoveryLoadedPlanIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [editConflict, setEditConflict] = useState<PlanEditConflict | null>(null);
+  const [conflictResolution, setConflictResolution] = useState<"keep_draft" | null>(null);
   const [addStepGoal, setAddStepGoal] = useState("");
   const [addStepTitle, setAddStepTitle] = useState("");
   const [addStepTargetDate, setAddStepTargetDate] = useState(() => dateInputValueAfterDays(7));
@@ -232,6 +374,11 @@ export function FamilyPlanPanel({
     return stepNeedsPersist(orig, stepDraft);
   }, [editingStepId, stepDraft, plan]);
 
+  const editConflictRows = useMemo(
+    () => (editConflict ? conflictComparisonRows(editConflict, stepDraft) : []),
+    [editConflict, stepDraft],
+  );
+
   const actionDraftStorageKey = plan ? localActionDraftKey(plan.id) : null;
 
   useEffect(() => {
@@ -250,6 +397,22 @@ export function FamilyPlanPanel({
     }
     setRecoverableDraft(stored);
   }, [actionDraftStorageKey, plan]);
+
+  useEffect(() => {
+    if (conflictResolution !== "keep_draft" || !editConflict || !plan) return;
+    const latestTimestamp =
+      editConflict.kind === "step"
+        ? plan.steps.find((step) => step.id === editConflict.entityId)?.updated_at
+        : plan.steps
+            .flatMap((step) => step.action_items ?? [])
+            .find((action) => action.id === editConflict.entityId)?.updated_at;
+    if (latestTimestamp !== editConflict.currentUpdatedAt) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resolve after refreshed server props confirm the latest version is loaded
+    setEditConflict(null);
+    setConflictResolution(null);
+    setSuccess("The latest version is loaded and your draft is still open. Review it, then save again.");
+  }, [conflictResolution, editConflict, plan]);
 
   useEffect(() => {
     if (!actionDraftStorageKey || !stepDirty || !stepDraft || !plan) return;
@@ -344,6 +507,8 @@ export function FamilyPlanPanel({
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
+    setEditConflict(null);
+    setConflictResolution(null);
     setError(null);
     setSuccess(null);
     return true;
@@ -372,7 +537,30 @@ export function FamilyPlanPanel({
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
+    setEditConflict(null);
+    setConflictResolution(null);
     setError(null);
+  }
+
+  function keepConflictDraft() {
+    if (!editConflict || conflictResolution) return;
+    setConflictResolution("keep_draft");
+    setError(null);
+    router.refresh();
+  }
+
+  function useLatestConflictVersion() {
+    clearLocalActionDraft();
+    setEditingStepId(null);
+    setStepDraft(null);
+    setAiStepId(null);
+    setAiPreview(null);
+    setAiInstruction("");
+    setEditConflict(null);
+    setConflictResolution(null);
+    setError(null);
+    setSuccess("Latest saved version loaded. Your older draft was not applied.");
+    router.refresh();
   }
 
   function patchEditingStep(patch: Partial<PlanStepRow>) {
@@ -455,6 +643,12 @@ export function FamilyPlanPanel({
         workflow_data: wd,
       });
       if (!stepRes.ok) {
+        if (stepRes.conflict) {
+          setEditConflict(stepRes.conflict);
+          setConflictResolution(null);
+          setError(null);
+          return false;
+        }
         setError(stepRes.error);
         return false;
       }
@@ -487,6 +681,12 @@ export function FamilyPlanPanel({
         follow_up_date: ai.follow_up_date,
       });
       if (!ar.ok) {
+        if (ar.conflict) {
+          setEditConflict(ar.conflict);
+          setConflictResolution(null);
+          setError(null);
+          return false;
+        }
         setError(ar.error);
         return false;
       }
@@ -529,6 +729,8 @@ export function FamilyPlanPanel({
         const ok = await persistOneStep(orig, stepDraft);
         if (!ok) return;
         setSuccess("Action saved.");
+        setEditConflict(null);
+        setConflictResolution(null);
         clearLocalActionDraft();
         setEditingStepId(null);
         setStepDraft(null);
@@ -1034,10 +1236,86 @@ export function FamilyPlanPanel({
       </div>
 
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+      {editConflict ? (
+        <section
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 sm:p-5"
+          role="alert"
+          aria-labelledby="edit-conflict-heading"
+        >
+          <h2 id="edit-conflict-heading" className="text-base font-semibold text-amber-950">
+            Another tab saved this action
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-amber-900">
+            Nothing was overwritten. Compare your open draft with the latest saved version, then
+            choose which one you want to continue with.
+          </p>
+
+          {editConflictRows.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              {editConflictRows.map((row) => (
+                <div
+                  key={row.label}
+                  className="grid gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:grid-cols-2"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 sm:col-span-2">
+                    {row.label}
+                  </p>
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500">Your draft</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-900">
+                      {row.mine}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500">Latest saved</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-900">
+                      {row.latest}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-amber-900">
+              The saved record changed outside the fields shown in this card.
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={keepConflictDraft}
+              disabled={conflictResolution === "keep_draft"}
+            >
+              {conflictResolution === "keep_draft" ? "Loading latest…" : "Keep my draft"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={useLatestConflictVersion}
+              disabled={conflictResolution === "keep_draft"}
+            >
+              Use latest version
+            </Button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-amber-800">
+            Keeping your draft loads the latest version underneath it. Review once more, then select
+            Save edits to apply your choice.
+          </p>
+        </section>
       ) : null}
       {success ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          role="status"
+        >
           {success}
         </p>
       ) : null}

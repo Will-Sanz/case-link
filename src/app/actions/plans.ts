@@ -38,7 +38,12 @@ import {
   type PrivacyFieldInput,
 } from "@/lib/privacy/no-pii";
 import { getFamilyDetail } from "@/lib/services/families";
-import type { PlanGenerationState, PlanStepDetails } from "@/types/family";
+import type {
+  PlanGenerationState,
+  PlanStepActionItemRow,
+  PlanStepDetails,
+  PlanStepRow,
+} from "@/types/family";
 import {
   refineStepWithOpenAI,
   type RefineStepResult,
@@ -59,6 +64,41 @@ import {
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+export type PlanEditConflict =
+  | {
+      kind: "step";
+      entityId: string;
+      currentUpdatedAt: string;
+      current: {
+        title: string;
+        description: string;
+        status: PlanStepRow["status"];
+        phase: PlanStepRow["phase"];
+        priority: PlanStepRow["priority"];
+        details: PlanStepDetails | null;
+        workflow_data: PlanStepRow["workflow_data"];
+      };
+    }
+  | {
+      kind: "action_item";
+      entityId: string;
+      currentUpdatedAt: string;
+      current: {
+        title: string;
+        description: string | null;
+        week_index: number;
+        target_date: string | null;
+        status: PlanStepActionItemRow["status"];
+        outcome: string | null;
+        notes: string | null;
+        follow_up_date: string | null;
+      };
+    };
+
+export type PlanEditActionResult =
+  | { ok: true; updatedAt?: string }
+  | { ok: false; error: string; conflict?: PlanEditConflict };
 
 function noPiiError(fields: PrivacyFieldInput[]): string | null {
   const result = validateNoPii(fields);
@@ -1295,7 +1335,7 @@ export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
 
 export async function updatePlanStep(
   input: unknown,
-): Promise<ActionResult> {
+): Promise<PlanEditActionResult> {
   const parsed = updatePlanStepSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
@@ -1347,7 +1387,7 @@ export async function updatePlanStep(
   if (expectedUpdatedAt) {
     const { data: currentStep } = await supabase
       .from("plan_steps")
-      .select("updated_at")
+      .select("title, description, status, phase, priority, details, workflow_data, updated_at")
       .eq("id", stepId)
       .eq("plan_id", planRow.id)
       .maybeSingle();
@@ -1356,7 +1396,21 @@ export async function updatePlanStep(
       return {
         ok: false,
         error:
-          "This action changed in another tab. Your edits are still here; reload to compare with the latest version.",
+          "This action changed in another tab. Compare both versions before choosing which one to keep.",
+        conflict: {
+          kind: "step",
+          entityId: stepId,
+          currentUpdatedAt: currentStep.updated_at,
+          current: {
+            title: currentStep.title,
+            description: currentStep.description,
+            status: currentStep.status,
+            phase: currentStep.phase,
+            priority: currentStep.priority,
+            details: currentStep.details as PlanStepDetails | null,
+            workflow_data: currentStep.workflow_data as PlanStepRow["workflow_data"],
+          },
+        },
       };
     }
   }
@@ -1391,13 +1445,40 @@ export async function updatePlanStep(
     .eq("id", stepId)
     .eq("plan_id", planRow.id);
   if (expectedUpdatedAt) updateQuery = updateQuery.eq("updated_at", expectedUpdatedAt);
-  const { data: updatedRows, error } = await updateQuery.select("id");
+  const { data: updatedRows, error } = await updateQuery.select("id, updated_at");
 
   if (error) {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
   if (!updatedRows?.length) {
-    return { ok: false, error: "Step not found or could not be updated." };
+    const { data: latestStep } = await supabase
+      .from("plan_steps")
+      .select("title, description, status, phase, priority, details, workflow_data, updated_at")
+      .eq("id", stepId)
+      .eq("plan_id", planRow.id)
+      .maybeSingle();
+    if (latestStep) {
+      return {
+        ok: false,
+        error:
+          "This action changed in another tab. Compare both versions before choosing which one to keep.",
+        conflict: {
+          kind: "step",
+          entityId: stepId,
+          currentUpdatedAt: latestStep.updated_at,
+          current: {
+            title: latestStep.title,
+            description: latestStep.description,
+            status: latestStep.status,
+            phase: latestStep.phase,
+            priority: latestStep.priority,
+            details: latestStep.details as PlanStepDetails | null,
+            workflow_data: latestStep.workflow_data as PlanStepRow["workflow_data"],
+          },
+        },
+      };
+    }
+    return { ok: false, error: "Action not found or could not be updated." };
   }
 
   await logCaseActivity(
@@ -1428,7 +1509,7 @@ export async function updatePlanStep(
   revalidatePath(`/families/${familyId}`);
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
-  return { ok: true };
+  return { ok: true, updatedAt: updatedRows[0]?.updated_at as string | undefined };
 }
 
 export async function createManualStep(input: unknown): Promise<ActionResult> {
@@ -1775,7 +1856,7 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
   return { ok: true };
 }
 
-export async function updatePlanStepActionItem(input: unknown): Promise<ActionResult> {
+export async function updatePlanStepActionItem(input: unknown): Promise<PlanEditActionResult> {
   const parsed = updatePlanStepActionItemSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Invalid request" };
@@ -1806,21 +1887,15 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
 
   const { data: ai } = await supabase
     .from("plan_step_action_items")
-    .select("plan_step_id, status, notes, follow_up_date, updated_at")
+    .select(
+      "plan_step_id, title, description, week_index, target_date, status, outcome, notes, follow_up_date, updated_at",
+    )
     .eq("id", actionItemId)
     .maybeSingle();
 
   if (!ai) {
     return { ok: false, error: "Action item not found" };
   }
-  if (expectedUpdatedAt && ai.updated_at !== expectedUpdatedAt) {
-    return {
-      ok: false,
-      error:
-        "This action changed in another tab. Your edits are still here; reload to compare with the latest version.",
-    };
-  }
-
   const { data: step } = await supabase
     .from("plan_steps")
     .select("plan_id")
@@ -1840,6 +1915,29 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
 
   if (!plan) {
     return { ok: false, error: "Action item not found" };
+  }
+
+  if (expectedUpdatedAt && ai.updated_at !== expectedUpdatedAt) {
+    return {
+      ok: false,
+      error:
+        "This action changed in another tab. Compare both versions before choosing which one to keep.",
+      conflict: {
+        kind: "action_item",
+        entityId: actionItemId,
+        currentUpdatedAt: ai.updated_at,
+        current: {
+          title: ai.title,
+          description: ai.description,
+          week_index: ai.week_index,
+          target_date: ai.target_date,
+          status: ai.status,
+          outcome: ai.outcome,
+          notes: ai.notes,
+          follow_up_date: ai.follow_up_date,
+        },
+      },
+    };
   }
 
   const nextStatus = status ?? ai.status;
@@ -1894,17 +1992,43 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   if (expectedUpdatedAt) {
     actionUpdateQuery = actionUpdateQuery.eq("updated_at", expectedUpdatedAt);
   }
-  const { data: updatedActionItems, error } = await actionUpdateQuery.select("id");
+  const { data: updatedActionItems, error } = await actionUpdateQuery.select("id, updated_at");
 
   if (error) {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
   if (!updatedActionItems?.length) {
-    return {
-      ok: false,
-      error:
-        "This action changed in another tab. Your edits are still here; reload to compare with the latest version.",
-    };
+    const { data: latestAction } = await supabase
+      .from("plan_step_action_items")
+      .select(
+        "title, description, week_index, target_date, status, outcome, notes, follow_up_date, updated_at",
+      )
+      .eq("id", actionItemId)
+      .eq("plan_step_id", ai.plan_step_id)
+      .maybeSingle();
+    if (latestAction) {
+      return {
+        ok: false,
+        error:
+          "This action changed in another tab. Compare both versions before choosing which one to keep.",
+        conflict: {
+          kind: "action_item",
+          entityId: actionItemId,
+          currentUpdatedAt: latestAction.updated_at,
+          current: {
+            title: latestAction.title,
+            description: latestAction.description,
+            week_index: latestAction.week_index,
+            target_date: latestAction.target_date,
+            status: latestAction.status,
+            outcome: latestAction.outcome,
+            notes: latestAction.notes,
+            follow_up_date: latestAction.follow_up_date,
+          },
+        },
+      };
+    }
+    return { ok: false, error: "Action item not found or could not be updated." };
   }
 
   await logCaseActivity(
@@ -1968,7 +2092,7 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
   revalidatePath(`/families/${familyId}`);
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
-  return { ok: true };
+  return { ok: true, updatedAt: updatedActionItems[0]?.updated_at as string | undefined };
 }
 
 /** AI revises a single step; returns proposed content without persisting. */
