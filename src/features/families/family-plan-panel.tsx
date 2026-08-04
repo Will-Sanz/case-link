@@ -167,6 +167,8 @@ export function FamilyPlanPanel({
   const [aiPending, setAiPending] = useState(false);
 
   const [planAiOpen, setPlanAiOpen] = useState(false);
+  const planAiDialogRef = useRef<HTMLDialogElement>(null);
+  const [planAiDiscardConfirm, setPlanAiDiscardConfirm] = useState(false);
   const [planAiInstruction, setPlanAiInstruction] = useState("");
   const [planAiPending, setPlanAiPending] = useState(false);
   const [planAiPreview, setPlanAiPreview] = useState<
@@ -621,6 +623,7 @@ export function FamilyPlanPanel({
     setPlanAiInstruction("");
     setPlanAiPreview(null);
     setPlanAiDraft(clonePlan(plan));
+    setPlanAiDiscardConfirm(false);
     setPlanAiOpen(true);
     setError(null);
   }
@@ -758,6 +761,7 @@ export function FamilyPlanPanel({
           if (!ok) return;
         }
         setSuccess("Plan updates saved.");
+        setPlanAiDiscardConfirm(false);
         setPlanAiOpen(false);
         setPlanAiPreview(null);
         setPlanAiInstruction("");
@@ -778,6 +782,29 @@ export function FamilyPlanPanel({
     }
     return false;
   }, [planAiDraft, plan]);
+
+  useEffect(() => {
+    if (!planAiOpen) return;
+    const dialog = planAiDialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, [planAiOpen]);
+
+  function closePlanAiRefine(force = false) {
+    if (planAiPending || planBulkSaving) return;
+    if (planAiDirty && !force) {
+      setPlanAiDiscardConfirm(true);
+      return;
+    }
+    setPlanAiDiscardConfirm(false);
+    setPlanAiOpen(false);
+    setPlanAiPreview(null);
+    setPlanAiInstruction("");
+    setPlanAiDraft(null);
+  }
 
   const planAiPreviewGoals = useMemo(() => {
     const titles = (planAiPreview?.steps ?? []).map(
@@ -1211,26 +1238,37 @@ export function FamilyPlanPanel({
       </div>
 
       {planAiOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+        <dialog
+          ref={planAiDialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="plan-ai-title"
+          aria-describedby="plan-ai-description"
+          className="m-auto max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-[1px]"
+          onCancel={(event) => {
+            event.preventDefault();
+            closePlanAiRefine();
+          }}
         >
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+          <div className="p-5">
             <h2 id="plan-ai-title" className="text-base font-semibold text-slate-900">
               Refine full plan with AI
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p id="plan-ai-description" className="mt-1 text-xs text-slate-500">
               Preview updates a working copy of this plan. After you apply a preview, use{" "}
               <strong>Save to plan</strong> to write only the steps that changed to the database.
             </p>
 
+            <label htmlFor="plan-ai-instruction" className="mt-4 block text-sm font-medium text-slate-800">
+              What should change?
+            </label>
             <Textarea
-              className="mt-3 min-h-[120px] border-slate-200"
+              id="plan-ai-instruction"
+              className="mt-2 min-h-[120px] border-slate-200"
               value={planAiInstruction}
               onChange={(e) => setPlanAiInstruction(e.target.value)}
               placeholder="e.g. Make the first actions more realistic for one case manager, keep the target dates, and preserve my manual edits."
+              autoFocus
             />
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1245,30 +1283,33 @@ export function FamilyPlanPanel({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  if (planAiDirty) {
-                    requestConfirmation({
-                      title: "Discard unsaved plan changes?",
-                      description: "You have unsaved changes in the working copy. Close and discard them?",
-                      confirmLabel: "Discard changes",
-                      onConfirm: () => {
-                        setPlanAiOpen(false);
-                        setPlanAiPreview(null);
-                        setPlanAiInstruction("");
-                        setPlanAiDraft(null);
-                      },
-                    });
-                    return;
-                  }
-                  setPlanAiOpen(false);
-                  setPlanAiPreview(null);
-                  setPlanAiInstruction("");
-                  setPlanAiDraft(null);
-                }}
+                onClick={() => closePlanAiRefine()}
               >
                 Close
               </Button>
             </div>
+
+            {planAiDiscardConfirm ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3" role="alert">
+                <p className="text-sm font-semibold text-amber-950">Discard unsaved changes?</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-900">
+                  The working copy differs from the saved plan.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setPlanAiDiscardConfirm(false)}
+                    autoFocus
+                  >
+                    Keep editing
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => closePlanAiRefine(true)}>
+                    Discard changes
+                  </Button>
+                </div>
+              </div>
+            ) : null}
 
             {planAiPreview ? (
               <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
@@ -1315,7 +1356,7 @@ export function FamilyPlanPanel({
               </div>
             ) : null}
           </div>
-        </div>
+        </dialog>
       ) : null}
       <ConfirmDialog
         open={confirmOpen}
