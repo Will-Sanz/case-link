@@ -16,6 +16,7 @@ import type {
   ResourceMatchRow,
 } from "@/types/family";
 import type { FamilyListQuery } from "@/lib/validations/family-list-query";
+import { selectNextFamilyWork } from "@/lib/domain/family-workspace/next-work";
 
 function escapeIlike(s: string): string {
   return s.replace(/[%_\\]/g, "\\$&");
@@ -90,11 +91,13 @@ export async function enrichFamiliesWithCurrentStep(
   if (items.length === 0) return [];
 
   const familyIds = items.map((f) => f.id);
-  const { data: plans } = await client
+  const { data: plans, error: plansError } = await client
     .from("plans")
     .select("id, family_id")
     .in("family_id", familyIds)
     .order("version", { ascending: false });
+
+  if (plansError) throw new Error(plansError.message);
 
   const latestPlanByFamily = new Map<string, string>();
   for (const p of plans ?? []) {
@@ -104,51 +107,57 @@ export async function enrichFamiliesWithCurrentStep(
   }
 
   const planIds = [...latestPlanByFamily.values()];
-  const { data: steps } = await client
+  if (planIds.length === 0) {
+    return items.map((item) => ({ ...item, current_step: null }));
+  }
+
+  const { data: steps, error: stepsError } = await client
     .from("plan_steps")
-    .select("id, plan_id, title, phase, status, workflow_data")
+    .select("id, plan_id, title, phase, status, due_date, sort_order, details, workflow_data")
     .in("plan_id", planIds)
     .order("sort_order", { ascending: true });
+
+  if (stepsError) throw new Error(stepsError.message);
+
+  const stepIds = (steps ?? []).map((step) => step.id);
+  const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
+  if (stepIds.length > 0) {
+    const { data: actionItems, error: actionItemsError } = await client
+      .from("plan_step_action_items")
+      .select("*")
+      .in("plan_step_id", stepIds)
+      .order("sort_order", { ascending: true });
+
+    if (actionItemsError) throw new Error(actionItemsError.message);
+
+    for (const actionItem of actionItems ?? []) {
+      const current = actionItemsByStep.get(actionItem.plan_step_id) ?? [];
+      current.push(actionItem as PlanStepActionItemRow);
+      actionItemsByStep.set(actionItem.plan_step_id, current);
+    }
+  }
 
   const familyIdByPlanId = new Map<string, string>();
   for (const p of plans ?? []) {
     familyIdByPlanId.set(p.id, p.family_id);
   }
 
-  const activeStepByFamily = new Map<
-    string,
-    { id: string; title: string; phase: string; status: string; workflow_data: unknown }
-  >();
+  const stepsByFamily = new Map<string, PlanStepRow[]>();
   for (const s of steps ?? []) {
     const fid = familyIdByPlanId.get(s.plan_id);
-    if (!fid || activeStepByFamily.has(fid)) continue;
-    if (["pending", "in_progress", "blocked"].includes(s.status)) {
-      activeStepByFamily.set(fid, s);
-    }
+    if (!fid) continue;
+    const current = stepsByFamily.get(fid) ?? [];
+    current.push({
+      ...s,
+      action_items: actionItemsByStep.get(s.id) ?? [],
+    } as PlanStepRow);
+    stepsByFamily.set(fid, current);
   }
 
   return items.map((item) => {
-    const step = activeStepByFamily.get(item.id);
-    if (!step) {
-      return { ...item, current_step: null };
-    }
-    const w = (step.workflow_data as { needs_escalation?: boolean }) ?? {};
-
-    const actionNeeded =
-      step.status === "blocked" ? `Blocked: ${step.title}` : step.title;
-
     return {
       ...item,
-      current_step: {
-        id: step.id,
-        title: step.title,
-        phase: step.phase,
-        status: step.status,
-        due_date: null,
-        action_needed_now: actionNeeded,
-        is_blocked: step.status === "blocked",
-        is_escalated: !!w.needs_escalation,
-      },
+      current_step: selectNextFamilyWork(stepsByFamily.get(item.id) ?? []),
     };
   });
 }

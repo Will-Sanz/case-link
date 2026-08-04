@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Plus, Search, UsersRound } from "lucide-react";
+import { ArrowRight, CalendarClock, Plus, Search, UsersRound } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { listFamilies } from "@/lib/services/families";
+import { enrichFamiliesWithCurrentStep, listFamilies } from "@/lib/services/families";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
 
 type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -15,10 +15,21 @@ export const metadata: Metadata = {
 
 const statusLabel = { active: "Active", on_hold: "On hold", closed: "Closed" } as const;
 
+function formatTargetDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(year, month - 1, day, 12));
+}
+
 export default async function FamiliesPage({ searchParams }: PageProps) {
   const parsed = parseFamilyListQuery(await searchParams);
   const supabase = await createSupabaseServerClient();
-  const { items, total } = await listFamilies(supabase, parsed);
+  const familyList = await listFamilies(supabase, parsed);
+  const items = await enrichFamiliesWithCurrentStep(supabase, familyList.items);
+  const { total } = familyList;
   const empty = total === 0 && !parsed.q.trim();
 
   return (
@@ -49,7 +60,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
           <div className="max-w-md">
             <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-white text-[#276221] shadow-[0_8px_24px_rgba(39,98,33,0.1)]"><UsersRound className="size-6" aria-hidden /></span>
             <h2 className="mt-6 text-2xl font-semibold tracking-[-0.025em] text-[#173a15]">Add your first family</h2>
-            <p className="mt-3 text-sm leading-6 text-[#5d705a]">Start with a simple family label, then add the goals and barriers needed to build the intervention plan.</p>
+            <p className="mt-3 text-sm leading-6 text-[#5d705a]">Start with a family label and the barriers you are helping them address. That is enough to begin a plan.</p>
             <Link href="/families/new" className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#276221] px-4 text-sm font-semibold text-white hover:bg-[#1f531b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30 focus-visible:ring-offset-2">
               Add a family <ArrowRight className="size-4" aria-hidden />
             </Link>
@@ -64,7 +75,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
       ) : (
         <div className="mt-2 divide-y divide-[#dce6d9]">
           {items.map((family) => (
-            <Link key={family.id} href={`/families/${family.id}/profile`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30 sm:grid-cols-[1fr_auto] sm:items-center">
+            <Link key={family.id} href={`/families/${family.id}/overview`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46923c]/30 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="truncate text-lg font-semibold tracking-[-0.015em] text-[#173a15] group-hover:text-[#276221]">{family.name}</h2>
@@ -72,6 +83,22 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                   {family.urgency && family.urgency !== "low" ? <span className="rounded-full bg-[#fff5da] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#765a16]">{family.urgency} priority</span> : null}
                 </div>
                 <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-6 text-[#5d705a]">{family.summary || "No family summary has been added yet."}</p>
+                <div className="mt-3 flex items-start gap-2 text-sm leading-5">
+                  <CalendarClock className="mt-0.5 size-4 shrink-0 text-[#3b8132]" aria-hidden />
+                  {family.current_step ? (
+                    <p className="text-[#365134]">
+                      <span className="font-semibold">Next: </span>
+                      {family.current_step.action_needed_now || family.current_step.title}
+                      <span className="text-[#687b65]">
+                        {family.current_step.due_date
+                          ? ` · Target ${formatTargetDate(family.current_step.due_date)}`
+                          : " · Target date needed"}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-[#687b65]">Open this family to build or review the support plan.</p>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3 text-xs text-[#778874] sm:justify-end">
                 <span>Updated {new Date(family.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
