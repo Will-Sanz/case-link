@@ -360,6 +360,7 @@ function parsedStepsToGenerated(stepsList: AiPlanStepParsed[]): GeneratedStep[] 
       : undefined;
 
     const details: GeneratedStepDetails = {
+      owner: "case_manager",
       action_needed_now: s.action_needed_now,
       rationale: s.rationale,
       detailed_instructions: s.detailed_instructions,
@@ -548,16 +549,11 @@ Phases: 30 day = immediate stabilization; 60 day = follow through; 90 day = sust
         maxAttempts,
         fullRegeneration: Boolean(options?.fullRegeneration),
         familyId: detail.id,
-        familyName: detail.name,
         hasRegenerationFeedback: Boolean(fb),
         regenerationFeedbackChars: fb?.length ?? 0,
-        regenerationFeedback: fb ?? null,
         feedbackBlockChars: feedbackBlock.length,
         contextChars: context.length,
         userPromptChars: user.length,
-        userPromptHead: user.slice(0, 900),
-        userPromptTail:
-          user.length > 900 ? user.slice(Math.max(0, user.length - 400)) : null,
         hasCorrection: Boolean(correction),
       });
     }
@@ -590,26 +586,10 @@ Phases: 30 day = immediate stabilization; 60 day = follow through; 90 day = sust
       lastModel = result.model;
 
       if (logRegen) {
-        let parsedPreview: unknown;
-        try {
-          parsedPreview = JSON.parse(result.text) as { steps?: unknown[] };
-        } catch {
-          parsedPreview = "(not valid JSON)";
-        }
-        const stepsPreview =
-          parsedPreview &&
-          typeof parsedPreview === "object" &&
-          parsedPreview !== null &&
-          "steps" in parsedPreview &&
-          Array.isArray((parsedPreview as { steps: unknown[] }).steps) ?
-            (parsedPreview as { steps: { title?: string }[] }).steps.map((s) => s.title)
-          : null;
         console.info("[openai-plan/regenerate] ← AI response", {
           model: result.model,
           textChars: result.text.length,
           total_tokens: result.usage?.total_tokens,
-          textPreview: result.text.slice(0, 2800),
-          parsedStepTitles: stepsPreview,
         });
       }
 
@@ -693,7 +673,6 @@ Phases: 30 day = immediate stabilization; 60 day = follow through; 90 day = sust
             },
             {} as Record<string, number>,
           ),
-          titles: generatedSteps.map((s) => ({ phase: s.phase, title: s.title })),
         });
       }
 

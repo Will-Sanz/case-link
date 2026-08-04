@@ -7,7 +7,7 @@ const labeledItemSchema = z.object({
 
 /** Client + server validation (no output transforms, works with react-hook-form). */
 export const familyIntakeFormSchema = z.object({
-  name: z.string().min(1, "Household name is required").max(200),
+  name: z.string().trim().min(1, "Family label is required").max(200),
   summary: z.string().max(8000).optional(),
   householdNotes: z.string().max(8000).optional(),
   initialCaseNote: z.string().max(8000).optional(),
@@ -17,8 +17,11 @@ export const familyIntakeFormSchema = z.object({
       z.literal(""),
     ])
     .optional(),
-  goals: z.array(labeledItemSchema).min(1, "Add at least one goal").max(40),
-  barriers: z.array(labeledItemSchema).min(1, "Add at least one barrier").max(40),
+  goals: z.array(labeledItemSchema).max(40),
+  barriers: z
+    .array(labeledItemSchema)
+    .min(1, "Choose at least one barrier")
+    .max(40),
   members: z
     .array(
       z.object({

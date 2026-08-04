@@ -1,6 +1,14 @@
-# CaseLink: From Scattered Case Details to Clear, Time-Bound Plans
+# CaseLink: Family Support Planning and Paperwork
 
-**CaseLink** is a case management workspace that helps teams turn family context—barriers, notes, and matched programs—into **structured 30 / 60 / 90-day plans**, trackable work, and optional AI-assisted drafting. It is built for **speed, clarity, and professional judgment**, not for replacing the case manager.
+## Product north star
+
+**CaseLink helps school case managers turn family needs into a structured intervention plan and reviewed, ready-to-submit paperwork.** A case manager creates a family profile, records barriers, generates and edits the plan, uploads a blank required form, reviews the AI-prepared draft, and downloads the completed PDF for their required school system.
+
+The near-term product is deliberately narrow. It is built for **speed, clarity, and professional judgment**, not for replacing case managers or the school's required system of record. Broader school-operations automation remains a future possibility only after this core workflow proves useful.
+
+The staged path from the current application to that north star is documented in the [Product Redesign Plan](docs/product-redesign-plan.md).
+
+The product definition for CaseLink's core AI experience is documented in the [Adaptive Intervention Planning PRD](docs/intervention-planning-prd.md).
 
 ---
 
@@ -16,21 +24,21 @@ CaseLink exists to **reduce that fragmentation** and make the path from intake t
 
 ## The solution
 
-CaseLink brings **family records**, **resource intelligence**, and **planning** into one application. A case manager captures barriers, goals, household context, and notes in structured forms. The system **matches programs** from an internal directory (deterministic scoring—no opaque “black box” retrieval). When enabled, **OpenAI** turns that context into **phased plans** with concrete steps, checklists, and action items.
+CaseLink brings **family intake**, **barrier assessment**, **intervention planning**, and **paperwork preparation** into one focused workflow. A case manager captures the approved family context and barriers in structured forms. When enabled, **OpenAI** turns that context into a structured plan and helps map reviewed information into an uploaded blank PDF.
 
-Everything downstream is **editable**. Plans are not static PDFs in a folder—they are living records the team can adjust, refine per step, export when needed, and connect to **timelines**, **tasks**, and a **case assistant** that answers in the context of *this* family’s plan.
+Everything downstream is **editable**. Plans and populated form fields remain drafts until a case manager reviews them. CaseLink produces a completed PDF; it does not submit directly to external school systems in the initial scope.
 
 ---
 
 ## Key features
 
-- **Phased plans (30 / 60 / 90)** — AI-assisted or rules-based generation; steps, priorities, and client-facing display fields suitable for export.
-- **Resource directory & matching** — Searchable programs; scoring-based suggestions; accept, dismiss, or attach matches with activity logged.
-- **Editable structured plans** — Update steps, checklists, and action items; per-step refinement without regenerating the whole plan.
-- **Timeline & task tracking** — Calendar-oriented views tied to plan work and due dates.
-- **Case assistant** — Chat grounded in the family’s barriers, plan, and matches; markdown output with **sanitized links** (only `http`, `https`, `mailto`).
-- **Intake & families** — Households, members, goals, barriers, and case notes with **server-side validation**.
-- **Dashboard** — Operational view across families and upcoming work.
+- **Families** — Create a family support case and reopen it from one simple list.
+- **Barrier intake** — Record the needs and context that should shape the intervention.
+- **Editable intervention plans** — Generate a structured plan, trace it to approved barriers, and edit it before approval.
+- **Paperwork preparation** — Upload a blank required PDF, map approved information into a draft, review uncertain or missing fields, and download the completed form.
+- **Human review** — Plans and forms remain drafts until the case manager approves them.
+
+Supporting resource, timeline, task, and case-assistant capabilities remain subordinate to that narrow V1 workflow. They should expand only when pilot evidence justifies it.
 
 ---
 
@@ -39,16 +47,18 @@ Everything downstream is **editable**. Plans are not static PDFs in a folder—t
 **Input → processing → output**, end to end:
 
 ```
-Case manager enters barriers, goals, notes, and household context
+Case manager creates a family and enters approved context and barriers
         ↓
-System scores and surfaces relevant programs from the directory
+AI drafts a structured intervention plan
         ↓
-(Optional) AI generates phased plan steps + structured fields (JSON schema, validated)
+Case manager reviews and edits the plan
         ↓
-Team edits, tracks, and exports; assistant answers using the same scoped context
+Case manager uploads a blank PDF; CaseLink drafts form entries
+        ↓
+Case manager reviews, downloads, and manually submits the PDF to the required system
 ```
 
-The loop is intentional: **capture → suggest → draft → human edit → track**. AI accelerates drafting; **people retain control** over what ships to the case file.
+The loop is intentional: **capture → draft → human edit → prepare form → human review → download**. AI accelerates drafting; **the case manager controls what becomes official**.
 
 ---
 
@@ -84,18 +94,19 @@ Design principles:
 - **Human-in-the-loop** — Outputs are **editable**; the product assumes review before reliance, especially for high-stakes decisions.
 - **Support, not substitution** — CaseLink is a **tool for case managers**, not an autonomous agent making decisions for families.
 
-Operational guardrails include **per-user (and optional per-IP) rate limiting**, **payload and output token caps**, and **generic user-facing errors in production** with detail confined to server logs.
+Operational guardrails include **shared atomic per-user and deployment AI budgets**, **one-owner generation claims**, **payload and output token caps**, and **generic user-facing errors in production** with privacy-filtered diagnostics in server logs.
 
 ---
 
 ## Security & privacy approach
 
 - **Secrets stay server-side** — Only public Supabase URL + anon key belong in the browser; OpenAI and service-role credentials never ship to the client.
-- **RLS by default** — Shared tables are family-scoped; access is enforced in Postgres, not only in UI checks.
-- **Validated inputs** — Server actions and AI entry points reject malformed or oversized input early.
-- **Throttled AI** — Rate limits and size caps limit abuse and runaway cost (limits are **per instance** today; strict global caps would need a shared store such as Redis).
+- **RLS and narrow RPCs** — Family access, value constraints, immutable ownership, cross-family integrity, and consequential transactions are enforced in Postgres, not only in UI checks.
+- **Validated inputs** — Server actions, AI entry points, and critical database boundaries reject malformed, identifying, or oversized input.
+- **Throttled AI** — Database-backed minute, hour, and deployment-day budgets coordinate across application instances and fail closed in production.
+- **Bounded paperwork** — Only blank, unlocked, fillable PDFs are accepted; the file remains in the active browser tab, while only bounded field metadata may be sent for mapping.
 - **No ads, no third-party analytics baked into the product narrative** — The app is built for case work, not ad profiles.
-- **Sensitive data** — The model assumes **real-world sensitivity**; prompts are scoped to what the case manager already recorded, and operators remain responsible for Auth URLs, redirects, environments, and compliance in their own deployments.
+- **Sensitive data** — The V1 pilot permits de-identified case context only and requires one dedicated environment per school or district. Operators must complete the hosted controls and exercises in the production runbook.
 
 HTTP security headers (e.g. frame options, content-type options, referrer and permissions policies) are set at the framework layer to reduce common browser-level risks.
 
@@ -109,9 +120,9 @@ The UI targets **usable density**: clear hierarchy, minimal noise, and flows tha
 
 ## Limitations & future work
 
-- **Account lifecycle** — Full self-service account deletion may not be available in-app; some flows are still evolving.
+- **Account lifecycle** — Accounts are invitation-only; access, offboarding, archive retention, and deletion are operator-controlled.
 - **Dependence on third-party AI** — When OpenAI is enabled, content generation relies on vendor availability, policy, and pricing; the stack includes **rules-based** paths where AI is off or fails.
-- **Rate limiting** — In-memory limits do not coordinate across multiple server instances; production hardening may require a shared limiter.
+- **Paperwork profile** — V1 supports blank standard AcroForm PDFs only; scanned, completed, signed, encrypted, XFA, attached, or active-content documents are rejected.
 - **Resource matching** — Deliberately **not** embedding-based; weights and rules live in code for transparency and predictability, at the cost of semantic “nearest neighbor” search. The repo ships a **small synthetic CSV** for demos; full partner exports stay **local** (see `data/README.md`).
 - **Early-stage product** — Scope is described honestly; the codebase is structured for review and iteration, not for claiming completeness.
 
@@ -121,3 +132,9 @@ The UI targets **usable density**: clear hierarchy, minimal noise, and flows tha
 
 - **Privacy Policy:** `/privacy`
 - **Terms of Service:** `/terms`
+
+## Production readiness
+
+- [Production hardening audit](docs/production-hardening-audit.md)
+- [Remediation and finding closure](docs/production-hardening-remediation.md)
+- [Production operations runbook](docs/production-operations-runbook.md)

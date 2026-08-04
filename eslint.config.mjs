@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Project-local design tooling and generated visual artifacts.
+    ".agents/**",
+    ".impeccable/**",
+    "supabase/.branches/**",
+    "supabase/.temp/**",
   ]),
 ]);
 

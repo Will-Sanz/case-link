@@ -100,6 +100,8 @@ export type ResourceMatchRow = {
 
 /** Rich structured content for plan steps (checklist, contacts, blockers, etc.) */
 export type PlanStepDetails = {
+  /** Explicit responsibility. AI-generated plans default to the case manager. */
+  owner?: "case_manager" | "family" | "school_program" | "shared";
   /** Short, concrete next action (e.g. "Call PECO and ask about CAP enrollment") */
   action_needed_now?: string;
   rationale?: string;
@@ -197,13 +199,16 @@ export type PlanStepRow = {
 export type PlanClientDisplay = {
   title?: string;
   phaseSummaries?: Partial<Record<"30" | "60" | "90", string>>;
+  /** Explicit case-manager approval required before plan content can feed paperwork. */
+  reviewedAt?: string;
+  reviewedById?: string;
 };
 
 /** Staged lean generation progress (plans.generation_state JSONB). */
 export type PlanGenerationState = {
   v: 1;
   status: "running" | "complete" | "failed";
-  pending_phase: "60" | "90" | null;
+  pending_phase: "30" | "60" | "90" | null;
   planning_brief: string;
   phases_complete: { "30": boolean; "60": boolean; "90": boolean };
   models_used: string[];

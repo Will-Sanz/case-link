@@ -27,7 +27,6 @@ function buildCaseContext(detail: FamilyDetail): string {
   );
 
   const lines = [
-    `Family: ${detail.name}`,
     detail.summary ? `Summary: ${detail.summary}` : null,
     detail.urgency ? `Urgency: ${detail.urgency}` : null,
     detail.household_notes ? `Circumstances: ${detail.household_notes}` : null,
@@ -36,9 +35,6 @@ function buildCaseContext(detail: FamilyDetail): string {
       : null,
     detail.barriers.length
       ? `Barriers: ${detail.barriers.map((b) => b.label).join("; ")}`
-      : null,
-    detail.members?.length
-      ? `Household: ${detail.members.map((m) => m.display_name).join(", ")}`
       : null,
     "---",
     `Plan: ${plan ? `${steps.length} steps` : "No plan yet"}`,
@@ -76,7 +72,7 @@ function formatPriorConversation(history: CaseAssistantHistoryItem[]): string {
 }
 
 /**
- * Case-level assistant. Uses gpt-5.4 via Responses API.
+ * Case-level assistant. Uses the configured GPT-5.6 Luna default via Responses API.
  */
 export async function askCaseAssistant(
   detail: FamilyDetail,
@@ -124,4 +120,3 @@ Answer concisely and practically. Use the prior messages only for continuity; re
   if (!result.ok) return { ok: false, error: result.error };
   return { ok: true, answer: result.text };
 }
-

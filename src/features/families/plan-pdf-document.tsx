@@ -2,6 +2,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { PlanWithSteps, PlanStepRow, PlanStepDetails } from "@/types/family";
+import { actionUiStatus } from "@/lib/domain/plan/action-state";
 
 // --- Text normalization (client-side PDF only; no PII logging) ---
 
@@ -23,6 +24,21 @@ function formatPriority(p: PlanStepRow["priority"] | null | undefined): string |
   if (!p || p === "medium") return null;
   if (p === "urgent") return "Urgent";
   return capitalizeWord(p);
+}
+
+function formatOwner(owner: PlanStepDetails["owner"]): string {
+  if (owner === "family") return "Family";
+  if (owner === "shared") return "Shared";
+  if (owner === "school_program") return "School / program";
+  return "Case manager";
+}
+
+function formatActionDate(value: string | null): string | null {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
 function formatTimeline(step: PlanStepRow, d: PlanStepDetails | undefined): string | null {
@@ -78,13 +94,20 @@ function keyActionBullets(step: PlanStepRow, d: PlanStepDetails | undefined): st
   };
 
   if (step.action_items?.length) {
-    const sorted = [...step.action_items].sort((a, b) =>
-      a.sort_order !== b.sort_order ? a.sort_order - b.sort_order : a.week_index - b.week_index,
-    );
+    const sorted = [...step.action_items].sort((a, b) => {
+      if (a.target_date && b.target_date && a.target_date !== b.target_date) {
+        return a.target_date.localeCompare(b.target_date);
+      }
+      if (a.target_date && !b.target_date) return -1;
+      if (!a.target_date && b.target_date) return 1;
+      return a.sort_order - b.sort_order;
+    });
     for (const ai of sorted) {
       const t = cleanText(ai.title);
       if (!t) continue;
-      pushUnique(ai.week_index > 1 ? `Week ${ai.week_index}: ${t}` : t);
+      const date = formatActionDate(ai.target_date);
+      const status = actionUiStatus(ai).replaceAll("_", " ");
+      pushUnique([date, t, status].filter(Boolean).join(" — "));
     }
   }
 
@@ -254,6 +277,7 @@ function PdfStep({ step, index }: { step: PlanStepRow; index: number }) {
           Priority: {pri}
         </Text>
       ) : null}
+      <Text style={styles.metaLine}>Owner: {formatOwner(d?.owner)}</Text>
       {timeline ? (
         <Text style={styles.metaLine}>
           Timeline: {timeline}

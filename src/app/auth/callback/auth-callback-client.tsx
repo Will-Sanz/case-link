@@ -6,41 +6,24 @@ import {
   safeAuthSessionClientMessage,
   safeOAuthRedirectMessage,
 } from "@/lib/auth/safe-client-auth-message";
+import { safeInternalPath } from "@/lib/auth/safe-internal-path";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-/** Survives React Strict Mode remount: first effect pass may clear `location.hash` before the second pass runs. */
-const AUTH_CALLBACK_HASH_KEY = "caselink_auth_callback_hash_v1";
-
-function safeInternalPath(nextRaw: string | null): string {
-  const fallback = "/dashboard";
-  if (!nextRaw || !nextRaw.startsWith("/") || nextRaw.startsWith("//")) return fallback;
-  return nextRaw;
-}
+/** Survives React Strict Mode remount without persisting bearer tokens in browser storage. */
+let pendingAuthFragment = "";
 
 function readFragmentForCallback(): string {
   if (typeof window === "undefined") return "";
   const fromUrl = window.location.hash.replace(/^#/, "");
   if (fromUrl) {
-    try {
-      sessionStorage.setItem(AUTH_CALLBACK_HASH_KEY, fromUrl);
-    } catch {
-      /* private mode */
-    }
+    pendingAuthFragment = fromUrl;
     return fromUrl;
   }
-  try {
-    return sessionStorage.getItem(AUTH_CALLBACK_HASH_KEY) ?? "";
-  } catch {
-    return "";
-  }
+  return pendingAuthFragment;
 }
 
 function clearStoredAuthFragment() {
-  try {
-    sessionStorage.removeItem(AUTH_CALLBACK_HASH_KEY);
-  } catch {
-    /* ignore */
-  }
+  pendingAuthFragment = "";
 }
 
 /**
@@ -120,6 +103,11 @@ export function AuthCallbackClient() {
 
       const fragmentStr = readFragmentForCallback();
       if (fragmentStr.length > 0) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}`,
+        );
         const params = new URLSearchParams(fragmentStr);
         const access_token = params.get("access_token");
         const refresh_token = params.get("refresh_token");
@@ -144,13 +132,6 @@ export function AuthCallbackClient() {
           if (!afterHash.session) {
             goLoginError("Could not establish a session. Try opening the link again.");
             return;
-          }
-          if (typeof window !== "undefined") {
-            window.history.replaceState(
-              null,
-              "",
-              `${window.location.pathname}${window.location.search}`,
-            );
           }
           finishRedirect(next);
           return;

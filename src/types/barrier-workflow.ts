@@ -1,5 +1,3 @@
-import type { AiMode } from "@/lib/ai/ai-mode";
-
 export const BARRIER_PRESETS = [
   { key: "housing_instability", label: "Housing" },
   { key: "unemployment", label: "Employment" },
@@ -17,15 +15,6 @@ export const BARRIER_PRESETS = [
 ] as const;
 
 export type BarrierPresetLabel = (typeof BARRIER_PRESETS)[number]["label"];
-
-export type BarrierWorkflowInput = {
-  referenceId: string;
-  selectedBarriers: BarrierPresetLabel[];
-  additionalBarriers?: string;
-  additionalDetails?: string;
-  /** AI quality preset from workspace toggle; defaults to fast on server. */
-  aiMode?: AiMode;
-};
 
 export type BarrierWorkflowActionItem = {
   id: string;
@@ -68,12 +57,6 @@ export type BarrierWorkflowResource = {
   whyMatched: string;
 };
 
-export type BarrierWorkflowRecentRecord = {
-  referenceId: string;
-  familyId: string;
-  updatedAt: string;
-};
-
 export type BarrierWorkflowResult = {
   referenceId: string;
   familyId: string;
@@ -82,6 +65,8 @@ export type BarrierWorkflowResult = {
   additionalDetails: string;
   sections: BarrierWorkflowPlanSection[];
   resources: BarrierWorkflowResource[];
+  resourceStatus: "ready" | "empty" | "unavailable";
+  resourceStatusMessage?: string | null;
   lastSavedAt: string | null;
   /** User-editable plan title from `plans.client_display.title`, if set. */
   planDisplayTitle?: string | null;

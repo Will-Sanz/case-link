@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { alertErrorClass, alertInfoClass } from "@/lib/ui/form-classes";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const MIN_PASSWORD_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 14;
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -133,7 +133,7 @@ export function ResetPasswordForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="mt-1"
         />
-        <p className="mt-1 text-xs text-slate-500">At least 6 characters.</p>
+        <p className="mt-1 text-xs text-slate-500">At least 14 characters.</p>
       </div>
       <div>
         <Label htmlFor="reset-confirm-password">Confirm new password</Label>

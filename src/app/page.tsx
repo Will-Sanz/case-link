@@ -6,9 +6,9 @@ import { getSessionUser } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "CaseLink: Support for families at Alain Locke School",
+  title: "Family paperwork, made manageable",
   description:
-    "CaseLink helps case managers at Alain Locke School in Philadelphia identify barriers and build personalized support plans connected to local resources.",
+    "CaseLink helps school case managers turn family needs into structured intervention plans and prepared paperwork for existing school systems.",
 };
 
 export default async function Home() {

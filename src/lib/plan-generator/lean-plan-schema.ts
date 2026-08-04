@@ -24,6 +24,7 @@ export const leanActionItemZ = z.object({
 
 /** One step from the model (phase may be omitted in single-step refine, caller supplies). */
 export const leanPlanStepBodyZ = z.object({
+  goal: z.string().min(1).max(300),
   title: z.string().min(1).max(500),
   summary: z.string().min(1).max(4000),
   action_items: z.array(leanActionItemZ).min(1).max(5),
@@ -60,13 +61,8 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase):
   const pri = lean.priority ?? "medium";
   const detailsPriority = pri === "urgent" ? "high" : pri;
 
-  const stageGoals: Record<PlanPhase, string> = {
-    "30": "Stabilize and start concrete outreach this month.",
-    "60": "Follow through on applications and appointments.",
-    "90": "Sustain gains and close remaining gaps.",
-  };
-
   return {
+    owner: "case_manager",
     timing_guidance: timing ?? `Within the ${phase}-day window; confirm dates with each agency.`,
     detailed_instructions: guidance,
     expected_outcome: lean.expected_outcome.trim(),
@@ -79,7 +75,7 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase):
     })),
     checklist: [],
     priority: detailsPriority,
-    stage_goal: stageGoals[phase],
+    stage_goal: lean.goal.trim(),
   };
 }
 
@@ -101,6 +97,7 @@ export function leanPhaseStepToGeneratedStep(
 
   const summary = lean.summary.trim();
   const fullDetails: GeneratedStepDetails = {
+    owner: "case_manager",
     action_needed_now: actionItems[0]?.title ?? summary.slice(0, 200),
     rationale: "",
     detailed_instructions: sparse.detailed_instructions ?? "",
@@ -139,6 +136,7 @@ export function sparseDetailsForPersistence(lean: LeanPlanPhaseStep): PlanStepDe
 
 const leanStepObjectFields = {
   phase: { type: "string", enum: ["30", "60", "90"] },
+  goal: { type: "string" },
   title: { type: "string" },
   summary: { type: "string" },
   action_items: {
@@ -180,6 +178,7 @@ const leanStepObjectFields = {
 
 const leanStepRequired = [
   "phase",
+  "goal",
   "title",
   "summary",
   "action_items",
@@ -196,6 +195,7 @@ export function buildLeanPhaseRootJsonSchema(phase: PlanPhase) {
     type: "object",
     properties: {
       phase: { type: "string", enum: [phase] },
+      goal: leanStepObjectFields.goal,
       title: { type: "string" },
       summary: { type: "string" },
       action_items: leanStepObjectFields.action_items,

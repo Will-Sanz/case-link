@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
+import { pdfBase64DataUrl } from "@/lib/ai/file-input";
 import {
   augmentInstructionsForMode,
   getDefaultMaxTokensForTask,
@@ -14,9 +15,7 @@ import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { getEnv } from "@/lib/env";
 import { isDev } from "@/lib/env/runtime";
-import { getClientIpFromHeaders } from "@/lib/http/client-ip";
-import { takeOpenAiRateSlot, takeOpenAiRateSlotForIp } from "@/lib/rate-limit/ai-rate-limit";
-import { headers } from "next/headers";
+import { consumeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
 const OPENAI_FETCH_TIMEOUT_MS = 180_000;
@@ -47,10 +46,18 @@ export type StructuredJsonSchema = {
   strict?: boolean;
 };
 
+export type AiFileInput = {
+  filename: string;
+  /** Raw base64, without a data-URL prefix. */
+  fileDataBase64: string;
+};
+
 export type CreateResponseOptions = {
   taskType: AiTaskType;
   instructions: string;
   input: string | ChatMessage[];
+  /** Responses API file inputs. Used only for short-lived, request-scoped analysis. */
+  fileInputs?: AiFileInput[];
   /** Legacy JSON mode, model returns valid JSON only; no schema enforcement. */
   responseFormat?: "json_object";
   /** When set, API enforces this schema (Responses: text.format; Chat: response_format json_schema). */
@@ -65,14 +72,14 @@ export type CreateResponseOptions = {
 
 export type CreateResponseResult =
   | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: "rate_limited"; retryAfter?: number };
 
-function summarizeInput(input: string | ChatMessage[]): { chars: number; preview: string } {
+function summarizeInput(input: string | ChatMessage[]): { chars: number } {
   if (typeof input === "string") {
-    return { chars: input.length, preview: input.slice(0, 1200) };
+    return { chars: input.length };
   }
   const combined = input.map((m) => `[${m.role}] ${m.content}`).join("\n\n");
-  return { chars: combined.length, preview: combined.slice(0, 1200) };
+  return { chars: combined.length };
 }
 
 function exposeAiErrorToClient(internal: string, envDebug: boolean): string {
@@ -95,7 +102,6 @@ function logOpenAiUsage(
   elapsedMs: number,
 ) {
   console.info("[openai-usage]", {
-    userId: meta.userId,
     route: meta.route,
     taskType,
     model,
@@ -113,21 +119,8 @@ function modelSupportsTemperature(modelId: string): boolean {
   const id = modelId.toLowerCase().trim();
   // e.g. o3, o3-mini, o4-mini-2025-01-01
   if (/^o\d/.test(id)) return false;
+  if (/^gpt-5\.6(?:-|$)/.test(id)) return false;
   return true;
-}
-
-async function enrichOpenAiRequestMeta(
-  meta: OpenAiRequestMeta | undefined,
-): Promise<OpenAiRequestMeta | undefined> {
-  if (!meta) return undefined;
-  if (meta.clientIp != null && meta.clientIp !== "") return meta;
-  try {
-    const h = await headers();
-    const ip = getClientIpFromHeaders(h);
-    return ip ? { ...meta, clientIp: ip } : meta;
-  } catch {
-    return meta;
-  }
 }
 
 /**
@@ -144,19 +137,14 @@ export async function createAiResponse(
     return { ok: false, error: exposeAiErrorToClient("OPENAI_API_KEY is not set", envDebug) };
   }
 
-  const meta = await enrichOpenAiRequestMeta(options.requestMeta);
-  if (meta) {
-    const allowed = takeOpenAiRateSlot(meta.userId);
-    if (!allowed) {
-      const msg = "Too many AI requests. Please wait a minute and try again.";
+  const meta = options.requestMeta;
+  const budget = await consumeOpenAiRateSlot(options.taskType);
+  if (!budget.allowed) {
+    const msg = "Too many AI requests. Please wait a minute and try again.";
+    if (meta) {
       logOpenAiUsage(meta, options.taskType, "(rate_limited)", { ok: false, error: msg }, 0);
-      return { ok: false, error: msg };
     }
-    if (meta.clientIp && !takeOpenAiRateSlotForIp(meta.clientIp)) {
-      const msg = "Too many AI requests. Please wait a minute and try again.";
-      logOpenAiUsage(meta, options.taskType, "(ip_rate_limited)", { ok: false, error: msg }, 0);
-      return { ok: false, error: msg };
-    }
+    return { ok: false, error: msg, code: "rate_limited", retryAfter: budget.retryAfter };
   }
 
   const mode = parseAiMode(options.aiMode);
@@ -168,7 +156,8 @@ export async function createAiResponse(
     return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
   }
 
-  const useResponses = !modelOverride && taskUsesResponsesApi(options.taskType);
+  const useResponses = Boolean(options.fileInputs?.length) ||
+    (!modelOverride && taskUsesResponsesApi(options.taskType));
   const instructions = augmentInstructionsForMode(options.instructions, mode);
   const requestedMax = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
   const outputCap =
@@ -194,6 +183,10 @@ export async function createAiResponse(
     }
     return { ok: false, error: exposeAiErrorToClient(err, envDebug) };
   }
+  if (options.fileInputs?.length && typeof options.input !== "string") {
+    const internal = "File inputs require a single text prompt.";
+    return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
+  }
 
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
@@ -215,17 +208,21 @@ export async function createAiResponse(
       inputChars: inputSummary.chars,
       instructionsChars: instructions.length,
       maxTokens,
+      fileCount: options.fileInputs?.length ?? 0,
     });
     if (payloadDebug) {
-      console.info("[ai] request:instructions", instructions.slice(0, 2000));
-      console.info("[ai] request:input_preview", inputSummary.preview);
+      console.info("[ai] request:payload_summary", {
+        inputChars: inputSummary.chars,
+        instructionsChars: instructions.length,
+        fileCount: options.fileInputs?.length ?? 0,
+      });
     }
   }
 
   try {
     const rawResult = useResponses
       ? await callResponsesApi(apiKey, model, resolved, debug, mode)
-      : await callChatCompletionsApi(apiKey, model, resolved, debug);
+      : await callChatCompletionsApi(apiKey, model, resolved, debug, mode);
     const result: CreateResponseResult =
       rawResult.ok ?
         rawResult
@@ -249,9 +246,6 @@ export async function createAiResponse(
         tokens: rawResult.ok ? (rawResult.usage?.total_tokens ?? null) : null,
         outputChars: rawResult.ok ? rawResult.text.length : null,
       });
-      if (payloadDebug && rawResult.ok) {
-        console.info("[ai] response:preview", rawResult.text.slice(0, 2500));
-      }
     }
 
     if (meta) {
@@ -289,7 +283,21 @@ async function callResponsesApi(
   mode: AiMode,
 ): Promise<CreateResponseResult> {
   const input =
-    typeof options.input === "string"
+    typeof options.input === "string" && options.fileInputs?.length
+      ? [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: options.input },
+              ...options.fileInputs.map((file) => ({
+                type: "input_file",
+                filename: file.filename,
+                file_data: pdfBase64DataUrl(file.fileDataBase64),
+              })),
+            ],
+          },
+        ]
+      : typeof options.input === "string"
       ? options.input
       : options.input.map((m) => ({
           role: m.role,
@@ -301,6 +309,7 @@ async function callResponsesApi(
     instructions: options.instructions,
     input,
     max_output_tokens: options.maxTokens ?? 4096,
+    store: false,
   };
   if (modelSupportsReasoningEffort(model)) {
     body.reasoning = { effort: mode === "thinking" ? "high" : "low" };
@@ -392,6 +401,7 @@ async function callChatCompletionsApi(
   model: string,
   options: CreateResponseOptions,
   debug: boolean,
+  mode: AiMode,
 ): Promise<CreateResponseResult> {
   const messages =
     typeof options.input === "string"
@@ -405,9 +415,13 @@ async function callChatCompletionsApi(
     model,
     messages,
     max_tokens: options.maxTokens ?? 4096,
+    store: false,
   };
   if (modelSupportsTemperature(model)) {
     body.temperature = options.temperature ?? 0.4;
+  }
+  if (modelSupportsReasoningEffort(model)) {
+    body.reasoning_effort = mode === "thinking" ? "high" : "none";
   }
 
   if (options.structuredJsonSchema) {

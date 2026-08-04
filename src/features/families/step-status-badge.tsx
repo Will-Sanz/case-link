@@ -9,7 +9,7 @@ const STATUS_LABELS: Record<StepStatus, string> = {
   pending: "Not started",
   in_progress: "In progress",
   completed: "Complete",
-  blocked: "Blocked",
+  blocked: "Waiting",
 };
 
 const STATUS_CLASSES: Record<StepStatus, string> = {

@@ -1,17 +1,21 @@
 "use server";
 
+import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { logServerError } from "@/lib/logger/server-error";
 import { getStepActivity } from "@/lib/services/workflow";
 
 export async function fetchStepActivity(stepId: string) {
+  const parsedStepId = z.string().uuid().safeParse(stepId);
+  if (!parsedStepId.success) return [];
+
   try {
     const supabase = (await requireAppUserWithClient()).supabase;
 
     const { data: step } = await supabase
       .from("plan_steps")
       .select("plan_id")
-      .eq("id", stepId)
+      .eq("id", parsedStepId.data)
       .maybeSingle();
 
     if (!step) return [];
@@ -24,7 +28,7 @@ export async function fetchStepActivity(stepId: string) {
 
     if (!plan) return [];
 
-    return await getStepActivity(supabase, stepId, 30);
+    return await getStepActivity(supabase, parsedStepId.data, 30);
   } catch (e) {
     logServerError("fetchStepActivity", e);
     return [];

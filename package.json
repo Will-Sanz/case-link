@@ -5,30 +5,42 @@
   "engines": {
     "node": ">=20.9.0"
   },
+  "overrides": {
+    "esbuild": "0.27.2",
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.0"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:db-security": "tsx scripts/test-database-security.ts",
     "typecheck": "tsc --noEmit",
     "verify:lockfile": "node scripts/verify-deploy-lockfiles.mjs",
     "verify:resource-seed": "tsx scripts/verify-resource-seed-paths.ts",
-    "verify": "npm run verify:lockfile && npm run verify:resource-seed && npm run typecheck && npm run lint && npm run test:run && npm run build",
+    "verify:secrets": "node scripts/scan-tracked-secrets.mjs",
+    "verify": "npm run verify:lockfile && npm run verify:resource-seed && npm run verify:secrets && npm run typecheck && npm run lint && npm run test:run && npm run build",
     "ci": "npm run verify",
     "db:import": "tsx scripts/import-resources.ts",
-    "db:create-admin": "tsx scripts/create-admin-user.ts",
+    "db:invite-user": "tsx scripts/invite-user.ts",
     "db:create-test-user": "tsx scripts/create-test-user.ts",
-    "db:apply-generation-state": "tsx scripts/apply-plans-generation-state-column.ts",
     "prepare": "husky"
   },
   "dependencies": {
+    "@fontsource-variable/newsreader": "^5.3.0",
     "@hookform/resolvers": "^5.2.2",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.99.3",
-    "next": "16.2.1",
+    "geist": "^1.7.2",
+    "lucide-react": "^1.28.0",
+    "next": "16.3.0",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.71.2",
@@ -47,14 +59,13 @@
     "csv-parse": "^6.2.1",
     "dotenv": "^17.3.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.1",
+    "eslint-config-next": "16.3.0",
     "husky": "^9.1.7",
     "jsdom": "^29.0.2",
     "pg": "^8.16.3",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.4"
   }
 }

@@ -10,19 +10,19 @@ export function PrivacyPolicySections() {
     <>
       <p>
         CaseLink (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the application&rdquo;) is a tool
-        designed to help case managers organize information and generate action plans for families.
-        This Privacy Policy explains what information we collect, how we use it, and how it is
-        handled.
+        designed to help authorized case managers prepare family-support plans and paperwork.
+        The current pilot is invitation-only, uses one dedicated environment per participating
+        school or district, and prohibits identifying student or family information.
       </p>
 
       <LegalSection n="1" title="Information We Collect">
         <h3 className="text-base font-semibold text-slate-900">Account Information</h3>
-        <p>When you create an account, we collect:</p>
+        <p>When an administrator invites you, we collect:</p>
         <LegalList
           items={[
             "Email address",
             "Authentication credentials (managed by our authentication provider)",
-            "Basic profile information (such as name, organization, or role, if provided)",
+            "Basic profile information (such as display name and role, if provided)",
           ]}
         />
 
@@ -32,15 +32,15 @@ export function PrivacyPolicySections() {
         </p>
         <LegalList
           items={[
-            "Family or household details",
-            "Case notes and summaries",
+            "A non-identifying family label and de-identified context",
+            "De-identified case notes and summaries",
             "Barriers, goals, and plans",
             "Task and referral information",
           ]}
         />
         <p>
-          This information is entered by users and may include sensitive personal context depending
-          on how the application is used.
+          This context is sensitive even when de-identified. Do not enter names, contact details,
+          student identifiers, signatures, or other information that could identify a person.
         </p>
 
         <h3 className="pt-2 text-base font-semibold text-slate-900">
@@ -51,7 +51,7 @@ export function PrivacyPolicySections() {
           items={[
             "Session and authentication data (via cookies)",
             "Basic request metadata (such as timestamps)",
-            "IP address (used for security and rate limiting purposes only)",
+            "Network metadata such as IP address processed by hosting and security providers",
           ]}
         />
         <p>We do not use tracking cookies or third-party advertising analytics.</p>
@@ -71,32 +71,35 @@ export function PrivacyPolicySections() {
 
       <LegalSection n="3" title="Use of AI Services">
         <p>
-          CaseLink uses third-party AI services, including OpenAI, to generate plans, suggestions,
-          and responses.
+          CaseLink uses OpenAI to generate plans and propose mappings for standard form fields.
         </p>
         <p>When AI features are used:</p>
         <LegalList
           items={[
-            "User-provided content (such as case details, notes, and questions) may be sent to these services",
-            "This data is used to generate responses within the application",
-            "We do not control how third-party providers process data beyond their stated policies",
+            "Only reviewed, de-identified case context and bounded PDF field metadata may be sent",
+            "Uploaded PDF bytes, completed PDFs, identity fields, and signature fields are not sent to OpenAI",
+            "AI output remains a draft until a case manager reviews it",
           ]}
         />
-        <p>Users should avoid entering unnecessary sensitive personal information when possible.</p>
+        <p>Identifying student or family information is not permitted in the current pilot.</p>
       </LegalSection>
 
       <LegalSection n="4" title="Data Storage and Processing">
         <p>
-          We use Supabase to store application data, including user accounts and case information.
+          We use Supabase to store accounts, de-identified case records, plans, and audit events,
+          and Vercel to host the application. Each pilot organization uses a dedicated deployment.
         </p>
         <p>Data is stored in a database with access controls designed to ensure that:</p>
         <LegalList
           items={[
-            "Users can only access data associated with their account or organization",
+            "Case managers can access only records they own or are explicitly assigned",
             "Access is restricted using row-level security policies",
           ]}
         />
-        <p>The application may be hosted on infrastructure providers such as Vercel.</p>
+        <p>
+          Blank PDF files and completed drafts remain in the active browser tab. CaseLink does not
+          persist those files on its server, and they are cleared after download or refresh.
+        </p>
       </LegalSection>
 
       <LegalSection n="5" title="Cookies and Sessions">
@@ -113,31 +116,33 @@ export function PrivacyPolicySections() {
         <p>Data may be shared only with:</p>
         <LegalList
           items={[
-            "Infrastructure and service providers (e.g., Supabase, OpenAI)",
-            "As required for application functionality",
+            "Supabase, Vercel, and OpenAI as needed to operate the approved features",
+            "Authorities when disclosure is legally required",
           ]}
         />
       </LegalSection>
 
       <LegalSection n="7" title="Data Retention">
-        <p>Data is stored as long as it is needed to operate the application.</p>
-        <p>Currently:</p>
+        <p>The production operating schedule is:</p>
         <LegalList
           items={[
-            "Users can delete or archive certain records within the app",
-            "Full account deletion workflows may not be available in-app",
+            "Active case records: for the authorized service period",
+            "Archived case records: 90 days, unless an approved legal hold applies",
+            "Product and security audit events: 365 days; application logs: 30 days",
+            "Browser PDF drafts and server-side raw PDF retention: none",
+            "Encrypted database backups: no more than 30 days after source deletion",
           ]}
         />
-        <p>If you would like your data deleted, you may contact us directly.</p>
+        <p>Deletion and access requests must be made through the participating organization or the contact below.</p>
       </LegalSection>
 
       <LegalSection n="8" title="Access and Organizational Use">
-        <p>CaseLink is designed for use by case managers and organizations.</p>
-        <p>Depending on configuration:</p>
+        <p>CaseLink is available only to invited users in the participating organization.</p>
         <LegalList
           items={[
-            "Data associated with a family or case may be accessible to assigned users or administrators within the same organization",
-            "Access is controlled through application permissions and database policies",
+            "Assigned case managers and authorized administrators may access a case",
+            "An administrator must remove access promptly when a user's role changes or ends",
+            "A shared multi-organization CaseLink environment is not approved for the current pilot",
           ]}
         />
       </LegalSection>
@@ -235,7 +240,10 @@ export function TermsOfServiceSections(
             "Reviewing all generated outputs before relying on them",
           ]}
         />
-        <p>You should avoid entering unnecessary sensitive personal information.</p>
+        <p>
+          You must use non-identifying family labels and de-identified context. Upload only blank,
+          unlocked, fillable PDFs; never upload completed, signed, scanned, or identifying forms.
+        </p>
       </LegalSection>
 
       <LegalSection n="3" title="AI-Generated Content">
@@ -243,16 +251,16 @@ export function TermsOfServiceSections(
         <p>You acknowledge that:</p>
         <LegalList
           items={[
-            "AI-generated content may be incomplete or inaccurate",
+            "AI-generated content and field mappings may be incomplete or inaccurate",
             "Outputs are provided for assistance only",
-            "You are responsible for reviewing and validating all outputs",
+            "You must review every plan, field, and completed PDF page before use",
           ]}
         />
         <p>CaseLink does not provide professional advice.</p>
       </LegalSection>
 
       <LegalSection n="4" title="Accounts">
-        <p>To use certain features, you must create an account.</p>
+        <p>Accounts are invitation-only and may be provisioned only by an authorized operator.</p>
         <p>You are responsible for:</p>
         <LegalList
           items={[
@@ -269,7 +277,7 @@ export function TermsOfServiceSections(
         <p>By using the application, you acknowledge that:</p>
         <LegalList
           items={[
-            "Data you provide may be processed by third-party services (such as AI providers)",
+            "Approved de-identified context and PDF field metadata may be processed by OpenAI",
             "Data is stored and managed using external infrastructure providers",
           ]}
         />

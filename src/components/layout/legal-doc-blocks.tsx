@@ -44,9 +44,9 @@ export function LegalSection({
       <h2
         id={`legal-section-${n}`}
         className={cn(
-          modal ?
+        modal ?
             "flex gap-2.5 text-[0.9375rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-base"
-          : "text-xl font-semibold text-slate-900 sm:text-2xl",
+          : "public-display text-2xl leading-tight text-[var(--public-ink)] sm:text-3xl",
         )}
       >
         {modal ?
@@ -78,10 +78,9 @@ export function LegalList({ items }: { items: string[] }) {
   return (
     <ul
       className={cn(
-        "text-slate-600",
         modal ?
-          "list-outside list-disc space-y-2 pl-[1.2em] marker:text-slate-400/90 sm:pl-[1.25em]"
-        : "list-disc space-y-2 pl-5 sm:pl-6",
+          "list-outside list-disc space-y-2 pl-[1.2em] text-slate-600 marker:text-slate-400/90 sm:pl-[1.25em]"
+        : "list-disc space-y-2 pl-5 text-[var(--public-ink-2)] marker:text-[var(--public-rule-mark)] sm:pl-6",
       )}
     >
       {items.map((item, i) => (

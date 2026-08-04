@@ -1,8 +1,23 @@
 import { z } from "zod";
 
+const dateOnlySchema = (message: string) =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, message)
+    .refine((value) => {
+      const [year, month, day] = value.split("-").map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() === month - 1 &&
+        date.getUTCDate() === day
+      );
+    }, message);
+
 export const aiModeSchema = z.enum(["fast", "thinking"]).optional();
 
 const planStepDetailsSchema = z.object({
+  owner: z.enum(["case_manager", "family", "school_program", "shared"]).optional(),
   /** Short, concrete next action for the case manager. */
   action_needed_now: z.string().optional(),
   rationale: z.string().optional(),
@@ -57,6 +72,17 @@ export const generatePlanSchema = z.object({
   aiMode: aiModeSchema,
 });
 
+export const stagedPlanStartSchema = generatePlanSchema.pick({
+  familyId: true,
+  regenerationFeedback: true,
+  aiMode: true,
+});
+
+export const stagedPlanAdvanceSchema = z.object({
+  familyId: z.string().uuid(),
+  aiMode: aiModeSchema,
+});
+
 export const planClientDisplaySchema = z.object({
   title: z.string().max(200).optional(),
   phaseSummaries: z
@@ -75,9 +101,15 @@ export const updatePlanSchema = z.object({
   clientDisplay: planClientDisplaySchema.optional(),
 });
 
+export const markPlanReviewedSchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+});
+
 export const updatePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
+  expectedUpdatedAt: z.string().datetime().optional(),
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
@@ -88,41 +120,29 @@ export const updatePlanStepSchema = z.object({
   sort_order: z.number().int().min(0).max(999).optional(),
 });
 
-export const createManualStepSchema = z.object({
-  familyId: z.string().uuid(),
-  planId: z.string().uuid(),
-  phase: z.enum(["30", "60", "90"]),
-  title: z.string().min(1, "Title is required").max(500),
-  description: z.string().max(4000).optional().default(""),
-  details: planStepDetailsSchema.optional(),
-});
+export const createManualStepSchema = z
+  .object({
+    familyId: z.string().uuid(),
+    planId: z.string().uuid(),
+    goal: z.string().trim().min(1, "Goal is required").max(500),
+    title: z.string().min(1, "Title is required").max(500),
+    description: z.string().max(4000).optional().default(""),
+    target_date: dateOnlySchema("Choose a valid target date"),
+    details: planStepDetailsSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.details?.expected_outcome?.trim()) {
+      context.addIssue({
+        code: "custom",
+        path: ["details", "expected_outcome"],
+        message: "Expected result is required",
+      });
+    }
+  });
 
 export const deletePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
-});
-
-export const ACTIVITY_TYPES = [
-  "call_attempted",
-  "voicemail_left",
-  "email_sent",
-  "text_sent",
-  "appointment_scheduled",
-  "attended_appointment",
-  "documents_requested",
-  "documents_submitted",
-  "no_response",
-  "completed",
-  "other",
-] as const;
-
-export const logPlanStepActivitySchema = z.object({
-  stepId: z.string().uuid(),
-  familyId: z.string().uuid(),
-  action: z.string().min(1).max(100),
-  activity_type: z.string().max(50).optional(),
-  notes: z.string().max(2000).optional(),
-  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const linkResourceToStepSchema = z.object({
@@ -141,10 +161,19 @@ export const toggleChecklistItemSchema = z.object({
 export const updatePlanStepActionItemSchema = z.object({
   actionItemId: z.string().uuid(),
   familyId: z.string().uuid(),
+  expectedUpdatedAt: z.string().datetime().optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).nullable().optional(),
   week_index: z.number().int().min(1).max(52).optional(),
+  target_date: z
+    .union([dateOnlySchema("Use a valid target date"), z.null()])
+    .optional(),
+  outcome: z.string().max(2000).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  follow_up_date: z
+    .union([dateOnlySchema("Use a valid follow-up date"), z.null()])
+    .optional(),
 });
 
 export const refineStepSchema = z.object({

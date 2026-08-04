@@ -15,11 +15,7 @@ export function safeOAuthRedirectMessage(raw: string | undefined): string {
   const m = raw?.trim() ?? "";
   if (!m) return GENERIC_SESSION;
   if (!isProduction()) return m.slice(0, 500);
-  if (m.length > 280) return GENERIC_SESSION;
-  if (/internal|server error|database|relation |sql|jwt|exception|stack|trace/i.test(m)) {
-    return GENERIC_SESSION;
-  }
-  return m;
+  return GENERIC_SESSION;
 }
 
 /** Supabase session exchange / OTP / setSession failures on the callback route. */
@@ -31,28 +27,16 @@ export function safeAuthSessionClientMessage(_raw: string | undefined): string {
   return GENERIC_SESSION;
 }
 
-/** Password sign-in: allow common Supabase user-facing strings; otherwise generic. */
+/** Password sign-in: map only known safe states; otherwise return a generic message. */
 export function safeSignInPasswordMessage(raw: string | undefined): string {
   const m = raw?.trim() ?? "";
   if (!m) return GENERIC_PASSWORD;
   if (!isProduction()) return m.slice(0, 500);
-  if (m.length > 280) return GENERIC_PASSWORD;
-  if (/internal|server error|database|relation |sql|jwt|exception|fetch failed|network/i.test(m)) {
-    return GENERIC_PASSWORD;
+  if (/email not confirmed/i.test(m)) {
+    return "Confirm your invitation email before signing in.";
   }
-  return m;
-}
-
-const GENERIC_SIGNUP = "Could not create an account. Check your details and try again.";
-
-/** Sign-up errors from Supabase Auth (client). */
-export function safeSignUpMessage(raw: string | undefined): string {
-  const m = raw?.trim() ?? "";
-  if (!m) return GENERIC_SIGNUP;
-  if (!isProduction()) return m.slice(0, 500);
-  if (m.length > 280) return GENERIC_SIGNUP;
-  if (/internal|server error|database|relation |sql|jwt|exception|fetch failed|network/i.test(m)) {
-    return GENERIC_SIGNUP;
+  if (/too many|rate.?limit/i.test(m)) {
+    return "Too many sign-in attempts. Wait a few minutes and try again.";
   }
-  return m;
+  return GENERIC_PASSWORD;
 }

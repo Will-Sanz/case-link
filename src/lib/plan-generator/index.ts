@@ -12,6 +12,7 @@ import type {
 
 function rulesTemplateDetails(t: StepTemplate): GeneratedStepDetails {
   return {
+    owner: "case_manager",
     action_needed_now: `Start work on: ${t.title}`,
     why_now: `This step belongs in the ${t.phase}-day phase to keep the case plan sequenced and accountable.`,
     rationale: t.description,

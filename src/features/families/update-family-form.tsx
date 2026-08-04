@@ -6,6 +6,7 @@ import { updateFamilyMeta } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { selectInputClass, textareaClass } from "@/lib/ui/form-classes";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 import type { FamilyDetail } from "@/types/family";
 
 export function UpdateFamilyForm({
@@ -19,6 +20,8 @@ export function UpdateFamilyForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [summaryPrivacyError, setSummaryPrivacyError] = useState<string | null>(null);
+  const [notesPrivacyError, setNotesPrivacyError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [summary, setSummary] = useState(family.summary ?? "");
   const [householdNotes, setHouseholdNotes] = useState(
@@ -30,6 +33,25 @@ export function UpdateFamilyForm({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSummaryPrivacyError(null);
+    setNotesPrivacyError(null);
+    const privacy = validateNoPii([
+      { field: "summary", label: "Summary", value: summary },
+      {
+        field: "householdNotes",
+        label: "Current circumstances",
+        value: householdNotes,
+      },
+    ]);
+    if (!privacy.ok) {
+      for (const finding of privacy.findings) {
+        const message = `Remove likely identifying text: “${finding.value}”.`;
+        if (finding.field === "summary") setSummaryPrivacyError(message);
+        if (finding.field === "householdNotes") setNotesPrivacyError(message);
+      }
+      setError(privacy.error);
+      return;
+    }
     setPending(true);
     try {
       const r = await updateFamilyMeta({
@@ -101,9 +123,19 @@ export function UpdateFamilyForm({
           id="fam-summary"
           rows={3}
           value={summary}
-          onChange={(e) => setSummary(e.target.value)}
+          onChange={(e) => {
+            setSummary(e.target.value);
+            setSummaryPrivacyError(null);
+          }}
           className={`mt-1 ${textareaClass}`}
+          aria-invalid={Boolean(summaryPrivacyError)}
+          aria-describedby={summaryPrivacyError ? "fam-summary-error" : undefined}
         />
+        {summaryPrivacyError ? (
+          <p id="fam-summary-error" className="mt-1.5 text-sm text-red-700" role="alert">
+            {summaryPrivacyError}
+          </p>
+        ) : null}
       </div>
       <div>
         <Label htmlFor="fam-circumstances">Current circumstances</Label>
@@ -111,9 +143,19 @@ export function UpdateFamilyForm({
           id="fam-circumstances"
           rows={4}
           value={householdNotes}
-          onChange={(e) => setHouseholdNotes(e.target.value)}
+          onChange={(e) => {
+            setHouseholdNotes(e.target.value);
+            setNotesPrivacyError(null);
+          }}
           className={`mt-1 ${textareaClass}`}
+          aria-invalid={Boolean(notesPrivacyError)}
+          aria-describedby={notesPrivacyError ? "fam-circumstances-error" : undefined}
         />
+        {notesPrivacyError ? (
+          <p id="fam-circumstances-error" className="mt-1.5 text-sm text-red-700" role="alert">
+            {notesPrivacyError}
+          </p>
+        ) : null}
       </div>
       <div className="flex gap-2">
         {onCancel && (
