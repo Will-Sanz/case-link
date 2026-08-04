@@ -7,7 +7,14 @@ const source = {
   goals: ["Stable housing"],
   barriers: ["Housing instability", "Transportation"],
   planSummary: "Prioritize housing intake.",
-  planSteps: [{ phase: "30", title: "Housing intake", description: "Gather documents.", action: "Complete the housing intake." }],
+  planActions: [{
+    goal: "Stable housing",
+    title: "Complete the housing intake",
+    description: "Gather documents.",
+    targetDate: "2026-08-10",
+    status: "in_progress",
+    expectedOutcome: "Housing intake submitted",
+  }],
 };
 
 describe("createDeterministicMappings", () => {
@@ -26,5 +33,23 @@ describe("createDeterministicMappings", () => {
   it("honors a PDF text field maximum length", () => {
     const [mapping] = createDeterministicMappings([{ name: "family_summary", kind: "text", options: [], maxLength: 10 }], source);
     expect(mapping.value).toHaveLength(10);
+  });
+
+  it("maps numbered service-plan fields to the matching barrier and goal", () => {
+    const mappings = createDeterministicMappings(
+      [
+        { name: "Contributing_Factor_2", kind: "text", options: [], maxLength: null },
+        { name: "Goal_1", kind: "text", options: [], maxLength: null },
+        { name: "Strategy_Case_Worker_Objective_1", kind: "text", options: [], maxLength: null },
+        { name: "Target_Date_1", kind: "text", options: [], maxLength: null },
+      ],
+      source,
+    );
+    expect(mappings.map((mapping) => mapping.value)).toEqual([
+      "Transportation",
+      "Stable housing",
+      "Complete the housing intake",
+      "2026-08-10",
+    ]);
   });
 });

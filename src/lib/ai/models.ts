@@ -42,6 +42,7 @@ const RESPONSES_API_TASK_TYPES: AiTaskType[] = [
   "plan_refinement",
   "step_refinement",
   "case_assistant",
+  "pdf_field_mapping",
   "blocker_troubleshoot",
 ];
 

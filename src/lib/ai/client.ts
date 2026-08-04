@@ -47,10 +47,18 @@ export type StructuredJsonSchema = {
   strict?: boolean;
 };
 
+export type AiFileInput = {
+  filename: string;
+  /** Raw base64, without a data-URL prefix. */
+  fileDataBase64: string;
+};
+
 export type CreateResponseOptions = {
   taskType: AiTaskType;
   instructions: string;
   input: string | ChatMessage[];
+  /** Responses API file inputs. Used only for short-lived, request-scoped analysis. */
+  fileInputs?: AiFileInput[];
   /** Legacy JSON mode, model returns valid JSON only; no schema enforcement. */
   responseFormat?: "json_object";
   /** When set, API enforces this schema (Responses: text.format; Chat: response_format json_schema). */
@@ -169,7 +177,8 @@ export async function createAiResponse(
     return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
   }
 
-  const useResponses = !modelOverride && taskUsesResponsesApi(options.taskType);
+  const useResponses = Boolean(options.fileInputs?.length) ||
+    (!modelOverride && taskUsesResponsesApi(options.taskType));
   const instructions = augmentInstructionsForMode(options.instructions, mode);
   const requestedMax = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
   const outputCap =
@@ -195,6 +204,10 @@ export async function createAiResponse(
     }
     return { ok: false, error: exposeAiErrorToClient(err, envDebug) };
   }
+  if (options.fileInputs?.length && typeof options.input !== "string") {
+    const internal = "File inputs require a single text prompt.";
+    return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
+  }
 
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
@@ -216,6 +229,7 @@ export async function createAiResponse(
       inputChars: inputSummary.chars,
       instructionsChars: instructions.length,
       maxTokens,
+      fileCount: options.fileInputs?.length ?? 0,
     });
     if (payloadDebug) {
       console.info("[ai] request:instructions", instructions.slice(0, 2000));
@@ -290,7 +304,21 @@ async function callResponsesApi(
   mode: AiMode,
 ): Promise<CreateResponseResult> {
   const input =
-    typeof options.input === "string"
+    typeof options.input === "string" && options.fileInputs?.length
+      ? [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: options.input },
+              ...options.fileInputs.map((file) => ({
+                type: "input_file",
+                filename: file.filename,
+                file_data: file.fileDataBase64,
+              })),
+            ],
+          },
+        ]
+      : typeof options.input === "string"
       ? options.input
       : options.input.map((m) => ({
           role: m.role,
@@ -302,6 +330,7 @@ async function callResponsesApi(
     instructions: options.instructions,
     input,
     max_output_tokens: options.maxTokens ?? 4096,
+    store: false,
   };
   if (modelSupportsReasoningEffort(model)) {
     body.reasoning = { effort: mode === "thinking" ? "high" : "low" };

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument } from "pdf-lib";
-import { applyPdfMappings, inspectPdfFields, UnsupportedPdfFieldError } from "@/lib/paperwork/pdf-form";
+import {
+  applyPdfMappings,
+  applyPdfOverlayMappings,
+  displayedPdfPageSize,
+  displayedPointToPdfPoint,
+  inspectPdfFields,
+  UnsupportedPdfFieldError,
+} from "@/lib/paperwork/pdf-form";
 
 describe("inspectPdfFields", () => {
   it("reads supported AcroForm field types and options", async () => {
@@ -55,5 +62,44 @@ describe("inspectPdfFields", () => {
     const page = document.addPage();
     document.getForm().createButton("Submit_Button").addToPage("Submit", page);
     expect(() => inspectPdfFields(document)).toThrow(UnsupportedPdfFieldError);
+  });
+
+  it("translates displayed coordinates for rotated scanned pages", () => {
+    const geometry = { width: 792, height: 612, rotation: 270 };
+    expect(displayedPdfPageSize(geometry)).toEqual({ width: 612, height: 792 });
+    expect(displayedPointToPdfPoint(geometry, 120, 700)).toEqual({ x: 700, y: 492 });
+  });
+
+  it("draws reviewed overlay text into a flattened PDF", async () => {
+    const document = await PDFDocument.create();
+    document.addPage([612, 792]);
+    await applyPdfOverlayMappings(
+      document,
+      [
+        {
+          fieldName: "goal_1",
+          label: "Goal",
+          pageIndex: 0,
+          kind: "text",
+          x: 0.2,
+          y: 0.2,
+          width: 0.5,
+          height: 0.08,
+        },
+      ],
+      [
+        {
+          fieldName: "goal_1",
+          value: "Secure stable housing",
+          confidence: "high",
+          source: "Reviewed plan",
+          needsReview: false,
+        },
+      ],
+    );
+    const bytes = await document.save();
+    const reloaded = await PDFDocument.load(bytes);
+    expect(reloaded.getPageCount()).toBe(1);
+    expect(bytes.byteLength).toBeGreaterThan(500);
   });
 });
