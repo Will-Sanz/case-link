@@ -148,6 +148,17 @@ async function logCaseActivity(
   void error;
 }
 
+function totalGenerationDurationMs(
+  timings: PlanGenerationState["stage_timings_ms"],
+): number {
+  return Object.values(timings).reduce((total, duration) => {
+    if (typeof duration !== "number" || !Number.isFinite(duration) || duration < 0) {
+      return total;
+    }
+    return total + duration;
+  }, 0);
+}
+
 async function clearPlanReview(supabase: SupabaseClient, planId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("plans")
@@ -756,6 +767,18 @@ async function advanceStagedLeanPlanGenerationCore(input: {
           },
         })
         .eq("id", planId);
+      await logCaseActivity(
+        supabase,
+        input.familyId,
+        userId,
+        "plan.generation_finished",
+        "plan",
+        planId,
+        {
+          recovered: true,
+          duration_ms: totalGenerationDurationMs(state.stage_timings_ms),
+        },
+      );
       return { ok: true, done: true };
     }
     state = {
@@ -803,10 +826,20 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         },
       })
       .eq("id", planId);
+    await logCaseActivity(
+      supabase,
+      input.familyId,
+      userId,
+      "plan.generation_failed",
+      "plan",
+      planId,
+      { pending_stage: state.pending_phase, category: "privacy_check" },
+    );
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
   async function persistState(updates: Partial<PlanGenerationState>, summaryUpdate?: string | null) {
+    const previousStatus = state.status;
     const next = { ...state, ...updates };
     state = next as PlanGenerationState;
     await supabase
@@ -816,6 +849,29 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         ai_model: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
       })
       .eq("id", planId);
+
+    if (next.status === "failed" && previousStatus !== "failed") {
+      await logCaseActivity(
+        supabase,
+        input.familyId,
+        userId,
+        "plan.generation_failed",
+        "plan",
+        planId,
+        { pending_stage: next.pending_phase, category: "generation" },
+      );
+    }
+    if (next.status === "complete" && previousStatus !== "complete") {
+      await logCaseActivity(
+        supabase,
+        input.familyId,
+        userId,
+        "plan.generation_finished",
+        "plan",
+        planId,
+        { duration_ms: totalGenerationDurationMs(next.stage_timings_ms) },
+      );
+    }
   }
 
   if (state.pending_phase === "30") {
@@ -863,11 +919,12 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: ins.error };
     }
     const modelsUsed = [...state.models_used, res.model];
+    const durationMs = Date.now() - t;
     await persistState({
       pending_phase: "60",
       phases_complete: { ...state.phases_complete, "30": true },
       models_used: modelsUsed,
-      stage_timings_ms: { ...state.stage_timings_ms, "30": Date.now() - t },
+      stage_timings_ms: { ...state.stage_timings_ms, "30": durationMs },
     });
     await logCaseActivity(
       supabase,
@@ -876,7 +933,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       "plan.stage_generated",
       "plan",
       planId,
-      { stage: "initial", steps: steps.length },
+      { stage: "initial", steps: steps.length, duration_ms: durationMs },
     );
     revalidatePath(`/families/${input.familyId}`, "page");
     revalidatePath("/calendar");
@@ -934,12 +991,22 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: ins.error };
     }
     const models_used = [...state.models_used, res.model];
+    const durationMs = Date.now() - t;
     await persistState({
       pending_phase: "90",
       phases_complete: { ...state.phases_complete, "60": true },
       models_used,
-      stage_timings_ms: { ...state.stage_timings_ms, "60": Date.now() - t },
+      stage_timings_ms: { ...state.stage_timings_ms, "60": durationMs },
     });
+    await logCaseActivity(
+      supabase,
+      input.familyId,
+      userId,
+      "plan.stage_generated",
+      "plan",
+      planId,
+      { stage: "follow_up", steps: steps.length, duration_ms: durationMs },
+    );
     revalidatePath(`/families/${input.familyId}`, "page");
     revalidatePath("/calendar");
     return { ok: true, done: false, phaseCompleted: "60" };
@@ -996,12 +1063,22 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: ins.error };
     }
     const models_used = [...state.models_used, res.model];
+    const durationMs = Date.now() - t;
+    await logCaseActivity(
+      supabase,
+      input.familyId,
+      userId,
+      "plan.stage_generated",
+      "plan",
+      planId,
+      { stage: "complete_plan", steps: steps.length, duration_ms: durationMs },
+    );
     await persistState({
       pending_phase: null,
       status: "complete",
       phases_complete: { ...state.phases_complete, "90": true },
       models_used,
-      stage_timings_ms: { ...state.stage_timings_ms, "90": Date.now() - t },
+      stage_timings_ms: { ...state.stage_timings_ms, "90": durationMs },
     });
     revalidatePath(`/families/${input.familyId}`, "page");
     revalidatePath("/calendar");
