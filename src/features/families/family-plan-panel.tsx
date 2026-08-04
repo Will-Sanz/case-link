@@ -30,6 +30,12 @@ import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
+import {
+  localActionDraftKey,
+  parseLocalActionDraft,
+  serializeLocalActionDraft,
+  type LocalActionDraft,
+} from "@/lib/domain/plan/local-action-draft";
 
 function dateInputValueAfterDays(days: number): string {
   const value = new Date();
@@ -56,8 +62,8 @@ function normalizeChecklistForSave(lines: string[] | undefined): string[] {
   return (lines ?? []).map((l) => l.trim()).filter((l) => l.length > 0);
 }
 
-/** Snapshot of what we persist in `updatePlanStep`, for dirty detection only. */
-function normalizeStepForPersistCompare(step: PlanStepRow): string {
+/** Snapshot of the parent plan-step record (excludes independently saved task rows). */
+function normalizeStepRecordForPersistCompare(step: PlanStepRow): string {
   const d = { ...(step.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
   d.owner ??= "case_manager";
   const normalizedChecklist = normalizeChecklistForSave(d.checklist);
@@ -79,6 +85,13 @@ function normalizeStepForPersistCompare(step: PlanStepRow): string {
     priority: step.priority ?? undefined,
     details: Object.keys(d).length > 0 ? d : undefined,
     workflow_data: wd,
+  });
+}
+
+/** Snapshot of everything edited in one action card, for dirty detection only. */
+function normalizeStepForPersistCompare(step: PlanStepRow): string {
+  return JSON.stringify({
+    step: normalizeStepRecordForPersistCompare(step),
     action_items: (step.action_items ?? []).map((action) => ({
       id: action.id,
       title: action.title,
@@ -96,6 +109,11 @@ function normalizeStepForPersistCompare(step: PlanStepRow): string {
 function stepNeedsPersist(orig: PlanStepRow | undefined, next: PlanStepRow): boolean {
   if (!orig) return true;
   return normalizeStepForPersistCompare(orig) !== normalizeStepForPersistCompare(next);
+}
+
+function stepRecordNeedsPersist(orig: PlanStepRow | undefined, next: PlanStepRow): boolean {
+  if (!orig) return true;
+  return normalizeStepRecordForPersistCompare(orig) !== normalizeStepRecordForPersistCompare(next);
 }
 
 function clonePlan(p: PlanWithSteps): PlanWithSteps {
@@ -131,7 +149,7 @@ export function FamilyPlanPanel({
   familyName: string;
   plan: PlanWithSteps | null;
   workflow: BarrierWorkflowResult | null;
-  onToggleActionItem?: (actionItemId: string, done: boolean) => void;
+  onToggleActionItem?: (actionItemId: string, done: boolean, expectedUpdatedAt: string) => void;
   actionToggleDisabled?: boolean;
   onRetryResources?: () => void;
   resourceRetrying?: boolean;
@@ -145,6 +163,8 @@ export function FamilyPlanPanel({
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
+  const [recoverableDraft, setRecoverableDraft] = useState<LocalActionDraft | null>(null);
+  const draftRecoveryLoadedPlanIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [addStepGoal, setAddStepGoal] = useState("");
@@ -208,6 +228,40 @@ export function FamilyPlanPanel({
     return stepNeedsPersist(orig, stepDraft);
   }, [editingStepId, stepDraft, plan]);
 
+  const actionDraftStorageKey = plan ? localActionDraftKey(plan.id) : null;
+
+  useEffect(() => {
+    if (!plan || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {
+      return;
+    }
+    draftRecoveryLoadedPlanIdRef.current = plan.id;
+    const stored = parseLocalActionDraft(window.localStorage.getItem(actionDraftStorageKey));
+    if (!stored || stored.planId !== plan.id) {
+      window.localStorage.removeItem(actionDraftStorageKey);
+      return;
+    }
+    if (!plan.steps.some((step) => step.id === stored.step.id)) {
+      window.localStorage.removeItem(actionDraftStorageKey);
+      return;
+    }
+    setRecoverableDraft(stored);
+  }, [actionDraftStorageKey, plan]);
+
+  useEffect(() => {
+    if (!actionDraftStorageKey || !stepDirty || !stepDraft || !plan) return;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          actionDraftStorageKey,
+          serializeLocalActionDraft(plan.id, stepDraft),
+        );
+      } catch {
+        // The in-memory draft remains available when browser storage is unavailable.
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [actionDraftStorageKey, plan, stepDirty, stepDraft]);
+
   useEffect(() => {
     if (!stepDirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -257,11 +311,30 @@ export function FamilyPlanPanel({
     fn?.();
   }
 
+  function clearLocalActionDraft() {
+    if (actionDraftStorageKey) window.localStorage.removeItem(actionDraftStorageKey);
+    setRecoverableDraft(null);
+  }
+
+  function restoreLocalActionDraft() {
+    if (!recoverableDraft || !plan) return;
+    if (!plan.steps.some((step) => step.id === recoverableDraft.step.id)) {
+      clearLocalActionDraft();
+      return;
+    }
+    setEditingStepId(recoverableDraft.step.id);
+    setStepDraft(cloneStep(recoverableDraft.step));
+    setRecoverableDraft(null);
+    setError(null);
+    setSuccess("Unsaved action edit restored. Review it before saving.");
+  }
+
   function switchToStepEdit(stepId: string): boolean {
     if (!plan) return false;
     if (editingStepId === stepId) return true;
     const s = plan.steps.find((x) => x.id === stepId);
     if (!s) return false;
+    clearLocalActionDraft();
     setEditingStepId(stepId);
     setStepDraft(cloneStep(s));
     setAiStepId(null);
@@ -289,6 +362,7 @@ export function FamilyPlanPanel({
   }
 
   function cancelStepEdit() {
+    clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
     setAiStepId(null);
@@ -363,20 +437,23 @@ export function FamilyPlanPanel({
       wd.checklist_completed = Array(checklistLen).fill(false);
     }
 
-    const stepRes = await updatePlanStep({
-      stepId: s.id,
-      familyId,
-      title: s.title,
-      description: s.description,
-      status: s.status,
-      phase: s.phase,
-      priority: (s.priority ?? undefined) as "low" | "medium" | "high" | "urgent" | undefined,
-      details: Object.keys(d).length > 0 ? d : undefined,
-      workflow_data: wd,
-    });
-    if (!stepRes.ok) {
-      setError(stepRes.error);
-      return false;
+    if (stepRecordNeedsPersist(orig, s)) {
+      const stepRes = await updatePlanStep({
+        stepId: s.id,
+        familyId,
+        expectedUpdatedAt: orig?.updated_at,
+        title: s.title,
+        description: s.description,
+        status: s.status,
+        phase: s.phase,
+        priority: (s.priority ?? undefined) as "low" | "medium" | "high" | "urgent" | undefined,
+        details: Object.keys(d).length > 0 ? d : undefined,
+        workflow_data: wd,
+      });
+      if (!stepRes.ok) {
+        setError(stepRes.error);
+        return false;
+      }
     }
 
     for (const ai of s.action_items ?? []) {
@@ -395,6 +472,7 @@ export function FamilyPlanPanel({
       const ar = await updatePlanStepActionItem({
         actionItemId: ai.id,
         familyId,
+        expectedUpdatedAt: oai?.updated_at,
         title: ai.title,
         description: ai.description,
         week_index: ai.week_index,
@@ -447,6 +525,7 @@ export function FamilyPlanPanel({
         const ok = await persistOneStep(orig, stepDraft);
         if (!ok) return;
         setSuccess("Action saved.");
+        clearLocalActionDraft();
         setEditingStepId(null);
         setStepDraft(null);
         setAiStepId(null);
@@ -475,6 +554,7 @@ export function FamilyPlanPanel({
           return;
         }
         if (editingStepId === stepId) {
+          clearLocalActionDraft();
           setEditingStepId(null);
           setStepDraft(null);
           setAiStepId(null);
@@ -956,6 +1036,23 @@ export function FamilyPlanPanel({
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           {success}
         </p>
+      ) : null}
+
+      {recoverableDraft && !editingStepId ? (
+        <section className="rounded-lg border border-[#cfe0cc] bg-[#f3f8f1] px-4 py-3" role="status">
+          <p className="text-sm font-semibold text-[#173a15]">Unsaved action edit found</p>
+          <p className="mt-1 text-xs leading-5 text-[#5d705a]">
+            Restore “{recoverableDraft.step.title}” to continue where you left off.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" onClick={restoreLocalActionDraft}>
+              Restore edit
+            </Button>
+            <Button type="button" variant="ghost" onClick={clearLocalActionDraft}>
+              Discard saved edit
+            </Button>
+          </div>
+        </section>
       ) : null}
 
       {plan?.generation_state?.status === "failed" ? (

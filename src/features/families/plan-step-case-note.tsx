@@ -163,7 +163,7 @@ export function PlanStepCaseNote({
   onPatchStep: (patch: Partial<PlanStepRow>) => void;
   onPatchDetails: (patch: Partial<PlanStepDetails>) => void;
   onPatchActionItem: (actionItemId: string, patch: Partial<PlanStepActionItemRow>) => void;
-  onToggleActionItem?: (actionItemId: string, done: boolean) => void;
+  onToggleActionItem?: (actionItemId: string, done: boolean, expectedUpdatedAt: string) => void;
   actionToggleDisabled?: boolean;
   onPatchWorkflow?: (patch: NonNullable<PlanStepRow["workflow_data"]>) => void;
   onBeginEdit?: () => void;
@@ -557,7 +557,11 @@ export function PlanStepCaseNote({
                         type="checkbox"
                         checked={done}
                         onChange={(event) =>
-                          onToggleActionItem?.(action.id, event.target.checked)
+                          onToggleActionItem?.(
+                            action.id,
+                            event.target.checked,
+                            action.updated_at,
+                          )
                         }
                         disabled={actionToggleDisabled || !onToggleActionItem}
                         className="mt-0.5 size-4 shrink-0 accent-[#276221]"

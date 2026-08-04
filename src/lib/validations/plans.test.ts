@@ -59,6 +59,7 @@ describe("plan execution schemas", () => {
       updatePlanStepActionItemSchema.safeParse({
         familyId: baseInput.familyId,
         actionItemId: "596a15f1-aa32-4371-b9c7-dfa081c85497",
+        expectedUpdatedAt: "2026-08-03T20:30:00.000Z",
         status: "blocked",
         notes: "Waiting for the program to return the call.",
         follow_up_date: "2026-08-12",

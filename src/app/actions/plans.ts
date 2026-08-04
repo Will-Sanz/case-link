@@ -1186,7 +1186,7 @@ export async function updatePlanStep(
     return { ok: false, error: "Unauthorized" };
   }
 
-  const { stepId, familyId, ...patch } = parsed.data;
+  const { stepId, familyId, expectedUpdatedAt, ...patch } = parsed.data;
   if (Object.keys(patch).length === 0) {
     return { ok: true };
   }
@@ -1201,6 +1201,23 @@ export async function updatePlanStep(
 
   if (!planRow) {
     return { ok: false, error: "Plan not found" };
+  }
+
+  if (expectedUpdatedAt) {
+    const { data: currentStep } = await supabase
+      .from("plan_steps")
+      .select("updated_at")
+      .eq("id", stepId)
+      .eq("plan_id", planRow.id)
+      .maybeSingle();
+    if (!currentStep) return { ok: false, error: "Action not found" };
+    if (currentStep.updated_at !== expectedUpdatedAt) {
+      return {
+        ok: false,
+        error:
+          "This action changed in another tab. Your edits are still here; reload to compare with the latest version.",
+      };
+    }
   }
 
   const changesReviewedContent =
@@ -1227,12 +1244,13 @@ export async function updatePlanStep(
   if (patch.phase !== undefined) updatePayload.phase = patch.phase;
   if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
 
-  const { data: updatedRows, error } = await supabase
+  let updateQuery = supabase
     .from("plan_steps")
     .update(updatePayload)
     .eq("id", stepId)
-    .eq("plan_id", planRow.id)
-    .select("id");
+    .eq("plan_id", planRow.id);
+  if (expectedUpdatedAt) updateQuery = updateQuery.eq("updated_at", expectedUpdatedAt);
+  const { data: updatedRows, error } = await updateQuery.select("id");
 
   if (error) {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
@@ -1643,16 +1661,23 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
     return { ok: false, error: "Unauthorized" };
   }
 
-  const { actionItemId, familyId, status } = parsed.data;
+  const { actionItemId, familyId, status, expectedUpdatedAt } = parsed.data;
 
   const { data: ai } = await supabase
     .from("plan_step_action_items")
-    .select("plan_step_id, status, notes, follow_up_date")
+    .select("plan_step_id, status, notes, follow_up_date, updated_at")
     .eq("id", actionItemId)
     .maybeSingle();
 
   if (!ai) {
     return { ok: false, error: "Action item not found" };
+  }
+  if (expectedUpdatedAt && ai.updated_at !== expectedUpdatedAt) {
+    return {
+      ok: false,
+      error:
+        "This action changed in another tab. Your edits are still here; reload to compare with the latest version.",
+    };
   }
 
   const { data: step } = await supabase
@@ -1721,13 +1746,24 @@ export async function updatePlanStepActionItem(input: unknown): Promise<ActionRe
     return { ok: true };
   }
 
-  const { error } = await supabase
+  let actionUpdateQuery = supabase
     .from("plan_step_action_items")
     .update(patch)
     .eq("id", actionItemId);
+  if (expectedUpdatedAt) {
+    actionUpdateQuery = actionUpdateQuery.eq("updated_at", expectedUpdatedAt);
+  }
+  const { data: updatedActionItems, error } = await actionUpdateQuery.select("id");
 
   if (error) {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
+  }
+  if (!updatedActionItems?.length) {
+    return {
+      ok: false,
+      error:
+        "This action changed in another tab. Your edits are still here; reload to compare with the latest version.",
+    };
   }
 
   await logCaseActivity(

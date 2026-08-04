@@ -382,9 +382,14 @@ export function FamilyLiteWorkspace({
     })();
   }
 
-  function toggleAction(actionItemId: string, done: boolean) {
+  function toggleAction(actionItemId: string, done: boolean, expectedUpdatedAt: string) {
     startTransition(async () => {
-      const r = await toggleBarrierWorkflowActionItemAction(familyId, actionItemId, done);
+      const r = await toggleBarrierWorkflowActionItemAction(
+        familyId,
+        actionItemId,
+        done,
+        expectedUpdatedAt,
+      );
       if (!r.ok) return setError(r.error);
       setResult(r.result);
       router.refresh();

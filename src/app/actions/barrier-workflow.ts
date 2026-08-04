@@ -354,11 +354,13 @@ export async function toggleBarrierWorkflowActionItemAction(
   familyId: string,
   actionItemId: string,
   completed: boolean,
+  expectedUpdatedAt?: string,
 ): Promise<{ ok: true; result: BarrierWorkflowResult } | { ok: false; error: string }> {
   const update = await updatePlanStepActionItem({
     familyId,
     actionItemId,
     status: completed ? "completed" : "pending",
+    expectedUpdatedAt,
   });
   if (!update.ok) return { ok: false, error: update.error };
 
