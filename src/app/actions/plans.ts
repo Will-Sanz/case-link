@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
+import { publicSessionError } from "@/lib/auth/session-errors";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
@@ -31,7 +32,11 @@ import {
 } from "@/lib/domain/plan/action-state";
 import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
-import { publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
+import {
+  publicMessageFromCaughtError,
+  publicMessageFromSupabaseError,
+} from "@/lib/errors/public-action-error";
+import { logServerError } from "@/lib/logger/server-error";
 import {
   validateFamilyNoPii,
   validateNoPii,
@@ -52,11 +57,11 @@ import {
   createManualStepSchema,
   deletePlanStepSchema,
   generatePlanSchema,
-  logPlanStepActivitySchema,
+  stagedPlanAdvanceSchema,
+  stagedPlanStartSchema,
   markPlanReviewedSchema,
   previewRefineStepSchema,
   previewRefinePlanSchema,
-  refineStepSchema,
   toggleChecklistItemSchema,
   updatePlanSchema,
   updatePlanStepActionItemSchema,
@@ -165,27 +170,48 @@ export type StagedPlanAdvanceResult =
   | { ok: true; done: boolean; phaseCompleted?: "30" | "60" | "90" }
   | { ok: false; error: string };
 
-/** Serialize staged advance per family so overlapping polls do not run the same phase twice. */
-const advanceStagedChainByFamilyId = new Map<string, Promise<unknown>>();
-
 async function logCaseActivity(
   supabase: SupabaseClient,
   familyId: string,
-  userId: string | null,
   action: string,
   entityType?: string,
   entityId?: string,
   details?: Record<string, unknown>,
 ) {
-  const { error } = await supabase.from("activity_log").insert({
-    family_id: familyId,
-    actor_user_id: userId,
-    action,
-    entity_type: entityType ?? null,
-    entity_id: entityId ?? null,
-    details: details ?? null,
+  const { error } = await supabase.rpc("record_activity_event", {
+    p_family_id: familyId,
+    p_action: action,
+    p_entity_type: entityType ?? null,
+    p_entity_id: entityId ?? null,
+    p_details: details ?? null,
   });
-  void error;
+  // These application-source timeline hints are not the authoritative audit stream.
+  // Never report a saved edit as failed because a later best-effort hint was unavailable.
+  if (error) logServerError("plans:product-timeline", error);
+}
+
+async function updateStagedPlanState(
+  supabase: SupabaseClient,
+  input: {
+    familyId: string;
+    planId: string;
+    generationState: PlanGenerationState;
+    aiModel: string | null;
+    event?: "plan.generation_failed" | "plan.generation_finished" | "plan.generation_resumed";
+    eventDetails?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const { data, error } = await supabase.rpc("update_staged_plan_state", {
+    p_family_id: input.familyId,
+    p_plan_id: input.planId,
+    p_generation_state: input.generationState,
+    p_ai_model: input.aiModel,
+    p_event: input.event ?? null,
+    p_event_details: input.eventDetails ?? null,
+  });
+  if (error || data !== true) {
+    throw error ?? new Error("Staged-plan state update returned an invalid result.");
+  }
 }
 
 function totalGenerationDurationMs(
@@ -197,31 +223,6 @@ function totalGenerationDurationMs(
     }
     return total + duration;
   }, 0);
-}
-
-async function clearPlanReview(supabase: SupabaseClient, planId: string): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("plans")
-    .select("client_display")
-    .eq("id", planId)
-    .maybeSingle();
-  if (error) return publicMessageFromSupabaseError(error);
-  if (!data) return "Plan not found";
-
-  const raw = data.client_display;
-  const display =
-    raw && typeof raw === "object" && !Array.isArray(raw)
-      ? { ...(raw as Record<string, unknown>) }
-      : {};
-  if (!("reviewedAt" in display) && !("reviewedById" in display)) return null;
-  delete display.reviewedAt;
-  delete display.reviewedById;
-
-  const { error: updateError } = await supabase
-    .from("plans")
-    .update({ client_display: Object.keys(display).length > 0 ? display : null })
-    .eq("id", planId);
-  return updateError ? publicMessageFromSupabaseError(updateError) : null;
 }
 
 function normAiNullable(v: string | null | undefined): string | null {
@@ -258,83 +259,56 @@ async function countStepsInPhase(
   return count ?? 0;
 }
 
-async function insertLeanPhaseStepsForPlan(
+async function appendLeanPhaseForPlan(
   supabase: SupabaseClient,
+  familyId: string,
   planId: string,
   phaseSteps: LeanPlanPhaseStep[],
   sortOrderStart: number,
   planStartDate: string,
+  generationState: PlanGenerationState,
+  aiModel: string,
+  durationMs: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (phaseSteps.length === 0) {
     return { ok: false, error: "No steps to insert for this phase" };
   }
 
   const rows = phaseSteps.map((lean, i) => ({
-    plan_id: planId,
     phase: lean.phase,
     title: lean.title.trim(),
     description: lean.summary.trim(),
     sort_order: sortOrderStart + i,
-    status: "pending" as const,
     details: sparseDetailsForPersistence(lean),
     priority:
       lean.priority === "urgent" ? "urgent"
       : lean.priority === "high" ? "high"
       : lean.priority === "low" ? "low"
       : "medium",
+    action_items: lean.action_items.map((item, sortOrder) => ({
+      title: item.title.trim(),
+      description: normAiNullable(item.description as string | null | undefined),
+      week_index: item.week_index,
+      target_date: resolveActionTargetDate({
+        planStartDate,
+        weekIndex: item.week_index,
+        proposedTargetDate: item.target_date,
+      }),
+      sort_order: sortOrder,
+    })),
   }));
 
-  const { data: insertedSteps, error: stepsErr } = await supabase
-    .from("plan_steps")
-    .insert(rows)
-    .select("id, sort_order")
-    .order("sort_order", { ascending: true });
-
-  if (stepsErr || !insertedSteps?.length) {
-    return {
-      ok: false,
-      error: publicMessageFromSupabaseError(stepsErr, "Could not insert plan steps"),
-    };
-  }
-
-  const actionItemRows: Array<{
-    plan_step_id: string;
-    title: string;
-    description: string | null;
-    week_index: number;
-    target_date: string | null;
-    status: string;
-    sort_order: number;
-  }> = [];
-
-  for (let i = 0; i < phaseSteps.length; i++) {
-    const lean = phaseSteps[i];
-    const stepId = insertedSteps[i]?.id;
-    if (!stepId) continue;
-    for (let j = 0; j < lean.action_items.length; j++) {
-      const ai = lean.action_items[j];
-      actionItemRows.push({
-        plan_step_id: stepId,
-        title: ai.title.trim(),
-        description: normAiNullable(ai.description as string | null | undefined),
-        week_index: ai.week_index,
-        target_date: resolveActionTargetDate({
-          planStartDate,
-          weekIndex: ai.week_index,
-          proposedTargetDate: ai.target_date,
-        }),
-        status: "pending",
-        sort_order: j,
-      });
-    }
-  }
-
-  if (actionItemRows.length > 0) {
-    const { error: itemsErr } = await supabase.from("plan_step_action_items").insert(actionItemRows);
-    if (itemsErr) {
-      return { ok: false, error: publicMessageFromSupabaseError(itemsErr) };
-    }
-  }
+  const { data: appended, error } = await supabase.rpc("append_staged_plan_phase", {
+    p_family_id: familyId,
+    p_plan_id: planId,
+    p_phase: phaseSteps[0].phase,
+    p_steps: rows,
+    p_generation_state: generationState,
+    p_ai_model: aiModel,
+    p_duration_ms: durationMs,
+  });
+  if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
+  if (!appended) return { ok: false, error: "This plan phase was already saved." };
 
   return { ok: true };
 }
@@ -346,13 +320,11 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   }
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { familyId, regenerationFeedback, regenerateExistingPlan, aiMode } = parsed.data;
@@ -384,16 +356,6 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
   }
 
   const logPrefix = "[generatePlan]";
-
-  const { data: existingPlan } = await supabase
-    .from("plans")
-    .select("id, version")
-    .eq("family_id", familyId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const nextVersion = existingPlan ? ((existingPlan.version as number) + 1) : 1;
 
   const rulesSteps = generatePlanSteps({
     goals: detail.goals.map((g) => ({ preset_key: g.preset_key, label: g.label })),
@@ -430,9 +392,7 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
       fullRegeneration: mustUseAi,
       retries: 1,
       aiMode: planAiMode,
-      requestMeta:
-        userId ? { userId, route: "generatePlan" }
-        : undefined,
+      requestMeta: { route: "generatePlan" },
     });
     if (ai.ok && ai.steps.length > 0) {
       steps = ai.steps;
@@ -449,10 +409,10 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
         !ai.ok ?
           `Plan regeneration failed: ${ai.reason}`
         : "The AI returned no steps. Try again, or shorten your regeneration notes.";
-      console.error(`${logPrefix} regenerate requires AI; not using rules fallback`, {
-        aiOk: ai.ok,
-        reason: !ai.ok ? ai.reason : "zero steps",
-      });
+      logServerError(
+        `${logPrefix}:required-ai`,
+        new Error(!ai.ok ? ai.reason : "AI returned zero plan steps"),
+      );
       return { ok: false, error: msg };
     } else if (logRegen) {
       if (!ai.ok) {
@@ -481,134 +441,65 @@ export async function generatePlan(input: unknown): Promise<GeneratePlanResult> 
     s.sort_order = i;
   });
   steps = ensureActionItems(steps);
+  if (steps.length === 0) return { ok: false, error: "No plan steps were generated." };
 
-  const { data: plan, error: planErr } = await supabase
-    .from("plans")
-    .insert({
-      family_id: familyId,
-      version: nextVersion,
-      summary: null,
-      generation_source: generationSource,
-      ai_model: aiModel,
-    })
-    .select("id, created_at")
-    .single();
-
-  if (planErr || !plan) {
-    console.error(`${logPrefix} plans insert failed:`, planErr?.message ?? "no row");
-    return {
-      ok: false,
-      error: publicMessageFromSupabaseError(planErr, "Could not create plan"),
-    };
+  const approximatePlanStart = new Date().toISOString();
+  const { data: createdRaw, error: createError } = await supabase.rpc("create_plan_with_steps", {
+    p_family_id: familyId,
+    p_generation_source: generationSource,
+    p_ai_model: aiModel,
+    p_steps: steps.map((step) => ({
+      phase: step.phase,
+      title: step.title,
+      description: step.description,
+      sort_order: step.sort_order,
+      priority: step.details.priority,
+      details: step.details,
+      action_items: (step.action_items ?? []).map((item, sortOrder) => ({
+        title: item.title,
+        description: item.description ?? null,
+        week_index: item.week_index,
+        target_date: resolveActionTargetDate({
+          planStartDate: approximatePlanStart,
+          weekIndex: item.week_index,
+          proposedTargetDate: item.target_date,
+        }),
+        sort_order: sortOrder,
+      })),
+    })),
+  });
+  const created = createdRaw as {
+    planId?: unknown;
+    version?: unknown;
+    stepCount?: unknown;
+  } | null;
+  if (
+    createError ||
+    typeof created?.planId !== "string" ||
+    typeof created.version !== "number" ||
+    typeof created.stepCount !== "number"
+  ) {
+    logServerError(`${logPrefix}:create-plan`, createError ?? new Error("invalid RPC result"));
+    return { ok: false, error: publicMessageFromSupabaseError(createError, "Could not create plan") };
   }
-
-  if (steps.length > 0) {
-    const { data: insertedSteps, error: stepsErr } = await supabase
-      .from("plan_steps")
-      .insert(
-        steps.map((s) => ({
-          plan_id: plan.id,
-          phase: s.phase,
-          title: s.title,
-          description: s.description,
-          sort_order: s.sort_order,
-          status: "pending",
-          details: s.details ?? null,
-        })),
-      )
-      .select("id, sort_order")
-      .order("sort_order", { ascending: true });
-
-    if (stepsErr || !insertedSteps?.length) {
-      console.error(`${logPrefix} plan_steps insert failed:`, stepsErr?.message ?? "empty result");
-      if (!stepsErr) await supabase.from("plans").delete().eq("id", plan.id);
-      return {
-        ok: false,
-        error: publicMessageFromSupabaseError(stepsErr, "Could not create steps"),
-      };
-    }
-
-    const actionItemRows: Array<{
-      plan_step_id: string;
-      title: string;
-      description: string | null;
-      week_index: number;
-      target_date: string | null;
-      status: string;
-      sort_order: number;
-    }> = [];
-
-    const stepIdByIndex = new Map<number, string>();
-    for (const row of insertedSteps) {
-      stepIdByIndex.set(row.sort_order, row.id);
-    }
-
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      const stepId = stepIdByIndex.get(step.sort_order) ?? insertedSteps[i]?.id;
-      if (!stepId) continue;
-      const actionItems = step.action_items ?? [];
-      for (let j = 0; j < actionItems.length; j++) {
-        const ai = actionItems[j];
-        actionItemRows.push({
-          plan_step_id: stepId,
-          title: ai.title,
-          description: ai.description ?? null,
-          week_index: ai.week_index,
-          target_date: resolveActionTargetDate({
-            planStartDate: plan.created_at,
-            weekIndex: ai.week_index,
-            proposedTargetDate: ai.target_date,
-          }),
-          status: "pending",
-          sort_order: j,
-        });
-      }
-    }
-
-    if (actionItemRows.length > 0) {
-      const { error: itemsErr } = await supabase
-        .from("plan_step_action_items")
-        .insert(actionItemRows);
-      if (itemsErr) {
-        console.error(`${logPrefix} plan_step_action_items insert failed:`, itemsErr.message);
-        await supabase.from("plans").delete().eq("id", plan.id);
-        return { ok: false, error: publicMessageFromSupabaseError(itemsErr) };
-      }
-    }
-  } else if (logRegen) {
-    console.warn(`${logPrefix} zero steps after generation; plan row created with no steps`);
-  }
-
-  await logCaseActivity(
-    supabase,
-    familyId,
-    userId,
-    "plan.generated",
-    "plan",
-    plan.id,
-    { version: nextVersion, steps: steps.length, generation_source: generationSource },
-  );
 
   revalidatePath(`/families/${familyId}`, "page");
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
 
   if (logRegen) {
     console.info("[generatePlan] returning to client", {
       ok: true,
-      planId: plan.id,
-      version: nextVersion,
-      stepCount: steps.length,
+      planId: created.planId,
+      version: created.version,
+      stepCount: created.stepCount,
       generationSource,
     });
   }
 
   return {
     ok: true,
-    planId: plan.id,
-    version: nextVersion,
-    stepCount: steps.length,
+    planId: created.planId,
+    version: created.version,
+    stepCount: created.stepCount,
   };
 }
 
@@ -622,14 +513,15 @@ export async function startStagedLeanPlanGeneration(input: {
   regenerationFeedback?: string;
   aiMode?: AiMode;
 }): Promise<StagedPlanStartResult> {
+  const parsed = stagedPlanStartSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid request" };
+  input = parsed.data;
   let supabase: SupabaseClient;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const env = getEnv();
@@ -652,91 +544,46 @@ export async function startStagedLeanPlanGeneration(input: {
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
-  const { data: existingPlan } = await supabase
-    .from("plans")
-    .select("id, version, generation_state")
-    .eq("family_id", input.familyId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const brief = buildPlanningBrief(detail, input.regenerationFeedback);
+  const stagedMode = parseAiMode(input.aiMode);
+  const generationState = {
+    v: 1,
+    status: "running",
+    pending_phase: "30",
+    planning_brief: brief,
+    phases_complete: { "30": false, "60": false, "90": false },
+    models_used: [],
+    stage_timings_ms: {},
+    ai_mode: stagedMode,
+  } satisfies PlanGenerationState;
+  const { data: createdRaw, error: createError } = await supabase.rpc(
+    "start_staged_plan_generation",
+    { p_family_id: input.familyId, p_generation_state: generationState },
+  );
+  const created = createdRaw as { planId?: unknown; version?: unknown; existing?: unknown } | null;
+  if (createError || typeof created?.planId !== "string" || typeof created.version !== "number") {
+    return {
+      ok: false,
+      error: publicMessageFromSupabaseError(createError, "Could not create plan"),
+    };
+  }
 
-  const latestGen = existingPlan?.generation_state as PlanGenerationState | null | undefined;
-  if (existingPlan && latestGen?.v === 1 && latestGen.status === "running") {
+  let stepCount = 0;
+  if (created.existing === true) {
     const { count } = await supabase
       .from("plan_steps")
       .select("id", { count: "exact", head: true })
-      .eq("plan_id", existingPlan.id);
-    return {
-      ok: true,
-      planId: existingPlan.id as string,
-      version: existingPlan.version as number,
-      stepCount: count ?? 0,
-    };
+      .eq("plan_id", created.planId);
+    stepCount = count ?? 0;
   }
-
-  const nextVersion = existingPlan ? ((existingPlan.version as number) + 1) : 1;
-  const brief = buildPlanningBrief(detail, input.regenerationFeedback);
-  const stagedMode = parseAiMode(input.aiMode);
-
-  const { data: plan, error: planErr } = await supabase
-    .from("plans")
-    .insert({
-      family_id: input.familyId,
-      version: nextVersion,
-      summary: null,
-      generation_source: "openai",
-      ai_model: null,
-      generation_state: {
-        v: 1,
-        status: "running",
-        pending_phase: "30",
-        planning_brief: brief,
-        phases_complete: { "30": false, "60": false, "90": false },
-        models_used: [],
-        stage_timings_ms: {},
-        ai_mode: stagedMode,
-      } satisfies PlanGenerationState,
-    })
-    .select("id, created_at")
-    .single();
-
-  if (planErr || !plan) {
-    const { data: racedPlan } = await supabase
-      .from("plans")
-      .select("id, version, generation_state")
-      .eq("family_id", input.familyId)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const racedState = racedPlan?.generation_state as PlanGenerationState | null | undefined;
-    if (racedPlan && racedState?.v === 1 && racedState.status === "running") {
-      return {
-        ok: true,
-        planId: racedPlan.id as string,
-        version: racedPlan.version as number,
-        stepCount: 0,
-      };
-    }
-    return {
-      ok: false,
-      error: publicMessageFromSupabaseError(planErr, "Could not create plan"),
-    };
-  }
-
-  await logCaseActivity(supabase, input.familyId, userId, "plan.generation_started", "plan", plan.id, {
-    version: nextVersion,
-    staged: true,
-  });
 
   revalidatePath(`/families/${input.familyId}`, "page");
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
 
   return {
     ok: true,
-    planId: plan.id,
-    version: nextVersion,
-    stepCount: 0,
+    planId: created.planId,
+    version: created.version,
+    stepCount,
   };
 }
 
@@ -747,13 +594,11 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   aiMode?: AiMode;
 }): Promise<StagedPlanAdvanceResult> {
   let supabase: SupabaseClient;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const env = getEnv();
@@ -795,30 +640,24 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       "90": n90,
     });
     if (recoveredPendingPhase === null) {
-      await supabase
-        .from("plans")
-        .update({
-          generation_state: {
-            ...state,
-            status: "complete",
-            pending_phase: null,
-            phases_complete: { "30": true, "60": true, "90": true },
-            error: undefined,
-          },
-        })
-        .eq("id", planId);
-      await logCaseActivity(
-        supabase,
-        input.familyId,
-        userId,
-        "plan.generation_finished",
-        "plan",
+      const completedState: PlanGenerationState = {
+        ...state,
+        status: "complete",
+        pending_phase: null,
+        phases_complete: { "30": true, "60": true, "90": true },
+        error: undefined,
+      };
+      await updateStagedPlanState(supabase, {
+        familyId: input.familyId,
         planId,
-        {
+        generationState: completedState,
+        aiModel: activePlan.ai_model as string | null,
+        event: "plan.generation_finished",
+        eventDetails: {
           recovered: true,
           duration_ms: totalGenerationDurationMs(state.stage_timings_ms),
         },
-      );
+      });
       return { ok: true, done: true };
     }
     state = {
@@ -832,16 +671,14 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       },
       error: undefined,
     };
-    await supabase.from("plans").update({ generation_state: state }).eq("id", planId);
-    await logCaseActivity(
-      supabase,
-      input.familyId,
-      userId,
-      "plan.generation_resumed",
-      "plan",
+    await updateStagedPlanState(supabase, {
+      familyId: input.familyId,
       planId,
-      { pending_stage: recoveredPendingPhase },
-    );
+      generationState: state as PlanGenerationState,
+      aiModel: activePlan.ai_model as string | null,
+      event: "plan.generation_resumed",
+      eventDetails: { pending_stage: recoveredPendingPhase },
+    });
   }
   const generationMode = parseAiMode(state.ai_mode ?? input.aiMode);
   const detail = await getFamilyDetail(supabase, input.familyId);
@@ -856,25 +693,19 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     },
   ]);
   if (!privacy.ok) {
-    await supabase
-      .from("plans")
-      .update({
-        generation_state: {
-          ...state,
-          status: "failed",
-          error: "Remove identifying text from the family record before generating the plan.",
-        },
-      })
-      .eq("id", planId);
-    await logCaseActivity(
-      supabase,
-      input.familyId,
-      userId,
-      "plan.generation_failed",
-      "plan",
+    const failedState: PlanGenerationState = {
+      ...state,
+      status: "failed",
+      error: "Remove identifying text from the family record before generating the plan.",
+    };
+    await updateStagedPlanState(supabase, {
+      familyId: input.familyId,
       planId,
-      { pending_stage: state.pending_phase, category: "privacy_check" },
-    );
+      generationState: failedState,
+      aiModel: activePlan.ai_model as string | null,
+      event: "plan.generation_failed",
+      eventDetails: { pending_stage: state.pending_phase, category: "privacy_check" },
+    });
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
@@ -882,36 +713,25 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     const previousStatus = state.status;
     const next = { ...state, ...updates };
     state = next as PlanGenerationState;
-    await supabase
-      .from("plans")
-      .update({
-        generation_state: { ...next, ...(summaryUpdate !== undefined ? { summary: summaryUpdate } : {}) },
-        ai_model: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
-      })
-      .eq("id", planId);
-
-    if (next.status === "failed" && previousStatus !== "failed") {
-      await logCaseActivity(
-        supabase,
-        input.familyId,
-        userId,
-        "plan.generation_failed",
-        "plan",
-        planId,
-        { pending_stage: next.pending_phase, category: "generation" },
-      );
-    }
-    if (next.status === "complete" && previousStatus !== "complete") {
-      await logCaseActivity(
-        supabase,
-        input.familyId,
-        userId,
-        "plan.generation_finished",
-        "plan",
-        planId,
-        { duration_ms: totalGenerationDurationMs(next.stage_timings_ms) },
-      );
-    }
+    const generationState = {
+      ...next,
+      ...(summaryUpdate !== undefined ? { summary: summaryUpdate } : {}),
+    } as PlanGenerationState;
+    const event =
+      next.status === "failed" && previousStatus !== "failed" ? "plan.generation_failed" as const
+      : next.status === "complete" && previousStatus !== "complete" ? "plan.generation_finished" as const
+      : undefined;
+    await updateStagedPlanState(supabase, {
+      familyId: input.familyId,
+      planId,
+      generationState,
+      aiModel: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
+      event,
+      eventDetails:
+        event === "plan.generation_failed" ? { pending_stage: next.pending_phase, category: "generation" }
+        : event === "plan.generation_finished" ? { duration_ms: totalGenerationDurationMs(next.stage_timings_ms) }
+        : undefined,
+    });
   }
 
   if (state.pending_phase === "30") {
@@ -930,7 +750,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       regenerationFeedback: state.planning_brief,
       retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
-      requestMeta: userId ? { userId, route: "stagedPlanPhase30" } : undefined,
+      requestMeta: { route: "stagedPlanPhase30" },
       planStartDate: activePlan.created_at as string,
     });
     if (!res.ok) {
@@ -947,36 +767,32 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       revalidatePath(`/families/${input.familyId}`, "page");
       return { ok: false, error };
     }
-    const ins = await insertLeanPhaseStepsForPlan(
+    const modelsUsed = [...state.models_used, res.model];
+    const durationMs = Date.now() - t;
+    const nextState: PlanGenerationState = {
+      ...state,
+      pending_phase: "60",
+      phases_complete: { ...state.phases_complete, "30": true },
+      models_used: modelsUsed,
+      stage_timings_ms: { ...state.stage_timings_ms, "30": durationMs },
+    };
+    const ins = await appendLeanPhaseForPlan(
       supabase,
+      input.familyId,
       planId,
       steps,
       0,
       activePlan.created_at as string,
+      nextState,
+      modelsUsed.join(" · "),
+      durationMs,
     );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
       return { ok: false, error: ins.error };
     }
-    const modelsUsed = [...state.models_used, res.model];
-    const durationMs = Date.now() - t;
-    await persistState({
-      pending_phase: "60",
-      phases_complete: { ...state.phases_complete, "30": true },
-      models_used: modelsUsed,
-      stage_timings_ms: { ...state.stage_timings_ms, "30": durationMs },
-    });
-    await logCaseActivity(
-      supabase,
-      input.familyId,
-      userId,
-      "plan.stage_generated",
-      "plan",
-      planId,
-      { stage: "initial", steps: steps.length, duration_ms: durationMs },
-    );
+    state = nextState;
     revalidatePath(`/families/${input.familyId}`, "page");
-    revalidatePath("/calendar");
     return { ok: true, done: false, phaseCompleted: "30" };
   }
 
@@ -999,7 +815,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor60 || undefined,
-      requestMeta: userId ? { userId, route: "stagedPlanPhase60" } : undefined,
+      requestMeta: { route: "stagedPlanPhase60" },
       planStartDate: activePlan.created_at as string,
     });
     if (!res.ok) {
@@ -1019,36 +835,32 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: "AI returned no steps for the 60-day phase." };
     }
     const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
-    const ins = await insertLeanPhaseStepsForPlan(
+    const models_used = [...state.models_used, res.model];
+    const durationMs = Date.now() - t;
+    const nextState: PlanGenerationState = {
+      ...state,
+      pending_phase: "90",
+      phases_complete: { ...state.phases_complete, "60": true },
+      models_used,
+      stage_timings_ms: { ...state.stage_timings_ms, "60": durationMs },
+    };
+    const ins = await appendLeanPhaseForPlan(
       supabase,
+      input.familyId,
       planId,
       steps,
       start,
       activePlan.created_at as string,
+      nextState,
+      models_used.join(" · "),
+      durationMs,
     );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
       return { ok: false, error: ins.error };
     }
-    const models_used = [...state.models_used, res.model];
-    const durationMs = Date.now() - t;
-    await persistState({
-      pending_phase: "90",
-      phases_complete: { ...state.phases_complete, "60": true },
-      models_used,
-      stage_timings_ms: { ...state.stage_timings_ms, "60": durationMs },
-    });
-    await logCaseActivity(
-      supabase,
-      input.familyId,
-      userId,
-      "plan.stage_generated",
-      "plan",
-      planId,
-      { stage: "follow_up", steps: steps.length, duration_ms: durationMs },
-    );
+    state = nextState;
     revalidatePath(`/families/${input.familyId}`, "page");
-    revalidatePath("/calendar");
     return { ok: true, done: false, phaseCompleted: "60" };
   }
 
@@ -1071,7 +883,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor90 || undefined,
-      requestMeta: userId ? { userId, route: "stagedPlanPhase90" } : undefined,
+      requestMeta: { route: "stagedPlanPhase90" },
       planStartDate: activePlan.created_at as string,
     });
     if (!res.ok) {
@@ -1091,38 +903,33 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       return { ok: false, error: "AI returned no steps for the 90-day phase." };
     }
     const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
-    const ins = await insertLeanPhaseStepsForPlan(
-      supabase,
-      planId,
-      steps,
-      start,
-      activePlan.created_at as string,
-    );
-    if (!ins.ok) {
-      await persistState({ status: "failed", error: ins.error });
-      return { ok: false, error: ins.error };
-    }
     const models_used = [...state.models_used, res.model];
     const durationMs = Date.now() - t;
-    await logCaseActivity(
-      supabase,
-      input.familyId,
-      userId,
-      "plan.stage_generated",
-      "plan",
-      planId,
-      { stage: "complete_plan", steps: steps.length, duration_ms: durationMs },
-    );
-    await persistState({
+    const nextState: PlanGenerationState = {
+      ...state,
       pending_phase: null,
       status: "complete",
       phases_complete: { ...state.phases_complete, "90": true },
       models_used,
       stage_timings_ms: { ...state.stage_timings_ms, "90": durationMs },
-    });
+    };
+    const ins = await appendLeanPhaseForPlan(
+      supabase,
+      input.familyId,
+      planId,
+      steps,
+      start,
+      activePlan.created_at as string,
+      nextState,
+      models_used.join(" · "),
+      durationMs,
+    );
+    if (!ins.ok) {
+      await persistState({ status: "failed", error: ins.error });
+      return { ok: false, error: ins.error };
+    }
+    state = nextState;
     revalidatePath(`/families/${input.familyId}`, "page");
-    revalidatePath("/calendar");
-    revalidatePath("/dashboard");
     return { ok: true, done: true, phaseCompleted: "90" };
   }
 
@@ -1179,17 +986,45 @@ export async function advanceStagedLeanPlanGeneration(input: {
   familyId: string;
   aiMode?: AiMode;
 }): Promise<StagedPlanAdvanceResult> {
-  const familyId = input.familyId;
-  const prev = advanceStagedChainByFamilyId.get(familyId);
-  const base = prev ? prev.catch(() => {}) : Promise.resolve();
-  const next = base.then(() => advanceStagedLeanPlanGenerationCore(input)) as Promise<StagedPlanAdvanceResult>;
-  advanceStagedChainByFamilyId.set(familyId, next);
-  void next.finally(() => {
-    if (advanceStagedChainByFamilyId.get(familyId) === next) {
-      advanceStagedChainByFamilyId.delete(familyId);
-    }
+  const parsed = stagedPlanAdvanceSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid request" };
+
+  let supabase: SupabaseClient;
+  try {
+    ({ supabase } = await requireAppUserWithClient());
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
+  }
+
+  const jobKey = "staged-plan-advance";
+  const { data: claimed, error: claimError } = await supabase.rpc("claim_ai_job", {
+    p_family_id: parsed.data.familyId,
+    p_job_key: jobKey,
+    p_ttl_seconds: 300,
   });
-  return next;
+  if (claimError) return { ok: false, error: publicMessageFromSupabaseError(claimError) };
+  if (!claimed) return { ok: false, error: "Plan generation is already running." };
+
+  try {
+    try {
+      return await advanceStagedLeanPlanGenerationCore(parsed.data);
+    } catch (error) {
+      return {
+        ok: false,
+        error: publicMessageFromCaughtError(
+          "advanceStagedLeanPlanGeneration",
+          error,
+          "Could not update plan generation. Try again.",
+        ),
+      };
+    }
+  } finally {
+    const { error } = await supabase.rpc("release_ai_job", {
+      p_family_id: parsed.data.familyId,
+      p_job_key: jobKey,
+    });
+    if (error) logServerError("advanceStagedLeanPlanGeneration:release", error);
+  }
 }
 
 export async function updatePlan(input: unknown): Promise<ActionResult> {
@@ -1218,8 +1053,8 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { familyId, summary, clientDisplay } = parsed.data;
@@ -1248,7 +1083,7 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
   delete display.reviewedById;
 
   const payload: Record<string, unknown> = {
-    client_display: Object.keys(display).length > 0 ? display : null,
+    client_display: display,
   };
   if (summary !== undefined) {
     payload.summary = summary;
@@ -1277,8 +1112,6 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -1287,13 +1120,11 @@ export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: "Invalid request" };
 
   let supabase;
-  let userId: string;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { familyId, planId } = parsed.data;
@@ -1308,25 +1139,12 @@ export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
     return { ok: false, error: reviewStatus.issue ?? "This plan is not ready for review." };
   }
 
-  const reviewedAt = new Date().toISOString();
-  const clientDisplay = {
-    ...(family.plan.client_display ?? {}),
-    reviewedAt,
-    reviewedById: userId,
-  };
-  const { data: updated, error } = await supabase
-    .from("plans")
-    .update({ client_display: clientDisplay })
-    .eq("id", planId)
-    .eq("family_id", familyId)
-    .select("id")
-    .maybeSingle();
-  if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
-  if (!updated) return { ok: false, error: "Plan not found or could not be reviewed." };
-
-  await logCaseActivity(supabase, familyId, userId, "plan.reviewed", "plan", planId, {
-    reviewed_at: reviewedAt,
+  const { data: reviewedAt, error } = await supabase.rpc("mark_plan_reviewed", {
+    p_family_id: familyId,
+    p_plan_id: planId,
   });
+  if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
+  if (!reviewedAt) return { ok: false, error: "Plan not found or could not be reviewed." };
   revalidatePath(`/families/${familyId}`);
   revalidatePath(`/families/${familyId}/plan`);
   revalidatePath(`/families/${familyId}/paperwork`);
@@ -1358,13 +1176,11 @@ export async function updatePlanStep(
   if (stepPrivacyError) return { ok: false, error: stepPrivacyError };
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { stepId, familyId, expectedUpdatedAt, ...patch } = parsed.data;
@@ -1413,18 +1229,6 @@ export async function updatePlanStep(
         },
       };
     }
-  }
-
-  const changesReviewedContent =
-    patch.title !== undefined ||
-    patch.description !== undefined ||
-    patch.details !== undefined ||
-    patch.priority !== undefined ||
-    patch.phase !== undefined ||
-    patch.sort_order !== undefined;
-  if (changesReviewedContent) {
-    const reviewError = await clearPlanReview(supabase, planRow.id);
-    if (reviewError) return { ok: false, error: reviewError };
   }
 
   const updatePayload: Record<string, unknown> = {};
@@ -1484,7 +1288,6 @@ export async function updatePlanStep(
   await logCaseActivity(
     supabase,
     familyId,
-    userId,
     "step.updated",
     "plan_step",
     stepId,
@@ -1495,7 +1298,6 @@ export async function updatePlanStep(
     await logCaseActivity(
       supabase,
       familyId,
-      userId,
       "step.status_changed",
       "plan_step",
       stepId,
@@ -1503,12 +1305,10 @@ export async function updatePlanStep(
     );
   }
   if (patch.workflow_data !== undefined && (patch.workflow_data as { needs_escalation?: boolean })?.needs_escalation) {
-    await logCaseActivity(supabase, familyId, userId, "step.escalation_flagged", "plan_step", stepId);
+    await logCaseActivity(supabase, familyId, "step.escalation_flagged", "plan_step", stepId);
   }
 
   revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
   return { ok: true, updatedAt: updatedRows[0]?.updated_at as string | undefined };
 }
 
@@ -1526,27 +1326,14 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   if (manualStepPrivacyError) return { ok: false, error: manualStepPrivacyError };
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { familyId, planId, goal, title, description, target_date, details } = parsed.data;
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("id")
-    .eq("id", planId)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Plan not found" };
-  }
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -1560,65 +1347,25 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
   ) {
     return { ok: false, error: "Choose a valid target date." };
   }
-  const reviewError = await clearPlanReview(supabase, planId);
-  if (reviewError) return { ok: false, error: reviewError };
   const daysFromToday = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
   const phase: "30" | "60" | "90" =
     daysFromToday <= 30 ? "30" : daysFromToday <= 60 ? "60" : "90";
 
-  const { data: maxOrder } = await supabase
-    .from("plan_steps")
-    .select("sort_order")
-    .eq("plan_id", planId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const sortOrder = (maxOrder?.sort_order ?? -1) + 1;
-
   const stepDetails = { owner: "case_manager", ...(details ?? {}), stage_goal: goal };
-  const { data: newStep, error } = await supabase.from("plan_steps").insert({
-    plan_id: planId,
-    phase,
-    title,
-    description: description ?? "",
-    status: "pending",
-    sort_order: sortOrder,
-    details: stepDetails,
-  }).select("id").single();
-
-  if (error) {
-    return { ok: false, error: publicMessageFromSupabaseError(error) };
-  }
-
-  if (!newStep) {
-    return { ok: false, error: "The action could not be created." };
-  }
-
-  const { error: actionError } = await supabase.from("plan_step_action_items").insert({
-    plan_step_id: newStep.id,
-    title,
-    description: description?.trim() || null,
-    week_index: 1,
-    target_date,
-    status: "pending",
-    sort_order: 0,
+  const { data: newStepId, error } = await supabase.rpc("create_manual_plan_step", {
+    p_family_id: familyId,
+    p_plan_id: planId,
+    p_phase: phase,
+    p_title: title,
+    p_description: description ?? "",
+    p_target_date: target_date,
+    p_details: stepDetails,
   });
-
-  if (actionError) {
-    await supabase.from("plan_steps").delete().eq("id", newStep.id);
-    return { ok: false, error: publicMessageFromSupabaseError(actionError) };
+  if (error || typeof newStepId !== "string") {
+    return { ok: false, error: publicMessageFromSupabaseError(error, "The action could not be created.") };
   }
-
-  await logCaseActivity(supabase, familyId, userId, "step.added", "plan_step", newStep.id, {
-    title,
-    goal,
-    target_date,
-  });
 
   revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -1629,123 +1376,25 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
   }
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { stepId, familyId } = parsed.data;
 
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("plan_id")
-    .eq("id", stepId)
-    .maybeSingle();
-
-  if (!step) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const reviewError = await clearPlanReview(supabase, step.plan_id);
-  if (reviewError) return { ok: false, error: reviewError };
-
-  const { error } = await supabase
-    .from("plan_steps")
-    .delete()
-    .eq("id", stepId);
-
+  const { data: deleted, error } = await supabase.rpc("delete_plan_step", {
+    p_family_id: familyId,
+    p_step_id: stepId,
+  });
   if (error) {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
-
-  await logCaseActivity(supabase, familyId, userId, "step.deleted", "plan_step", stepId);
-
-  revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
-  return { ok: true };
-}
-
-export async function logPlanStepActivity(input: unknown): Promise<ActionResult> {
-  const parsed = logPlanStepActivitySchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: "Invalid request" };
-  }
-  const activityPrivacyError = noPiiError([
-    { field: "notes", label: "Activity note", value: parsed.data.notes },
-  ]);
-  if (activityPrivacyError) return { ok: false, error: activityPrivacyError };
-
-  let supabase;
-  let userId: string | null = null;
-  try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
-  }
-
-  const { stepId, familyId, action, activity_type, notes, details } = parsed.data;
-
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("plan_id")
-    .eq("id", stepId)
-    .maybeSingle();
-
-  if (!step) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { error } = await supabase.from("plan_step_activity").insert({
-    plan_step_id: stepId,
-    family_id: familyId,
-    actor_user_id: userId,
-    action,
-    activity_type: activity_type ?? null,
-    notes: notes ?? null,
-    details: details ?? {},
-  });
-
-  if (error) {
-    return { ok: false, error: publicMessageFromSupabaseError(error) };
-  }
-
-  await logCaseActivity(supabase, familyId, userId, "step.activity_logged", "plan_step", stepId, {
-    action,
-    activity_type: activity_type ?? null,
-  });
+  if (!deleted) return { ok: false, error: "Step not found" };
 
   revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -1756,13 +1405,11 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
   }
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { stepId, familyId, checklistIndex, completed } = parsed.data;
@@ -1842,7 +1489,6 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
     await logCaseActivity(
       supabase,
       familyId,
-      userId,
       "step.status_changed",
       "plan_step",
       stepId,
@@ -1851,8 +1497,6 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
   }
 
   revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -1874,13 +1518,11 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
   if (actionPrivacyError) return { ok: false, error: actionPrivacyError };
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { actionItemId, familyId, status, expectedUpdatedAt } = parsed.data;
@@ -1960,16 +1602,6 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
     }
   }
 
-  const changesReviewedContent =
-    parsed.data.title !== undefined ||
-    parsed.data.description !== undefined ||
-    parsed.data.week_index !== undefined ||
-    parsed.data.target_date !== undefined;
-  if (changesReviewedContent) {
-    const reviewError = await clearPlanReview(supabase, step.plan_id);
-    if (reviewError) return { ok: false, error: reviewError };
-  }
-
   const patch: Record<string, unknown> = {};
   if (status !== undefined) patch.status = status;
   if (parsed.data.title !== undefined) patch.title = parsed.data.title;
@@ -2034,7 +1666,6 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
   await logCaseActivity(
     supabase,
     familyId,
-    userId,
     "step.action_item_updated",
     "plan_step_action_item",
     actionItemId,
@@ -2050,7 +1681,6 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
     await logCaseActivity(
       supabase,
       familyId,
-      userId,
       noLongerNeeded ? "step.action_item_no_longer_needed" : "step.action_item_completed",
       "plan_step_action_item",
       actionItemId,
@@ -2072,26 +1702,27 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
         .eq("id", ai.plan_step_id)
         .single();
       if (curStep && curStep.status !== "completed" && curStep.status !== "blocked") {
-        await supabase
+        const { error: stepCompletionError } = await supabase
           .from("plan_steps")
           .update({ status: "completed" })
           .eq("id", ai.plan_step_id);
-        await logCaseActivity(
-          supabase,
-          familyId,
-          userId,
-          "step.status_changed",
-          "plan_step",
-          ai.plan_step_id,
-          { status: "completed", source: "action_items_auto" },
-        );
+        if (stepCompletionError) {
+          logServerError("plans:auto-complete-step", stepCompletionError);
+        } else {
+          await logCaseActivity(
+            supabase,
+            familyId,
+            "step.status_changed",
+            "plan_step",
+            ai.plan_step_id,
+            { status: "completed", source: "action_items_auto" },
+          );
+        }
       }
     }
   }
 
   revalidatePath(`/families/${familyId}`);
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
   return { ok: true, updatedAt: updatedActionItems[0]?.updated_at as string | undefined };
 }
 
@@ -2105,13 +1736,11 @@ export async function previewRefinePlanStep(
   }
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { stepId, familyId, feedback, aiMode } = parsed.data;
@@ -2174,7 +1803,7 @@ export async function previewRefinePlanStep(
     {
       surroundingStepTitles: surroundingTitles,
       aiMode: stepMode,
-      requestMeta: userId ? { userId, route: "previewRefinePlanStep" } : undefined,
+      requestMeta: { route: "previewRefinePlanStep" },
     },
   );
 
@@ -2212,13 +1841,11 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   }
 
   let supabase;
-  let userId: string | null = null;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const { familyId, feedback, draft, aiMode } = parsed.data;
@@ -2287,7 +1914,7 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
     feedback,
     {
       aiMode: planRefineMode,
-      requestMeta: userId ? { userId, route: "previewRefinePlan" } : undefined,
+      requestMeta: { route: "previewRefinePlan" },
     },
   );
 
@@ -2311,146 +1938,4 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
       })),
     })),
   };
-}
-
-export async function refinePlanStep(input: unknown): Promise<ActionResult> {
-  const parsed = refineStepSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
-  }
-
-  let supabase;
-  let userId: string | null = null;
-  try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
-    userId = session.user.id;
-  } catch {
-    return { ok: false, error: "Unauthorized" };
-  }
-
-  const { stepId, familyId, feedback, aiMode } = parsed.data;
-  const stepMode = parseAiMode(aiMode);
-
-  const detail = await getFamilyDetail(supabase, familyId);
-  if (!detail) {
-    return { ok: false, error: "Family not found" };
-  }
-  const privacy = validateFamilyNoPii(detail, [
-    { field: "feedback", label: "AI revision instructions", value: feedback },
-  ]);
-  if (!privacy.ok) {
-    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
-  }
-
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("id, plan_id, phase, title, description, details, workflow_data")
-    .eq("id", stepId)
-    .maybeSingle();
-
-  if (!step) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const env = getEnv();
-  if (!env.OPENAI_API_KEY?.trim()) {
-    return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
-  }
-
-  const allSteps = detail.plan?.steps ?? [];
-  const stepIndex = allSteps.findIndex((s) => s.id === stepId);
-  const surroundingTitles = [
-    ...allSteps.slice(Math.max(0, stepIndex - 1), stepIndex),
-    ...allSteps.slice(stepIndex + 1, stepIndex + 2),
-  ].map((s) => s.title);
-
-  const result = await refineStepWithOpenAI(
-    detail,
-    {
-      phase: step.phase,
-      title: step.title,
-      description: step.description,
-      details: step.details,
-      workflow_data: step.workflow_data,
-    },
-    feedback,
-    {
-      surroundingStepTitles: surroundingTitles,
-      aiMode: stepMode,
-      requestMeta: userId ? { userId, route: "refinePlanStep" } : undefined,
-    },
-  );
-
-  if (!result.ok) {
-    return { ok: false, error: result.reason };
-  }
-
-  const { title, description, details, stepPriority } = result.step;
-
-  const { data: curStep } = await supabase
-    .from("plan_steps")
-    .select("workflow_data")
-    .eq("id", stepId)
-    .single();
-
-  const curWd = (curStep?.workflow_data as Record<string, unknown>) ?? {};
-  const checklistLen = (details?.checklist ?? []).length;
-  const nextWd = {
-    ...curWd,
-    checklist_completed: Array(checklistLen).fill(false),
-  };
-
-  const updatePayload: Record<string, unknown> = {
-    title,
-    description,
-    details: details ?? null,
-    workflow_data: nextWd,
-  };
-  if (stepPriority) {
-    updatePayload.priority = stepPriority;
-  }
-
-  const reviewError = await clearPlanReview(supabase, step.plan_id);
-  if (reviewError) return { ok: false, error: reviewError };
-
-  const { error } = await supabase.from("plan_steps").update(updatePayload).eq("id", stepId);
-
-  if (error) {
-    return { ok: false, error: publicMessageFromSupabaseError(error) };
-  }
-
-  const session = await requireAppUserWithClient();
-  await supabase.from("plan_step_activity").insert({
-    plan_step_id: stepId,
-    family_id: familyId,
-    actor_user_id: session.user.id,
-    action: "step.refined",
-    notes: null,
-    details: { instruction_chars: feedback.length },
-  });
-
-  await logCaseActivity(
-    supabase,
-    familyId,
-    session.user.id,
-    "step.refined",
-    "plan_step",
-    stepId,
-    { instruction_chars: feedback.length },
-  );
-
-  revalidatePath(`/families/${familyId}`);
-  return { ok: true };
 }

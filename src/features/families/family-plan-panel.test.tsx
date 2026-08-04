@@ -87,7 +87,6 @@ const plan: PlanWithSteps = {
 
 describe("FamilyPlanPanel stale edit recovery", () => {
   beforeEach(() => {
-    window.localStorage.clear();
     routerRefresh.mockReset();
     vi.mocked(updatePlanStep).mockReset();
   });

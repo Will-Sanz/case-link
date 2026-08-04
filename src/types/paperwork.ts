@@ -13,7 +13,7 @@ export type PdfFieldMapping = {
   confidence: "high" | "medium" | "low";
   source: string;
   needsReview: boolean;
-  /** Human review state for a browser-local paperwork draft. */
+  /** Human review state for the current tab's paperwork session. */
   reviewState?: "ready" | "suggested" | "accepted" | "edited" | "left_blank" | "out_of_date";
   /** Suggestion that was current when this draft field was first prepared. */
   baselineValue?: string;
@@ -23,26 +23,4 @@ export type PdfFieldMapping = {
   proposedSource?: string;
   proposedConfidence?: "high" | "medium" | "low";
   proposedNeedsReview?: boolean;
-};
-
-/** AI-detected writable area in a scanned or flattened PDF. Coordinates are normalized. */
-export type PdfOverlayField = {
-  fieldName: string;
-  label: string;
-  pageIndex: number;
-  kind: "text" | "checkbox";
-  /** Left edge in displayed page coordinates, 0 to 1. */
-  x: number;
-  /** Top edge in displayed page coordinates, 0 to 1. */
-  y: number;
-  width: number;
-  height: number;
-};
-
-export type ScannedPdfAnalysis = {
-  documentTitle: string;
-  mappings: PdfFieldMapping[];
-  overlayFields: PdfOverlayField[];
-  warnings: string[];
-  assistedByAi: true;
 };

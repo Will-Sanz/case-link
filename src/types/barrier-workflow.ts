@@ -1,5 +1,3 @@
-import type { AiMode } from "@/lib/ai/ai-mode";
-
 export const BARRIER_PRESETS = [
   { key: "housing_instability", label: "Housing" },
   { key: "unemployment", label: "Employment" },
@@ -17,15 +15,6 @@ export const BARRIER_PRESETS = [
 ] as const;
 
 export type BarrierPresetLabel = (typeof BARRIER_PRESETS)[number]["label"];
-
-export type BarrierWorkflowInput = {
-  referenceId: string;
-  selectedBarriers: BarrierPresetLabel[];
-  additionalBarriers?: string;
-  additionalDetails?: string;
-  /** AI quality preset from workspace toggle; defaults to fast on server. */
-  aiMode?: AiMode;
-};
 
 export type BarrierWorkflowActionItem = {
   id: string;
@@ -66,12 +55,6 @@ export type BarrierWorkflowResource = {
   website: string | null;
   address: string | null;
   whyMatched: string;
-};
-
-export type BarrierWorkflowRecentRecord = {
-  referenceId: string;
-  familyId: string;
-  updatedAt: string;
 };
 
 export type BarrierWorkflowResult = {

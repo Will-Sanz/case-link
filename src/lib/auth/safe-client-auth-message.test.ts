@@ -3,7 +3,6 @@ import {
   safeAuthSessionClientMessage,
   safeOAuthRedirectMessage,
   safeSignInPasswordMessage,
-  safeSignUpMessage,
 } from "@/lib/auth/safe-client-auth-message";
 
 describe("safe-client-auth-message", () => {
@@ -31,6 +30,9 @@ describe("safe-client-auth-message", () => {
     expect(safeOAuthRedirectMessage("SQL exception while exchanging JWT token")).toBe(
       "Sign-in could not be completed. Try again or request a new link.",
     );
+    expect(safeOAuthRedirectMessage("Operator supplied short message")).toBe(
+      "Sign-in could not be completed. Try again or request a new link.",
+    );
   });
 
   it("falls back for long or infrastructure sign-in errors in production", () => {
@@ -42,13 +44,11 @@ describe("safe-client-auth-message", () => {
     expect(safeSignInPasswordMessage("x".repeat(281))).toBe(
       "Could not sign in. Check your email and password and try again.",
     );
-  });
-
-  it("preserves user-facing sign-up messages in production", () => {
-    setNodeEnv("production");
-
-    expect(safeSignUpMessage("A user with this email already exists")).toBe(
-      "A user with this email already exists",
+    expect(safeSignInPasswordMessage("Email not confirmed")).toBe(
+      "Confirm your invitation email before signing in.",
+    );
+    expect(safeSignInPasswordMessage("Too many requests")).toBe(
+      "Too many sign-in attempts. Wait a few minutes and try again.",
     );
   });
 });

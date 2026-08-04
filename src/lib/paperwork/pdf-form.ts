@@ -1,23 +1,91 @@
 import {
   PDFCheckBox,
+  PDFDict,
   PDFDocument,
   PDFDropdown,
   type PDFField,
   PDFOptionList,
   PDFRadioGroup,
-  StandardFonts,
   PDFTextField,
-  degrees,
-  rgb,
 } from "pdf-lib";
-import type { PdfFieldDescriptor } from "@/types/paperwork";
-import type { PdfFieldMapping, PdfOverlayField } from "@/types/paperwork";
+import type { PdfFieldDescriptor, PdfFieldMapping } from "@/types/paperwork";
 
 export class UnsupportedPdfFieldError extends Error {
   constructor(fieldName: string) {
     super(`Unsupported PDF field: ${fieldName}`);
     this.name = "UnsupportedPdfFieldError";
   }
+}
+
+export class UnsafePdfError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnsafePdfError";
+  }
+}
+
+const BLOCKED_PDF_KEYS = new Set([
+  "/AA",
+  "/A",
+  "/EmbeddedFiles",
+  "/Filespec",
+  "/GoToR",
+  "/GoTo",
+  "/ImportData",
+  "/JavaScript",
+  "/JS",
+  "/Launch",
+  "/OpenAction",
+  "/RichMedia",
+  "/Sound",
+  "/SubmitForm",
+  "/URI",
+  "/XFA",
+]);
+
+/** Accept only bounded, blank AcroForms without executable or attached content. */
+export function inspectSafeBlankPdf(document: PDFDocument): PdfFieldDescriptor[] {
+  const pages = document.getPageCount();
+  if (pages < 1 || pages > 50) {
+    throw new UnsafePdfError("Use a form with 50 pages or fewer.");
+  }
+
+  const objects = document.context.enumerateIndirectObjects();
+  if (objects.length > 20_000) {
+    throw new UnsafePdfError("This PDF is too complex to process safely.");
+  }
+  for (const [, object] of objects) {
+    if (!(object instanceof PDFDict)) continue;
+    for (const key of object.keys()) {
+      if (BLOCKED_PDF_KEYS.has(key.toString())) {
+        throw new UnsafePdfError("This PDF contains active or attached content.");
+      }
+    }
+  }
+
+  const form = document.getForm();
+  if (form.hasXFA()) {
+    throw new UnsafePdfError("Use a standard AcroForm without XFA content.");
+  }
+  const fields = inspectPdfFields(document);
+  if (fields.length === 0) {
+    throw new UnsafePdfError("Use a blank fillable PDF with standard form fields.");
+  }
+  if (fields.length > 150) {
+    throw new UnsafePdfError("Use a form with 150 fields or fewer.");
+  }
+  if (fields.some((field) =>
+    field.name.length > 200
+    || field.options.length > 50
+    || field.options.some((option) => option.length > 200)
+    || (field.maxLength !== null && (field.maxLength < 1 || field.maxLength > 4000))
+  )) {
+    throw new UnsafePdfError("This PDF contains form fields outside the supported safety limits.");
+  }
+  if (findCompletedPdfFields(document).length > 0) {
+    throw new UnsafePdfError("Use a blank copy with every form field empty.");
+  }
+  return fields;
 }
 
 export function inspectPdfFields(document: PDFDocument): PdfFieldDescriptor[] {
@@ -77,147 +145,5 @@ export function applyPdfMappings(
     } else {
       throw new UnsupportedPdfFieldError(descriptor.name);
     }
-  }
-}
-
-type PageGeometry = { width: number; height: number; rotation: number };
-
-function normalizedRotation(value: number): 0 | 90 | 180 | 270 {
-  const normalized = ((Math.round(value / 90) * 90) % 360 + 360) % 360;
-  if (normalized === 90 || normalized === 180 || normalized === 270) return normalized;
-  return 0;
-}
-
-export function displayedPdfPageSize(geometry: PageGeometry): { width: number; height: number } {
-  const rotation = normalizedRotation(geometry.rotation);
-  return rotation === 90 || rotation === 270
-    ? { width: geometry.height, height: geometry.width }
-    : { width: geometry.width, height: geometry.height };
-}
-
-/** Inverse of PDF page rotation for a point expressed in displayed bottom-left coordinates. */
-export function displayedPointToPdfPoint(
-  geometry: PageGeometry,
-  displayedX: number,
-  displayedY: number,
-): { x: number; y: number } {
-  const rotation = normalizedRotation(geometry.rotation);
-  if (rotation === 90) {
-    return { x: geometry.width - displayedY, y: displayedX };
-  }
-  if (rotation === 180) {
-    return { x: geometry.width - displayedX, y: geometry.height - displayedY };
-  }
-  if (rotation === 270) {
-    return { x: displayedY, y: geometry.height - displayedX };
-  }
-  return { x: displayedX, y: displayedY };
-}
-
-function wrapOverlayText(
-  value: string,
-  maxWidth: number,
-  maxLines: number,
-  widthOf: (text: string) => number,
-): string[] {
-  const output: string[] = [];
-  const paragraphs = value.replace(/\r/g, "").split("\n");
-  for (const paragraph of paragraphs) {
-    const words = paragraph.trim().split(/\s+/).filter(Boolean);
-    if (words.length === 0) continue;
-    let line = "";
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && widthOf(candidate) > maxWidth) {
-        output.push(line);
-        line = word;
-      } else {
-        line = candidate;
-      }
-      if (output.length >= maxLines) break;
-    }
-    if (output.length >= maxLines) break;
-    if (line) output.push(line);
-    if (output.length >= maxLines) break;
-  }
-  if (output.length > maxLines) output.length = maxLines;
-  if (output.length === maxLines && widthOf(output[maxLines - 1]) > maxWidth) {
-    let finalLine = output[maxLines - 1];
-    while (finalLine.length > 1 && widthOf(`${finalLine}…`) > maxWidth) {
-      finalLine = finalLine.slice(0, -1);
-    }
-    output[maxLines - 1] = `${finalLine}…`;
-  }
-  return output;
-}
-
-/** Draw reviewed values into AI-detected writable areas in a scanned/flattened PDF. */
-export async function applyPdfOverlayMappings(
-  document: PDFDocument,
-  overlayFields: PdfOverlayField[],
-  mappings: PdfFieldMapping[],
-): Promise<void> {
-  const font = await document.embedFont(StandardFonts.Helvetica);
-  const mappingByName = new Map(mappings.map((mapping) => [mapping.fieldName, mapping]));
-  const pages = document.getPages();
-
-  for (const field of overlayFields) {
-    const page = pages[field.pageIndex];
-    const value = mappingByName.get(field.fieldName)?.value.trim() ?? "";
-    if (!page || !value) continue;
-
-    const rawSize = page.getSize();
-    const rotation = normalizedRotation(page.getRotation().angle);
-    const geometry = { width: rawSize.width, height: rawSize.height, rotation };
-    const displaySize = displayedPdfPageSize(geometry);
-    const left = Math.max(0, Math.min(displaySize.width, field.x * displaySize.width));
-    const top = Math.max(0, Math.min(displaySize.height, field.y * displaySize.height));
-    const boxWidth = Math.max(8, Math.min(displaySize.width - left, field.width * displaySize.width));
-    const boxHeight = Math.max(8, Math.min(displaySize.height - top, field.height * displaySize.height));
-    // PDF page /Rotate values are clockwise. pdf-lib text rotation is counterclockwise,
-    // so using the same numeric angle counteracts the displayed page rotation.
-    const drawRotation = degrees(rotation);
-
-    if (field.kind === "checkbox") {
-      if (value.toLowerCase() !== "true") continue;
-      const fontSize = Math.max(7, Math.min(13, boxHeight * 0.9, boxWidth * 0.9));
-      const visualBaselineY = displaySize.height - top - (boxHeight + fontSize) / 2 + 1;
-      const point = displayedPointToPdfPoint(
-        geometry,
-        left + Math.max(0, (boxWidth - font.widthOfTextAtSize("X", fontSize)) / 2),
-        visualBaselineY,
-      );
-      page.drawText("X", {
-        x: point.x,
-        y: point.y,
-        size: fontSize,
-        font,
-        rotate: drawRotation,
-        color: rgb(0.05, 0.12, 0.05),
-      });
-      continue;
-    }
-
-    const fontSize = Math.max(6, Math.min(10, boxHeight * 0.48));
-    const lineHeight = fontSize * 1.18;
-    const maxLines = Math.max(1, Math.floor(boxHeight / lineHeight));
-    const lines = wrapOverlayText(
-      value,
-      Math.max(8, boxWidth - 3),
-      maxLines,
-      (text) => font.widthOfTextAtSize(text, fontSize),
-    );
-    lines.forEach((line, lineIndex) => {
-      const visualBaselineY = displaySize.height - top - fontSize - lineIndex * lineHeight;
-      const point = displayedPointToPdfPoint(geometry, left + 1.5, visualBaselineY);
-      page.drawText(line, {
-        x: point.x,
-        y: point.y,
-        size: fontSize,
-        font,
-        rotate: drawRotation,
-        color: rgb(0.05, 0.12, 0.05),
-      });
-    });
   }
 }

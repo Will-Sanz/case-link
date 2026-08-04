@@ -32,28 +32,6 @@ import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
-import {
-  localActionDraftKey,
-  parseLocalActionDraft,
-  serializeLocalActionDraft,
-  type LocalActionDraft,
-} from "@/lib/domain/plan/local-action-draft";
-
-function readStoredActionDraft(key: string): LocalActionDraft | null {
-  try {
-    return parseLocalActionDraft(window.localStorage.getItem(key));
-  } catch {
-    return null;
-  }
-}
-
-function removeStoredActionDraft(key: string): void {
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    // Draft recovery is optional when browser storage is restricted.
-  }
-}
 
 function dateInputValueAfterDays(days: number): string {
   const value = new Date();
@@ -324,8 +302,6 @@ export function FamilyPlanPanel({
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
-  const [recoverableDraft, setRecoverableDraft] = useState<LocalActionDraft | null>(null);
-  const draftRecoveryLoadedPlanIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editConflict, setEditConflict] = useState<PlanEditConflict | null>(null);
@@ -396,8 +372,6 @@ export function FamilyPlanPanel({
     [editConflict, stepDraft],
   );
 
-  const actionDraftStorageKey = plan ? localActionDraftKey(plan.id) : null;
-
   useEffect(() => {
     if (!plan) return;
     const events: Array<"plan_viewed" | "first_action_visible"> = ["plan_viewed"];
@@ -415,23 +389,6 @@ export function FamilyPlanPanel({
   }, [familyId, plan]);
 
   useEffect(() => {
-    if (!plan || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {
-      return;
-    }
-    draftRecoveryLoadedPlanIdRef.current = plan.id;
-    const stored = readStoredActionDraft(actionDraftStorageKey);
-    if (!stored || stored.planId !== plan.id) {
-      removeStoredActionDraft(actionDraftStorageKey);
-      return;
-    }
-    if (!plan.steps.some((step) => step.id === stored.step.id)) {
-      removeStoredActionDraft(actionDraftStorageKey);
-      return;
-    }
-    setRecoverableDraft(stored);
-  }, [actionDraftStorageKey, plan]);
-
-  useEffect(() => {
     if (conflictResolution !== "keep_draft" || !editConflict || !plan) return;
     const latestTimestamp =
       editConflict.kind === "step"
@@ -445,21 +402,6 @@ export function FamilyPlanPanel({
     setConflictResolution(null);
     setSuccess("The latest version is loaded and your draft is still open. Review it, then save again.");
   }, [conflictResolution, editConflict, plan]);
-
-  useEffect(() => {
-    if (!actionDraftStorageKey || !stepDirty || !stepDraft || !plan) return;
-    const timer = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(
-          actionDraftStorageKey,
-          serializeLocalActionDraft(plan.id, stepDraft),
-        );
-      } catch {
-        // The in-memory draft remains available when browser storage is unavailable.
-      }
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [actionDraftStorageKey, plan, stepDirty, stepDraft]);
 
   useEffect(() => {
     if (!stepDirty) return;
@@ -510,30 +452,11 @@ export function FamilyPlanPanel({
     fn?.();
   }
 
-  function clearLocalActionDraft() {
-    if (actionDraftStorageKey) removeStoredActionDraft(actionDraftStorageKey);
-    setRecoverableDraft(null);
-  }
-
-  function restoreLocalActionDraft() {
-    if (!recoverableDraft || !plan) return;
-    if (!plan.steps.some((step) => step.id === recoverableDraft.step.id)) {
-      clearLocalActionDraft();
-      return;
-    }
-    setEditingStepId(recoverableDraft.step.id);
-    setStepDraft(cloneStep(recoverableDraft.step));
-    setRecoverableDraft(null);
-    setError(null);
-    setSuccess("Unsaved action edit restored. Review it before saving.");
-  }
-
   function switchToStepEdit(stepId: string): boolean {
     if (!plan) return false;
     if (editingStepId === stepId) return true;
     const s = plan.steps.find((x) => x.id === stepId);
     if (!s) return false;
-    clearLocalActionDraft();
     setEditingStepId(stepId);
     setStepDraft(cloneStep(s));
     setAiStepId(null);
@@ -563,7 +486,6 @@ export function FamilyPlanPanel({
   }
 
   function cancelStepEdit() {
-    clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
     setAiStepId(null);
@@ -582,7 +504,6 @@ export function FamilyPlanPanel({
   }
 
   function useLatestConflictVersion() {
-    clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
     setAiStepId(null);
@@ -763,7 +684,6 @@ export function FamilyPlanPanel({
         setSuccess("Action saved.");
         setEditConflict(null);
         setConflictResolution(null);
-        clearLocalActionDraft();
         setEditingStepId(null);
         setStepDraft(null);
         setAiStepId(null);
@@ -792,7 +712,6 @@ export function FamilyPlanPanel({
           return;
         }
         if (editingStepId === stepId) {
-          clearLocalActionDraft();
           setEditingStepId(null);
           setStepDraft(null);
           setAiStepId(null);
@@ -1350,23 +1269,6 @@ export function FamilyPlanPanel({
         >
           {success}
         </p>
-      ) : null}
-
-      {recoverableDraft && !editingStepId ? (
-        <section className="rounded-lg border border-[#cfe0cc] bg-[#f3f8f1] px-4 py-3" role="status">
-          <p className="text-sm font-semibold text-[#173a15]">Unsaved action edit found</p>
-          <p className="mt-1 text-xs leading-5 text-[#5d705a]">
-            Restore “{recoverableDraft.step.title}” to continue where you left off.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" onClick={restoreLocalActionDraft}>
-              Restore edit
-            </Button>
-            <Button type="button" variant="ghost" onClick={clearLocalActionDraft}>
-              Discard saved edit
-            </Button>
-          </div>
-        </section>
       ) : null}
 
       {plan?.generation_state?.status === "failed" ? (

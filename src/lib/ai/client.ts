@@ -15,9 +15,7 @@ import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { getEnv } from "@/lib/env";
 import { isDev } from "@/lib/env/runtime";
-import { getClientIpFromHeaders } from "@/lib/http/client-ip";
-import { takeOpenAiRateSlot, takeOpenAiRateSlotForIp } from "@/lib/rate-limit/ai-rate-limit";
-import { headers } from "next/headers";
+import { consumeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
 const OPENAI_FETCH_TIMEOUT_MS = 180_000;
@@ -74,7 +72,7 @@ export type CreateResponseOptions = {
 
 export type CreateResponseResult =
   | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: "rate_limited"; retryAfter?: number };
 
 function summarizeInput(input: string | ChatMessage[]): { chars: number } {
   if (typeof input === "string") {
@@ -104,7 +102,6 @@ function logOpenAiUsage(
   elapsedMs: number,
 ) {
   console.info("[openai-usage]", {
-    userId: meta.userId,
     route: meta.route,
     taskType,
     model,
@@ -126,20 +123,6 @@ function modelSupportsTemperature(modelId: string): boolean {
   return true;
 }
 
-async function enrichOpenAiRequestMeta(
-  meta: OpenAiRequestMeta | undefined,
-): Promise<OpenAiRequestMeta | undefined> {
-  if (!meta) return undefined;
-  if (meta.clientIp != null && meta.clientIp !== "") return meta;
-  try {
-    const h = await headers();
-    const ip = getClientIpFromHeaders(h);
-    return ip ? { ...meta, clientIp: ip } : meta;
-  } catch {
-    return meta;
-  }
-}
-
 /**
  * Call OpenAI. Uses Responses API for core reasoning tasks, Chat Completions for helpers.
  * Supports env override: OPENAI_MODEL_OVERRIDE forces a single model for all tasks.
@@ -154,19 +137,14 @@ export async function createAiResponse(
     return { ok: false, error: exposeAiErrorToClient("OPENAI_API_KEY is not set", envDebug) };
   }
 
-  const meta = await enrichOpenAiRequestMeta(options.requestMeta);
-  if (meta) {
-    const allowed = takeOpenAiRateSlot(meta.userId);
-    if (!allowed) {
-      const msg = "Too many AI requests. Please wait a minute and try again.";
+  const meta = options.requestMeta;
+  const budget = await consumeOpenAiRateSlot(options.taskType);
+  if (!budget.allowed) {
+    const msg = "Too many AI requests. Please wait a minute and try again.";
+    if (meta) {
       logOpenAiUsage(meta, options.taskType, "(rate_limited)", { ok: false, error: msg }, 0);
-      return { ok: false, error: msg };
     }
-    if (meta.clientIp && !takeOpenAiRateSlotForIp(meta.clientIp)) {
-      const msg = "Too many AI requests. Please wait a minute and try again.";
-      logOpenAiUsage(meta, options.taskType, "(ip_rate_limited)", { ok: false, error: msg }, 0);
-      return { ok: false, error: msg };
-    }
+    return { ok: false, error: msg, code: "rate_limited", retryAfter: budget.retryAfter };
   }
 
   const mode = parseAiMode(options.aiMode);
@@ -437,6 +415,7 @@ async function callChatCompletionsApi(
     model,
     messages,
     max_tokens: options.maxTokens ?? 4096,
+    store: false,
   };
   if (modelSupportsTemperature(model)) {
     body.temperature = options.temperature ?? 0.4;

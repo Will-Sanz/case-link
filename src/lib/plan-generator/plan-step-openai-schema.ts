@@ -198,11 +198,6 @@ function isPlaceholder(s: string): boolean {
   return t.length === 0 || PLACEHOLDER_RE.test(t);
 }
 
-function normStr(v: string | null | undefined): string {
-  if (v == null) return "";
-  return String(v).trim();
-}
-
 /**
  * Removes conversational answer prefixes the model sometimes puts in action_needed_now
  * (e.g. "Yes, SNAP timelines…" → "SNAP timelines…").

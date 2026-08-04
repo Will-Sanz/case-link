@@ -113,7 +113,7 @@ export function LegalDocumentModal({
           <LegalDensityProvider value="modal">
             <div className="mx-auto w-full max-w-prose px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-6">
               <p className="text-[11px] font-medium tabular-nums text-slate-400 sm:text-xs">
-                Last updated <span className="text-slate-500">April 2026</span>
+                Last updated <span className="text-slate-500">August 2026</span>
               </p>
 
               <div

@@ -13,12 +13,13 @@ import {
   safeOAuthRedirectMessage,
   safeSignInPasswordMessage,
 } from "@/lib/auth/safe-client-auth-message";
+import { safeInternalPath } from "@/lib/auth/safe-internal-path";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/families";
+  const nextPath = safeInternalPath(searchParams.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +60,7 @@ export function LoginForm() {
         setError(safeSignInPasswordMessage(signError.message));
         return;
       }
-      router.push(nextPath.startsWith("/") ? nextPath : "/families");
+      router.push(nextPath);
       router.refresh();
     } finally {
       setPending(false);

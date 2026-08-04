@@ -21,7 +21,7 @@ export default async function TermsOfServicePage() {
 
   return (
     <PublicSiteShell authenticated={Boolean(user)}>
-      <LegalDocumentBody title="Terms of Service" lastUpdated="April 2026">
+      <LegalDocumentBody title="Terms of Service" lastUpdated="August 2026">
         <TermsOfServiceSections />
       </LegalDocumentBody>
     </PublicSiteShell>

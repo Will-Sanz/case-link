@@ -1,63 +1,52 @@
 import "server-only";
 
-import { getEnv } from "@/lib/env";
-import { createMemorySlidingWindow } from "@/lib/rate-limit/memory-bucket";
+import type { AiTaskType } from "@/lib/ai/models";
+import { isProd } from "@/lib/env/runtime";
+import { logServerError } from "@/lib/logger/server-error";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-let bucket: ReturnType<typeof createMemorySlidingWindow> | null = null;
-let ipBucket: ReturnType<typeof createMemorySlidingWindow> | null = null;
+type SharedBudgetResult = {
+  allowed: boolean;
+  retryAfter: number;
+  reason?: string;
+};
 
-function windowMsFromEnv(): number {
-  const env = getEnv();
-  const windowRaw = env.OPENAI_RATE_LIMIT_WINDOW_MS;
-  return typeof windowRaw === "number" && Number.isFinite(windowRaw) && windowRaw >= 10_000
-    ? Math.min(3_600_000, Math.floor(windowRaw))
-    : 60_000;
+function budgetForTask(taskType: AiTaskType): { operation: string; weight: number } {
+  if (taskType === "full_plan_generation") return { operation: "plan", weight: 3 };
+  if (taskType === "plan_phase_generation") return { operation: "plan_phase", weight: 2 };
+  if (taskType === "plan_refinement" || taskType === "step_refinement") {
+    return { operation: "plan", weight: 2 };
+  }
+  if (taskType === "pdf_field_mapping") return { operation: "pdf_mapping", weight: 1 };
+  if (taskType === "case_assistant") return { operation: "chat", weight: 1 };
+  return { operation: "helper", weight: 1 };
 }
 
-function getBucket() {
-  if (!bucket) {
-    const env = getEnv();
-    const maxRaw = env.OPENAI_RATE_LIMIT_MAX_PER_MINUTE;
-    const max =
-      typeof maxRaw === "number" && Number.isFinite(maxRaw) && maxRaw >= 1
-        ? Math.min(500, Math.floor(maxRaw))
-        : 30;
-    bucket = createMemorySlidingWindow({ max, windowMs: windowMsFromEnv() });
-  }
-  return bucket;
-}
-
-function getIpBucket(): ReturnType<typeof createMemorySlidingWindow> | null {
-  const env = getEnv();
-  const maxRaw = env.OPENAI_RATE_LIMIT_PER_IP_MAX;
-  if (typeof maxRaw !== "number" || !Number.isFinite(maxRaw) || maxRaw < 1) {
-    return null;
-  }
-  if (!ipBucket) {
-    ipBucket = createMemorySlidingWindow({
-      max: Math.min(2000, Math.floor(maxRaw)),
-      windowMs: windowMsFromEnv(),
+/** Consume the shared Postgres budget. Production fails closed if the control is unavailable. */
+export async function consumeOpenAiRateSlot(taskType: AiTaskType): Promise<SharedBudgetResult> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const budget = budgetForTask(taskType);
+    const { data, error } = await supabase.rpc("consume_ai_budget", {
+      p_operation: budget.operation,
+      p_weight: budget.weight,
     });
+    if (error) throw error;
+
+    const value = data as Partial<SharedBudgetResult> | null;
+    if (typeof value?.allowed !== "boolean") throw new Error("Invalid AI budget response");
+    return {
+      allowed: value.allowed,
+      retryAfter:
+        typeof value.retryAfter === "number" && Number.isFinite(value.retryAfter)
+          ? Math.max(1, Math.ceil(value.retryAfter))
+          : 60,
+      reason: typeof value.reason === "string" ? value.reason : undefined,
+    };
+  } catch (error) {
+    logServerError("consumeOpenAiRateSlot", error);
+    return isProd()
+      ? { allowed: false, retryAfter: 60, reason: "control_unavailable" }
+      : { allowed: true, retryAfter: 0 };
   }
-  return ipBucket;
-}
-
-/**
- * Returns false if this user exceeded the AI request budget for the current window.
- * Counts all OpenAI-backed actions together per user (stronger cost control than per-route).
- */
-export function takeOpenAiRateSlot(userId: string): boolean {
-  return getBucket().take(userId);
-}
-
-/**
- * Secondary limit when `OPENAI_RATE_LIMIT_PER_IP_MAX` is set and `clientIp` is known.
- * Returns true when IP limiting is disabled or the IP is within budget.
- */
-export function takeOpenAiRateSlotForIp(ip: string): boolean {
-  const b = getIpBucket();
-  if (!b) return true;
-  const key = ip.trim().slice(0, 64);
-  if (!key) return true;
-  return b.take(`ip:${key}`);
 }

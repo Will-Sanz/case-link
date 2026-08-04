@@ -6,16 +6,17 @@ import { createAiResponse } from "@/lib/ai/client";
 import { toStructuredJsonSchema } from "@/lib/ai/structured-json-schema";
 import { getFamilyDetail } from "@/lib/services/families";
 import { buildPaperworkSource, createDeterministicMappings } from "@/lib/paperwork/pdf-field-mapper";
-import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
-import { isManualOnlyPaperworkField } from "@/lib/paperwork/scanned-pdf-analysis";
+import { validateFamilyNoPii, validateNoPii } from "@/lib/privacy/no-pii";
+import { isManualOnlyPaperworkField } from "@/lib/paperwork/field-policy";
 import { isPlanReviewed } from "@/lib/domain/plan/review-status";
+import { publicSessionError } from "@/lib/auth/session-errors";
 import type { PdfFieldMapping } from "@/types/paperwork";
 
 const fieldSchema = z.object({
   name: z.string().min(1).max(200),
   kind: z.enum(["text", "checkbox", "dropdown", "radio", "option-list"]),
   options: z.array(z.string().max(200)).max(50),
-  maxLength: z.number().int().positive().max(100_000).nullable(),
+  maxLength: z.number().int().positive().max(4000).nullable(),
 });
 
 const inputSchema = z.object({ familyId: z.string().uuid(), fields: z.array(fieldSchema).min(1).max(150) });
@@ -25,12 +26,12 @@ const downloadSchema = z.object({
   reviewedAt: z.string().datetime(),
   fieldCount: z.number().int().min(0).max(150),
   assistedByAi: z.boolean(),
-  paperworkMode: z.enum(["fillable", "scanned"]),
+  paperworkMode: z.literal("fillable"),
 });
 const aiMappingSchema = z.object({
   mappings: z.array(z.object({
     fieldName: z.string().min(1).max(200),
-    value: z.union([z.string().max(10_000), z.null()]),
+    value: z.union([z.string().max(4000), z.null()]),
     confidence: z.enum(["high", "medium", "low"]),
     source: z.string().min(1).max(300),
     needsReview: z.boolean(),
@@ -45,12 +46,11 @@ export async function authorizePaperworkDownloadAction(
   const parsed = downloadSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "The paperwork source is invalid." };
 
-  let user;
   let supabase;
   try {
-    ({ user, supabase } = await requireAppUserWithClient());
-  } catch {
-    return { ok: false, error: "Your session expired. Sign in again; your browser still has the current edits." };
+    ({ supabase } = await requireAppUserWithClient());
+  } catch (error) {
+    return { ok: false, error: `${publicSessionError(error)} Your browser still has the current edits.` };
   }
 
   const family = await getFamilyDetail(supabase, parsed.data.familyId);
@@ -74,33 +74,17 @@ export async function authorizePaperworkDownloadAction(
     return { ok: false, error: privacy.error ?? "Remove identifying text before downloading paperwork." };
   }
 
-  await supabase.from("activity_log").insert([
-    {
-      family_id: family.id,
-      actor_user_id: user.id,
-      action: "paperwork.review_completed",
-      entity_type: "plan",
-      entity_id: family.plan.id,
-      details: {
-        plan_version: family.plan.version,
-        field_count: parsed.data.fieldCount,
-        assisted_by_ai: parsed.data.assistedByAi,
-        paperwork_mode: parsed.data.paperworkMode,
-      },
-    },
-    {
-      family_id: family.id,
-      actor_user_id: user.id,
-      action: "paperwork.downloaded",
-      entity_type: "plan",
-      entity_id: family.plan.id,
-      details: {
-        plan_version: family.plan.version,
-        field_count: parsed.data.fieldCount,
-        paperwork_mode: parsed.data.paperworkMode,
-      },
-    },
-  ]);
+  const { error: auditError } = await supabase.rpc("record_paperwork_download", {
+    p_family_id: family.id,
+    p_plan_id: family.plan.id,
+    p_plan_version: family.plan.version,
+    p_field_count: parsed.data.fieldCount,
+    p_assisted_by_ai: parsed.data.assistedByAi,
+    p_paperwork_mode: parsed.data.paperworkMode,
+  });
+  if (auditError) {
+    return { ok: false, error: "The download could not be authorized. Try again." };
+  }
   return { ok: true };
 }
 
@@ -108,12 +92,28 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "The PDF contains unsupported or invalid form fields." };
 
-  let user;
+  const metadataPrivacy = validateNoPii(
+    parsed.data.fields.flatMap((field, index) => [
+      { field: `fields.${index}.name`, label: "PDF field name", value: field.name },
+      ...field.options.map((option, optionIndex) => ({
+        field: `fields.${index}.options.${optionIndex}`,
+        label: "PDF field option",
+        value: option,
+      })),
+    ]),
+  );
+  if (!metadataPrivacy.ok) {
+    return {
+      ok: false,
+      error: "This PDF contains identifying text in its field metadata. Use the original blank form.",
+    };
+  }
+
   let supabase;
   try {
-    ({ user, supabase } = await requireAppUserWithClient());
-  } catch {
-    return { ok: false, error: "Your session expired. Sign in again and retry." };
+    ({ supabase } = await requireAppUserWithClient());
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
   }
 
   const family = await getFamilyDetail(supabase, parsed.data.familyId);
@@ -133,7 +133,7 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
     aiMode: "fast",
     temperature: 0,
     maxTokens: 4096,
-    requestMeta: { userId: user.id, route: "/families/[id]/paperwork" },
+    requestMeta: { route: "/families/[id]/paperwork" },
     instructions: [
       "Map reviewed CaseLink source information into the provided PDF form fields.",
       "Never invent facts, infer identities, or fill signatures, consent, dates of birth, addresses, IDs, eligibility attestations, or case-manager certifications.",
@@ -174,7 +174,7 @@ export async function mapPdfFieldsAction(input: unknown): Promise<{ ok: true; ma
       }
       if (!proposed || proposed.value == null) return base;
       let value = proposed.value;
-      if (field.maxLength) value = value.slice(0, field.maxLength);
+      value = value.slice(0, Math.min(field.maxLength ?? 4000, 4000));
       if (["dropdown", "radio", "option-list"].includes(field.kind) && !field.options.includes(value)) return base;
       if (field.kind === "checkbox" && !["true", "false"].includes(value.toLowerCase())) return base;
       return { ...proposed, value };
