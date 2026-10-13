@@ -33,6 +33,48 @@ async function staff() {
   assert.ok(login.data.session);
   return { id, client, email, password, accessToken: login.data.session.access_token, refreshToken: login.data.session.refresh_token };
 }
+async function invitedStaff(assignedFamilyId: string) {
+  const email = `auth-security-${randomUUID()}@example.test`;
+  const firstPassword = `${randomUUID()}-Initial!1`;
+  const password = `${randomUUID()}-Replacement!1`;
+  const invite = await operator.auth.admin.generateLink({ type: "invite", email });
+  assert.equal(invite.error, null, "a synthetic invitation link can be created");
+  const id = invite.data.user.id;
+  users.push(id);
+  assert.equal((await operator.rpc("operator_set_user_role", { p_target_user_id: id, p_role: "case_manager", p_actor_label: "Auth test", p_reason: "Synthetic invitation setup test", p_action: "user.invited" })).error, null);
+  assert.equal((await operator.rpc("operator_set_family_assignment", { p_family_id: assignedFamilyId, p_target_user_id: id, p_assigned: true, p_actor_label: "Auth test", p_reason: "Synthetic assignment before password setup" })).error, null);
+  const client = createClient(local.API_URL, local.ANON_KEY, authOptions);
+  const verified = await client.auth.verifyOtp({ type: "invite", token_hash: invite.data.properties.hashed_token });
+  assert.equal(verified.error, null, "invitation verification establishes a setup session");
+  assert.equal((await client.auth.updateUser({ data: { amr: [{ method: "password" }] } })).error, null);
+  assert.equal((await client.rpc("has_password_session")).data, false, "invitation and forged user_metadata cannot impersonate password authentication");
+  assert.deepEqual((await client.from("families").select("id").eq("id", assignedFamilyId)).data, [], "invitation sessions cannot read assigned cases before setup");
+  assert.ok((await client.rpc("consume_ai_budget", { p_operation: "chat", p_weight: 1 })).error, "invitation sessions cannot skip setup through direct RPCs");
+  const weak = await client.auth.updateUser({ password: "lowercasepasswordonly" });
+  assert.equal(weak.error?.code, "weak_password", "Auth enforces the displayed password requirements");
+  assert.equal((await client.auth.updateUser({ password: firstPassword })).error, null, "initial password can be saved");
+  assert.equal((await client.rpc("has_password_session")).data, false, "setting a password must be followed by password sign-in");
+  assert.equal((await client.auth.signOut({ scope: "global" })).error, null);
+  const initialLogin = await client.auth.signInWithPassword({ email, password: firstPassword });
+  assert.equal(initialLogin.error, null);
+  assert.equal((await client.rpc("has_password_session")).data, true);
+  assert.equal((await client.from("families").select("id").eq("id", assignedFamilyId)).data?.length, 1);
+  const oldToken = initialLogin.data.session!.access_token;
+  const recovery = await operator.auth.admin.generateLink({ type: "recovery", email });
+  assert.equal(recovery.error, null);
+  assert.equal((await client.auth.verifyOtp({ type: "recovery", token_hash: recovery.data.properties.hashed_token })).error, null);
+  assert.equal((await client.auth.updateUser({ password })).error, null, "a fresh recovery session changes the password");
+  assert.equal((await client.auth.signOut({ scope: "global" })).error, null);
+  const oldAccess = await retainedRequest(oldToken, `families?select=id&id=eq.${assignedFamilyId}`);
+  assert.deepEqual(await oldAccess.json(), [], "password-reset completion revokes earlier case access");
+  assert.ok((await client.auth.signInWithPassword({ email, password: firstPassword })).error, "the previous password no longer works");
+  const login = await client.auth.signInWithPassword({ email, password });
+  assert.equal(login.error, null, "the replacement password signs in successfully");
+  const reused = await createClient(local.API_URL, local.ANON_KEY, authOptions).auth.verifyOtp({ type: "recovery", token_hash: recovery.data.properties.hashed_token });
+  assert.ok(reused.error, "a recovery link cannot be reused");
+  return { id, client, email, password, accessToken: login.data.session!.access_token, refreshToken: login.data.session!.refresh_token };
+}
+
 async function family(client: SupabaseClient) {
   const created = await client.rpc("create_family_intake", {
     p_name: "Family synthetic", p_summary: null, p_urgency: "medium", p_household_notes: null,
@@ -56,10 +98,10 @@ async function run() {
   const signup = await publicClient.auth.signUp({ email: `blocked-signup-${randomUUID()}@example.test`, password: `${randomUUID()}-Synthetic!1` });
   assert.ok(signup.error, "public signup remains disabled while email login is enabled");
   assert.equal(signup.data.session, null);
-  const original = await staff();
   const replacement = await staff();
-  const owned = await family(original.client);
   const assigned = await family(replacement.client);
+  const original = await invitedStaff(assigned);
+  const owned = await family(original.client);
   assert.equal((await operator.rpc("operator_set_family_assignment", { p_family_id: assigned, p_target_user_id: original.id, p_assigned: true, p_actor_label: "Auth test", p_reason: "Synthetic assignment before offboarding" })).error, null);
   const before = await retainedRequest(original.accessToken, `families?select=id&id=in.(${owned},${assigned})`);
   assert.equal((await before.json()).length, 2, "retained token initially sees owned and assigned cases");
@@ -96,7 +138,7 @@ async function run() {
   assert.equal(signedOutRead.status, 200);
   assert.deepEqual(await signedOutRead.json(), [], "logout invalidates direct reads even while the JWT is unexpired");
   assert.equal((await retainedRequest(retainedReplacementToken, "rpc/consume_ai_budget", { p_operation: "chat", p_weight: 1 })).status, 403);
-  console.info("Local Auth security checks passed: retained JWT, reads/writes, RPCs, reassignment, refresh, sign-in, and audit.");
+  console.info("Local Auth security checks passed: password setup/reset, one-time links, retained JWT, reads/writes, RPCs, reassignment, refresh, sign-in, and audit.");
 }
 run().finally(async () => {
   if (families.length) await db.query("delete from public.families where id = any($1::uuid[])", [families]);

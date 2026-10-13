@@ -34,6 +34,7 @@ async function asUser<T>(
   userId: string,
   run: (client: PoolClient) => Promise<T>,
   aal: "aal1" | "aal2" = "aal1",
+  authMethod = "password",
 ): Promise<T> {
   const client = await pool.connect();
   try {
@@ -42,7 +43,7 @@ async function asUser<T>(
     await client.query("select set_config('request.jwt.claim.sub', $1, true)", [userId]);
     await client.query("select set_config('request.jwt.claim.role', 'authenticated', true)");
     await client.query("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({ sub: userId, role: "authenticated", aal, session_id: sessionIds.get(userId) }),
+      JSON.stringify({ sub: userId, role: "authenticated", aal, session_id: sessionIds.get(userId), amr: [{ method: authMethod }] }),
     ]);
     const result = await run(client);
     await client.query("commit");
@@ -167,6 +168,9 @@ async function run() {
   sessionIds.set(userB, sessionIds.get(userA)!);
   assert.equal((await asUser(userB, (client) => client.query("select public.is_active_app_user() as allowed"))).rows[0].allowed, false, "session identity must match the authenticated account");
   sessionIds.set(userB, actualSessionB);
+  assert.equal((await asUser(userA, (client) => client.query("select public.is_active_app_user() as allowed"), "aal1", "otp")).rows[0].allowed, false, "invitation sessions cannot skip password sign-in");
+  assert.equal((await asUser(userA, (client) => client.query("select count(*)::int as count from public.families"), "aal1", "otp")).rows[0].count, 0);
+  await expectDbError(() => asUser(userA, (client) => client.query("select public.consume_ai_budget('chat', 1)"), "aal1", "otp"), "password sign-in is required before AI work");
   await asUser(userA, (client) => client.query("select public.ensure_app_user()"));
   const contextRevision = (await admin.query("select to_json(updated_at) as revision from public.families where id = $1", [familyA])).rows[0].revision;
   await asUser(userA, (client) => client.query(

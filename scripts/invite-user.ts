@@ -36,7 +36,7 @@ async function main() {
   }
   let action: "user.invited" | "user.role_changed" = "user.role_changed";
   if (!targetUser) {
-    const next = encodeURIComponent("/reset-password?mode=recovery");
+    const next = encodeURIComponent("/reset-password?mode=setup");
     const invited = await supabase.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${siteOrigin}/auth/callback?next=${next}`,
     });

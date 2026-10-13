@@ -4,6 +4,7 @@ import { logServerError } from "@/lib/logger/server-error";
 import {
   AuthenticationRequiredError,
   SessionUnavailableError,
+  PasswordSetupRequiredError,
 } from "@/lib/auth/session-errors";
 import type { AppUserRow } from "@/types/database";
 import type { UserRole as UserRoleType } from "@/types/user-role";
@@ -66,6 +67,10 @@ export async function ensureAppUserWithClient(
   }
 
   if (existing) {
+    const account = rowToAppUser(existing as AppUserRow);
+    const passwordSession = await supabase.rpc("has_password_session");
+    if (passwordSession.error) throw new SessionUnavailableError();
+    if (passwordSession.data !== true) throw new PasswordSetupRequiredError();
     if (existing.email !== email) {
       const { data: synced, error: syncError } = await supabase.rpc("ensure_app_user");
       if (syncError || !synced) {
@@ -74,7 +79,7 @@ export async function ensureAppUserWithClient(
       }
       return rowToAppUser(synced as AppUserRow);
     }
-    return rowToAppUser(existing as AppUserRow);
+    return account;
   }
 
   const { data: inserted, error: insertError } = await supabase.rpc("ensure_app_user");

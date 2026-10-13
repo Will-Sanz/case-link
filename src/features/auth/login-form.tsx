@@ -71,6 +71,7 @@ export function LoginForm() {
         onClose={() => setLegalModal(null)}
         onChangeDocument={(doc) => setLegalModal(doc)}
       />
+      {searchParams.get("message") === "password-reset-success" ? <p role="status" className="text-sm text-[var(--color-positive)]">Your password is updated. Sign in with your new password.</p> : null}
       {error ? (
         <p className={alertErrorClass} role="alert">
           {error}

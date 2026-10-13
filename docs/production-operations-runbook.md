@@ -39,6 +39,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 - [ ] Disable public email signup and anonymous signup.
 - [ ] Use `npm run db:invite-user` with `NEXT_PUBLIC_SITE_URL`, `CASELINK_INVITE_EMAIL`, optional `CASELINK_INVITE_ROLE` (`case_manager` by default), `CASELINK_OPERATOR_LABEL`, and `CASELINK_CHANGE_REASON`; verify the invite opens the exact callback, establishes a session, and requires initial password setup. Test expired/reused links.
 - [ ] Require at least 14 characters and lower/upper-case letters, digits, and symbols; enable leaked-password protection when the hosted plan supports it.
+- [ ] Verify invitation/recovery sessions cannot use casework before password sign-in. The database checks the signed authentication method, never editable user metadata. Initial setup and reset end with global sign-out and a fresh password login; earlier case-access tokens must then fail. Existing password users do not need a forced reset. Exercise verification-code and sign-out retry paths without repeating a successful password change.
 - [ ] Set email OTP/recovery expiry to 15 minutes, secure password changes, and session timebox/inactivity limits no longer than 12/2 hours.
 - [ ] Restrict redirect URLs to the exact production callback and recovery paths. No wildcards.
 - [ ] Configure custom SMTP, delivery monitoring, auth abuse limits, CAPTCHA if abuse warrants it, and security notifications.
