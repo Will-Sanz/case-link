@@ -1,12 +1,13 @@
 /** Isolated, synthetic Auth + Data API tests. This script cannot target a remote project. */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { offboardUser } from "./offboard-user-operation";
 import { inviteUser } from "./invite-user-operation";
+import { recoverMfaUser } from "./recover-mfa-operation";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 
 const local = JSON.parse(execFileSync("npx", ["--yes", "supabase@2.111.0", "status", "--output", "json"], {
@@ -21,6 +22,29 @@ const db = new Client({ connectionString: local.DB_URL });
 const users: string[] = [];
 const families: string[] = [];
 const mailIds = new Set<string>();
+
+function totp(secret: string, time = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bits = [...secret.replaceAll("=", "").toUpperCase()].map((character) => {
+    const value = alphabet.indexOf(character);
+    assert.ok(value >= 0, "the synthetic factor secret uses base32");
+    return value.toString(2).padStart(5, "0");
+  }).join("");
+  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((byte) => parseInt(byte, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(time / 30000)));
+  const digest = createHmac("sha1", key).update(counter).digest();
+  const offset = digest[digest.length - 1] & 15;
+  return ((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, "0");
+}
+assert.equal(totp("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", 59000), "287082", "test authenticator matches the RFC 6238 SHA-1 vector");
+const usedCounters = new Map<string, number>();
+async function freshTotp(secret: string) {
+  const previous = usedCounters.get(secret);
+  if (previous !== undefined && Math.floor(Date.now() / 30000) <= previous) await delay((previous + 1) * 30000 - Date.now() + 50);
+  usedCounters.set(secret, Math.floor(Date.now() / 30000));
+  return totp(secret);
+}
 
 async function deliveredMail(email: string, subject: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -159,6 +183,69 @@ async function retainedRequest(token: string, path: string, body?: unknown) {
   });
 }
 
+async function mfaSecurity(otherFamilyId: string) {
+  const account = await staff();
+  const owned = await family(account.client);
+  assert.equal((await operator.rpc("operator_set_user_role", { p_target_user_id: account.id, p_role: "admin", p_actor_label: "Auth test", p_reason: "Synthetic MFA administrator test", p_action: "user.role_changed" })).error, null);
+  assert.equal((await account.client.rpc("has_required_mfa")).data, false);
+  assert.deepEqual((await account.client.from("families").select("id")).data, [], "a password-only administrator cannot read even an owned case");
+  const enrolled = await account.client.auth.mfa.enroll({ factorType: "totp", issuer: "CaseLink", friendlyName: "Synthetic authenticator" });
+  assert.equal(enrolled.error, null);
+  const first = enrolled.data!;
+  const invalidCode = totp(first.totp.secret) === "000000" ? "000001" : "000000";
+  assert.ok((await account.client.auth.mfa.challengeAndVerify({ factorId: first.id, code: invalidCode })).error, "an incorrect authenticator code is rejected");
+  const expired = await account.client.auth.mfa.challenge({ factorId: first.id });
+  assert.equal(expired.error, null);
+  await db.query("update auth.mfa_challenges set created_at = now() - interval '10 minutes' where id = $1", [expired.data!.id]);
+  assert.ok((await account.client.auth.mfa.verify({ factorId: first.id, challengeId: expired.data!.id, code: totp(first.totp.secret) })).error, "an expired challenge rejects even a current code");
+  const verified = await account.client.auth.mfa.challengeAndVerify({ factorId: first.id, code: await freshTotp(first.totp.secret) });
+  assert.equal(verified.error, null, "initial authenticator enrollment verifies successfully");
+  assert.equal((await account.client.rpc("is_app_admin")).data, true);
+  assert.equal((await account.client.from("families").select("id").eq("id", otherFamilyId)).data?.length, 1);
+  assert.deepEqual(await (await retainedRequest(account.accessToken, `families?select=id&id=eq.${otherFamilyId}`)).json(), [], "the earlier AAL1 JWT cannot borrow the session's later MFA verification");
+  await deliveredMail(account.email, "Verification method added — CaseLink");
+  assert.equal((await account.client.auth.signOut({ scope: "global" })).error, null);
+  assert.equal((await account.client.auth.signInWithPassword({ email: account.email, password: account.password })).error, null);
+  assert.equal((await account.client.rpc("has_required_mfa")).data, false, "returning password login requires a fresh MFA challenge");
+  const returning = await account.client.auth.mfa.challengeAndVerify({ factorId: first.id, code: await freshTotp(first.totp.secret) });
+  assert.equal(returning.error, null);
+  const elevatedToken = returning.data!.access_token;
+  assert.equal((await account.client.auth.mfa.unenroll({ factorId: first.id })).error, null);
+  assert.deepEqual(await (await retainedRequest(elevatedToken, `families?select=id&id=eq.${owned}`)).json(), [], "factor removal immediately denies the retained AAL2 token");
+  await deliveredMail(account.email, "Verification method removed — CaseLink");
+  const second = await account.client.auth.mfa.enroll({ factorType: "totp", issuer: "CaseLink", friendlyName: "Synthetic replacement" });
+  assert.equal(second.error, null);
+  const secondVerified = await account.client.auth.mfa.challengeAndVerify({ factorId: second.data!.id, code: await freshTotp(second.data!.totp.secret) });
+  assert.equal(secondVerified.error, null);
+  const beforeRecovery = secondVerified.data!.access_token;
+  const ordinaryRecovery = await operator.auth.admin.generateLink({ type: "recovery", email: account.email });
+  assert.equal(ordinaryRecovery.error, null);
+  const recoveryClient = createClient(local.API_URL, local.ANON_KEY, authOptions);
+  assert.equal((await recoveryClient.auth.verifyOtp({ type: "recovery", token_hash: ordinaryRecovery.data.properties.hashed_token })).error, null);
+  assert.equal((await recoveryClient.auth.updateUser({ password: `${randomUUID()}-NotAllowed!1` })).error?.code, "insufficient_aal", "email recovery alone cannot bypass the authenticator");
+  assert.deepEqual((await recoveryClient.from("families").select("id")).data, []);
+  await recoverMfaUser(operator, { targetUserId: account.id, siteOrigin: "http://127.0.0.1:3000", actorLabel: "Auth test", reason: "Synthetic independent identity verification", identityVerified: true });
+  assert.deepEqual(await (await retainedRequest(beforeRecovery, `families?select=id&id=eq.${owned}`)).json(), [], "operator recovery revokes earlier verified sessions");
+  assert.ok((await account.client.auth.signInWithPassword({ email: account.email, password: account.password })).error, "lost-factor recovery also invalidates the previous password");
+  const token = await deliveredToken(account.email, "recovery");
+  const recovered = createClient(local.API_URL, local.ANON_KEY, authOptions);
+  assert.equal((await recovered.auth.verifyOtp({ type: "recovery", token_hash: token })).error, null);
+  const newPassword = `${randomUUID()}-Recovered!1`;
+  assert.equal((await recovered.auth.updateUser({ password: newPassword })).error, null);
+  assert.equal((await recovered.auth.signOut({ scope: "global" })).error, null);
+  assert.equal((await recovered.auth.signInWithPassword({ email: account.email, password: newPassword })).error, null);
+  assert.equal((await recovered.rpc("has_required_mfa")).data, false, "recovered administrators must enroll again before reading cases");
+  const replacementFactor = await recovered.auth.mfa.enroll({ factorType: "totp", issuer: "CaseLink", friendlyName: "Recovered authenticator" });
+  assert.equal(replacementFactor.error, null);
+  assert.equal((await recovered.auth.mfa.challengeAndVerify({ factorId: replacementFactor.data!.id, code: await freshTotp(replacementFactor.data!.totp.secret) })).error, null);
+  assert.equal((await recovered.rpc("is_app_admin")).data, true);
+  assert.equal((await recovered.from("families").select("id").eq("id", owned)).data?.length, 1);
+  assert.equal((await db.query("select created_by_id from public.families where id = $1", [owned])).rows[0].created_by_id, account.id, "MFA recovery preserves case ownership");
+  const audit = await db.query("select action from public.security_audit_log where target_user_id = $1 and action like 'user.mfa_recovery_%' order by created_at", [account.id]);
+  assert.deepEqual(audit.rows.map((row) => row.action), ["user.mfa_recovery_started", "user.mfa_recovery_ready"]);
+  assert.equal((await recovered.auth.signOut({ scope: "global" })).error, null);
+}
+
 async function run() {
   await db.connect();
   const publicClient = createClient(local.API_URL, local.ANON_KEY, authOptions);
@@ -205,7 +292,8 @@ async function run() {
   assert.equal(signedOutRead.status, 200);
   assert.deepEqual(await signedOutRead.json(), [], "logout invalidates direct reads even while the JWT is unexpired");
   assert.equal((await retainedRequest(retainedReplacementToken, "rpc/consume_ai_budget", { p_operation: "chat", p_weight: 1 })).status, 403);
-  console.info("Local Auth security checks passed: password setup/reset, one-time links, retained JWT, reads/writes, RPCs, reassignment, refresh, sign-in, and audit.");
+  await mfaSecurity(assigned);
+  console.info("Local Auth security checks passed: invitation/reset/email, MFA setup/challenge/removal/recovery, retained JWT denial, reads/writes, RPCs, reassignment, refresh, and audit.");
 }
 run().finally(async () => {
   if (families.length) await db.query("delete from public.families where id = any($1::uuid[])", [families]);

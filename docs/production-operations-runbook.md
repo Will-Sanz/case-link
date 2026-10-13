@@ -44,7 +44,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 - [ ] Install the checked-in invite/recovery/reauthentication templates and enable password/email/MFA-change notices. Use six-digit email codes. Verify delivered messages in a synthetic school mailbox, including its link scanner, expiry/resend, a reset requested in another browser, and code renewal. New invitation/reset links open a confirmation screen before redemption and keep their token in the fragment; disable email click tracking and never capture tokens in logs or screenshots. Record actual hosted template/SMTP and canonical-origin settings; local configuration is not hosted evidence.
 - [ ] Restrict redirect URLs to the exact production callback and recovery paths. No wildcards.
 - [ ] Configure custom SMTP, delivery monitoring, auth abuse limits, CAPTCHA if abuse warrants it, and security notifications.
-- [ ] Require TOTP MFA for every administrator and production operator; prove a password-only AAL1 admin cannot access an unrelated synthetic case and an AAL2 session can.
+- [ ] Require TOTP MFA for every administrator and production operator; prove a password-only AAL1 admin cannot access even an owned synthetic case and an AAL2 session can. App users enroll/challenge at `/verify-account`; Settings links to factor management. Enrolled case managers also need their second factor. The database checks the signed assurance level, current session, and a currently verified factor. Removing a factor must immediately deny an administrator's retained token.
 - [ ] Review `app_users` for unexpected roles before launch and attach the query result to the release ticket.
 
 ### Platform and vendor controls
@@ -103,6 +103,14 @@ The automated synthetic rehearsal is `npm run test:auth-security`. It only accep
 Successful staff sign-out ends all refresh sessions. Database case access also checks that the JWT session still exists and has not expired, so revoked tokens cannot keep reading casework until token expiry. A failed sign-out stays visible with a retry action; staff should confirm completion before leaving a shared device. Browser draft cleanup and recovery are tracked separately in CL-04.
 
 Review every user, admin, assignment, service credential, and vendor operator quarterly and before each pilot extension.
+
+### Lost authenticator recovery
+
+1. A designated operator verifies the staff member's identity independently through the school's approved procedure (for example, an in-person check or a previously established trusted contact). An email request alone is insufficient. Record who approved recovery and the reason; do not put identity documents or sensitive personal details in the audit reason. The operator's own hosting/vendor accounts require MFA and protected credential access.
+2. In the protected operator environment, set `CASELINK_RECOVERY_USER_ID`, `CASELINK_OPERATOR_LABEL`, `CASELINK_CHANGE_REASON`, exact `NEXT_PUBLIC_SITE_URL`, and `CASELINK_RECOVERY_IDENTITY_VERIFIED=1`. Supply the project URL and service key through protected environment secrets. Run `npm run db:recover-mfa` only for the independently verified account.
+3. The job audits and revokes sessions, invalidates the previous password with an undisclosed random replacement, removes the old factors through Auth, audits a second session cleanup, and requests a recovery email. It does not change ownership, assignments, roles, or offboarding status. A failure identifies the incomplete stage; retry the same operation after resolving it. Never report recovery complete based only on the first audit event or an email-accepted result.
+4. The staff member opens the latest email, chooses a new password, signs in with it, and enrolls/verifies an authenticator. Administrators remain unable to read cases until enrollment succeeds. Verify `user.mfa_recovery_started` and `user.mfa_recovery_ready`, mailbox receipt, new enrollment, and authorized synthetic case access. Do not send or store the QR code, setup key, OTP, password, or recovery URL in the support record.
+5. An ordinary password-reset email does not bypass an enrolled authenticator. Users who still have their device verify its code before changing the password. Users may remove a method through Settings after verification; removal signs out all sessions, and administrators must enroll again. Rehearse these paths in staging before launch. Automated local evidence is in `test:auth-security`; hosted MFA delivery/configuration and the named recovery operator remain release gates.
 
 ## Deploy and rollback
 

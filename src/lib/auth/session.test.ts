@@ -1,6 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
-import { PasswordSetupRequiredError, SessionUnavailableError } from "./session-errors";
+import { MfaRequiredError, PasswordSetupRequiredError, SessionUnavailableError } from "./session-errors";
 import { ensureAppUserWithClient } from "./session";
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: vi.fn() }));
 
@@ -23,4 +23,9 @@ it.each([false, null])("requires password sign-in when the signed session result
 it("fails closed when the password sign-in check is unavailable", async () => {
   const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: { id: user.id, email: user.email, role: "case_manager", is_active: true }, error: null }) };
   await expect(ensureAppUserWithClient({ from: () => query, rpc: async () => ({ data: null, error: {} }) } as unknown as SupabaseClient, user)).rejects.toBeInstanceOf(SessionUnavailableError);
+});
+it.each([false, "unavailable"])("requires verified MFA or fails closed when its result is %s", async (result) => {
+  const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: { id: user.id, email: user.email, role: "admin", is_active: true }, error: null }) };
+  const rpc = vi.fn().mockResolvedValueOnce({ data: true, error: null }).mockResolvedValueOnce({ data: false, error: result === "unavailable" ? {} : null });
+  await expect(ensureAppUserWithClient({ from: () => query, rpc } as unknown as SupabaseClient, user)).rejects.toBeInstanceOf(result === false ? MfaRequiredError : SessionUnavailableError);
 });

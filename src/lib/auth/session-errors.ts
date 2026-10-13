@@ -13,10 +13,17 @@ export class SessionUnavailableError extends Error {
 }
 
 export function publicSessionError(error: unknown): string {
-  if (error instanceof PasswordSetupRequiredError) return error.message;
+  if (error instanceof PasswordSetupRequiredError || error instanceof MfaRequiredError) return error.message;
   return error instanceof AuthenticationRequiredError
     ? "Sign in to continue."
     : "CaseLink could not verify your session. Try again.";
+}
+
+export class MfaRequiredError extends Error {
+  constructor() {
+    super("Verify your authenticator code to continue. Open account verification and try again.");
+    this.name = "MfaRequiredError";
+  }
 }
 
 export class PasswordSetupRequiredError extends Error {

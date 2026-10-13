@@ -144,3 +144,13 @@ it("can cancel a recovery session without changing the password or looping back 
   expect(m.signOut).toHaveBeenCalledWith({ scope: "global" });
   expect(m.update).not.toHaveBeenCalled();
 });
+it("requires the authenticator during password recovery instead of treating MFA as an expired link", async () => {
+  m.update.mockResolvedValue({ error: { code: "insufficient_aal", status: 401 } });
+  render(<ResetPasswordForm />);
+  await fillPassword();
+  fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+  const link = await screen.findByRole("link", { name: "Verify with your authenticator" });
+  expect(link.getAttribute("href")).toBe("/verify-account?next=%2Freset-password%3Fmode%3Drecovery");
+  expect(screen.queryByRole("link", { name: "Request a new reset link" })).toBeNull();
+  expect(m.signOut).not.toHaveBeenCalled();
+});
