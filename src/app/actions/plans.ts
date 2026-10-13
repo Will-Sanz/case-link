@@ -25,11 +25,7 @@ import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-ph
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
-import {
-  actionUserNotes,
-  encodeActionNotes,
-  isActionNoLongerNeeded,
-} from "@/lib/domain/plan/action-state";
+import { actionUserNotes } from "@/lib/domain/plan/action-state";
 import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import {
@@ -60,12 +56,12 @@ import {
   stagedPlanAdvanceSchema,
   stagedPlanStartSchema,
   markPlanReviewedSchema,
+  savePlanEditsSchema,
   previewRefineStepSchema,
   previewRefinePlanSchema,
   toggleChecklistItemSchema,
   updatePlanSchema,
   updatePlanStepActionItemSchema,
-  updatePlanStepSchema,
 } from "@/lib/validations/plans";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -102,7 +98,7 @@ export type PlanEditConflict =
     };
 
 export type PlanEditActionResult =
-  | { ok: true; updatedAt?: string }
+  | { ok: true }
   | { ok: false; error: string; conflict?: PlanEditConflict };
 
 function noPiiError(fields: PrivacyFieldInput[]): string | null {
@@ -1173,134 +1169,40 @@ export async function validatePlanExport(input: unknown): Promise<ActionResult> 
   }
 }
 
-export async function updatePlanStep(
-  input: unknown,
-): Promise<PlanEditActionResult> {
-  const parsed = updatePlanStepSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: "Invalid request" };
-  }
-  const stepPrivacyError = noPiiError([
-    { field: "title", label: "Action title", value: parsed.data.title },
-    { field: "description", label: "Action description", value: parsed.data.description },
-    ...planDetailsPrivacyFields(parsed.data.details as PlanStepDetails | undefined, "details"),
-    {
-      field: "workflow_data.blocker_reason",
-      label: "Blocker reason",
-      value: parsed.data.workflow_data?.blocker_reason,
-    },
-    {
-      field: "workflow_data.outcome_notes",
-      label: "Outcome notes",
-      value: parsed.data.workflow_data?.outcome_notes,
-    },
+async function persistPlanEdits(supabase: SupabaseClient, input: import("@/lib/validations/plans").SavePlanEditsInput): Promise<PlanEditActionResult> {
+  const fields: PrivacyFieldInput[] = input.steps.flatMap((edit, i) => [
+    { field: `steps.${i}.title`, label: "Action title", value: edit.patch.title },
+    { field: `steps.${i}.description`, label: "Action description", value: edit.patch.description },
+    ...planDetailsPrivacyFields(edit.patch.details, `steps.${i}.details`),
+    ...Object.entries(edit.patch.workflow_data ?? {}).flatMap(([key, value]) => typeof value === "string" ? [{ field: `steps.${i}.workflow_data.${key}`, label: "Action progress", value }] : []),
+    ...edit.actionItems.flatMap((action, j) => [
+      { field: `steps.${i}.actions.${j}.title`, label: "Action title", value: action.patch.title },
+      { field: `steps.${i}.actions.${j}.description`, label: "Action description", value: action.patch.description },
+      { field: `steps.${i}.actions.${j}.outcome`, label: "Action outcome", value: action.patch.outcome },
+      { field: `steps.${i}.actions.${j}.notes`, label: "Action note", value: actionUserNotes(action.patch.notes) },
+    ]),
   ]);
-  if (stepPrivacyError) return { ok: false, error: stepPrivacyError };
+  const privacyError = noPiiError(fields);
+  if (privacyError) return { ok: false, error: privacyError };
+  const { data, error } = await supabase.rpc("save_plan_edits", {
+    p_family_id: input.familyId, p_plan_id: input.planId, p_changes: input.steps,
+  });
+  if (error) return { ok: false, error: publicMessageFromSupabaseError(error, "The save could not be confirmed. Keep your edits and reload the saved plan before retrying.") };
+  if (data?.ok === false) return data as PlanEditActionResult;
+  if (data?.ok !== true) return { ok: false, error: "The save could not be confirmed. Keep your edits and reload the saved plan before retrying." };
+  for (const path of [`/families/${input.familyId}`, `/families/${input.familyId}/plan`, `/families/${input.familyId}/paperwork`, "/families", "/calendar"]) revalidatePath(path);
+  return { ok: true };
+}
 
-  let supabase;
+export async function savePlanEdits(input: unknown): Promise<PlanEditActionResult> {
+  const parsed = savePlanEditsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Check the edited fields and reload the saved plan before retrying." };
   try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
+    const { supabase } = await requireAppUserWithClient();
+    return await persistPlanEdits(supabase, parsed.data);
   } catch (error) {
     return { ok: false, error: publicSessionError(error) };
   }
-
-  const { stepId, familyId, expectedUpdatedAt, ...patch } = parsed.data;
-  if (Object.keys(patch).length === 0) {
-    return { ok: true };
-  }
-
-  const { data: planRow } = await supabase
-    .from("plans")
-    .select("id")
-    .eq("family_id", familyId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!planRow) {
-    return { ok: false, error: "Plan not found" };
-  }
-
-  const updatePayload: Record<string, unknown> = {};
-  if (patch.title !== undefined) updatePayload.title = patch.title;
-  if (patch.description !== undefined)
-    updatePayload.description = patch.description;
-  if (patch.status !== undefined) updatePayload.status = patch.status;
-  if (patch.details !== undefined) updatePayload.details = patch.details;
-  if (patch.workflow_data !== undefined)
-    updatePayload.workflow_data = patch.workflow_data;
-  if (patch.priority !== undefined) updatePayload.priority = patch.priority;
-  if (patch.phase !== undefined) updatePayload.phase = patch.phase;
-  if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
-
-  let updateQuery = supabase
-    .from("plan_steps")
-    .update(updatePayload)
-    .eq("id", stepId)
-    .eq("plan_id", planRow.id);
-  if (expectedUpdatedAt) updateQuery = updateQuery.eq("updated_at", expectedUpdatedAt);
-  const { data: updatedRows, error } = await updateQuery.select("id, updated_at");
-
-  if (error) {
-    return { ok: false, error: publicMessageFromSupabaseError(error) };
-  }
-  if (!updatedRows?.length) {
-    const { data: latestStep } = await supabase
-      .from("plan_steps")
-      .select("title, description, status, phase, priority, details, workflow_data, updated_at")
-      .eq("id", stepId)
-      .eq("plan_id", planRow.id)
-      .maybeSingle();
-    if (latestStep) {
-      return {
-        ok: false,
-        error:
-          "This action changed in another tab. Compare both versions before choosing which one to keep.",
-        conflict: {
-          kind: "step",
-          entityId: stepId,
-          currentUpdatedAt: latestStep.updated_at,
-          current: {
-            title: latestStep.title,
-            description: latestStep.description,
-            status: latestStep.status,
-            phase: latestStep.phase,
-            priority: latestStep.priority,
-            details: latestStep.details as PlanStepDetails | null,
-            workflow_data: latestStep.workflow_data as PlanStepRow["workflow_data"],
-          },
-        },
-      };
-    }
-    return { ok: false, error: "Action not found or could not be updated." };
-  }
-
-  await logCaseActivity(
-    supabase,
-    familyId,
-    "step.updated",
-    "plan_step",
-    stepId,
-    { plan_id: planRow.id, changed_fields: Object.keys(updatePayload) },
-  );
-
-  if (patch.status !== undefined) {
-    await logCaseActivity(
-      supabase,
-      familyId,
-      "step.status_changed",
-      "plan_step",
-      stepId,
-      { status: patch.status },
-    );
-  }
-  if (patch.workflow_data !== undefined && (patch.workflow_data as { needs_escalation?: boolean })?.needs_escalation) {
-    await logCaseActivity(supabase, familyId, "step.escalation_flagged", "plan_step", stepId);
-  }
-
-  revalidatePath(`/families/${familyId}`);
-  return { ok: true, updatedAt: updatedRows[0]?.updated_at as string | undefined };
 }
 
 export async function createManualStep(input: unknown): Promise<ActionResult> {
@@ -1493,205 +1395,18 @@ export async function toggleChecklistItem(input: unknown): Promise<ActionResult>
 
 export async function updatePlanStepActionItem(input: unknown): Promise<PlanEditActionResult> {
   const parsed = updatePlanStepActionItemSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: "Invalid request" };
-  }
-  const actionPrivacyError = noPiiError([
-    { field: "title", label: "Action title", value: parsed.data.title },
-    {
-      field: "description",
-      label: "Action description",
-      value: parsed.data.description,
-    },
-    { field: "outcome", label: "Action outcome", value: parsed.data.outcome },
-    { field: "notes", label: "Action note", value: actionUserNotes(parsed.data.notes) },
-  ]);
-  if (actionPrivacyError) return { ok: false, error: actionPrivacyError };
-
-  let supabase;
+  if (!parsed.success || !parsed.data.expectedUpdatedAt) return { ok: false, error: "Invalid request" };
   try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
+    const { supabase } = await requireAppUserWithClient();
+    const { data: action, error: actionError } = await supabase.from("plan_step_action_items").select("plan_step_id").eq("id", parsed.data.actionItemId).maybeSingle();
+    if (actionError || !action) return { ok: false, error: "The action could not be loaded. Try again." };
+    const { data: step, error: stepError } = await supabase.from("plan_steps").select("id, plan_id, updated_at").eq("id", action.plan_step_id).maybeSingle();
+    if (stepError || !step) return { ok: false, error: "The action could not be loaded. Try again." };
+    const { familyId, actionItemId, expectedUpdatedAt, ...patch } = parsed.data;
+    return await persistPlanEdits(supabase, { familyId, planId: step.plan_id, steps: [{ stepId: step.id, expectedUpdatedAt: step.updated_at, patch: {}, actionItems: [{ actionItemId, expectedUpdatedAt, patch }] }] });
   } catch (error) {
     return { ok: false, error: publicSessionError(error) };
   }
-
-  const { actionItemId, familyId, status, expectedUpdatedAt } = parsed.data;
-
-  const { data: ai } = await supabase
-    .from("plan_step_action_items")
-    .select(
-      "plan_step_id, title, description, week_index, target_date, status, outcome, notes, follow_up_date, updated_at",
-    )
-    .eq("id", actionItemId)
-    .maybeSingle();
-
-  if (!ai) {
-    return { ok: false, error: "Action item not found" };
-  }
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("plan_id")
-    .eq("id", ai.plan_step_id)
-    .maybeSingle();
-
-  if (!step) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Action item not found" };
-  }
-
-  const nextStatus = status ?? ai.status;
-  let nextNotes = parsed.data.notes !== undefined ? parsed.data.notes : ai.notes;
-  const nextFollowUpDate =
-    parsed.data.follow_up_date !== undefined
-      ? parsed.data.follow_up_date
-      : ai.follow_up_date;
-
-  if (status !== undefined && status !== "completed" && isActionNoLongerNeeded(ai)) {
-    nextNotes = encodeActionNotes(ai.notes, false);
-  }
-
-  if (nextStatus === "blocked") {
-    if (!actionUserNotes(nextNotes).trim()) {
-      return { ok: false, error: "Add a short waiting reason before saving." };
-    }
-    if (!nextFollowUpDate) {
-      return { ok: false, error: "Choose the next follow-up date before saving." };
-    }
-  }
-
-  const patch: Record<string, unknown> = {};
-  if (status !== undefined) patch.status = status;
-  if (parsed.data.title !== undefined) patch.title = parsed.data.title;
-  if (parsed.data.description !== undefined) patch.description = parsed.data.description;
-  if (parsed.data.week_index !== undefined) patch.week_index = parsed.data.week_index;
-  if (parsed.data.target_date !== undefined) patch.target_date = parsed.data.target_date;
-  if (parsed.data.outcome !== undefined) patch.outcome = parsed.data.outcome;
-  if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes;
-  if (parsed.data.follow_up_date !== undefined) patch.follow_up_date = parsed.data.follow_up_date;
-  if (nextNotes !== ai.notes && parsed.data.notes === undefined) patch.notes = nextNotes;
-
-  if (Object.keys(patch).length === 0) {
-    return { ok: true };
-  }
-
-  let actionUpdateQuery = supabase
-    .from("plan_step_action_items")
-    .update(patch)
-    .eq("id", actionItemId);
-  if (expectedUpdatedAt) {
-    actionUpdateQuery = actionUpdateQuery.eq("updated_at", expectedUpdatedAt);
-  }
-  const { data: updatedActionItems, error } = await actionUpdateQuery.select("id, updated_at");
-
-  if (error) {
-    return { ok: false, error: publicMessageFromSupabaseError(error) };
-  }
-  if (!updatedActionItems?.length) {
-    const { data: latestAction } = await supabase
-      .from("plan_step_action_items")
-      .select(
-        "title, description, week_index, target_date, status, outcome, notes, follow_up_date, updated_at",
-      )
-      .eq("id", actionItemId)
-      .eq("plan_step_id", ai.plan_step_id)
-      .maybeSingle();
-    if (latestAction) {
-      return {
-        ok: false,
-        error:
-          "This action changed in another tab. Compare both versions before choosing which one to keep.",
-        conflict: {
-          kind: "action_item",
-          entityId: actionItemId,
-          currentUpdatedAt: latestAction.updated_at,
-          current: {
-            title: latestAction.title,
-            description: latestAction.description,
-            week_index: latestAction.week_index,
-            target_date: latestAction.target_date,
-            status: latestAction.status,
-            outcome: latestAction.outcome,
-            notes: latestAction.notes,
-            follow_up_date: latestAction.follow_up_date,
-          },
-        },
-      };
-    }
-    return { ok: false, error: "Action item not found or could not be updated." };
-  }
-
-  await logCaseActivity(
-    supabase,
-    familyId,
-    "step.action_item_updated",
-    "plan_step_action_item",
-    actionItemId,
-    {
-      plan_id: step.plan_id,
-      changed_fields: Object.keys(patch),
-      status: nextStatus,
-    },
-  );
-
-  if (status === "completed") {
-    const noLongerNeeded = isActionNoLongerNeeded({ status: nextStatus, notes: nextNotes });
-    await logCaseActivity(
-      supabase,
-      familyId,
-      noLongerNeeded ? "step.action_item_no_longer_needed" : "step.action_item_completed",
-      "plan_step_action_item",
-      actionItemId,
-      {},
-    );
-
-    // Auto-complete step if all action items are now completed
-    const { data: stepActionItems } = await supabase
-      .from("plan_step_action_items")
-      .select("id, status")
-      .eq("plan_step_id", ai.plan_step_id);
-    const allDone =
-      (stepActionItems ?? []).length > 0 &&
-      (stepActionItems ?? []).every((x) => x.status === "completed");
-    if (allDone) {
-      const { data: curStep } = await supabase
-        .from("plan_steps")
-        .select("status")
-        .eq("id", ai.plan_step_id)
-        .single();
-      if (curStep && curStep.status !== "completed" && curStep.status !== "blocked") {
-        const { error: stepCompletionError } = await supabase
-          .from("plan_steps")
-          .update({ status: "completed" })
-          .eq("id", ai.plan_step_id);
-        if (stepCompletionError) {
-          logServerError("plans:auto-complete-step", stepCompletionError);
-        } else {
-          await logCaseActivity(
-            supabase,
-            familyId,
-            "step.status_changed",
-            "plan_step",
-            ai.plan_step_id,
-            { status: "completed", source: "action_items_auto" },
-          );
-        }
-      }
-    }
-  }
-
-  revalidatePath(`/families/${familyId}`);
-  return { ok: true, updatedAt: updatedActionItems[0]?.updated_at as string | undefined };
 }
 
 /** AI revises a single step; returns proposed content without persisting. */

@@ -241,7 +241,7 @@ Full-plan AI input omits step/action IDs and action status/outcomes. Application
 
 **Close with:** swapped same-phase steps, swapped action rows, duplicate IDs, deleted IDs, completed actions, and another family's IDs. No outcome or completion history may move to a different action. **Source:** [full-plan preview and apply](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:1001).
 
-### [ ] CL-30 — Save one reviewed edit transactionally
+### [x] CL-30 — Save one reviewed edit transactionally
 
 **Additional finding during CL-05:** `capture_case_progress_update` still executes with the browser role even though the hardening migration revoked the required direct case-progress/activity/family writes. Include a real successful meeting-progress transaction, its permissions and rollback tests here; preserve material approval for progress-only updates instead of clearing review unconditionally.
 
@@ -252,6 +252,10 @@ Full-plan save loops through steps, and each step then saves action items separa
 **Fix:** use a scoped database transaction for one user-confirmed edit, including expected revisions and audit evidence. An individual step edit that updates its actions needs the same all-or-nothing behavior. Reuse the repository's existing transactional RPC pattern.
 
 **Close with:** force failure on the second step and second child update; assert no partial content or audit commit; prove stale-version rejection and a successful retry without duplicates. **Source:** [step persistence and bulk save](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:622).
+
+**Completed October 13, 2026 — engineering:** goal/action and full-plan edits now use one authorized database transaction with original revisions, parent/child ownership checks, deterministic locking, and atomic audit events. The UI retains a failed working copy and exposes conflicts inside the full-plan dialog. Meeting progress uses an append-only authorized transaction; staff can read their permitted history. A request ID and payload hash make unchanged/concurrent retries return the existing note without duplicate changes, while changed reuse is rejected. Progress-only changes retain material review evidence. The form catches lost responses, prevents duplicate submissions, retains its original revision across refreshes, and uses the same note limits as storage. The retired standalone goal-save action was removed.
+
+**Evidence:** 23 focused component/action tests passed. A fresh local Supabase reset and the database security suite passed, including forced second-goal, second-action, and audit failures; zero partial writes; stale/foreign-child rejection; unchanged and concurrent retries; retry after rollback; forbidden direct inserts; and unrelated-staff read/write denial. Security advisors reported no issues. Correctness/security/privacy and separate Ponytail/React reviews completed for the few-staff pilot; full repository verification is enforced by the pre-push hook. Deployed browser acceptance remains in CL-08/CL-38; AI edit preservation remains in CL-27/CL-28. Commit: `git log --grep='CL-30'`.
 
 ### [ ] CL-38 — Prove least-privilege access and the one-school boundary
 

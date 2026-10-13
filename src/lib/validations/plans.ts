@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const dateOnlySchema = (message: string) =>
+export const dateOnlySchema = (message: string) =>
   z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, message)
@@ -183,6 +183,22 @@ export const refineStepSchema = z.object({
   feedback: z.string().min(1, "Feedback is required").max(2000),
   aiMode: aiModeSchema,
 });
+
+export const savePlanEditsSchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+  steps: z.array(z.object({
+    stepId: z.string().uuid(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+    patch: updatePlanStepSchema.omit({ familyId: true, stepId: true, expectedUpdatedAt: true }).strict(),
+    actionItems: z.array(z.object({
+      actionItemId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      patch: updatePlanStepActionItemSchema.omit({ familyId: true, actionItemId: true, expectedUpdatedAt: true }).strict(),
+    })).max(50),
+  })).min(1).max(15),
+});
+export type SavePlanEditsInput = z.infer<typeof savePlanEditsSchema>;
 
 const previewDraftActionItemSchema = z.object({
   title: z.string().min(1).max(500),

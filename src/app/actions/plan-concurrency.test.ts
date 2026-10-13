@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { updatePlanStep, updatePlanStepActionItem } from "./plans";
+import { savePlanEdits, updatePlanStepActionItem } from "./plans";
 import { captureCaseProgressUpdate } from "./case-progress";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn() }));
@@ -12,7 +12,7 @@ const stepId = "160e28d7-438d-4e85-844b-abb90b7e6ef4";
 const actionItemId = "596a15f1-aa32-4371-b9c7-dfa081c85497";
 const databaseTime = "2026-08-03T20:30:00.123456+00:00";
 
-function database(updateSucceeds = true) {
+function database() {
   const predicates: unknown[][] = [];
   const writes: string[] = [];
   const from = vi.fn((table: string) => {
@@ -27,7 +27,7 @@ function database(updateSucceeds = true) {
       limit: vi.fn().mockImplementation(() => query),
       maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
       update: vi.fn().mockImplementation(() => { writing = true; writes.push(table); return query; }),
-      then: (resolve: (value: unknown) => void) => resolve({ data: updateSucceeds ? [row] : [], error: null }),
+      then: (resolve: (value: unknown) => void) => resolve({ data: [row], error: null }),
     };
     return query;
   });
@@ -36,7 +36,7 @@ function database(updateSucceeds = true) {
 }
 
 beforeEach(() => {
-  mocks.rpc.mockResolvedValue({ data: planId, error: null });
+  mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "save_plan_edits" ? { ok: true } : planId, error: null }));
   database();
 });
 
@@ -44,34 +44,37 @@ describe("database revision timestamps", () => {
   it.each([databaseTime, "2026-08-03T20:30:00.123456Z", "2026-08-03T16:30:00.123456-04:00"])(
     "passes the complete timestamp to the atomic update: %s", async (expectedUpdatedAt) => {
       const db = database();
-      expect(await updatePlanStep({ familyId, stepId, expectedUpdatedAt, title: "Arrange an intake" })).toMatchObject({ ok: true });
+      expect(await savePlanEdits({ familyId, planId, steps: [{ stepId, expectedUpdatedAt, patch: { title: "Arrange an intake" }, actionItems: [] }] })).toMatchObject({ ok: true });
       expect(await updatePlanStepActionItem({ familyId, actionItemId, expectedUpdatedAt, title: "Arrange an intake" })).toMatchObject({ ok: true });
-      expect(db.predicates.filter(([key]) => key === "updated_at")).toEqual([
-        ["updated_at", expectedUpdatedAt], ["updated_at", expectedUpdatedAt],
-      ]);
+      expect(db.writes).toEqual([]);
+      const saves = mocks.rpc.mock.calls.filter(([name]) => name === "save_plan_edits");
+      expect(saves[0][1].p_changes[0].expectedUpdatedAt).toBe(expectedUpdatedAt);
+      expect(saves[1][1].p_changes[0].actionItems[0].expectedUpdatedAt).toBe(expectedUpdatedAt);
     },
   );
 
   it("returns conflicts when the atomic database update finds a newer revision", async () => {
-    database(false);
-    expect(await updatePlanStep({ familyId, stepId, expectedUpdatedAt: databaseTime, title: "Arrange an intake" })).toMatchObject({ ok: false, conflict: { kind: "step" } });
+    database();
+    mocks.rpc.mockResolvedValueOnce({ data: { ok: false, error: "Changed", conflict: { kind: "step" } }, error: null })
+      .mockResolvedValueOnce({ data: { ok: false, error: "Changed", conflict: { kind: "action_item" } }, error: null });
+    expect(await savePlanEdits({ familyId, planId, steps: [{ stepId, expectedUpdatedAt: databaseTime, patch: { title: "Arrange an intake" }, actionItems: [] }] })).toMatchObject({ ok: false, conflict: { kind: "step" } });
     expect(await updatePlanStepActionItem({ familyId, actionItemId, expectedUpdatedAt: databaseTime, title: "Arrange an intake" })).toMatchObject({ ok: false, conflict: { kind: "action_item" } });
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["save_plan_edits", "save_plan_edits"]);
   });
 
   it("passes microseconds unchanged into the meeting transaction and preserves its conflict result", async () => {
-    const input = { familyId, planId, occurredOn: "2026-08-03", summary: "Discussed next steps.", changes: [
+    const input = { requestId: "9b731b93-485b-4629-8b25-c088f9743245", familyId, planId, occurredOn: "2026-08-03", summary: "Discussed next steps.", changes: [
       { actionItemId, expectedUpdatedAt: databaseTime, status: "pending", targetDate: "2026-08-10", followUpDate: null, notes: null, outcome: null },
     ] };
     expect(await captureCaseProgressUpdate(input)).toMatchObject({ ok: true });
-    expect(mocks.rpc).toHaveBeenCalledWith("capture_case_progress_update", expect.objectContaining({ p_changes: [expect.objectContaining({ expected_updated_at: databaseTime })] }));
+    expect(mocks.rpc).toHaveBeenCalledWith("capture_case_progress_update", expect.objectContaining({ p_request_id: input.requestId, p_changes: [expect.objectContaining({ expected_updated_at: databaseTime })] }));
     mocks.rpc.mockResolvedValue({ error: { message: "changed in another tab" }, data: null });
     expect(await captureCaseProgressUpdate(input)).toMatchObject({ ok: false, conflict: true });
   });
 
   it.each(["2026-02-30T00:00:00Z", "today", "2026-08-03T20:30:00", "2026-08-03T20:30:00+99:00"])(
     "rejects malformed revisions before accessing the database: %s", async (expectedUpdatedAt) => {
-      expect(await updatePlanStep({ familyId, stepId, expectedUpdatedAt, title: "Arrange an intake" })).toMatchObject({ ok: false });
+      expect(await savePlanEdits({ familyId, planId, steps: [{ stepId, expectedUpdatedAt, patch: { title: "Arrange an intake" }, actionItems: [] }] })).toMatchObject({ ok: false });
       expect(await updatePlanStepActionItem({ familyId, actionItemId, expectedUpdatedAt, title: "Arrange an intake" })).toMatchObject({ ok: false });
       expect(mocks.session).not.toHaveBeenCalled();
     },

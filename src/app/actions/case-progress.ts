@@ -5,11 +5,9 @@ import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { logServerError } from "@/lib/logger/server-error";
 import { validateNoPii, type PrivacyFieldInput } from "@/lib/privacy/no-pii";
+import { dateOnlySchema as makeDateOnlySchema } from "@/lib/validations/plans";
 
-const dateOnlySchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((value) => !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()));
+const dateOnlySchema = makeDateOnlySchema("Choose a valid date");
 
 const progressChangeSchema = z.object({
   actionItemId: z.string().uuid(),
@@ -17,11 +15,12 @@ const progressChangeSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   targetDate: dateOnlySchema.nullable(),
   followUpDate: dateOnlySchema.nullable(),
-  notes: z.string().max(4000).nullable(),
-  outcome: z.string().max(4000).nullable(),
+  notes: z.string().max(2000).nullable(),
+  outcome: z.string().max(2000).nullable(),
 });
 
 const captureProgressSchema = z.object({
+  requestId: z.string().uuid(),
   familyId: z.string().uuid(),
   planId: z.string().uuid(),
   occurredOn: dateOnlySchema,
@@ -60,7 +59,7 @@ function publicProgressError(message: string | undefined): CaptureProgressUpdate
   ) {
     return { ok: false, error: "You do not have permission to update this family." };
   }
-  return { ok: false, error: "The progress update could not be saved. Nothing was changed; try again." };
+  return { ok: false, error: "We could not confirm the save. Retry to check or finish this same update." };
 }
 
 export async function captureCaseProgressUpdate(
@@ -76,7 +75,7 @@ export async function captureCaseProgressUpdate(
     return { ok: false, error: "Meeting date cannot be in the future." };
   }
   for (const change of parsed.data.changes) {
-    if (["pending", "in_progress"].includes(change.status) && !change.targetDate) {
+    if (change.status !== "completed" && !change.targetDate) {
       return { ok: false, error: "Choose a target date for each open action." };
     }
     if (change.status === "blocked" && (!change.followUpDate || !change.notes?.trim())) {
@@ -112,6 +111,7 @@ export async function captureCaseProgressUpdate(
   }
 
   const { data, error } = await supabase.rpc("capture_case_progress_update", {
+    p_request_id: parsed.data.requestId,
     p_family_id: parsed.data.familyId,
     p_plan_id: parsed.data.planId,
     p_occurred_on: parsed.data.occurredOn,

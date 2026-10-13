@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Client, Pool, type PoolClient } from "pg";
+import type { PlanWithSteps } from "../src/types/family";
 import { updatePlanStepSchema, updatePlanStepActionItemSchema } from "../src/lib/validations/plans";
 
 const databaseUrl = process.env.CASELINK_DB_SECURITY_TEST_URL
@@ -64,6 +65,96 @@ async function revisionFor(userId: string, familyId: string): Promise<string> {
 }
 async function canExport(revision: string): Promise<boolean> {
   return asUser(userA, async client => (await client.query("select public.is_reviewed_plan_revision($1, $2, $3) allowed", [familyA, planA, revision])).rows[0].allowed);
+}
+
+async function checkAtomicPlanEdits() {
+  const step2 = randomUUID();
+  const action2 = randomUUID();
+  const action3 = randomUUID();
+  await admin.query("insert into public.plan_steps (id, plan_id, phase, title, description, sort_order, details) values ($1,$2,'60','Second goal','Second goal description',1,'{\"expected_outcome\":\"Support confirmed\"}')", [step2, planA]);
+  await admin.query("insert into public.plan_step_action_items (id, plan_step_id, title, week_index, target_date, sort_order) values ($1,$2,'Second action',2,'2026-10-20',1),($3,$4,'Third action',3,'2026-10-22',0)", [action2, stepA, action3, step2]);
+  async function state() {
+    const plan = (await snapshotFor(userA, familyA)).plan as PlanWithSteps;
+    const counts = await asUser(userA, client => client.query("select (select count(*)::int from public.activity_log where family_id=$1) events, (select count(*)::int from public.case_progress_updates where family_id=$1) notes", [familyA]));
+    return { plan, ...counts.rows[0] } as { plan: PlanWithSteps; events: number; notes: number };
+  }
+  function edits(plan: PlanWithSteps) {
+    return plan.steps.filter(s => s.id === stepA || s.id === step2).map((step,i) => ({ stepId: step.id, expectedUpdatedAt: step.updated_at,
+      patch: { title: `Updated goal ${i}` }, actionItems: (step.action_items ?? []).map((a,j) => ({ actionItemId:a.id,expectedUpdatedAt:a.updated_at,patch:{title:`Updated action ${i} ${j}`} })) }));
+  }
+  async function save(changes: ReturnType<typeof edits>, actor = userA) {
+    return asUser(actor, async client => (await client.query("select public.save_plan_edits($1,$2,$3) saved", [familyA,planA,JSON.stringify(changes)])).rows[0].saved);
+  }
+  const before = await state();
+  for (const kind of ["second step", "second child"] as const) {
+    const broken = edits(before.plan);
+    if (kind === "second step") broken[1].patch.title = "";
+    else broken[0].actionItems[1].patch.title = "";
+    await expectDbError(() => save(broken), `a failure on the ${kind} rolls back all edits`);
+    assert.deepEqual(await state(), before, "neither earlier writes nor audit records survive a failed batch");
+  }
+  const stale = edits(before.plan);
+  stale[1].expectedUpdatedAt = "2000-01-01T00:00:00Z";
+  assert.equal((await save(stale)).ok, false);
+  assert.deepEqual(await state(), before, "revision conflicts happen before any writes");
+  const foreign = edits(before.plan);
+  foreign[0].actionItems[0].actionItemId = actionB;
+  await expectDbError(() => save(foreign), "a child from another family cannot be written");
+  await expectDbError(() => save(edits(before.plan), userB), "unrelated staff cannot execute the atomic edit");
+  assert.deepEqual(await state(), before);
+  await admin.query(`alter table public.activity_log add constraint test_reject_plan_edit check (entity_id <> '${action2}') not valid`);
+  try {
+    await expectDbError(() => save(edits(before.plan)), "audit failure rolls back the edited content");
+    assert.deepEqual(await state(), before);
+  } finally { await admin.query("alter table public.activity_log drop constraint test_reject_plan_edit"); }
+  const changes = edits(before.plan);
+  assert.equal((await save(changes)).ok, true);
+  const after = await state();
+  assert.equal(after.events - before.events, 5, "both goals and all three actions have one authoritative edit event");
+  assert.equal(after.plan.steps[0].title, "Updated goal 0");
+  assert.equal(after.plan.steps[1].title, "Updated goal 1");
+  assert.equal((await save(changes)).ok, false, "replaying an old request cannot overwrite or duplicate events");
+  assert.deepEqual(await state(), after);
+  assert.equal((await save(edits(after.plan))).ok, true, "a fresh unchanged retry is a no-op");
+  assert.deepEqual(await state(), after);
+
+  await asUser(userA, client => client.query("select public.mark_plan_reviewed($1,$2,$3)", [familyA,planA,after.plan.review_revision]));
+  const reviewed = await state();
+  const action = reviewed.plan.steps.flatMap(s => s.action_items ?? []).find(a => a.id === actionA)!;
+  const progress = { action_item_id: action.id, expected_updated_at: action.updated_at, status: "in_progress", target_date: action.target_date, follow_up_date: null, notes: "Intake contacted", outcome: null };
+  const requestId = randomUUID();
+  const saveMeeting = (summary = 'Discussed the next appointment', changes = [progress], id = requestId) => asUser(userA, client => client.query("select public.capture_case_progress_update($1,$2,'2026-08-03',$3,$4,$5) id", [familyA,planA,summary,id,JSON.stringify(changes)]));
+  const note = await saveMeeting();
+  assert.ok(note.rows[0].id);
+  const withProgress = await state();
+  assert.equal(withProgress.notes, reviewed.notes + 1, "the saved meeting note is readable with the staff role");
+  assert.equal(withProgress.plan.material_revision, withProgress.plan.client_display?.reviewedRevision, "progress-only notes preserve material approval");
+  assert.equal((await saveMeeting()).rows[0].id, requestId, "retry returns the existing record before testing stale child revisions");
+  assert.deepEqual(await state(), withProgress, "retry does not duplicate narrative or action history");
+  await expectDbError(() => saveMeeting("A changed meeting note"), "reused IDs cannot silently discard changed text");
+  const hiddenNote = await asUser(userB, client => client.query("select id from public.case_progress_updates where id=$1", [note.rows[0].id]));
+  assert.equal(hiddenNote.rowCount, 0, "unrelated staff cannot read the meeting note");
+  const latest = withProgress.plan.steps.flatMap(s => s.action_items ?? []).find(a => a.id === actionA)!;
+  const failedMeeting = [{ ...progress, expected_updated_at: latest.updated_at, notes: "Should roll back" }, { ...progress, action_item_id: actionB }];
+  await expectDbError(() => asUser(userA, client => client.query("select public.capture_case_progress_update($1,$2,'2026-08-03','Failed meeting',$3,$4)", [familyA,planA,randomUUID(),JSON.stringify(failedMeeting)])), "meeting failure rolls back earlier action updates, narrative, and history");
+  assert.deepEqual(await state(), withProgress);
+  await expectDbError(() => asUser(userA, client => client.query("select public.capture_case_progress_update($1,$2,'2026-08-03','Email parent@example.test',$3,'[]')", [familyA,planA,randomUUID()])), "meeting RPC rejects direct identifiers independently of the UI");
+  await expectDbError(() => asUser(userA, client => client.query("insert into public.case_progress_updates (family_id,author_id,occurred_on,summary) values ($1,$2,current_date,'Bypass attempt')", [familyA,userA])), "meeting records cannot bypass the audited operation");
+  const noteOnlyId = randomUUID();
+  const [firstNote, sameNote] = await Promise.all([saveMeeting("Meeting without action edits", [], noteOnlyId), saveMeeting("Meeting without action edits", [], noteOnlyId)]);
+  assert.equal(firstNote.rows[0].id, sameNote.rows[0].id, "concurrent note-only retries return the same record");
+  const noteOnly = await state();
+  assert.equal(noteOnly.notes, withProgress.notes + 1);
+  assert.equal(noteOnly.events, withProgress.events + 1);
+  await expectDbError(() => asUser(userB, client => client.query("select public.capture_case_progress_update($1,$2,'2026-08-03','Meeting without action edits',$3,'[]')", [familyA,planA,noteOnlyId])), "retry IDs do not bypass family access");
+  const failedRequestId = randomUUID();
+  await admin.query(`alter table public.activity_log add constraint test_reject_meeting check (entity_id <> '${failedRequestId}') not valid`);
+  try {
+    await expectDbError(() => saveMeeting("Meeting audit must commit", [], failedRequestId), "meeting audit failure rolls back the note");
+    assert.deepEqual(await state(), noteOnly);
+  } finally { await admin.query("alter table public.activity_log drop constraint test_reject_meeting"); }
+  assert.equal((await saveMeeting("Meeting audit must commit", [], failedRequestId)).rows[0].id, failedRequestId, "retry after rollback can commit the original request");
+  console.info("Atomic plan edits and meeting progress: rollback, conflict, audit, permissions, and review checks passed.");
 }
 
 async function checkReviewRaces() {
@@ -684,6 +775,7 @@ async function run() {
     )),
     "manual plan steps cannot bypass their atomic RPC",
   );
+  await checkAtomicPlanEdits();
   const manualStep = await asUser(userA, (client) => client.query<{ create_manual_plan_step: string }>(
     `select public.create_manual_plan_step(
        $1, $2, '30', 'Manual housing action', 'Contact the approved office',

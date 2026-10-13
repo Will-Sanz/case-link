@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar as CalendarDays,
@@ -25,6 +25,7 @@ import type {
 } from "@/types/family";
 
 type ActionDraft = {
+  original: PlanStepActionItemRow;
   selected: boolean;
   status: PlanStepActionItemRow["status"];
   targetDate: string;
@@ -50,6 +51,7 @@ function formatDate(value: string): string {
 
 function initialDraft(action: PlanStepActionItemRow): ActionDraft {
   return {
+    original: action,
     selected: false,
     status: action.status,
     targetDate: action.target_date ?? "",
@@ -79,9 +81,9 @@ export function CaseProgressWorkspace({
   const [formOpen, setFormOpen] = useState(false);
   const [occurredOn, setOccurredOn] = useState(localDateOnly);
   const [summary, setSummary] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, ActionDraft>>(() =>
-    Object.fromEntries(actionOptions.map(({ action }) => [action.id, initialDraft(action)])),
-  );
+  const [drafts, setDrafts] = useState<Record<string, ActionDraft>>({});
+  const submitting = useRef(false);
+  const request = useRef<{ id: string; payload: string } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -102,10 +104,15 @@ export function CaseProgressWorkspace({
 
   async function submitProgress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
     setError(null);
     setSuccess(null);
 
     const selected = actionOptions.filter(({ action }) => drafts[action.id]?.selected);
+    if (Object.entries(drafts).some(([id, draft]) => draft.selected && !selected.some(({ action }) => action.id === id))) {
+      setError("A selected action is no longer in the plan. Your note is still here; review the latest plan before saving.");
+      return;
+    }
     const privacy = validateNoPii([
       { field: "summary", label: "Progress note", value: summary },
       ...selected.flatMap(({ action }, index) => [
@@ -140,19 +147,19 @@ export function CaseProgressWorkspace({
       }
       const next = {
         actionItemId: action.id,
-        expectedUpdatedAt: action.updated_at,
+        expectedUpdatedAt: draft.original.updated_at,
         status: draft.status,
-        targetDate: draft.targetDate || null,
+        targetDate: (draft.status === "blocked" ? draft.followUpDate : draft.targetDate) || null,
         followUpDate: draft.followUpDate || null,
         notes: normalizedOptional(draft.notes),
         outcome: normalizedOptional(draft.outcome),
       };
       const changed =
-        next.status !== action.status ||
-        next.targetDate !== action.target_date ||
-        next.followUpDate !== action.follow_up_date ||
-        next.notes !== normalizedOptional(action.notes) ||
-        next.outcome !== normalizedOptional(action.outcome);
+        next.status !== draft.original.status ||
+        next.targetDate !== draft.original.target_date ||
+        next.followUpDate !== draft.original.follow_up_date ||
+        next.notes !== normalizedOptional(draft.original.notes) ||
+        next.outcome !== normalizedOptional(draft.original.outcome);
       return changed ? [next] : [];
     });
     if (validationError) {
@@ -160,23 +167,25 @@ export function CaseProgressWorkspace({
       return;
     }
 
+    const input = { familyId, planId: plan.id, occurredOn, summary, changes };
+    const payload = JSON.stringify(input);
+    if (request.current?.payload !== payload) {
+      request.current = { id: crypto.randomUUID(), payload };
+    }
+    submitting.current = true;
     setPending(true);
     try {
       const result = await captureCaseProgressUpdate({
-        familyId,
-        planId: plan.id,
-        occurredOn,
-        summary,
-        changes,
+        ...input,
+        requestId: request.current.id,
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setSummary("");
-      setDrafts(
-        Object.fromEntries(actionOptions.map(({ action }) => [action.id, initialDraft(action)])),
-      );
+      setDrafts({});
+      request.current = null;
       setFormOpen(false);
       setSuccess(
         changes.length > 0
@@ -184,7 +193,10 @@ export function CaseProgressWorkspace({
           : "Progress saved to the case history.",
       );
       router.refresh();
+    } catch {
+      setError("We could not confirm the save. Your note is still here; retry to check or finish this same update.");
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   }
@@ -244,6 +256,7 @@ export function CaseProgressWorkspace({
       <div className="border-t border-[var(--color-rule)] bg-[var(--color-paper)] px-5 py-4 sm:px-6">
         <button
           type="button"
+          disabled={pending}
           onClick={() => {
             setFormOpen((value) => !value);
             setError(null);
@@ -260,6 +273,7 @@ export function CaseProgressWorkspace({
 
         {formOpen ? (
           <form onSubmit={submitProgress} className="mt-5 space-y-6 border-t border-[var(--color-rule)] pt-5">
+            <fieldset disabled={pending} className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
               <label className="block text-sm font-medium text-[var(--color-ink-2)]">
                 Meeting date
@@ -308,10 +322,10 @@ export function CaseProgressWorkspace({
                               </label>
                             ) : <div />}
                             <label className="text-xs font-medium text-[var(--color-ink-muted)] sm:col-span-2">{draft.status === "blocked" ? "Why is this waiting?" : "Progress note (optional)"}
-                              <Textarea rows={2} value={draft.notes} onChange={(event) => patchDraft(action.id, { notes: event.target.value })} required={draft.status === "blocked"} maxLength={4000} className="mt-1.5 min-h-16" />
+                              <Textarea rows={2} value={draft.notes} onChange={(event) => patchDraft(action.id, { notes: event.target.value })} required={draft.status === "blocked"} maxLength={2000} className="mt-1.5 min-h-16" />
                             </label>
                             <label className="text-xs font-medium text-[var(--color-ink-muted)] sm:col-span-2">Outcome (optional)
-                              <Textarea rows={2} value={draft.outcome} onChange={(event) => patchDraft(action.id, { outcome: event.target.value })} maxLength={4000} className="mt-1.5 min-h-16" />
+                              <Textarea rows={2} value={draft.outcome} onChange={(event) => patchDraft(action.id, { outcome: event.target.value })} maxLength={2000} className="mt-1.5 min-h-16" />
                             </label>
                           </div>
                         ) : null}
@@ -327,6 +341,7 @@ export function CaseProgressWorkspace({
               <p className="max-w-xl text-xs leading-5 text-[var(--color-ink-faint)]">Use household labels only. Saving creates one permanent history entry; it does not replace the plan or submit paperwork.</p>
               <Button type="submit" className="min-h-11" disabled={pending}>{pending ? "Saving update…" : "Save progress update"}</Button>
             </div>
+            </fieldset>
           </form>
         ) : null}
       </div>

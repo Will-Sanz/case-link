@@ -11,10 +11,10 @@ import {
   previewRefinePlan,
   createManualStep,
   deletePlanStep,
-  updatePlanStep,
-  updatePlanStepActionItem,
+  savePlanEdits,
   type PlanEditConflict,
 } from "@/app/actions/plans";
+import type { SavePlanEditsInput } from "@/lib/validations/plans";
 import { recordCaseWorkflowEvent } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
@@ -595,6 +595,12 @@ export function FamilyPlanPanel({
 
   function keepConflictDraft() {
     if (!editConflict || conflictResolution) return;
+    setStepDraft(previous => {
+      if (!previous) return previous;
+      return editConflict.kind === "step"
+        ? { ...previous, updated_at: editConflict.currentUpdatedAt }
+        : { ...previous, action_items: previous.action_items?.map(action => action.id === editConflict.entityId ? { ...action, updated_at: editConflict.currentUpdatedAt } : action) };
+    });
     setConflictResolution("keep_draft");
     setError(null);
     router.refresh();
@@ -642,106 +648,49 @@ export function FamilyPlanPanel({
     });
   }
 
-  async function persistOneStep(orig: PlanStepRow | undefined, s: PlanStepRow): Promise<boolean> {
-    if (!stepNeedsPersist(orig, s)) return true;
-    const untitledAction = (s.action_items ?? []).find((action) => !action.title.trim());
-    if (untitledAction) {
-      setError("Every action needs a short title before saving.");
-      return false;
-    }
-    const unscheduledAction = (s.action_items ?? []).find(
-      (action) => action.status !== "completed" && !action.target_date,
-    );
-    if (unscheduledAction) {
-      setError(`Choose a target date for “${unscheduledAction.title}” before saving.`);
-      return false;
-    }
-    const incompleteWaitingAction = (s.action_items ?? []).find(
-      (action) =>
-        action.status === "blocked" &&
-        (!actionUserNotes(action.notes).trim() || !action.follow_up_date),
-    );
-    if (incompleteWaitingAction) {
-      setError(
-        `Add a waiting reason and next follow-up date for “${incompleteWaitingAction.title}”.`,
-      );
-      return false;
-    }
-    const d = { ...(s.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
-    d.owner ??= "case_manager";
-    const normalizedChecklist = normalizeChecklistForSave(d.checklist);
-    if (normalizedChecklist.length > 0) {
-      d.checklist = normalizedChecklist;
-    } else {
-      delete d.checklist;
-    }
-    const checklistLen = normalizedChecklist.length;
-    const wd = { ...(s.workflow_data ?? {}) };
-    if (wd.checklist_completed && wd.checklist_completed.length !== checklistLen) {
-      wd.checklist_completed = Array(checklistLen).fill(false);
-    }
-
-    if (stepRecordNeedsPersist(orig, s)) {
-      const stepRes = await updatePlanStep({
+  async function persistSteps(steps: PlanStepRow[], bulk = false): Promise<boolean> {
+    if (!plan) return false;
+    const changes: SavePlanEditsInput["steps"] = [];
+    for (const s of steps) {
+      const orig = plan.steps.find(row => row.id === s.id);
+      if (!orig) { setError("This action is no longer in the current plan. Reload the saved plan before continuing."); return false; }
+      if (!stepNeedsPersist(orig, s)) continue;
+      for (const action of s.action_items ?? []) {
+        if (!action.title.trim()) { setError("Every action needs a short title before saving."); return false; }
+        if (action.status !== "completed" && !action.target_date) { setError(`Choose a target date for “${action.title}” before saving.`); return false; }
+        if (action.status === "blocked" && (!actionUserNotes(action.notes).trim() || !action.follow_up_date)) {
+          setError(`Add a waiting reason and next follow-up date for “${action.title}”.`); return false;
+        }
+      }
+      const details = { ...s.details, owner: s.details?.owner ?? "case_manager" };
+      details.checklist = normalizeChecklistForSave(details.checklist);
+      const workflow = { ...s.workflow_data };
+      if (workflow.checklist_completed && workflow.checklist_completed.length !== details.checklist.length) {
+        workflow.checklist_completed = Array(details.checklist.length).fill(false);
+      }
+      const actionItems: SavePlanEditsInput["steps"][number]["actionItems"] = [];
+      for (const action of s.action_items ?? []) {
+        const original = orig.action_items?.find(row => row.id === action.id);
+        const patch = { title: action.title, description: action.description, week_index: action.week_index, target_date: action.target_date,
+          status: action.status, outcome: action.outcome, notes: action.notes, follow_up_date: action.follow_up_date };
+        if (original && Object.entries(patch).every(([key, value]) => original[key as keyof PlanStepActionItemRow] === value)) continue;
+        actionItems.push({ actionItemId: action.id, expectedUpdatedAt: action.updated_at, patch });
+      }
+      changes.push({
         stepId: s.id,
-        familyId,
-        expectedUpdatedAt: orig?.updated_at,
-        title: s.title,
-        description: s.description,
-        status: s.status,
-        phase: s.phase,
-        priority: (s.priority ?? undefined) as "low" | "medium" | "high" | "urgent" | undefined,
-        details: Object.keys(d).length > 0 ? d : undefined,
-        workflow_data: wd,
+        expectedUpdatedAt: s.updated_at,
+        patch: stepRecordNeedsPersist(orig, s) ? { title: s.title, description: s.description, status: s.status, phase: s.phase,
+          priority: s.priority ?? undefined, details, workflow_data: workflow } : {},
+        actionItems,
       });
-      if (!stepRes.ok) {
-        if (stepRes.conflict) {
-          setEditConflict(stepRes.conflict);
-          setConflictResolution(null);
-          setError(null);
-          return false;
-        }
-        setError(stepRes.error);
-        return false;
-      }
     }
-
-    for (const ai of s.action_items ?? []) {
-      const oai = orig?.action_items?.find((x) => x.id === ai.id);
-      const aiChanged =
-        !oai ||
-        oai.title !== ai.title ||
-        (oai.description ?? "") !== (ai.description ?? "") ||
-        oai.week_index !== ai.week_index ||
-        oai.target_date !== ai.target_date ||
-        oai.status !== ai.status ||
-        oai.outcome !== ai.outcome ||
-        oai.notes !== ai.notes ||
-        oai.follow_up_date !== ai.follow_up_date;
-      if (!aiChanged) continue;
-      const ar = await updatePlanStepActionItem({
-        actionItemId: ai.id,
-        familyId,
-        expectedUpdatedAt: oai?.updated_at,
-        title: ai.title,
-        description: ai.description,
-        week_index: ai.week_index,
-        target_date: ai.target_date,
-        status: ai.status,
-        outcome: ai.outcome,
-        notes: ai.notes,
-        follow_up_date: ai.follow_up_date,
-      });
-      if (!ar.ok) {
-        if (ar.conflict) {
-          setEditConflict(ar.conflict);
-          setConflictResolution(null);
-          setError(null);
-          return false;
-        }
-        setError(ar.error);
-        return false;
-      }
+    if (!changes.length) return true;
+    const result = await savePlanEdits({ familyId, planId: plan.id, steps: changes });
+    if (!result.ok) {
+      setEditConflict(result.conflict ?? null);
+      setConflictResolution(null);
+      setError(result.conflict && !bulk ? null : result.error);
+      return false;
     }
     return true;
   }
@@ -778,7 +727,7 @@ export function FamilyPlanPanel({
     setSuccess(null);
     startTransition(async () => {
       try {
-        const ok = await persistOneStep(orig, stepDraft);
+        const ok = await persistSteps([stepDraft]);
         if (!ok) return;
         setSuccess("Action saved.");
         setEditConflict(null);
@@ -791,6 +740,8 @@ export function FamilyPlanPanel({
         setAiPreview(null);
         setAiInstruction("");
         router.refresh();
+      } catch {
+        setError("The save could not be confirmed. Your edits are still open; reload the saved plan before retrying.");
       } finally {
         stepSaveLockRef.current = false;
         setStepSaveBusy(false);
@@ -1178,11 +1129,8 @@ export function FamilyPlanPanel({
     setSuccess(null);
     startTransition(async () => {
       try {
-        for (const s of planAiDraft.steps) {
-          const orig = plan.steps.find((x) => x.id === s.id);
-          const ok = await persistOneStep(orig, s);
-          if (!ok) return;
-        }
+        const ok = await persistSteps(planAiDraft.steps, true);
+        if (!ok) return;
         setSuccess("Plan updates saved.");
         setPlanAiDiscardConfirm(false);
         setPlanAiOpen(false);
@@ -1190,6 +1138,8 @@ export function FamilyPlanPanel({
         setPlanAiInstruction("");
         setPlanAiDraft(null);
         router.refresh();
+      } catch {
+        setError("The save could not be confirmed. Your working copy is still open; reload the saved plan before retrying.");
       } finally {
         planBulkSaveLockRef.current = false;
         setPlanBulkSaving(false);
@@ -1316,7 +1266,7 @@ export function FamilyPlanPanel({
         </div>
       </div>
 
-      {error ? (
+      {error && !planAiOpen ? (
         <p
           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
           role="alert"
@@ -1324,7 +1274,7 @@ export function FamilyPlanPanel({
           {error}
         </p>
       ) : null}
-      {editConflict ? (
+      {editConflict && !planAiOpen ? (
         <section
           className="rounded-xl border border-amber-300 bg-amber-50 p-4 sm:p-5"
           role="alert"
@@ -1833,6 +1783,23 @@ export function FamilyPlanPanel({
             <h2 id="plan-ai-title" className="text-base font-semibold text-[var(--color-ink)]">
               Refine full plan with AI
             </h2>
+            {error ? <p role="alert" className="mt-3 text-sm text-[var(--color-error)]">{error}</p> : null}
+            {editConflict && planAiDraft ? (
+              <section aria-label="Save conflict" className="my-3 space-y-3 rounded-lg border border-[var(--color-rule)] p-3 text-sm">
+                <p>Nothing was saved. Compare this action with the latest saved version before keeping your working copy.</p>
+                {conflictComparisonRows(editConflict, planAiDraft.steps.find(step => step.id === editConflict.entityId || step.action_items?.some(action => action.id === editConflict.entityId)) ?? null).map(row => (
+                  <div key={row.label}><p className="font-semibold">{row.label}</p><p>Your edit: {row.mine}</p><p>Latest saved: {row.latest}</p></div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => {
+                  setPlanAiDraft(previous => previous ? { ...previous, steps: previous.steps.map(step => editConflict.kind === "step"
+                    ? step.id === editConflict.entityId ? { ...step, updated_at: editConflict.currentUpdatedAt } : step
+                    : { ...step, action_items: step.action_items?.map(action => action.id === editConflict.entityId ? { ...action, updated_at: editConflict.currentUpdatedAt } : action) }) } : previous);
+                  setEditConflict(null);
+                  setError(null);
+                  router.refresh();
+                }}>Keep my working copy for this action</Button>
+              </section>
+            ) : null}
             <p id="plan-ai-description" className="mt-1 text-xs text-[var(--color-ink-faint)]">
               Preview updates a working copy of this plan. After you apply a preview, use{" "}
               <strong>Save to plan</strong> to write only the actions that changed.

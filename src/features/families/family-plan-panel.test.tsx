@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, updatePlanStep } from "@/app/actions/plans";
+import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, savePlanEdits } from "@/app/actions/plans";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
@@ -21,8 +21,7 @@ vi.mock("@/app/actions/plans", () => ({
   previewRefinePlan: vi.fn(),
   createManualStep: vi.fn(),
   deletePlanStep: vi.fn(),
-  updatePlanStep: vi.fn(),
-  updatePlanStepActionItem: vi.fn(),
+  savePlanEdits: vi.fn(),
 }));
 
 vi.mock("@/app/actions/families", () => ({
@@ -94,7 +93,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     localStorage.clear(); sessionStorage.clear();
     routerRefresh.mockReset();
     vi.mocked(markPlanReviewed).mockReset();
-    vi.mocked(updatePlanStep).mockReset();
+    vi.mocked(savePlanEdits).mockReset();
     vi.mocked(previewRefinePlanStep).mockReset();
     vi.mocked(previewRefinePlan).mockReset();
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -127,6 +126,56 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "Keep this edit" } });
     expect(screen.getByText(/Draft recovery is unavailable/)).toBeTruthy();
     expect(screen.getByDisplayValue("Keep this edit")).toBeTruthy();
+  });
+
+  it("saves the parent and its actions together using the draft's original revisions after a refresh", async () => {
+    vi.mocked(savePlanEdits).mockRejectedValueOnce(new Error("network interrupted"));
+    const view = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "Prepare the intake" } });
+    fireEvent.change(screen.getByDisplayValue("Call intake"), { target: { value: "Schedule the appointment" } });
+    const latest = structuredClone(plan);
+    latest.steps[0].updated_at = "2026-08-03T12:05:00Z";
+    latest.steps[0].action_items![0].updated_at = "2026-08-03T12:05:00Z";
+    view.rerender(<FamilyPlanPanel familyId={plan.family_id} plan={latest} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    await screen.findByText("The save could not be confirmed. Your edits are still open; reload the saved plan before retrying.");
+    expect(savePlanEdits).toHaveBeenCalledTimes(1);
+    expect(savePlanEdits).toHaveBeenCalledWith(expect.objectContaining({ steps: [expect.objectContaining({
+      expectedUpdatedAt: plan.steps[0].updated_at, patch: expect.objectContaining({ title: "Prepare the intake" }),
+      actionItems: [expect.objectContaining({ expectedUpdatedAt: plan.steps[0].action_items![0].updated_at, patch: expect.objectContaining({ title: "Schedule the appointment" }) })],
+    })] }));
+    expect(screen.getByDisplayValue("Prepare the intake")).toBeTruthy();
+    expect(screen.getByDisplayValue("Schedule the appointment")).toBeTruthy();
+  });
+
+  it("submits all changed goals once and keeps the full working copy available after a failed save", async () => {
+    const two = structuredClone(plan);
+    const second = structuredClone(two.steps[0]);
+    second.id = "30000000-0000-4000-8000-000000000005";
+    second.action_items![0].id = "40000000-0000-4000-8000-000000000006";
+    second.action_items![0].plan_step_id = second.id;
+    two.steps.push(second);
+    vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test-model", steps: two.steps.map((step, i) => ({
+      phase: step.phase, title: `Revised goal ${i}`, description: step.description, details: step.details!, action_items: step.action_items!,
+    })) });
+    vi.mocked(savePlanEdits).mockResolvedValueOnce({ ok: false, error: "Nothing was saved. Try again." }).mockResolvedValueOnce({ ok: true });
+    render(<FamilyPlanPanel familyId={two.family_id} plan={two} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refine plan with AI" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify both goals" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
+    fireEvent.click(await dialog.findByRole("button", { name: "Apply to working copy" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
+    await dialog.findByText("Nothing was saved. Try again.");
+    expect(savePlanEdits).toHaveBeenCalledTimes(1);
+    const firstRequest = vi.mocked(savePlanEdits).mock.calls[0][0] as { steps: unknown[] };
+    expect(firstRequest.steps).toHaveLength(2);
+    await waitFor(() => expect((dialog.getByRole("button", { name: "Save to plan" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
+    await screen.findByText("Plan updates saved.");
+    expect(vi.mocked(savePlanEdits).mock.calls[1][0]).toEqual(firstRequest);
   });
 
   it("settles an unexpectedly rejected action preview and keeps instructions for retry", async () => {
@@ -186,7 +235,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
   });
 
   it("compares the open draft with the latest saved value before resolving a conflict", async () => {
-    vi.mocked(updatePlanStep).mockResolvedValue({
+    vi.mocked(savePlanEdits).mockResolvedValue({
       ok: false,
       error: "This action changed in another tab.",
       conflict: {
@@ -235,7 +284,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     expect(
       within(conflictPanel!).getByRole("button", { name: "Use latest version" }),
     ).toBeTruthy();
-    await waitFor(() => expect(updatePlanStep).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
   });
 
   it("keeps the plan usable when browser draft storage is restricted", () => {
