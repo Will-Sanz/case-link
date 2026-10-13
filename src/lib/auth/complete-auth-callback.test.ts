@@ -20,6 +20,8 @@ describe("callback contract", () => {
     ["?code=synthetic-code&next=/profile", "exchangeCodeForSession", "/profile"],
     ["?token_hash=synthetic-token&type=invite&next=/reset-password?mode=recovery", "verifyOtp", "/reset-password?mode=recovery"],
     ["?token_hash=synthetic-token&type=recovery", "verifyOtp", "/families"],
+    ["#token_hash=synthetic-token&type=invite&next=%2Freset-password%3Fmode%3Dsetup", "verifyOtp", "/reset-password?mode=setup"],
+    ["#token_hash=synthetic-token&type=recovery&next=%2Freset-password%3Fmode%3Drecovery", "verifyOtp", "/reset-password?mode=recovery"],
     ["#access_token=synthetic-access&refresh_token=synthetic-refresh", "setSession", "/families"],
     ["?code=synthetic-code&next=https://attacker.example", "exchangeCodeForSession", "/families"],
   ])("completes supported callback %s", async (suffix, method, destination) => {
@@ -29,7 +31,7 @@ describe("callback contract", () => {
     expect(f.auth.getSession).toHaveBeenCalledTimes(1);
     expect(f.auth.getUser).toHaveBeenCalledTimes(1);
   });
-  it.each(["", "?next=/families", "?token_hash=hash", "?type=invite", "?token_hash=hash&type=admin", "?token_hash=hash&type=signup", "?code=code&token_hash=hash&type=invite", "#access_token=access", "#refresh_token=refresh", "?error=internal-secret", "#error=expired&error_description=secret"])("rejects invalid or ambiguous input %s before contacting Auth", async (suffix) => {
+  it.each(["", "?next=/families", "?token_hash=hash", "?type=invite", "?token_hash=hash&type=admin", "?token_hash=hash&type=signup", "?code=code&token_hash=hash&type=invite", "?code=first&code=second", "?token_hash=first&type=invite#token_hash=second&type=recovery", "?code=code#token_hash=hash&type=invite", "#token_hash=hash&type=recovery&access_token=access&refresh_token=refresh", "#access_token=access", "#refresh_token=refresh", "?error=internal-secret", "#error=expired&error_description=secret"])("rejects invalid or ambiguous input %s before contacting Auth", async (suffix) => {
     const f = fixture();
     expect(await completeAuthCallback(url(suffix), f.factory)).toBe(AUTH_CALLBACK_ERROR_PATH);
     expect(f.factory).not.toHaveBeenCalled();

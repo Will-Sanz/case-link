@@ -22,29 +22,35 @@ const users: string[] = [];
 const families: string[] = [];
 const mailIds = new Set<string>();
 
-async function deliveredToken(email: string, type: "invite" | "recovery") {
+async function deliveredMail(email: string, subject: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const response = await fetchWithTimeout(`${local.MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
     assert.equal(response.status, 200, "the isolated mailbox is available");
     const { messages } = await response.json() as { messages: { ID: string }[] };
     for (const message of messages) {
       if (mailIds.has(message.ID)) continue;
-      const detail = await (await fetchWithTimeout(`${local.MAILPIT_URL}/api/v1/message/${message.ID}`)).json() as { HTML: string };
-      for (const link of detail.HTML.matchAll(/href="([^"]+)"/g)) {
-        const url = new URL(link[1].replaceAll("&amp;", "&"));
-        if (url.searchParams.get("type") !== type) continue;
-        const token = url.searchParams.get("token");
-        assert.ok(token, "the delivered email contains a verification token");
-        assert.ok(url.origin === local.API_URL, "email links only use the isolated Auth service");
-        const destination = new URL(url.searchParams.get("redirect_to")!);
-        assert.ok(destination.origin === "http://127.0.0.1:3000" && destination.pathname === "/auth/callback", "the delivered link uses the exact intended callback");
-        mailIds.add(message.ID);
-        return token;
-      }
+      const detail = await (await fetchWithTimeout(`${local.MAILPIT_URL}/api/v1/message/${message.ID}`)).json() as { HTML: string; Subject: string };
+      if (detail.Subject !== subject) continue;
+      mailIds.add(message.ID);
+      return detail.HTML;
     }
     await delay(100);
   }
   throw new Error("The expected synthetic account email was not delivered.");
+}
+async function deliveredToken(email: string, type: "invite" | "recovery") {
+  const html = await deliveredMail(email, type === "invite" ? "You're invited to CaseLink" : "Reset your password — CaseLink");
+  for (const link of html.matchAll(/href="([^"]+)"/g)) {
+    const url = new URL(link[1].replaceAll("&amp;", "&"));
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    if (fragment.get("type") !== type) continue;
+    const token = fragment.get("token_hash");
+    assert.ok(token, "the delivered email contains a verification token");
+    assert.ok(url.search === "", "account links keep credentials out of the HTTP request URL");
+    assert.ok(url.origin === "http://127.0.0.1:3000" && url.pathname === "/auth/callback", "the delivered link uses the canonical confirmation screen");
+    return token;
+  }
+  throw new Error("The delivered account email does not use the required confirmation screen.");
 }
 
 async function staff() {
@@ -65,6 +71,7 @@ async function staff() {
 async function invitedStaff(assignedFamilyId: string) {
   const email = `auth-security-${randomUUID()}@example.test`;
   const firstPassword = `${randomUUID()}-Initial!1`;
+  const freshPassword = `${randomUUID()}-Fresh!1`;
   const password = `${randomUUID()}-Replacement!1`;
   const invitationInput = { email, role: "case_manager", siteOrigin: "http://127.0.0.1:3000", actorLabel: "Auth test", reason: "Synthetic invitation setup test" };
   const invite = await inviteUser(operator, invitationInput);
@@ -88,6 +95,7 @@ async function invitedStaff(assignedFamilyId: string) {
   const weak = await client.auth.updateUser({ password: "lowercasepasswordonly" });
   assert.equal(weak.error?.code, "weak_password", "Auth enforces the displayed password requirements");
   assert.equal((await client.auth.updateUser({ password: firstPassword })).error, null, "initial password can be saved");
+  assert.ok((await deliveredMail(email, "Password changed — CaseLink")).includes("password"), "password changes deliver a distinct security notification");
   assert.equal((await client.rpc("has_password_session")).data, false, "setting a password must be followed by password sign-in");
   assert.equal((await client.auth.signOut({ scope: "global" })).error, null);
   const initialLogin = await client.auth.signInWithPassword({ email, password: firstPassword });
@@ -98,12 +106,35 @@ async function invitedStaff(assignedFamilyId: string) {
   assert.equal((await inviteUser(operator, invitationInput)).delivery, "none", "an active account's role update sends no unexpected email");
   assert.equal((await inviteUser(operator, { ...invitationInput, resend: true })).delivery, "recovery");
   const recoveryToken = await deliveredToken(email, "recovery");
-  assert.equal((await client.auth.verifyOtp({ type: "recovery", token_hash: recoveryToken })).error, null);
-  assert.equal((await client.auth.updateUser({ password })).error, null, "a fresh recovery session changes the password");
-  assert.equal((await client.auth.signOut({ scope: "global" })).error, null);
+  const recoveryClient = createClient(local.API_URL, local.ANON_KEY, authOptions);
+  assert.equal((await recoveryClient.auth.verifyOtp({ type: "recovery", token_hash: recoveryToken })).error, null, "the delivered link works in a separate browser without the request's verifier");
+  assert.equal((await recoveryClient.auth.updateUser({ password: freshPassword })).error, null, "a fresh recovery session changes the password");
+  // Age only this synthetic session to exercise Auth's older-session verification path.
+  await db.query("update auth.sessions set created_at = now() - interval '25 hours' where user_id = $1", [id]);
+  assert.equal((await recoveryClient.auth.updateUser({ password })).error?.code, "reauthentication_needed");
+  assert.equal((await recoveryClient.auth.reauthenticate()).error, null);
+  const verificationMail = await deliveredMail(email, "Verify your identity — CaseLink");
+  const nonce = verificationMail.match(/>(\d{6})<\/span>/)?.[1];
+  assert.ok(nonce, "the delivered reauthentication code matches the configured six-digit input");
+  const wrongNonce = nonce === "000000" ? "000001" : "000000";
+  assert.equal((await recoveryClient.auth.updateUser({ password, nonce: wrongNonce })).error?.code, "reauthentication_not_valid");
+  await db.query("update auth.users set reauthentication_sent_at = now() - interval '16 minutes' where id = $1", [id]);
+  assert.equal((await recoveryClient.auth.updateUser({ password, nonce })).error?.code, "reauthentication_not_valid", "expired verification codes are rejected");
+  assert.equal((await recoveryClient.auth.reauthenticate()).error, null);
+  const renewedNonce = (await deliveredMail(email, "Verify your identity — CaseLink")).match(/>(\d{6})<\/span>/)?.[1];
+  assert.ok(renewedNonce);
+  assert.equal((await recoveryClient.auth.updateUser({ password, nonce: renewedNonce })).error, null, "an older session can complete secure password change using the emailed code");
+  assert.equal((await recoveryClient.auth.signOut({ scope: "global" })).error, null);
   const oldAccess = await retainedRequest(oldToken, `families?select=id&id=eq.${assignedFamilyId}`);
   assert.deepEqual(await oldAccess.json(), [], "password-reset completion revokes earlier case access");
   assert.ok((await client.auth.signInWithPassword({ email, password: firstPassword })).error, "the previous password no longer works");
+  await db.query("update auth.users set recovery_sent_at = now() - interval '61 seconds' where id = $1", [id]);
+  const pkceRequestClient = createClient(local.API_URL, local.ANON_KEY, { ...authOptions, auth: { ...authOptions.auth, flowType: "pkce" } });
+  assert.equal((await pkceRequestClient.auth.resetPasswordForEmail(email, { redirectTo: "http://127.0.0.1:3000/auth/callback" })).error, null);
+  const pkceToken = await deliveredToken(email, "recovery");
+  const separateBrowser = createClient(local.API_URL, local.ANON_KEY, authOptions);
+  assert.equal((await separateBrowser.auth.verifyOtp({ type: "recovery", token_hash: pkceToken })).error, null, "a PKCE-initiated request can be recovered in a browser without its verifier using the email token");
+  assert.equal((await separateBrowser.auth.signOut({ scope: "global" })).error, null);
   const login = await client.auth.signInWithPassword({ email, password });
   assert.equal(login.error, null, "the replacement password signs in successfully");
   const reused = await createClient(local.API_URL, local.ANON_KEY, authOptions).auth.verifyOtp({ type: "recovery", token_hash: recoveryToken });

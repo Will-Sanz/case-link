@@ -242,16 +242,38 @@ otp_expiry = 900
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+[auth.email.template.invite]
+subject = "You're invited to CaseLink"
+content_path = "./supabase/email-templates/invite.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+[auth.email.template.recovery]
+subject = "Reset your password — CaseLink"
+content_path = "./supabase/email-templates/recovery.html"
+
+[auth.email.template.reauthentication]
+subject = "Verify your identity — CaseLink"
+content_path = "./supabase/email-templates/reauthentication.html"
+
+# The pinned CLI resolves notification paths relative to this config directory.
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Password changed — CaseLink"
+content_path = "./email-templates/password_changed_notification.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Email address changed — CaseLink"
+content_path = "./email-templates/email_changed_notification.html"
+
+[auth.email.notification.mfa_factor_enrolled]
+enabled = true
+subject = "Verification method added — CaseLink"
+content_path = "./email-templates/mfa_factor_enrolled_notification.html"
+
+[auth.email.notification.mfa_factor_unenrolled]
+enabled = true
+subject = "Verification method removed — CaseLink"
+content_path = "./email-templates/mfa_factor_unenrolled_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.

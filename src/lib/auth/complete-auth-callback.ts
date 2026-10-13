@@ -9,9 +9,14 @@ export async function completeAuthCallback(url: URL, client: () => SupabaseClien
     const query = url.searchParams;
     const fragment = new URLSearchParams(url.hash.slice(1));
     if (url.href.length > 20000 || query.has("error") || fragment.has("error")) return AUTH_CALLBACK_ERROR_PATH;
+    for (const params of [query, fragment]) {
+      if (["code", "token_hash", "type", "access_token", "refresh_token", "next"].some((key) => params.getAll(key).length > 1)) return AUTH_CALLBACK_ERROR_PATH;
+    }
+    if (query.has("token_hash") && fragment.has("token_hash")) return AUTH_CALLBACK_ERROR_PATH;
+    const tokenParams = fragment.has("token_hash") ? fragment : query;
     const code = query.get("code");
-    const tokenHash = query.get("token_hash");
-    const type = query.get("type");
+    const tokenHash = tokenParams.get("token_hash");
+    const type = tokenParams.get("type");
     const accessToken = fragment.get("access_token");
     const refreshToken = fragment.get("refresh_token");
     const methods = Number(Boolean(code)) + Number(Boolean(tokenHash)) + Number(Boolean(accessToken || refreshToken));
@@ -31,7 +36,7 @@ export async function completeAuthCallback(url: URL, client: () => SupabaseClien
     if (stored.error || stored.data.session?.user.id !== userId) return AUTH_CALLBACK_ERROR_PATH;
     const verified = await auth.getUser();
     if (verified.error || verified.data.user?.id !== userId) return AUTH_CALLBACK_ERROR_PATH;
-    return safeInternalPath(query.get("next"));
+    return safeInternalPath(tokenParams.get("next") ?? query.get("next"));
   } catch {
     return AUTH_CALLBACK_ERROR_PATH;
   }
