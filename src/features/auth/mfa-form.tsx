@@ -1,5 +1,7 @@
 "use client";
 
+import { clearLocalActionDrafts } from "@/lib/domain/plan/local-action-draft";
+
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -52,6 +54,7 @@ export function MfaForm({ required, manage, nextPath }: { required: boolean; man
   }, [reload]);
 
   async function signOut() {
+    clearLocalActionDrafts();
     const result = await createSupabaseBrowserClient().auth.signOut({ scope: "global" });
     if (result.error) throw result.error;
     if (mounted.current) { router.replace("/login"); router.refresh(); }

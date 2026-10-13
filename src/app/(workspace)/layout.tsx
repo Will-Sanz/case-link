@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ensureAppUser, getSessionUser } from "@/lib/auth/session";
 import { MfaRequiredError, PasswordSetupRequiredError } from "@/lib/auth/session-errors";
 import { AppShell } from "@/components/layout/app-shell";
+import { WorkspaceSessionBoundary } from "@/components/layout/workspace-session-boundary";
 
 export const dynamic = "force-dynamic";
 
@@ -23,5 +24,5 @@ export default async function WorkspaceLayout({
     throw error;
   }
 
-  return <AppShell>{children}</AppShell>;
+  return <WorkspaceSessionBoundary key={authUser.id} userId={authUser.id}><AppShell>{children}</AppShell></WorkspaceSessionBoundary>;
 }

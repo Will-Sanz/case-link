@@ -5,8 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { previewRefinePlan, previewRefinePlanStep, updatePlanStep } from "@/app/actions/plans";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
+import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
 
 const routerRefresh = vi.hoisted(() => vi.fn());
+const owner = "90000000-0000-4000-8000-000000000001";
+vi.mock("@/components/layout/workspace-session-boundary", () => ({ useWorkspaceUserId: () => "90000000-0000-4000-8000-000000000001" }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: routerRefresh }),
@@ -87,12 +90,41 @@ const plan: PlanWithSteps = {
 
 describe("FamilyPlanPanel stale edit recovery", () => {
   beforeEach(() => {
+    localStorage.clear(); sessionStorage.clear();
     routerRefresh.mockReset();
     vi.mocked(updatePlanStep).mockReset();
     vi.mocked(previewRefinePlanStep).mockReset();
     vi.mocked(previewRefinePlan).mockReset();
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     HTMLDialogElement.prototype.close = function () { this.open = false; };
+  });
+
+  it("recovers de-identified edits in the same tab, and removes a recovery copy when identifying text is entered", async () => {
+    const key = localActionDraftKey(owner, plan.id);
+    const first = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "Schedule the intake" } });
+    expect(sessionStorage.getItem(key)).toContain("Schedule the intake");
+    expect(localStorage.getItem(key)).toBeNull();
+    first.unmount();
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Restore edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Schedule the intake" }));
+    fireEvent.change(screen.getByDisplayValue("Schedule the intake"), { target: { value: "Email parent@example.test" } });
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(screen.getByText(/This edit cannot be kept for recovery/)).toBeTruthy();
+    expect(screen.getByDisplayValue("Email parent@example.test")).toBeTruthy();
+  });
+
+  it("keeps edits in memory and warns when quota prevents saving a recovery copy", () => {
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "Keep this edit" } });
+    expect(screen.getByText(/Draft recovery is unavailable/)).toBeTruthy();
+    expect(screen.getByDisplayValue("Keep this edit")).toBeTruthy();
   });
 
   it("settles an unexpectedly rejected action preview and keeps instructions for retry", async () => {

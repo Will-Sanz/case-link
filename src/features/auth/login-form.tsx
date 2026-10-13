@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { pruneLocalActionDrafts } from "@/lib/domain/plan/local-action-draft";
 import { LegalDocumentModal } from "@/components/legal/legal-document-modal";
 import type { LegalModalDocument } from "@/components/legal/legal-document-modal";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { safeInternalPath } from "@/lib/auth/safe-internal-path";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
+  useEffect(() => { try { pruneLocalActionDrafts(); } catch { /* Recovery may be unavailable on this browser. */ } }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = safeInternalPath(searchParams.get("next"));

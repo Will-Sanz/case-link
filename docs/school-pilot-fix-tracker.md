@@ -153,7 +153,9 @@ Save schemas use `z.string().datetime()` while callers pass database timestamps 
 
 **Close with:** step, action-item, and meeting saves using actual database-returned timestamps; equivalent valid offset forms; malformed values rejected; stale concurrent writes still rejected. **Sources:** [plan validation](/Users/willsanz/homelessness-project/src/lib/validations/plans.ts:112), [progress action](/Users/willsanz/homelessness-project/src/app/actions/case-progress.ts), [barrier action](/Users/willsanz/homelessness-project/src/app/actions/barrier-workflow.ts:212).
 
-### [ ] CL-04 — Make unsaved-work recovery safe on shared computers
+### [x] CL-04 — Make unsaved-work recovery safe on shared computers
+
+**Completed October 13, 2026 — engineering:** drafts now use per-account, per-plan session storage with a 30-minute lifetime and bounded, validated editable fields. Persistent legacy drafts are deleted. Explicit sign-out removes recovery copies; a content-free logout marker also invalidates suspended/duplicated tabs. Account switches clear drafts and hide the old workspace; ordinary token renewal preserves the current editor, and session expiry permits the same account to recover within the lifetime. Restore rechecks scope, expiry, child ownership, and privacy. Likely identifiers prevent storage immediately; blocked storage and quota failures keep the current edit in memory and explain that recovery is unavailable. Forty-seven focused checks passed across draft, account, and auth flows, including rendered edit/recovery, cross-account/logout events, malformed nested content, rejected identifiers, and quota failure. Normal correctness/privacy/accessibility and separate Ponytail reviews completed; full verification runs on push. The detector is a safeguard, not proof that text is de-identified; the school data-policy decision remains CL-01. Deployed browser rehearsal remains CL-08. Commit: `git log --grep='CL-04'`.
 
 **Type:** Fix · **Responsible:** engineering + privacy owner.
 

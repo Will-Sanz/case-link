@@ -1,5 +1,7 @@
 "use client";
 
+import { clearLocalActionDrafts } from "@/lib/domain/plan/local-action-draft";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -68,6 +70,7 @@ export function ResetPasswordForm() {
   }
 
   async function signOutAndRedirect(changed: boolean) {
+    clearLocalActionDrafts();
     const { error: signOutError } = await createSupabaseBrowserClient().auth.signOut({ scope: "global" });
     if (signOutError) throw signOutError;
     router.replace(changed ? "/login?message=password-reset-success" : "/login");

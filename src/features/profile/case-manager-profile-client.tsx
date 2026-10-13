@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { CheckCircle as CheckCircle2, FloppyDisk as Save, LogOut } from "iconoir-react";
 import { signOutAction } from "@/app/actions/auth";
+import { clearLocalActionDrafts } from "@/lib/domain/plan/local-action-draft";
 import { updateCaseManagerProfile, type ProfileSaveState } from "@/app/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,7 +92,7 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
 
           <Link href="/verify-account?mode=manage&next=/profile" className="mt-5 block text-sm font-medium underline underline-offset-2">Manage two-step verification</Link>
 
-          <form action={signOutFormAction} className="mt-5">
+          <form action={signOutFormAction} onSubmit={clearLocalActionDrafts} className="mt-5">
             {signOutState.error ? <p role="alert" className="mb-3 text-sm text-[var(--color-error)]">{signOutState.error}</p> : null}
             <Button type="submit" variant="outline" disabled={signOutPending} className="flex min-h-10 w-full items-center justify-center gap-2">
               <LogOut className="size-4" aria-hidden /> {signOutPending ? "Signing out…" : "Sign out"}

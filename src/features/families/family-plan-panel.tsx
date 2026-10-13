@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useWorkspaceUserId } from "@/components/layout/workspace-session-boundary";
 import { CheckCircle as CheckCircle2, WarningCircle as CircleAlert } from "iconoir-react";
 import {
   markPlanReviewed,
@@ -35,20 +36,19 @@ import {
   localActionDraftKey,
   parseLocalActionDraft,
   serializeLocalActionDraft,
+  pruneLocalActionDrafts,
+  DRAFT_LOGOUT_KEY,
   type LocalActionDraft,
 } from "@/lib/domain/plan/local-action-draft";
 
-function readStoredActionDraft(key: string): LocalActionDraft | null {
-  try {
-    return parseLocalActionDraft(window.localStorage.getItem(key));
-  } catch {
-    return null;
-  }
+function readStoredActionDraft(userId: string, planId: string): LocalActionDraft | null {
+  pruneLocalActionDrafts(userId);
+  return parseLocalActionDraft(window.sessionStorage.getItem(localActionDraftKey(userId, planId)), userId, planId, Date.now(), Number(window.localStorage.getItem(DRAFT_LOGOUT_KEY)) || 0);
 }
 
 function removeStoredActionDraft(key: string): void {
   try {
-    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
   } catch {
     // Draft recovery is optional when browser storage is restricted.
   }
@@ -313,6 +313,7 @@ export function FamilyPlanPanel({
   continueDraftPending?: boolean;
 }) {
   const router = useRouter();
+  const userId = useWorkspaceUserId();
   const aiRequestRef = useRef({ id: 0, pending: false });
   const planAiRequestRef = useRef({ id: 0, pending: false });
   useEffect(() => {
@@ -329,6 +330,7 @@ export function FamilyPlanPanel({
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
   const [recoverableDraft, setRecoverableDraft] = useState<LocalActionDraft | null>(null);
+  const [recoveryWarning, setRecoveryWarning] = useState<string | null>(null);
   const draftRecoveryLoadedPlanIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -400,7 +402,7 @@ export function FamilyPlanPanel({
     [editConflict, stepDraft],
   );
 
-  const actionDraftStorageKey = plan ? localActionDraftKey(plan.id) : null;
+  const actionDraftStorageKey = plan && userId ? localActionDraftKey(userId, plan.id) : null;
 
   useEffect(() => {
     if (!plan) return;
@@ -419,11 +421,15 @@ export function FamilyPlanPanel({
   }, [familyId, plan]);
 
   useEffect(() => {
-    if (!plan || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {
+    if (!plan || !userId || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {
       return;
     }
     draftRecoveryLoadedPlanIdRef.current = plan.id;
-    const stored = readStoredActionDraft(actionDraftStorageKey);
+    let stored: LocalActionDraft | null;
+    try { stored = readStoredActionDraft(userId, plan.id); } catch {
+      setRecoveryWarning("Draft recovery is unavailable in this browser. Keep this tab open until your edits are saved.");
+      return;
+    }
     if (!stored || stored.planId !== plan.id) {
       removeStoredActionDraft(actionDraftStorageKey);
       return;
@@ -433,7 +439,7 @@ export function FamilyPlanPanel({
       return;
     }
     setRecoverableDraft(stored);
-  }, [actionDraftStorageKey, plan]);
+  }, [actionDraftStorageKey, plan, userId]);
 
   useEffect(() => {
     if (conflictResolution !== "keep_draft" || !editConflict || !plan) return;
@@ -451,19 +457,22 @@ export function FamilyPlanPanel({
   }, [conflictResolution, editConflict, plan]);
 
   useEffect(() => {
-    if (!actionDraftStorageKey || !stepDirty || !stepDraft || !plan) return;
-    const timer = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(
-          actionDraftStorageKey,
-          serializeLocalActionDraft(plan.id, stepDraft),
-        );
-      } catch {
-        // The in-memory draft remains available when browser storage is unavailable.
+    if (!actionDraftStorageKey || !userId || !stepDirty || !stepDraft || !plan) return;
+    try {
+      pruneLocalActionDrafts(userId);
+      const value = serializeLocalActionDraft(userId, plan.id, stepDraft);
+      // Remove a previous copy immediately when identifying text or invalid content is entered.
+      window.sessionStorage.removeItem(actionDraftStorageKey);
+      if (!value) {
+        setRecoveryWarning("This edit cannot be kept for recovery. Remove identifying text and check the fields; keep this tab open until saved.");
+        return;
       }
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [actionDraftStorageKey, plan, stepDirty, stepDraft]);
+      window.sessionStorage.setItem(actionDraftStorageKey, value);
+      setRecoveryWarning(null);
+    } catch {
+      setRecoveryWarning("Draft recovery is unavailable in this browser. Keep this tab open until your edits are saved.");
+    }
+  }, [actionDraftStorageKey, plan, stepDirty, stepDraft, userId]);
 
   useEffect(() => {
     if (!stepDirty) return;
@@ -517,16 +526,20 @@ export function FamilyPlanPanel({
   function clearLocalActionDraft() {
     if (actionDraftStorageKey) removeStoredActionDraft(actionDraftStorageKey);
     setRecoverableDraft(null);
+    setRecoveryWarning(null);
   }
 
   function restoreLocalActionDraft() {
-    if (!recoverableDraft || !plan) return;
-    if (!plan.steps.some((step) => step.id === recoverableDraft.step.id)) {
+    if (!recoverableDraft || !plan || !userId) return;
+    let stored: LocalActionDraft | null;
+    try { stored = readStoredActionDraft(userId, plan.id); } catch { stored = null; }
+    if (!stored || !plan.steps.some((step) => step.id === stored.step.id)) {
       clearLocalActionDraft();
+      setRecoveryWarning("This recovery copy expired or is unavailable. Your saved plan is unchanged.");
       return;
     }
-    setEditingStepId(recoverableDraft.step.id);
-    setStepDraft(cloneStep(recoverableDraft.step));
+    setEditingStepId(stored.step.id);
+    setStepDraft(cloneStep(stored.step));
     setRecoverableDraft(null);
     setError(null);
     setSuccess("Unsaved action edit restored. Review it before saving.");
@@ -1386,6 +1399,8 @@ export function FamilyPlanPanel({
         </p>
       ) : null}
 
+      {recoveryWarning ? <p role="status" className="text-sm text-[var(--color-ink-muted)]">{recoveryWarning}</p> : null}
+      {stepDirty && !recoveryWarning ? <p className="text-xs text-[var(--color-ink-muted)]">Unsaved edits can be recovered in this tab for 30 minutes. Signing out clears them. Use only non-identifying case information.</p> : null}
       {recoverableDraft && !editingStepId ? (
         <section className="rounded-lg border border-[var(--color-rule-strong)] bg-[var(--color-accent-soft)] px-4 py-3" role="status">
           <p className="text-sm font-semibold text-[var(--color-ink)]">Unsaved action edit found</p>
