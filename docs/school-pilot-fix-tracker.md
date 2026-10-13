@@ -437,7 +437,7 @@ The full-plan refinement baseline replaces fewer than two action items with gene
 
 **Close with:** zero/one/many existing actions according to the product contract, unchanged one-action rewrite, removal of a wrong contact/document, and UI/server count agreement. **Source:** [baseline and merge](/Users/willsanz/homelessness-project/src/lib/plan-generator/plan-refine-lean.ts:137).
 
-### [ ] CL-31 — Persist the context staff enter before using it
+### [x] CL-31 — Persist the context staff enter before using it
 
 **Type:** Fix · **Responsible:** engineering.
 
@@ -446,6 +446,8 @@ The barrier-generation action persists selected barriers but uses `additionalDet
 **Fix:** establish whether this field edits the family description or is a generation-only instruction and label it accordingly. For the current “Short description” behavior, save it with the intake update before matching/generation, with conflict protection and a clear failure state.
 
 **Close with:** change description, generate, refresh, reopen, inspect matching/assistant inputs, and fail the save. No displayed saved description may silently revert or differ from the case used downstream. **Source:** [barrier workflow](/Users/willsanz/homelessness-project/src/app/actions/barrier-workflow.ts:272).
+
+**Completed October 13, 2026 — engineering:** one authorized database transaction now saves the short description and barriers before matching/generation. It locks the family and checks the form's original database revision; barrier edits from the profile also invalidate that revision. A failed child write rolls back description, barriers, and audit events. The UI retains its draft revision across background refreshes and advances it after a successful context save even if AI fails, so retries remain possible without silently adopting another person's revision. Six action/rendered regression tests passed, plus local Supabase tests for stale edits, missing barriers, rollback, preserved audit counts, and denied cross-family writes. Typecheck/lint and the full pre-push verification gate passed. Correctness/security and separate Ponytail review completed for the single-school pilot. Migration must be applied to staging before the CL-08/CL-38 deployed journey; those gates remain open. Commit: `git log --grep='CL-31'`.
 
 ### [ ] CL-32 — Resume staged generation through busy and interrupted states
 

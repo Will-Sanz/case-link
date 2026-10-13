@@ -47,6 +47,7 @@ const barrierLabelSchema = z.string().refine(
 );
 const familyWorkflowInputSchema = z.object({
   selectedBarriers: z.array(barrierLabelSchema).max(20),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
   additionalBarriers: z.string().max(2000).optional(),
   additionalDetails: z.string().max(4000).optional(),
   aiMode: z.enum(["fast", "thinking"]).optional(),
@@ -74,25 +75,6 @@ function parseAdditionalBarriers(input: string): string[] {
         .filter(Boolean),
     ),
   );
-}
-
-type BarrierReplacementRow = {
-  preset_key: string | null;
-  label: string;
-  sort_order: number;
-};
-
-type AppSupabaseClient = Awaited<ReturnType<typeof requireAppUserWithClient>>["supabase"];
-async function replaceFamilyBarriers(
-  supabase: AppSupabaseClient,
-  familyId: string,
-  barriers: BarrierReplacementRow[],
-): Promise<{ code?: string; message?: string } | null> {
-  const { error } = await supabase.rpc("replace_family_barriers", {
-    p_family_id: familyId,
-    p_barriers: barriers,
-  });
-  return error;
 }
 
 function mapFamilyToWorkflowResult(
@@ -257,8 +239,8 @@ export async function generateBarrierWorkflowForFamilyAction(
   familyId: string,
   input: unknown,
 ): Promise<
-  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean }
-  | { ok: false; error: string }
+  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean; savedContextAt: string }
+  | { ok: false; error: string; savedContextAt?: string }
 > {
   const parsed = z.object({
     familyId: familyIdSchema,
@@ -290,6 +272,7 @@ export async function generateBarrierWorkflowForFamilyAction(
   if (!privacy.ok) {
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
+  let savedContextAt: string | undefined;
   try {
     const { supabase } = await requireAppUserWithClient();
     const { data: fam } = await supabase
@@ -323,10 +306,21 @@ export async function generateBarrierWorkflowForFamilyAction(
 
     // Save the case manager's selections first. The saved context remains useful even
     // if AI generation is temporarily unavailable.
-    const barrierErr = await replaceFamilyBarriers(supabase, familyId, barrierRows);
-    if (barrierErr) {
-      return { ok: false, error: publicMessageFromSupabaseError(barrierErr) };
+    const { data: savedAt, error: contextError } = await supabase.rpc("save_family_planning_context", {
+      p_family_id: familyId,
+      p_barriers: barrierRows,
+      p_summary: details || null,
+      p_expected_updated_at: parsed.data.input.expectedUpdatedAt,
+    });
+    if (contextError) {
+      return { ok: false, error: contextError.code === "40001"
+        ? "The saved case details have changed. Reload this page and review them before saving your changes."
+        : publicMessageFromSupabaseError(contextError) };
     }
+    savedContextAt = savedAt as string;
+    revalidatePath(`/families/${familyId}`);
+    revalidatePath(`/families/${familyId}/profile`);
+    revalidatePath("/families");
 
     // Match before generation so the planner can use current directory facts. A
     // matching outage is explicit in the UI but never blocks the core plan.
@@ -347,12 +341,13 @@ export async function generateBarrierWorkflowForFamilyAction(
       revalidatePath(`/families/${familyId}`);
       return {
         ok: false,
-        error: `Your barriers were saved, but the plan could not be prepared. ${planRes.error}`,
+        error: `Your case details were saved, but the plan could not be prepared. ${planRes.error}`,
+        savedContextAt,
       };
     }
 
     const detail = await getFamilyDetail(supabase, familyId);
-    if (!detail) return { ok: false, error: "Could not load generated family workflow." };
+    if (!detail) return { ok: false, error: "Could not load generated family workflow.", savedContextAt };
 
     const mapped = mapFamilyToWorkflowResult(
       detail.name,
@@ -367,9 +362,9 @@ export async function generateBarrierWorkflowForFamilyAction(
     );
     revalidatePath(`/families/${familyId}`);
     revalidatePath("/families");
-    return { ok: true, result: mapped, stagedPolling: true };
+    return { ok: true, result: mapped, stagedPolling: true, savedContextAt };
   } catch (error) {
-    return { ok: false, error: toClientError(error) };
+    return { ok: false, error: toClientError(error), savedContextAt };
   }
 }
 

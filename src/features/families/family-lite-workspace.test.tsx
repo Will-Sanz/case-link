@@ -45,6 +45,7 @@ describe("FamilyLiteWorkspace plan generation", () => {
     vi.mocked(generateBarrierWorkflowForFamilyAction).mockResolvedValue({
       ok: true,
       stagedPolling: true,
+      savedContextAt: "2026-08-04T14:00:00.000Z",
       result: {
         referenceId: familyId,
         familyId,
@@ -62,6 +63,7 @@ describe("FamilyLiteWorkspace plan generation", () => {
     render(
       <FamilyLiteWorkspace
         familyId={familyId}
+        familyUpdatedAt="2026-08-04T13:00:00.000Z"
         familyName="Family 014"
         barrierOptions={[{ key: "housing_instability", label: "Housing" }]}
         initialResult={null}
@@ -77,4 +79,19 @@ describe("FamilyLiteWorkspace plan generation", () => {
       expect(routerPush).toHaveBeenCalledWith(`/families/${familyId}/plan`);
     });
   });
+});
+
+it("retains the draft's revision on refresh and advances it when context saved but AI failed", async () => {
+  const firstRevision = "2026-08-04T13:00:00.000Z";
+  const savedRevision = "2026-08-04T14:00:00.000Z";
+  vi.mocked(generateBarrierWorkflowForFamilyAction).mockResolvedValue({ ok: false, error: "Plan unavailable", savedContextAt: savedRevision });
+  const props = { familyId, familyName: "Family 014", barrierOptions: [{ key: "housing_instability", label: "Housing" }], initialResult: null, plan: null, tab: "overview" as const };
+  const view = render(<FamilyLiteWorkspace {...props} familyUpdatedAt={firstRevision} />);
+  fireEvent.click(screen.getByRole("button", { name: "Housing" }));
+  view.rerender(<FamilyLiteWorkspace {...props} familyUpdatedAt="2026-08-04T13:30:00.000Z" />);
+  fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
+  await screen.findByText("Plan unavailable");
+  expect(generateBarrierWorkflowForFamilyAction).toHaveBeenLastCalledWith(familyId, expect.objectContaining({ expectedUpdatedAt: firstRevision }));
+  fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
+  await waitFor(() => expect(generateBarrierWorkflowForFamilyAction).toHaveBeenLastCalledWith(familyId, expect.objectContaining({ expectedUpdatedAt: savedRevision })));
 });

@@ -184,6 +184,7 @@ function ResourceMatchCard({
 
 export function FamilyLiteWorkspace({
   familyId,
+  familyUpdatedAt,
   familyName,
   barrierOptions,
   initialResult,
@@ -193,6 +194,7 @@ export function FamilyLiteWorkspace({
   tab = "plan",
 }: {
   familyId: string;
+  familyUpdatedAt: string;
   familyName: string;
   barrierOptions: readonly { key: string; label: string }[];
   initialResult: BarrierWorkflowResult | null;
@@ -203,6 +205,7 @@ export function FamilyLiteWorkspace({
   tab?: "overview" | "plan" | "resources" | "assistant";
 }) {
   const router = useRouter();
+  const [contextUpdatedAt, setContextUpdatedAt] = useState(familyUpdatedAt);
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
@@ -375,8 +378,10 @@ export function FamilyLiteWorkspace({
           selectedBarriers: selected,
           additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
           additionalDetails: additionalContext.trim(),
+          expectedUpdatedAt: contextUpdatedAt,
           aiMode: DEFAULT_AI_MODE,
         });
+        if (r.savedContextAt) setContextUpdatedAt(r.savedContextAt);
         if (!r.ok) {
           setError(r.error);
           router.refresh();

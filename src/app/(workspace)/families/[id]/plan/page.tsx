@@ -20,7 +20,9 @@ export default async function FamilyPlanPage({ params }: PageProps) {
   const loaded = await loadBarrierWorkflowForFamilyAction(parsed.data);
   return (
     <FamilyLiteWorkspace
+      key={family.id}
       familyId={family.id}
+      familyUpdatedAt={family.updated_at}
       familyName={family.name}
       barrierOptions={BARRIER_PRESETS}
       initialResult={loaded.ok ? loaded.result : null}

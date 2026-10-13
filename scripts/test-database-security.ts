@@ -157,6 +157,44 @@ async function run() {
   }
 
   await asUser(userA, (client) => client.query("select public.ensure_app_user()"));
+  const contextRevision = (await admin.query("select to_json(updated_at) as revision from public.families where id = $1", [familyA])).rows[0].revision;
+  await asUser(userA, (client) => client.query(
+    "select public.save_family_planning_context($1, $2, $3::jsonb, $4::timestamptz)",
+    [familyA, "Needs flexible meeting times.", JSON.stringify([{ label: "Housing", preset_key: "housing_instability" }]), contextRevision],
+  ));
+  const beforeBarrierChange = (await admin.query("select to_json(updated_at) as revision from public.families where id = $1", [familyA])).rows[0].revision;
+  await asUser(userA, (client) => client.query(
+    "select public.replace_family_barriers($1, '[{\"label\":\"Housing\"}]'::jsonb)", [familyA],
+  ));
+  await expectDbError(() => asUser(userA, (client) => client.query(
+    "select public.save_family_planning_context($1, 'Stale barriers', '[{\"label\":\"Transportation\"}]'::jsonb, $2::timestamptz)", [familyA, beforeBarrierChange],
+  )), "a barrier edit from the profile also invalidates an old planning form");
+  const savedContext = await admin.query("select summary from public.families where id = $1", [familyA]);
+  assert.equal(savedContext.rows[0].summary, "Needs flexible meeting times.");
+  const currentContextRevision = (await admin.query("select to_json(updated_at) as revision from public.families where id = $1", [familyA])).rows[0].revision;
+  await expectDbError(() => asUser(userA, (client) => client.query(
+    "select public.save_family_planning_context($1, 'Stale input', '[{\"label\":\"Housing\"}]'::jsonb, $2::timestamptz)", [familyA, contextRevision],
+  )), "a stale description cannot overwrite newer case details");
+  await expectDbError(() => asUser(userA, (client) => client.query(
+    "select public.save_family_planning_context($1, 'Invalid input', null, $2::timestamptz)", [familyA, currentContextRevision],
+  )), "missing barriers cannot erase the saved barriers");
+  const beforeBadContext = await admin.query("select count(*)::int as count from public.activity_log where family_id = $1", [familyA]);
+  await expectDbError(() => asUser(userA, (client) => client.query(
+    "select public.save_family_planning_context($1, 'This must roll back.', $2::jsonb, $3::timestamptz)",
+    [familyA, JSON.stringify([{ label: "" }]), currentContextRevision],
+  )), "a failed barrier write rolls back the description and audit evidence");
+  const afterBadContext = await admin.query(
+    `select summary,
+       (select count(*)::int from public.activity_log where family_id = $1) as events,
+       (select label from public.family_barriers where family_id = $1 limit 1) as barrier
+     from public.families where id = $1`, [familyA],
+  );
+  assert.equal(afterBadContext.rows[0].summary, "Needs flexible meeting times.");
+  assert.equal(afterBadContext.rows[0].barrier, "Housing");
+  assert.equal(afterBadContext.rows[0].events, beforeBadContext.rows[0].count);
+  await expectDbError(() => asUser(userB, (client) => client.query(
+    "select public.save_family_planning_context($1, 'Unauthorized change', '[{\"label\":\"Housing\"}]'::jsonb, $2::timestamptz)", [familyA, currentContextRevision],
+  )), "another staff member cannot save an inaccessible family's context");
   await expectDbError(
     () => asUser(unprovisionedUser, (client) => client.query("select public.ensure_app_user()")),
     "authenticated users cannot provision their own application role",
