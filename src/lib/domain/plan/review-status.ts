@@ -87,7 +87,9 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
 
   if (
     hasValidReviewedAt(plan.client_display?.reviewedAt) &&
-    Boolean(plan.client_display?.reviewedById)
+    Boolean(plan.client_display?.reviewedById) &&
+    Boolean(plan.material_revision) &&
+    plan.client_display?.reviewedRevision === plan.material_revision
   ) {
     return { state: "reviewed", label: "Reviewed", issue: null };
   }

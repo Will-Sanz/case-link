@@ -11,7 +11,6 @@ import type {
   FamilyMemberRow,
   FamilyWithCurrentStep,
   MatchedResourceSummary,
-  PlanRow,
   PlanStepActionItemRow,
   PlanStepRow,
   PlanWithSteps,
@@ -199,15 +198,10 @@ export async function getFamilyDetail(
     return null;
   }
 
-  const [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
+  const [goalsRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
     await Promise.all([
     client
       .from("family_goals")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("sort_order", { ascending: true }),
-    client
-      .from("family_barriers")
       .select("*")
       .eq("family_id", familyId)
       .order("sort_order", { ascending: true }),
@@ -282,65 +276,17 @@ export async function getFamilyDetail(
         )
       `,
     ).eq("family_id", familyId),
-    client
-      .from("plans")
-      .select(
-        "id, family_id, version, summary, generation_source, ai_model, created_at, client_display, generation_state",
-      )
-      .eq("family_id", familyId)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    client.rpc("get_family_plan_snapshot", { p_family_id: familyId }),
   ]);
 
-  let plan: PlanWithSteps | null = null;
-  if (planRes.data) {
-    const p = planRes.data as PlanRow;
-    const { data: stepsData, error: stepsError } = await client
-      .from("plan_steps")
-      .select("*")
-      .eq("plan_id", p.id)
-      .order("sort_order", { ascending: true });
-    if (stepsError) throw new Error(stepsError.message);
-
-    const stepIds = (stepsData ?? []).map((s) => s.id);
-    const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
-    if (stepIds.length > 0) {
-      const { data: actionItems, error: actionItemsError } = await client
-        .from("plan_step_action_items")
-        .select("*")
-        .in("plan_step_id", stepIds)
-        .order("sort_order", { ascending: true });
-      if (actionItemsError) throw new Error(actionItemsError.message);
-      for (const ai of actionItems ?? []) {
-        const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
-        list.push(ai as PlanStepActionItemRow);
-        actionItemsByStep.set(ai.plan_step_id, list);
-      }
-    }
-
-    const stepsWithItems = (stepsData ?? []).map((s) => ({
-      ...s,
-      action_items: actionItemsByStep.get(s.id) ?? [],
-    })) as PlanStepRow[];
-
-    plan = {
-      ...p,
-      steps: stepsWithItems,
-      presentation: buildPlanPresentation(p),
-    };
+  for (const res of [goalsRes, membersRes, notesRes, progressRes, matchesRes, planRes]) {
+    if (res.error) throw new Error(res.error.message);
   }
+  if (!planRes.data) return null;
+  const snapshot = planRes.data as { family: FamilyDetail; barriers: FamilyBarrierRow[]; plan: PlanWithSteps | null };
+  const plan = snapshot.plan ? { ...snapshot.plan, presentation: buildPlanPresentation(snapshot.plan) } : null;
 
-  for (const res of [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes]) {
-    if (res.error) {
-      throw new Error(res.error.message);
-    }
-  }
-  if (planRes.error) {
-    throw new Error(planRes.error.message);
-  }
-
-  const f = fam as unknown as FamilyDetail & {
+  const f = { ...fam, ...snapshot.family } as unknown as FamilyDetail & {
     creator: { email: string } | { email: string }[] | null;
   };
   const creatorRaw = f.creator;
@@ -360,7 +306,7 @@ export async function getFamilyDetail(
     updated_at: f.updated_at,
     creator,
     goals: (goalsRes.data ?? []) as FamilyGoalRow[],
-    barriers: (barriersRes.data ?? []) as FamilyBarrierRow[],
+    barriers: snapshot.barriers,
     members: (membersRes.data ?? []) as FamilyMemberRow[],
     caseNotes: normalizeCaseNotes(notesRes.data ?? []),
     progressUpdates: normalizeProgressUpdates(progressRes.data ?? []),

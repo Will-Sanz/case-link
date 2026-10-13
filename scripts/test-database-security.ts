@@ -56,6 +56,81 @@ async function asUser<T>(
   }
 }
 
+async function snapshotFor(userId: string, familyId: string) {
+  return asUser(userId, async client => (await client.query("select public.get_family_plan_snapshot($1) snapshot", [familyId])).rows[0].snapshot);
+}
+async function revisionFor(userId: string, familyId: string): Promise<string> {
+  return (await snapshotFor(userId, familyId)).plan.review_revision;
+}
+async function canExport(revision: string): Promise<boolean> {
+  return asUser(userA, async client => (await client.query("select public.is_reviewed_plan_revision($1, $2, $3) allowed", [familyA, planA, revision])).rows[0].allowed);
+}
+
+async function checkReviewRaces() {
+  const seen = await revisionFor(userA, familyA);
+  assert.match(seen, /^[a-f0-9]{64}$/);
+  assert.equal(await canExport(seen), false, "an unreviewed snapshot cannot be exported");
+  let releaseWrite!: () => void;
+  const holdWrite = new Promise<void>(resolve => { releaseWrite = resolve; });
+  let signalWritten!: () => void;
+  const written = new Promise<void>(resolve => { signalWritten = resolve; });
+  const writer = asUser(userA, async client => {
+    await client.query("update public.plan_step_action_items set title = 'Changed in a second tab' where id = $1", [actionA]);
+    signalWritten();
+    await holdWrite;
+  });
+  await written;
+  const staleReview = asUser(userA, async client => {
+    await client.query("set local application_name = 'caselink-review-race'");
+    return client.query("select public.mark_plan_reviewed($1, $2, $3)", [familyA, planA, seen]);
+  });
+  const rejected = assert.rejects(staleReview, { code: "40001" }, "a review waiting on an edit cannot approve the unseen revision");
+  try {
+    let locked = false;
+    for (let i = 0; i < 60; i++) {
+      const state = await admin.query("select 1 from pg_stat_activity where application_name = 'caselink-review-race' and wait_event_type = 'Lock'");
+      if (state.rowCount) { locked = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(locked, true, "review serializes with child writes even before any approval exists");
+  } finally { releaseWrite(); }
+  await writer;
+  await rejected;
+  const current = await revisionFor(userA, familyA);
+  assert.notEqual(current, seen);
+  const events = await admin.query("select count(*)::int n from public.activity_log where family_id = $1 and action = 'plan.reviewed'", [familyA]);
+  assert.equal(events.rows[0].n, 0, "stale approval adds no audit evidence");
+  await expectDbError(() => asUser(userA, client => client.query("select public.mark_plan_reviewed($1, $2, $3)", [familyA, planA, seen])), "stale screen cannot approve after the edit either");
+  let releaseReview!: () => void;
+  const holdReview = new Promise<void>(resolve => { releaseReview = resolve; });
+  let signalReviewed!: () => void;
+  const didReview = new Promise<void>(resolve => { signalReviewed = resolve; });
+  const reviewer = asUser(userA, async client => {
+    await client.query("select public.mark_plan_reviewed($1, $2, $3)", [familyA, planA, current]);
+    signalReviewed();
+    await holdReview;
+  });
+  await didReview;
+  const laterWriter = asUser(userA, async client => {
+    await client.query("set local application_name = 'caselink-edit-race'");
+    return client.query("update public.plan_step_action_items set title = 'Changed during review' where id = $1", [actionA]);
+  });
+  try {
+    let locked = false;
+    for (let i = 0; i < 60; i++) {
+      const state = await admin.query("select 1 from pg_stat_activity where application_name = 'caselink-edit-race' and wait_event_type = 'Lock'");
+      if (state.rowCount) { locked = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(locked, true, "child writes serialize with an in-flight approval");
+  } finally { releaseReview(); }
+  await reviewer;
+  await laterWriter;
+  assert.equal(await canExport(current), false, "an edit committed after approval invalidates that export");
+  assert.equal((await snapshotFor(userA, familyA)).plan.client_display.reviewedAt, undefined);
+
+}
+
 async function expectDbError(run: () => Promise<unknown>, label: string) {
   await assert.rejects(run, label);
 }
@@ -146,6 +221,7 @@ async function setup() {
 
 async function run() {
   await setup();
+  assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 
   // PostgREST uses PostgreSQL's JSON timestamp representation, including microseconds and offsets.
   for (const [table, id, schema, idField] of [
@@ -551,11 +627,16 @@ async function run() {
     )),
     "step activity cannot be inserted directly",
   );
-  const reviewed = await asUser(userA, (client) => client.query<{ mark_plan_reviewed: string }>(
-    "select public.mark_plan_reviewed($1, $2)",
-    [familyA, planA],
+  await checkReviewRaces();
+  const reviewed = await asUser(userA, async (client) => client.query<{ mark_plan_reviewed: string }>(
+    "select public.mark_plan_reviewed($1, $2, $3)",
+    [familyA, planA, await revisionFor(userA, familyA)],
   ));
   assert.ok(Number.isFinite(new Date(String(reviewed.rows[0].mark_plan_reviewed)).getTime()));
+  const approvedRevision = await revisionFor(userA, familyA);
+  assert.equal(await canExport(approvedRevision), true, "exact approved content can be exported");
+  await expectDbError(() => asUser(userA, client => client.query("update public.plans set client_display = client_display || jsonb_build_object('reviewedRevision', $2::text) where id = $1", [planA, 'f'.repeat(64)])), "review revisions cannot be forged");
+
   await asUser(userA, (client) => client.query(
     "update public.plans set summary = 'Revised plan summary' where id = $1",
     [planA],
@@ -565,9 +646,10 @@ async function run() {
     [planA],
   );
   assert.equal(reviewAfterPlanEdit.rows[0].reviewed, false);
-  await asUser(userA, (client) => client.query(
-    "select public.mark_plan_reviewed($1, $2)",
-    [familyA, planA],
+  assert.equal(await canExport(approvedRevision), false, "an old preview is blocked after a material edit");
+  await asUser(userA, async (client) => client.query(
+    "select public.mark_plan_reviewed($1, $2, $3)",
+    [familyA, planA, await revisionFor(userA, familyA)],
   ));
   await asUser(userA, (client) => client.query(
     "update public.plan_steps set workflow_data = '{\"documents_received\":true}'::jsonb where id = $1",
@@ -578,6 +660,13 @@ async function run() {
     [planA],
   );
   assert.equal(reviewAfterProgress.rows[0].reviewed, true);
+  const progressSnapshot = (await snapshotFor(userA, familyA)).plan;
+  assert.equal(progressSnapshot.material_revision, progressSnapshot.client_display.reviewedRevision);
+  assert.equal(await canExport(progressSnapshot.review_revision), true, "current progress is exportable under the reviewed plan");
+  await admin.query("update public.families set name = 'Family updated label' where id = $1", [familyA]);
+  assert.equal(await canExport(progressSnapshot.review_revision), false, "a changed PDF family header invalidates the old preview");
+  assert.equal(await canExport(await revisionFor(userA, familyA)), false, "reloading a changed family label requires a fresh plan review");
+
   await asUser(userA, (client) => client.query(
     "update public.plan_steps set title = 'Revised alpha step' where id = $1",
     [stepA],

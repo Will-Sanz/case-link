@@ -4,6 +4,7 @@ import { getFamilyDetail } from "./families";
 
 function clientWithFailure(failedTable?: string, missingFamily = false) {
   return {
+    rpc: vi.fn().mockResolvedValue({ data: { family: { id: "family", name: "Snapshot label" }, barriers: [], plan: { id: "plan", generation_source: "rules", steps: [{ id: "step", action_items: [] }] } }, error: failedTable === "get_family_plan_snapshot" ? { message: "get_family_plan_snapshot unavailable" } : null }),
     from: vi.fn((table: string) => {
       const data = table === "families" ? (missingFamily ? null : { id: "family", creator: null })
         : table === "plans" ? { id: "plan", generation_source: "rules" }
@@ -20,7 +21,7 @@ function clientWithFailure(failedTable?: string, missingFamily = false) {
 }
 
 describe("getFamilyDetail", () => {
-  it.each(["families", "family_goals", "family_barriers", "family_members", "case_notes", "case_progress_updates", "resource_matches", "plans", "plan_steps", "plan_step_action_items"])(
+  it.each(["families", "family_goals", "family_members", "case_notes", "case_progress_updates", "resource_matches", "get_family_plan_snapshot"])(
     "refuses a partial workspace when %s fails", async (table) => {
       await expect(getFamilyDetail(clientWithFailure(table), "family")).rejects.toThrow(`${table} unavailable`);
     },
@@ -29,6 +30,7 @@ describe("getFamilyDetail", () => {
   it("keeps genuinely missing content distinct from a load failure", async () => {
     expect(await getFamilyDetail(clientWithFailure(undefined, true), "family")).toBeNull();
     const detail = await getFamilyDetail(clientWithFailure(), "family");
+    expect(detail?.name).toBe("Snapshot label");
     expect(detail?.plan?.steps).toHaveLength(1);
     expect(detail?.plan?.steps[0].action_items).toEqual([]);
   });

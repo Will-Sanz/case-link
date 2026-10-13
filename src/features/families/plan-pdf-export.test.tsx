@@ -1,10 +1,13 @@
 /** @vitest-environment jsdom */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { validatePlanExport } from "@/app/actions/plans";
 import { PlanPdfExport } from "@/features/families/plan-pdf-export";
 import type { PlanWithSteps } from "@/types/family";
+
+vi.mock("@/app/actions/plans", () => ({ validatePlanExport: vi.fn() }));
 
 const { pdfMock, toBlobMock, finalizePlanPdfMock } = vi.hoisted(() => ({
   pdfMock: vi.fn(),
@@ -29,6 +32,7 @@ const plan: PlanWithSteps = {
   id: "10000000-0000-4000-8000-000000000001",
   family_id: "20000000-0000-4000-8000-000000000002",
   version: 3,
+  review_revision: "a".repeat(64),
   summary: "Reviewed plan",
   generation_source: "openai",
   ai_model: null,
@@ -44,6 +48,7 @@ describe("PlanPdfExport", () => {
   let anchorClick: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.mocked(validatePlanExport).mockReset().mockResolvedValue({ ok: true });
     toBlobMock.mockResolvedValue(new Blob([new Uint8Array([1, 2, 3])], { type: "application/pdf" }));
     pdfMock.mockReturnValue({ toBlob: toBlobMock });
     finalizePlanPdfMock.mockResolvedValue(new Uint8Array([4, 5, 6]));
@@ -72,9 +77,51 @@ describe("PlanPdfExport", () => {
     );
 
     fireEvent.click(downloadButton);
-    expect(anchorClick).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(anchorClick).toHaveBeenCalledTimes(1));
+    expect(validatePlanExport).toHaveBeenCalledTimes(3);
 
     unmount();
     expect(revokeObjectUrl).toHaveBeenCalledWith("blob:reviewed-plan");
   });
+  it("refuses to render an already stale plan", async () => {
+    vi.mocked(validatePlanExport).mockResolvedValue({ ok: false, error: "Reload and review the current plan." });
+    render(<PlanPdfExport plan={plan} barrierLabels={[]} />);
+    await screen.findByText("Reload and review the current plan.");
+    expect(pdfMock).not.toHaveBeenCalled();
+    expect(anchorClick).not.toHaveBeenCalled();
+  });
+
+  it("catches an edit while the PDF is rendering", async () => {
+    vi.mocked(validatePlanExport).mockResolvedValueOnce({ ok: true }).mockResolvedValue({ ok: false, error: "Changed while preparing." });
+    render(<PlanPdfExport plan={plan} barrierLabels={[]} />);
+    await screen.findByText("Changed while preparing.");
+    expect(screen.queryByTitle("Family reviewed plan PDF")).toBeNull();
+    expect(createObjectUrl).not.toHaveBeenCalled();
+  });
+
+  it("blocks a stale download and duplicate download attempts", async () => {
+    render(<PlanPdfExport plan={plan} barrierLabels={[]} />);
+    const button = await screen.findByRole("button", { name: "Download PDF" });
+    let finish!: (v: Awaited<ReturnType<typeof validatePlanExport>>) => void;
+    vi.mocked(validatePlanExport).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await act(async () => finish({ ok: false, error: "Changed after preview." }));
+    await screen.findByText("Changed after preview.");
+    expect(anchorClick).not.toHaveBeenCalled();
+    expect(validatePlanExport).toHaveBeenCalledTimes(3);
+    expect(screen.queryByTitle("Family reviewed plan PDF")).toBeNull();
+  });
+
+  it("ignores a download check that completes after leaving the preview", async () => {
+    const { unmount } = render(<PlanPdfExport plan={plan} barrierLabels={[]} />);
+    const button = await screen.findByRole("button", { name: "Download PDF" });
+    let finish!: (v: Awaited<ReturnType<typeof validatePlanExport>>) => void;
+    vi.mocked(validatePlanExport).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    fireEvent.click(button);
+    unmount();
+    await act(async () => finish({ ok: true }));
+    expect(anchorClick).not.toHaveBeenCalled();
+  });
+
 });

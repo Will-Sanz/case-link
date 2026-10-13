@@ -59,13 +59,19 @@ describe("getPlanReviewStatus", () => {
 
   it("recognizes explicit case-manager approval", () => {
     const reviewed = plan({
+      material_revision: "a".repeat(64),
       client_display: {
         reviewedAt: "2026-08-03T13:00:00.000Z",
         reviewedById: "00000000-0000-4000-8000-000000000005",
+        reviewedRevision: "a".repeat(64),
       },
     });
     expect(getPlanReviewStatus(reviewed).label).toBe("Reviewed");
     expect(isPlanReviewed(reviewed)).toBe(true);
+    reviewed.material_revision = "b".repeat(64);
+    expect(isPlanReviewed(reviewed)).toBe(false);
+    delete reviewed.material_revision;
+    expect(isPlanReviewed(reviewed)).toBe(false);
   });
 
   it("requires an exact date on every open action", () => {

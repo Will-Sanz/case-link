@@ -104,6 +104,7 @@ export const updatePlanSchema = z.object({
 export const markPlanReviewedSchema = z.object({
   familyId: z.string().uuid(),
   planId: z.string().uuid(),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
 export const updatePlanStepSchema = z.object({

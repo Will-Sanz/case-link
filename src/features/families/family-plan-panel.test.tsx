@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { previewRefinePlan, previewRefinePlanStep, updatePlanStep } from "@/app/actions/plans";
+import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, updatePlanStep } from "@/app/actions/plans";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
@@ -33,6 +33,7 @@ const plan: PlanWithSteps = {
   id: "10000000-0000-4000-8000-000000000001",
   family_id: "20000000-0000-4000-8000-000000000002",
   version: 1,
+  review_revision: "a".repeat(64),
   summary: null,
   generation_source: "openai",
   ai_model: "gpt-5.6-luna",
@@ -92,6 +93,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
   beforeEach(() => {
     localStorage.clear(); sessionStorage.clear();
     routerRefresh.mockReset();
+    vi.mocked(markPlanReviewed).mockReset();
     vi.mocked(updatePlanStep).mockReset();
     vi.mocked(previewRefinePlanStep).mockReset();
     vi.mocked(previewRefinePlan).mockReset();
@@ -140,6 +142,19 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     expect((region.getByRole("button", { name: "Generate preview" }) as HTMLButtonElement).disabled).toBe(false);
     expect((region.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Shorten the description.");
     expect(screen.queryByText("private failure")).toBeNull();
+  });
+
+  it("submits the displayed revision and recovers from a failed review", async () => {
+    vi.mocked(markPlanReviewed).mockResolvedValueOnce({ ok: false, error: "This plan changed in another tab." });
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Mark plan reviewed" }));
+    await screen.findByText("This plan changed in another tab.");
+    await waitFor(() => expect((screen.getByRole("button", { name: "Mark plan reviewed" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(markPlanReviewed).toHaveBeenCalledWith({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });
+    vi.mocked(markPlanReviewed).mockRejectedValueOnce(new Error("private service error"));
+    fireEvent.click(screen.getByRole("button", { name: "Mark plan reviewed" }));
+    await screen.findByText("The review could not be saved. Your edits are unchanged; try again.");
+    await waitFor(() => expect((screen.getByRole("button", { name: "Mark plan reviewed" }) as HTMLButtonElement).disabled).toBe(false));
   });
 
   it("ignores a cancelled action preview that finishes after reopening", async () => {

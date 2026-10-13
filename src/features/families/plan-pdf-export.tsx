@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { validatePlanExport } from "@/app/actions/plans";
 import { Download, Page as FileText, RefreshDouble } from "iconoir-react";
 import { Button } from "@/components/ui/button";
 import type { PlanWithSteps } from "@/types/family";
@@ -23,6 +24,9 @@ export function PlanPdfExport({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generationAttempt, setGenerationAttempt] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const downloadLock = useRef(false);
+  const activePreview = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +43,11 @@ export function PlanPdfExport({
       });
 
       try {
+        const approved = await validatePlanExport({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });
+        if (!approved.ok) {
+          if (!cancelled) setError(approved.error);
+          return;
+        }
         const [{ pdf }, { PlanPdfDocument }, { finalizePlanPdf }] = await Promise.all([
           import("@react-pdf/renderer"),
           import("@/features/families/plan-pdf-document"),
@@ -55,6 +64,11 @@ export function PlanPdfExport({
         const finalizedBytes = await finalizePlanPdf(
           new Uint8Array(await renderedBlob.arrayBuffer()),
         );
+        const stillApproved = await validatePlanExport({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });
+        if (!stillApproved.ok) {
+          if (!cancelled) setError(stillApproved.error);
+          return;
+        }
         const blob = new Blob([new Uint8Array(finalizedBytes).buffer], {
           type: "application/pdf",
         });
@@ -69,10 +83,10 @@ export function PlanPdfExport({
         const namePart = familyName ? `${sanitizeFilenamePart(familyName)}-` : "";
         const datePart = sanitizeFilenamePart(generatedDate.replace(/\s+/g, "-"));
         setDownloadName(`family-support-plan-${namePart}${datePart}.pdf`);
+        activePreview.current = objectUrl;
         setPreviewUrl(objectUrl);
-      } catch (err) {
+      } catch {
         if (cancelled) return;
-        console.error("PDF preview failed:", err);
         setError("The PDF could not be prepared. Try generating it again.");
       } finally {
         if (!cancelled) setLoading(false);
@@ -83,18 +97,37 @@ export function PlanPdfExport({
 
     return () => {
       cancelled = true;
+      activePreview.current = null;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [barrierLabels, familyName, generationAttempt, plan]);
 
-  function handleDownload() {
-    if (!previewUrl || !downloadName) return;
-    const link = document.createElement("a");
-    link.href = previewUrl;
-    link.download = downloadName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  async function handleDownload() {
+    if (!previewUrl || !downloadName || downloadLock.current) return;
+    downloadLock.current = true;
+    setDownloading(true);
+    try {
+      const approved = await validatePlanExport({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });
+      if (activePreview.current !== previewUrl) return;
+      if (!approved.ok) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+        setError(approved.error);
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = previewUrl;
+      link.download = downloadName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      setError("The reviewed plan could not be checked. Please try again.");
+      setPreviewUrl(null);
+    } finally {
+      downloadLock.current = false;
+      setDownloading(false);
+    }
   }
 
   return (
@@ -120,9 +153,9 @@ export function PlanPdfExport({
             Try again
           </Button>
         ) : (
-          <Button type="button" variant="outline" className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleDownload} disabled={loading || !previewUrl}>
+          <Button type="button" variant="outline" className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleDownload} disabled={loading || downloading || !previewUrl}>
             <Download className="size-4" aria-hidden />
-            {loading ? "Preparing PDF…" : "Download PDF"}
+            {loading ? "Preparing PDF…" : downloading ? "Checking plan…" : "Download PDF"}
           </Button>
         )}
       </div>

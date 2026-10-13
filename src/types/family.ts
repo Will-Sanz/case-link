@@ -231,6 +231,7 @@ export type PlanClientDisplay = {
   /** Explicit case-manager approval required before the plan can be exported. */
   reviewedAt?: string;
   reviewedById?: string;
+  reviewedRevision?: string;
 };
 
 /** Staged lean generation progress (plans.generation_state JSONB). */
@@ -262,6 +263,9 @@ export type PlanRow = {
 };
 
 export type PlanWithSteps = PlanRow & {
+  /** Hashes from the same database snapshot as these rows; absent on legacy fixtures. */
+  review_revision?: string;
+  material_revision?: string;
   steps: PlanStepRow[];
   /** Derived on the server for UI, avoids branching on raw `generation_source` in components. */
   presentation: {

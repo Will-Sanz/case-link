@@ -165,7 +165,9 @@ The plan editor saves the entire draft to `localStorage` every 250 ms, before se
 
 **Close with:** shared-device account switch, logout, expired-session recovery, abandoned draft expiry, storage-disabled/quota errors, and rejected-PII draft tests. **Sources:** [draft persistence](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:446), [sign-out](/Users/willsanz/homelessness-project/src/app/actions/auth.ts).
 
-### [ ] CL-05 — Bind review and export to the revision the person saw
+### [x] CL-05 — Bind review and export to the revision the person saw
+
+**Completed October 13, 2026 — engineering:** plan, actions, case context, and PDF header fields now come from one database snapshot with content and material-content revisions. Approval checks the displayed revision while holding the plan/context locks and records both revisions in the audit event. All child edits serialize with review; material edits invalidate it, while progress-only edits retain material approval. Directly forging review revisions is denied. PDF preparation checks approval before and after rendering; download rechecks the exact source and uses the same preview bytes, refusing stale or unavailable authorization. Real local database tests cover a review waiting for an edit, an edit waiting for review, cross-family snapshot denial, stale approval with no audit evidence, approved export, material/progress changes, and changed family header context. Focused server/rendered tests cover displayed-revision submission, failed review recovery, edits during rendering, stale download, and duplicate clicks. Normal correctness/security/accessibility and separate Ponytail review completed; the fresh-migration database run passed and full verification runs on push. Deployed two-tab/browser evidence remains CL-08/CL-35/CL-38. Commit: `git log --grep='CL-05'`.
 
 **Type:** Fix · **Responsible:** engineering.
 
@@ -240,6 +242,8 @@ Full-plan AI input omits step/action IDs and action status/outcomes. Application
 **Close with:** swapped same-phase steps, swapped action rows, duplicate IDs, deleted IDs, completed actions, and another family's IDs. No outcome or completion history may move to a different action. **Source:** [full-plan preview and apply](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:1001).
 
 ### [ ] CL-30 — Save one reviewed edit transactionally
+
+**Additional finding during CL-05:** `capture_case_progress_update` still executes with the browser role even though the hardening migration revoked the required direct case-progress/activity/family writes. Include a real successful meeting-progress transaction, its permissions and rollback tests here; preserve material approval for progress-only updates instead of clearing review unconditionally.
 
 **Type:** Fix · **Responsible:** engineering.
 

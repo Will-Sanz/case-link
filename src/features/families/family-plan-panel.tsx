@@ -1252,13 +1252,15 @@ export function FamilyPlanPanel({
     setSuccess(null);
     startTransition(async () => {
       try {
-        const result = await markPlanReviewed({ familyId, planId: plan.id });
+        const result = await markPlanReviewed({ familyId, planId: plan.id, expectedRevision: plan.review_revision });
         if (!result.ok) {
           setError(result.error);
           return;
         }
         setSuccess("Plan marked reviewed. Paperwork is ready.");
         router.refresh();
+      } catch {
+        setError("The review could not be saved. Your edits are unchanged; try again.");
       } finally {
         setReviewPending(false);
       }

@@ -1127,28 +1127,50 @@ export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
     return { ok: false, error: publicSessionError(error) };
   }
 
-  const { familyId, planId } = parsed.data;
+  const { familyId, planId, expectedRevision } = parsed.data;
   const family = await getFamilyDetail(supabase, familyId);
   if (!family?.plan || family.plan.id !== planId) {
     return { ok: false, error: "Plan not found" };
   }
 
+  if (family.plan.review_revision !== expectedRevision) {
+    return { ok: false, error: "The plan changed. Reload it and review the current version before approving." };
+  }
   const reviewStatus = getPlanReviewStatus(family.plan);
-  if (reviewStatus.state === "reviewed") return { ok: true };
-  if (reviewStatus.state !== "needs_review") {
+  if (reviewStatus.state !== "needs_review" && reviewStatus.state !== "reviewed") {
     return { ok: false, error: reviewStatus.issue ?? "This plan is not ready for review." };
   }
 
   const { data: reviewedAt, error } = await supabase.rpc("mark_plan_reviewed", {
     p_family_id: familyId,
     p_plan_id: planId,
+    p_expected_revision: expectedRevision,
   });
+  if (error?.code === "40001") return { ok: false, error: "The plan changed. Reload it and review the current version before approving." };
   if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
   if (!reviewedAt) return { ok: false, error: "Plan not found or could not be reviewed." };
   revalidatePath(`/families/${familyId}`);
   revalidatePath(`/families/${familyId}/plan`);
   revalidatePath(`/families/${familyId}/paperwork`);
   return { ok: true };
+}
+
+export async function validatePlanExport(input: unknown): Promise<ActionResult> {
+  const parsed = markPlanReviewedSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Reload the plan before preparing a PDF." };
+  try {
+    const { supabase } = await requireAppUserWithClient();
+    const { data, error } = await supabase.rpc("is_reviewed_plan_revision", {
+      p_family_id: parsed.data.familyId,
+      p_plan_id: parsed.data.planId,
+      p_expected_revision: parsed.data.expectedRevision,
+    });
+    if (error) return { ok: false, error: "The reviewed plan could not be checked. Please try again." };
+    if (data !== true) return { ok: false, error: "The plan changed or needs review. Return to the plan, reload it, and review it before downloading." };
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
+  }
 }
 
 export async function updatePlanStep(
