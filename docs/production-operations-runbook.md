@@ -90,10 +90,12 @@ The privacy owner approves every deletion. A documented legal hold pauses deleti
 
 ### Offboard
 
-1. Disable the Supabase Auth user immediately.
-2. Remove family assignments and active sessions.
-3. Transfer owned cases only through the approved, audited operator process.
-4. Record actor, target opaque user ID, reason, approval, and completion time in the security audit.
+1. In a protected operator environment, identify the departing account's opaque user ID and an active replacement staff account. Set `CASELINK_OFFBOARD_USER_ID`, `CASELINK_REASSIGN_USER_ID`, `CASELINK_OPERATOR_LABEL`, and `CASELINK_CHANGE_REASON`; supply the project URL and service key through protected environment secrets, never command arguments or screenshots.
+2. Run `npm run db:offboard-user`. Its first database transaction disables effective access, assigns owned/assigned cases to the replacement, removes departing assignments, revokes Auth sessions and their refresh tokens, and records `user.disabled` with actor/reason/replacement/counts. Original case creators and case history remain intact. Database policies and mutation functions check the current active-account flag, including requests with an old JWT.
+3. The job disables further Auth sign-in and then revokes sessions again to close the interval between the first transaction and the Auth change. A partial failure exits unsuccessfully and names the stage to retry; a failed Auth call never re-enables database access. Rerunning is safe. Never treat a partial-success message as completed offboarding.
+4. Verify the security audit, replacement access, inactive account, and zero remaining sessions using the protected operator job/dashboard. Test this procedure in staging before pilot invitations. Do not delete the account or rewrite historical creators as a substitute. A later role change does not reactivate an offboarded account; reactivation requires a separate approved operating decision.
+
+The automated synthetic rehearsal is `npm run test:auth-security`. It only accepts the local Supabase service addresses and proves that a retained unexpired token cannot read/write owned or assigned cases, refresh, or sign in again. The database regression suite also checks inactive administrator and direct RPC behavior. Repeat the authorized rehearsal in isolated staging under CL-38 before launch. Supabase's [session documentation](https://supabase.com/docs/guides/auth/sessions) explains why token expiry alone is insufficient for immediate removal.
 
 Review every user, admin, assignment, service credential, and vendor operator quarterly and before each pilot extension.
 

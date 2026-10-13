@@ -15,6 +15,9 @@ export type AppUser = {
 };
 
 function rowToAppUser(row: AppUserRow): AppUser {
+  if (row.is_active !== true) {
+    throw new Error("This account no longer has workspace access. Contact your school administrator.");
+  }
   return {
     id: row.id,
     email: row.email,
@@ -53,7 +56,7 @@ export async function ensureAppUserWithClient(
 
   const { data: existing, error: fetchError } = await supabase
     .from("app_users")
-    .select("id, email, role, created_at, updated_at")
+    .select("id, email, role, is_active, created_at, updated_at")
     .eq("id", supabaseUser.id)
     .maybeSingle();
 

@@ -830,6 +830,36 @@ async function run() {
     "operator security audit is not browser-readable",
   );
 
+  const afterDowngrade = await asUser(userB, (client) => client.query("select public.is_app_admin() as allowed"), "aal2");
+  assert.equal(afterDowngrade.rows[0].allowed, false, "role downgrade applies to retained AAL2 tokens");
+  await expectDbError(() => asUser(userA, (client) => client.query(
+    "select public.operator_offboard_user($1, $2, 'forged operator', 'Unauthorized removal')", [userB, userA],
+  )), "browser roles cannot offboard staff");
+  await admin.query("select public.operator_set_user_role($1, 'admin', 'security test', 'Verify inactive admin denial', 'user.role_changed')", [userA]);
+  assert.equal((await asUser(userA, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, true);
+  await admin.query("alter table public.security_audit_log add constraint test_reject_offboarding check (action <> 'user.disabled') not valid");
+  try {
+    await expectDbError(() => admin.query("select public.operator_offboard_user($1, $2, 'security test', 'Audit failure must roll back')", [userA, userB]), "audit failure rolls back offboarding");
+    assert.equal((await admin.query("select is_active from public.app_users where id = $1", [userA])).rows[0].is_active, true);
+    assert.equal((await admin.query("select 1 from public.family_case_managers where family_id = $1 and user_id = $2", [familyA, userB])).rowCount, 0, "failed offboarding did not reassign cases");
+  } finally {
+    await admin.query("alter table public.security_audit_log drop constraint test_reject_offboarding");
+  }
+  await admin.query("select public.operator_offboard_user($1, $2, 'security test', 'Synthetic offboarding verification')", [userA, userB]);
+  assert.equal((await asUser(userA, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, false);
+  for (const table of ["families", "plan_steps", "plan_step_action_items", "resources"]) {
+    const denied = await asUser(userA, (client) => client.query(`select count(*)::int as count from public.${table}`), "aal2");
+    assert.equal(denied.rows[0].count, 0, `inactive user cannot read ${table}`);
+  }
+  for (const rpc of ["select public.ensure_app_user()", "select public.consume_ai_budget('chat', 1)",
+    `select public.archive_family('${familyA}')`,
+    "select public.create_family_intake('Denied family', null, 'medium', null, '[]'::jsonb, '[{\"label\":\"Housing\"}]'::jsonb, '[]'::jsonb, null)"]) {
+    await expectDbError(() => asUser(userA, (client) => client.query(rpc)), "inactive users cannot use privileged mutation functions");
+  }
+  await expectDbError(() => asUser(userA, (client) => client.query("update public.app_users set is_active = true where id = $1", [userA])), "offboarded staff cannot reactivate themselves");
+  const preserved = await asUser(userB, (client) => client.query("select id from public.families where id = $1", [familyA]));
+  assert.equal(preserved.rowCount, 1, "replacement staff can still access the preserved case");
+
   console.info("Database security integration checks passed.");
 }
 

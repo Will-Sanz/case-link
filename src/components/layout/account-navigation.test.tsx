@@ -51,6 +51,7 @@ describe("account navigation", () => {
           id: "11111111-1111-4111-8111-111111111111",
           email: "case.manager@example.org",
           role: "case_manager",
+          is_active: true,
           created_at: "2026-08-01T12:00:00.000Z",
           updated_at: "2026-08-02T12:00:00.000Z",
           display_name: "Case Manager",

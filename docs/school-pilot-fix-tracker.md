@@ -183,7 +183,7 @@ Model output accepts arbitrary contact names, phones, and emails and maps them i
 
 **Close with:** invented/altered phone, unknown resource ID, dismissed/inactive resource, stale information, and no-resource cases across generation, both refinements, chat, and PDF. All factual contacts must trace to approved source data. **Sources:** [lean output schema](/Users/willsanz/homelessness-project/src/lib/plan-generator/lean-plan-schema.ts), [resource context](/Users/willsanz/homelessness-project/src/lib/plan-generator/resource-context.ts).
 
-### [ ] CL-07 — Make offboarding deny access at the database boundary
+### [x] CL-07 — Make offboarding deny access at the database boundary
 
 **Type:** Fix + Verify · **Responsible:** engineering + pilot administrator.
 
@@ -192,6 +192,8 @@ Model output accepts arbitrary contact names, phones, and emails and maps them i
 **Fix:** define an auditable offboarding operation that removes effective access immediately, revokes sessions, and safely preserves/reassigns cases. Enforce the inactive-user condition or equivalent removal of effective permissions inside database authorization, not just navigation.
 
 **Close with:** retain a synthetic user's access token, offboard them, then prove direct reads/writes/RPCs fail for owned and assigned cases; cover admin downgrade, session refresh, reassignment, and audit history. **Source:** [family access policies](/Users/willsanz/homelessness-project/supabase/migrations/20260321120000_family_rls.sql:18).
+
+**Completed October 13, 2026 — engineering:** active-account state now gates family authorization, administrator authority, direct table operations, and non-family mutation RPCs. The protected `db:offboard-user` job atomically denies access, reassigns cases, revokes sessions/refresh tokens, and audits the operation; Auth sign-in is then disabled and a second session cleanup closes that interval. Historical creators remain unchanged. Partial Auth failures preserve database denial and provide retry instructions. Eleven targeted unit/rendered tests passed; the expanded database suite proved AAL2 admin downgrade/offboarding, unauthorized operator rejection, no self-reactivation, and audit-failure rollback. A new real local Auth/Data API test retained the same unexpired JWT through removal and proved owned/assigned reads, writes, RPCs, refresh, and sign-in are denied while the replacement keeps access; public signup also remains disabled. This test runs in CI. The rehearsal exposed and corrected the local email-provider setting that had disabled password login. Supabase's local security advisor reported no warnings after the existing timestamp trigger's search path was fixed. Correctness/security and separate Ponytail review completed; full verification is required on push. Hosted role/configuration evidence still belongs to CL-38/CL-41. Commit: `git log --grep='CL-07'`.
 
 ### [ ] CL-11 — Complete administrator MFA enrollment and challenge
 
@@ -298,6 +300,8 @@ New users receive an invitation before the role-provisioning RPC completes. If p
 **Close with:** first invite, existing active user, expired invite, failed role RPC after email creation, retry, duplicate operator requests, and wrong-role input tests with a synthetic mailbox. **Sources:** [invitation workflow](/Users/willsanz/homelessness-project/scripts/invite-user.ts), [provisioning safety](/Users/willsanz/homelessness-project/scripts/provisioning-safety.ts).
 
 ### [ ] CL-14 — Make auth callbacks and failures finish predictably
+
+**Related fix in CL-07:** real local Auth testing found that `auth.email.enable_signup=false` disabled the email provider. The provider is now enabled while top-level public signup remains disabled; both behaviors are tested. Callback/form work and hosted evidence below remain open.
 
 **Type:** Fix + Verify · **Responsible:** engineering.
 
