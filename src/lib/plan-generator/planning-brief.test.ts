@@ -1,0 +1,149 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildPlanningBrief, buildPlanningSnapshot, parsePlanningSnapshot } from "./planning-brief";
+import { startStagedLeanPlanGeneration, advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
+import { tryGenerateLeanPlanPhaseOpenAI } from "./openai-plan-lean-phase";
+import { createAiResponse } from "@/lib/ai/client";
+import { generatedPlanStep } from "../../../tests/fixtures/plan-contract";
+import type { FamilyDetail, PlanGenerationState, PlanStepRow } from "@/types/family";
+
+const mocks = vi.hoisted(() => ({ session: vi.fn(), detail: vi.fn(), prior: vi.fn() }));
+vi.mock("@/lib/auth/session", () => ({ requireAppUserWithClient: mocks.session }));
+vi.mock("@/lib/services/families", () => ({ getFamilyDetail: mocks.detail }));
+vi.mock("@/lib/plan-generator/prior-phase-summary", () => ({ fetchPriorPhasesSummaryForPlanner: mocks.prior }));
+vi.mock("@/lib/env", () => ({ getEnv: () => ({ OPENAI_API_KEY: "synthetic" }) }));
+vi.mock("@/lib/ai/client", () => ({ createAiResponse: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+const familyId = "20000000-0000-4000-8000-000000000002";
+const stamp = "2026-10-13T12:00:00Z";
+function fixture(): FamilyDetail {
+  return { id: familyId, name: "Family 014", summary: "Housing support", household_notes: null, urgency: "high", status: "active", created_by_id: "owner", created_at: stamp,
+    updated_at: stamp, creator: null, members: [], goals: [], barriers: [], resourceMatches: [], plan: null, caseNotes: [], progressUpdates: [] };
+}
+
+function stagedDatabase(initial?: PlanGenerationState) {
+  let state = initial;
+  const counts: Record<string, number> = { "30": 0, "60": 0, "90": 0 };
+  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+    if (name === "start_staged_plan_generation") {
+      state = structuredClone(args.p_generation_state as PlanGenerationState);
+      return { data: { planId: "plan-1", version: 1 }, error: null };
+    }
+    if (name === "append_staged_plan_phase" || name === "update_staged_plan_state") {
+      state = structuredClone(args.p_generation_state as PlanGenerationState);
+      if (name === "append_staged_plan_phase") counts[args.p_phase as string] = 1;
+    }
+    return { data: true, error: null };
+  });
+  const from = vi.fn((table: string) => {
+    let phase = "30";
+    const query = {
+      select: () => query, order: () => query, limit: () => query,
+      eq: (key: string, value: string) => { if (key === "phase") phase = value; return query; },
+      maybeSingle: async () => ({ data: table === "plans" ? { id: "plan-1", version: 1, created_at: stamp, generation_state: structuredClone(state), ai_model: null } : { sort_order: 0 }, error: null }),
+      then: (resolve: (value: unknown) => unknown) => Promise.resolve({ count: counts[phase], error: null }).then(resolve),
+    };
+    return query;
+  });
+  return { client: { rpc, from }, read: () => state };
+}
+
+describe("one durable planning snapshot", () => {
+  beforeEach(() => {
+    mocks.session.mockReset(); mocks.detail.mockReset().mockResolvedValue(fixture()); mocks.prior.mockReset().mockResolvedValue("");
+    vi.mocked(createAiResponse).mockReset().mockImplementation(async request => {
+      const phase = request.structuredJsonSchema!.name.slice(-2) as "30" | "60" | "90";
+      return { ok: true, model: "test", text: JSON.stringify({ steps: [{ ...generatedPlanStep, phase }] }) };
+    });
+  });
+
+  it("retains all instructions, long notes, and many barriers/goals without slicing the last constraint", () => {
+    const detail = fixture();
+    detail.summary = "Existing context. ".repeat(200);
+    detail.goals = Array.from({ length: 60 }, (_, i) => ({ id: `goal-${i}`, family_id: familyId, preset_key: null, label: `Goal ${i}`, sort_order: i, created_at: stamp }));
+    detail.barriers = detail.goals.map(g => ({ ...g, label: g.label.replace("Goal", "Barrier") }));
+    const instructions = `${"Use agreed priorities. ".repeat(100)}Do not contact the landlord.`;
+    const brief = JSON.parse(buildPlanningBrief(detail, instructions));
+    expect(brief.instructions).toBe(instructions);
+    expect(brief.summary).toBe(detail.summary);
+    expect(brief.barriers).toHaveLength(60); expect(brief.stated_goals).toHaveLength(60);
+  });
+
+  it("includes completed outcomes on regeneration and identifies older history omitted from context", () => {
+    const detail = fixture();
+    detail.plan = { id: "old-plan", version: 2, steps: [{ title: "Housing", description: "Intake", status: "completed", action_items: [{ title: "Finish intake", status: "completed", notes: "Reviewed", outcome: "Intake accepted", target_date: "2026-10-12" }] } as PlanStepRow] } as FamilyDetail["plan"];
+    detail.caseNotes = Array.from({ length: 8 }, (_, i) => ({ id: `note-${i}`, family_id: familyId, author_id: "owner", body: `Note ${i}`, created_at: `2026-10-${10 + i}T12:00:00Z`, author: null }));
+    const brief = JSON.parse(buildPlanningBrief(detail));
+    expect(brief.previous_plan.goals[0].actions[0]).toMatchObject({ status: "completed", outcome: "Intake accepted" });
+    expect(brief.recent_notes[0].text).toBe("Note 7");
+    expect(brief.history_limits.older_notes_omitted).toBe(3);
+  });
+
+  it("rejects oversized context instead of silently discarding it", () => {
+    const detail = fixture(); detail.household_notes = "x".repeat(80_000);
+    expect(() => buildPlanningBrief(detail, "Do not contact the landlord.")).toThrow("no instructions were discarded");
+  });
+
+  it("freezes resource recommendations and declares omitted matches without copying contact identifiers", () => {
+    const detail = fixture();
+    detail.resourceMatches = Array.from({ length: 8 }, (_, i) => ({ status: "suggested", score: 8 - i, match_reason: "Reason ".repeat(30), resource: { program_name: `Program ${i}`, category: "Housing", primary_contact_phone: "215-555-0100", primary_contact_email: "staff@example.test" } })) as FamilyDetail["resourceMatches"];
+    const snapshot = buildPlanningSnapshot(detail);
+    detail.resourceMatches[0].resource!.program_name = "Changed resource";
+    expect(snapshot.resources).toContain("Program 0");
+    expect(snapshot.resources).toContain("2 additional matches omitted");
+    expect(snapshot.resources).toContain("[shortened]");
+    expect(snapshot.resources).not.toContain("215-555");
+    expect(snapshot.resources).not.toContain("staff@example.test");
+    expect(snapshot.resources).not.toContain("Changed resource");
+  });
+
+  it("rejects missing, edited, or cross-family snapshots", () => {
+    const snapshot = buildPlanningSnapshot(fixture(), "Use agreed priorities", new Date(stamp));
+    expect(parsePlanningSnapshot(JSON.parse(JSON.stringify(snapshot)), familyId)).toEqual(snapshot);
+    for (const value of [null, {}, { ...snapshot, brief: "Changed" }, { ...snapshot, resources: "Changed" }, { ...snapshot, captured_at: "yesterday" }]) expect(parsePlanningSnapshot(value, familyId)).toBeNull();
+    expect(parsePlanningSnapshot(snapshot, "another-family")).toBeNull();
+  });
+
+  it("uses exactly the saved context after refresh and a concurrent family edit, across every stage", async () => {
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await startStagedLeanPlanGeneration({ familyId, regenerationFeedback: "Do not contact the landlord." })).toMatchObject({ ok: true });
+    const snapshot = structuredClone(db.read()!.input_snapshot!);
+    const changed = fixture(); changed.summary = "New instructions saved after generation began";
+    mocks.detail.mockResolvedValue(changed);
+    for (const phase of ["30", "60", "90"]) {
+      expect(await advanceStagedLeanPlanGeneration({ familyId })).toMatchObject({ ok: true, phaseCompleted: phase, done: phase === "90" });
+      expect(db.read()!.input_snapshot).toEqual(snapshot);
+    }
+    expect(mocks.detail).toHaveBeenCalledTimes(1);
+    expect(createAiResponse).toHaveBeenCalledTimes(3);
+    for (const [request] of vi.mocked(createAiResponse).mock.calls) {
+      expect(request.input).toContain(snapshot.brief);
+      expect(request.input).toContain(snapshot.revision);
+      expect(String(request.input).match(/Do not contact the landlord/g)).toHaveLength(1);
+      expect(request.input).not.toContain(changed.summary!);
+    }
+  });
+
+  it("fails old partial jobs before any provider call instead of replacing their context", async () => {
+    const db = stagedDatabase({ v: 1, status: "running", pending_phase: "60", planning_brief: "old", phases_complete: { "30": true, "60": false, "90": false }, models_used: [], stage_timings_ms: {} });
+    mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await advanceStagedLeanPlanGeneration({ familyId })).toMatchObject({ ok: false, error: expect.stringContaining("Generate a new draft") });
+    expect(db.read()!.status).toBe("failed"); expect(createAiResponse).not.toHaveBeenCalled();
+  });
+
+  it("blocks identifying current action outcomes before storing or sending a snapshot", async () => {
+    const detail = fixture();
+    detail.plan = { id: "old", version: 1, steps: [{ action_items: [{ title: "Finish intake", status: "completed", outcome: "Email private-person@example.test" }] } as PlanStepRow] } as FamilyDetail["plan"];
+    mocks.detail.mockResolvedValue(detail);
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await startStagedLeanPlanGeneration({ familyId })).toMatchObject({ ok: false });
+    expect(db.client.rpc).not.toHaveBeenCalled(); expect(createAiResponse).not.toHaveBeenCalled();
+  });
+
+  it("tells the model to respect completed outcomes and the snapshot's history limits", async () => {
+    await tryGenerateLeanPlanPhaseOpenAI(buildPlanningSnapshot(fixture()), "30");
+    const request = vi.mocked(createAiResponse).mock.calls[0][0];
+    expect(request.instructions).toContain("Do not restart them");
+    expect(request.instructions).toContain("history_limits");
+  });
+});

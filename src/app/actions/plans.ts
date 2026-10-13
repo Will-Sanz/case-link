@@ -11,7 +11,7 @@ import { MAX_PLAN_STEPS_PER_PHASE, previewRefinePlanStepsWithOpenAI } from "@/li
 import { sparseDetailsForPersistence, type LeanPlanPhaseStep } from "@/lib/plan-generator/lean-plan-schema";
 import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-phase-summary";
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
-import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
+import { buildPlanningSnapshot, parsePlanningSnapshot } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
 import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
@@ -309,13 +309,23 @@ export async function startStagedLeanPlanGeneration(input: {
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
-  const brief = buildPlanningBrief(detail, input.regenerationFeedback);
+  let snapshot;
+  try {
+    snapshot = buildPlanningSnapshot(detail, input.regenerationFeedback);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not prepare the planning context." };
+  }
+  const snapshotPrivacy = validateNoPii([
+    { field: "planningSnapshot", label: "Planning context", value: snapshot.brief },
+    { field: "planningResources", label: "Resource context", value: snapshot.resources },
+  ]);
+  if (!snapshotPrivacy.ok) return { ok: false, error: snapshotPrivacy.error ?? "Remove identifying text before continuing." };
   const stagedMode = parseAiMode(input.aiMode);
   const generationState = {
     v: 1,
     status: "running",
     pending_phase: "30",
-    planning_brief: brief,
+    input_snapshot: snapshot,
     phases_complete: { "30": false, "60": false, "90": false },
     models_used: [],
     stage_timings_ms: {},
@@ -394,6 +404,16 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   }
   const planId = activePlan.id as string;
   let state = { ...rawState };
+  const snapshot = parsePlanningSnapshot(state.input_snapshot, input.familyId);
+  if (!snapshot) {
+    const error = "This draft has no valid saved planning context. Generate a new draft to restart safely.";
+    await updateStagedPlanState(supabase, {
+      familyId: input.familyId, planId, generationState: { ...state, status: "failed", error },
+      aiModel: activePlan.ai_model as string | null,
+      event: "plan.generation_failed", eventDetails: { category: "missing_context" },
+    });
+    return { ok: false, error };
+  }
 
   if (state.status === "failed") {
     const n30 = await countStepsInPhase(supabase, planId, "30");
@@ -446,16 +466,9 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     });
   }
   const generationMode = parseAiMode(state.ai_mode ?? input.aiMode);
-  const detail = await getFamilyDetail(supabase, input.familyId);
-  if (!detail) {
-    return { ok: false, error: "Family not found" };
-  }
-  const privacy = validateFamilyNoPii(detail, [
-    {
-      field: "planningBrief",
-      label: "Plan context",
-      value: state.planning_brief,
-    },
+  const privacy = validateNoPii([
+    { field: "planningSnapshot", label: "Planning context", value: snapshot.brief },
+    { field: "planningResources", label: "Resource context", value: snapshot.resources },
   ]);
   if (!privacy.ok) {
     const failedState: PlanGenerationState = {
@@ -511,8 +524,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     }
 
     const t = Date.now();
-    const res = await tryGenerateLeanPlanPhaseOpenAI(detail, "30", {
-      regenerationFeedback: state.planning_brief,
+    const res = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", {
       retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       requestMeta: { route: "stagedPlanPhase30" },
@@ -575,8 +587,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
 
     const priorFor60 = await fetchPriorPhasesSummaryForPlanner(supabase, planId, ["30"]);
     const t = Date.now();
-    const res = await tryGenerateLeanPlanPhaseOpenAI(detail, "60", {
-      regenerationFeedback: state.planning_brief,
+    const res = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "60", {
       retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor60 || undefined,
@@ -643,8 +654,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
 
     const priorFor90 = await fetchPriorPhasesSummaryForPlanner(supabase, planId, ["30", "60"]);
     const t = Date.now();
-    const res = await tryGenerateLeanPlanPhaseOpenAI(detail, "90", {
-      regenerationFeedback: state.planning_brief,
+    const res = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "90", {
       retries: generationMode === "fast" ? 1 : 2,
       aiMode: generationMode,
       priorPhasesSummary: priorFor90 || undefined,

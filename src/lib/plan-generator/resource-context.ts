@@ -29,11 +29,12 @@ export function formatMatchesForPlannerPrompt(
   }
   const lines = rows.map((m, i) => {
     const r = m.resource!;
-    const contact = [r.primary_contact_phone, r.primary_contact_email].filter(Boolean).join(" · ");
-    const why = m.match_reason.trim().slice(0, 140);
-    return `${i + 1}. ${r.program_name} (${r.office_or_department || r.category || "service"})${contact ? `, ${contact}` : ""}, ${why}`;
+    const reason = m.match_reason.trim();
+    const why = reason.length > 140 ? `${reason.slice(0, 140)}… [shortened]` : reason;
+    return `${i + 1}. ${r.program_name} (${r.office_or_department || r.category || "service"}), ${why}`;
   });
-  return `MATCHED_RESOURCES (reference, cite when clearly relevant; generic case-management steps are OK):\n${lines.join("\n")}`;
+  const omitted = matchesForPlanContext(matches, matches.length).length - rows.length;
+  return `MATCHED_RESOURCES (reference, generic steps are OK; ${omitted} additional matches omitted; contact details are not included):\n${lines.join("\n")}`;
 }
 
 export function formatMatchesForAiPrompt(

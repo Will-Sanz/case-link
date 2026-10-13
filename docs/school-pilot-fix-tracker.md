@@ -425,7 +425,7 @@ The assistant claims live context about blockers and progress but primarily rece
 
 **Evidence:** 14 focused tests passed for overdue/completed/withdrawn/Waiting work, conflicting old notes and newer outcomes, no plan, bounded large cases with explicit omissions, local-date rollover, private text in newly included fields, inaccessible families, and expired sessions. Typecheck/lint and normal correctness/security/privacy plus separate Ponytail reviews completed. Full verification runs before push. These tests prove context fidelity; live answer quality and case-manager acceptance remain CL-34, while full provider-payload provenance and source-backed contacts remain CL-18/CL-06. Commit: `git log --grep='CL-22'`.
 
-### [ ] CL-23 — Preserve important instructions and one consistent generation context
+### [x] CL-23 — Preserve important instructions and one consistent generation context
 
 **Type:** Reproduced + Fix · **Responsible:** engineering.
 
@@ -434,6 +434,10 @@ The planning brief places extra feedback after existing notes and slices the com
 **Fix:** preserve explicit new instructions and critical constraints; bound context deliberately and surface material omissions. Generate all stages from an identified case revision/snapshot, or explicitly invalidate/restart when relevant inputs change. Include appropriate recent outcomes when regenerating.
 
 **Close with:** long notes plus final critical instruction, many barriers/goals, refresh between phases, case edit during generation, and regeneration after completed work. No silent omission of the requested change. **Sources:** [planning brief](/Users/willsanz/homelessness-project/src/lib/plan-generator/planning-brief.ts), [staged actions](/Users/willsanz/homelessness-project/src/app/actions/plans.ts:547).
+
+**Completed October 13, 2026 — engineering:** all three stages use one persisted, family-bound, hashed snapshot of the planning brief and resource recommendations. Refreshes and concurrent case edits cannot rebuild or duplicate the context. New instructions, all barriers/goals, and current action status/outcomes are retained in full; oversized context fails clearly before starting. Five recent notes/meetings are included with explicit older-history counts. Resource recommendations identify omitted matches/shortened explanations; contact identifiers are excluded from the frozen narrative. Missing or damaged legacy snapshots require a fresh draft. The plan view explains the saved-context boundary and history limit.
+
+**Evidence:** focused tests cover long notes plus a final restriction, many barriers/goals, completed outcomes, history/resource limits, oversized/mutated/cross-family snapshots, private action outcomes, and the real start/advance action flow through all three model requests with a concurrent case edit. The local database security suite verifies the exact snapshot survives transactional phase persistence. Normal correctness/security/privacy and separate Ponytail reviews completed; full verification runs before push. Directory grounding and live usefulness remain CL-06/CL-34. Commit: `git log --grep='CL-23'`.
 
 ### [x] CL-24 — Bound chat history before validation
 

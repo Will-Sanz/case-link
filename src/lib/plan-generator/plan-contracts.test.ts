@@ -5,11 +5,11 @@ import { OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA, planRefineLeanResponseSchema } fr
 import { tryGenerateLeanPlanPhaseOpenAI } from "./openai-plan-lean-phase";
 import { updatePlanStepActionItemSchema } from "@/lib/validations/plans";
 import { createAiResponse } from "@/lib/ai/client";
-import type { FamilyDetail } from "@/types/family";
+import type { PlanGenerationSnapshot } from "@/types/family";
 
 vi.mock("@/lib/ai/client", () => ({ createAiResponse: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getEnv: () => ({}) }));
-const detail = { summary: null, household_notes: null, goals: [], barriers: [], resourceMatches: [] } as unknown as FamilyDetail;
+const snapshot: PlanGenerationSnapshot = { family_id: "synthetic", captured_at: "2026-10-13T12:00:00Z", revision: "a".repeat(64), brief: "Synthetic context", resources: "None" };
 
 describe("plan output contracts", () => {
   beforeEach(() => vi.mocked(createAiResponse).mockReset());
@@ -17,7 +17,7 @@ describe("plan output contracts", () => {
   it.each(["30", "60", "90"] as const)("enforces the same complete phase %s contract in the provider and parser", async phase => {
     const step = { ...generatedPlanStep, phase };
     vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [step] }) });
-    expect(await tryGenerateLeanPlanPhaseOpenAI(detail, phase, { retries: 1 })).toMatchObject({ ok: true, steps: [step] });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, phase, { retries: 1 })).toMatchObject({ ok: true, steps: [step] });
     expect(vi.mocked(createAiResponse).mock.calls[0][0].structuredJsonSchema).toEqual({ name: `lean_plan_phase_${phase}`, schema: buildLeanPhaseRootJsonSchema(phase), strict: true });
     expect(sparseDetailsForPersistence(step)).toMatchObject({ owner: "case_manager", stage_goal: step.goal, required_documents: [], contacts: [] });
   });
@@ -31,7 +31,7 @@ describe("plan output contracts", () => {
     if (kind === "impossible date" || kind === "null date") step.action_items = [{ ...generatedPlanStep.action_items[0], target_date: kind === "null date" ? null : "2026-02-30" }];
     if (kind === "unknown contact field") step.contacts = [{ name: "Intake desk", phone: null, email: null, notes: null, trusted: true }];
     vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [step] }) });
-    expect(await tryGenerateLeanPlanPhaseOpenAI(detail, "30", { retries: 1 })).toMatchObject({ ok: false });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", { retries: 1 })).toMatchObject({ ok: false });
   });
 
   it("requires all refinement fields, rejects progress fields, and preserves explicit null lists", () => {
@@ -61,7 +61,7 @@ describe("plan output contracts", () => {
 
   it("does not retry provider schema rejection as a weaker contract", async () => {
     vi.mocked(createAiResponse).mockResolvedValue({ ok: false, code: "provider_error", error: "Schema unsupported" });
-    expect(await tryGenerateLeanPlanPhaseOpenAI(detail, "30")).toMatchObject({ ok: false });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30")).toMatchObject({ ok: false });
     expect(createAiResponse).toHaveBeenCalledTimes(1);
   });
 });

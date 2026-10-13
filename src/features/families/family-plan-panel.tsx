@@ -1298,6 +1298,13 @@ export function FamilyPlanPanel({
         </section>
       ) : null}
 
+      {plan?.generation_state?.input_snapshot ? (
+        <p className="text-xs leading-5 text-[var(--color-ink-muted)]">
+          This draft uses the case information saved when drafting began, including the five most recent notes and meetings.
+          Later case changes need a new draft or a manual edit. Check the draft against the current case before approving it.
+        </p>
+      ) : null}
+
       {plan?.generation_state?.status === "failed" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <p className="font-semibold">

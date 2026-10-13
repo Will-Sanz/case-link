@@ -862,7 +862,11 @@ async function run() {
     v: 1,
     status: "running",
     pending_phase: "30",
-    planning_brief: "Housing support and benefits navigation",
+    input_snapshot: {
+      family_id: familyB, captured_at: "2026-10-13T12:00:00Z", revision: "a".repeat(64),
+      brief: JSON.stringify({ instructions: "Do not contact the landlord.", summary: "Housing support and benefits navigation" }),
+      resources: "None matched",
+    },
     phases_complete: { "30": false, "60": false, "90": false },
     models_used: [],
     stage_timings_ms: {},
@@ -931,6 +935,8 @@ async function run() {
     [familyB, stagedPlanId, JSON.stringify(validPhase), JSON.stringify(nextGenerationState)],
   ));
   assert.equal(appended.rows[0].append_staged_plan_phase, true);
+  const savedGenerationSnapshot = await admin.query("select generation_state->'input_snapshot' as snapshot from public.plans where id = $1", [stagedPlanId]);
+  assert.deepEqual(savedGenerationSnapshot.rows[0].snapshot, initialGenerationState.input_snapshot, "phase append preserves the exact saved planning snapshot");
   const committedPhase = await admin.query(
     `select
        (select count(*)::int from public.plan_steps where plan_id = $1 and phase = '30') as steps,

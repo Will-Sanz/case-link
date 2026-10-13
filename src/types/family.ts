@@ -234,12 +234,22 @@ export type PlanClientDisplay = {
   reviewedRevision?: string;
 };
 
+export type PlanGenerationSnapshot = {
+  family_id: string;
+  captured_at: string;
+  revision: string;
+  brief: string;
+  resources: string;
+};
+
 /** Staged lean generation progress (plans.generation_state JSONB). */
 export type PlanGenerationState = {
   v: 1;
   status: "running" | "complete" | "failed";
   pending_phase: "30" | "60" | "90" | null;
-  planning_brief: string;
+  /** Legacy rows need a fresh generation run; never mix their partial context with current data. */
+  planning_brief?: string;
+  input_snapshot?: PlanGenerationSnapshot;
   phases_complete: { "30": boolean; "60": boolean; "90": boolean };
   models_used: string[];
   stage_timings_ms: Partial<Record<"30" | "60" | "90", number>>;
