@@ -129,7 +129,9 @@ The privacy page and operating runbook permit de-identified casework, not identi
 
 **Close with:** school-approved data examples and training; tests covering identifier variations and legitimate resource facts; an approved retention/access/vendor record if identifiable information will be allowed. **Sources:** [privacy guard](/Users/willsanz/homelessness-project/src/lib/privacy/no-pii.ts), [privacy page](/Users/willsanz/homelessness-project/src/app/privacy/page.tsx), [runbook](/Users/willsanz/homelessness-project/docs/production-operations-runbook.md).
 
-### [ ] CL-02 — Resolve production dependency advisories
+### [x] CL-02 — Resolve production dependency advisories
+
+**Completed October 13, 2026 (Codex; correctness/security and Ponytail review):** Next/ESLint config 16.3.8, sharp 0.35.5, nanoid 3.3.20, and source-map-js 1.2.2. Production audit reports zero vulnerabilities. Full verification passed (37 files / 113 tests, including real PDF rendering). Node 24 production smoke: health and login 200, anonymous family access redirects to login, image optimizer 200. Hosted project uses Node 24.x. Authenticated end-to-end proof remains tracked in CL-08. Development-tool advisories still exist and must be assessed as part of the release tooling review; they are outside this production-only audit result. Commit: `git log --grep='CL-02'`.
 
 **Type:** Reproduced · **Responsible:** engineering.
 
