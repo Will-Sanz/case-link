@@ -1,3 +1,4 @@
+import { actionTargetDate } from "@/lib/domain/plan/action-state";
 import type {
   FamilyWithCurrentStep,
   PlanStepActionItemRow,
@@ -37,7 +38,7 @@ export function selectNextFamilyWork(
   );
 
   actionCandidates.sort((a, b) => {
-    const dateOrder = compareOptionalDates(a.action.target_date, b.action.target_date);
+    const dateOrder = compareOptionalDates(actionTargetDate(a.action), actionTargetDate(b.action));
     if (dateOrder !== 0) return dateOrder;
     if (a.step.sort_order !== b.step.sort_order) {
       return a.step.sort_order - b.step.sort_order;
@@ -53,7 +54,7 @@ export function selectNextFamilyWork(
       title: step.title,
       phase: step.phase,
       status: action.status,
-      due_date: action.target_date,
+      due_date: actionTargetDate(action),
       action_needed_now: action.title,
       is_blocked: action.status === "blocked" || step.status === "blocked",
       is_escalated: Boolean(step.workflow_data?.needs_escalation),
@@ -61,7 +62,7 @@ export function selectNextFamilyWork(
   }
 
   const nextStep = steps
-    .filter((step) => OPEN_STATUSES.has(step.status))
+    .filter((step) => OPEN_STATUSES.has(step.status) && !step.action_items?.length)
     .toSorted((a, b) => {
       const dateOrder = compareOptionalDates(a.due_date, b.due_date);
       return dateOrder !== 0 ? dateOrder : a.sort_order - b.sort_order;

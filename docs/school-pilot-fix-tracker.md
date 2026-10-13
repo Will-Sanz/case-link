@@ -411,7 +411,7 @@ Current lean generation/refinement calls explicitly use `strict: false`, and han
 
 **Evidence:** focused tests cover missing/extra fields, explicit nulls, whitespace, length/count/week boundaries, leap days, invalid dates, wrong phases, protected fields, IDs, unsupported schemas, and failure without fallback. The opt-in `npm run test:ai-contracts -- --live` checks all three phase contracts and refinement against both allowed models using synthetic examples, `store: false`, and metadata-only output. All eight final live checks passed; see [contract evidence](verification/2026-10-13-ai-schema-contracts.json). Normal correctness/security/privacy and separate Ponytail reviews completed; full verification runs before push. Contract validity is not factual correctness: contact grounding and complete outbound provenance remain CL-06/CL-18, and school usefulness remains CL-34. Commit: `git log --grep='CL-21'`.
 
-### [ ] CL-22 — Give the assistant the progress it claims to know
+### [x] CL-22 — Give the assistant the progress it claims to know
 
 **Type:** Fix · **Responsible:** engineering + case-manager reviewer.
 
@@ -420,6 +420,10 @@ The assistant claims live context about blockers and progress but primarily rece
 **Fix:** build bounded, authorized context from the same next-work/date/status rules used by the workspace, plus relevant recent progress. Distinguish missing information from known facts; keep source references to actions/resources and make context limits clear.
 
 **Close with:** overdue task, completed task, waiting follow-up, updated meeting outcome, conflicting older notes, no plan, and inaccessible-family fixtures. Answers should reflect the latest approved case state. **Sources:** [assistant context](/Users/willsanz/homelessness-project/src/lib/case-assistant/ai-case-assistant.ts:13), [existing next-work logic](/Users/willsanz/homelessness-project/src/lib/domain/family-workspace/next-work.ts).
+
+**Completed October 13, 2026 — engineering:** the assistant now receives a bounded snapshot of the current plan/review state, goal responsibility, action IDs/titles, exact dates, status, notes, outcomes, and dated recent meetings and notes. It uses the workspace next-work selector; Waiting uses its follow-up date, completed/withdrawn work is not resurrected from an older open parent, and overdue evaluation uses the school's Philadelphia date. Prompts distinguish current state from historical observations and chat, require honest unknowns/conflict handling, and declare omitted records/shortened text. Account/author identifiers are omitted; newly included narrative is checked before provider access.
+
+**Evidence:** 14 focused tests passed for overdue/completed/withdrawn/Waiting work, conflicting old notes and newer outcomes, no plan, bounded large cases with explicit omissions, local-date rollover, private text in newly included fields, inaccessible families, and expired sessions. Typecheck/lint and normal correctness/security/privacy plus separate Ponytail reviews completed. Full verification runs before push. These tests prove context fidelity; live answer quality and case-manager acceptance remain CL-34, while full provider-payload provenance and source-backed contacts remain CL-18/CL-06. Commit: `git log --grep='CL-22'`.
 
 ### [ ] CL-23 — Preserve important instructions and one consistent generation context
 
