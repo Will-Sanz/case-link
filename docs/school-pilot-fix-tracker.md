@@ -339,7 +339,9 @@ The four tests in `scripts/provisioning-safety.test.ts` are outside Vitest's `sr
 
 **Close with:** CI output explicitly includes these tests; a deliberately invalid production/test provisioning input fails. **Sources:** [tests](/Users/willsanz/homelessness-project/scripts/provisioning-safety.test.ts), [test discovery](/Users/willsanz/homelessness-project/vitest.config.mts), [CI](/Users/willsanz/homelessness-project/.github/workflows/ci.yml).
 
-### [ ] CL-19 — Handle AI terminal states before accepting text
+### [x] CL-19 — Handle AI terminal states before accepting text
+
+**Completed October 13, 2026 (Codex; correctness/privacy and Ponytail review):** shared AI client accepts only completed, non-refused, nonempty results. Both API paths validate response structure; incomplete/refused/provider/malformed/timeout/network failures remain errors, preserve safe categories and retry timing, and never return partial prose. Provider error bodies are not exposed or logged. No automatic retry was added. Of 27 contract tests, 22 failed before the fix; all pass afterward, along with typecheck/lint. Every AI caller uses this shared boundary. Full verification runs on push. Commit: `git log --grep='CL-19'`.
 
 **Type:** Reproduced · **Responsible:** engineering.
 

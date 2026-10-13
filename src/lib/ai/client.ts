@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
@@ -72,7 +73,7 @@ export type CreateResponseOptions = {
 
 export type CreateResponseResult =
   | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
-  | { ok: false; error: string; code?: "rate_limited"; retryAfter?: number };
+  | { ok: false; error: string; code?: "rate_limited" | "incomplete" | "refused" | "provider_error" | "invalid_response" | "timeout" | "network_error"; retryAfter?: number };
 
 function summarizeInput(input: string | ChatMessage[]): { chars: number } {
   if (typeof input === "string") {
@@ -227,8 +228,8 @@ export async function createAiResponse(
       rawResult.ok ?
         rawResult
       : {
-          ok: false,
-          error: exposeAiErrorToClient(rawResult.error, envDebug),
+          ...rawResult,
+          error: rawResult.code ? rawResult.error : exposeAiErrorToClient(rawResult.error, envDebug),
         };
 
     if (!rawResult.ok && debug) {
@@ -257,22 +258,60 @@ export async function createAiResponse(
     if (isAbortOrTimeoutError(e)) {
       const internal = `OpenAI request timed out after ${OPENAI_FETCH_TIMEOUT_MS / 1000}s`;
       if (debug) console.info(`[ai] task=${options.taskType} model=${model} error=`, internal);
-      const out = { ok: false as const, error: exposeAiErrorToClient(internal, envDebug) };
+      const out = { ok: false as const, code: "timeout" as const, error: "The AI request timed out. Your saved work is unchanged. Try again." };
       if (meta) {
         logOpenAiUsage(meta, options.taskType, model, { ok: false, error: internal }, Date.now() - startedAt);
       }
       return out;
     }
-    const internal = e instanceof Error ? e.message : "Request failed";
+    const code = e instanceof SyntaxError ? "invalid_response" as const : "network_error" as const;
+    const internal = "The AI service could not complete this request. Your saved work is unchanged. Try again.";
     if (debug) {
       console.info(`[ai] task=${options.taskType} model=${model} error=`, internal);
     }
-    const out = { ok: false as const, error: exposeAiErrorToClient(internal, envDebug) };
+    const out = { ok: false as const, code, error: internal };
     if (meta) {
       logOpenAiUsage(meta, options.taskType, model, { ok: false, error: internal }, Date.now() - startedAt);
     }
     return out;
   }
+}
+
+const usageSchema = z.object({ total_tokens: z.number().int().nonnegative().optional() }).optional();
+const responsesBodySchema = z.object({
+  status: z.string(),
+  error: z.unknown().optional(),
+  output: z.array(z.object({
+    type: z.string(),
+    status: z.string().optional(),
+    text: z.string().optional(),
+    content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional(),
+  })),
+  usage: usageSchema,
+});
+const chatBodySchema = z.object({
+  choices: z.array(z.object({
+    finish_reason: z.string().nullable(),
+    message: z.object({ content: z.string().nullish(), refusal: z.string().nullish() }),
+  })).min(1),
+  usage: usageSchema,
+});
+
+function invalidResponse(): CreateResponseResult {
+  return { ok: false, code: "invalid_response", error: "The AI returned an unusable answer. Your saved work is unchanged. Try again." };
+}
+
+function providerHttpError(response: Response): CreateResponseResult {
+  // Provider error bodies can echo case input; never expose or log them.
+  void response.body?.cancel().catch(() => {});
+  if (response.status === 429) {
+    const header = response.headers.get("retry-after");
+    const seconds = header && /^\d+(?:\.\d+)?$/.test(header) ? Number(header)
+      : header ? (Date.parse(header) - Date.now()) / 1000 : 60;
+    const retryAfter = Number.isFinite(seconds) ? Math.max(1, Math.ceil(seconds)) : 60;
+    return { ok: false, code: "rate_limited", retryAfter, error: `The AI service is busy. Try again in ${retryAfter} seconds.` };
+  }
+  return { ok: false, code: "provider_error", error: "The AI service could not complete this request. Try again." };
 }
 
 async function callResponsesApi(
@@ -344,21 +383,20 @@ async function callResponsesApi(
     signal: openAiAbortSignal(),
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    if (debug) console.info("[ai] Responses API error", res.status, errText.slice(0, 300));
-    return { ok: false, error: `API ${res.status}: ${errText.slice(0, 100)}` };
+  if (!res.ok) return providerHttpError(res);
+
+  const parsed = responsesBodySchema.safeParse(await res.json());
+  if (!parsed.success) return invalidResponse();
+  const data = parsed.data;
+  if (data.error) return { ok: false, code: "provider_error", error: "The AI service could not complete this request. Try again." };
+  if (data.output.some((item) => item.content?.some((part) => part.type === "refusal"))) {
+    return { ok: false, code: "refused", error: "The AI could not help with that request. Reword it or edit the plan yourself." };
   }
-
-  const data = (await res.json()) as {
-    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
-    usage?: { total_tokens?: number };
-  };
-
+  if (data.status !== "completed" || data.output.some((item) => item.status && item.status !== "completed")) {
+    return { ok: false, code: "incomplete", error: "The AI answer was incomplete and was not applied. Try a shorter request." };
+  }
   const text = extractOutputText(data);
-  if (text === null) {
-    return { ok: false, error: "Empty response" };
-  }
+  if (!text?.trim()) return invalidResponse();
 
   if (debug) {
     console.info(`[ai] Responses task=${options.taskType} model=${model} tokens=`, data.usage?.total_tokens);
@@ -447,21 +485,20 @@ async function callChatCompletionsApi(
     signal: openAiAbortSignal(),
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    if (debug) console.info("[ai] Chat error", res.status, errText.slice(0, 300));
-    return { ok: false, error: `API ${res.status}: ${errText.slice(0, 100)}` };
-  }
+  if (!res.ok) return providerHttpError(res);
 
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string | null } }[];
-    usage?: { total_tokens?: number };
-  };
-
-  const raw = data.choices?.[0]?.message?.content;
-  if (!raw || typeof raw !== "string") {
-    return { ok: false, error: "Empty response" };
+  const parsed = chatBodySchema.safeParse(await res.json());
+  if (!parsed.success) return invalidResponse();
+  const data = parsed.data;
+  const choice = data.choices[0];
+  if (choice.message.refusal) {
+    return { ok: false, code: "refused", error: "The AI could not help with that request. Reword it or edit the plan yourself." };
   }
+  if (choice.finish_reason !== "stop") {
+    return { ok: false, code: "incomplete", error: "The AI answer was incomplete and was not applied. Try a shorter request." };
+  }
+  const raw = choice.message.content;
+  if (!raw?.trim()) return invalidResponse();
 
   if (debug) {
     console.info(`[ai] Chat task=${options.taskType} model=${model} tokens=`, data.usage?.total_tokens);
