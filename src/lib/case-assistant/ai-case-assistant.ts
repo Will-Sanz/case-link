@@ -8,6 +8,7 @@ import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
 import type { FamilyDetail } from "@/types/family";
 import { createAiResponse } from "@/lib/ai/client";
 import { formatMatchesForAiPrompt } from "@/lib/plan-generator/resource-context";
+import { recentConversation } from "./conversation-history";
 
 function buildCaseContext(detail: FamilyDetail): string {
   const plan = detail.plan;
@@ -56,18 +57,13 @@ function buildCaseContext(detail: FamilyDetail): string {
   return lines.join("\n");
 }
 
-const MAX_PRIOR_HISTORY_CHARS = 12_000;
-
 function formatPriorConversation(history: CaseAssistantHistoryItem[]): string {
   if (!history.length) return "";
-  const blocks = history.map((m) => {
+  const blocks = recentConversation(history).map((m) => {
     const label = m.role === "user" ? "Case manager" : "Assistant";
     return `${label}:\n${m.content.trim()}`;
   });
-  let text = blocks.join("\n\n---\n\n");
-  if (text.length > MAX_PRIOR_HISTORY_CHARS) {
-    text = `…\n\n${text.slice(-MAX_PRIOR_HISTORY_CHARS)}`;
-  }
+  const text = blocks.join("\n\n---\n\n");
   return `## Prior messages in this session\n\n${text}\n\n`;
 }
 

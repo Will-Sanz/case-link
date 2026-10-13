@@ -393,7 +393,9 @@ The planning brief places extra feedback after existing notes and slices the com
 
 **Close with:** long notes plus final critical instruction, many barriers/goals, refresh between phases, case edit during generation, and regeneration after completed work. No silent omission of the requested change. **Sources:** [planning brief](/Users/willsanz/homelessness-project/src/lib/plan-generator/planning-brief.ts), [staged actions](/Users/willsanz/homelessness-project/src/app/actions/plans.ts:547).
 
-### [ ] CL-24 — Bound chat history before validation
+### [x] CL-24 — Bound chat history before validation
+
+**Completed October 13, 2026 (Codex; correctness/accessibility and Ponytail review):** client and provider formatting use complete recent exchanges, bounded by 40 messages / 12,000 content characters. The server separately enforces text size and alternating roles; the UI shows its 4,000-character question limit and explains limited history. Visible history is capped at 100 messages. Seven tests cover 0/40/42/100 messages, overlong text, incomplete exchanges, and a rendered 23-exchange conversation with a successful follow-up. Typecheck/lint pass; full verification runs on push. Commit: `git log --grep='CL-24'`.
 
 **Type:** Reproduced · **Responsible:** engineering.
 

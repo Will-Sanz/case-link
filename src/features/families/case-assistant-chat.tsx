@@ -10,7 +10,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import { SendDiagonal, Spark } from "iconoir-react";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
-import type { CaseAssistantHistoryItem } from "@/types/case-assistant";
+import { recentConversation, MAX_QUESTION_CHARS, MAX_VISIBLE_MESSAGES } from "@/lib/case-assistant/conversation-history";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
@@ -129,25 +129,22 @@ export function CaseAssistantChat({
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
 
-  function historyForApi(beforeUserMessage: ChatMessage[]): CaseAssistantHistoryItem[] {
-    return beforeUserMessage.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-  }
-
   function submitFromInput() {
     const q = draft.trim();
     if (!q) {
       setError("Add a message to send.");
       return;
     }
+    if (q.length > MAX_QUESTION_CHARS) {
+      setError(`Keep your message within ${MAX_QUESTION_CHARS.toLocaleString()} characters.`);
+      return;
+    }
     if (pending) return;
     setError(null);
     const userMsg: ChatMessage = { id: newId(), role: "user", content: q };
-    const prior = historyForApi(messages);
+    const prior = recentConversation(messages);
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev.slice(-(MAX_VISIBLE_MESSAGES - 2)), userMsg]);
     setDraft("");
 
     startTransition(async () => {
@@ -302,6 +299,8 @@ export function CaseAssistantChat({
             <textarea
               ref={textareaRef}
               rows={2}
+              maxLength={MAX_QUESTION_CHARS}
+              aria-describedby="assistant-message-limit"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onKeyDown}
@@ -310,6 +309,9 @@ export function CaseAssistantChat({
               className="max-h-40 min-h-[3rem] w-full resize-y border-0 bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:outline-none focus:ring-0 disabled:opacity-60"
             />
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-rule)] px-2 py-2">
+              <span id="assistant-message-limit" className="w-full text-xs text-[var(--color-ink-muted)]">
+                {draft.length.toLocaleString()} / {MAX_QUESTION_CHARS.toLocaleString()} characters. Only recent complete exchanges are included in follow-ups; restate older details when needed.
+              </span>
               <span className="mr-auto hidden text-[10px] text-[var(--color-ink-faint)] sm:inline">
                 Enter to send · Shift+Enter new line
               </span>
