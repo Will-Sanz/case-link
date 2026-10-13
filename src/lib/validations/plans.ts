@@ -109,7 +109,7 @@ export const markPlanReviewedSchema = z.object({
 export const updatePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
-  expectedUpdatedAt: z.string().datetime().optional(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
@@ -161,7 +161,7 @@ export const toggleChecklistItemSchema = z.object({
 export const updatePlanStepActionItemSchema = z.object({
   actionItemId: z.string().uuid(),
   familyId: z.string().uuid(),
-  expectedUpdatedAt: z.string().datetime().optional(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(4000).nullable().optional(),

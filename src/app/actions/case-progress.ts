@@ -13,7 +13,7 @@ const dateOnlySchema = z
 
 const progressChangeSchema = z.object({
   actionItemId: z.string().uuid(),
-  expectedUpdatedAt: z.string().datetime(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   targetDate: dateOnlySchema.nullable(),
   followUpDate: dateOnlySchema.nullable(),

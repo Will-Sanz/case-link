@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Client, Pool, type PoolClient } from "pg";
+import { updatePlanStepSchema, updatePlanStepActionItemSchema } from "../src/lib/validations/plans";
 
 const databaseUrl = process.env.CASELINK_DB_SECURITY_TEST_URL
   ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
@@ -133,6 +134,27 @@ async function setup() {
 
 async function run() {
   await setup();
+
+  // PostgREST uses PostgreSQL's JSON timestamp representation, including microseconds and offsets.
+  for (const [table, id, schema, idField] of [
+    ["plan_steps", stepA, updatePlanStepSchema, "stepId"],
+    ["plan_step_action_items", actionA, updatePlanStepActionItemSchema, "actionItemId"],
+  ] as const) {
+    const revision = await admin.query<{ value: string }>(
+      `select to_jsonb(t)->>'updated_at' as value from public.${table} t where id = $1`, [id],
+    );
+    const value = revision.rows[0].value;
+    assert.equal(schema.safeParse({ familyId: familyA, [idField]: id, expectedUpdatedAt: value }).success, true);
+    const equivalent = value.replace(/\+00:00$/, "Z");
+    const saved = await asUser(userA, (client) => client.query(
+      `update public.${table} set title = title where id = $1 and updated_at = $2::timestamptz returning id`, [id, equivalent],
+    ));
+    assert.equal(saved.rowCount, 1, "equivalent timezone notation must match the same revision");
+    const stale = await asUser(userA, (client) => client.query(
+      `update public.${table} set title = title where id = $1 and updated_at = $2::timestamptz returning id`, [id, value],
+    ));
+    assert.equal(stale.rowCount, 0, "a stale revision cannot overwrite the saved row");
+  }
 
   await asUser(userA, (client) => client.query("select public.ensure_app_user()"));
   await expectDbError(

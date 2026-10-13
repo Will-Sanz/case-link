@@ -1200,37 +1200,6 @@ export async function updatePlanStep(
     return { ok: false, error: "Plan not found" };
   }
 
-  if (expectedUpdatedAt) {
-    const { data: currentStep } = await supabase
-      .from("plan_steps")
-      .select("title, description, status, phase, priority, details, workflow_data, updated_at")
-      .eq("id", stepId)
-      .eq("plan_id", planRow.id)
-      .maybeSingle();
-    if (!currentStep) return { ok: false, error: "Action not found" };
-    if (currentStep.updated_at !== expectedUpdatedAt) {
-      return {
-        ok: false,
-        error:
-          "This action changed in another tab. Compare both versions before choosing which one to keep.",
-        conflict: {
-          kind: "step",
-          entityId: stepId,
-          currentUpdatedAt: currentStep.updated_at,
-          current: {
-            title: currentStep.title,
-            description: currentStep.description,
-            status: currentStep.status,
-            phase: currentStep.phase,
-            priority: currentStep.priority,
-            details: currentStep.details as PlanStepDetails | null,
-            workflow_data: currentStep.workflow_data as PlanStepRow["workflow_data"],
-          },
-        },
-      };
-    }
-  }
-
   const updatePayload: Record<string, unknown> = {};
   if (patch.title !== undefined) updatePayload.title = patch.title;
   if (patch.description !== undefined)
@@ -1557,29 +1526,6 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
 
   if (!plan) {
     return { ok: false, error: "Action item not found" };
-  }
-
-  if (expectedUpdatedAt && ai.updated_at !== expectedUpdatedAt) {
-    return {
-      ok: false,
-      error:
-        "This action changed in another tab. Compare both versions before choosing which one to keep.",
-      conflict: {
-        kind: "action_item",
-        entityId: actionItemId,
-        currentUpdatedAt: ai.updated_at,
-        current: {
-          title: ai.title,
-          description: ai.description,
-          week_index: ai.week_index,
-          target_date: ai.target_date,
-          status: ai.status,
-          outcome: ai.outcome,
-          notes: ai.notes,
-          follow_up_date: ai.follow_up_date,
-        },
-      },
-    };
   }
 
   const nextStatus = status ?? ai.status;

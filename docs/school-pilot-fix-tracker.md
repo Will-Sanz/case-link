@@ -141,7 +141,9 @@ The October 13 production audit flags `next` 16.3.0, pinned `sharp` 0.35.0, `nan
 
 **Close with:** zero unresolved findings at the configured CI threshold, full verification, and auth/image/PDF smoke checks on the supported runtime. **Sources:** [package manifest](/Users/willsanz/homelessness-project/package.json), [lockfile](/Users/willsanz/homelessness-project/package-lock.json), [Next advisory](https://github.com/advisories/GHSA-2xp9-vwfh-vxw4).
 
-### [ ] CL-03 — Accept database timestamps without weakening conflict detection
+### [x] CL-03 — Accept database timestamps without weakening conflict detection
+
+**Completed October 13, 2026 (Codex; correctness/security and Ponytail review):** step/action/meeting validation accepts offsets without converting or truncating timestamps. Removed redundant string-equality prechecks; the atomic database timestamp predicate decides revision equality. Nine regression tests cover offset/Z/equivalent timezone values, unchanged microseconds, malformed revisions, and conflict responses. Five failed before the fix and all now pass. Local database integration verifies real PostgreSQL JSON timestamps, equivalent representations, and stale-write rejection. Typecheck/lint pass; the full suite/build also runs in the required pre-push hook. Commit: `git log --grep='CL-03'`.
 
 **Type:** Reproduced · **Responsible:** engineering.
 
