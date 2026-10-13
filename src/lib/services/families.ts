@@ -296,20 +296,22 @@ export async function getFamilyDetail(
   let plan: PlanWithSteps | null = null;
   if (planRes.data) {
     const p = planRes.data as PlanRow;
-    const { data: stepsData } = await client
+    const { data: stepsData, error: stepsError } = await client
       .from("plan_steps")
       .select("*")
       .eq("plan_id", p.id)
       .order("sort_order", { ascending: true });
+    if (stepsError) throw new Error(stepsError.message);
 
     const stepIds = (stepsData ?? []).map((s) => s.id);
     const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
     if (stepIds.length > 0) {
-      const { data: actionItems } = await client
+      const { data: actionItems, error: actionItemsError } = await client
         .from("plan_step_action_items")
         .select("*")
         .in("plan_step_id", stepIds)
         .order("sort_order", { ascending: true });
+      if (actionItemsError) throw new Error(actionItemsError.message);
       for (const ai of actionItems ?? []) {
         const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
         list.push(ai as PlanStepActionItemRow);

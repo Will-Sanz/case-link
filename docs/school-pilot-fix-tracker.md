@@ -255,7 +255,9 @@ Application authentication and family-level row policies are good foundations, b
 
 ## Gate B: complete the staff workflows
 
-### [ ] CL-09 — Surface plan-loading failures instead of empty content
+### [x] CL-09 — Surface plan-loading failures instead of empty content
+
+**Completed October 13, 2026 (Codex; correctness/security and Ponytail review):** child query failures now abort the family detail load instead of producing an empty plan. Eleven tests independently fail every constituent query and distinguish absent content from unavailable content; both child-query cases failed before the fix. The existing route error boundary supplies retry, and server callers cannot proceed with a partial returned family. Targeted tests, typecheck, and lint pass; full verification is required on push. Commit: `git log --grep='CL-09'`.
 
 **Type:** Reproduced · **Responsible:** engineering.
 
