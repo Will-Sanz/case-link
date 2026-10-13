@@ -12,7 +12,7 @@ import {
   taskUsesResponsesApi,
   type AiTaskType,
 } from "@/lib/ai/models";
-import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
+import { isAllowedOpenAiModelId, OPENAI_MODELS } from "@/lib/ai/model-allowlist";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { getEnv } from "@/lib/env";
 import { isDev } from "@/lib/env/runtime";
@@ -114,17 +114,6 @@ function logOpenAiUsage(
 }
 
 /**
- * Reasoning models (o1, o3, o4, …) return 400 if `temperature` is sent on Responses / Chat.
- */
-function modelSupportsTemperature(modelId: string): boolean {
-  const id = modelId.toLowerCase().trim();
-  // e.g. o3, o3-mini, o4-mini-2025-01-01
-  if (/^o\d/.test(id)) return false;
-  if (/^gpt-5\.6(?:-|$)/.test(id)) return false;
-  return true;
-}
-
-/**
  * Call OpenAI. Uses Responses API for core reasoning tasks, Chat Completions for helpers.
  * Supports env override: OPENAI_MODEL_OVERRIDE forces a single model for all tasks.
  */
@@ -158,7 +147,7 @@ export async function createAiResponse(
   }
 
   const useResponses = Boolean(options.fileInputs?.length) ||
-    (!modelOverride && taskUsesResponsesApi(options.taskType));
+    taskUsesResponsesApi(options.taskType);
   const instructions = augmentInstructionsForMode(options.instructions, mode);
   const requestedMax = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
   const outputCap =
@@ -167,7 +156,7 @@ export async function createAiResponse(
     env.OPENAI_MAX_OUTPUT_TOKENS >= 256
       ? Math.min(32_768, Math.floor(env.OPENAI_MAX_OUTPUT_TOKENS))
       : 8192;
-  const maxTokens = Math.min(requestedMax, outputCap);
+  const maxTokens = Math.min(requestedMax, outputCap, OPENAI_MODELS[model].maxOutputTokens);
 
   const inputSummary = summarizeInput(options.input);
   const maxInputChars =
@@ -353,7 +342,7 @@ async function callResponsesApi(
   if (modelSupportsReasoningEffort(model)) {
     body.reasoning = { effort: mode === "thinking" ? "high" : "low" };
   }
-  if (modelSupportsTemperature(model)) {
+  if (!modelSupportsReasoningEffort(model)) {
     body.temperature = options.temperature ?? 0.4;
   }
 
@@ -452,10 +441,10 @@ async function callChatCompletionsApi(
   const body: Record<string, unknown> = {
     model,
     messages,
-    max_tokens: options.maxTokens ?? 4096,
+    max_completion_tokens: options.maxTokens ?? 4096,
     store: false,
   };
-  if (modelSupportsTemperature(model)) {
+  if (!modelSupportsReasoningEffort(model)) {
     body.temperature = options.temperature ?? 0.4;
   }
   if (modelSupportsReasoningEffort(model)) {

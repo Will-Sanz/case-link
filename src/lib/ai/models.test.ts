@@ -9,10 +9,10 @@ describe("AI model defaults", () => {
     });
   });
 
-  it("recognizes GPT-5.6 family reasoning controls", () => {
+  it("recognizes reasoning controls only for supported model contracts", () => {
     expect(modelSupportsReasoningEffort("gpt-5.6-luna")).toBe(true);
-    expect(modelSupportsReasoningEffort("gpt-5.6-terra")).toBe(true);
-    expect(modelSupportsReasoningEffort("gpt-5.6-sol")).toBe(true);
+    expect(modelSupportsReasoningEffort("gpt-5.6-terra")).toBe(false);
+    expect(modelSupportsReasoningEffort("gpt-5.6-sol")).toBe(false);
     expect(modelSupportsReasoningEffort("gpt-4.1-mini")).toBe(false);
   });
 });

@@ -351,7 +351,9 @@ The Responses parser accepts any returned output text on HTTP 200 without checki
 
 **Close with:** mocked completed, token-limit, content-filter, refusal, empty, malformed, 429/Retry-After, 5xx, timeout, and network-abort responses across all callers. **Source:** [AI response handling](/Users/willsanz/homelessness-project/src/lib/ai/client.ts:354). [OpenAI output handling guidance](https://developers.openai.com/api/docs/guides/structured-outputs).
 
-### [ ] CL-20 — Keep API routing and model capabilities explicit
+### [x] CL-20 — Keep API routing and model capabilities explicit
+
+**Completed October 13, 2026 (Codex; correctness/security and Ponytail review):** model overrides preserve task routing. Configuration permits only `gpt-5.6-luna` (unchanged default) and `gpt-4o` (existing QA override), with explicit reasoning/output limits and tested request options. Legacy helper requests use `max_completion_tokens`. Fast-only product routing remains unchanged. All 38 AI contract tests, typecheck, and lint pass. Synthetic live Responses requests confirmed both selected models accept strict JSON, token limits, reasoning/temperature, and `store: false`. The first GPT-4o prompt failed the exact-label assertion; a clarified JSON instruction passed. This was an API compatibility check, not the CL-34 domain-quality evaluation. Commit: `git log --grep='CL-20'`. References: [GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o).
 
 **Type:** Reproduced + Verify · **Responsible:** engineering.
 

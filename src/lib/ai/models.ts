@@ -8,6 +8,7 @@
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
+import { isAllowedOpenAiModelId, OPENAI_MODELS } from "./model-allowlist";
 
 /** Task types for model routing */
 export type AiTaskType =
@@ -49,7 +50,7 @@ const RESPONSES_API_TASK_TYPES: AiTaskType[] = [
 /** Models that accept configurable reasoning effort. */
 export function modelSupportsReasoningEffort(modelId: string): boolean {
   const id = modelId.trim();
-  return /^o\d/i.test(id) || /^gpt-5\.6(?:-|$)/i.test(id);
+  return isAllowedOpenAiModelId(id) && OPENAI_MODELS[id].reasoning;
 }
 
 export function getModelForTask(taskType: AiTaskType, mode: AiMode): string {

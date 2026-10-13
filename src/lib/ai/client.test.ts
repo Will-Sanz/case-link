@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAiResponse } from "./client";
+import { isAllowedOpenAiModelId } from "./model-allowlist";
 
 const mocks = vi.hoisted(() => ({ env: {} as Record<string, unknown>, budget: vi.fn(), fetch: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getEnv: () => mocks.env }));
@@ -17,6 +18,38 @@ beforeEach(() => {
   vi.stubGlobal("fetch", mocks.fetch);
 });
 afterEach(() => vi.unstubAllGlobals());
+
+describe("model request contracts", () => {
+  it.each(["OPENAI_MODEL_OVERRIDE", "OPENAI_UI_MODEL", "OPENAI_PLAN_PHASE_MODEL"])("keeps Responses routing with %s", async (key) => {
+    mocks.env[key] = "gpt-4o";
+    await createAiResponse({ ...options, taskType: "plan_phase_generation", maxTokens: 30000 });
+    expect(mocks.fetch.mock.calls[0][0]).toBe("https://api.openai.com/v1/responses");
+    const body = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(body).toMatchObject({ model: "gpt-4o", store: false, temperature: 0.4 });
+    expect(body).not.toHaveProperty("reasoning");
+    expect(body.max_output_tokens).toBeLessThanOrEqual(16384);
+  });
+
+  it.each(["fast", "thinking"] as const)("preserves the fast-only product policy for incoming %s mode", async (aiMode) => {
+    await createAiResponse({ ...options, aiMode });
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ model: "gpt-5.6-luna", reasoning: { effort: "low" } });
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).not.toHaveProperty("temperature");
+  });
+
+  it("uses the reasoning token parameter on legacy helper requests", async () => {
+    await createAiResponse({ ...options, taskType: "call_script" });
+    const body = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(body).toHaveProperty("max_completion_tokens");
+    expect(body).not.toHaveProperty("max_tokens");
+  });
+
+  it.each(["gpt-5-fake", "gpt-4-turbo", "gpt-3.5-turbo", "o9-test", "gpt-4o-2024-05-13"])("rejects untested or incompatible model %s", async (model) => {
+    expect(isAllowedOpenAiModelId(model)).toBe(false);
+    mocks.env.OPENAI_MODEL_OVERRIDE = model;
+    expect(await createAiResponse(options)).toMatchObject({ ok: false });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+});
 
 describe("AI terminal results", () => {
   it("accepts completed text and disables provider response storage", async () => {

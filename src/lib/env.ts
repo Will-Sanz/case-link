@@ -82,7 +82,7 @@ function assertOptionalModelEnv(name: string, value: string | undefined): void {
   const id = value.trim();
   if (!isAllowedOpenAiModelId(id)) {
     throw new Error(
-      `Invalid ${name}: "${id}" is not an allowed OpenAI model id pattern. See src/lib/ai/model-allowlist.ts.`,
+      `Invalid ${name}: "${id}" does not have a supported CaseLink request contract. See src/lib/ai/model-allowlist.ts.`,
     );
   }
 }
