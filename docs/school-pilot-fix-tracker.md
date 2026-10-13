@@ -221,7 +221,7 @@ Database admin privilege requires an AAL2 session, but the app has no complete T
 
 **Close with:** a synthetic identifier placed in each outbound field is caught before the provider call; legitimate source-backed agency contacts remain usable on follow-up; fabricated contacts cannot obtain the same exemption. **Sources:** [privacy field collection](/Users/willsanz/homelessness-project/src/lib/privacy/no-pii.ts:237), [assistant validation](/Users/willsanz/homelessness-project/src/app/actions/case-assistant.ts), [step refinement](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-refine-step.ts).
 
-### [ ] CL-27 — Preserve human work when applying AI edits
+### [x] CL-27 — Preserve human work when applying AI edits
 
 **Type:** Fix · **Responsible:** engineering.
 
@@ -230,6 +230,10 @@ Single-step preview sends only the saved step ID and feedback, not the current u
 **Fix:** generate from the explicitly selected draft and base revision; apply a validated, reviewable change to the requested fields only. Protect owner, completed work, outcomes, manually confirmed dates, and unrelated details. Ignore stale previews after editing, canceling, or switching actions.
 
 **Close with:** unsaved manual edits plus rewrite, narrow wording change, completed checklist, stale response, cancel/reopen, and changed base revision tests. **Sources:** [preview/apply UI](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:925), [saved-step lookup](/Users/willsanz/homelessness-project/src/app/actions/plans.ts).
+
+**Completed October 13, 2026 — engineering:** single-action and whole-plan refinement now use the actual unsaved draft, original row versions, and current plan revision. Both paths share one validated refiner. Previews show each proposed field with before/after values and require an explicit selection; completed work, ownership, checklist completion, notes, and outcomes cannot be changed by AI application. Dates change only when selected. Human edits, cancellation, and saved-plan changes invalidate pending/ready previews. Atomic saves retain original conflict timestamps; conflict comparisons include all persisted details, checklist evidence, and action fields. Whole-plan edits now warn before closing the tab, and applying a preview restores keyboard focus. Removed the retired single-step refiner and checklist-resetting save cleanup.
+
+**Evidence:** 48 focused server, provider/merge, domain, and rendered-component tests cover narrow edits alongside unsaved human text, completed work and legacy checklists, explicit document removal, selected dates, stale/late replies, revision changes, failed saves/retries, conflict detail visibility, tab-close warnings, and focus restoration. Typecheck/lint and normal correctness/security/privacy plus separate Ponytail/React reviews completed; full verification is enforced before push. Browser acceptance and live AI usefulness remain in CL-08/CL-34. Commit: `git log --grep='CL-27'`.
 
 ### [x] CL-28 — Match full-plan refinements by stable IDs
 

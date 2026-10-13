@@ -202,6 +202,7 @@ export type SavePlanEditsInput = z.infer<typeof savePlanEditsSchema>;
 
 const previewDraftActionItemSchema = z.object({
   id: z.string().uuid(),
+  updated_at: z.string().datetime({ offset: true }),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   notes: z.string().max(2000).nullable(),
   outcome: z.string().max(2000).nullable(),
@@ -212,29 +213,29 @@ const previewDraftActionItemSchema = z.object({
   target_date: z.union([dateOnlySchema("Use a valid target date"), z.null()]).optional(),
 });
 
+export const previewStepDraftSchema = z.object({
+  id: z.string().uuid(),
+  updated_at: z.string().datetime({ offset: true }),
+  status: z.enum(["pending", "in_progress", "completed", "blocked"]),
+  workflow_data: planStepWorkflowSchema.optional(),
+  phase: z.enum(["30", "60", "90"]),
+  title: z.string().min(1).max(500),
+  description: z.string().max(4000),
+  details: planStepDetailsSchema.optional(),
+  action_items: z.array(previewDraftActionItemSchema).max(50),
+});
+
 export const previewRefinePlanSchema = z.object({
   familyId: z.string().uuid(),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
   feedback: z.string().min(1, "Feedback is required").max(2000),
   aiMode: aiModeSchema,
   draft: z.object({
-    steps: z
-      .array(
-        z.object({
-          id: z.string().uuid(),
-          status: z.enum(["pending", "in_progress", "completed", "blocked"]),
-          workflow_data: planStepWorkflowSchema.optional(),
-          phase: z.enum(["30", "60", "90"]),
-          title: z.string().min(1).max(500),
-          description: z.string().max(4000),
-          details: planStepDetailsSchema.optional(),
-          action_items: z.array(previewDraftActionItemSchema).max(50),
-        }),
-      )
-      .min(1)
-      .max(15),
+    steps: z.array(previewStepDraftSchema).min(1).max(15),
   }),
 });
 
 
-/** Same shape as refine; used for preview-only AI step revision. */
-export const previewRefineStepSchema = refineStepSchema;
+export const previewRefineStepSchema = refineStepSchema.extend({
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/), draft: previewStepDraftSchema,
+});

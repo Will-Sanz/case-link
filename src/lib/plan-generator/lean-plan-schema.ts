@@ -40,11 +40,6 @@ export const leanPlanPhaseResponseZ = z.object({
   steps: z.array(leanPlanStepBodyZ.extend({ phase: z.enum(["30", "60", "90"]) })).min(1).max(5),
 });
 
-/** Single step refinement (root JSON = one step). */
-export const leanSingleStepZ = leanPlanStepBodyZ.extend({
-  phase: z.enum(["30", "60", "90"]),
-});
-
 export type LeanPlanStepBody = z.infer<typeof leanPlanStepBodyZ>;
 export type LeanPlanPhaseStep = z.infer<typeof leanPlanPhaseResponseZ>["steps"][number];
 
@@ -221,16 +216,6 @@ export function buildLeanPhaseRootJsonSchema(phase: PlanPhase) {
       },
     },
     required: ["steps"],
-    additionalProperties: false,
-  } as const;
-}
-
-/** Single-step root for refinement. */
-export function buildLeanSingleStepRootJsonSchema() {
-  return {
-    type: "object",
-    properties: { ...leanStepObjectFields },
-    required: [...leanStepRequired],
     additionalProperties: false,
   } as const;
 }

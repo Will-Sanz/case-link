@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { previewRefinePlan } from "./plans";
+import { previewRefinePlan, previewRefinePlanStep } from "./plans";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), detail: vi.fn(), refine: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireAppUserWithClient: mocks.session }));
@@ -9,21 +9,21 @@ vi.mock("@/lib/plan-generator/openai-plan", () => ({ previewRefinePlanStepsWithO
 
 const familyId = "20000000-0000-4000-8000-000000000002";
 const step = {
-  id: "30000000-0000-4000-8000-000000000003", phase: "30", title: "Plan the intake", description: "Prepare materials",
+  id: "30000000-0000-4000-8000-000000000003", updated_at: "2026-10-01T12:00:00.123456Z", phase: "30", title: "Plan the intake", description: "Prepare materials",
   status: "pending", details: { owner: "family", expected_outcome: "Ready" }, workflow_data: {},
-  action_items: [{ id: "40000000-0000-4000-8000-000000000004", title: "Call intake", description: null, week_index: 1,
+  action_items: [{ id: "40000000-0000-4000-8000-000000000004", updated_at: "2026-10-01T12:00:00.123456Z", title: "Call intake", description: null, week_index: 1,
     target_date: "2026-10-20", status: "completed", notes: "Confirmed", outcome: "Intake booked", follow_up_date: null }],
 };
 
 describe("full plan refinement boundary", () => {
   beforeEach(() => {
     mocks.session.mockResolvedValue({ supabase: {} });
-    mocks.detail.mockResolvedValue({ name: "Household 4", goals: [], barriers: [], members: [], caseNotes: [], plan: { steps: [structuredClone(step)] } });
+    mocks.detail.mockResolvedValue({ name: "Household 4", goals: [], barriers: [], members: [], caseNotes: [], plan: { review_revision: "a".repeat(64), steps: [structuredClone(step)] } });
     mocks.refine.mockImplementation(async (_detail, steps) => ({ ok: true, model: "test", steps }));
   });
 
   it("passes the authorized IDs and progress evidence through the preview without saving", async () => {
-    expect(await previewRefinePlan({ familyId, feedback: "Clarify wording", draft: { steps: [step] } })).toMatchObject({ ok: true, steps: [expect.objectContaining({
+    expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify wording", draft: { steps: [step] } })).toMatchObject({ ok: true, steps: [expect.objectContaining({
       id: step.id, action_items: [expect.objectContaining({ id: step.action_items[0].id, status: "completed", outcome: "Intake booked" })],
     })] });
     expect(mocks.refine).toHaveBeenCalledTimes(1);
@@ -36,22 +36,43 @@ describe("full plan refinement boundary", () => {
     if (kind === "duplicate goal") draft.steps.push(structuredClone(step));
     if (kind === "duplicate action") draft.steps[0].action_items.push({ ...step.action_items[0] });
     if (kind === "deleted action") draft.steps[0].action_items = [];
-    expect(await previewRefinePlan({ familyId, feedback: "Clarify wording", draft })).toMatchObject({ ok: false });
+    expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify wording", draft })).toMatchObject({ ok: false });
     expect(mocks.refine).not.toHaveBeenCalled();
   });
 
   it.each(["notes", "outcome"])("checks the newly included action %s for identifiers before AI", async (field) => {
     const changed = structuredClone(step);
     changed.action_items[0][field as "notes" | "outcome"] = "parent@example.test";
-    expect(await previewRefinePlan({ familyId, feedback: "Clarify", draft: { steps: [changed] } })).toMatchObject({ ok: false });
+    expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify", draft: { steps: [changed] } })).toMatchObject({ ok: false });
     expect(mocks.refine).not.toHaveBeenCalled();
   });
 
   it("fails closed without an authenticated accessible family", async () => {
     mocks.detail.mockResolvedValue(null);
-    expect(await previewRefinePlan({ familyId, feedback: "Clarify", draft: { steps: [step] } })).toMatchObject({ ok: false });
+    expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify", draft: { steps: [step] } })).toMatchObject({ ok: false });
     mocks.session.mockRejectedValue(new Error("No session"));
-    expect(await previewRefinePlan({ familyId, feedback: "Clarify", draft: { steps: [step] } })).toMatchObject({ ok: false });
+    expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify", draft: { steps: [step] } })).toMatchObject({ ok: false });
+    expect(mocks.refine).not.toHaveBeenCalled();
+  });
+
+  it("uses the selected unsaved action draft instead of fetching older saved prose", async () => {
+    const draft = { ...step, title: "Unsaved human title", description: "Unsaved human instructions" };
+    expect(await previewRefinePlanStep({ familyId, expectedRevision: "a".repeat(64), stepId: step.id, feedback: "Shorten the summary", draft })).toMatchObject({ ok: true, step: expect.objectContaining({ title: draft.title, description: draft.description }) });
+    expect(mocks.refine).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining(draft)], "Shorten the summary", expect.objectContaining({ taskType: "step_refinement" }));
+  });
+
+  it.each(["goal", "action"])("rejects a stale %s revision before either refinement call", async kind => {
+    const draft = structuredClone(step);
+    if (kind === "goal") draft.updated_at = "2026-10-01T12:00:00.123455Z";
+    else draft.action_items[0].updated_at = "2026-10-01T12:00:00.123455Z";
+    expect(await previewRefinePlanStep({ familyId, expectedRevision: "a".repeat(64), stepId: step.id, feedback: "Clarify", draft })).toMatchObject({ ok: false, error: expect.stringContaining("saved plan changed") });
+    expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify", draft: { steps: [draft] } })).toMatchObject({ ok: false });
+    expect(mocks.refine).not.toHaveBeenCalled();
+  });
+
+  it("rejects a changed family/plan snapshot even if individual action timestamps are unchanged", async () => {
+    expect(await previewRefinePlanStep({ familyId, stepId: step.id, expectedRevision: "b".repeat(64), feedback: "Clarify", draft: step })).toMatchObject({ ok: false });
+    expect(await previewRefinePlan({ familyId, expectedRevision: "b".repeat(64), feedback: "Clarify", draft: { steps: [step] } })).toMatchObject({ ok: false });
     expect(mocks.refine).not.toHaveBeenCalled();
   });
 });

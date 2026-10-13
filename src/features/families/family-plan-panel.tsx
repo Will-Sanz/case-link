@@ -13,7 +13,6 @@ import {
   deletePlanStep,
   savePlanEdits,
   type PlanEditConflict,
-  type PreviewRefinePlanResult,
 } from "@/app/actions/plans";
 import type { SavePlanEditsInput } from "@/lib/validations/plans";
 import { recordCaseWorkflowEvent } from "@/app/actions/families";
@@ -32,7 +31,9 @@ import type {
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
-import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
+import { applyRefinementChanges, collectRefinementChanges, toRefinementDraft, type RefinementChange } from "@/lib/domain/plan/refinement-review";
+import { RefinementChangeReview } from "@/features/families/refinement-change-review";
+
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import {
   localActionDraftKey,
@@ -42,6 +43,8 @@ import {
   DRAFT_LOGOUT_KEY,
   type LocalActionDraft,
 } from "@/lib/domain/plan/local-action-draft";
+
+type RefinementPreview = { changes: RefinementChange[]; selected: string[]; base: string; revision: string | null };
 
 function readStoredActionDraft(userId: string, planId: string): LocalActionDraft | null {
   pruneLocalActionDrafts(userId);
@@ -114,6 +117,13 @@ function contactDisplay(details: PlanStepDetails): string {
   );
 }
 
+function workflowValueDisplay(value: unknown): string {
+  if (value == null || value === "") return "Not set";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.map((done, i) => `${i + 1}. ${done ? "Completed" : "Not completed"}`).join("; ") || "Not set";
+  return String(value);
+}
+
 function conflictComparisonRows(
   conflict: PlanEditConflict,
   draft: PlanStepRow | null,
@@ -127,6 +137,7 @@ function conflictComparisonRows(
     rows = [
       { label: "Title", mine: draft.title, latest: conflict.current.title },
       { label: "Summary", mine: draft.description, latest: conflict.current.description },
+      { label: "Plan stage", mine: draft.phase, latest: conflict.current.phase },
       {
         label: "Status",
         mine: workflowStatusLabel(draft.status),
@@ -159,16 +170,37 @@ function conflictComparisonRows(
       },
       {
         label: "Documents",
-        mine: listDisplay(mineDetails.required_documents ?? mineDetails.materials_needed),
-        latest: listDisplay(
-          latestDetails.required_documents ?? latestDetails.materials_needed,
-        ),
+        mine: listDisplay(mineDetails.required_documents),
+        latest: listDisplay(latestDetails.required_documents),
       },
       {
         label: "Contact",
         mine: contactDisplay(mineDetails),
         latest: contactDisplay(latestDetails),
       },
+      ...([
+        ["rationale", "Reason"], ["detailed_instructions", "Instructions"],
+        ["timing_guidance", "Timing guidance"], ["why_now", "Why now"],
+        ["depends_on", "Dependencies"], ["milestone_type", "Milestone"],
+        ["success_marker", "Success marker"], ["contact_script", "Contact script"],
+        ["priority", "Detail priority"],
+      ] as const).map(([key, label]) => ({ label, mine: mineDetails[key] || "Not set", latest: latestDetails[key] || "Not set" })),
+      ...([
+        ["materials_needed", "Other materials"], ["blockers", "Possible barriers"],
+        ["fallback_options", "Fallback options"], ["checklist", "Checklist"],
+      ] as const).map(([key, label]) => ({ label,
+        mine: (mineDetails[key] ?? []).map((value, i) => `${i + 1}. ${value || "(blank)"}`).join("; ") || "Not set",
+        latest: (latestDetails[key] ?? []).map((value, i) => `${i + 1}. ${value || "(blank)"}`).join("; ") || "Not set",
+      })),
+      ...([
+        ["contact_attempted_at", "Contact attempted"], ["outreach_result", "Outreach result"],
+        ["needs_escalation", "Escalation needed"], ["documents_received", "Documents received"],
+        ["family_understood", "Family understood"], ["case_manager_assisted", "Case manager assisted"],
+        ["checklist_completed", "Checklist completion"],
+      ] as const).map(([key, label]) => ({ label,
+        mine: workflowValueDisplay(draft.workflow_data?.[key]),
+        latest: workflowValueDisplay(conflict.current.workflow_data?.[key]),
+      })),
       {
         label: "Case notes",
         mine: draft.workflow_data?.outcome_notes?.trim() || "Not set",
@@ -185,6 +217,8 @@ function conflictComparisonRows(
     if (!mine) return [];
     rows = [
       { label: "Action", mine: mine.title, latest: conflict.current.title },
+      { label: "Task description", mine: mine.description || "Not set", latest: conflict.current.description || "Not set" },
+      { label: "Week", mine: String(mine.week_index), latest: String(conflict.current.week_index) },
       {
         label: "Target date",
         mine: formatTargetDate(mine.target_date) ?? "Not set",
@@ -216,25 +250,11 @@ function conflictComparisonRows(
   return rows.filter((row) => row.mine !== row.latest);
 }
 
-function normalizeChecklistForSave(lines: string[] | undefined): string[] {
-  return (lines ?? []).map((l) => l.trim()).filter((l) => l.length > 0);
-}
-
 /** Snapshot of the parent plan-step record (excludes independently saved task rows). */
 function normalizeStepRecordForPersistCompare(step: PlanStepRow): string {
   const d = { ...(step.details as PlanStepDetails | null | undefined) } as PlanStepDetails;
   d.owner ??= "case_manager";
-  const normalizedChecklist = normalizeChecklistForSave(d.checklist);
-  if (normalizedChecklist.length > 0) {
-    d.checklist = normalizedChecklist;
-  } else {
-    delete d.checklist;
-  }
-  const checklistLen = normalizedChecklist.length;
   const wd = { ...(step.workflow_data ?? {}) };
-  if (wd.checklist_completed && wd.checklist_completed.length !== checklistLen) {
-    wd.checklist_completed = Array(checklistLen).fill(false);
-  }
   return JSON.stringify({
     title: step.title,
     description: step.description,
@@ -316,8 +336,8 @@ export function FamilyPlanPanel({
 }) {
   const router = useRouter();
   const userId = useWorkspaceUserId();
-  const aiRequestRef = useRef({ id: 0, pending: false });
-  const planAiRequestRef = useRef({ id: 0, pending: false });
+  const aiRequestRef = useRef({ id: 0, pending: false, revision: null as string | null });
+  const planAiRequestRef = useRef({ id: 0, pending: false, revision: null as string | null });
   useEffect(() => {
     const stepRequest = aiRequestRef.current;
     const planRequest = planAiRequestRef.current;
@@ -361,12 +381,7 @@ export function FamilyPlanPanel({
 
   const [aiStepId, setAiStepId] = useState<string | null>(null);
   const [aiInstruction, setAiInstruction] = useState("");
-  const [aiPreview, setAiPreview] = useState<{
-    title: string;
-    description: string;
-    details: PlanStepDetails;
-    stepPriority?: "low" | "medium" | "high" | "urgent";
-  } | null>(null);
+  const [aiPreview, setAiPreview] = useState<RefinementPreview | null>(null);
   const [aiPending, setAiPending] = useState(false);
 
   const [planAiOpen, setPlanAiOpen] = useState(false);
@@ -374,13 +389,38 @@ export function FamilyPlanPanel({
   const [planAiDiscardConfirm, setPlanAiDiscardConfirm] = useState(false);
   const [planAiInstruction, setPlanAiInstruction] = useState("");
   const [planAiPending, setPlanAiPending] = useState(false);
-  const [planAiPreview, setPlanAiPreview] = useState<Omit<Extract<PreviewRefinePlanResult, { ok: true }>, "ok"> | null>(null);
+  const [planAiPreview, setPlanAiPreview] = useState<RefinementPreview | null>(null);
+
+  useEffect(() => {
+    const revision = plan?.review_revision ?? null;
+    if (aiRequestRef.current.revision !== null && aiRequestRef.current.revision !== revision) {
+      Object.assign(aiRequestRef.current, { id: aiRequestRef.current.id + 1, pending: false, revision: null });
+      setAiPending(false);
+      setAiPreview(null);
+      setError("The saved plan changed. Your draft is still here; review the latest plan before generating another preview.");
+    }
+    if (planAiRequestRef.current.revision !== null && planAiRequestRef.current.revision !== revision) {
+      Object.assign(planAiRequestRef.current, { id: planAiRequestRef.current.id + 1, pending: false, revision: null });
+      setPlanAiPending(false);
+      setPlanAiPreview(null);
+      setError("The saved plan changed. Your working copy is still here; review the latest plan before generating another preview.");
+    }
+  }, [plan?.review_revision]);
 
   const stepDirty = useMemo(() => {
     if (!editingStepId || !stepDraft || !plan) return false;
     const orig = plan.steps.find((s) => s.id === editingStepId);
     return stepNeedsPersist(orig, stepDraft);
   }, [editingStepId, stepDraft, plan]);
+
+  const planAiDirty = useMemo(() => {
+    if (!planAiDraft || !plan) return false;
+    for (const s of planAiDraft.steps) {
+      const o = plan.steps.find((x) => x.id === s.id);
+      if (stepNeedsPersist(o, s)) return true;
+    }
+    return false;
+  }, [planAiDraft, plan]);
 
   const editConflictRows = useMemo(
     () => (editConflict ? conflictComparisonRows(editConflict, stepDraft) : []),
@@ -460,14 +500,14 @@ export function FamilyPlanPanel({
   }, [actionDraftStorageKey, plan, stepDirty, stepDraft, userId]);
 
   useEffect(() => {
-    if (!stepDirty) return;
+    if (!stepDirty && !planAiDirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [stepDirty]);
+  }, [stepDirty, planAiDirty]);
 
   const goalGroups = useMemo(() => {
     return groupPlanStepsByGoal(plan?.steps ?? []);
@@ -607,10 +647,14 @@ export function FamilyPlanPanel({
   }
 
   function patchEditingStep(patch: Partial<PlanStepRow>) {
+    cancelStepPreviewRequest();
+    setAiPreview(null);
     setStepDraft((prev) => (prev ? { ...prev, ...patch } : prev));
   }
 
   function patchEditingStepDetails(patch: Partial<PlanStepDetails>) {
+    cancelStepPreviewRequest();
+    setAiPreview(null);
     setStepDraft((prev) => {
       if (!prev) return prev;
       const d = (prev.details ?? {}) as PlanStepDetails;
@@ -622,6 +666,8 @@ export function FamilyPlanPanel({
     actionItemId: string,
     patch: Partial<PlanStepActionItemRow>,
   ) {
+    cancelStepPreviewRequest();
+    setAiPreview(null);
     setStepDraft((prev) => {
       if (!prev) return prev;
       return {
@@ -648,11 +694,7 @@ export function FamilyPlanPanel({
         }
       }
       const details = { ...s.details, owner: s.details?.owner ?? "case_manager" };
-      details.checklist = normalizeChecklistForSave(details.checklist);
       const workflow = { ...s.workflow_data };
-      if (workflow.checklist_completed && workflow.checklist_completed.length !== details.checklist.length) {
-        workflow.checklist_completed = Array(details.checklist.length).fill(false);
-      }
       const actionItems: SavePlanEditsInput["steps"][number]["actionItems"] = [];
       for (const action of s.action_items ?? []) {
         const original = orig.action_items?.find(row => row.id === action.id);
@@ -862,6 +904,7 @@ export function FamilyPlanPanel({
   function cancelStepPreviewRequest() {
     aiRequestRef.current.id += 1;
     aiRequestRef.current.pending = false;
+    aiRequestRef.current.revision = null;
     setAiPending(false);
   }
 
@@ -890,18 +933,25 @@ export function FamilyPlanPanel({
   }
 
   function runAiPreview() {
-    if (!aiStepId || aiRequestRef.current.pending) return;
+    if (!aiStepId || !stepDraft || stepDraft.id !== aiStepId || aiRequestRef.current.pending) return;
+    if (!plan?.review_revision) { setError("Reload the plan before requesting an AI preview."); return; }
     const instr = aiInstruction.trim();
     if (!instr) {
       setError("Describe what you want changed for this action.");
       return;
     }
+    const snapshot = cloneStep(stepDraft);
+    const revision = plan?.review_revision ?? null;
     const requestId = ++aiRequestRef.current.id;
     aiRequestRef.current.pending = true;
+    aiRequestRef.current.revision = revision;
     setAiPending(true);
+    setAiPreview(null);
     setError(null);
     previewRefinePlanStep({
       stepId: aiStepId,
+      expectedRevision: plan.review_revision,
+      draft: toRefinementDraft(snapshot),
       familyId,
       feedback: instr,
       aiMode: DEFAULT_AI_MODE,
@@ -911,12 +961,7 @@ export function FamilyPlanPanel({
         setError(res.error);
         return;
       }
-      setAiPreview({
-        title: res.step.title,
-        description: res.step.description,
-        details: res.step.details as PlanStepDetails,
-        stepPriority: res.step.stepPriority,
-      });
+      setAiPreview({ changes: collectRefinementChanges([snapshot], [res.step]), selected: [], base: JSON.stringify(snapshot), revision });
     }).catch(() => {
       if (requestId === aiRequestRef.current.id) setError("The preview could not be prepared. Your edits are unchanged; try again.");
     }).finally(() => {
@@ -928,25 +973,12 @@ export function FamilyPlanPanel({
   }
 
   function applyAiToDraft() {
-    if (!aiPreview || !aiStepId || !stepDraft || stepDraft.id !== aiStepId) return;
-    const checklistLen = (aiPreview.details.checklist ?? []).length;
-    setStepDraft((prev) => {
-      if (!prev || prev.id !== aiStepId) return prev;
-      const wd = { ...(prev.workflow_data ?? {}) };
-      wd.checklist_completed = Array(checklistLen).fill(false);
-      return {
-        ...prev,
-        title: aiPreview.title,
-        description: aiPreview.description,
-        details: {
-          ...aiPreview.details,
-          owner:
-            (prev.details as PlanStepDetails | null | undefined)?.owner ?? "case_manager",
-        },
-        priority: aiPreview.stepPriority ?? prev.priority,
-        workflow_data: wd,
-      };
-    });
+    if (!aiPreview || !stepDraft || !aiPreview.selected.length) return;
+    if (aiPreview.base !== JSON.stringify(stepDraft) || aiPreview.revision !== (plan?.review_revision ?? null)) {
+      setError("The draft or saved plan changed. Generate a new preview before applying changes.");
+      return;
+    }
+    setStepDraft(applyRefinementChanges([stepDraft], aiPreview.changes, aiPreview.selected)[0]);
     cancelStepPreviewRequest();
     setAiStepId(null);
     setAiPreview(null);
@@ -976,6 +1008,7 @@ export function FamilyPlanPanel({
   }
 
   function runPlanAiPreview() {
+    if (!plan?.review_revision) { setError("Reload the plan before requesting an AI preview."); return; }
     const instr = planAiInstruction.trim();
     if (!instr) {
       setError("Describe what you want to change for the full plan.");
@@ -983,36 +1016,20 @@ export function FamilyPlanPanel({
     }
     if (!planAiDraft || planAiRequestRef.current.pending) return;
 
+    const snapshot = clonePlan(planAiDraft);
+    const revision = plan?.review_revision ?? null;
     const requestId = ++planAiRequestRef.current.id;
     planAiRequestRef.current.pending = true;
+    planAiRequestRef.current.revision = revision;
     setPlanAiPending(true);
+    setPlanAiPreview(null);
     setError(null);
 
-    const draftForApi = {
-      steps: planAiDraft.steps.map((s) => ({
-        id: s.id,
-        status: s.status,
-        workflow_data: s.workflow_data ?? {},
-        phase: s.phase,
-        title: s.title,
-        description: s.description,
-        details: s.details ?? {},
-        action_items: (s.action_items ?? []).map((ai) => ({
-          id: ai.id,
-          status: ai.status,
-          notes: ai.notes,
-          outcome: ai.outcome,
-          follow_up_date: ai.follow_up_date,
-          title: ai.title,
-          description: ai.description ?? null,
-          week_index: ai.week_index,
-          target_date: ai.target_date,
-        })),
-      })),
-    };
+    const draftForApi = { steps: snapshot.steps.map(toRefinementDraft) };
 
     previewRefinePlan({
       familyId,
+      expectedRevision: plan.review_revision,
       feedback: instr,
       draft: draftForApi,
       aiMode: DEFAULT_AI_MODE,
@@ -1022,7 +1039,7 @@ export function FamilyPlanPanel({
         setError(res.error);
         return;
       }
-      setPlanAiPreview({ model: res.model, steps: res.steps });
+      setPlanAiPreview({ changes: collectRefinementChanges(snapshot.steps, res.steps), selected: [], base: JSON.stringify(snapshot), revision });
     }).catch(() => {
       if (requestId === planAiRequestRef.current.id) setError("The preview could not be prepared. Your edits are unchanged; try again.");
     }).finally(() => {
@@ -1034,34 +1051,15 @@ export function FamilyPlanPanel({
   }
 
   function applyPlanAiToDraft() {
-    if (!planAiPreview || !planAiDraft) return;
-    try {
-      const matchedSteps = matchPlanRowsById(planAiDraft.steps, planAiPreview.steps);
-      const steps = planAiDraft.steps.map((step, i) => {
-        const proposal = matchedSteps[i];
-        if (proposal.phase !== step.phase) throw new Error("AI refinement changed the plan structure. Please request a smaller change.");
-        const matchedActions = matchPlanRowsById(step.action_items ?? [], proposal.action_items);
-        return {
-          ...step,
-          title: proposal.title,
-          description: proposal.description,
-          details: { ...proposal.details, owner: step.details?.owner ?? "case_manager" },
-          priority: proposal.details.priority ?? step.priority,
-          action_items: (step.action_items ?? []).map((action, j) => ({
-            ...action,
-            title: matchedActions[j].title,
-            description: matchedActions[j].description ?? null,
-            week_index: matchedActions[j].week_index,
-            target_date: matchedActions[j].target_date ?? action.target_date,
-          })),
-        };
-      });
-      setPlanAiDraft({ ...planAiDraft, steps });
-      setPlanAiPreview(null);
-      setPlanAiInstruction("");
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "The preview no longer matches the current plan. Generate another preview.");
+    if (!planAiPreview || !planAiDraft || !planAiPreview.selected.length) return;
+    if (planAiPreview.base !== JSON.stringify(planAiDraft) || planAiPreview.revision !== (plan?.review_revision ?? null)) {
+      setError("The working copy or saved plan changed. Generate a new preview before applying changes.");
+      return;
     }
+    setPlanAiDraft({ ...planAiDraft, steps: applyRefinementChanges(planAiDraft.steps, planAiPreview.changes, planAiPreview.selected) });
+    document.getElementById("plan-ai-instruction")?.focus();
+    setPlanAiPreview(null);
+    setPlanAiInstruction("");
   }
 
   function savePlanAiRefinements() {
@@ -1091,15 +1089,6 @@ export function FamilyPlanPanel({
     });
   }
 
-  const planAiDirty = useMemo(() => {
-    if (!planAiDraft || !plan) return false;
-    for (const s of planAiDraft.steps) {
-      const o = plan.steps.find((x) => x.id === s.id);
-      if (stepNeedsPersist(o, s)) return true;
-    }
-    return false;
-  }, [planAiDraft, plan]);
-
   useEffect(() => {
     if (!planAiOpen) return;
     const dialog = planAiDialogRef.current;
@@ -1118,6 +1107,7 @@ export function FamilyPlanPanel({
     }
     planAiRequestRef.current.id += 1;
     planAiRequestRef.current.pending = false;
+    planAiRequestRef.current.revision = null;
     setPlanAiPending(false);
     setPlanAiDiscardConfirm(false);
     setPlanAiOpen(false);
@@ -1126,12 +1116,6 @@ export function FamilyPlanPanel({
     setPlanAiDraft(null);
   }
 
-  const planAiPreviewGoals = useMemo(() => {
-    const titles = (planAiPreview?.steps ?? []).map(
-      (step) => step.details.stage_goal?.trim() || step.title,
-    );
-    return [...new Set(titles)];
-  }, [planAiPreview]);
 
   const reviewStatus = getPlanReviewStatus(plan);
 
@@ -1479,9 +1463,11 @@ export function FamilyPlanPanel({
                               stepDirty={isEditingThis && stepDirty}
                               refineOpen={aiStepId === full.id}
                               refineInstruction={aiInstruction}
-                              refinePreview={aiPreview}
+                              refineChanges={aiPreview?.changes ?? null}
+                              refineSelected={aiPreview?.selected ?? []}
+                              onRefineSelect={(id, checked) => setAiPreview(previous => previous ? { ...previous, selected: checked ? [...previous.selected, id] : previous.selected.filter(value => value !== id) } : null)}
                               refinePending={aiPending}
-                              onRefineInstruction={setAiInstruction}
+                              onRefineInstruction={(value) => { cancelStepPreviewRequest(); setAiPreview(null); setAiInstruction(value); }}
                               onRefineRun={runAiPreview}
                               onRefineApply={applyAiToDraft}
                               onRefineClose={() => {
@@ -1756,7 +1742,12 @@ export function FamilyPlanPanel({
               id="plan-ai-instruction"
               className="mt-2 min-h-[120px] border-[var(--color-rule)]"
               value={planAiInstruction}
-              onChange={(e) => setPlanAiInstruction(e.target.value)}
+              onChange={(e) => {
+                Object.assign(planAiRequestRef.current, { id: planAiRequestRef.current.id + 1, pending: false, revision: null });
+                setPlanAiPending(false);
+                setPlanAiPreview(null);
+                setPlanAiInstruction(e.target.value);
+              }}
               placeholder="e.g. Make the first actions more realistic for one case manager, keep the target dates, and preserve my manual edits."
               autoFocus
             />
@@ -1803,21 +1794,9 @@ export function FamilyPlanPanel({
 
             {planAiPreview ? (
               <div className="mt-4 space-y-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-3 text-sm">
-                <p className="text-sm font-semibold text-[var(--color-ink)]">
-                  Preview ready ({planAiPreview.steps.length} steps)
-                </p>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
-                    Goals in this preview
-                  </p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[var(--color-ink-2)]">
-                    {planAiPreviewGoals.map((goal) => (
-                      <li key={goal}>{goal}</li>
-                    ))}
-                  </ul>
-                </div>
+                <RefinementChangeReview changes={planAiPreview.changes} selected={planAiPreview.selected} onSelect={(id, checked) => setPlanAiPreview(previous => previous ? { ...previous, selected: checked ? [...previous.selected, id] : previous.selected.filter(value => value !== id) } : null)} />
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={applyPlanAiToDraft}>
+                  <Button type="button" onClick={applyPlanAiToDraft} disabled={!planAiPreview.selected.length}>
                     Apply to working copy
                   </Button>
                   <Button

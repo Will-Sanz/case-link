@@ -48,10 +48,6 @@ import type {
   PlanStepRow,
 } from "@/types/family";
 import {
-  refineStepWithOpenAI,
-  type RefineStepResult,
-} from "@/lib/plan-generator/openai-refine-step";
-import {
   createManualStepSchema,
   deletePlanStepSchema,
   generatePlanSchema,
@@ -151,7 +147,7 @@ function planDetailsPrivacyFields(
 export type PreviewRefinePlanStepResult =
   | {
       ok: true;
-      step: NonNullable<Extract<RefineStepResult, { ok: true }>["step"]>;
+      step: DraftStepRefineInput;
     }
   | { ok: false; error: string };
 
@@ -1411,92 +1407,75 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
   }
 }
 
-/** AI revises a single step; returns proposed content without persisting. */
-export async function previewRefinePlanStep(
-  input: unknown,
-): Promise<PreviewRefinePlanStepResult> {
+function refinementPrivacyFields(steps: DraftStepRefineInput[]): PrivacyFieldInput[] {
+  return steps.flatMap((step, stepIndex) => [
+      {
+        field: `draft.steps.${stepIndex}.title`,
+        label: "Action title",
+        value: step.title,
+      },
+      {
+        field: `draft.steps.${stepIndex}.description`,
+        label: "Action description",
+        value: step.description,
+      },
+      ...planDetailsPrivacyFields(
+        (step.details ?? {}) as PlanStepDetails,
+        `draft.steps.${stepIndex}.details`,
+      ),
+      ...Object.entries(step.workflow_data ?? {}).flatMap(([key, value]) => typeof value === "string" ? [{ field: `draft.steps.${stepIndex}.workflow_data.${key}`, label: "Action progress", value }] : []),
+      ...step.action_items.flatMap((action, actionIndex) => [
+        {
+          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.title`,
+          label: "Action title",
+          value: action.title,
+        },
+        {
+          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.description`,
+          label: "Action description",
+          value: action.description,
+        },
+        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.notes`, label: "Action progress", value: action.notes },
+        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.outcome`, label: "Action outcome", value: action.outcome },
+      ]),
+    ]);
+}
+
+function assertCurrentRefinementDraft(current: PlanStepRow[], draft: DraftStepRefineInput[]) {
+  const requested = matchPlanRowsById(current, draft);
+  current.forEach((step, i) => {
+    const proposed = requested[i];
+    const actions = matchPlanRowsById(step.action_items ?? [], proposed.action_items);
+    if (step.updated_at !== proposed.updated_at || (step.action_items ?? []).some((action, j) => action.updated_at !== actions[j].updated_at)) {
+      throw new Error("The saved plan changed. Reload the latest version before requesting another preview; your edits are still here.");
+    }
+  });
+}
+
+/** AI revises the selected unsaved draft; applying and saving remain explicit user actions. */
+export async function previewRefinePlanStep(input: unknown): Promise<PreviewRefinePlanStepResult> {
   const parsed = previewRefineStepSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
-  }
-
+  if (!parsed.success) return { ok: false, error: "Check the draft and instructions before requesting a preview." };
   let supabase;
-  try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
-  } catch (error) {
-    return { ok: false, error: publicSessionError(error) };
-  }
-
-  const { stepId, familyId, feedback, aiMode } = parsed.data;
-  const stepMode = parseAiMode(aiMode);
-
+  try { ({ supabase } = await requireAppUserWithClient()); }
+  catch (error) { return { ok: false, error: publicSessionError(error) }; }
+  const { familyId, stepId, feedback, aiMode } = parsed.data;
   const detail = await getFamilyDetail(supabase, familyId);
-  if (!detail) {
-    return { ok: false, error: "Family not found" };
-  }
+  const current = detail?.plan?.steps.find(step => step.id === stepId);
+  if (!detail || !current) return { ok: false, error: "The current action could not be found." };
+  if (detail.plan?.review_revision !== parsed.data.expectedRevision) return { ok: false, error: "The saved plan changed. Reload the latest version before refining." };
+  const draft = { ...parsed.data.draft, details: parsed.data.draft.details ?? {} };
+  try { assertCurrentRefinementDraft([current], [draft]); }
+  catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Reload the current plan before refining." }; }
   const privacy = validateFamilyNoPii(detail, [
-    { field: "feedback", label: "AI revision instructions", value: feedback },
+    { field: "feedback", label: "AI revision instructions", value: feedback }, ...refinementPrivacyFields([draft]),
   ]);
-  if (!privacy.ok) {
-    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
-  }
-
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("id, plan_id, phase, title, description, details, workflow_data")
-    .eq("id", stepId)
-    .maybeSingle();
-
-  if (!step) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const env = getEnv();
-  if (!env.OPENAI_API_KEY?.trim()) {
-    return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
-  }
-
-  const allSteps = detail.plan?.steps ?? [];
-  const stepIndex = allSteps.findIndex((s) => s.id === stepId);
-  const surroundingTitles = [
-    ...allSteps.slice(Math.max(0, stepIndex - 1), stepIndex),
-    ...allSteps.slice(stepIndex + 1, stepIndex + 2),
-  ].map((s) => s.title);
-
-  const result = await refineStepWithOpenAI(
-    detail,
-    {
-      phase: step.phase,
-      title: step.title,
-      description: step.description,
-      details: step.details,
-      workflow_data: step.workflow_data,
-    },
-    feedback,
-    {
-      surroundingStepTitles: surroundingTitles,
-      aiMode: stepMode,
-      requestMeta: { route: "previewRefinePlanStep" },
-    },
-  );
-
-  if (!result.ok) {
-    return { ok: false, error: result.reason };
-  }
-
-  return { ok: true, step: result.step };
+  if (!privacy.ok) return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+  if (!getEnv().OPENAI_API_KEY?.trim()) return { ok: false, error: "AI refinement is not configured." };
+  const result = await previewRefinePlanStepsWithOpenAI(detail, [draft], feedback, {
+    aiMode: parseAiMode(aiMode), requestMeta: { route: "previewRefinePlanStep" }, taskType: "step_refinement",
+  });
+  return result.ok ? { ok: true, step: result.steps[0] } : { ok: false, error: result.reason };
 }
 
 export type PreviewRefinePlanResult =
@@ -1529,46 +1508,15 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
+  if (detail.plan?.review_revision !== parsed.data.expectedRevision) return { ok: false, error: "The saved plan changed. Reload the latest version before refining." };
   try {
-    const currentSteps = detail.plan?.steps ?? [];
-    const requestedSteps = matchPlanRowsById(currentSteps, draft.steps);
-    currentSteps.forEach((step, i) => matchPlanRowsById(step.action_items ?? [], requestedSteps[i].action_items));
-  } catch {
-    return { ok: false, error: "The current plan's goals or actions changed. Reload the saved plan before requesting another preview." };
+    assertCurrentRefinementDraft(detail.plan?.steps ?? [], draft.steps.map(step => ({ ...step, details: step.details ?? {} })));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "The current plan changed. Reload before requesting another preview." };
   }
+  const draftSteps: DraftStepRefineInput[] = draft.steps.map(step => ({ ...step, details: step.details ?? {} }));
   const privacy = validateFamilyNoPii(detail, [
-    { field: "feedback", label: "AI revision instructions", value: feedback },
-    ...draft.steps.flatMap((step, stepIndex) => [
-      {
-        field: `draft.steps.${stepIndex}.title`,
-        label: "Action title",
-        value: step.title,
-      },
-      {
-        field: `draft.steps.${stepIndex}.description`,
-        label: "Action description",
-        value: step.description,
-      },
-      ...planDetailsPrivacyFields(
-        (step.details ?? {}) as PlanStepDetails,
-        `draft.steps.${stepIndex}.details`,
-      ),
-      ...Object.entries(step.workflow_data ?? {}).flatMap(([key, value]) => typeof value === "string" ? [{ field: `draft.steps.${stepIndex}.workflow_data.${key}`, label: "Action progress", value }] : []),
-      ...step.action_items.flatMap((action, actionIndex) => [
-        {
-          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.title`,
-          label: "Action title",
-          value: action.title,
-        },
-        {
-          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.description`,
-          label: "Action description",
-          value: action.description,
-        },
-        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.notes`, label: "Action progress", value: action.notes },
-        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.outcome`, label: "Action outcome", value: action.outcome },
-      ]),
-    ]),
+    { field: "feedback", label: "AI revision instructions", value: feedback }, ...refinementPrivacyFields(draftSteps),
   ]);
   if (!privacy.ok) {
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
@@ -1578,27 +1526,6 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   if (!env.OPENAI_API_KEY?.trim()) {
     return { ok: false, error: "AI refinement requires OPENAI_API_KEY" };
   }
-
-  const draftSteps = draft.steps.map((s) => ({
-    id: s.id,
-    status: s.status,
-    workflow_data: s.workflow_data,
-    phase: s.phase,
-    title: s.title,
-    description: s.description,
-    details: (s.details ?? {}) as PlanStepDetails,
-    action_items: s.action_items.map((ai) => ({
-      id: ai.id,
-      status: ai.status,
-      notes: ai.notes,
-      outcome: ai.outcome,
-      follow_up_date: ai.follow_up_date,
-      title: ai.title,
-      description: ai.description ?? undefined,
-      week_index: ai.week_index,
-      target_date: ai.target_date ?? undefined,
-    })),
-  }));
 
   const result = await previewRefinePlanStepsWithOpenAI(
     detail,

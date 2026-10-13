@@ -10,10 +10,10 @@ vi.mock("@/lib/env", () => ({ getEnv: () => ({}) }));
 
 const detail = { summary: null, household_notes: null, barriers: [], resourceMatches: [] } as unknown as FamilyDetail;
 const base: DraftStepRefineInput = {
-  id: "30000000-0000-4000-8000-000000000003", status: "pending", phase: "30", title: "Prepare intake", description: "Gather the agreed materials",
+  id: "30000000-0000-4000-8000-000000000003", updated_at: "2026-10-01T12:00:00.123456Z", status: "pending", phase: "30", title: "Prepare intake", description: "Gather the agreed materials",
   details: { owner: "family", checklist: ["Confirmed document"], required_documents: ["Old document"],
     contacts: [{ name: "Old contact" }], expected_outcome: "Intake ready", timing_guidance: "After school", stage_goal: "Housing stability" },
-  action_items: [{ id: "40000000-0000-4000-8000-000000000004", status: "pending", notes: null, outcome: null, follow_up_date: null, title: "Call intake", description: "Use the agreed wording", week_index: 1, target_date: "2026-10-20" }],
+  action_items: [{ id: "40000000-0000-4000-8000-000000000004", updated_at: "2026-10-01T12:00:00.123456Z", status: "pending", notes: null, outcome: null, follow_up_date: null, title: "Call intake", description: "Use the agreed wording", week_index: 1, target_date: "2026-10-20" }],
 };
 const unchanged: PlanRefineLeanStep = {
   id: base.id, phase: "30", title: base.title, description: base.description,
@@ -31,12 +31,14 @@ describe("existing-plan refinement preserves cardinality and intentional removal
     const prompt = vi.mocked(createAiResponse).mock.calls[0][0].input as string;
     if (count > 0) expect(prompt).toContain("2026-10-20");
     expect(prompt).not.toContain("Start:");
-    expect(previewRefinePlanSchema.safeParse({ familyId: "20000000-0000-4000-8000-000000000002", feedback: "Improve heading", draft: { steps: [draft] } }).success).toBe(true);
+    expect(previewRefinePlanSchema.safeParse({ expectedRevision: "a".repeat(64), familyId: "20000000-0000-4000-8000-000000000002", feedback: "Improve heading", draft: { steps: [draft] } }).success).toBe(true);
   });
 
   it("distinguishes explicit clearing from leaving documents and contacts unchanged", () => {
     expect(mergeLeanRefineIntoBase(base, unchanged)).toEqual(base);
-    const cleared = mergeLeanRefineIntoBase(base, { ...unchanged, required_documents: [], contacts: [] });
+    const withLegacy = { ...base, details: { ...base.details, materials_needed: ["Legacy form"] } };
+    expect(mergeLeanRefineIntoBase(withLegacy, unchanged)).toEqual(withLegacy);
+    const cleared = mergeLeanRefineIntoBase(withLegacy, { ...unchanged, required_documents: [], contacts: [] });
     expect(cleared.details).toEqual({ ...base.details, required_documents: [], contacts: [] });
     expect(cleared.action_items).toEqual(base.action_items);
     expect(base.details.contacts).toEqual([{ name: "Old contact" }]);

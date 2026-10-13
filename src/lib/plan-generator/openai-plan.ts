@@ -709,9 +709,9 @@ export async function previewRefinePlanStepsWithOpenAI(
   detail: FamilyDetail,
   draftSteps: DraftStepRefineInput[],
   feedback: string,
-  options?: { retries?: number; aiMode?: AiMode; requestMeta?: OpenAiRequestMeta },
+  options?: { aiMode?: AiMode; requestMeta?: OpenAiRequestMeta; taskType?: "step_refinement" | "plan_refinement" },
 ): Promise<{ ok: true; steps: DraftStepRefineInput[]; model: string } | { ok: false; reason: string }> {
-  void options?.retries;
+  const taskType = options?.taskType ?? "plan_refinement";
   const env = getEnv();
   const logRefine = env.PLAN_REFINE_DEBUG === "1" || env.OPENAI_DEBUG === "1";
   const startedAt = Date.now();
@@ -746,7 +746,7 @@ ${feedback.trim()}
 
   try {
     const result = await createAiResponse({
-      taskType: "plan_refinement",
+      taskType,
       instructions,
       input: user,
       structuredJsonSchema: {
@@ -762,7 +762,7 @@ ${feedback.trim()}
     if (!result.ok) {
       if (logRefine) {
         console.info("[plan-refine]", {
-          taskType: "plan_refinement",
+          taskType,
           model: null,
           aiMode: options?.aiMode ?? null,
           retry: false,
@@ -780,7 +780,7 @@ ${feedback.trim()}
     } catch {
       if (logRefine) {
         console.info("[plan-refine]", {
-          taskType: "plan_refinement",
+          taskType,
           model: result.model,
           aiMode: options?.aiMode ?? null,
           retry: false,
@@ -796,7 +796,7 @@ ${feedback.trim()}
     if (!validated.success) {
       if (logRefine) {
         console.info("[plan-refine]", {
-          taskType: "plan_refinement",
+          taskType,
           model: result.model,
           aiMode: options?.aiMode ?? null,
           retry: false,
@@ -814,7 +814,7 @@ ${feedback.trim()}
     if (validated.data.steps.length !== draftSteps.length) {
       if (logRefine) {
         console.info("[plan-refine]", {
-          taskType: "plan_refinement",
+          taskType,
           model: result.model,
           aiMode: options?.aiMode ?? null,
           retry: false,
@@ -837,7 +837,7 @@ ${feedback.trim()}
       if (merged[i]!.phase !== draftSteps[i]!.phase) {
         if (logRefine) {
           console.info("[plan-refine]", {
-            taskType: "plan_refinement",
+            taskType,
             model: result.model,
             aiMode: options?.aiMode ?? null,
             retry: false,
@@ -856,7 +856,7 @@ ${feedback.trim()}
 
     if (logRefine) {
       console.info("[plan-refine]", {
-        taskType: "plan_refinement",
+        taskType,
         model: result.model,
         aiMode: options?.aiMode ?? null,
         retry: false,
@@ -869,7 +869,7 @@ ${feedback.trim()}
   } catch (e) {
     if (logRefine) {
       console.info("[plan-refine]", {
-        taskType: "plan_refinement",
+        taskType,
         model: null,
         aiMode: options?.aiMode ?? null,
         retry: false,

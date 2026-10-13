@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { RefinementChangeReview } from "./refinement-change-review";
+import type { RefinementChange } from "@/lib/domain/plan/refinement-review";
 import { Textarea } from "@/components/ui/textarea";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
@@ -41,61 +43,6 @@ const sectionLabelClass =
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return <p className={sectionLabelClass}>{children}</p>;
-}
-
-function RefineComparisonCard({
-  label,
-  title,
-  summary,
-  outcome,
-  documents,
-  contact,
-  proposed = false,
-}: {
-  label: string;
-  title: string;
-  summary: string;
-  outcome: string | null;
-  documents: string | null;
-  contact: string | null;
-  proposed?: boolean;
-}) {
-  const fields = [
-    ["Title", title],
-    ["Summary", summary],
-    ["Expected result", outcome],
-    ["Documents", documents],
-    ["Contact", contact],
-  ] as const;
-
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-3",
-        proposed
-          ? "border-[var(--color-positive-rule)] bg-[var(--color-positive-bg)]"
-          : "border-[var(--color-rule)] bg-[var(--color-paper)]",
-      )}
-    >
-      <p className={cn(sectionLabelClass, proposed && "text-[var(--color-positive)]")}>{label}</p>
-      <dl className="mt-3 space-y-3">
-        {fields.map(([fieldLabel, value]) => (
-          <div key={fieldLabel}>
-            <dt className="text-[11px] font-medium text-[var(--color-ink-faint)]">{fieldLabel}</dt>
-            <dd
-              className={cn(
-                "mt-0.5 whitespace-pre-wrap text-sm leading-relaxed",
-                value?.trim() ? "text-[var(--color-ink-strong)]" : "italic text-[var(--color-ink-faint)]",
-                fieldLabel === "Title" && value?.trim() && "font-semibold text-[var(--color-ink)]",
-              )}
-            >
-              {value?.trim() || "Not set"}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
 }
 
 function formatDateOnly(value: string | null): string | null {
@@ -204,7 +151,9 @@ export function PlanStepCaseNote({
   stepDirty,
   refineOpen,
   refineInstruction,
-  refinePreview,
+  refineChanges,
+  refineSelected,
+  onRefineSelect,
   refinePending,
   onRefineInstruction,
   onRefineRun,
@@ -229,12 +178,9 @@ export function PlanStepCaseNote({
   stepDirty?: boolean;
   refineOpen: boolean;
   refineInstruction: string;
-  refinePreview: {
-    title: string;
-    description: string;
-    details: PlanStepDetails;
-    stepPriority?: PlanStepRow["priority"];
-  } | null;
+  refineChanges: RefinementChange[] | null;
+  refineSelected: string[];
+  onRefineSelect: (id: string, checked: boolean) => void;
   refinePending: boolean;
   onRefineInstruction: (v: string) => void;
   onRefineRun: () => void;
@@ -256,14 +202,6 @@ export function PlanStepCaseNote({
   const documentsDisplay = useMemo(() => formatDocumentsDisplay(d), [d]);
   const contactDisplay = useMemo(() => formatContactDisplay(d), [d]);
   const outcomeDisplay = useMemo(() => formatOutcomeDisplay(d), [d]);
-  const refineDocumentsDisplay = useMemo(
-    () => (refinePreview ? formatDocumentsDisplay(refinePreview.details) : null),
-    [refinePreview],
-  );
-  const refineContactDisplay = useMemo(
-    () => (refinePreview ? formatContactDisplay(refinePreview.details) : null),
-    [refinePreview],
-  );
   const recordNotes = useMemo(() => formatRecordNotes(step.workflow_data), [step.workflow_data]);
   const actions = useMemo(
     () =>
@@ -829,7 +767,7 @@ export function PlanStepCaseNote({
           <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Assist</SectionLabel>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onOpenRefine}>
+              <Button type="button" variant="secondary" className="h-8 text-xs" id={`${titleId}-refine`} onClick={onOpenRefine}>
                 Refine action
               </Button>
             </div>
@@ -840,11 +778,12 @@ export function PlanStepCaseNote({
                 aria-label="Refine action with AI"
               >
                 <p className="text-xs text-[var(--color-ink-muted)]">
-                  Describe how this action should read. Preview updates this action&apos;s draft only until
-                  you apply; use <strong>Save edits</strong> to persist.
+                  Describe the wording, preparation, or date changes you want. Choose changes from the preview,
+                  then use <strong>Save edits</strong> to save.
                 </p>
                 <Textarea
                   rows={3}
+                  aria-label="AI revision instructions"
                   value={refineInstruction}
                   onChange={(e) => onRefineInstruction(e.target.value)}
                   placeholder="e.g. Shorten for a city intake form; keep contacts and documents."
@@ -864,7 +803,7 @@ export function PlanStepCaseNote({
                     Close
                   </Button>
                 </div>
-                {refinePreview ? (
+                {refineChanges ? (
                   <div className="space-y-3 border-t border-[var(--color-rule)] pt-3" aria-live="polite">
                     <div>
                       <p className="text-sm font-semibold text-[var(--color-ink)]">Review changes</p>
@@ -873,27 +812,9 @@ export function PlanStepCaseNote({
                         it, and <strong>Save edits</strong> is still required.
                       </p>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <RefineComparisonCard
-                        label="Current draft"
-                        title={step.title}
-                        summary={mainParagraphRead}
-                        outcome={outcomeDisplay}
-                        documents={documentsDisplay}
-                        contact={contactDisplay}
-                      />
-                      <RefineComparisonCard
-                        label="Proposed draft"
-                        title={refinePreview.title}
-                        summary={refinePreview.description}
-                        outcome={refinePreview.details.expected_outcome?.trim() || null}
-                        documents={refineDocumentsDisplay}
-                        contact={refineContactDisplay}
-                        proposed
-                      />
-                    </div>
+                    <RefinementChangeReview changes={refineChanges} selected={refineSelected} onSelect={onRefineSelect} />
                     <div className="flex flex-wrap gap-2 pt-1">
-                      <Button type="button" className="h-8 text-xs" onClick={onRefineApply}>
+                      <Button type="button" className="h-8 text-xs" onClick={() => { onRefineApply(); document.getElementById(`${titleId}-refine`)?.focus(); }} disabled={!refineSelected.length}>
                         Apply to draft
                       </Button>
                       <Button

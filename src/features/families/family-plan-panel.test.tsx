@@ -6,6 +6,7 @@ import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, savePlanEdi
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
+import { toRefinementDraft } from "@/lib/domain/plan/refinement-review";
 
 const routerRefresh = vi.hoisted(() => vi.fn());
 const owner = "90000000-0000-4000-8000-000000000001";
@@ -156,7 +157,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     original.steps[0].details!.required_documents = ["Unneeded document"];
     const step = original.steps[0];
     vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test", steps: [{
-      id: step.id, status: step.status, phase: step.phase, title: step.title, description: step.description,
+      id: step.id, updated_at: step.updated_at, status: step.status, phase: step.phase, title: step.title, description: step.description,
       details: { ...step.details, contacts: [], required_documents: [] }, action_items: step.action_items!,
     }] });
     vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
@@ -165,7 +166,9 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Remove the outdated contact and unneeded document" } });
     fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Apply to working copy" }));
+    await screen.findByRole("button", { name: "Apply to working copy" });
+    for (const choice of dialog.getAllByRole("checkbox")) fireEvent.click(choice);
+    fireEvent.click(screen.getByRole("button", { name: "Apply to working copy" }));
     fireEvent.click(screen.getByRole("button", { name: "Save to plan" }));
     await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
     expect(previewRefinePlan).toHaveBeenCalledWith(expect.objectContaining({ draft: { steps: [expect.objectContaining({ action_items: [expect.objectContaining({ title: "Call intake" })] })] } }));
@@ -180,7 +183,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     second.action_items![0].plan_step_id = second.id;
     two.steps.push(second);
     vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test-model", steps: two.steps.map((step, i) => ({
-      id: step.id, status: step.status, phase: step.phase, title: `Revised goal ${i}`, description: step.description, details: step.details!, action_items: step.action_items!,
+      id: step.id, updated_at: step.updated_at, status: step.status, phase: step.phase, title: `Revised goal ${i}`, description: step.description, details: step.details!, action_items: step.action_items!,
     })) });
     vi.mocked(savePlanEdits).mockResolvedValueOnce({ ok: false, error: "Nothing was saved. Try again." }).mockResolvedValueOnce({ ok: true });
     render(<FamilyPlanPanel familyId={two.family_id} plan={two} workflow={null} />);
@@ -188,7 +191,16 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify both goals" } });
     fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
-    fireEvent.click(await dialog.findByRole("button", { name: "Apply to working copy" }));
+    await dialog.findByRole("button", { name: "Apply to working copy" });
+    for (const choice of dialog.getAllByRole("checkbox")) fireEvent.click(choice);
+    const cleanExit = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(cleanExit);
+    expect(cleanExit.defaultPrevented).toBe(false);
+    fireEvent.click(dialog.getByRole("button", { name: "Apply to working copy" }));
+    expect(document.activeElement).toBe(dialog.getByRole("textbox"));
+    const dirtyExit = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirtyExit);
+    expect(dirtyExit.defaultPrevented).toBe(true);
     fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
     await dialog.findByText("Nothing was saved. Try again.");
     expect(savePlanEdits).toHaveBeenCalledTimes(1);
@@ -197,6 +209,9 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     await waitFor(() => expect((dialog.getByRole("button", { name: "Save to plan" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
     await screen.findByText("Plan updates saved.");
+    const savedExit = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(savedExit);
+    expect(savedExit.defaultPrevented).toBe(false);
     expect(vi.mocked(savePlanEdits).mock.calls[1][0]).toEqual(firstRequest);
   });
 
@@ -224,13 +239,15 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify only the wording" } });
     fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
-    fireEvent.click(await dialog.findByRole("button", { name: "Apply to working copy" }));
+    await dialog.findByRole("button", { name: "Apply to working copy" });
+    for (const choice of dialog.getAllByRole("checkbox")) fireEvent.click(choice);
+    fireEvent.click(dialog.getByRole("button", { name: "Apply to working copy" }));
     fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
     await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
     expect(savePlanEdits).toHaveBeenCalledWith(expect.objectContaining({ steps: original.steps.map(step => expect.objectContaining({
       stepId: step.id,
       patch: expect.objectContaining({ details: expect.objectContaining({ owner: "family" }), workflow_data: step.workflow_data }),
-      actionItems: step.action_items!.map(action => expect.objectContaining({ actionItemId: action.id,
+      actionItems: step.action_items!.filter(action => action.status !== "completed").map(action => expect.objectContaining({ actionItemId: action.id,
         patch: expect.objectContaining({ title: `${action.title} clarified`, status: action.status, outcome: action.outcome, notes: action.notes }),
       })),
     })) }));
@@ -246,8 +263,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify wording" } });
     fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
-    fireEvent.click(await dialog.findByRole("button", { name: "Apply to working copy" }));
-    expect(dialog.getByRole("alert").textContent).toContain("changed the plan structure");
+    expect((await dialog.findByRole("alert")).textContent).toContain("preview could not be prepared");
     expect(dialog.queryByRole("button", { name: "Save to plan" })).toBeNull();
     expect(savePlanEdits).not.toHaveBeenCalled();
   });
@@ -265,6 +281,76 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     expect((region.getByRole("button", { name: "Generate preview" }) as HTMLButtonElement).disabled).toBe(false);
     expect((region.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Shorten the description.");
     expect(screen.queryByText("private failure")).toBeNull();
+  });
+
+  it("refines the unsaved draft and applies only a selected sentence change, preserving progress and dates", async () => {
+    const original = structuredClone(plan);
+    original.steps[0].details = { ...original.steps[0].details, owner: "family", required_documents: ["Agreed document"], checklist: ["", "Completed requirement"] };
+    original.steps[0].workflow_data = { checklist_completed: [false, true], outcome_notes: "Agreed follow-up" };
+    vi.mocked(previewRefinePlanStep).mockImplementation(async input => {
+      const draft = (input as { draft: ReturnType<typeof toRefinementDraft> }).draft;
+      return { ok: true, step: { ...draft, title: "Unrequested title change", description: "Shortened summary",
+        details: { ...draft.details, owner: "school_program", required_documents: ["Unrequested document"], checklist: ["New checklist"] },
+        action_items: draft.action_items.map(action => ({ ...action, target_date: "2026-12-01" })),
+      } };
+    });
+    vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
+    render(<FamilyPlanPanel familyId={original.family_id} plan={original} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "My unsaved title" } });
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    const region = within(screen.getByRole("region", { name: "Refine action with AI" }));
+    fireEvent.change(region.getByRole("textbox"), { target: { value: "Shorten only the summary" } });
+    fireEvent.click(region.getByRole("button", { name: "Generate preview" }));
+    const apply = await region.findByRole("button", { name: "Apply to draft" });
+    expect((apply as HTMLButtonElement).disabled).toBe(true);
+    expect(previewRefinePlanStep).toHaveBeenCalledWith(expect.objectContaining({ draft: expect.objectContaining({ title: "My unsaved title", updated_at: original.steps[0].updated_at }) }));
+    fireEvent.click(region.getByRole("checkbox", { name: /— Summary$/ }));
+    fireEvent.click(apply);
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
+    expect(savePlanEdits).toHaveBeenCalledWith(expect.objectContaining({ steps: [expect.objectContaining({
+      patch: expect.objectContaining({ title: "My unsaved title", description: "Shortened summary",
+        details: expect.objectContaining({ owner: "family", required_documents: ["Agreed document"], checklist: ["", "Completed requirement"] }),
+        workflow_data: { checklist_completed: [false, true], outcome_notes: "Agreed follow-up" },
+      }), actionItems: [],
+    })] }));
+  });
+
+  it.each(["pending", "ready"])("invalidates a %s preview when the human edits the draft", async state => {
+    let finish!: (value: Awaited<ReturnType<typeof previewRefinePlanStep>>) => void;
+    vi.mocked(previewRefinePlanStep).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    const region = within(screen.getByRole("region", { name: "Refine action with AI" }));
+    fireEvent.change(region.getByRole("textbox"), { target: { value: "Shorten the title" } });
+    fireEvent.click(region.getByRole("button", { name: "Generate preview" }));
+    const response = { ok: true as const, step: { ...toRefinementDraft(plan.steps[0]), title: "Older suggestion" } };
+    if (state === "ready") await act(async () => finish(response));
+    fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "New manual wording" } });
+    if (state === "pending") await act(async () => finish(response));
+    expect(region.queryByRole("button", { name: "Apply to draft" })).toBeNull();
+    expect(screen.getByDisplayValue("New manual wording")).toBeTruthy();
+    expect((region.getByRole("button", { name: "Generate preview" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("rejects a late preview when a new saved plan revision arrives", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof previewRefinePlanStep>>) => void;
+    vi.mocked(previewRefinePlanStep).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const view = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    const region = within(screen.getByRole("region", { name: "Refine action with AI" }));
+    fireEvent.change(region.getByRole("textbox"), { target: { value: "Clarify the title" } });
+    fireEvent.click(region.getByRole("button", { name: "Generate preview" }));
+    view.rerender(<FamilyPlanPanel familyId={plan.family_id} plan={{ ...plan, review_revision: "b".repeat(64) }} workflow={null} />);
+    await act(async () => finish({ ok: true, step: { ...toRefinementDraft(plan.steps[0]), title: "Stale suggestion" } }));
+    expect(screen.getByText(/The saved plan changed. Your draft is still here/)).toBeTruthy();
+    expect(region.queryByRole("button", { name: "Apply to draft" })).toBeNull();
   });
 
   it("submits the displayed revision and recovers from a failed review", async () => {
@@ -322,8 +408,8 @@ describe("FamilyPlanPanel stale edit recovery", () => {
           status: "pending",
           phase: "30",
           priority: "high",
-          details: plan.steps[0].details ?? null,
-          workflow_data: {},
+          details: { ...plan.steps[0].details, timing_guidance: "Keep the school deadline", checklist: ["Confirm consent"], materials_needed: ["School form"] },
+          workflow_data: { checklist_completed: [true], documents_received: true },
         },
       },
     });
@@ -354,6 +440,9 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     expect(
       within(conflictPanel!).getByText("Call housing intake and confirm eligibility"),
     ).toBeTruthy();
+    for (const text of ["Timing guidance", "Keep the school deadline", "1. Confirm consent", "1. School form", "Checklist completion", "1. Completed", "Documents received"]) {
+      expect(within(conflictPanel!).getByText(text)).toBeTruthy();
+    }
     expect(within(conflictPanel!).getByRole("button", { name: "Keep my draft" })).toBeTruthy();
     expect(
       within(conflictPanel!).getByRole("button", { name: "Use latest version" }),

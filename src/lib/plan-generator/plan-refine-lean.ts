@@ -115,13 +115,14 @@ export type PlanRefineLeanStep = z.infer<typeof planRefineLeanStepSchema>;
 
 export type DraftStepRefineInput = {
   id: string;
+  updated_at: string;
   status: PlanStepRow["status"];
   workflow_data?: PlanStepRow["workflow_data"];
   phase: PlanPhase;
   title: string;
   description: string;
   details: PlanStepDetails;
-  action_items: Array<z.infer<typeof leanActionItemSchema> & Pick<PlanStepActionItemRow, "status" | "notes" | "outcome" | "follow_up_date">>;
+  action_items: Array<z.infer<typeof leanActionItemSchema> & Pick<PlanStepActionItemRow, "updated_at" | "status" | "notes" | "outcome" | "follow_up_date">>;
 };
 
 /** Null leaves a list unchanged; an empty list explicitly clears it. */
@@ -135,7 +136,7 @@ export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRe
     description: lean.description.trim(),
     details: {
       ...base.details,
-      ...(lean.required_documents !== null ? { required_documents: lean.required_documents.map(value => value.trim()).filter(Boolean) } : {}),
+      ...(lean.required_documents !== null ? { required_documents: lean.required_documents.map(value => value.trim()).filter(Boolean), materials_needed: undefined } : {}),
       ...(lean.contacts !== null ? { contacts: lean.contacts.map(contact => ({
         name: contact.name.trim(), phone: contact.phone?.trim() || undefined,
         email: contact.email?.trim() || undefined, notes: contact.notes?.trim() || undefined,
