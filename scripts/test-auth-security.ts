@@ -2,21 +2,50 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { offboardUser } from "./offboard-user-operation";
+import { inviteUser } from "./invite-user-operation";
+import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 
 const local = JSON.parse(execFileSync("npx", ["--yes", "supabase@2.111.0", "status", "--output", "json"], {
   encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
 })) as Record<string, string>;
-for (const name of ["API_URL", "DB_URL"]) {
+for (const name of ["API_URL", "DB_URL", "MAILPIT_URL"]) {
   assert.ok(["127.0.0.1", "localhost"].includes(new URL(local[name]).hostname), "Auth security tests require isolated local services.");
 }
-const authOptions = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
+const authOptions = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { fetch: fetchWithTimeout } };
 const operator = createClient(local.API_URL, local.SERVICE_ROLE_KEY, authOptions);
 const db = new Client({ connectionString: local.DB_URL });
 const users: string[] = [];
 const families: string[] = [];
+const mailIds = new Set<string>();
+
+async function deliveredToken(email: string, type: "invite" | "recovery") {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const response = await fetchWithTimeout(`${local.MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
+    assert.equal(response.status, 200, "the isolated mailbox is available");
+    const { messages } = await response.json() as { messages: { ID: string }[] };
+    for (const message of messages) {
+      if (mailIds.has(message.ID)) continue;
+      const detail = await (await fetchWithTimeout(`${local.MAILPIT_URL}/api/v1/message/${message.ID}`)).json() as { HTML: string };
+      for (const link of detail.HTML.matchAll(/href="([^"]+)"/g)) {
+        const url = new URL(link[1].replaceAll("&amp;", "&"));
+        if (url.searchParams.get("type") !== type) continue;
+        const token = url.searchParams.get("token");
+        assert.ok(token, "the delivered email contains a verification token");
+        assert.ok(url.origin === local.API_URL, "email links only use the isolated Auth service");
+        const destination = new URL(url.searchParams.get("redirect_to")!);
+        assert.ok(destination.origin === "http://127.0.0.1:3000" && destination.pathname === "/auth/callback", "the delivered link uses the exact intended callback");
+        mailIds.add(message.ID);
+        return token;
+      }
+    }
+    await delay(100);
+  }
+  throw new Error("The expected synthetic account email was not delivered.");
+}
 
 async function staff() {
   const email = `auth-security-${randomUUID()}@example.test`;
@@ -37,14 +66,20 @@ async function invitedStaff(assignedFamilyId: string) {
   const email = `auth-security-${randomUUID()}@example.test`;
   const firstPassword = `${randomUUID()}-Initial!1`;
   const password = `${randomUUID()}-Replacement!1`;
-  const invite = await operator.auth.admin.generateLink({ type: "invite", email });
-  assert.equal(invite.error, null, "a synthetic invitation link can be created");
-  const id = invite.data.user.id;
+  const invitationInput = { email, role: "case_manager", siteOrigin: "http://127.0.0.1:3000", actorLabel: "Auth test", reason: "Synthetic invitation setup test" };
+  const invite = await inviteUser(operator, invitationInput);
+  const id = invite.userId;
   users.push(id);
-  assert.equal((await operator.rpc("operator_set_user_role", { p_target_user_id: id, p_role: "case_manager", p_actor_label: "Auth test", p_reason: "Synthetic invitation setup test", p_action: "user.invited" })).error, null);
+  const firstToken = await deliveredToken(email, "invite");
+  assert.equal((await db.query("select count(*)::int as count from public.app_users where id = $1", [id])).rows[0].count, 1, "permissions exist before the delivered invitation is opened");
+  await db.query("update auth.users set confirmation_sent_at = now() - interval '16 minutes' where id = $1", [id]);
+  assert.ok((await createClient(local.API_URL, local.ANON_KEY, authOptions).auth.verifyOtp({ type: "invite", token_hash: firstToken })).error, "expired invitations cannot establish a session");
+  const resent = await inviteUser(operator, invitationInput);
+  assert.equal(resent.userId, id, "resending an expired invitation reuses the same account");
+  const token = await deliveredToken(email, "invite");
   assert.equal((await operator.rpc("operator_set_family_assignment", { p_family_id: assignedFamilyId, p_target_user_id: id, p_assigned: true, p_actor_label: "Auth test", p_reason: "Synthetic assignment before password setup" })).error, null);
   const client = createClient(local.API_URL, local.ANON_KEY, authOptions);
-  const verified = await client.auth.verifyOtp({ type: "invite", token_hash: invite.data.properties.hashed_token });
+  const verified = await client.auth.verifyOtp({ type: "invite", token_hash: token });
   assert.equal(verified.error, null, "invitation verification establishes a setup session");
   assert.equal((await client.auth.updateUser({ data: { amr: [{ method: "password" }] } })).error, null);
   assert.equal((await client.rpc("has_password_session")).data, false, "invitation and forged user_metadata cannot impersonate password authentication");
@@ -60,9 +95,10 @@ async function invitedStaff(assignedFamilyId: string) {
   assert.equal((await client.rpc("has_password_session")).data, true);
   assert.equal((await client.from("families").select("id").eq("id", assignedFamilyId)).data?.length, 1);
   const oldToken = initialLogin.data.session!.access_token;
-  const recovery = await operator.auth.admin.generateLink({ type: "recovery", email });
-  assert.equal(recovery.error, null);
-  assert.equal((await client.auth.verifyOtp({ type: "recovery", token_hash: recovery.data.properties.hashed_token })).error, null);
+  assert.equal((await inviteUser(operator, invitationInput)).delivery, "none", "an active account's role update sends no unexpected email");
+  assert.equal((await inviteUser(operator, { ...invitationInput, resend: true })).delivery, "recovery");
+  const recoveryToken = await deliveredToken(email, "recovery");
+  assert.equal((await client.auth.verifyOtp({ type: "recovery", token_hash: recoveryToken })).error, null);
   assert.equal((await client.auth.updateUser({ password })).error, null, "a fresh recovery session changes the password");
   assert.equal((await client.auth.signOut({ scope: "global" })).error, null);
   const oldAccess = await retainedRequest(oldToken, `families?select=id&id=eq.${assignedFamilyId}`);
@@ -70,7 +106,7 @@ async function invitedStaff(assignedFamilyId: string) {
   assert.ok((await client.auth.signInWithPassword({ email, password: firstPassword })).error, "the previous password no longer works");
   const login = await client.auth.signInWithPassword({ email, password });
   assert.equal(login.error, null, "the replacement password signs in successfully");
-  const reused = await createClient(local.API_URL, local.ANON_KEY, authOptions).auth.verifyOtp({ type: "recovery", token_hash: recovery.data.properties.hashed_token });
+  const reused = await createClient(local.API_URL, local.ANON_KEY, authOptions).auth.verifyOtp({ type: "recovery", token_hash: recoveryToken });
   assert.ok(reused.error, "a recovery link cannot be reused");
   return { id, client, email, password, accessToken: login.data.session!.access_token, refreshToken: login.data.session!.refresh_token };
 }
@@ -85,7 +121,7 @@ async function family(client: SupabaseClient) {
   return created.data as string;
 }
 async function retainedRequest(token: string, path: string, body?: unknown) {
-  return fetch(`${local.API_URL}/rest/v1/${path}`, {
+  return fetchWithTimeout(`${local.API_URL}/rest/v1/${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: { apikey: local.ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

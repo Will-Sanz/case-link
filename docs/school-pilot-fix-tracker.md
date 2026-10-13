@@ -289,7 +289,7 @@ README, PRD, privacy/operations material, and retained PDF helpers describe blan
 
 **Close with:** repo-wide reference search, updated school-demo instructions, and normal verification. Preserve historical data/migrations unless a separate reviewed migration is required. **Sources:** [README](/Users/willsanz/homelessness-project/README.md), [PRD](/Users/willsanz/homelessness-project/docs/intervention-planning-prd.md), [PDF inspector](/Users/willsanz/homelessness-project/src/lib/paperwork/pdf-form.ts), [field policy](/Users/willsanz/homelessness-project/src/lib/paperwork/field-policy.ts). **Lean opportunity:** at least 159 implementation lines, zero dependencies established for removal.
 
-### [ ] CL-13 — Make invitation retry and partial provisioning recoverable
+### [x] CL-13 — Make invitation retry and partial provisioning recoverable
 
 **Type:** Fix · **Responsible:** engineering + pilot administrator.
 
@@ -298,6 +298,8 @@ New users receive an invitation before the role-provisioning RPC completes. If p
 **Fix:** provide explicit, auditable invite/resend/repair operations with safe idempotency. Distinguish inviting a new person, resending setup, and changing an existing person's role; never reset an established account accidentally.
 
 **Close with:** first invite, existing active user, expired invite, failed role RPC after email creation, retry, duplicate operator requests, and wrong-role input tests with a synthetic mailbox. **Sources:** [invitation workflow](/Users/willsanz/homelessness-project/scripts/invite-user.ts), [provisioning safety](/Users/willsanz/homelessness-project/scripts/provisioning-safety.ts).
+
+**Completed October 13, 2026 — engineering:** account creation and audited permission provisioning now precede invitation delivery. Failed provisioning sends no email; retries reuse the unconfirmed account and resend its invitation, including after expiry. Duplicate creation is resolved by the existing account instead of creating another. Confirmed users receive only a role update unless the operator explicitly requests `CASELINK_INVITE_RESEND=true`, which sends a recovery link for interrupted setup or renewed access. Offboarded accounts cannot be reactivated by this operation. Safe stage-specific errors explain what remains to retry, and provider waits are bounded. Ten invitation/provisioning unit tests passed, covering ordering, partial failure, resend, duplicate requests, active users, role validation, and offboarding. The real local Auth test now consumes delivered messages from the isolated mailbox and passed initial invite, forced expiry, resend to the same account, initial password, explicit recovery email, one-time links, and old/new password checks. Correctness/security and separate Ponytail review completed; full verification is required on push. School SMTP delivery remains CL-16. Commit: `git log --grep='CL-13'`.
 
 ### [x] CL-14 — Make auth callbacks and failures finish predictably
 

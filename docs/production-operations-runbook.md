@@ -85,9 +85,10 @@ The privacy owner approves every deletion. A documented legal hold pauses deleti
 ### Invite
 
 1. Pilot administrator verifies the work email and business need out of band.
-2. Release operator runs the invitation script using environment variables; passwords never appear in arguments or output.
+2. Release operator runs `npm run db:invite-user` using environment variables; passwords and links never appear in arguments or output. It creates an unconfirmed Auth account, saves audited permissions, and then requests email delivery. A permission failure sends no invitation. Rerun the same operation after fixing a partial failure; it reuses the account and resends an unopened or expired invitation. Respect the provider's resend delay (at least one minute).
 3. Assign the least-privileged `case_manager` role. Admin role changes require service-owner approval, recent authentication, TOTP MFA, and an operator audit event.
-4. Confirm the user can access only an explicitly owned or assigned synthetic case before real use.
+4. Existing confirmed accounts get the requested role update without an unsolicited email. If setup was interrupted after accepting the invite, or a new link is needed, set `CASELINK_INVITE_RESEND=true` to send a recovery link. This also works through the normal Forgot password flow. Neither path reactivates an offboarded account. A delivery-accepted result is not evidence that the school's mailbox received the email; verify receipt separately.
+5. Confirm the user can access only an explicitly owned or assigned synthetic case before real use.
 
 ### Offboard
 

@@ -1,7 +1,9 @@
 /** Invite or update a provisioned user without creating or printing a password. */
 import { config as loadEnv } from "dotenv";
-import { createClient, type User } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { parseInviteSiteOrigin, parseProvisioningRole } from "./provisioning-safety";
+import { inviteUser } from "./invite-user-operation";
+import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 
 loadEnv({ path: ".env.local" });
 loadEnv({ path: ".env" });
@@ -20,41 +22,15 @@ async function main() {
   const role = parseProvisioningRole(process.env.CASELINK_INVITE_ROLE);
   const actorLabel = requireEnv("CASELINK_OPERATOR_LABEL");
   const reason = requireEnv("CASELINK_CHANGE_REASON");
-  if (actorLabel.length < 3 || reason.length < 8) {
-    throw new Error("Operator label and change reason are too short for an auditable role change.");
-  }
+  const resend = process.env.CASELINK_INVITE_RESEND?.trim() || "false";
+  if (resend !== "true" && resend !== "false") throw new Error("CASELINK_INVITE_RESEND must be true or false.");
 
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchWithTimeout },
   });
-  let targetUser: User | undefined;
-  for (let page = 1; !targetUser; page += 1) {
-    const listed = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
-    if (listed.error) throw listed.error;
-    targetUser = listed.data.users.find((user) => user.email?.toLowerCase() === email);
-    if (listed.data.users.length < 1000) break;
-  }
-  let action: "user.invited" | "user.role_changed" = "user.role_changed";
-  if (!targetUser) {
-    const next = encodeURIComponent("/reset-password?mode=setup");
-    const invited = await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${siteOrigin}/auth/callback?next=${next}`,
-    });
-    if (invited.error) throw invited.error;
-    targetUser = invited.data.user;
-    action = "user.invited";
-  }
-  if (!targetUser?.email) throw new Error("The invited user could not be resolved.");
-
-  const roleChange = await supabase.rpc("operator_set_user_role", {
-    p_target_user_id: targetUser.id,
-    p_role: role,
-    p_actor_label: actorLabel,
-    p_reason: reason,
-    p_action: action,
-  });
-  if (roleChange.error) throw roleChange.error;
-  console.info(`${role === "admin" ? "Administrator" : "Case manager"} ${action === "user.invited" ? "invited" : "updated"}: ${email}`);
+  const result = await inviteUser(supabase, { email, role, siteOrigin, actorLabel, reason, resend: resend === "true" });
+  console.info(`${role === "admin" ? "Administrator" : "Case manager"} permissions saved. ${result.delivery === "none" ? "Existing confirmed account; no email sent. Use CASELINK_INVITE_RESEND=true if a fresh setup/recovery link is needed." : `${result.delivery === "invitation" ? "Invitation" : "Recovery email"} accepted for delivery.`}`);
   if (role === "admin") console.info("Require TOTP enrollment before granting production access.");
 }
 
