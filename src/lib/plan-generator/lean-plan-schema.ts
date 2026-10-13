@@ -7,41 +7,45 @@
 import { z } from "zod";
 import type { PlanStepDetails } from "@/types/family";
 import type { PlanPhase } from "./types";
+import { dateOnlySchema, updatePlanStepActionItemSchema } from "@/lib/validations/plans";
+import { toStructuredJsonSchema } from "@/lib/ai/structured-json-schema";
 
-const contactLeanZ = z.object({
-  name: z.string(),
-  phone: z.union([z.string(), z.null()]).optional(),
-  email: z.union([z.string(), z.null()]).optional(),
-  notes: z.union([z.string(), z.null()]).optional(),
+export const planContactSchema = z.strictObject({
+  name: z.string().trim().min(1).max(500),
+  phone: z.string().max(200).nullable(),
+  email: z.string().max(320).nullable(),
+  notes: z.string().max(2000).nullable(),
 });
 
-export const leanActionItemZ = z.object({
-  title: z.string().min(1).max(300),
-  description: z.union([z.string().max(500), z.null()]).optional(),
-  week_index: z.number().int().min(1).max(12),
-  target_date: z.union([z.string(), z.null()]).optional(),
+/** Same editable task limits in AI, manual edits, and persistence. Null dates preserve existing drafts. */
+export const planActionContentSchema = updatePlanStepActionItemSchema.pick({
+  title: true, description: true, week_index: true, target_date: true,
+}).required().strict();
+
+export const leanActionItemZ = planActionContentSchema.extend({
+  target_date: dateOnlySchema("Every generated action needs a valid target date"),
 });
 
-/** One step from the model (phase may be omitted in single-step refine, caller supplies). */
-export const leanPlanStepBodyZ = z.object({
-  goal: z.string().min(1).max(300),
-  title: z.string().min(1).max(500),
-  summary: z.string().min(1).max(4000),
-  action_items: z.array(leanActionItemZ).min(1).max(5),
-  timing: z.union([z.string().max(400), z.null()]).optional(),
-  required_documents: z.array(z.string()).max(20),
-  contacts: z.array(contactLeanZ).max(12),
-  expected_outcome: z.string().min(1).max(800),
-  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-  additional_guidance: z.union([z.string().max(3000), z.null()]).optional(),
+export const leanPlanStepBodyZ = z.strictObject({
+  goal: z.string().trim().min(1).max(500),
+  title: z.string().trim().min(1).max(500),
+  summary: z.string().trim().min(1).max(4000),
+  // The staged-insert RPC accepts up to 20 new tasks per goal.
+  action_items: z.array(leanActionItemZ).min(1).max(20),
+  timing: z.string().max(400).nullable(),
+  required_documents: z.array(z.string().trim().min(1).max(500)).max(20),
+  contacts: z.array(planContactSchema).max(12),
+  expected_outcome: z.string().trim().min(1).max(800),
+  priority: z.enum(["low", "medium", "high", "urgent"]),
+  additional_guidance: z.string().max(3000).nullable(),
 });
 
-export const leanPlanPhaseResponseZ = z.object({
-  steps: z.array(leanPlanStepBodyZ.extend({ phase: z.enum(["30", "60", "90"]) })).min(1).max(5),
-});
+export function planPhaseResponseSchema(phase: PlanPhase) {
+  return z.strictObject({ steps: z.array(leanPlanStepBodyZ.extend({ phase: z.literal(phase) })).min(1).max(5) });
+}
 
 export type LeanPlanStepBody = z.infer<typeof leanPlanStepBodyZ>;
-export type LeanPlanPhaseStep = z.infer<typeof leanPlanPhaseResponseZ>["steps"][number];
+export type LeanPlanPhaseStep = z.infer<ReturnType<typeof planPhaseResponseSchema>>["steps"][number];
 
 function normStr(v: string | null | undefined): string | undefined {
   if (v == null) return undefined;
@@ -79,93 +83,6 @@ export function sparseDetailsForPersistence(lean: LeanPlanPhaseStep): PlanStepDe
   return leanStepToPlanDetails(lean, lean.phase);
 }
 
-const leanStepObjectFields = {
-  phase: { type: "string", enum: ["30", "60", "90"] },
-  goal: { type: "string" },
-  title: { type: "string" },
-  summary: { type: "string" },
-  action_items: {
-    type: "array",
-    minItems: 1,
-    maxItems: 5,
-    items: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        description: { type: ["string", "null"] },
-        week_index: { type: "integer" },
-        target_date: { type: ["string", "null"] },
-      },
-      required: ["title", "description", "week_index", "target_date"],
-      additionalProperties: false,
-    },
-  },
-  timing: { type: ["string", "null"] },
-  required_documents: { type: "array", items: { type: "string" } },
-  contacts: {
-    type: "array",
-    items: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        phone: { type: ["string", "null"] },
-        email: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-      },
-      required: ["name", "phone", "email", "notes"],
-      additionalProperties: false,
-    },
-  },
-  expected_outcome: { type: "string" },
-  priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
-  additional_guidance: { type: ["string", "null"] },
-} as const;
-
-const leanStepRequired = [
-  "phase",
-  "goal",
-  "title",
-  "summary",
-  "action_items",
-  "timing",
-  "required_documents",
-  "contacts",
-  "expected_outcome",
-  "priority",
-  "additional_guidance",
-] as const;
-
 export function buildLeanPhaseRootJsonSchema(phase: PlanPhase) {
-  const stepProps = {
-    type: "object",
-    properties: {
-      phase: { type: "string", enum: [phase] },
-      goal: leanStepObjectFields.goal,
-      title: { type: "string" },
-      summary: { type: "string" },
-      action_items: leanStepObjectFields.action_items,
-      timing: leanStepObjectFields.timing,
-      required_documents: leanStepObjectFields.required_documents,
-      contacts: leanStepObjectFields.contacts,
-      expected_outcome: leanStepObjectFields.expected_outcome,
-      priority: leanStepObjectFields.priority,
-      additional_guidance: leanStepObjectFields.additional_guidance,
-    },
-    required: [...leanStepRequired],
-    additionalProperties: false,
-  } as const;
-
-  return {
-    type: "object",
-    properties: {
-      steps: {
-        type: "array",
-        items: stepProps,
-        minItems: 1,
-        maxItems: 5,
-      },
-    },
-    required: ["steps"],
-    additionalProperties: false,
-  } as const;
+  return toStructuredJsonSchema(planPhaseResponseSchema(phase));
 }

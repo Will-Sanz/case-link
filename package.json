@@ -32,7 +32,8 @@
     "db:recover-mfa": "tsx scripts/recover-mfa.ts",
     "db:invite-user": "tsx scripts/invite-user.ts",
     "db:create-test-user": "tsx scripts/create-test-user.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

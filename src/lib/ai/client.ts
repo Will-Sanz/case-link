@@ -42,7 +42,7 @@ export type ChatMessage = { role: "system" | "user" | "assistant"; content: stri
 export type StructuredJsonSchema = {
   name: string;
   schema: Record<string, unknown>;
-  strict?: boolean;
+  strict: true;
 };
 
 export type CreateResponseOptions = {
@@ -298,7 +298,7 @@ async function callResponsesApi(
         type: "json_schema",
         name: options.structuredJsonSchema.name,
         schema: options.structuredJsonSchema.schema,
-        strict: options.structuredJsonSchema.strict !== false,
+        strict: true,
       },
       // Omit `verbosity`: values like "high" are not supported on all models (e.g. gpt-4o) and return 400.
     };

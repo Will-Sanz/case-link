@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-10-13T23:31:26.414Z",
+  "syntheticOnly": true,
+  "results": [
+    {
+      "model": "gpt-5.6-luna",
+      "task": "phase_30",
+      "passed": true,
+      "elapsedMs": 1853,
+      "totalTokens": 513
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "phase_60",
+      "passed": true,
+      "elapsedMs": 1527,
+      "totalTokens": 514
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "phase_90",
+      "passed": true,
+      "elapsedMs": 2764,
+      "totalTokens": 511
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "refinement",
+      "passed": true,
+      "elapsedMs": 2501,
+      "totalTokens": 586
+    },
+    {
+      "model": "gpt-4o",
+      "task": "phase_30",
+      "passed": true,
+      "elapsedMs": 2257,
+      "totalTokens": 485
+    },
+    {
+      "model": "gpt-4o",
+      "task": "phase_60",
+      "passed": true,
+      "elapsedMs": 1286,
+      "totalTokens": 485
+    },
+    {
+      "model": "gpt-4o",
+      "task": "phase_90",
+      "passed": true,
+      "elapsedMs": 945,
+      "totalTokens": 485
+    },
+    {
+      "model": "gpt-4o",
+      "task": "refinement",
+      "passed": true,
+      "elapsedMs": 1199,
+      "totalTokens": 561
+    }
+  ]
+}

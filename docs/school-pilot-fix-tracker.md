@@ -397,7 +397,7 @@ Setting `OPENAI_MODEL_OVERRIDE` silently sends ordinary Responses tasks to Chat 
 
 **Close with:** default and per-task/global override contract tests plus a synthetic smoke request on the actual OpenAI project for every selected model. Verify reasoning, temperature, token limits, structured output, and `store: false`. **Sources:** [routing](/Users/willsanz/homelessness-project/src/lib/ai/client.ts:159), [model configuration](/Users/willsanz/homelessness-project/src/lib/ai/models.ts), [allowlist](/Users/willsanz/homelessness-project/src/lib/ai/model-allowlist.ts).
 
-### [ ] CL-21 — Use one tested structured-output contract
+### [x] CL-21 — Use one tested structured-output contract
 
 **Type:** Fix · **Responsible:** engineering.
 
@@ -406,6 +406,10 @@ Current lean generation/refinement calls explicitly use `strict: false`, and han
 **Fix:** use a supported strict schema for each structured task, reusing the installed Zod/schema helper where suitable. Model optional values explicitly, then run semantic checks for allowed IDs, dates, task identity, contacts, and protected edits before saving. Align valid cardinality/date ranges between manual edits, AI previews, and storage.
 
 **Close with:** missing/extra fields, nulls, length/count boundaries, invalid dates, unsupported schema, all supported model contracts, and semantic rejection tests. **Sources:** [schema helper](/Users/willsanz/homelessness-project/src/lib/ai/structured-json-schema.ts), [lean generation](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-plan-lean-phase.ts), [refine schema](/Users/willsanz/homelessness-project/src/lib/plan-generator/plan-refine-lean.ts). [OpenAI strict schema requirements](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+**Completed October 13, 2026 — engineering:** generation and refinement now derive provider JSON schemas from their strict Zod validators. Every provider property is required; optional content uses explicit nulls. All active structured calls enforce strict output, with no non-strict fallback. The schema helper rejects optional/open objects and unsupported composition. Generation rejects wrong phases and missing/impossible action dates instead of coercing them. Task text/week/calendar limits reuse the manual-edit schema; generation follows the database's 20-new-task cap, while refinement supports up to 50 existing tasks without changing membership. Null dates preserve confirmed dates, and AI cannot change scheduling metadata or progress. Errors no longer echo malformed model fields into the UI or logs.
+
+**Evidence:** focused tests cover missing/extra fields, explicit nulls, whitespace, length/count/week boundaries, leap days, invalid dates, wrong phases, protected fields, IDs, unsupported schemas, and failure without fallback. The opt-in `npm run test:ai-contracts -- --live` checks all three phase contracts and refinement against both allowed models using synthetic examples, `store: false`, and metadata-only output. All eight final live checks passed; see [contract evidence](verification/2026-10-13-ai-schema-contracts.json). Normal correctness/security/privacy and separate Ponytail reviews completed; full verification runs before push. Contract validity is not factual correctness: contact grounding and complete outbound provenance remain CL-06/CL-18, and school usefulness remains CL-34. Commit: `git log --grep='CL-21'`.
 
 ### [ ] CL-22 — Give the assistant the progress it claims to know
 

@@ -15,10 +15,6 @@ import {
 } from "./plan-refine-lean";
 export const MAX_PLAN_STEPS_PER_PHASE = 5;
 
-function cloneSchema(schema: unknown): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
-}
-
 /** Shorter context for plan-level refine (compact resources, minimal prose). */
 function buildFamilyContextForRefine(detail: FamilyDetail): string {
   const notes =
@@ -94,7 +90,7 @@ ${feedback.trim()}
   const instructions =
     "You edit an existing case plan draft for a case manager. " +
     "Return one JSON object with key `steps` only. Each step includes its original id, phase, title, description, " +
-    "required_documents, contacts, expected_outcome, timing_guidance, optional priority, and action_items " +
+    "required_documents, contacts, expected_outcome, timing_guidance, priority (null to preserve), and action_items " +
     "(use null to leave a list unchanged; [] explicitly clears it).";
 
   try {
@@ -104,8 +100,8 @@ ${feedback.trim()}
       input: user,
       structuredJsonSchema: {
         name: "plan_refine_lean_steps",
-        schema: cloneSchema(OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA),
-        strict: false,
+        schema: OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA,
+        strict: true,
       },
       temperature: 0.25,
       aiMode: options?.aiMode,
@@ -155,12 +151,12 @@ ${feedback.trim()}
           retry: false,
           ms: Date.now() - startedAt,
           ok: false,
-          error: validated.error.message.slice(0, 200),
+          error: "invalid_refinement_shape",
         });
       }
       return {
         ok: false,
-        reason: `Refine output did not match the expected shape: ${validated.error.message.slice(0, 300)}`,
+        reason: "The AI returned an invalid plan draft. Nothing was applied. Try a smaller change or edit it yourself.",
       };
     }
 

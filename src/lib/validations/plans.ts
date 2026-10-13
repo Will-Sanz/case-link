@@ -99,7 +99,7 @@ export const updatePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
-  title: z.string().min(1).max(500).optional(),
+  title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(4000).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
   details: planStepDetailsSchema.optional(),
@@ -145,7 +145,7 @@ export const updatePlanStepActionItemSchema = z.object({
   familyId: z.string().uuid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
-  title: z.string().min(1).max(500).optional(),
+  title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(4000).nullable().optional(),
   week_index: z.number().int().min(1).max(52).optional(),
   target_date: z
@@ -188,10 +188,10 @@ const previewDraftActionItemSchema = z.object({
   notes: z.string().max(2000).nullable(),
   outcome: z.string().max(2000).nullable(),
   follow_up_date: dateOnlySchema("Use a valid follow-up date").nullable(),
-  title: z.string().min(1).max(500),
-  description: z.union([z.string().max(4000), z.null()]).optional(),
+  title: z.string().trim().min(1).max(500),
+  description: z.string().max(4000).nullable(),
   week_index: z.number().int().min(1).max(52),
-  target_date: z.union([dateOnlySchema("Use a valid target date"), z.null()]).optional(),
+  target_date: dateOnlySchema("Use a valid target date").nullable(),
 });
 
 export const previewStepDraftSchema = z.object({
@@ -200,7 +200,7 @@ export const previewStepDraftSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   workflow_data: planStepWorkflowSchema.optional(),
   phase: z.enum(["30", "60", "90"]),
-  title: z.string().min(1).max(500),
+  title: z.string().trim().min(1).max(500),
   description: z.string().max(4000),
   details: planStepDetailsSchema.optional(),
   action_items: z.array(previewDraftActionItemSchema).max(50),

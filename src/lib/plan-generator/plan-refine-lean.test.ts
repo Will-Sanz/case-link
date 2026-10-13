@@ -79,7 +79,7 @@ describe("existing-plan refinement preserves cardinality and intentional removal
   it.each(["foreign goal", "foreign action", "duplicate goals", "duplicate actions", "missing action"])("rejects %s before returning a preview", async (kind) => {
     const first = { ...base, action_items: [base.action_items[0], { ...base.action_items[0], id: "40000000-0000-4000-8000-000000000005" }] };
     const second = { ...base, id: "30000000-0000-4000-8000-000000000006" };
-    const rows = [ { ...unchanged, action_items: first.action_items.map(action => ({ ...action })) }, { ...unchanged, id: second.id } ];
+    const rows = [ { ...unchanged, action_items: first.action_items.map(({ id, title, description, week_index, target_date }) => ({ id, title, description, week_index, target_date })) }, { ...unchanged, id: second.id } ];
     if (kind === "foreign goal") rows[0].id = "90000000-0000-4000-8000-000000000009";
     if (kind === "foreign action") rows[0].action_items![0].id = "90000000-0000-4000-8000-000000000009";
     if (kind === "duplicate goals") rows[1].id = rows[0].id;
@@ -88,4 +88,17 @@ describe("existing-plan refinement preserves cardinality and intentional removal
     vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: rows }) });
     expect(await previewRefinePlanStepsWithOpenAI(detail, [first, second], "Clarify")).toMatchObject({ ok: false, reason: expect.stringContaining("changed the plan structure") });
   });
+  it("rejects unsolicited progress fields without reflecting model content in errors", async () => {
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...unchanged, "private model content": true }] }) });
+    const result = await previewRefinePlanStepsWithOpenAI(detail, [base], "Clarify");
+    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining("invalid plan draft") });
+    expect(JSON.stringify(result)).not.toContain("private model content");
+  });
+
+  it("preserves a confirmed date and scheduling metadata when a model returns a null date", () => {
+    const proposed = { id: base.action_items[0].id, title: "Call intake", description: null, week_index: 52, target_date: null };
+    const result = mergeLeanRefineIntoBase(base, { ...unchanged, action_items: [proposed] });
+    expect(result.action_items[0]).toMatchObject({ target_date: base.action_items[0].target_date, week_index: base.action_items[0].week_index });
+  });
+
 });

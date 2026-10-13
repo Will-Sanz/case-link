@@ -9,16 +9,12 @@ import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { dedupeLeanPhaseSteps } from "@/lib/plan-generator/lean-step-dedupe";
 import {
   buildLeanPhaseRootJsonSchema,
-  leanPlanPhaseResponseZ,
+  planPhaseResponseSchema,
   type LeanPlanPhaseStep,
 } from "@/lib/plan-generator/lean-plan-schema";
 import { formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { PlanPhase } from "./types";
-
-function cloneSchema(schema: unknown): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
-}
 
 function shouldLog(): boolean {
   const env = getEnv();
@@ -118,8 +114,8 @@ The plan starts on ${planStartDate}. Set an exact target_date for every action w
         input,
         structuredJsonSchema: {
           name: `lean_plan_phase_${phase}`,
-          schema: cloneSchema(buildLeanPhaseRootJsonSchema(phase)),
-          strict: false,
+          schema: buildLeanPhaseRootJsonSchema(phase),
+          strict: true,
         },
         temperature: 0.35,
         aiMode: options?.aiMode,
@@ -139,17 +135,13 @@ The plan starts on ${planStartDate}. Set an exact target_date for every action w
         continue;
       }
 
-      const validated = leanPlanPhaseResponseZ.safeParse(parsed);
+      const validated = planPhaseResponseSchema(phase).safeParse(parsed);
       if (!validated.success) {
-        correction = validated.error.message.slice(0, 700);
+        correction = validated.error.issues.map(issue => `${issue.path.join(".")}: ${issue.code}`).join("; ").slice(0, 700);
         continue;
       }
 
-      // Coerce phase so a mis-labeled model response still lands in the requested bucket.
-      let steps: LeanPlanPhaseStep[] = validated.data.steps.map((s) => ({
-        ...s,
-        phase,
-      }));
+      let steps: LeanPlanPhaseStep[] = validated.data.steps;
 
       steps = dedupeLeanPhaseSteps(steps, prior ?? null);
       if (steps.length === 0) {

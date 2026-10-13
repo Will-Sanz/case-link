@@ -39,6 +39,7 @@ Install the locked dependencies with `npm ci`. Use `.env.example` as the configu
 - `npm run verify`: lockfile/resource/secret checks, typecheck, lint, unit and component tests, and production build. The pre-push hook runs it.
 - `npm run test:auth-security`: real local Auth lifecycle and session/MFA tests.
 - `npm run test:db-security`: real local database authorization, concurrency, rollback, and audit tests.
+- `npm run test:ai-contracts -- --live`: opt-in provider format check with eight small synthetic requests. Supply an operator test-project `OPENAI_API_KEY` through the environment; it is excluded from normal CI and prints only pass/fail metadata.
 
 Local Supabase uses Docker to isolate synthetic development/test data. Docker is a local testing tool; staff do not install it, and this does not select production hosting. See the [operations runbook](docs/production-operations-runbook.md) for environment separation and required hosted rehearsals.
 
