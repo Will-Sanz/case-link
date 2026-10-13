@@ -8,6 +8,7 @@ import { getEnv } from "@/lib/env";
 import { formatMatchesForAiPrompt, formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
+import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
 import {
   type DraftStepRefineInput,
   mergeLeanRefineIntoBase,
@@ -88,9 +89,14 @@ function compactDraftJsonForRefine(
     draftSteps.map((s) => {
       const d = s.details;
       return {
+        id: s.id,
+        status: s.status,
+        workflow_data: s.workflow_data,
         phase: s.phase,
         title: s.title,
         description: s.description,
+        owner: d.owner,
+        goal: d.stage_goal,
         timing_guidance: d.timing_guidance,
         required_documents: d.required_documents ?? [],
         contacts: d.contacts ?? [],
@@ -723,8 +729,9 @@ ${feedback.trim()}
 
 ## Rules
 - Revise this existing draft; do not invent a new plan shape.
-- Return exactly ${draftSteps.length} steps, same order and phase at each index (step 1 ↔ index 0, etc.).
-- Improve clarity and usefulness; do not reorder or merge steps unless the user explicitly asks.
+- Return exactly ${draftSteps.length} steps with their original IDs and phases. Include each step/action ID exactly once.
+- IDs identify the same work regardless of response order. Never substitute, duplicate, add, remove, or move IDs between goals.
+- Status, ownership, outcomes, progress notes, and completed work are human records. Do not reinterpret or reassign them.
 - Return null for action_items, required_documents, or contacts to leave that list unchanged.
 - Return [] for required_documents or contacts only when the instructions ask to remove every item.
 - Preserve the exact number of actions, including zero or one; do not add filler tasks, contacts, or documents.
@@ -733,7 +740,7 @@ ${feedback.trim()}
 
   const instructions =
     "You edit an existing case plan draft for a case manager. " +
-    "Return one JSON object with key `steps` only. Each step includes phase, title, description, " +
+    "Return one JSON object with key `steps` only. Each step includes its original id, phase, title, description, " +
     "required_documents, contacts, expected_outcome, timing_guidance, optional priority, and action_items " +
     "(use null to leave a list unchanged; [] explicitly clears it).";
 
@@ -823,7 +830,8 @@ ${feedback.trim()}
       };
     }
 
-    const merged = validated.data.steps.map((lean, i) => mergeLeanRefineIntoBase(draftSteps[i]!, lean));
+    const matched = matchPlanRowsById(draftSteps, validated.data.steps);
+    const merged = draftSteps.map((base, i) => mergeLeanRefineIntoBase(base, matched[i]));
 
     for (let i = 0; i < merged.length; i++) {
       if (merged[i]!.phase !== draftSteps[i]!.phase) {
@@ -841,7 +849,7 @@ ${feedback.trim()}
         return {
           ok: false,
           reason:
-            "Refinement changed a step's phase. Try again or adjust your instructions to keep 30/60/90 assignments.",
+            "Refinement changed the goal structure. Keep the existing goals and request wording or date edits.",
         };
       }
     }

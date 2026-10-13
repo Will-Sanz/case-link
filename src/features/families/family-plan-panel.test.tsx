@@ -156,7 +156,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     original.steps[0].details!.required_documents = ["Unneeded document"];
     const step = original.steps[0];
     vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test", steps: [{
-      phase: step.phase, title: step.title, description: step.description,
+      id: step.id, status: step.status, phase: step.phase, title: step.title, description: step.description,
       details: { ...step.details, contacts: [], required_documents: [] }, action_items: step.action_items!,
     }] });
     vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
@@ -180,7 +180,7 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     second.action_items![0].plan_step_id = second.id;
     two.steps.push(second);
     vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test-model", steps: two.steps.map((step, i) => ({
-      phase: step.phase, title: `Revised goal ${i}`, description: step.description, details: step.details!, action_items: step.action_items!,
+      id: step.id, status: step.status, phase: step.phase, title: `Revised goal ${i}`, description: step.description, details: step.details!, action_items: step.action_items!,
     })) });
     vi.mocked(savePlanEdits).mockResolvedValueOnce({ ok: false, error: "Nothing was saved. Try again." }).mockResolvedValueOnce({ ok: true });
     render(<FamilyPlanPanel familyId={two.family_id} plan={two} workflow={null} />);
@@ -198,6 +198,58 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
     await screen.findByText("Plan updates saved.");
     expect(vi.mocked(savePlanEdits).mock.calls[1][0]).toEqual(firstRequest);
+  });
+
+  it("applies reordered AI suggestions to their original records without moving completed work", async () => {
+    const original = structuredClone(plan);
+    const first = original.steps[0];
+    first.details!.owner = "family";
+    first.details!.checklist = ["Materials gathered"];
+    first.workflow_data = { checklist_completed: [true], outcome_notes: "Agreed at the meeting" };
+    first.action_items![0].status = "completed";
+    first.action_items![0].outcome = "Intake booked";
+    first.action_items!.push({ ...first.action_items![0], id: "40000000-0000-4000-8000-000000000007", title: "Confirm transport", status: "pending", outcome: null });
+    const second = structuredClone(first);
+    second.id = "30000000-0000-4000-8000-000000000005";
+    second.action_items = [{ ...second.action_items![1], id: "40000000-0000-4000-8000-000000000006", plan_step_id: second.id }];
+    original.steps.push(second);
+    vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test", steps: [...original.steps].reverse().map(step => ({
+      ...step, title: `${step.title} clarified`, details: { ...step.details!, owner: "school_program" },
+      workflow_data: { checklist_completed: [false] },
+      action_items: [...step.action_items!].reverse().map(action => ({ ...action, title: `${action.title} clarified`, status: "blocked", notes: "Model replacement", outcome: "Model outcome" })),
+    })) });
+    vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
+    render(<FamilyPlanPanel familyId={original.family_id} plan={original} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refine plan with AI" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify only the wording" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
+    fireEvent.click(await dialog.findByRole("button", { name: "Apply to working copy" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
+    await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
+    expect(savePlanEdits).toHaveBeenCalledWith(expect.objectContaining({ steps: original.steps.map(step => expect.objectContaining({
+      stepId: step.id,
+      patch: expect.objectContaining({ details: expect.objectContaining({ owner: "family" }), workflow_data: step.workflow_data }),
+      actionItems: step.action_items!.map(action => expect.objectContaining({ actionItemId: action.id,
+        patch: expect.objectContaining({ title: `${action.title} clarified`, status: action.status, outcome: action.outcome, notes: action.notes }),
+      })),
+    })) }));
+  });
+
+  it("refuses a preview with a foreign task ID without changing the working copy", async () => {
+    const step = plan.steps[0];
+    vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test", steps: [{ ...step, details: step.details!,
+      action_items: [{ ...step.action_items![0], id: "90000000-0000-4000-8000-000000000009", title: "Foreign task" }],
+    }] });
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refine plan with AI" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify wording" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
+    fireEvent.click(await dialog.findByRole("button", { name: "Apply to working copy" }));
+    expect(dialog.getByRole("alert").textContent).toContain("changed the plan structure");
+    expect(dialog.queryByRole("button", { name: "Save to plan" })).toBeNull();
+    expect(savePlanEdits).not.toHaveBeenCalled();
   });
 
   it("settles an unexpectedly rejected action preview and keeps instructions for retry", async () => {

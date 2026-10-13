@@ -26,6 +26,8 @@ import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan
 import { buildPlanningBrief } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
+import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
+import type { DraftStepRefineInput } from "@/lib/plan-generator/plan-refine-lean";
 import { pendingPhaseFromPersistedCounts } from "@/lib/domain/plan/generation-progress";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import {
@@ -1500,18 +1502,7 @@ export async function previewRefinePlanStep(
 export type PreviewRefinePlanResult =
   | {
       ok: true;
-      steps: Array<{
-        phase: "30" | "60" | "90";
-        title: string;
-        description: string;
-        details: PlanStepDetails;
-        action_items: Array<{
-          title: string;
-          description: string | null | undefined;
-          week_index: number;
-          target_date: string | null | undefined;
-        }>;
-      }>;
+      steps: DraftStepRefineInput[];
       model: string;
     }
   | { ok: false; error: string };
@@ -1538,6 +1529,13 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
+  try {
+    const currentSteps = detail.plan?.steps ?? [];
+    const requestedSteps = matchPlanRowsById(currentSteps, draft.steps);
+    currentSteps.forEach((step, i) => matchPlanRowsById(step.action_items ?? [], requestedSteps[i].action_items));
+  } catch {
+    return { ok: false, error: "The current plan's goals or actions changed. Reload the saved plan before requesting another preview." };
+  }
   const privacy = validateFamilyNoPii(detail, [
     { field: "feedback", label: "AI revision instructions", value: feedback },
     ...draft.steps.flatMap((step, stepIndex) => [
@@ -1555,6 +1553,7 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
         (step.details ?? {}) as PlanStepDetails,
         `draft.steps.${stepIndex}.details`,
       ),
+      ...Object.entries(step.workflow_data ?? {}).flatMap(([key, value]) => typeof value === "string" ? [{ field: `draft.steps.${stepIndex}.workflow_data.${key}`, label: "Action progress", value }] : []),
       ...step.action_items.flatMap((action, actionIndex) => [
         {
           field: `draft.steps.${stepIndex}.action_items.${actionIndex}.title`,
@@ -1566,6 +1565,8 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
           label: "Action description",
           value: action.description,
         },
+        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.notes`, label: "Action progress", value: action.notes },
+        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.outcome`, label: "Action outcome", value: action.outcome },
       ]),
     ]),
   ]);
@@ -1579,11 +1580,19 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   }
 
   const draftSteps = draft.steps.map((s) => ({
+    id: s.id,
+    status: s.status,
+    workflow_data: s.workflow_data,
     phase: s.phase,
     title: s.title,
     description: s.description,
     details: (s.details ?? {}) as PlanStepDetails,
     action_items: s.action_items.map((ai) => ({
+      id: ai.id,
+      status: ai.status,
+      notes: ai.notes,
+      outcome: ai.outcome,
+      follow_up_date: ai.follow_up_date,
       title: ai.title,
       description: ai.description ?? undefined,
       week_index: ai.week_index,
@@ -1608,17 +1617,6 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   return {
     ok: true,
     model: result.model,
-    steps: result.steps.map((s) => ({
-      phase: s.phase,
-      title: s.title,
-      description: s.description,
-      details: s.details as PlanStepDetails,
-      action_items: (s.action_items ?? []).map((ai) => ({
-        title: ai.title,
-        description: ai.description ?? null,
-        week_index: ai.week_index,
-        target_date: ai.target_date ?? null,
-      })),
-    })),
+    steps: result.steps,
   };
 }

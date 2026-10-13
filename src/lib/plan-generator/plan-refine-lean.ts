@@ -2,8 +2,9 @@ import "server-only";
 
 import { z } from "zod";
 import type { PlanPhase } from "@/lib/plan-generator/types";
-import type { PlanStepDetails } from "@/types/family";
+import type { PlanStepDetails, PlanStepRow, PlanStepActionItemRow } from "@/types/family";
 import { dateOnlySchema } from "@/lib/validations/plans";
+import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
 
 const contactJsonSchema = {
   type: "object",
@@ -20,12 +21,13 @@ const contactJsonSchema = {
 const actionItemJsonSchema = {
   type: "object",
   properties: {
+    id: { type: "string" },
     title: { type: "string" },
     description: { type: ["string", "null"] },
     week_index: { type: "integer" },
     target_date: { type: ["string", "null"] },
   },
-  required: ["title", "description", "week_index", "target_date"],
+  required: ["id", "title", "description", "week_index", "target_date"],
   additionalProperties: false,
 } as const;
 
@@ -33,6 +35,7 @@ const actionItemJsonSchema = {
 const leanPlanStepRefineJsonSchema = {
   type: "object",
   properties: {
+    id: { type: "string" },
     phase: { type: "string", enum: ["30", "60", "90"] },
     title: { type: "string" },
     description: { type: "string" },
@@ -49,6 +52,7 @@ const leanPlanStepRefineJsonSchema = {
     },
   },
   required: [
+    "id",
     "phase",
     "title",
     "description",
@@ -83,6 +87,7 @@ const contactSchema = z.object({
 });
 
 const leanActionItemSchema = z.object({
+  id: z.string().uuid(),
   title: z.string().trim().min(1).max(500),
   description: z.union([z.string().max(4000), z.null()]).optional(),
   week_index: z.number().int().min(1).max(52),
@@ -90,6 +95,7 @@ const leanActionItemSchema = z.object({
 });
 
 export const planRefineLeanStepSchema = z.object({
+  id: z.string().uuid(),
   phase: z.enum(["30", "60", "90"]),
   title: z.string().trim().min(1).max(500),
   description: z.string().max(4000),
@@ -108,19 +114,20 @@ export const planRefineLeanResponseSchema = z.object({
 export type PlanRefineLeanStep = z.infer<typeof planRefineLeanStepSchema>;
 
 export type DraftStepRefineInput = {
+  id: string;
+  status: PlanStepRow["status"];
+  workflow_data?: PlanStepRow["workflow_data"];
   phase: PlanPhase;
   title: string;
   description: string;
   details: PlanStepDetails;
-  action_items: Array<z.infer<typeof leanActionItemSchema>>;
+  action_items: Array<z.infer<typeof leanActionItemSchema> & Pick<PlanStepActionItemRow, "status" | "notes" | "outcome" | "follow_up_date">>;
 };
 
 /** Null leaves a list unchanged; an empty list explicitly clears it. */
 export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRefineLeanStep): DraftStepRefineInput {
-  const actions = lean.action_items ?? base.action_items;
-  if (actions.length !== base.action_items.length) {
-    throw new Error("AI refinement cannot add or remove actions. Keep the existing actions and edit their wording or dates.");
-  }
+  matchPlanRowsById([base], [lean]);
+  const actions = matchPlanRowsById(base.action_items, lean.action_items ?? base.action_items);
   return {
     ...base,
     phase: lean.phase,
@@ -137,6 +144,6 @@ export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRe
       timing_guidance: lean.timing_guidance.trim(),
       ...(lean.priority != null ? { priority: lean.priority } : {}),
     },
-    action_items: actions,
+    action_items: base.action_items.map((action, i) => ({ ...action, ...actions[i] })),
   };
 }

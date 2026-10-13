@@ -201,6 +201,11 @@ export const savePlanEditsSchema = z.object({
 export type SavePlanEditsInput = z.infer<typeof savePlanEditsSchema>;
 
 const previewDraftActionItemSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(["pending", "in_progress", "completed", "blocked"]),
+  notes: z.string().max(2000).nullable(),
+  outcome: z.string().max(2000).nullable(),
+  follow_up_date: dateOnlySchema("Use a valid follow-up date").nullable(),
   title: z.string().min(1).max(500),
   description: z.union([z.string().max(4000), z.null()]).optional(),
   week_index: z.number().int().min(1).max(52),
@@ -215,6 +220,9 @@ export const previewRefinePlanSchema = z.object({
     steps: z
       .array(
         z.object({
+          id: z.string().uuid(),
+          status: z.enum(["pending", "in_progress", "completed", "blocked"]),
+          workflow_data: planStepWorkflowSchema.optional(),
           phase: z.enum(["30", "60", "90"]),
           title: z.string().min(1).max(500),
           description: z.string().max(4000),

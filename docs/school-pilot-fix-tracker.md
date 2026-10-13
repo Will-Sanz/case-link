@@ -231,7 +231,7 @@ Single-step preview sends only the saved step ID and feedback, not the current u
 
 **Close with:** unsaved manual edits plus rewrite, narrow wording change, completed checklist, stale response, cancel/reopen, and changed base revision tests. **Sources:** [preview/apply UI](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:925), [saved-step lookup](/Users/willsanz/homelessness-project/src/app/actions/plans.ts).
 
-### [ ] CL-28 — Match full-plan refinements by stable IDs
+### [x] CL-28 — Match full-plan refinements by stable IDs
 
 **Type:** Fix · **Responsible:** engineering.
 
@@ -240,6 +240,8 @@ Full-plan AI input omits step/action IDs and action status/outcomes. Application
 **Fix:** use stable step/action IDs and scoped patches; reject unknown, duplicate, or unauthorized IDs. Preserve completion and ownership independently of wording/order. Treat explicitly requested structural changes as separate reviewable operations.
 
 **Close with:** swapped same-phase steps, swapped action rows, duplicate IDs, deleted IDs, completed actions, and another family's IDs. No outcome or completion history may move to a different action. **Source:** [full-plan preview and apply](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:1001).
+
+**Completed October 13, 2026 — engineering:** full-plan draft input, model output, merge, and UI application now carry the original goal/action IDs. The server confirms the exact IDs and parent-child relationships against the authorized current plan before calling AI. A shared ID check rejects missing, duplicate, foreign, and reassigned children; valid reordered responses are matched back to the original records. Status, notes, outcomes, owner, and checklist completion remain attached to the original draft records. Newly supplied progress text is privacy-checked before the request. Thirty-four focused tests passed across the server boundary, mocked provider/merge, and rendered Apply → Save workflow, including reordered same-phase goals/tasks and forged progress values. Typecheck/lint passed; normal security/correctness and separate Ponytail/React reviews completed. Full verification runs at push. Narrow edit scope and stale-preview handling remain in CL-27; live usefulness remains in CL-34. Commit: `git log --grep='CL-28'`.
 
 ### [x] CL-30 — Save one reviewed edit transactionally
 

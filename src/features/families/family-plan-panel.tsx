@@ -13,6 +13,7 @@ import {
   deletePlanStep,
   savePlanEdits,
   type PlanEditConflict,
+  type PreviewRefinePlanResult,
 } from "@/app/actions/plans";
 import type { SavePlanEditsInput } from "@/lib/validations/plans";
 import { recordCaseWorkflowEvent } from "@/app/actions/families";
@@ -31,6 +32,7 @@ import type {
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
+import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
 import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import {
   localActionDraftKey,
@@ -372,24 +374,7 @@ export function FamilyPlanPanel({
   const [planAiDiscardConfirm, setPlanAiDiscardConfirm] = useState(false);
   const [planAiInstruction, setPlanAiInstruction] = useState("");
   const [planAiPending, setPlanAiPending] = useState(false);
-  const [planAiPreview, setPlanAiPreview] = useState<
-    | null
-    | {
-        model: string;
-        steps: Array<{
-          phase: "30" | "60" | "90";
-          title: string;
-          description: string;
-          details: PlanStepDetails;
-          action_items: Array<{
-            title: string;
-            description: string | null | undefined;
-            week_index: number;
-            target_date: string | null | undefined;
-          }>;
-        }>;
-      }
-  >(null);
+  const [planAiPreview, setPlanAiPreview] = useState<Omit<Extract<PreviewRefinePlanResult, { ok: true }>, "ok"> | null>(null);
 
   const stepDirty = useMemo(() => {
     if (!editingStepId || !stepDraft || !plan) return false;
@@ -1005,11 +990,19 @@ export function FamilyPlanPanel({
 
     const draftForApi = {
       steps: planAiDraft.steps.map((s) => ({
+        id: s.id,
+        status: s.status,
+        workflow_data: s.workflow_data ?? {},
         phase: s.phase,
         title: s.title,
         description: s.description,
         details: s.details ?? {},
         action_items: (s.action_items ?? []).map((ai) => ({
+          id: ai.id,
+          status: ai.status,
+          notes: ai.notes,
+          outcome: ai.outcome,
+          follow_up_date: ai.follow_up_date,
           title: ai.title,
           description: ai.description ?? null,
           week_index: ai.week_index,
@@ -1042,79 +1035,33 @@ export function FamilyPlanPanel({
 
   function applyPlanAiToDraft() {
     if (!planAiPreview || !planAiDraft) return;
-
-    const previewSteps = planAiPreview.steps;
-    const baseSteps = planAiDraft.steps;
-
-    if (previewSteps.length !== baseSteps.length) {
-      setError("AI refinement changed the action count. Please try again or adjust your instructions.");
-      return;
+    try {
+      const matchedSteps = matchPlanRowsById(planAiDraft.steps, planAiPreview.steps);
+      const steps = planAiDraft.steps.map((step, i) => {
+        const proposal = matchedSteps[i];
+        if (proposal.phase !== step.phase) throw new Error("AI refinement changed the plan structure. Please request a smaller change.");
+        const matchedActions = matchPlanRowsById(step.action_items ?? [], proposal.action_items);
+        return {
+          ...step,
+          title: proposal.title,
+          description: proposal.description,
+          details: { ...proposal.details, owner: step.details?.owner ?? "case_manager" },
+          priority: proposal.details.priority ?? step.priority,
+          action_items: (step.action_items ?? []).map((action, j) => ({
+            ...action,
+            title: matchedActions[j].title,
+            description: matchedActions[j].description ?? null,
+            week_index: matchedActions[j].week_index,
+            target_date: matchedActions[j].target_date ?? action.target_date,
+          })),
+        };
+      });
+      setPlanAiDraft({ ...planAiDraft, steps });
+      setPlanAiPreview(null);
+      setPlanAiInstruction("");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "The preview no longer matches the current plan. Generate another preview.");
     }
-    for (let i = 0; i < baseSteps.length; i++) {
-      if (previewSteps[i].phase !== baseSteps[i].phase) {
-        setError("AI refinement changed the plan structure. Please try again.");
-        return;
-      }
-    }
-
-    for (let i = 0; i < baseSteps.length; i++) {
-      const baseAisLen = baseSteps[i].action_items?.length ?? 0;
-      const previewAisLen = previewSteps[i].action_items?.length ?? 0;
-      if (baseAisLen !== previewAisLen) {
-        setError(
-          "AI refinement changed the task count inside an action. Please try again or request a smaller change.",
-        );
-        return;
-      }
-    }
-
-    setPlanAiDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        steps: prev.steps.map((s, i) => {
-          const aiStep = previewSteps[i];
-          const newDetails: PlanStepDetails = {
-            ...aiStep.details,
-            owner: (s.details as PlanStepDetails | null | undefined)?.owner ?? "case_manager",
-          };
-          const checklistLen = (newDetails.checklist ?? []).length;
-
-          const existingWd = { ...(s.workflow_data ?? {}) };
-          const prevChecklistCompleted = existingWd.checklist_completed ?? [];
-          const nextChecklistCompleted = Array(checklistLen)
-            .fill(false)
-            .map((_, idx) => prevChecklistCompleted[idx] ?? false);
-          existingWd.checklist_completed = nextChecklistCompleted;
-
-          const prevAis = s.action_items ?? [];
-          const nextAis = prevAis.map((ai, j) => {
-            const aiPreviewRow = aiStep.action_items[j];
-            if (!aiPreviewRow) return ai;
-            return {
-              ...ai,
-              title: aiPreviewRow.title,
-              description: aiPreviewRow.description ?? null,
-              week_index: aiPreviewRow.week_index,
-              target_date: aiPreviewRow.target_date ?? ai.target_date,
-            };
-          });
-
-          return {
-            ...s,
-            title: aiStep.title,
-            description: aiStep.description,
-            details: newDetails,
-            priority: newDetails.priority ?? s.priority,
-            workflow_data: existingWd,
-            action_items: nextAis,
-          };
-        }),
-      };
-    });
-
-    setPlanAiPreview(null);
-    setPlanAiInstruction("");
   }
 
   function savePlanAiRefinements() {
