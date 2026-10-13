@@ -313,6 +313,13 @@ export function FamilyPlanPanel({
   continueDraftPending?: boolean;
 }) {
   const router = useRouter();
+  const aiRequestRef = useRef({ id: 0, pending: false });
+  const planAiRequestRef = useRef({ id: 0, pending: false });
+  useEffect(() => {
+    const stepRequest = aiRequestRef.current;
+    const planRequest = planAiRequestRef.current;
+    return () => { stepRequest.id += 1; planRequest.id += 1; };
+  }, []);
   const stepSaveLockRef = useRef(false);
   const planBulkSaveLockRef = useRef(false);
   const [stepSaveBusy, setStepSaveBusy] = useState(false);
@@ -533,6 +540,7 @@ export function FamilyPlanPanel({
     clearLocalActionDraft();
     setEditingStepId(stepId);
     setStepDraft(cloneStep(s));
+    cancelStepPreviewRequest();
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
@@ -563,6 +571,7 @@ export function FamilyPlanPanel({
     clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
+    cancelStepPreviewRequest();
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
@@ -582,6 +591,7 @@ export function FamilyPlanPanel({
     clearLocalActionDraft();
     setEditingStepId(null);
     setStepDraft(null);
+    cancelStepPreviewRequest();
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
@@ -763,6 +773,7 @@ export function FamilyPlanPanel({
         clearLocalActionDraft();
         setEditingStepId(null);
         setStepDraft(null);
+        cancelStepPreviewRequest();
         setAiStepId(null);
         setAiPreview(null);
         setAiInstruction("");
@@ -792,6 +803,7 @@ export function FamilyPlanPanel({
           clearLocalActionDraft();
           setEditingStepId(null);
           setStepDraft(null);
+          cancelStepPreviewRequest();
           setAiStepId(null);
           setAiPreview(null);
           setAiInstruction("");
@@ -898,6 +910,12 @@ export function FamilyPlanPanel({
     });
   }
 
+  function cancelStepPreviewRequest() {
+    aiRequestRef.current.id += 1;
+    aiRequestRef.current.pending = false;
+    setAiPending(false);
+  }
+
   function openAiForStep(stepId: string) {
     if (!plan) return;
     if (editingStepId !== stepId && editingStepId && stepDirty) {
@@ -923,12 +941,14 @@ export function FamilyPlanPanel({
   }
 
   function runAiPreview() {
-    if (!aiStepId) return;
+    if (!aiStepId || aiRequestRef.current.pending) return;
     const instr = aiInstruction.trim();
     if (!instr) {
       setError("Describe what you want changed for this action.");
       return;
     }
+    const requestId = ++aiRequestRef.current.id;
+    aiRequestRef.current.pending = true;
     setAiPending(true);
     setError(null);
     previewRefinePlanStep({
@@ -937,7 +957,7 @@ export function FamilyPlanPanel({
       feedback: instr,
       aiMode: DEFAULT_AI_MODE,
     }).then((res) => {
-      setAiPending(false);
+      if (requestId !== aiRequestRef.current.id) return;
       if (!res.ok) {
         setError(res.error);
         return;
@@ -948,6 +968,13 @@ export function FamilyPlanPanel({
         details: res.step.details as PlanStepDetails,
         stepPriority: res.step.stepPriority,
       });
+    }).catch(() => {
+      if (requestId === aiRequestRef.current.id) setError("The preview could not be prepared. Your edits are unchanged; try again.");
+    }).finally(() => {
+      if (requestId === aiRequestRef.current.id) {
+        aiRequestRef.current.pending = false;
+        setAiPending(false);
+      }
     });
   }
 
@@ -971,6 +998,7 @@ export function FamilyPlanPanel({
         workflow_data: wd,
       };
     });
+    cancelStepPreviewRequest();
     setAiStepId(null);
     setAiPreview(null);
     setAiInstruction("");
@@ -1004,8 +1032,10 @@ export function FamilyPlanPanel({
       setError("Describe what you want to change for the full plan.");
       return;
     }
-    if (!planAiDraft) return;
+    if (!planAiDraft || planAiRequestRef.current.pending) return;
 
+    const requestId = ++planAiRequestRef.current.id;
+    planAiRequestRef.current.pending = true;
     setPlanAiPending(true);
     setError(null);
 
@@ -1033,12 +1063,19 @@ export function FamilyPlanPanel({
       draft: draftForApi,
       aiMode: DEFAULT_AI_MODE,
     }).then((res) => {
-      setPlanAiPending(false);
+      if (requestId !== planAiRequestRef.current.id) return;
       if (!res.ok) {
         setError(res.error);
         return;
       }
       setPlanAiPreview({ model: res.model, steps: res.steps });
+    }).catch(() => {
+      if (requestId === planAiRequestRef.current.id) setError("The preview could not be prepared. Your edits are unchanged; try again.");
+    }).finally(() => {
+      if (requestId === planAiRequestRef.current.id) {
+        planAiRequestRef.current.pending = false;
+        setPlanAiPending(false);
+      }
     });
   }
 
@@ -1167,11 +1204,14 @@ export function FamilyPlanPanel({
   }, [planAiOpen]);
 
   function closePlanAiRefine(force = false) {
-    if (planAiPending || planBulkSaving) return;
+    if (planBulkSaving) return;
     if (planAiDirty && !force) {
       setPlanAiDiscardConfirm(true);
       return;
     }
+    planAiRequestRef.current.id += 1;
+    planAiRequestRef.current.pending = false;
+    setPlanAiPending(false);
     setPlanAiDiscardConfirm(false);
     setPlanAiOpen(false);
     setPlanAiPreview(null);
@@ -1534,6 +1574,7 @@ export function FamilyPlanPanel({
                               onRefineRun={runAiPreview}
                               onRefineApply={applyAiToDraft}
                               onRefineClose={() => {
+                                cancelStepPreviewRequest();
                                 setAiStepId(null);
                                 setAiPreview(null);
                                 setAiInstruction("");

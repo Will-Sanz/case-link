@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { updatePlanStep } from "@/app/actions/plans";
+import { previewRefinePlan, previewRefinePlanStep, updatePlanStep } from "@/app/actions/plans";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 
@@ -89,6 +89,53 @@ describe("FamilyPlanPanel stale edit recovery", () => {
   beforeEach(() => {
     routerRefresh.mockReset();
     vi.mocked(updatePlanStep).mockReset();
+    vi.mocked(previewRefinePlanStep).mockReset();
+    vi.mocked(previewRefinePlan).mockReset();
+    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    HTMLDialogElement.prototype.close = function () { this.open = false; };
+  });
+
+  it("settles an unexpectedly rejected action preview and keeps instructions for retry", async () => {
+    vi.mocked(previewRefinePlanStep).mockRejectedValue(new Error("private failure"));
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    const region = within(screen.getByRole("region", { name: "Refine action with AI" }));
+    fireEvent.change(region.getByRole("textbox"), { target: { value: "Shorten the description." } });
+    fireEvent.click(region.getByRole("button", { name: "Generate preview" }));
+    await screen.findByText("The preview could not be prepared. Your edits are unchanged; try again.");
+    expect((region.getByRole("button", { name: "Generate preview" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((region.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Shorten the description.");
+    expect(screen.queryByText("private failure")).toBeNull();
+  });
+
+  it("ignores a cancelled action preview that finishes after reopening", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof previewRefinePlanStep>>) => void;
+    vi.mocked(previewRefinePlanStep).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    const region = within(screen.getByRole("region", { name: "Refine action with AI" }));
+    fireEvent.change(region.getByRole("textbox"), { target: { value: "Shorten it." } });
+    fireEvent.click(region.getByRole("button", { name: "Generate preview" }));
+    fireEvent.click(region.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    await act(async () => finish({ ok: false, error: "Old request error" }));
+    expect(screen.queryByText("Old request error")).toBeNull();
+    expect((screen.getByRole("button", { name: "Generate preview" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("settles a rejected full-plan preview", async () => {
+    vi.mocked(previewRefinePlan).mockRejectedValueOnce(new Error("private failure"));
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refine plan with AI" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Shorten the plan." } });
+    fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
+    await screen.findByText("The preview could not be prepared. Your edits are unchanged; try again.");
+    expect((dialog.getByRole("button", { name: "Generate preview" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("compares the open draft with the latest saved value before resolving a conflict", async () => {

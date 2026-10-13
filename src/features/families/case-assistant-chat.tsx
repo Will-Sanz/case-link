@@ -4,7 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useTransition,
   type KeyboardEvent,
 } from "react";
 import ReactMarkdown from "react-markdown";
@@ -119,7 +118,13 @@ export function CaseAssistantChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const requestRef = useRef({ id: 0, pending: false });
+
+  useEffect(() => {
+    const request = requestRef.current;
+    return () => { request.id += 1; request.pending = false; };
+  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -139,7 +144,10 @@ export function CaseAssistantChat({
       setError(`Keep your message within ${MAX_QUESTION_CHARS.toLocaleString()} characters.`);
       return;
     }
-    if (pending) return;
+    if (requestRef.current.pending) return;
+    const requestId = ++requestRef.current.id;
+    requestRef.current.pending = true;
+    setPending(true);
     setError(null);
     const userMsg: ChatMessage = { id: newId(), role: "user", content: q };
     const prior = recentConversation(messages);
@@ -147,14 +155,31 @@ export function CaseAssistantChat({
     setMessages((prev) => [...prev.slice(-(MAX_VISIBLE_MESSAGES - 2)), userMsg]);
     setDraft("");
 
-    startTransition(async () => {
-      const r = await askCaseAssistantAction(familyId, q, DEFAULT_AI_MODE, prior);
-      if (!r.ok) {
-        setError(r.error);
-        return;
+    void (async () => {
+      try {
+        const r = await askCaseAssistantAction(familyId, q, DEFAULT_AI_MODE, prior);
+        if (requestRef.current.id !== requestId) return;
+        if (!r.ok) {
+          setError(r.error);
+          setDraft(q);
+          setMessages((prev) => prev.filter((message) => message.id !== userMsg.id));
+          textareaRef.current?.focus();
+          return;
+        }
+        setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: r.answer }]);
+      } catch {
+        if (requestRef.current.id !== requestId) return;
+        setError("The message could not be sent. Your question is ready to edit or retry.");
+        setDraft(q);
+        setMessages((prev) => prev.filter((message) => message.id !== userMsg.id));
+        textareaRef.current?.focus();
+      } finally {
+        if (requestRef.current.id === requestId) {
+          requestRef.current.pending = false;
+          setPending(false);
+        }
       }
-      setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: r.answer }]);
-    });
+    })();
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -171,6 +196,9 @@ export function CaseAssistantChat({
   }
 
   function clearChat() {
+    requestRef.current.id += 1;
+    requestRef.current.pending = false;
+    setPending(false);
     setMessages([]);
     setDraft("");
     setError(null);

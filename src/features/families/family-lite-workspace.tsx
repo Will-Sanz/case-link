@@ -548,6 +548,7 @@ export function FamilyLiteWorkspace({
       {(result || plan) && tab === "plan" ? (
         <Card className="border-[var(--color-rule)] bg-[var(--color-surface)] p-5 [box-shadow:var(--shadow-surface)] sm:p-6">
           <FamilyPlanPanel
+            key={familyId}
             familyId={familyId}
             plan={plan}
             workflow={result}
@@ -625,7 +626,7 @@ export function FamilyLiteWorkspace({
       ) : null}
 
       {tab === "assistant" ? (
-        <CaseAssistantChat familyId={familyId} familyName={familyName} />
+        <CaseAssistantChat key={familyId} familyId={familyId} familyName={familyName} />
       ) : null}
     </div>
   );

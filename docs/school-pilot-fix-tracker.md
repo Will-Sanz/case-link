@@ -405,7 +405,9 @@ The browser sends every previous message, but the server accepts at most 40. Aft
 
 **Close with:** 0/40/42/100 prior messages, long assistant answers, an overlong question, and a useful follow-up after trimming. **Sources:** [history builder](/Users/willsanz/homelessness-project/src/features/families/case-assistant-chat.tsx:154), [request schema](/Users/willsanz/homelessness-project/src/lib/validations/ai-actions.ts).
 
-### [ ] CL-25 — Recover from failed or superseded AI requests
+### [x] CL-25 — Recover from failed or superseded AI requests
+
+**Completed October 13, 2026 (Codex; correctness/accessibility, React, and Ponytail review):** failed chat questions are restored for editing/keyboard retry without adding failed exchanges to history. Request identities ignore replies after clear, cancellation, or unmount; family-keyed chat/editor instances isolate navigation. Both preview flows catch failures, settle pending state, and invalidate cancelled requests. Ten rendered component tests cover long chat, returned/thrown failures, keyboard retry, duplicate pending sends, clear/new conversation, family switch, cancelled/reopened preview, and both preview failure paths. Targeted checks, typecheck, and lint pass; full verification runs on push. Commit: `git log --grep='CL-25'`.
 
 **Type:** Fix · **Responsible:** engineering.
 
