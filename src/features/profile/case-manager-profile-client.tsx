@@ -50,6 +50,7 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
     updateCaseManagerProfile,
     initialSaveState,
   );
+  const [signOutState, signOutFormAction, signOutPending] = useActionState(signOutAction, { error: null });
   const displayName = profile.display_name?.trim() || profile.email;
   const updatedAt = new Date(profile.updated_at).toLocaleString(undefined, {
     dateStyle: "medium",
@@ -87,9 +88,10 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
             </div>
           </dl>
 
-          <form action={signOutAction} className="mt-5">
-            <Button type="submit" variant="outline" className="flex min-h-10 w-full items-center justify-center gap-2">
-              <LogOut className="size-4" aria-hidden /> Sign out
+          <form action={signOutFormAction} className="mt-5">
+            {signOutState.error ? <p role="alert" className="mb-3 text-sm text-[var(--color-error)]">{signOutState.error}</p> : null}
+            <Button type="submit" variant="outline" disabled={signOutPending} className="flex min-h-10 w-full items-center justify-center gap-2">
+              <LogOut className="size-4" aria-hidden /> {signOutPending ? "Signing out…" : "Sign out"}
             </Button>
           </form>
         </aside>

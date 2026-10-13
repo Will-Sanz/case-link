@@ -18,6 +18,7 @@ const admin = new Client({ connectionString: databaseUrl });
 const userA = randomUUID();
 const userB = randomUUID();
 const unprovisionedUser = randomUUID();
+const sessionIds = new Map<string, string>([userA, userB, unprovisionedUser].map((id) => [id, randomUUID()]));
 const familyA = randomUUID();
 const familyB = randomUUID();
 const planA = randomUUID();
@@ -41,7 +42,7 @@ async function asUser<T>(
     await client.query("select set_config('request.jwt.claim.sub', $1, true)", [userId]);
     await client.query("select set_config('request.jwt.claim.role', 'authenticated', true)");
     await client.query("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({ sub: userId, role: "authenticated", aal }),
+      JSON.stringify({ sub: userId, role: "authenticated", aal, session_id: sessionIds.get(userId) }),
     ]);
     const result = await run(client);
     await client.query("commit");
@@ -90,6 +91,9 @@ async function setup() {
       `case-unprovisioned-${unprovisionedUser}@example.test`,
     ],
   );
+  for (const [userId, sessionId] of sessionIds) {
+    await admin.query("insert into auth.sessions (id, user_id) values ($1, $2)", [sessionId, userId]);
+  }
   await admin.query(
     `insert into public.app_users (id, email, role)
      values ($1, $2, 'case_manager'), ($3, $4, 'case_manager')`,
@@ -156,6 +160,13 @@ async function run() {
     assert.equal(stale.rowCount, 0, "a stale revision cannot overwrite the saved row");
   }
 
+  await admin.query("update auth.sessions set not_after = now() - interval '1 minute' where id = $1", [sessionIds.get(userA)]);
+  assert.equal((await asUser(userA, (client) => client.query("select public.is_active_app_user() as allowed"))).rows[0].allowed, false, "expired sessions lose database access");
+  await admin.query("update auth.sessions set not_after = null where id = $1", [sessionIds.get(userA)]);
+  const actualSessionB = sessionIds.get(userB)!;
+  sessionIds.set(userB, sessionIds.get(userA)!);
+  assert.equal((await asUser(userB, (client) => client.query("select public.is_active_app_user() as allowed"))).rows[0].allowed, false, "session identity must match the authenticated account");
+  sessionIds.set(userB, actualSessionB);
   await asUser(userA, (client) => client.query("select public.ensure_app_user()"));
   const contextRevision = (await admin.query("select to_json(updated_at) as revision from public.families where id = $1", [familyA])).rows[0].revision;
   await asUser(userA, (client) => client.query(

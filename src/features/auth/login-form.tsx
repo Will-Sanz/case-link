@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { LegalDocumentModal } from "@/components/legal/legal-document-modal";
 import type { LegalModalDocument } from "@/components/legal/legal-document-modal";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { alertErrorClass } from "@/lib/ui/form-classes";
 import {
-  safeOAuthRedirectMessage,
+  AUTH_LINK_ERROR_MESSAGE,
   safeSignInPasswordMessage,
 } from "@/lib/auth/safe-client-auth-message";
 import { safeInternalPath } from "@/lib/auth/safe-internal-path";
@@ -23,37 +23,30 @@ export function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const urlErrorRaw = searchParams.get("error");
-  const urlError =
-    urlErrorRaw ?
-      (() => {
-        try {
-          return decodeURIComponent(urlErrorRaw);
-        } catch {
-          return urlErrorRaw;
-        }
-      })()
-    : null;
+  const urlError = searchParams.get("error");
   const [error, setError] = useState<string | null>(() => {
     if (urlError === "auth") {
       return "This sign-in link is invalid, expired, or was already used.";
     }
     if (urlError && urlError.length > 0) {
-      return safeOAuthRedirectMessage(urlError);
+      return AUTH_LINK_ERROR_MESSAGE;
     }
     return null;
   });
   const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
   const [legalModal, setLegalModal] = useState<LegalModalDocument | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
     setError(null);
+    submitting.current = true;
     setPending(true);
     try {
       const supabase = createSupabaseBrowserClient();
       const { error: signError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
       });
       if (signError) {
@@ -62,7 +55,10 @@ export function LoginForm() {
       }
       router.push(nextPath);
       router.refresh();
+    } catch {
+      setError("Sign-in is temporarily unavailable. Please try again.");
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   }

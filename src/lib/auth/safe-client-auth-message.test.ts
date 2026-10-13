@@ -1,7 +1,5 @@
 import { describe, expect, it, afterEach } from "vitest";
 import {
-  safeAuthSessionClientMessage,
-  safeOAuthRedirectMessage,
   safeSignInPasswordMessage,
 } from "@/lib/auth/safe-client-auth-message";
 
@@ -15,24 +13,6 @@ describe("safe-client-auth-message", () => {
 
   afterEach(() => {
     setNodeEnv(originalEnv);
-  });
-
-  it("preserves raw oauth messages outside production", () => {
-    setNodeEnv("development");
-
-    expect(safeOAuthRedirectMessage("Provider said no")).toBe("Provider said no");
-    expect(safeAuthSessionClientMessage("Token exchange failed")).toBe("Token exchange failed");
-  });
-
-  it("hides sensitive oauth details in production", () => {
-    setNodeEnv("production");
-
-    expect(safeOAuthRedirectMessage("SQL exception while exchanging JWT token")).toBe(
-      "Sign-in could not be completed. Try again or request a new link.",
-    );
-    expect(safeOAuthRedirectMessage("Operator supplied short message")).toBe(
-      "Sign-in could not be completed. Try again or request a new link.",
-    );
   });
 
   it("falls back for long or infrastructure sign-in errors in production", () => {

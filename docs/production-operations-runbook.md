@@ -97,6 +97,8 @@ The privacy owner approves every deletion. A documented legal hold pauses deleti
 
 The automated synthetic rehearsal is `npm run test:auth-security`. It only accepts the local Supabase service addresses and proves that a retained unexpired token cannot read/write owned or assigned cases, refresh, or sign in again. The database regression suite also checks inactive administrator and direct RPC behavior. Repeat the authorized rehearsal in isolated staging under CL-38 before launch. Supabase's [session documentation](https://supabase.com/docs/guides/auth/sessions) explains why token expiry alone is insufficient for immediate removal.
 
+Successful staff sign-out ends all refresh sessions. Database case access also checks that the JWT session still exists and has not expired, so revoked tokens cannot keep reading casework until token expiry. A failed sign-out stays visible with a retry action; staff should confirm completion before leaving a shared device. Browser draft cleanup and recovery are tracked separately in CL-04.
+
 Review every user, admin, assignment, service credential, and vendor operator quarterly and before each pilot extension.
 
 ## Deploy and rollback

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({
@@ -16,6 +16,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/actions/auth", () => ({ signOutAction: vi.fn() }));
 vi.mock("@/app/actions/profile", () => ({ updateCaseManagerProfile: vi.fn() }));
 
+import { signOutAction } from "@/app/actions/auth";
 import { FamilyCaseChrome } from "@/components/layout/family-case-chrome";
 import { CaseManagerProfileClient } from "@/features/profile/case-manager-profile-client";
 
@@ -63,4 +64,12 @@ describe("account navigation", () => {
     expect(screen.queryByText(/User ID:/)).toBeNull();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
+});
+
+it("shows sign-out failure and keeps the retry button available", async () => {
+  vi.mocked(signOutAction).mockResolvedValue({ error: "Sign-out could not be confirmed. Please try again." });
+  render(<CaseManagerProfileClient profile={{ id: "staff-id", email: "staff@example.test", role: "case_manager", is_active: true, created_at: "2026-08-01T12:00:00Z", updated_at: "2026-08-01T12:00:00Z" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Sign-out could not be confirmed");
+  expect((screen.getByRole("button", { name: "Sign out" }) as HTMLButtonElement).disabled).toBe(false);
 });

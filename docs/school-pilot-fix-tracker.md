@@ -299,7 +299,7 @@ New users receive an invitation before the role-provisioning RPC completes. If p
 
 **Close with:** first invite, existing active user, expired invite, failed role RPC after email creation, retry, duplicate operator requests, and wrong-role input tests with a synthetic mailbox. **Sources:** [invitation workflow](/Users/willsanz/homelessness-project/scripts/invite-user.ts), [provisioning safety](/Users/willsanz/homelessness-project/scripts/provisioning-safety.ts).
 
-### [ ] CL-14 — Make auth callbacks and failures finish predictably
+### [x] CL-14 — Make auth callbacks and failures finish predictably
 
 **Related fix in CL-07:** real local Auth testing found that `auth.email.enable_signup=false` disabled the email provider. The provider is now enabled while top-level public signup remains disabled; both behaviors are tested. Callback/form work and hosted evidence below remain open.
 
@@ -310,6 +310,8 @@ The callback supports PKCE codes, token hashes, and fragment sessions. Its async
 **Fix:** give every supported callback and network failure a finite, safe result; allow only intended verification types; prevent competing exchanges/redirects. Preserve safe internal redirects and token cleanup. Handle sign-out failures deliberately instead of ignoring the SDK error result.
 
 **Close with:** the auth matrix below, including expired/reused links, remount, missing verifier, bad type, malformed fragment, denied cookies, provider outage, and sign-out failure. **Sources:** [callback](/Users/willsanz/homelessness-project/src/app/auth/callback/auth-callback-client.tsx), [login](/Users/willsanz/homelessness-project/src/features/auth/login-form.tsx), [forgot password](/Users/willsanz/homelessness-project/src/features/auth/forgot-password-form.tsx), [sign-out](/Users/willsanz/homelessness-project/src/app/actions/auth.ts).
+
+**Completed October 13, 2026 — engineering:** callbacks now validate one supported exchange (PKCE, invitation/recovery token hash, or complete fragment session), scrub query/fragment credentials before browser-client initialization, and share the current operation across Strict Mode and route remounts. Stored and provider-verified account identities must agree. Invalid/ambiguous input, missing session, blocked storage, thrown failures, and unsafe destinations finish at a generic recovery screen without provider text in URLs. Browser/server/proxy requests have bounded waits and preserve cancellation. Login, reset-email, reset-session, and password-update failures recover with retained input and duplicate-submit guards. Sign-out reports failure with retry; success revokes global refresh sessions. Database authorization additionally requires a live, unexpired session belonging to the authenticated account, so an old unexpired JWT cannot access cases after logout. Thirty-nine focused checks passed, plus real local Auth logout/retained-token tests and database tests for expired/mismatched sessions. Supabase security advisor: no issues. Correctness/security and separate Ponytail review completed; full verification is required on push. Actual school mail delivery and deployed browser/cookie settings remain CL-08/CL-16/CL-38 gates. Commit: `git log --grep='CL-14'`.
 
 ### [ ] CL-15 — Define and complete initial-password and reset behavior
 

@@ -90,6 +90,12 @@ async function run() {
   const audit = await db.query("select action, details from public.security_audit_log where target_user_id = $1 and action = 'user.disabled'", [original.id]);
   assert.ok(audit.rowCount);
   assert.equal(audit.rows[0].details.replacement_user_id, replacement.id);
+  const retainedReplacementToken = replacement.accessToken;
+  assert.equal((await replacement.client.auth.signOut({ scope: "global" })).error, null);
+  const signedOutRead = await retainedRequest(retainedReplacementToken, `families?select=id&id=eq.${owned}`);
+  assert.equal(signedOutRead.status, 200);
+  assert.deepEqual(await signedOutRead.json(), [], "logout invalidates direct reads even while the JWT is unexpired");
+  assert.equal((await retainedRequest(retainedReplacementToken, "rpc/consume_ai_budget", { p_operation: "chat", p_weight: 1 })).status, 403);
   console.info("Local Auth security checks passed: retained JWT, reads/writes, RPCs, reassignment, refresh, sign-in, and audit.");
 }
 run().finally(async () => {

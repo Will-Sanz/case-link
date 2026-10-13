@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ export function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -35,8 +36,19 @@ export function ResetPasswordForm() {
         return;
       }
 
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase.auth.getSession();
+      let data;
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const result = await supabase.auth.getSession();
+        if (result.error) throw result.error;
+        data = result.data;
+      } catch {
+        if (active) {
+          setError("We couldn't verify this reset session. Reopen your email link to try again.");
+          setStatus("invalid");
+        }
+        return;
+      }
 
       if (!active) return;
       if (isRecoveryMode && data.session) {
@@ -54,6 +66,7 @@ export function ResetPasswordForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting.current || status !== "ready") return;
     setError(null);
     setInfo(null);
 
@@ -66,6 +79,7 @@ export function ResetPasswordForm() {
       return;
     }
 
+    submitting.current = true;
     setPending(true);
     try {
       const supabase = createSupabaseBrowserClient();
@@ -80,7 +94,10 @@ export function ResetPasswordForm() {
         router.replace("/login?message=password-reset-success");
         router.refresh();
       }, 900);
+    } catch {
+      setError("We couldn't update your password right now. Please try again.");
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   }

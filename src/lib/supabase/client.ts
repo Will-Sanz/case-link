@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { fetchWithTimeout } from "./fetch-with-timeout";
 
 export function createSupabaseBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -10,5 +11,7 @@ export function createSupabaseBrowserClient() {
       "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. On Vercel, add them under Project → Settings → Environment Variables and redeploy.",
     );
   }
-  return createBrowserClient(url, key);
+  return createBrowserClient(url, key, {
+    global: { fetch: fetchWithTimeout },
+  });
 }
