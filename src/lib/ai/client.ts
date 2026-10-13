@@ -3,13 +3,11 @@ import { z } from "zod";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
-import { pdfBase64DataUrl } from "@/lib/ai/file-input";
 import {
   augmentInstructionsForMode,
   getDefaultMaxTokensForTask,
   getModelForTask,
   modelSupportsReasoningEffort,
-  taskUsesResponsesApi,
   type AiTaskType,
 } from "@/lib/ai/models";
 import { isAllowedOpenAiModelId, OPENAI_MODELS } from "@/lib/ai/model-allowlist";
@@ -47,21 +45,11 @@ export type StructuredJsonSchema = {
   strict?: boolean;
 };
 
-export type AiFileInput = {
-  filename: string;
-  /** Raw base64, without a data-URL prefix. */
-  fileDataBase64: string;
-};
-
 export type CreateResponseOptions = {
   taskType: AiTaskType;
   instructions: string;
   input: string | ChatMessage[];
-  /** Responses API file inputs. Used only for short-lived, request-scoped analysis. */
-  fileInputs?: AiFileInput[];
-  /** Legacy JSON mode, model returns valid JSON only; no schema enforcement. */
-  responseFormat?: "json_object";
-  /** When set, API enforces this schema (Responses: text.format; Chat: response_format json_schema). */
+  /** API-enforced structured output, also validated by each task before use. */
   structuredJsonSchema?: StructuredJsonSchema;
   temperature?: number;
   maxTokens?: number;
@@ -114,7 +102,7 @@ function logOpenAiUsage(
 }
 
 /**
- * Call OpenAI. Uses Responses API for core reasoning tasks, Chat Completions for helpers.
+ * Call OpenAI Responses API for the current text-only product tasks.
  * Supports env override: OPENAI_MODEL_OVERRIDE forces a single model for all tasks.
  */
 export async function createAiResponse(
@@ -146,8 +134,6 @@ export async function createAiResponse(
     return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
   }
 
-  const useResponses = Boolean(options.fileInputs?.length) ||
-    taskUsesResponsesApi(options.taskType);
   const instructions = augmentInstructionsForMode(options.instructions, mode);
   const requestedMax = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
   const outputCap =
@@ -173,11 +159,6 @@ export async function createAiResponse(
     }
     return { ok: false, error: exposeAiErrorToClient(err, envDebug) };
   }
-  if (options.fileInputs?.length && typeof options.input !== "string") {
-    const internal = "File inputs require a single text prompt.";
-    return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
-  }
-
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
   const debug = envDebug;
@@ -192,27 +173,22 @@ export async function createAiResponse(
       model,
       aiMode: mode,
       reasoningEffort: reasoning,
-      api: useResponses ? "responses" : "chat.completions",
+      api: "responses",
       hasStructuredJsonSchema: Boolean(options.structuredJsonSchema),
-      responseFormat: options.responseFormat ?? null,
       inputChars: inputSummary.chars,
       instructionsChars: instructions.length,
       maxTokens,
-      fileCount: options.fileInputs?.length ?? 0,
     });
     if (payloadDebug) {
       console.info("[ai] request:payload_summary", {
         inputChars: inputSummary.chars,
         instructionsChars: instructions.length,
-        fileCount: options.fileInputs?.length ?? 0,
       });
     }
   }
 
   try {
-    const rawResult = useResponses
-      ? await callResponsesApi(apiKey, model, resolved, debug, mode)
-      : await callChatCompletionsApi(apiKey, model, resolved, debug, mode);
+    const rawResult = await callResponsesApi(apiKey, model, resolved, debug, mode);
     const result: CreateResponseResult =
       rawResult.ok ?
         rawResult
@@ -278,14 +254,6 @@ const responsesBodySchema = z.object({
   })),
   usage: usageSchema,
 });
-const chatBodySchema = z.object({
-  choices: z.array(z.object({
-    finish_reason: z.string().nullable(),
-    message: z.object({ content: z.string().nullish(), refusal: z.string().nullish() }),
-  })).min(1),
-  usage: usageSchema,
-});
-
 function invalidResponse(): CreateResponseResult {
   return { ok: false, code: "invalid_response", error: "The AI returned an unusable answer. Your saved work is unchanged. Try again." };
 }
@@ -310,32 +278,10 @@ async function callResponsesApi(
   debug: boolean,
   mode: AiMode,
 ): Promise<CreateResponseResult> {
-  const input =
-    typeof options.input === "string" && options.fileInputs?.length
-      ? [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: options.input },
-              ...options.fileInputs.map((file) => ({
-                type: "input_file",
-                filename: file.filename,
-                file_data: pdfBase64DataUrl(file.fileDataBase64),
-              })),
-            ],
-          },
-        ]
-      : typeof options.input === "string"
-      ? options.input
-      : options.input.map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
   const body: Record<string, unknown> = {
     model,
     instructions: options.instructions,
-    input,
+    input: typeof options.input === "string" ? options.input : options.input.map(({ role, content }) => ({ role, content })),
     max_output_tokens: options.maxTokens ?? 4096,
     store: false,
   };
@@ -355,10 +301,6 @@ async function callResponsesApi(
         strict: options.structuredJsonSchema.strict !== false,
       },
       // Omit `verbosity`: values like "high" are not supported on all models (e.g. gpt-4o) and return 400.
-    };
-  } else if (options.responseFormat === "json_object") {
-    body.text = {
-      format: { type: "json_object" },
     };
   }
 
@@ -421,82 +363,4 @@ function extractOutputText(
     }
   }
   return texts.length > 0 ? texts.join("\n") : null;
-}
-
-async function callChatCompletionsApi(
-  apiKey: string,
-  model: string,
-  options: CreateResponseOptions,
-  debug: boolean,
-  mode: AiMode,
-): Promise<CreateResponseResult> {
-  const messages =
-    typeof options.input === "string"
-      ? [
-          { role: "system" as const, content: options.instructions },
-          { role: "user" as const, content: options.input },
-        ]
-      : options.input;
-
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    max_completion_tokens: options.maxTokens ?? 4096,
-    store: false,
-  };
-  if (!modelSupportsReasoningEffort(model)) {
-    body.temperature = options.temperature ?? 0.4;
-  }
-  if (modelSupportsReasoningEffort(model)) {
-    body.reasoning_effort = mode === "thinking" ? "high" : "none";
-  }
-
-  if (options.structuredJsonSchema) {
-    body.response_format = {
-      type: "json_schema",
-      json_schema: {
-        name: options.structuredJsonSchema.name,
-        schema: options.structuredJsonSchema.schema,
-        strict: options.structuredJsonSchema.strict !== false,
-      },
-    };
-  } else if (options.responseFormat === "json_object") {
-    body.response_format = { type: "json_object" };
-  }
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    signal: openAiAbortSignal(),
-  });
-
-  if (!res.ok) return providerHttpError(res);
-
-  const parsed = chatBodySchema.safeParse(await res.json());
-  if (!parsed.success) return invalidResponse();
-  const data = parsed.data;
-  const choice = data.choices[0];
-  if (choice.message.refusal) {
-    return { ok: false, code: "refused", error: "The AI could not help with that request. Reword it or edit the plan yourself." };
-  }
-  if (choice.finish_reason !== "stop") {
-    return { ok: false, code: "incomplete", error: "The AI answer was incomplete and was not applied. Try a shorter request." };
-  }
-  const raw = choice.message.content;
-  if (!raw?.trim()) return invalidResponse();
-
-  if (debug) {
-    console.info(`[ai] Chat task=${options.taskType} model=${model} tokens=`, data.usage?.total_tokens);
-  }
-
-  return {
-    ok: true,
-    text: raw.trim(),
-    model,
-    usage: data.usage,
-  };
 }

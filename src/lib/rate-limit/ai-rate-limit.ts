@@ -12,14 +12,11 @@ type SharedBudgetResult = {
 };
 
 function budgetForTask(taskType: AiTaskType): { operation: string; weight: number } {
-  if (taskType === "full_plan_generation") return { operation: "plan", weight: 3 };
   if (taskType === "plan_phase_generation") return { operation: "plan_phase", weight: 2 };
   if (taskType === "plan_refinement" || taskType === "step_refinement") {
     return { operation: "plan", weight: 2 };
   }
-  if (taskType === "pdf_field_mapping") return { operation: "pdf_mapping", weight: 1 };
-  if (taskType === "case_assistant") return { operation: "chat", weight: 1 };
-  return { operation: "helper", weight: 1 };
+  return { operation: "chat", weight: 1 };
 }
 
 /** Consume the shared Postgres budget. Production fails closed if the control is unavailable. */

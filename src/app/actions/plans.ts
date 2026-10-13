@@ -7,19 +7,7 @@ import { publicSessionError } from "@/lib/auth/session-errors";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
-import { generatePlanSteps } from "@/lib/plan-generator";
-import {
-  capStepsPerPhase,
-  MAX_PLAN_STEPS_PER_PHASE,
-  shouldLogPlanRegenerate,
-  tryGeneratePlanStepsWithOpenAI,
-  previewRefinePlanStepsWithOpenAI,
-} from "@/lib/plan-generator/openai-plan";
-import {
-  generatedStepsFromMatches,
-  mergeResourceAndRulesSteps,
-} from "@/lib/plan-generator/resource-context";
-import { ensureActionItems } from "@/lib/plan-generator/derive-action-items";
+import { MAX_PLAN_STEPS_PER_PHASE, previewRefinePlanStepsWithOpenAI } from "@/lib/plan-generator/openai-plan";
 import { sparseDetailsForPersistence, type LeanPlanPhaseStep } from "@/lib/plan-generator/lean-plan-schema";
 import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-phase-summary";
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
@@ -50,14 +38,12 @@ import type {
 import {
   createManualStepSchema,
   deletePlanStepSchema,
-  generatePlanSchema,
   stagedPlanAdvanceSchema,
   stagedPlanStartSchema,
   markPlanReviewedSchema,
   savePlanEditsSchema,
   previewRefineStepSchema,
   previewRefinePlanSchema,
-  toggleChecklistItemSchema,
   updatePlanSchema,
   updatePlanStepActionItemSchema,
 } from "@/lib/validations/plans";
@@ -151,11 +137,6 @@ export type PreviewRefinePlanStepResult =
     }
   | { ok: false; error: string };
 
-/** Result of generatePlan, includes planId on success for client verification. */
-export type GeneratePlanResult =
-  | { ok: true; planId: string; version: number; stepCount: number }
-  | { ok: false; error: string };
-
 export type StagedPlanStartResult =
   | { ok: true; planId: string; version: number; stepCount: number }
   | { ok: false; error: string };
@@ -163,26 +144,6 @@ export type StagedPlanStartResult =
 export type StagedPlanAdvanceResult =
   | { ok: true; done: boolean; phaseCompleted?: "30" | "60" | "90" }
   | { ok: false; error: string };
-
-async function logCaseActivity(
-  supabase: SupabaseClient,
-  familyId: string,
-  action: string,
-  entityType?: string,
-  entityId?: string,
-  details?: Record<string, unknown>,
-) {
-  const { error } = await supabase.rpc("record_activity_event", {
-    p_family_id: familyId,
-    p_action: action,
-    p_entity_type: entityType ?? null,
-    p_entity_id: entityId ?? null,
-    p_details: details ?? null,
-  });
-  // These application-source timeline hints are not the authoritative audit stream.
-  // Never report a saved edit as failed because a later best-effort hint was unavailable.
-  if (error) logServerError("plans:product-timeline", error);
-}
 
 async function updateStagedPlanState(
   supabase: SupabaseClient,
@@ -305,196 +266,6 @@ async function appendLeanPhaseForPlan(
   if (!appended) return { ok: false, error: "This plan phase was already saved." };
 
   return { ok: true };
-}
-
-export async function generatePlan(input: unknown): Promise<GeneratePlanResult> {
-  const parsed = generatePlanSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: "Invalid request" };
-  }
-
-  let supabase;
-  try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
-  } catch (error) {
-    return { ok: false, error: publicSessionError(error) };
-  }
-
-  const { familyId, regenerationFeedback, regenerateExistingPlan, aiMode } = parsed.data;
-  const planAiMode = parseAiMode(aiMode);
-  const logRegen = shouldLogPlanRegenerate();
-  if (logRegen) {
-    const fb = regenerationFeedback?.trim();
-    console.info("[generatePlan] start", {
-      familyId,
-      regenerateExistingPlan: Boolean(regenerateExistingPlan),
-      hasRegenerationFeedback: Boolean(fb),
-      regenerationFeedbackChars: fb?.length ?? 0,
-    });
-  }
-
-  const detail = await getFamilyDetail(supabase, familyId);
-  if (!detail) {
-    return { ok: false, error: "Family not found" };
-  }
-  const privacy = validateFamilyNoPii(detail, [
-    {
-      field: "regenerationFeedback",
-      label: "Plan instructions",
-      value: regenerationFeedback,
-    },
-  ]);
-  if (!privacy.ok) {
-    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
-  }
-
-  const logPrefix = "[generatePlan]";
-
-  const rulesSteps = generatePlanSteps({
-    goals: detail.goals.map((g) => ({ preset_key: g.preset_key, label: g.label })),
-    barriers: detail.barriers.map((b) => ({
-      preset_key: b.preset_key,
-      label: b.label,
-    })),
-  });
-  const resourceSteps = generatedStepsFromMatches(detail.resourceMatches);
-  const rulesStepsMerged = mergeResourceAndRulesSteps(
-    resourceSteps,
-    rulesSteps,
-  );
-
-  const env = getEnv();
-  const apiKey = env.OPENAI_API_KEY?.trim();
-  const mustUseAi = Boolean(regenerateExistingPlan);
-
-  if (mustUseAi && !apiKey) {
-    return {
-      ok: false,
-      error:
-        "Regenerating a plan requires AI. Add OPENAI_API_KEY to your environment and restart the server.",
-    };
-  }
-
-  let steps = rulesStepsMerged;
-  let generationSource: "openai" | "rules" = "rules";
-  let aiModel: string | null = null;
-
-  if (apiKey) {
-    const ai = await tryGeneratePlanStepsWithOpenAI(detail, {
-      regenerationFeedback: regenerationFeedback?.trim() || undefined,
-      fullRegeneration: mustUseAi,
-      retries: 1,
-      aiMode: planAiMode,
-      requestMeta: { route: "generatePlan" },
-    });
-    if (ai.ok && ai.steps.length > 0) {
-      steps = ai.steps;
-      generationSource = "openai";
-      aiModel = ai.model;
-      if (logRegen) {
-        console.info("[generatePlan] using OpenAI steps", {
-          model: ai.model,
-          stepCount: ai.steps.length,
-        });
-      }
-    } else if (mustUseAi) {
-      const msg =
-        !ai.ok ?
-          `Plan regeneration failed: ${ai.reason}`
-        : "The AI returned no steps. Try again, or shorten your regeneration notes.";
-      logServerError(
-        `${logPrefix}:required-ai`,
-        new Error(!ai.ok ? ai.reason : "AI returned zero plan steps"),
-      );
-      return { ok: false, error: msg };
-    } else if (logRegen) {
-      if (!ai.ok) {
-        console.warn(`${logPrefix} OpenAI failed, using rules fallback:`, ai.reason);
-      } else if (ai.steps.length === 0) {
-        console.warn(`${logPrefix} OpenAI returned zero steps, using rules fallback`);
-      }
-      console.info("[generatePlan] OpenAI branch not used for final steps", {
-        aiOk: ai.ok,
-        aiStepCount: ai.ok ? ai.steps.length : 0,
-        aiReason: ai.ok ? null : ai.reason,
-        rulesMergedStepCount: rulesStepsMerged.length,
-      });
-    }
-  }
-
-  if (logRegen) {
-    console.info("[generatePlan] steps after AI/rules (before cap/sort)", {
-      generationSource,
-      stepCount: steps.length,
-    });
-  }
-
-  steps = capStepsPerPhase(steps, MAX_PLAN_STEPS_PER_PHASE);
-  steps.forEach((s, i) => {
-    s.sort_order = i;
-  });
-  steps = ensureActionItems(steps);
-  if (steps.length === 0) return { ok: false, error: "No plan steps were generated." };
-
-  const approximatePlanStart = new Date().toISOString();
-  const { data: createdRaw, error: createError } = await supabase.rpc("create_plan_with_steps", {
-    p_family_id: familyId,
-    p_generation_source: generationSource,
-    p_ai_model: aiModel,
-    p_steps: steps.map((step) => ({
-      phase: step.phase,
-      title: step.title,
-      description: step.description,
-      sort_order: step.sort_order,
-      priority: step.details.priority,
-      details: step.details,
-      action_items: (step.action_items ?? []).map((item, sortOrder) => ({
-        title: item.title,
-        description: item.description ?? null,
-        week_index: item.week_index,
-        target_date: resolveActionTargetDate({
-          planStartDate: approximatePlanStart,
-          weekIndex: item.week_index,
-          proposedTargetDate: item.target_date,
-        }),
-        sort_order: sortOrder,
-      })),
-    })),
-  });
-  const created = createdRaw as {
-    planId?: unknown;
-    version?: unknown;
-    stepCount?: unknown;
-  } | null;
-  if (
-    createError ||
-    typeof created?.planId !== "string" ||
-    typeof created.version !== "number" ||
-    typeof created.stepCount !== "number"
-  ) {
-    logServerError(`${logPrefix}:create-plan`, createError ?? new Error("invalid RPC result"));
-    return { ok: false, error: publicMessageFromSupabaseError(createError, "Could not create plan") };
-  }
-
-  revalidatePath(`/families/${familyId}`, "page");
-
-  if (logRegen) {
-    console.info("[generatePlan] returning to client", {
-      ok: true,
-      planId: created.planId,
-      version: created.version,
-      stepCount: created.stepCount,
-      generationSource,
-    });
-  }
-
-  return {
-    ok: true,
-    planId: created.planId,
-    version: created.version,
-    stepCount: created.stepCount,
-  };
 }
 
 /**
@@ -1284,108 +1055,6 @@ export async function deletePlanStep(input: unknown): Promise<ActionResult> {
     return { ok: false, error: publicMessageFromSupabaseError(error) };
   }
   if (!deleted) return { ok: false, error: "Step not found" };
-
-  revalidatePath(`/families/${familyId}`);
-  return { ok: true };
-}
-
-export async function toggleChecklistItem(input: unknown): Promise<ActionResult> {
-  const parsed = toggleChecklistItemSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: "Invalid request" };
-  }
-
-  let supabase;
-  try {
-    const session = await requireAppUserWithClient();
-    supabase = session.supabase;
-  } catch (error) {
-    return { ok: false, error: publicSessionError(error) };
-  }
-
-  const { stepId, familyId, checklistIndex, completed } = parsed.data;
-
-  const { data: step } = await supabase
-    .from("plan_steps")
-    .select("plan_id, details, workflow_data")
-    .eq("id", stepId)
-    .maybeSingle();
-
-  if (!step) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("family_id")
-    .eq("id", step.plan_id)
-    .eq("family_id", familyId)
-    .maybeSingle();
-
-  if (!plan) {
-    return { ok: false, error: "Step not found" };
-  }
-
-  const details = (step.details as { checklist?: string[] }) ?? {};
-  const checklist = details.checklist ?? [];
-  const wd = (step.workflow_data as { checklist_completed?: boolean[] }) ?? {};
-  const completedArr = wd.checklist_completed ?? Array(checklist.length).fill(false);
-
-  if (checklistIndex >= checklist.length) {
-    return { ok: false, error: "Invalid checklist index" };
-  }
-
-  const next = [...completedArr];
-  while (next.length <= checklistIndex) {
-    next.push(false);
-  }
-  next[checklistIndex] = completed;
-
-  // Auto-update step status from checklist progress
-  const completedCount = next.filter(Boolean).length;
-  const totalRequired = checklist.length;
-  const allComplete = totalRequired > 0 && completedCount >= totalRequired;
-  const someComplete = completedCount > 0;
-
-  const { data: stepForStatus } = await supabase
-    .from("plan_steps")
-    .select("status")
-    .eq("id", stepId)
-    .single();
-
-  const currentStatus = (stepForStatus?.status as string) ?? "pending";
-  let statusUpdate: string | undefined;
-
-  if (allComplete && currentStatus !== "completed" && currentStatus !== "blocked") {
-    statusUpdate = "completed";
-  } else if (someComplete && currentStatus === "pending" && !allComplete) {
-    statusUpdate = "in_progress";
-  }
-
-  const updatePayload: Record<string, unknown> = {
-    workflow_data: { ...wd, checklist_completed: next },
-  };
-  if (statusUpdate) updatePayload.status = statusUpdate;
-
-  const { error } = await supabase
-    .from("plan_steps")
-    .update(updatePayload)
-    .eq("id", stepId);
-
-  if (error) {
-    return { ok: false, error: publicMessageFromSupabaseError(error) };
-  }
-
-  if (statusUpdate && plan) {
-    await logCaseActivity(
-      supabase,
-      familyId,
-      "step.status_changed",
-      "plan_step",
-      stepId,
-      { status: statusUpdate, source: "checklist_auto" },
-    );
-  }
 
   revalidatePath(`/families/${familyId}`);
   return { ok: true };

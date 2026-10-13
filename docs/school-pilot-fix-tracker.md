@@ -219,7 +219,7 @@ Database admin privilege requires an AAL2 session, but the app has no complete T
 
 **Fix:** validate the actual provider-bound payload, including saved and unsaved plan text. Keep trusted directory facts distinguishable from user narrative and untrusted model claims. Never solve the false positive by exempting all assistant text or all contact fields.
 
-**Close with:** a synthetic identifier placed in each outbound field is caught before the provider call; legitimate source-backed agency contacts remain usable on follow-up; fabricated contacts cannot obtain the same exemption. **Sources:** [privacy field collection](/Users/willsanz/homelessness-project/src/lib/privacy/no-pii.ts:237), [assistant validation](/Users/willsanz/homelessness-project/src/app/actions/case-assistant.ts), [step refinement](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-refine-step.ts).
+**Close with:** a synthetic identifier placed in each outbound field is caught before the provider call; legitimate source-backed agency contacts remain usable on follow-up; fabricated contacts cannot obtain the same exemption. **Sources:** [privacy field collection](/Users/willsanz/homelessness-project/src/lib/privacy/no-pii.ts:237), [assistant validation](/Users/willsanz/homelessness-project/src/app/actions/case-assistant.ts), [step refinement](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-plan.ts).
 
 ### [x] CL-27 — Preserve human work when applying AI edits
 
@@ -297,7 +297,7 @@ A plan phase costs two units and the per-user phase limit is six units per ten-m
 
 **Close with:** two consecutive family plans, malformed-output repair, local quota, global quota, AI-disabled state, unavailable control, and concurrent-user tests. Show accurate recovery without losing completed stages. **Sources:** [rate policy](/Users/willsanz/homelessness-project/src/lib/rate-limit/ai-rate-limit.ts), [shared counters](/Users/willsanz/homelessness-project/supabase/migrations/20260804173443_production_hardening.sql:720), [AI client](/Users/willsanz/homelessness-project/src/lib/ai/client.ts).
 
-### [ ] CL-12 — Reconcile product scope and remove proven unused paths
+### [x] CL-12 — Reconcile product scope and remove proven unused paths
 
 **Type:** Fix · **Responsible:** product + engineering.
 
@@ -306,6 +306,10 @@ README, PRD, privacy/operations material, and retained PDF helpers describe blan
 **Fix:** update current-facing promises and release checks to reviewed-plan PDF export. Reconcile the legacy `CASELINK_PDF_MODE=fillable-only` schema/startup requirement with the actual export-only product, preserving the privacy and deployment checks. Label historical design documents clearly. Remove the unused helpers and obsolete tests if still unused at implementation; keep PDF dependencies needed by the actual renderer. Recheck dead AI task/mode configuration before removing it.
 
 **Close with:** repo-wide reference search, updated school-demo instructions, and normal verification. Preserve historical data/migrations unless a separate reviewed migration is required. **Sources:** [README](/Users/willsanz/homelessness-project/README.md), [PRD](/Users/willsanz/homelessness-project/docs/intervention-planning-prd.md), [PDF inspector](/Users/willsanz/homelessness-project/src/lib/paperwork/pdf-form.ts), [field policy](/Users/willsanz/homelessness-project/src/lib/paperwork/field-policy.ts). **Lean opportunity:** at least 159 implementation lines, zero dependencies established for removal.
+
+**Completed October 13, 2026 — engineering:** README and school-demo instructions, current PRD acceptance matrix, privacy/terms text, and the operations runbook now describe reviewed-plan PDF export. Historical audits/design proposals are explicitly marked superseded. Removed the obsolete fillable-PDF deployment setting from startup validation, CI, and examples while retaining all eleven applicable production safety checks. Repository-wide caller searches established that the uploaded-form inspector/field policy, raw AI file-input assembly, retired single-request/rules generation and templates, direct checklist action, and legacy helper/Chat Completions routing had no product callers; those implementations and their obsolete tests were deleted. Staged generation, scoped refinements, case assistance, the reviewed PDF renderer/finalizer, database history/migrations, and both PDF dependencies remain.
+
+**Evidence:** all 336 tests in 59 files, typecheck, and lint passed after deletion. Active AI task routing tests cover all four current task types; the source-boundary test now rejects any raw-file AI path anywhere in production source. Existing review/export, conflict/rollback, session, and production-posture tests still pass. Normal correctness/security/privacy/regression and separate Ponytail reviews found no remaining caller regression; full verification/build runs before push. Approximately 2,800 net lines of obsolete code/document duplication were removed. Hosted release gates remain open. Commit: `git log --grep='CL-12'`.
 
 ### [x] CL-13 — Make invitation retry and partial provisioning recoverable
 
@@ -455,7 +459,7 @@ Single-step refinement asks the model for action items and dates, but the return
 
 **Fix:** return and preview the supported action changes, preserving IDs and human approval; or explicitly restrict the feature to wording and reject unsupported requests. The preferred product behavior is a reviewed, consistent change to the actual dated action.
 
-**Close with:** deadline change, action wording change, unsupported structural request, cancel, apply, reload, and PDF comparison. Prose and stored tasks must agree. **Sources:** [refinement result](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-refine-step.ts), [apply path](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:954).
+**Close with:** deadline change, action wording change, unsupported structural request, cancel, apply, reload, and PDF comparison. Prose and stored tasks must agree. **Sources:** [refinement result](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-plan.ts), [apply path](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:954).
 
 ### [x] CL-29 — Preserve one-action plans and deliberate removals
 

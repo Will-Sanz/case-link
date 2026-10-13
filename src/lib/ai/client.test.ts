@@ -36,11 +36,12 @@ describe("model request contracts", () => {
     expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).not.toHaveProperty("temperature");
   });
 
-  it("uses the reasoning token parameter on legacy helper requests", async () => {
-    await createAiResponse({ ...options, taskType: "call_script" });
+  it.each(["plan_phase_generation", "plan_refinement", "step_refinement", "case_assistant"] as const)("uses Responses for the active %s task", async (taskType) => {
+    expect(await createAiResponse({ ...options, taskType })).toMatchObject({ ok: true });
+    expect(mocks.fetch.mock.calls[0][0]).toBe("https://api.openai.com/v1/responses");
     const body = JSON.parse(mocks.fetch.mock.calls[0][1].body);
-    expect(body).toHaveProperty("max_completion_tokens");
-    expect(body).not.toHaveProperty("max_tokens");
+    expect(body).toHaveProperty("max_output_tokens");
+    expect(body).toMatchObject({ store: false });
   });
 
   it.each(["gpt-5-fake", "gpt-4-turbo", "gpt-3.5-turbo", "o9-test", "gpt-4o-2024-05-13"])("rejects untested or incompatible model %s", async (model) => {
@@ -108,15 +109,8 @@ describe("AI terminal results", () => {
     expect(await createAiResponse(options)).toMatchObject({ ok: false, code: "invalid_response" });
   });
 
-  it.each(["length", "content_filter", "tool_calls", null])("rejects unfinished legacy helper output: %s", async (finish_reason) => {
-    mocks.fetch.mockResolvedValue(Response.json({ choices: [{ finish_reason, message: { content: "Partial text" } }] }));
-    expect(await createAiResponse({ ...options, taskType: "call_script" })).toMatchObject({ ok: false });
-  });
-
-  it("accepts only a finished, non-refused helper response", async () => {
-    mocks.fetch.mockResolvedValueOnce(Response.json({ choices: [{ finish_reason: "stop", message: { content: "Hello." } }] }));
-    expect(await createAiResponse({ ...options, taskType: "call_script" })).toMatchObject({ ok: true, text: "Hello." });
-    mocks.fetch.mockResolvedValueOnce(Response.json({ choices: [{ finish_reason: "stop", message: { content: "Hello.", refusal: "Refused" } }] }));
-    expect(await createAiResponse({ ...options, taskType: "call_script" })).toMatchObject({ ok: false, code: "refused" });
+  it("rejects obsolete chat-completion-shaped output", async () => {
+    mocks.fetch.mockResolvedValue(Response.json({ choices: [{ finish_reason: "stop", message: { content: "Hello." } }] }));
+    expect(await createAiResponse(options)).toMatchObject({ ok: false, code: "invalid_response" });
   });
 });

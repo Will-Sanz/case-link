@@ -39,7 +39,6 @@ jobs:
           VERCEL_ENV: production
           CASELINK_ENVIRONMENT: production
           CASELINK_TENANCY_MODE: single-tenant
-          CASELINK_PDF_MODE: fillable-only
           CASELINK_INVITE_ONLY: "1"
           CASELINK_HSTS: "1"
           NEXT_PUBLIC_SITE_URL: https://caselink.example

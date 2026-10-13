@@ -60,22 +60,10 @@ const planStepWorkflowSchema = z.object({
   checklist_completed: z.array(z.boolean()).optional(),
 });
 
-export const generatePlanSchema = z.object({
+export const stagedPlanStartSchema = z.object({
   familyId: z.string().uuid(),
-  /** Optional notes when regenerating an existing plan; passed to the AI. */
   regenerationFeedback: z.string().max(4000).optional(),
-  /**
-   * Set by the Regenerate UI only. When true, the server requires a successful
-   * OpenAI plan (no rules fallback) so titles and full step content are freshly generated.
-   */
-  regenerateExistingPlan: z.boolean().optional(),
   aiMode: aiModeSchema,
-});
-
-export const stagedPlanStartSchema = generatePlanSchema.pick({
-  familyId: true,
-  regenerationFeedback: true,
-  aiMode: true,
 });
 
 export const stagedPlanAdvanceSchema = z.object({
@@ -150,13 +138,6 @@ export const linkResourceToStepSchema = z.object({
   matchId: z.string().uuid(),
   familyId: z.string().uuid(),
   stepId: z.string().uuid(),
-});
-
-export const toggleChecklistItemSchema = z.object({
-  stepId: z.string().uuid(),
-  familyId: z.string().uuid(),
-  checklistIndex: z.number().int().min(0),
-  completed: z.boolean(),
 });
 
 export const updatePlanStepActionItemSchema = z.object({

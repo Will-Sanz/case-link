@@ -9,7 +9,6 @@ const productionDeployment =
 if (productionDeployment) {
   const postureIssues = productionPostureIssues({
     CASELINK_TENANCY_MODE: process.env.CASELINK_TENANCY_MODE,
-    CASELINK_PDF_MODE: process.env.CASELINK_PDF_MODE,
     CASELINK_INVITE_ONLY: process.env.CASELINK_INVITE_ONLY,
     CASELINK_HSTS: process.env.CASELINK_HSTS,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,

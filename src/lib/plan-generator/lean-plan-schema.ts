@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import type { PlanStepDetails } from "@/types/family";
-import type { GeneratedActionItem, GeneratedStep, GeneratedStepDetails, PlanPhase } from "./types";
+import type { PlanPhase } from "./types";
 
 const contactLeanZ = z.object({
   name: z.string(),
@@ -71,56 +71,6 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase):
     checklist: [],
     priority: detailsPriority,
     stage_goal: lean.goal.trim(),
-  };
-}
-
-/**
- * Build GeneratedStep for ensureActionItems + insert pipeline (fills required GeneratedStepDetails).
- */
-export function leanPhaseStepToGeneratedStep(
-  lean: LeanPlanPhaseStep,
-  sort_order: number,
-): GeneratedStep {
-  const phase = lean.phase;
-  const sparse = leanStepToPlanDetails(lean, phase);
-  const actionItems: GeneratedActionItem[] = lean.action_items.map((a) => ({
-    title: a.title.trim(),
-    description: normStr(a.description as string | null | undefined),
-    week_index: a.week_index,
-    target_date: normStr(a.target_date as string | null | undefined),
-  }));
-
-  const summary = lean.summary.trim();
-  const fullDetails: GeneratedStepDetails = {
-    owner: "case_manager",
-    action_needed_now: actionItems[0]?.title ?? summary.slice(0, 200),
-    rationale: "",
-    detailed_instructions: sparse.detailed_instructions ?? "",
-    checklist: [],
-    required_documents: sparse.required_documents ?? [],
-    contacts: (sparse.contacts ?? []).map((c) => ({
-      name: c.name ?? "",
-      phone: c.phone,
-      email: c.email,
-      notes: c.notes,
-    })),
-    blockers: [],
-    fallback_options: [],
-    expected_outcome: sparse.expected_outcome ?? "",
-    timing_guidance: sparse.timing_guidance ?? "",
-    priority: (sparse.priority ?? "medium") as "low" | "medium" | "high",
-    stage_goal: sparse.stage_goal ?? "",
-    why_now: "",
-    success_marker: sparse.expected_outcome ?? "",
-  };
-
-  return {
-    phase,
-    title: lean.title.trim(),
-    description: summary,
-    sort_order,
-    details: fullDetails,
-    action_items: actionItems,
   };
 }
 

@@ -36,8 +36,6 @@ const envSchema = z.object({
   OPENAI_PLAN_PHASE_THINKING_MODEL: z.string().optional(),
   /** Server-only; non-plan tasks in Thinking mode (default: OPENAI_PLAN_MODEL or gpt-5.6-luna). */
   OPENAI_THINKING_UI_MODEL: z.string().optional(),
-  /** Server-only; monolithic full-plan in Fast mode (default: OPENAI_UI_MODEL). */
-  OPENAI_FAST_PLAN_MODEL: z.string().optional(),
   /** Server-only; overrides chat, UI helpers, refinements, and other non-plan AI (default: gpt-5.6-luna). */
   OPENAI_UI_MODEL: z.string().optional(),
   /** Override: force this model for ALL AI tasks (e.g. gpt-4o for QA). */
@@ -51,7 +49,6 @@ const envSchema = z.object({
   PLAN_REFINE_DEBUG: z.string().optional(),
   /** Explicit launch posture. Required for production deployments. */
   CASELINK_TENANCY_MODE: z.literal("single-tenant").optional(),
-  CASELINK_PDF_MODE: z.literal("fillable-only").optional(),
   CASELINK_INVITE_ONLY: z.literal("1").optional(),
   CASELINK_HSTS: z.literal("1").optional(),
   CASELINK_ENVIRONMENT: z.enum(["local", "test", "preview", "production"]).optional(),
@@ -101,7 +98,6 @@ export function getEnv(): Env {
   assertOptionalModelEnv("OPENAI_PLAN_PHASE_MODEL", data.OPENAI_PLAN_PHASE_MODEL);
   assertOptionalModelEnv("OPENAI_PLAN_PHASE_THINKING_MODEL", data.OPENAI_PLAN_PHASE_THINKING_MODEL);
   assertOptionalModelEnv("OPENAI_THINKING_UI_MODEL", data.OPENAI_THINKING_UI_MODEL);
-  assertOptionalModelEnv("OPENAI_FAST_PLAN_MODEL", data.OPENAI_FAST_PLAN_MODEL);
   assertOptionalModelEnv("OPENAI_UI_MODEL", data.OPENAI_UI_MODEL);
   if (data.VERCEL_ENV === "production" || data.CASELINK_ENVIRONMENT === "production") {
     const postureIssues = productionPostureIssues(data);

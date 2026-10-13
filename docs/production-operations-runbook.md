@@ -4,7 +4,7 @@
 
 **Approved deployment shape:** one Vercel project and one Supabase project per school or district
 
-**Data posture:** de-identified case context only; blank unlocked fillable PDFs only; no raw PDF bytes stored server-side or sent to OpenAI
+**Data posture:** de-identified case context only; browser-generated reviewed-plan PDF export; no PDF uploads or raw PDF bytes sent to OpenAI
 
 This runbook is a release control. A deployment is not production-ready until every pre-launch item has an owner, date, and evidence link in the release ticket. Repository tests cannot prove hosted-provider configuration, contractual approval, recovery, or alert delivery.
 
@@ -28,7 +28,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 ### Application and environment
 
 - [ ] Deploy a dedicated Vercel and Supabase project for exactly one school or district.
-- [ ] Set `CASELINK_TENANCY_MODE=single-tenant`, `CASELINK_PDF_MODE=fillable-only`, `CASELINK_INVITE_ONLY=1`, `CASELINK_HSTS=1`, `CASELINK_ENVIRONMENT=production`, exact HTTPS `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_SUPABASE_URL` values, the public Supabase anon key, and the production OpenAI key.
+- [ ] Set `CASELINK_TENANCY_MODE=single-tenant`, `CASELINK_INVITE_ONLY=1`, `CASELINK_HSTS=1`, `CASELINK_ENVIRONMENT=production`, exact HTTPS `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_SUPABASE_URL` values, the public Supabase anon key, and the production OpenAI key.
 - [ ] Keep `OPENAI_DEBUG`, `OPENAI_PAYLOAD_DEBUG`, `PLAN_REGENERATE_DEBUG`, and `PLAN_REFINE_DEBUG` unset.
 - [ ] Use distinct production, preview, test, and local databases, auth projects, secrets, and OpenAI projects.
 - [ ] Confirm only the production branch can deploy to production and require passing CI plus review.
@@ -59,7 +59,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 ### Release verification
 
 - [ ] `npm ci`, production dependency audit, secret scan, typecheck, lint, unit/integration tests, production build, and database security suite pass on the candidate commit.
-- [ ] Authenticated staging checks cover the complete family → barriers → plan → review → blank PDF → field review → page review → download flow.
+- [ ] Authenticated staging checks cover the complete family → barriers → plan → dated-action review → reviewed-plan PDF preview → download flow.
 - [ ] An automated accessibility scan plus keyboard-only check passes for login, Families, Family workspace, plan review, and paperwork review.
 - [ ] PDF corpus tests reject filled, scanned, encrypted, signed, XFA, active-content, attached, malformed, oversized, over-page, over-field, and excessive-object files without an AI call.
 - [ ] AI safety/evaluation fixtures meet the release rubric for privacy, grounding, unsupported claims, resource fidelity, and human-review requirements.
@@ -175,13 +175,13 @@ Every alert must carry only time, environment, route/event taxonomy, correlation
 5. Recover from a known-good state, rerun the security and workflow gates, and monitor closely.
 6. Produce a blameless postmortem within five business days with root cause, impact, detection gap, corrective owners/dates, and evidence of completion.
 
-Run a tabletop before launch and every six months. At minimum simulate a role escalation, a prohibited PDF upload, a leaked service key, and an unavailable AI provider.
+Run a tabletop before launch and every six months. At minimum simulate a role escalation, a stale or unauthorized PDF export, a leaked service key, and an unavailable AI provider.
 
 ## Degraded modes
 
 - **OpenAI unavailable or budget cutoff:** keep saved context; show a specific retryable failure; do not duplicate jobs; allow non-AI editing and existing plan/PDF manual work.
 - **Supabase unavailable:** fail closed for authorization and mutations; never use cached case data as authorization evidence.
-- **PDF unsupported:** preserve no server copy; explain the accepted blank fillable profile; allow the user to choose another form.
+- **PDF export unavailable:** preserve the saved plan and review state; offer retry, verify the current revision, and check rendering errors without logging case content. Uploaded forms are outside pilot scope.
 - **Email unavailable:** pause invitations and password recovery; do not bypass identity verification.
 
 ## Evidence record
