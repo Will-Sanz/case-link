@@ -451,7 +451,7 @@ Single-step refinement asks the model for action items and dates, but the return
 
 **Close with:** deadline change, action wording change, unsupported structural request, cancel, apply, reload, and PDF comparison. Prose and stored tasks must agree. **Sources:** [refinement result](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-refine-step.ts), [apply path](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:954).
 
-### [ ] CL-29 — Preserve one-action plans and deliberate removals
+### [x] CL-29 — Preserve one-action plans and deliberate removals
 
 **Type:** Reproduced + Fix · **Responsible:** engineering.
 
@@ -460,6 +460,8 @@ The full-plan refinement baseline replaces fewer than two action items with gene
 **Fix:** preserve valid existing cardinality; distinguish no change from an explicit clear/remove operation. Do not insert filler tasks or contacts to satisfy legacy output assumptions.
 
 **Close with:** zero/one/many existing actions according to the product contract, unchanged one-action rewrite, removal of a wrong contact/document, and UI/server count agreement. **Source:** [baseline and merge](/Users/willsanz/homelessness-project/src/lib/plan-generator/plan-refine-lean.ts:137).
+
+**Completed October 13, 2026 — engineering:** refinement merges directly into the actual draft; the legacy baseline/default passes that invented tasks, contacts, checklists, and blockers were removed. Zero/one/many existing actions retain their exact cardinality. `null` means keep an existing list; `[]` explicitly clears contacts/documents. Unsupported action-count changes return an error for manual review instead of silently adding or retaining tasks. Dates and action descriptions reach the model intact, and editor/server limits agree. Seventeen focused refinement/component tests passed, including the mocked provider-to-merge path and the UI's explicit empty-list save payload; typecheck and lint passed. Normal correctness/privacy and separate Ponytail review completed. Full verification runs before this item's push; live-model quality and identity/edit-preservation evidence remain in CL-21/CL-27/CL-28/CL-34. Commit: `git log --grep='CL-29'`.
 
 ### [x] CL-31 — Persist the context staff enter before using it
 

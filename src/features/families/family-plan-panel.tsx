@@ -1009,15 +1009,12 @@ export function FamilyPlanPanel({
         title: s.title,
         description: s.description,
         details: s.details ?? {},
-        action_items:
-          (s.action_items ?? []).length > 0 ?
-            (s.action_items ?? []).map((ai) => ({
-              title: ai.title,
-              description: ai.description ?? null,
-              week_index: ai.week_index,
-              target_date: ai.target_date,
-            }))
-          : [{ title: s.title, description: null, week_index: 1, target_date: null }],
+        action_items: (s.action_items ?? []).map((ai) => ({
+          title: ai.title,
+          description: ai.description ?? null,
+          week_index: ai.week_index,
+          target_date: ai.target_date,
+        })),
       })),
     };
 

@@ -9,7 +9,7 @@ import { formatMatchesForAiPrompt, formatMatchesForPlannerPrompt } from "@/lib/p
 import type { GeneratedStep, GeneratedStepDetails, GeneratedActionItem, PlanPhase } from "./types";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import {
-  draftRefineInputToAiParsed,
+  type DraftStepRefineInput,
   mergeLeanRefineIntoBase,
   OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA,
   planRefineLeanResponseSchema,
@@ -82,13 +82,7 @@ function buildFamilyContextForRefine(detail: FamilyDetail): string {
 }
 
 function compactDraftJsonForRefine(
-  draftSteps: Array<{
-    phase: PlanPhase;
-    title: string;
-    description: string;
-    details: GeneratedStepDetails;
-    action_items: GeneratedActionItem[];
-  }>,
+  draftSteps: DraftStepRefineInput[],
 ): string {
   return JSON.stringify(
     draftSteps.map((s) => {
@@ -102,10 +96,7 @@ function compactDraftJsonForRefine(
         contacts: d.contacts ?? [],
         expected_outcome: d.expected_outcome,
         priority: d.priority,
-        action_items: (s.action_items ?? []).map((a) => ({
-          title: a.title,
-          week_index: a.week_index,
-        })),
+        action_items: s.action_items,
       };
     }),
     null,
@@ -710,16 +701,10 @@ Phases: 30 day = immediate stabilization; 60 day = follow through; 90 day = sust
 
 export async function previewRefinePlanStepsWithOpenAI(
   detail: FamilyDetail,
-  draftSteps: Array<{
-    phase: PlanPhase;
-    title: string;
-    description: string;
-    details: GeneratedStepDetails;
-    action_items: GeneratedActionItem[];
-  }>,
+  draftSteps: DraftStepRefineInput[],
   feedback: string,
   options?: { retries?: number; aiMode?: AiMode; requestMeta?: OpenAiRequestMeta },
-): Promise<OpenAiPlanResult> {
+): Promise<{ ok: true; steps: DraftStepRefineInput[]; model: string } | { ok: false; reason: string }> {
   void options?.retries;
   const env = getEnv();
   const logRefine = env.PLAN_REFINE_DEBUG === "1" || env.OPENAI_DEBUG === "1";
@@ -740,8 +725,9 @@ ${feedback.trim()}
 - Revise this existing draft; do not invent a new plan shape.
 - Return exactly ${draftSteps.length} steps, same order and phase at each index (step 1 ↔ index 0, etc.).
 - Improve clarity and usefulness; do not reorder or merge steps unless the user explicitly asks.
-- Empty \`action_items\` → keep existing weekly items (system retains prior).
-- Empty \`required_documents\` or \`contacts\` → keep prior lists.
+- Return null for action_items, required_documents, or contacts to leave that list unchanged.
+- Return [] for required_documents or contacts only when the instructions ask to remove every item.
+- Preserve the exact number of actions, including zero or one; do not add filler tasks, contacts, or documents.
 - JSON only; key \`steps\` matching the schema.
 - Geographic scope: Philadelphia; use matched resources when relevant; do not invent programs.`;
 
@@ -749,7 +735,7 @@ ${feedback.trim()}
     "You edit an existing case plan draft for a case manager. " +
     "Return one JSON object with key `steps` only. Each step includes phase, title, description, " +
     "required_documents, contacts, expected_outcome, timing_guidance, optional priority, and action_items " +
-    "(use [] to leave weekly items unchanged).";
+    "(use null to leave a list unchanged; [] explicitly clears it).";
 
   try {
     const result = await createAiResponse({
@@ -837,8 +823,7 @@ ${feedback.trim()}
       };
     }
 
-    const baselines = draftSteps.map((s) => draftRefineInputToAiParsed(s));
-    const merged = validated.data.steps.map((lean, i) => mergeLeanRefineIntoBase(baselines[i]!, lean));
+    const merged = validated.data.steps.map((lean, i) => mergeLeanRefineIntoBase(draftSteps[i]!, lean));
 
     for (let i = 0; i < merged.length; i++) {
       if (merged[i]!.phase !== draftSteps[i]!.phase) {
@@ -861,10 +846,6 @@ ${feedback.trim()}
       }
     }
 
-    const generatedSteps = parsedStepsToGenerated(
-      merged.map((s) => applyPlanStepDefaults(normalizePlanStep(s))),
-    );
-
     if (logRefine) {
       console.info("[plan-refine]", {
         taskType: "plan_refinement",
@@ -876,7 +857,7 @@ ${feedback.trim()}
       });
     }
 
-    return { ok: true, steps: generatedSteps, model: result.model };
+    return { ok: true, steps: merged, model: result.model };
   } catch (e) {
     if (logRefine) {
       console.info("[plan-refine]", {

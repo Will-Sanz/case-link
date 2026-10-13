@@ -1,11 +1,9 @@
 import "server-only";
 
 import { z } from "zod";
-import type { GeneratedActionItem, GeneratedStepDetails, PlanPhase } from "@/lib/plan-generator/types";
-import {
-  normalizePlanStep,
-  type AiPlanStepParsed,
-} from "@/lib/plan-generator/plan-step-openai-schema";
+import type { PlanPhase } from "@/lib/plan-generator/types";
+import type { PlanStepDetails } from "@/types/family";
+import { dateOnlySchema } from "@/lib/validations/plans";
 
 const contactJsonSchema = {
   type: "object",
@@ -38,16 +36,16 @@ const leanPlanStepRefineJsonSchema = {
     phase: { type: "string", enum: ["30", "60", "90"] },
     title: { type: "string" },
     description: { type: "string" },
-    required_documents: { type: "array", items: { type: "string" } },
-    contacts: { type: "array", items: contactJsonSchema },
+    required_documents: { type: ["array", "null"], items: { type: "string" } },
+    contacts: { type: ["array", "null"], items: contactJsonSchema },
     expected_outcome: { type: "string" },
     timing_guidance: { type: "string" },
     priority: { type: "string", enum: ["low", "medium", "high"] },
     action_items: {
-      type: "array",
+      type: ["array", "null"],
       items: actionItemJsonSchema,
       minItems: 0,
-      maxItems: 8,
+      maxItems: 50,
     },
   },
   required: [
@@ -85,22 +83,22 @@ const contactSchema = z.object({
 });
 
 const leanActionItemSchema = z.object({
-  title: z.string().min(1).max(300),
-  description: z.union([z.string().max(500), z.null()]).optional(),
-  week_index: z.number().int().min(1).max(12),
-  target_date: z.union([z.string(), z.null()]).optional(),
+  title: z.string().trim().min(1).max(500),
+  description: z.union([z.string().max(4000), z.null()]).optional(),
+  week_index: z.number().int().min(1).max(52),
+  target_date: z.union([dateOnlySchema("Use a valid target date"), z.null()]).optional(),
 });
 
 export const planRefineLeanStepSchema = z.object({
   phase: z.enum(["30", "60", "90"]),
-  title: z.string().min(1).max(500),
+  title: z.string().trim().min(1).max(500),
   description: z.string().max(4000),
-  required_documents: z.array(z.string()),
-  contacts: z.array(contactSchema),
+  required_documents: z.array(z.string()).nullable(),
+  contacts: z.array(contactSchema).nullable(),
   expected_outcome: z.string().max(800),
   timing_guidance: z.string().max(400),
   priority: z.union([z.enum(["low", "medium", "high"]), z.null()]).optional(),
-  action_items: z.array(leanActionItemSchema).max(8),
+  action_items: z.array(leanActionItemSchema).max(50).nullable(),
 });
 
 export const planRefineLeanResponseSchema = z.object({
@@ -113,135 +111,32 @@ export type DraftStepRefineInput = {
   phase: PlanPhase;
   title: string;
   description: string;
-  details: GeneratedStepDetails;
-  action_items: GeneratedActionItem[];
+  details: PlanStepDetails;
+  action_items: Array<z.infer<typeof leanActionItemSchema>>;
 };
 
-/**
- * Maps the server draft wire shape into a full AiPlanStepParsed baseline so lean refine can merge overlays.
- */
-export function draftRefineInputToAiParsed(wire: DraftStepRefineInput): AiPlanStepParsed {
-  const d = wire.details;
-  const checklist =
-    d.checklist && d.checklist.length >= 3 ?
-      d.checklist.map((c) => c.trim()).filter(Boolean)
-    : [
-        "Confirm objective and documents for this step",
-        "Complete the primary outreach or task",
-        "Record outcome and next follow-up in the case file",
-      ];
-
-  const actionItems =
-    wire.action_items && wire.action_items.length >= 2 ?
-      wire.action_items.map((a) => ({
-        title: a.title.trim(),
-        description: a.description?.trim() || null,
-        week_index: a.week_index,
-        target_date: a.target_date?.trim() || null,
-      }))
-    : [
-        {
-          title: `Start: ${wire.title.slice(0, 80)}`,
-          description: "Begin the first concrete task from the step description.",
-          week_index: wire.phase === "30" ? 1 : wire.phase === "60" ? 5 : 9,
-          target_date: null,
-        },
-        {
-          title: `Follow up: ${wire.title.slice(0, 80)}`,
-          description: "Confirm results and document next steps.",
-          week_index: wire.phase === "30" ? 2 : wire.phase === "60" ? 6 : 10,
-          target_date: null,
-        },
-      ];
-
-  const contacts = (d.contacts ?? []).map((c) => ({
-    name: (c.name ?? "Contact").trim(),
-    phone: c.phone?.trim() || null,
-    email: c.email?.trim() || null,
-    notes: c.notes?.trim() || null,
-  }));
-
-  return normalizePlanStep({
-    phase: wire.phase,
-    title: wire.title.trim() || "Plan step",
-    description: wire.description.trim(),
-    action_needed_now: (d.action_needed_now ?? wire.title).trim().slice(0, 500),
-    action_items: actionItems,
-    rationale: (d.rationale ?? `Execute this step: ${wire.title}`).trim().slice(0, 1200),
-    detailed_instructions: (d.detailed_instructions ?? wire.description).trim().slice(0, 2000),
-    checklist,
-    required_documents: (d.required_documents ?? []).map((x) => x.trim()).filter(Boolean),
-    contacts: contacts.length > 0 ? contacts : [{ name: "Primary contact", phone: null, email: null, notes: null }],
-    blockers:
-      d.blockers && d.blockers.length > 0 ?
-        d.blockers.map((b) => b.trim()).filter(Boolean)
-      : ["Typical: documentation delays, callbacks, or eligibility questions, note in file."],
-    fallback_options:
-      d.fallback_options && d.fallback_options.length > 0 ?
-        d.fallback_options.map((b) => b.trim()).filter(Boolean)
-      : ["Try alternate contact channel or supervisor consult if stalled."],
-    expected_outcome: (d.expected_outcome ?? `Progress on: ${wire.title}`).trim().slice(0, 600),
-    success_marker: (d.success_marker ?? "Primary deliverable documented or next step scheduled.").trim().slice(
-      0,
-      400,
-    ),
-    stage_goal: (d.stage_goal ?? wire.title).trim().slice(0, 600),
-    why_now: (d.why_now ?? `Fits the ${wire.phase}-day phase priorities.`).trim().slice(0, 600),
-    timing_guidance: (d.timing_guidance ?? `Within the ${wire.phase}-day window.`).trim().slice(0, 400),
-    priority: d.priority === "high" || d.priority === "medium" || d.priority === "low" ? d.priority : "medium",
-    contact_script: d.contact_script?.trim() || null,
-    depends_on: d.depends_on?.trim() || null,
-    milestone_type: d.milestone_type?.trim() || null,
-  });
-}
-
-export function mergeLeanRefineIntoBase(base: AiPlanStepParsed, lean: PlanRefineLeanStep): AiPlanStepParsed {
-  const description = lean.description.trim() ? lean.description : base.description;
-  const title = lean.title.trim() ? lean.title : base.title;
-
-  const required_documents =
-    lean.required_documents.length > 0 ? lean.required_documents.map((x) => x.trim()).filter(Boolean) : base.required_documents;
-
-  const contacts =
-    lean.contacts.length > 0 ?
-      lean.contacts.map((c) => ({
-        name: c.name.trim(),
-        phone: c.phone?.trim() || undefined,
-        email: c.email?.trim() || undefined,
-        notes: c.notes?.trim() || undefined,
-      }))
-    : base.contacts;
-
-  const action_items =
-    lean.action_items.length > 0 ?
-      lean.action_items.map((a) => ({
-        title: a.title.trim(),
-        description: a.description?.trim() || null,
-        week_index: a.week_index,
-        target_date: a.target_date?.trim() || null,
-      }))
-    : base.action_items;
-
-  const expected_outcome = lean.expected_outcome.trim() ? lean.expected_outcome.trim() : base.expected_outcome;
-  const timing_guidance = lean.timing_guidance.trim() ? lean.timing_guidance.trim() : base.timing_guidance;
-  const priority = lean.priority ?? base.priority;
-
-  return normalizePlanStep({
+/** Null leaves a list unchanged; an empty list explicitly clears it. */
+export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRefineLeanStep): DraftStepRefineInput {
+  const actions = lean.action_items ?? base.action_items;
+  if (actions.length !== base.action_items.length) {
+    throw new Error("AI refinement cannot add or remove actions. Keep the existing actions and edit their wording or dates.");
+  }
+  return {
     ...base,
     phase: lean.phase,
-    title,
-    description,
-    action_items,
-    required_documents,
-    contacts,
-    expected_outcome,
-    timing_guidance,
-    priority,
-    detailed_instructions:
-      description !== base.description ? description : base.detailed_instructions,
-    action_needed_now:
-      description !== base.description ?
-        description.slice(0, 500)
-      : base.action_needed_now,
-  });
+    title: lean.title.trim(),
+    description: lean.description.trim(),
+    details: {
+      ...base.details,
+      ...(lean.required_documents !== null ? { required_documents: lean.required_documents.map(value => value.trim()).filter(Boolean) } : {}),
+      ...(lean.contacts !== null ? { contacts: lean.contacts.map(contact => ({
+        name: contact.name.trim(), phone: contact.phone?.trim() || undefined,
+        email: contact.email?.trim() || undefined, notes: contact.notes?.trim() || undefined,
+      })) } : {}),
+      expected_outcome: lean.expected_outcome.trim(),
+      timing_guidance: lean.timing_guidance.trim(),
+      ...(lean.priority != null ? { priority: lean.priority } : {}),
+    },
+    action_items: actions,
+  };
 }

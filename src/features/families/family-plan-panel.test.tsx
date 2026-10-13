@@ -150,6 +150,28 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     expect(screen.getByDisplayValue("Schedule the appointment")).toBeTruthy();
   });
 
+  it("keeps one real action and saves an explicit contact/document removal", async () => {
+    const original = structuredClone(plan);
+    original.steps[0].details!.contacts = [{ name: "Outdated desk" }];
+    original.steps[0].details!.required_documents = ["Unneeded document"];
+    const step = original.steps[0];
+    vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test", steps: [{
+      phase: step.phase, title: step.title, description: step.description,
+      details: { ...step.details, contacts: [], required_documents: [] }, action_items: step.action_items!,
+    }] });
+    vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
+    render(<FamilyPlanPanel familyId={original.family_id} plan={original} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refine plan with AI" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Remove the outdated contact and unneeded document" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Apply to working copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save to plan" }));
+    await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
+    expect(previewRefinePlan).toHaveBeenCalledWith(expect.objectContaining({ draft: { steps: [expect.objectContaining({ action_items: [expect.objectContaining({ title: "Call intake" })] })] } }));
+    expect(savePlanEdits).toHaveBeenCalledWith(expect.objectContaining({ steps: [expect.objectContaining({ patch: expect.objectContaining({ details: expect.objectContaining({ contacts: [], required_documents: [] }) }), actionItems: [] })] }));
+  });
+
   it("submits all changed goals once and keeps the full working copy available after a failed save", async () => {
     const two = structuredClone(plan);
     const second = structuredClone(two.steps[0]);

@@ -203,8 +203,8 @@ export type SavePlanEditsInput = z.infer<typeof savePlanEditsSchema>;
 const previewDraftActionItemSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.union([z.string().max(4000), z.null()]).optional(),
-  week_index: z.number().int().min(1).max(12),
-  target_date: z.union([z.string(), z.null()]).optional(),
+  week_index: z.number().int().min(1).max(52),
+  target_date: z.union([dateOnlySchema("Use a valid target date"), z.null()]).optional(),
 });
 
 export const previewRefinePlanSchema = z.object({
@@ -219,7 +219,7 @@ export const previewRefinePlanSchema = z.object({
           title: z.string().min(1).max(500),
           description: z.string().max(4000),
           details: planStepDetailsSchema.optional(),
-          action_items: z.array(previewDraftActionItemSchema).min(1).max(10),
+          action_items: z.array(previewDraftActionItemSchema).max(50),
         }),
       )
       .min(1)

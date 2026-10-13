@@ -1593,7 +1593,7 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
 
   const result = await previewRefinePlanStepsWithOpenAI(
     detail,
-    draftSteps as Parameters<typeof previewRefinePlanStepsWithOpenAI>[1],
+    draftSteps,
     feedback,
     {
       aiMode: planRefineMode,
