@@ -34,11 +34,15 @@ PDFs are generated from the reviewed plan in the browser. CaseLink does not acce
 
 ## Development and verification
 
-Install the locked dependencies with `npm ci`. Use `.env.example` as the configuration reference, then start the app with `npm run dev`. Read `AGENTS.md` and the installed Next.js guides before changing framework code.
+Use a supported, patched Node 24.x release (`.nvmrc`), matching CI and hosting, and install the locked dependencies with `npm ci`. Use `.env.example` as the configuration reference, then start the app with `npm run dev`. Read `AGENTS.md` and the installed Next.js guides before changing framework code.
 
 - `npm run verify`: lockfile/resource/secret checks, typecheck, lint, unit and component tests, and production build. The pre-push hook runs it.
 - `npm run test:auth-security`: real local Auth lifecycle and session/MFA tests.
 - `npm run test:db-security`: real local database authorization, concurrency, rollback, and audit tests.
+- `npm run test:restore`: isolated synthetic backup/restore and authorization rehearsal; no hosted database changes.
+- `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase.
+- `npm run test:pdf`: extracted source-content and rendered PDF placement/monochrome checks; requires Python and Poppler.
+- `npm run verify:release -- <exact-commit-SHA>`: confirm required trusted repository checks for that commit; this does not deploy or replace hosted/school approval.
 - `npm run test:ai-contracts -- --live`: opt-in provider format check with eight small synthetic requests. Supply an operator test-project `OPENAI_API_KEY` through the environment; it is excluded from normal CI and prints only pass/fail metadata.
 
 Local Supabase uses Docker to isolate synthetic development/test data. Docker is a local testing tool; staff do not install it, and this does not select production hosting. See the [operations runbook](docs/production-operations-runbook.md) for environment separation and required hosted rehearsals.

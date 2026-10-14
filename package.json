@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "24.x"
   },
   "overrides": {
     "esbuild": "0.27.2",
@@ -22,11 +22,13 @@
     "test:pdf": "node --import tsx scripts/test-plan-pdfs.ts",
     "test:e2e": "node tests/e2e/run.mjs",
     "test:auth-security": "tsx scripts/test-auth-security.ts",
+    "test:restore": "node scripts/test-restore.mjs",
     "test:db-security": "tsx scripts/test-database-security.ts",
     "typecheck": "tsc --noEmit",
     "verify:lockfile": "node scripts/verify-deploy-lockfiles.mjs",
     "verify:resource-seed": "tsx scripts/verify-resource-seed-paths.ts",
     "verify:secrets": "node scripts/scan-tracked-secrets.mjs",
+    "verify:release": "tsx scripts/release-checks.ts",
     "verify": "npm run verify:lockfile && npm run verify:resource-seed && npm run verify:secrets && npm run typecheck && npm run lint && npm run test:run && npm run build",
     "ci": "npm run verify",
     "db:import": "tsx scripts/import-resources.ts",
@@ -36,7 +38,6 @@
     "db:create-test-user": "tsx scripts/create-test-user.ts",
     "prepare": "husky",
     "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts",
-    "test:restore": "node scripts/test-restore.mjs",
     "prebuild": "node scripts/clear-compiler-cache.mjs",
     "predev": "node scripts/clear-compiler-cache.mjs"
   },
@@ -62,12 +63,12 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^20",
+    "@types/node": "^24.19.2",
     "@types/pg": "^8.15.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.3",
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
@@ -77,6 +78,6 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.11"
   }
 }
