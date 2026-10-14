@@ -181,21 +181,20 @@ const styles = StyleSheet.create({
   actionTable: {
     marginTop: 8,
     borderTopWidth: 0.75,
+    borderBottomWidth: 0.75,
     borderLeftWidth: 0.75,
     borderRightWidth: 0.75,
     borderColor: PLAN_PDF_PALETTE.ink,
   },
   actionHeader: {
     flexDirection: "row",
-    borderBottomWidth: 0.75,
-    borderBottomColor: PLAN_PDF_PALETTE.ink,
     fontWeight: "bold",
     fontSize: 8,
   },
-  actionRow: {
+  actionHeading: {
     flexDirection: "row",
-    borderBottomWidth: 0.75,
-    borderBottomColor: PLAN_PDF_PALETTE.ink,
+    borderTopWidth: 0.75,
+    borderTopColor: PLAN_PDF_PALETTE.ink,
   },
   actionCell: {
     width: "58%",
@@ -223,7 +222,9 @@ const styles = StyleSheet.create({
     borderLeftColor: PLAN_PDF_PALETTE.ink,
   },
   actionDetail: {
-    marginTop: 2,
+    paddingRight: 6,
+    paddingBottom: 5,
+    paddingLeft: 6,
     fontSize: 8,
   },
   listRow: {
@@ -245,7 +246,7 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
 
   return (
     <View style={styles.actionTable}>
-      <View style={styles.actionHeader} minPresenceAhead={24}>
+      <View style={styles.actionHeader} wrap={false} minPresenceAhead={24}>
         <Text style={styles.actionCell}>Action</Text>
         <Text style={styles.dateCell}>Target / follow-up</Text>
         <Text style={styles.statusCell}>Status</Text>
@@ -253,16 +254,16 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
       {actions.map((action) => {
         const displayDate = actionTargetDate(action);
         return (
-          <View key={action.id} style={styles.actionRow}>
-            <View style={styles.actionCell}>
-              <Text style={styles.label}>{cleanText(action.title) || "Untitled action"}</Text>
-              {cleanText(action.description) ? <Text style={styles.actionDetail}>{cleanText(action.description)}</Text> : null}
-              {cleanText(actionUserNotes(action.notes)) ? <Text style={styles.actionDetail}>Progress: {cleanText(actionUserNotes(action.notes))}</Text> : null}
-              {cleanText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanText(action.outcome)}</Text> : null}
+          <Fragment key={action.id}>
+            <View style={styles.actionHeading} wrap={false} minPresenceAhead={32}>
+              <Text style={[styles.actionCell, styles.label]}>{cleanText(action.title) || "Untitled action"}</Text>
+              <Text style={styles.dateCell}>{formatDateOnly(displayDate) ?? (action.status === "completed" ? "Not required" : "Not set")}</Text>
+              <Text style={styles.statusCell}>{actionUiStatus(action).replaceAll("_", " ")}</Text>
             </View>
-            <Text style={styles.dateCell}>{formatDateOnly(displayDate) ?? (action.status === "completed" ? "Not required" : "Not set")}</Text>
-            <Text style={styles.statusCell}>{actionUiStatus(action).replaceAll("_", " ")}</Text>
-          </View>
+            {cleanText(action.description) ? <Text style={styles.actionDetail}>{cleanText(action.description)}</Text> : null}
+            {cleanText(actionUserNotes(action.notes)) ? <Text style={styles.actionDetail}>Progress: {cleanText(actionUserNotes(action.notes))}</Text> : null}
+            {cleanText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanText(action.outcome)}</Text> : null}
+          </Fragment>
         );
       })}
     </View>
@@ -292,22 +293,22 @@ function PdfStep({ step }: { step: PlanStepRow }) {
       {body ? <Text style={styles.narrative}>{body}</Text> : null}
       <PdfActionTable step={step} />
       {documents.length > 0 ? (
-        <View>
+        <Fragment>
           <Text style={styles.fieldHeading} minPresenceAhead={14}>Documents or materials</Text>
           {documents.map((line) => <View key={line} style={styles.listRow}><Text style={styles.bullet}>•</Text><Text style={styles.grow}>{line}</Text></View>)}
-        </View>
+        </Fragment>
       ) : null}
       {contacts.length > 0 ? (
-        <View>
+        <Fragment>
           <Text style={styles.fieldHeading} minPresenceAhead={14}>Contacts</Text>
           {contacts.map((line) => <Text key={line}>{line}</Text>)}
-        </View>
+        </Fragment>
       ) : null}
       {cleanText(details.expected_outcome) ? (
-        <View>
+        <Fragment>
           <Text style={styles.fieldHeading} minPresenceAhead={14}>Expected outcome</Text>
           <Text>{cleanText(details.expected_outcome)}</Text>
-        </View>
+        </Fragment>
       ) : null}
     </View>
   );

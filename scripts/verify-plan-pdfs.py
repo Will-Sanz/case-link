@@ -42,6 +42,12 @@ def verify(case):
     for forbidden in case["forbiddenText"]:
         if forbidden in compact:
             errors.append("Unexpected text: " + forbidden)
+    page_texts = [normalized("\n".join(" ".join(word.text or "" for word in line.findall("{*}word"))
+                                     for line in page.findall(".//{*}line"))) for page in pages]
+    for action in case["actionHeaders"]:
+        if not any(normalized(action["title"]) in page_text and action["date"] in page_text and action["status"] in page_text
+                   for page_text in page_texts):
+            errors.append("Action title separated from its date/status: " + action["title"][:90])
     for index, page in enumerate(pages):
         width, height = float(page.attrib["width"]), float(page.attrib["height"])
         words = page.findall(".//{*}word")
@@ -56,6 +62,9 @@ def verify(case):
         body = [word for word in words if word not in footer]
         if not body:
             errors.append(f"Page {index + 1}: empty body")
+        body_lines = [line for line in page.findall(".//{*}line") if float(line.attrib["yMin"]) <= height - 38]
+        if body_lines and normalized(" ".join(word.text or "" for word in body_lines[-1].findall("{*}word"))) in {"Contacts", "Documents or materials", "Expected outcome"}:
+            errors.append(f"Page {index + 1}: field heading separated from its content")
         for word in body:
             x1, y1, x2, y2 = (float(word.attrib[key]) for key in ("xMin", "yMin", "xMax", "yMax"))
             if x1 < 36 or x2 > width - 36 or y1 < 36 or y2 > height - 44:

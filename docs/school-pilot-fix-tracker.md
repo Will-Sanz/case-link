@@ -6,13 +6,15 @@
 
 **Recommendation:** complete this first-priority readiness workstream before routine school use. A successful build is not sufficient evidence that account setup, AI recommendations, concurrent edits, and PDF export work together safely. Use synthetic cases for the school demonstration until the applicable release gates below are evidenced.
 
-**October 14 continuation:** the intake-to-PDF browser release suite now passes, with CI execution added. Thirty-three engineering records are closed; nine required records and the optional Decisions evaluation remain open after adding the user's device-verification preference as CL-43. Checkpoint `5ec04a3` passed full GitHub CI, CodeQL and exact-commit release preflight, and builds as an isolated READY Vercel Preview; its preceding code checkpoint passed 697 unit/component tests plus the database/Auth/browser/PDF checks. The synthetic legacy upgrade rehearsal, explicit staging permissions, Free email-provider setup and protected preview routing are now evidenced. See the [current handoff](pilot-readiness-handoff.md) for remaining hosted account/AI/PDF verification, legacy data reconciliation, production secrets and school gates. CaseLink local services remain stopped after the user reported workstation slowdown; full code verification ran remotely. All further work must remain in the background unless the user explicitly authorizes screen interaction. This is not pilot launch approval.
+**October 14 scope reset (user approved):** finish three narrow engineering outcomes: (1) correct the PDF page break and remove all CaseLink 2FA, (2) verify invited account setup/password login/recovery and the core intake-to-PDF workflow, and (3) finalize production settings/secrets and a controlled release with a usable backup/recovery path. School data/usefulness/resource validation remains a separate fourth outcome. Do not add Face ID/passkeys, Decisions integration, form filling, Kubernetes, or broad redesign. Historical findings and test evidence remain below; superseded MFA requirements are not current acceptance criteria. The 2FA removal is pending. CaseLink local services remain stopped; all work stays in the background.
+
+Latest code checkpoint `bd533c8` passed complete CI `38648819280`. Its protected hosted synthetic journey passed login, intake, live AI generation and both refinements, manual edit preservation, review, PDF-byte parity, assistant, accessibility and logout. Visual PDF review then exposed a page-break defect, now reproduced and corrected under CL-35. Production has not received the full upgrade.
 
 The current product is family intake → barriers → a goal-based intervention plan with confirmed dates → human review → a professional black-and-white PDF downloaded for manual use. Blank-PDF upload, field detection, form filling, and automatic submission are outside this release. The current decisions in [AGENTS.md](/Users/willsanz/homelessness-project/AGENTS.md) take precedence over older roadmap language.
 
 ## How to use this tracker
 
-There are 42 pilot-readiness records (CL-01–CL-39, CL-41–CL-43) and one optional Decisions API evaluation (CL-40). Engineering implementation is assigned to Codex; school, privacy, and operations owners still need to be named. Check a record only after its completion tests pass, then add implementation and test evidence below. Each item is committed separately; its commit is discoverable with `git log --grep='CL-NN'`. A verification record closes with evidence or produces a concrete defect; it does not mean the hosted system is already known to be broken.
+There are 41 original pilot-readiness records (CL-01–CL-39, CL-41–CL-42), one optional Decisions API evaluation (CL-40), and a superseded device-verification proposal (CL-43). Engineering implementation is assigned to Codex; school, privacy, and operations owners still need to be named. Check a record only after its completion tests pass, then add implementation and test evidence below. Each item is committed separately; its commit is discoverable with `git log --grep='CL-NN'`. A verification record closes with evidence or produces a concrete defect; it does not mean the hosted system is already known to be broken.
 
 - **Fix:** source-confirmed defect or missing behavior.
 - **Reproduced:** additionally demonstrated with synthetic local inputs or mocked services.
@@ -22,7 +24,7 @@ There are 42 pilot-readiness records (CL-01–CL-39, CL-41–CL-43) and one opti
 - **Gate B:** reliable and useful daily workflows. Complete before routine pilot use.
 - **Gate C:** prove the complete release in staging and record operating readiness.
 
-All gates are part of the requested first-priority workstream. Ordering is not permission to skip the earlier findings. Blank-form filling remains a separate future project.
+The current three engineering outcomes above govern remaining work. Retain privacy, access and data-integrity safeguards; keep external school decisions open. Blank-form filling remains a separate future project.
 
 ## Final pilot scope check — October 13, 2026
 
@@ -32,7 +34,7 @@ The scope review retains every original finding and adds explicit production hos
 | --- | --- | --- |
 | Core product | Invite staff; create a family profile with a non-identifying label; record barriers; generate/edit a dated goal plan; record progress; review; download the reviewed black-and-white PDF | Blank-form uploads, field detection/filling, signatures, CitySpan integration, automatic submission |
 | AI | Correct generation, both refinement flows, and case assistant; grounded resources; preserve human edits; tested failures and usefulness | Decisions API adoption, model-platform migration, agents, new autonomous tools |
-| Accounts | Invitation, initial password, login, recovery, session handling, admin MFA, least privilege, offboarding | Public self-signup; building institutional SSO unless the school makes it a launch requirement |
+| Accounts | Invitation, initial password, login, recovery, session handling, password-only accounts, least privilege, offboarding | Public self-signup; building institutional SSO unless the school makes it a launch requirement |
 | Data | Agree permitted data, enforce it, test authorization/privacy, approve retention/deletion and vendor handling | Adding identifying fields or broadening data use without the explicit CL-01 decision |
 | Hosting | One managed production deployment for this school's trust boundary; isolated synthetic staging; controlled release, monitoring, restore/rollback | Kubernetes, self-hosted database/Auth, multi-region failover, microservices |
 | Scale | Test a few concurrent staff plus headroom and realistic case histories; repair currently supported query limits in CL-37 | Building multi-school tenancy, district analytics, speculative high-volume infrastructure |
@@ -213,7 +215,9 @@ Model output accepts arbitrary contact names, phones, and emails and maps them i
 
 **Completed October 13, 2026 — engineering:** active-account state now gates family authorization, administrator authority, direct table operations, and non-family mutation RPCs. The protected `db:offboard-user` job atomically denies access, reassigns cases, revokes sessions/refresh tokens, and audits the operation; Auth sign-in is then disabled and a second session cleanup closes that interval. Historical creators remain unchanged. Partial Auth failures preserve database denial and provide retry instructions. Eleven targeted unit/rendered tests passed; the expanded database suite proved AAL2 admin downgrade/offboarding, unauthorized operator rejection, no self-reactivation, and audit-failure rollback. A new real local Auth/Data API test retained the same unexpired JWT through removal and proved owned/assigned reads, writes, RPCs, refresh, and sign-in are denied while the replacement keeps access; public signup also remains disabled. This test runs in CI. The rehearsal exposed and corrected the local email-provider setting that had disabled password login. Supabase's local security advisor reported no warnings after the existing timestamp trigger's search path was fixed. Correctness/security and separate Ponytail review completed; full verification is required on push. Hosted role/configuration evidence still belongs to CL-38/CL-41. Commit: `git log --grep='CL-07'`.
 
-### [x] CL-11 — Complete administrator MFA enrollment and challenge
+### [ ] CL-11 — Remove CaseLink 2FA under the revised pilot scope
+
+**October 14 user decision:** remove 2FA from every CaseLink account, including administrators. Password-session checks, active-account/session revocation, roles and family permissions remain required. Remove enrollment/challenge UI and dead recovery code, update database guards and provider settings, and prove password-only admin/staff access plus negative authorization cases. Prior MFA implementation below is historical evidence, not the current requirement. Removal is pending.
 
 **Type:** Fix + Verify · **Responsible:** engineering + administrator.
 
@@ -301,13 +305,17 @@ Application authentication and family-level row policies are good foundations, b
 
 ## Gate B: complete the staff workflows
 
-### [ ] CL-43 — Support the preferred device-verification experience
+### CL-43 — Device verification deferred; superseded by password-only pilot
+
+**October 14 user decision:** no Face ID/passkey or authenticator requirement for this pilot. The capability research below is retained for reference only. CL-11 tracks complete removal of existing CaseLink 2FA; CL-43 is not a launch gate.
 
 **Added October 14 at the user's request:** prefer Face ID/fingerprint or the device's secure prompt without forcing staff to install a dedicated authenticator app. The existing TOTP implementation and its prior regression evidence remain valid; the new experience is not implemented. The approved temporary staging administrator test proved password-only casework is gated, then restored the original case-manager role and verified normal access. Hosted enrollment stopped when the user raised this preference. [Gate and restoration evidence](verification/2026-10-14-hosted-mfa-gate.json).
 
 **Type:** Decide + Fix + Verify · **Responsible:** engineering + service owner.
 
 **Fix/verify:** choose and implement the smallest provider-supported device-verification flow, preserving invitation-only onboarding, strong administrator access, current-session checks and recovery protections. Supabase's passkey sign-in and WebAuthn second-factor APIs are currently experimental; the staging Passkeys setting is off, and SDK support alone does not prove hosted second-factor availability. Passwordless sign-in also requires deliberate changes to the existing password-session boundary. [Provider findings, implementation boundaries and exact acceptance tests](verification/passkey-readiness.md).
+
+**Hosted capability check:** a disposable confirmed staging Auth account received HTTP 422 / `mfa_webauthn_enroll_not_enabled`; public settings independently show passkeys off. The probe sent no email, granted no application role and opened no biometric prompt. Its sessions/account were removed. Provider enablement/support terms and the actual device experience remain open. [Exact result](verification/2026-10-14-device-feature-probe.json).
 
 **Close with:** supported-provider/plan evidence; regression tests for enrollment, sign-in, cancellation, fallback, removal, recovery and retained-token denial; actual hosted authorization checks; and separately authorized real-device acceptance. Keep this item open until the user-preferred experience is proven or the user explicitly accepts a documented pilot fallback. Do not silently weaken MFA or treat a virtual authenticator as real-device acceptance.
 
@@ -643,6 +651,8 @@ No repeatable, scored evaluation set establishes that generated plans and answer
 
 ### [x] CL-35 — Verify the downloaded PDF visually and against its reviewed source
 
+**October 14 follow-up:** reopened after the real hosted synthetic PDF placed a task over the footer. The exact new fixture fails before the fix; bounded title/date/status now stay together and long details wrap normally. All five fixtures / 17 rendered pages / 415 source fields pass, with visual inspection, five component tests, typecheck and targeted lint. [Before/after evidence](verification/2026-10-14-pdf-page-boundary.json). Correctness/privacy/accessibility and separate Ponytail deletion reviews passed; no dependency or saved-data change. Fresh hosted release verification remains step 2.
+
 **Type:** Verify + Fix · **Responsible:** engineering + case-manager reviewer.
 
 **Completed October 13, 2026 — engineering:** a repeatable four-case PDF corpus now checks 368 source fields across 15 rendered pages, including maximum saved text, long unbroken filenames, eight goals/forty actions, exact dates, Waiting, completed/withdrawn work, directory contacts, and composed/decomposed Western European accents. It compares text and repeated-field inventory, margins, overlaps, headings, page numbering, and monochrome pixels. The corpus reproduced and fixed clipped filenames, exposed internal note markers, and a goal heading stranded on a mostly empty page. Withdrawn tasks no longer inflate completed counts on screen or in PDFs.
@@ -707,7 +717,7 @@ Account creation is currently **operator invitation**, not public signup: `/sign
 | Malicious/invalid callback | External/double-encoded next, backslash/control characters, missing/bad type, expired/reused token | No open redirect, token disclosure, unexpected account, or indefinite spinner |
 | First password | Valid/weak/mismatched password, skipped setup, interrupted setup | Clear requirements and intentional access policy |
 | Login | Correct/wrong password, unknown user, case/whitespace email, duplicate submit, throttling/outage | No account enumeration or raw provider detail; recoverable, accurate state |
-| MFA | Enrollment, challenge, bad code, returning admin, recovery | Required admin operations demand verified AAL2 |
+| Password-only pilot | Admin and staff login without MFA; old verification link; provider enrollment disabled | Authorized password sessions work; invitation/recovery-only, revoked and inactive sessions remain denied |
 | Workspace session | Reload, refresh-token rotation, two tabs, expiry, inactivity, lost network | No redirect loop or stale-token write; safe reauthentication with approved draft recovery |
 | Password reset | Known/unknown email, actual email link, expiry, reuse, secure change, success | Generic request acknowledgement; only intended account changes; post-reset session behavior matches policy |
 | Logout | Success, provider failure, another tab/device, Back button, account switch | Intended session scope ends; no residual sensitive app drafts shown to another person |
@@ -795,7 +805,7 @@ For future blank-PDF filling, create a separate validated scope: approved blank 
 | --- | --- | --- |
 | Approved pilot data boundary | Open | CL-01 and school/privacy-owner decision |
 | Dependency and repository checks | Open | CL-02 plus fresh complete CI |
-| Auth and database access | Open | CL-07, CL-11, CL-13–17, CL-38, CL-43 and auth matrix |
+| Auth and database access | Open | CL-07, revised CL-11, CL-13–17, CL-38 and auth matrix |
 | Concurrent editing/review integrity | Open | CL-03–05, CL-27–30 and injected-failure tests |
 | AI correctness and usefulness | Open | CL-06, CL-10, CL-18–26, CL-29, CL-32–34 and eval results |
 | Complete intake-to-PDF journey | Open | CL-08–09, CL-31, CL-35, CL-39 and browser/render evidence |
@@ -807,7 +817,7 @@ For future blank-PDF filling, create a separate validated scope: approved blank 
 
 ### Final pilot launch decision
 
-- [ ] All required records CL-01–CL-39 and CL-41–CL-43 are closed with evidence, or the existing runbook's explicit residual-risk process has approved a permitted exception. No silent deferrals; privacy/access/data-integrity blockers cannot be hidden by disabling a test.
+- [ ] The three current engineering outcomes are complete with evidence, and the separate school/data acceptance is recorded before routine use. Superseded requirements are explicitly marked; any remaining applicable risk is recorded. No silent deferrals; privacy/access/data-integrity blockers cannot be hidden by disabling a test.
 - [ ] Named school, product/privacy, engineering, and operating owners have agreed the permitted data, support hours, resource directory, staff list, service limits, and recovery targets. Staff have practiced the full workflow with synthetic cases and know how to report an error.
 - [ ] Invite the named pilot staff only after the candidate release is approved. Start with supervised use, review errors/latency/cost and user feedback during the first week, and assign an owner for follow-up. This is an operating plan, not a scheduled automation created by this audit.
 - [ ] Decisions API evaluation, uploaded-PDF features, multi-school infrastructure, and Kubernetes remain outside the launch gate. Any newly mandated school requirement is recorded and assessed before sign-off.

@@ -46,10 +46,59 @@ export function pdfPlanFixtures(): Array<{name:string;plan:PlanWithSteps;barrier
   const accented=step(99);
   accented.description="Información: cafe\u0301, re\u0301sume\u0301, naïve, façade, coöperate, piñata. Préparer l’entretien. Cost example £25 / €30. Quote: “confirm options” - then follow up.";
   accented.details!.expected_outcome="The café’s résumé checklist is ready & the follow-up is agreed.";
+  // Reproduce the live synthetic plan whose second goal's last task overlapped the footer.
+  const boundary = [
+    {
+      ...step(101),
+      title: "Agree practical food and transport priorities",
+      description: "Ask which food and transportation needs matter most, preferred supports, safe contact preferences, language needs, and consent for follow-up.",
+      details: {
+        owner: "case_manager" as const,
+        stage_goal: "Clarify immediate food and transportation priorities",
+        detailed_instructions: "Eligibility, availability, and service status are not recorded; verify them before discussing specific programs or appointments.",
+        expected_outcome: "The family’s priorities, preferences, consent, and safe contact limits are documented for the next planning phase.",
+      },
+      action_items: [
+        {...action(101), title: "Confirm the agreed transport and food-access next step", description: "Review current food and transportation barriers with the family and record only their stated priorities and preferences.", status: "blocked" as const, follow_up_date: "2026-10-21", notes: "Waiting for the family to confirm a preferred review time."},
+        {...action(102), title: "Document agreed next steps", description: "Record consent, safe contact restrictions, and any requested follow-up for human review.", target_date: "2026-10-23"},
+      ],
+    },
+    {
+      ...step(102), priority: "medium" as const,
+      title: "Review prior plan progress",
+      description: "Check whether the family-priorities conversation and agreed actions occurred; record outcomes, barriers, and any status not recorded.",
+      details: {
+        owner: "case_manager" as const,
+        stage_goal: "Follow through on food and transportation priorities",
+        detailed_instructions: "Do not infer service status from missing records; record it as not recorded.",
+        expected_outcome: "Current progress and any unresolved food or transportation needs are documented for the next planning decision.",
+      },
+      action_items: [
+        {...action(103), title: "Review documented follow-through", description: "Confirm whether the earlier conversation and agreed next steps occurred, without treating proposals as completed.", target_date: "2026-11-18"},
+        {...action(104), title: "Update the family support plan", description: "If needs remain unresolved, document the family’s preferred next steps and safe contact preferences for human review.", target_date: "2026-12-09"},
+      ],
+    },
+    {
+      ...step(103), priority: "medium" as const,
+      title: "Complete the 90-day family progress review",
+      description: "Review documented outcomes, discuss remaining food or transportation needs, and record the family's preferred next step.",
+      details: {
+        owner: "case_manager" as const,
+        stage_goal: "Review food and transportation progress and confirm the family's next choice",
+        detailed_instructions: "If the record shows an immediate safety concern, seek responsible human assessment through the school's approved safeguarding or emergency pathway immediately.",
+        expected_outcome: "The family's progress and preferred next step are documented for human review.",
+      },
+      action_items: [
+        {...action(105), title: "Review documented progress and barriers", description: "Check recorded outcomes from the prior plan and identify any unresolved food or transportation needs.", target_date: "2027-01-07"},
+        {...action(106), title: "Confirm the family's next choice", description: "Ask whether the family wants to continue, revise, or conclude support and document their decision.", target_date: "2027-01-09"},
+      ],
+    },
+  ];
   return [
     {name:"dated-states",plan:plan([dated]),barriers:["Housing","Transportation"],minimumPages:1,expectedText:["1 of 6 actions complete"]},
     {name:"many-goals",plan:plan(many),barriers:["Housing","Food access","Childcare"],minimumPages:3},
     {name:"maximum-fields",plan:plan([maximum]),barriers:["Housing"],minimumPages:3},
     {name:"latin-characters",plan:plan([accented]),barriers:["Educación & formación"],minimumPages:1},
+    {name:"hosted-page-boundary",plan:{...plan(boundary),summary:null},barriers:["No transportation","Food insecurity"],minimumPages:2},
   ];
 }

@@ -19,12 +19,13 @@ async function main() {
     writeFileSync(file,bytes);
     const requiredText=["Family Support Intervention Plan","Family 014","Oct 13, 2026","Plan version: 7","Plan status: Reviewed",fixture.plan.summary!,...fixture.barriers,...(fixture.expectedText??[])];
     for(const step of fixture.plan.steps) {
-      requiredText.push(step.title,step.description,step.details?.stage_goal??"",step.details?.expected_outcome??"",...(step.details?.required_documents??[]));
+      requiredText.push(step.title,step.description,step.details?.stage_goal??"",step.details?.detailed_instructions??"",step.details?.expected_outcome??"",...(step.details?.required_documents??[]));
       for(const contact of step.details?.contacts??[])requiredText.push(...[contact.name,contact.phone,contact.email,contact.notes].filter((text):text is string=>Boolean(text)));
       for(const action of step.action_items??[])requiredText.push(action.title,action.description??"",actionUserNotes(action.notes),action.outcome??"",actionUiStatus(action).replaceAll("_"," "),formatDateOnly(actionTargetDate(action))??"Not required");
     }
     const goalStarts=fixture.plan.steps.map(step=>({title:step.details!.stage_goal,followingText:step.title.slice(0,32)}));
-    manifest.push({...fixture,plan:undefined,file,goalStarts,requiredText:requiredText.filter(Boolean),forbiddenText:["[[caselink:","2020","undefined","null"]});
+    const actionHeaders=fixture.plan.steps.flatMap(step=>(step.action_items??[]).map(action=>({title:action.title,date:formatDateOnly(actionTargetDate(action))??"Not required",status:actionUiStatus(action).replaceAll("_"," ")})));
+    manifest.push({...fixture,plan:undefined,file,goalStarts,actionHeaders,requiredText:requiredText.filter(Boolean),forbiddenText:["[[caselink:","2020","undefined","null"]});
   }
   const manifestFile=resolve(directory,"manifest.json");
   writeFileSync(manifestFile,JSON.stringify(manifest,null,2));
