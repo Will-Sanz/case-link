@@ -1,8 +1,8 @@
 # Hosted database and staging preparation — October 14, 2026
 
-CL-38, CL-36 and CL-41 remain open. The restored project is reachable; it is not yet compatible with this release. All hosted inspection below was read-only. No hosted migration, account, case, resource, Auth setting or secret was changed.
+CL-38, CL-36 and CL-41 remain open. The restored project is reachable; it is not yet compatible with this release. The initial inspection below was read-only. The user subsequently approved the specific legacy permission containment and created a separate Free test project. The applied changes and their limits are recorded below; no production application was deployed.
 
-## Restored project
+## Restored project: initial inspection
 
 The user restored `zpfypkizsapvsxeykmdq` (display name `Will-Sanz's Project`) in organization `homelessness-project` / `esnufmvikgpxzgoosqnw`. Direct inspection reports `ACTIVE_HEALTHY`, Free plan, `us-east-1`, Postgres 17.6.1.084. The broad project-list tool omitted this project while direct access worked; its unrelated inactive result is not the pilot target.
 
@@ -12,7 +12,11 @@ All 20 observed public tables have RLS enabled, but the current release's privat
 
 Security advisors flag a mutable search path on `public.set_updated_at`, three anonymous-executable privileged functions (`can_access_family`, `create_family_intake_row`, `is_app_admin`), and disabled leaked-password protection. The corresponding authenticated-function warnings require reviewing each intended RPC's authorization rather than blanket revocation. These are configuration/code review findings, not a claim that a data exposure was demonstrated. The public Auth settings also report signup enabled; see the account-email evidence in CL-16.
 
-## Separate test project: prepared, not created
+**Subsequent critical finding:** the actual `app_users` INSERT/UPDATE policies check only that the row belongs to the caller. Authenticated callers have table-wide write grants, and `is_app_admin()` trusts the row's `role` without MFA. Together these permit self-provisioning/self-promotion to admin. The query read definitions only; no hosted account was altered or foreign case read. A synthetic local reproduction using the original account/family schema proves both paths and cross-family access after self-promotion. [Tested containment SQL](legacy-access-containment.sql) revokes self-provisioning and protected account writes, preserves profile-column editing, removes anonymous privileged RPC execution and fixes the mutable search path. [Regression evidence](2026-10-14-legacy-containment.json) proves the attack paths fail afterward, all account rows remain identical, and existing admin/profile/owned-case access still works. It creates and removes an isolated local database and is now in CI. This is a limited SQL-policy reproduction, not a hosted exploit or full upgrade rehearsal.
+
+**Applied with explicit user approval at 16:56 UTC:** migration `20261014165601_legacy_account_permission_containment`. [Read-back evidence](2026-10-14-live-containment.json) confirms account contents and the 11 account / 44 family / 54 resource counts are unchanged, protected writes and anonymous RPC access are denied, and profile editing remains allowed. It preserves rows, roles and assignments and does not rotate credentials or deploy an application. It intentionally prevents direct account insertion and changes to account ID/email/role by ordinary users; operator provisioning must use protected access. It cannot establish whether an account was previously promoted: the operator must review existing account roles and access history, approve any correction and revoke suspect sessions. Disable public signup in hosted Auth separately. Keep those operating steps and the full upgrade open. The restored project now has only the containment migration recorded; its legacy application schema still needs reconciliation.
+
+## Separate test project: created and migrated
 
 | Setting | Prepared value |
 | --- | --- |
@@ -20,16 +24,24 @@ Security advisors flag a mutable search path on `public.set_updated_at`, three a
 | Name | `caselink-staging` |
 | Region | `us-east-1` |
 | Data | New synthetic accounts and families only; never clone the existing family records |
-| Initial plan | Free, only if the dashboard confirms $0 and an available slot |
+| Initial plan | Free ($0); the user completed creation after checking the displayed plan |
 | Database administrator credential | Generate and save directly in the operator's password vault; never chat, source, build logs or the web app |
 | Web connection | New project's URL and public publishable/anon key; no service-role or database password |
 | Auth | Invite-only; no anonymous signup; email confirmation, short token lifetime, secure changes, MFA and exact staging redirects per the local tested policy |
 | AI | Separate restricted OpenAI test-project key and budget; no production key shared with previews |
 | Vercel | Preview-only connection; explicit preview marker, production-project marker, HTTPS origin, invite/tenancy/HSTS posture and protected access |
 
-The user authorized preparing this separate project. Supabase's connected `get_cost` workflow returns unavailable; the dashboard is at sign-in. No cost-confirmation ID was fabricated and no project was created. The official Free tier lists $0/month and two active projects; available capacity for this organization still needs dashboard confirmation. If the creation screen requires a paid plan, stop and present its actual quote. Pro starts at $25/month, with additional projects from $10/month; no purchase is authorized by this preparation. Free also pauses after inactivity and lacks automatic backups and some Auth protections, so its suitability for synthetic testing is distinct from real pilot hosting. [Supabase pricing, checked October 14](https://supabase.com/pricing).
+The user created **`caselink-staging` / `umnbyupudhunyccqhyrp`** on Free in the same organization and region. The new API is `https://umnbyupudhunyccqhyrp.supabase.co`. It was verified empty before setup. All 37 existing repository migrations and the new platform-trigger permission migration are applied. Because MCP assigned execution timestamps, each successful migration was matched by its unique name and repaired to the exact repository version; all 38 IDs were then read back. The [manifest and checks](2026-10-14-staging-database.json) retain file hashes and both timestamps. This history reconciliation applies only to the newly created empty staging database, never the legacy project.
 
-After access and cost confirmation, record the new project ID, URL, region, plan and owner. Apply all repository migrations to that **new empty project**, install the reviewed email templates and exact Auth policy, then run bounded synthetic hosted account/access/casework/PDF checks. Do not use local reset, restore or security-test scripts against a hosted database without first reviewing their destructive setup assumptions. The existing local runners deliberately target local test infrastructure.
+All 22 public tables have RLS; ordinary roles have no table access to the three private control tables. A bounded [synthetic SQL role rehearsal](staging-access-smoke.sql) passed owned/unrelated case isolation, self-promotion denial, legitimate profile edits, immediate offboarding and revoked-session denial. Every fixture rolled back; zero Auth users or family rows remain. This tests hosted SQL permissions using simulated claims, not real hosted Auth tokens or the browser journey.
+
+The dashboard-created automatic-RLS event trigger initially had unnecessary public execution grants. The new conditional migration revokes those grants while leaving the trigger enabled, and adds a runnable database regression for both absent and present helper states. Read-back confirms no anonymous executable privileged function remains. The final advisor reports two informational deny-all tables (`demo_requests`, `security_audit_log`) and 30 warnings for intentionally authenticated privileged RPCs; those require their authorization tests, not blanket revocation. See [privileged function advisor guidance](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable). Normal correctness/security/privacy and separate Ponytail deletion reviews completed. The new conditional-helper regression runs in remote CI because local services were stopped at the user's slowdown report.
+
+Staging Auth is now invitation-only with confirmation and secure changes, a 14-character mixed-character password policy, and a 15-minute email-code lifetime. The provider's default eight-digit code is retained; the form now supports the local six-digit and hosted eight-digit settings. SMTP, installed templates, exact staging origin/redirects, sessions/MFA settings, school-mailbox scanning and actual account delivery remain open under CL-16. No hosted invitation was sent.
+
+The creation connector's cost workflow was unavailable, so the user completed the dashboard's password and submission privately. No paid plan, live credential rotation or Vercel setting change occurred. Free has inactivity/backup limitations; production recovery and vendor approval remain required. [Supabase pricing, checked October 14](https://supabase.com/pricing).
+
+Next, provision only synthetic accounts through the protected operator path, connect a protected preview with separate credentials, and run the full hosted account/access/casework/PDF checks. The existing database/Auth/restore runners have destructive local setup assumptions: do not point them at a hosted project as a shortcut. A real hosted workflow still requires a scoped operator credential and configured email/canonical origin.
 
 ## Preserve and upgrade the legacy database
 

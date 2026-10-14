@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { PlanPdfDocument } from "../src/features/families/plan-pdf-document";
@@ -39,6 +39,22 @@ const actionA = randomUUID();
 const actionB = randomUUID();
 const resourceId = randomUUID();
 const matchId = randomUUID();
+
+async function checkPlatformRlsTriggerPrivileges() {
+  const migration = readFileSync("supabase/migrations/20261014174244_restrict_platform_rls_trigger.sql", "utf8");
+  await admin.query("begin");
+  try {
+    await admin.query(migration); // Also succeeds when the hosted helper does not exist locally.
+    if (!(await admin.query("select to_regprocedure('public.rls_auto_enable()') as helper")).rows[0].helper) {
+      await admin.query("create function public.rls_auto_enable() returns event_trigger language plpgsql security definer set search_path = '' as $$ begin return; end $$");
+    }
+    await admin.query("grant execute on function public.rls_auto_enable() to public, anon, authenticated");
+    assert.equal((await admin.query("select has_function_privilege('anon','public.rls_auto_enable()','execute') allowed")).rows[0].allowed, true);
+    await admin.query(migration);
+    for (const role of ["anon", "authenticated"])
+      assert.equal((await admin.query("select has_function_privilege($1,'public.rls_auto_enable()','execute') allowed", [role])).rows[0].allowed, false);
+  } finally { await admin.query("rollback"); }
+}
 
 async function asUser<T>(
   userId: string,
@@ -531,6 +547,7 @@ async function seedMfa(userId: string, status: "unverified" | "verified") {
 
 async function setup() {
   await admin.connect();
+  await checkPlatformRlsTriggerPrivileges();
   if (["127.0.0.1", "localhost"].includes(parsedUrl.hostname)) {
     await admin.query(
       `delete from public.families where created_by_id in (

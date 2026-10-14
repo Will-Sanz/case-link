@@ -80,6 +80,9 @@ jobs:
       - name: Verify isolated synthetic backup restoration
         run: npm run test:restore
 
+      - name: Verify legacy account permission containment
+        run: npm run test:legacy-containment
+
       - name: Verify retained tokens and offboarding with real local Auth
         run: npm run test:auth-security
 
