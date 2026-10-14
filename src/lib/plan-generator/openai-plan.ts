@@ -7,6 +7,7 @@ import { createAiResponse } from "@/lib/ai/client";
 import { getEnv } from "@/lib/env";
 import { formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
+import { actionTargetDate } from "@/lib/domain/plan/action-state";
 import {
   type DraftStepRefineInput,
   mergeLeanRefineIntoBase,
@@ -46,7 +47,7 @@ function compactDraftJsonForRefine(
         contacts: d.contacts ?? [],
         expected_outcome: d.expected_outcome,
         priority: d.priority,
-        action_items: s.action_items,
+        action_items: s.action_items.map(action => ({ ...action, target_date: actionTargetDate(action) })),
       };
     }),
     null,
@@ -81,6 +82,7 @@ ${feedback.trim()}
 - Return exactly ${draftSteps.length} steps with their original IDs and phases. Include each step/action ID exactly once.
 - IDs identify the same work regardless of response order. Never substitute, duplicate, add, remove, or move IDs between goals.
 - Status, ownership, outcomes, progress notes, and completed work are human records. Do not reinterpret or reassign them.
+- For blocked (Waiting) work, target_date means the next follow-up date. Return null to preserve an existing date.
 - Return null for action_items, required_documents, or contacts to leave that list unchanged.
 - Return [] for required_documents or contacts only when the instructions ask to remove every item.
 - Preserve the exact number of actions, including zero or one; do not add filler tasks, contacts, or documents.

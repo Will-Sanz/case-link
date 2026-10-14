@@ -60,6 +60,9 @@ export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRe
       timing_guidance: lean.timing_guidance.trim(),
       ...(lean.priority != null ? { priority: lean.priority } : {}),
     },
-    action_items: base.action_items.map((action, i) => ({ ...action, ...actions[i], target_date: actions[i].target_date ?? action.target_date, week_index: action.week_index })),
+    action_items: lean.action_items === null ? base.action_items : base.action_items.map((action, i) => ({
+      ...action, ...actions[i], target_date: actions[i].target_date ?? action.target_date, week_index: action.week_index,
+      ...(action.status === "blocked" && actions[i].target_date ? { follow_up_date: actions[i].target_date } : {}),
+    })),
   };
 }

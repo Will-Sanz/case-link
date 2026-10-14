@@ -318,6 +318,46 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     })] }));
   });
 
+  it.each(["pending", "blocked"] as const)("previews, approves, saves, and reloads the actual %s task wording and date", async status => {
+    const original = structuredClone(plan);
+    const action = original.steps[0].action_items![0];
+    Object.assign(action, { status, notes: status === "blocked" ? "Waiting for a callback" : null, follow_up_date: status === "blocked" ? "2026-10-15" : null });
+    vi.mocked(previewRefinePlanStep).mockImplementation(async input => {
+      const draft = (input as { draft: ReturnType<typeof toRefinementDraft> }).draft;
+      return { ok: true, step: { ...draft, action_items: draft.action_items.map(item => ({ ...item,
+        title: "Follow up with intake", description: "Ask whether an appointment is available.", target_date: "2026-10-20",
+        follow_up_date: status === "blocked" ? "2026-10-20" : item.follow_up_date,
+      })) } };
+    });
+    vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
+    const view = render(<FamilyPlanPanel familyId={original.family_id} plan={original} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refine action" }));
+    const region = within(screen.getByRole("region", { name: "Refine action with AI" }));
+    fireEvent.change(region.getByRole("textbox"), { target: { value: "Move the call to October 20 and clarify the task wording" } });
+    fireEvent.click(region.getByRole("button", { name: "Generate preview" }));
+    const apply = await region.findByRole("button", { name: "Apply to draft" });
+    expect(savePlanEdits).not.toHaveBeenCalled();
+    expect((apply as HTMLButtonElement).disabled).toBe(true);
+    for (const choice of region.getAllByRole("checkbox")) fireEvent.click(choice);
+    fireEvent.click(apply);
+    expect(savePlanEdits).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    await screen.findByText("Action saved.");
+    const save = vi.mocked(savePlanEdits).mock.calls[0][0] as { steps: { actionItems: { actionItemId: string; patch: Partial<typeof action> }[] }[] };
+    expect(save.steps[0].actionItems).toHaveLength(1);
+    const change = save.steps[0].actionItems[0];
+    expect(change.actionItemId).toBe(action.id);
+    expect(change.patch).toMatchObject({ title: "Follow up with intake", description: "Ask whether an appointment is available.", target_date: "2026-10-20", status });
+    if (status === "blocked") expect(change.patch.follow_up_date).toBe("2026-10-20");
+    Object.assign(action, change.patch);
+    view.unmount();
+    render(<FamilyPlanPanel familyId={original.family_id} plan={original} workflow={null} />);
+    expect(screen.getByText("Follow up with intake")).toBeTruthy();
+    expect(screen.getByText(`${status === "blocked" ? "Follow up" : "Target"} Oct 20, 2026`)).toBeTruthy();
+  });
+
   it.each(["pending", "ready"])("invalidates a %s preview when the human edits the draft", async state => {
     let finish!: (value: Awaited<ReturnType<typeof previewRefinePlanStep>>) => void;
     vi.mocked(previewRefinePlanStep).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));

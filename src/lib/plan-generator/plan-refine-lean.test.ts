@@ -44,6 +44,25 @@ describe("existing-plan refinement preserves cardinality and intentional removal
     expect(base.details.contacts).toEqual([{ name: "Old contact" }]);
   });
 
+  it.each(["wording", "date", "preserve"])("uses the actual Waiting follow-up for a %s edit through the provider/merge path", async kind => {
+    const waiting = structuredClone(base);
+    Object.assign(waiting.action_items[0], { status: "blocked", target_date: "2020-01-01", follow_up_date: "2026-10-20", notes: "Waiting for a callback" });
+    const action = waiting.action_items[0];
+    const proposal = { id: action.id, title: kind === "wording" ? "Follow up with intake" : action.title, description: action.description, week_index: 1, target_date: kind === "date" ? "2026-10-23" : null };
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...unchanged, action_items: kind === "preserve" ? null : [proposal] }] }) });
+    const result = await previewRefinePlanStepsWithOpenAI(detail, [waiting], "Clarify the follow-up", { taskType: "step_refinement" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.steps[0].action_items[0]).toMatchObject({
+      title: kind === "wording" ? "Follow up with intake" : action.title,
+      target_date: kind === "date" ? "2026-10-23" : "2020-01-01", follow_up_date: kind === "date" ? "2026-10-23" : "2026-10-20",
+      status: "blocked", notes: "Waiting for a callback", updated_at: action.updated_at,
+    });
+    const prompt = vi.mocked(createAiResponse).mock.calls[0][0].input as string;
+    expect(prompt).toContain('"target_date": "2026-10-20"');
+    expect(prompt).not.toContain("2020-01-01");
+  });
+
   it("returns an explicit error for unsupported action removal instead of fabricating or retaining tasks", async () => {
     vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...unchanged, action_items: [] }] }) });
     expect(await previewRefinePlanStepsWithOpenAI(detail, [base], "Remove the action")).toMatchObject({ ok: false, reason: expect.stringContaining("changed the plan structure") });

@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { PlanPdfDocument } from "../src/features/families/plan-pdf-document";
+import { finalizePlanPdf } from "../src/lib/domain/plan/finalize-plan-pdf";
+import { mergeLeanRefineIntoBase } from "../src/lib/plan-generator/plan-refine-lean";
+import { applyRefinementChanges, collectRefinementChanges, toRefinementDraft } from "../src/lib/domain/plan/refinement-review";
 import { Client, Pool, type PoolClient } from "pg";
 import { addCalendarDays, schoolDate } from "../src/lib/dates";
 import { selectNextFamilyWork } from "../src/lib/domain/family-workspace/next-work";
@@ -133,6 +140,45 @@ async function checkResourceAvailability() {
     await admin.query("delete from public.resources where id=$1",[resource]);
   }
   console.log("Resource availability: inactive/demo rejection, safe dismissal/unlink, restoration, and family authorization passed.");
+}
+
+async function checkRefinedActionPersistence() {
+  const family = randomUUID(), plan = randomUUID(), stepId = randomUUID(), actionId = randomUUID();
+  try {
+    await admin.query("insert into public.families(id,name,created_by_id) values($1,'Refinement test case',$2)",[family,userA]);
+    await admin.query("insert into public.plans(id,family_id,version,generation_source) values($1,$2,1,'manual')",[plan,family]);
+    await admin.query(`insert into public.plan_steps(id,plan_id,phase,title,description,sort_order,details) values($1,$2,'30','Confirm intake options','Review the next appointment',0,'{"expected_outcome":"An appointment option is confirmed"}')`,[stepId,plan]);
+    await admin.query("insert into public.plan_step_action_items(id,plan_step_id,title,week_index,sort_order,status,target_date,follow_up_date,notes) values($1,$2,'Call intake',1,0,'blocked','2020-01-01','2026-10-15','Waiting for a callback')",[actionId,stepId]);
+    const original = (await snapshotFor(userA,family)).plan as PlanWithSteps;
+    const step = original.steps[0], action = step.action_items![0];
+    const proposed = mergeLeanRefineIntoBase(toRefinementDraft(step), {
+      id: stepId, phase: '30', title: step.title, description: step.description, required_documents: null, contacts: null,
+      expected_outcome: 'An appointment option is confirmed', timing_guidance: '', priority: null,
+      action_items: [{ id: actionId, title: 'Follow up with intake', description: 'Ask whether an appointment is available.', week_index: 1, target_date: '2026-10-20' }],
+    });
+    const changes = collectRefinementChanges([step],[proposed]);
+    assert.deepEqual(applyRefinementChanges([step],changes,[]),[step],"cancelling leaves dates and wording unchanged");
+    const selected = applyRefinementChanges([step],changes,changes.map(change=>change.id))[0].action_items![0];
+    const edits = [{ stepId,expectedUpdatedAt:step.updated_at,patch:{},actionItems:[{actionItemId:actionId,expectedUpdatedAt:action.updated_at,patch:{title:selected.title,description:selected.description,target_date:selected.target_date,follow_up_date:selected.follow_up_date}}] }];
+    assert.equal((await asUser(userA,async client=>(await client.query("select public.save_plan_edits($1,$2,$3) saved",[family,plan,JSON.stringify(edits)])).rows[0].saved)).ok,true);
+    const saved = (await snapshotFor(userA,family)).plan as PlanWithSteps;
+    assert.equal(saved.steps[0].action_items![0].title,'Follow up with intake');
+    assert.equal(saved.steps[0].action_items![0].description,'Ask whether an appointment is available.');
+    assert.equal(saved.steps[0].action_items![0].target_date,'2026-10-20');
+    assert.equal(saved.steps[0].action_items![0].follow_up_date,'2026-10-20');
+    assert.equal(saved.steps[0].action_items![0].notes,'Waiting for a callback');
+    await asUser(userA,client=>client.query("select public.mark_plan_reviewed($1,$2,$3,true)",[family,plan,saved.review_revision]));
+    const reviewed = (await snapshotFor(userA,family)).plan as PlanWithSteps;
+    const evidence = process.env.CASELINK_PDF_EVIDENCE_DIR;
+    if (evidence) {
+      mkdirSync(evidence,{recursive:true});
+      const bytes = await finalizePlanPdf(await renderToBuffer(PlanPdfDocument({plan:reviewed,familyName:'Refinement test case',generatedDate:'Oct 13, 2026',barrierLabels:['Housing instability']})));
+      writeFileSync(resolve(evidence,'refined-action.pdf'),bytes);
+    }
+  } finally {
+    await admin.query("delete from public.families where id=$1",[family]);
+  }
+  console.log("Action refinement: selected wording/follow-up survives atomic save, reload, and exact-revision review.");
 }
 
 async function checkLargeFamilyLists() {
@@ -486,6 +532,7 @@ async function run() {
   await checkLargeFamilyLists();
   await checkDateConfirmation();
   await checkResourceAvailability();
+  await checkRefinedActionPersistence();
   assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 
   // PostgREST uses PostgreSQL's JSON timestamp representation, including microseconds and offsets.

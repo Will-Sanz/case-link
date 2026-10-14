@@ -1,6 +1,7 @@
 import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 import type { DraftStepRefineInput } from "@/lib/plan-generator/plan-refine-lean";
 import { matchPlanRowsById } from "./refinement-identity";
+import { actionTargetDate } from "./action-state";
 
 export type RefinementChange = {
   id: string;
@@ -68,10 +69,11 @@ export function collectRefinementChanges(base: PlanStepRow[], proposed: DraftSte
         add(`${action.id}:${field}`, `${action.title} — ${label}`, action[field], proposal[field],
           { actionPatch: { id: action.id, fields: { [field]: proposal[field] ?? null } } });
       }
-      if (proposal.target_date) {
+      const proposedDate = actionTargetDate({ ...proposal, status: action.status });
+      if (proposedDate) {
         add(`${action.id}:target_date`, `${action.title} — ${action.status === "blocked" ? "Follow-up date" : "Target date"}`,
-          action.status === "blocked" ? action.follow_up_date : action.target_date, proposal.target_date,
-          { actionPatch: { id: action.id, fields: { target_date: proposal.target_date, ...(action.status === "blocked" ? { follow_up_date: proposal.target_date } : {}) } } });
+          actionTargetDate(action), proposedDate,
+          { actionPatch: { id: action.id, fields: { target_date: proposedDate, ...(action.status === "blocked" ? { follow_up_date: proposedDate } : {}) } } });
       }
     });
   });

@@ -36,11 +36,18 @@ describe("reviewing individual AI changes", () => {
   it("changes a waiting date only after selection and keeps both stored dates consistent", () => {
     const next = toRefinementDraft(base);
     next.action_items[0].target_date = "2026-11-02";
+    next.action_items[0].follow_up_date = "2026-11-02";
     const changes = collectRefinementChanges([base], [next]);
     const selected = applyRefinementChanges([base], changes, [changes[0].id])[0];
     expect(selected.action_items![0]).toEqual({ ...base.action_items![0], target_date: "2026-11-02", follow_up_date: "2026-11-02" });
     expect(selected.updated_at).toBe(stamp);
     expect(selected.action_items![0].updated_at).toBe(stamp);
+  });
+
+  it("does not propose an older target date when an unchanged Waiting action has a later follow-up", () => {
+    const waiting = structuredClone(base);
+    waiting.action_items![0].target_date = "2020-01-01";
+    expect(collectRefinementChanges([waiting], [toRefinementDraft(waiting)])).toEqual([]);
   });
 
   it("does not offer model rewrites of completed work", () => {

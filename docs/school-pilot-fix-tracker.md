@@ -467,7 +467,7 @@ Chat clears the input and appends a user message before the request succeeds, wi
 
 **Close with:** failed send/retry, clear during request, switch family/action, duplicate click, late response, thrown server-action error, and keyboard-only recovery. **Sources:** [chat](/Users/willsanz/homelessness-project/src/features/families/case-assistant-chat.tsx), [refinement requests](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:925).
 
-### [ ] CL-26 — Make single-step AI changes reach the real actions
+### [x] CL-26 — Make single-step AI changes reach the real actions
 
 **Type:** Reproduced · **Responsible:** engineering.
 
@@ -476,6 +476,10 @@ Single-step refinement asks the model for action items and dates, but the return
 **Fix:** return and preview the supported action changes, preserving IDs and human approval; or explicitly restrict the feature to wording and reject unsupported requests. The preferred product behavior is a reviewed, consistent change to the actual dated action.
 
 **Close with:** deadline change, action wording change, unsupported structural request, cancel, apply, reload, and PDF comparison. Prose and stored tasks must agree. **Sources:** [refinement result](/Users/willsanz/homelessness-project/src/lib/plan-generator/openai-plan.ts), [apply path](/Users/willsanz/homelessness-project/src/features/families/family-plan-panel.tsx:954).
+
+**Completed October 13, 2026 — engineering:** the shared refinement path returns actual task IDs, wording, and dates. Staff select each proposed change before applying it and save separately; unsupported structural changes fail without modifying the draft. A new regression test reproduced an additional Waiting bug: an unchanged task could offer its historical target date instead of its current follow-up. Model context, merge, and review now use the effective follow-up consistently, preserving dates when the model leaves actions unchanged or returns a null date.
+
+**Evidence:** provider/merge tests cover Waiting wording-only, explicit-date, and unchanged-list responses. Rendered UI tests cover pending and Waiting task wording/date preview, no automatic selection or save, explicit application, save payload, and reload. Existing tests cover cancellation, unselected edits, stale responses, and unsupported IDs/cardinality. A real local database rehearsal selects the proposal, atomically saves it, reloads it, and approves its exact revision; the resulting PDF was text-extracted and visually checked. It contains the selected task wording and Oct 20, 2026 follow-up, preserves the callback note, and omits the old dates. Database security tests, typecheck/lint, normal correctness/security/privacy review, and separate Ponytail deletion review pass; full verification runs before push. Full authenticated browser acceptance and live model usefulness remain CL-08/CL-34. Commit: `git log --grep='CL-26'`.
 
 ### [x] CL-29 — Preserve one-action plans and deliberate removals
 
