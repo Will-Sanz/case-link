@@ -65,7 +65,25 @@ Store current phone/email contacts in the restricted operational system, not in 
 - [ ] AI safety/evaluation fixtures meet the release rubric for privacy, grounding, unsupported claims, resource fidelity, and human-review requirements.
 - [ ] Product/privacy, engineering, and the pilot owner sign the residual-risk section of the release ticket.
 
+## School data boundary and staff rehearsal
+
+This pilot permits real circumstances only in de-identified form. It does not authorize identifiable school or family records. Before the first real case, the school privacy owner and service owner must approve the examples, access list, vendor handling, retention schedule, incident contacts, and staff training record in the restricted release ticket. Those approvals are still launch gates; repository changes cannot supply them.
+
+| Staff entry | Permitted example | Keep in the school's required records system |
+| --- | --- | --- |
+| Family label | `Family 014`, unrelated to any school/student identifier | Names, initials that identify a person, student IDs, or the mapping back to a person |
+| Circumstances/barriers | `Transportation is unreliable; prefers an afternoon meeting` | Addresses, exact birth dates, phone/email, identifying combinations of school/class/family details |
+| Plan/progress/AI question | `Confirm transport options by October 20`; `Waiting for a callback` | Named-person narratives, copied emails, unredacted records, signatures |
+| Resource contacts | Approved directory entries maintained by the resource owner | Family contact details disguised as an agency contact; unverified model-generated contacts |
+| Downloads | Reviewed plan on a school-approved device/location, for manual use | Personal email, public links, or uncontrolled copies |
+
+Use only the detail needed to prepare the plan. Automated checks catch representative identifiers, including unformatted phone numbers, explicit name fields, and some likely names; they do not prove anonymity. A person must review the whole entry, including combinations of facts. If the work cannot be done without identifying information, keep it in the school's required system and resolve the data-policy decision before broadening CaseLink's scope.
+
+Rehearse with synthetic cases: enter an identifier and correct it, prepare a de-identified plan, confirm dates and agency facts, review/download, sign out on a shared device, and report an accidental entry. Do not copy accidentally entered content into a support ticket or screenshot. Stop further AI use for that case, notify the named privacy/incident owner through the approved channel, and follow the incident procedure to contain access and decide deletion/provider follow-up. Archive is not deletion. Account/profile names needed for staff authentication are separate from family narrative and must not be included in AI prompts.
+
 ## Data inventory and retention
+
+The schedule below is the proposed operational policy. The school/privacy owner must approve it and the operator must evidence its implementation before launch; these periods are not an automatic database deletion job.
 
 | Data class | Location | Retention | Disposal/control |
 | --- | --- | --- | --- |
@@ -75,7 +93,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 | Product activity and security audit events | Postgres | 365 days | Monthly age-based deletion; no browser mutation |
 | Structured application/error logs | Approved logging provider | 30 days | Provider TTL; allowlisted metadata only |
 | AI usage metadata | Application/provider | 30 days unless contract requires less | Provider/project retention control; no prompt or response logging |
-| Blank and completed PDF bytes | Active browser tab | Until download, refresh, or tab close | No server, OpenAI, IndexedDB, or localStorage persistence |
+| Reviewed-plan PDF bytes | Active browser tab; approved device after download | Tab lifetime; downloaded copies follow school policy | No app-server, OpenAI, IndexedDB, or localStorage persistence |
 | Demo/contact email | Approved mailbox | 90 days unless an active sales relationship exists | Quarterly mailbox review/deletion |
 | Database backups/PITR | Supabase | At most 30 days after source deletion | Provider expiry; restoration access restricted and audited |
 

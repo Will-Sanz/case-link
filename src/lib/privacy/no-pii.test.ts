@@ -31,6 +31,22 @@ describe("findLikelyIdentifiers", () => {
     ]);
   });
 
+  it.each(["2155550184", "+12155550184", "(215)555-0184", "(215) 555 0184", "1.215.555.0184"])("flags phone formatting %s", value => {
+    expect(findLikelyIdentifiers(`Call ${value} tomorrow.`)).toContainEqual(expect.objectContaining({ kind: "phone", value }));
+  });
+
+  it.each(["jordan williams", "María García", "Élodie Durand", "Jordan Williams 014"])("flags likely names in labels: %s", value => {
+    expect(findLikelyIdentifiers(value, "label").some(finding => finding.kind === "person_name")).toBe(true);
+  });
+
+  it.each(["parent name is jordan williams", "Name: maría garcía", "Student name: Jordan Williams", "DOB: 2012-08-14"])("flags explicit identifying context: %s", value => {
+    expect(findLikelyIdentifiers(value).length).toBeGreaterThan(0);
+  });
+
+  it.each(["The parent is awaiting confirmation.", "The family is seeking support.", "Phone contact method preferred.", "2026-10-20", "40000000-0000-4000-8000-000000000004"])("allows ordinary context and internal identifiers: %s", value => {
+    expect(findLikelyIdentifiers(value)).toEqual([]);
+  });
+
   it("allows non-identifying labels and ordinary service-plan language", () => {
     expect(findLikelyIdentifiers("Family 014", "label")).toEqual([]);
     expect(

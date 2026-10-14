@@ -41,6 +41,8 @@ export function PrivacyPolicySections() {
         <p>
           This context is sensitive even when de-identified. Do not enter names, contact details,
           student identifiers, signatures, or other information that could identify a person.
+          Automated warnings can miss identifiers and identifying combinations of facts. Review
+          every entry yourself; a passing check is not permission to enter identifiable records.
         </p>
 
         <h3 className="pt-2 text-base font-semibold text-slate-900">

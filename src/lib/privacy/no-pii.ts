@@ -40,7 +40,7 @@ const PATTERNS: Pattern[] = [
   },
   {
     kind: "phone",
-    expression: /\b(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}\b/g,
+    expression: /(?<![\p{L}\d])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\p{L}\d])/gu,
   },
   {
     kind: "government_id",
@@ -54,7 +54,7 @@ const PATTERNS: Pattern[] = [
   {
     kind: "birth_date",
     expression:
-      /\b(?:date\s+of\s+birth|d\.?o\.?b\.?|born)\s*[:#-]?\s*(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4})\b/gi,
+      /\b(?:date\s+of\s+birth|d\.?o\.?b\.?|born)\s*[:#-]?\s*(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4})\b/gi,
   },
   {
     kind: "street_address",
@@ -64,10 +64,12 @@ const PATTERNS: Pattern[] = [
 ];
 
 const PERSON_NAME =
-  /\b[A-Z][a-z]{1,30}(?:[-'][A-Z]?[a-z]{1,30})?\s+[A-Z][a-z]{1,30}(?:[-'][A-Z]?[a-z]{1,30})?\b/g;
+  /(?<!\p{L})\p{Lu}\p{Ll}{1,30}(?:[-'’]\p{Lu}?\p{Ll}{1,30})?\s+\p{Lu}\p{Ll}{1,30}(?:[-'’]\p{Lu}?\p{Ll}{1,30})?(?!\p{L})/gu;
+
+const LABEL_PERSON_NAME = /^[\p{L}][\p{L}'’-]{1,30}(?:\s+[\p{L}][\p{L}'’-]{1,30}){1,2}$/u;
 
 const EXPLICIT_PERSON_NAME =
-  /\b(?:student|child|parent|mother|father|guardian|participant|client|family|name)\s+(?:name\s+)?(?:is|:)\s+([A-Z][A-Za-z'-]{1,30}(?:\s+[A-Z][A-Za-z'-]{1,30}){1,2})\b/g;
+  /\b(?:(?:student|child|parent|mother|father|guardian|participant|client|family)\s+(?:name\s*)?|name\s*)(?:is\s+|:\s*)([\p{L}][\p{L}'’-]{1,30}\s+[\p{L}][\p{L}'’-]{1,30})/giu;
 
 const PERSON_CONTEXT_AFTER =
   /^(?:,\s*)?(?:age\b|needs?\b|lives?\b|called\b|reported\b|said\b|has\b|is\b|was\b|will\b|can(?:not|'t)?\b|attends?\b|was\s+born\b)/i;
@@ -136,12 +138,19 @@ function addPersonNameFindings(
   mode: "label" | "narrative",
   findings: LikelyIdentifierFinding[],
 ): void {
+  const label = text.trim().replace(/\s+\d+$/, "");
+  if (mode === "label" && LABEL_PERSON_NAME.test(label) && !looksLikeAllowedPhrase(label)) {
+    const start = text.indexOf(label);
+    findings.push({ kind: "person_name", value: label, start, end: start + label.length });
+  }
   EXPLICIT_PERSON_NAME.lastIndex = 0;
   for (const match of text.matchAll(EXPLICIT_PERSON_NAME)) {
     const value = match[1];
     if (!value || looksLikeAllowedPhrase(value)) continue;
     const whole = match[0];
     const withinMatch = whole.lastIndexOf(value);
+    // Lowercase prose such as "parent is awaiting confirmation" is not a named-person field.
+    if (!/\bname\b|:/i.test(whole.slice(0, withinMatch)) && !/^\p{Lu}/u.test(value)) continue;
     const start = (match.index ?? 0) + Math.max(0, withinMatch);
     findings.push({ kind: "person_name", value, start, end: start + value.length });
   }
@@ -150,7 +159,6 @@ function addPersonNameFindings(
   for (const match of text.matchAll(PERSON_NAME)) {
     const value = match[0];
     if (looksLikeAllowedPhrase(value)) continue;
-    if (mode === "label" && /\d/.test(text)) continue;
     const start = match.index ?? 0;
     if (
       mode === "narrative" &&

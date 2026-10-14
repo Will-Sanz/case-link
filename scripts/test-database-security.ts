@@ -528,6 +528,13 @@ async function setup() {
 
 async function run() {
   await setup();
+  for (const value of ["Call 2155550184", "Call +12155550184", "Call (215)555-0184", "Call (215) 555 0184", "DOB: 2012-08-14", "parent name is jordan williams", "Name: maría garcía"]) {
+    assert.equal((await admin.query("select public.contains_direct_identifier($1) detected",[value])).rows[0].detected,true,"database detects representative identifier variants");
+    await expectDbError(() => asUser(userA,client=>client.query("select public.add_case_note($1,$2)",[familyA,value])),"an authenticated request cannot save identifier variants directly");
+  }
+  for (const value of ["The parent is awaiting confirmation.","Family 014","2026-10-20",randomUUID()]) {
+    assert.equal((await admin.query("select public.contains_direct_identifier($1) detected",[value])).rows[0].detected,false,"ordinary context, dates, and opaque IDs remain valid");
+  }
   await expectDbError(() => asUser(userA,client => client.query("select public.mark_plan_reviewed($1,$2,$3)",[familyA,planA,"ignored"])),"unconfirmed dates cannot be approved directly");
   await checkLargeFamilyLists();
   await checkDateConfirmation();
