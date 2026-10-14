@@ -100,7 +100,7 @@ export function ResetPasswordForm() {
     if (!passwordUpdated) {
       if (!passwordMeetsPolicy(password)) { setError(PASSWORD_REQUIREMENTS); return; }
       if (password !== confirmPassword) { setError("Passwords do not match."); return; }
-      if (needsVerification && !/^\d{6}$/.test(nonce)) { setError("Enter the six-digit verification code from your email."); return; }
+      if (needsVerification && !/^\d{6,8}$/.test(nonce)) { setError("Enter the verification code from your email."); return; }
     }
     submitting.current = true;
     setPending(true);
@@ -173,7 +173,7 @@ export function ResetPasswordForm() {
         {needsVerification ? <div className="space-y-2">
           <Button type="button" variant="outline" disabled={pending} onClick={() => void sendVerificationCode()}>Send verification code</Button>
           <Label htmlFor="password-verification">Verification code</Label>
-          <Input id="password-verification" name="nonce" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={nonce} onChange={(e) => setNonce(e.target.value)} />
+          <Input id="password-verification" name="nonce" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={nonce} onChange={(e) => setNonce(e.target.value)} />
         </div> : null}
       </>}
       <Button type="submit" className="w-full" disabled={pending}>{pending ? "Please wait…" : passwordUpdated ? "Finish signing out" : "Update password"}</Button>

@@ -88,19 +88,33 @@ it.each(["weak_password", "same_password"])("keeps policy error %s editable with
   expect(screen.queryByRole("link", { name: "Request a new reset link" })).toBeNull();
   expect((screen.getByLabelText("New password") as HTMLInputElement).value).toBe("Synthetic-test-password1!");
 });
-it("confirms an older session with a nonce, then signs out before the login destination", async () => {
+it.each(["123456", "12345678"])("confirms an older session with email code %s, then signs out before the login destination", async (nonce) => {
   m.update.mockResolvedValueOnce({ error: { code: "reauthentication_needed" } }).mockResolvedValueOnce({ error: null });
   render(<ResetPasswordForm />);
   await fillPassword();
   fireEvent.click(screen.getByRole("button", { name: "Update password" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send verification code" }));
   await screen.findByText(/Check your account email/);
-  fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
+  expect(screen.getByLabelText("Verification code").getAttribute("maxlength")).toBe("8");
+  fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: nonce } });
   fireEvent.click(screen.getByRole("button", { name: "Update password" }));
   await waitFor(() => expect(m.router.replace).toHaveBeenCalledWith("/login?message=password-reset-success"));
-  expect(m.update).toHaveBeenLastCalledWith({ password: "Synthetic-test-password1!", nonce: "123456" });
+  expect(m.update).toHaveBeenLastCalledWith({ password: "Synthetic-test-password1!", nonce });
   expect(m.signOut).toHaveBeenCalledWith({ scope: "global" });
   expect(m.signOut.mock.invocationCallOrder[0]).toBeLessThan(m.router.replace.mock.invocationCallOrder[0]);
+});
+it("rejects malformed email verification codes before asking Auth to change the password", async () => {
+  m.update.mockResolvedValue({ error: { code: "reauthentication_needed" } });
+  render(<ResetPasswordForm />);
+  await fillPassword();
+  fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+  const field = await screen.findByLabelText("Verification code");
+  for (const nonce of ["", "12345", "123456789", "12ab5678"]) {
+    fireEvent.change(field, { target: { value: nonce } });
+    fireEvent.submit(field.closest("form")!);
+    expect(screen.getByRole("alert").textContent).toContain("verification code from your email");
+    expect(m.update).toHaveBeenCalledTimes(1);
+  }
 });
 it("retries only sign-out when the password was already changed", async () => {
   m.update.mockResolvedValue({ error: null });
