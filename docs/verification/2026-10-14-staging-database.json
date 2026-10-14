@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-14T17:48:11.171Z",
+  "checkedAt": "2026-10-14T21:05:10.985173+00:00",
   "project": "umnbyupudhunyccqhyrp",
   "name": "caselink-staging",
   "organization": "esnufmvikgpxzgoosqnw",
@@ -281,9 +281,16 @@
       "name": "restrict_platform_rls_trigger",
       "sha256": "100080081d283918aecd31735b64bc14bc56f3a735db3bf164baa14a96e46bf5",
       "executionVersion": "20261014174325"
+    },
+    {
+      "file": "20261014203800_explicit_application_privileges.sql",
+      "version": "20261014203800",
+      "name": "explicit_application_privileges",
+      "sha256": "0cfb5d2cfa9e13b7415ec844ff85c427c6dbf3849a5eb5847aa5e1997ac81793",
+      "executionVersion": "20261014204815"
     }
   ],
-  "historyRepair": "Only successful, name-matched MCP execution timestamps were replaced with the exact repository versions on this new empty project. All 38 read back exactly; SQL statements were preserved. No legacy-project history was repaired.",
+  "historyRepair": "Successful MCP execution timestamps were reconciled to repository versions only on this new empty staging project. The latest migration was also matched by the exact stored SQL SHA-256 before repair. All 39 versions are recorded; SQL statements were preserved. No legacy-project history was repaired.",
   "checks": {
     "publicTablesWithoutRls": 0,
     "anonymousSecurityDefinerFunctions": 0,
@@ -292,7 +299,7 @@
     "roleUpdate": false,
     "platformRlsTriggerEnabled": true,
     "platformRlsTriggerPublicExecution": false,
-    "syntheticSqlRoleSmoke": "passed",
+    "syntheticSqlRoleSmoke": "passed after migration 39",
     "smokeCovers": [
       "owned-case access",
       "unrelated-case denial",
@@ -301,7 +308,12 @@
       "offboarded-session denial",
       "revoked-session denial",
       "rollback leaves no accounts or cases"
-    ]
+    ],
+    "maintenanceGrants": 0,
+    "anonymousCallableFunctions": 0,
+    "serviceArchiveSelect": false,
+    "futurePostgresObjectsRequireExplicitApplicationGrants": true,
+    "smokeTransientFailure": "First connector request returned Invalid or expired requestState; retry passed and reported zero remaining Auth users/families."
   },
   "advisorSummary": [
     {
@@ -321,6 +333,6 @@
     "SQL role simulation, not real hosted Auth tokens or browser journey",
     "Private tables rely on revoked role grants and non-exposed schema; RLS is not enabled on those three tables",
     "Intended authenticated RPCs still produce 30 advisor warnings; authorization regression evidence and hosted full role matrix remain relevant",
-    "No SMTP, real mailbox, school data, hosted AI credentials, Vercel settings or production deployment"
+    "No real hosted Auth tokens, invitation delivery, AI workflow, production upgrade or production application deployment; separate environment/Auth evidence is recorded in adjacent files."
   ]
 }
