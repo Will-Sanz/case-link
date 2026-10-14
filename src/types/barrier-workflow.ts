@@ -40,6 +40,7 @@ export type BarrierWorkflowPlanSection = {
 
 export type BarrierWorkflowResource = {
   id: string;
+  directoryUpdatedAt: string;
   name: string;
   programName: string;
   /** 0 to 100 display percent (normalized vs top match in the same list). */

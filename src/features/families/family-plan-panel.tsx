@@ -1624,7 +1624,7 @@ export function FamilyPlanPanel({
           <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Resources</p>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              Matches from your organization&apos;s resource directory.
+              Matches from your directory. Confirm current eligibility, availability, and contact details before referring.
             </p>
 
             <div className="mt-4 space-y-3">
@@ -1678,6 +1678,7 @@ export function FamilyPlanPanel({
                     ) : null}
                   </div>
 
+                  <p className="mt-2 text-xs text-[var(--color-ink-faint)]">Directory updated {formatTargetDate(schoolDate(new Date(r.directoryUpdatedAt)))}. Import date is not verification.</p>
                   <div className="mt-3 space-y-1">
                     {r.primaryPhone ? (
                       <a className="block text-xs text-[var(--color-accent)] hover:underline" href={`tel:${r.primaryPhone}`}>

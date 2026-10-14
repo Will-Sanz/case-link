@@ -94,7 +94,7 @@ describe("one durable planning snapshot", () => {
 
   it("freezes resource recommendations and declares omitted matches without copying contact identifiers", () => {
     const detail = fixture();
-    detail.resourceMatches = Array.from({ length: 8 }, (_, i) => ({ status: "suggested", score: 8 - i, match_reason: "Reason ".repeat(30), resource: { program_name: `Program ${i}`, category: "Housing", primary_contact_phone: "215-555-0100", primary_contact_email: "staff@example.test" } })) as FamilyDetail["resourceMatches"];
+    detail.resourceMatches = Array.from({ length: 8 }, (_, i) => ({ status: "suggested", score: 8 - i, match_reason: "Reason ".repeat(30), resource: { active: true, is_demo: false, updated_at: stamp, program_name: `Program ${i}`, category: "Housing", primary_contact_phone: "215-555-0100", primary_contact_email: "staff@example.test" } })) as FamilyDetail["resourceMatches"];
     const snapshot = buildPlanningSnapshot(detail);
     detail.resourceMatches[0].resource!.program_name = "Changed resource";
     expect(snapshot.resources).toContain("Program 0");

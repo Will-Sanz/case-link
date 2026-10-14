@@ -96,6 +96,9 @@ export type CaseProgressUpdateRow = {
 
 export type MatchedResourceSummary = {
   id: string;
+  active: boolean;
+  is_demo: boolean;
+  updated_at: string;
   slug: string;
   program_name: string;
   office_or_department: string;

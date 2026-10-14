@@ -9,6 +9,8 @@ import { offboardUser } from "./offboard-user-operation";
 import { inviteUser } from "./invite-user-operation";
 import { recoverMfaUser } from "./recover-mfa-operation";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
+import { parseResourceCsvFromPath } from "../src/lib/db/resource-import/parse-resource-file";
+import { parsedResourceToDbRow } from "../src/lib/db/resource-import/to-db-row";
 
 const local = JSON.parse(execFileSync("npx", ["--yes", "supabase@2.111.0", "status", "--output", "json"], {
   encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
@@ -248,6 +250,19 @@ async function mfaSecurity(otherFamilyId: string) {
 
 async function run() {
   await db.connect();
+  const resourceKey = `import-check-${randomUUID()}`;
+  try {
+    const fixture = parseResourceCsvFromPath("data/resources-seed.sample.csv").rows[0];
+    const row = { ...parsedResourceToDbRow(fixture), import_key: resourceKey, slug: resourceKey };
+    const upsert = () => operator.from("resources").upsert([row], { onConflict: "import_key", defaultToNull: false });
+    assert.equal((await upsert()).error, null, "first import uses the active default");
+    assert.equal((await db.query("select active from public.resources where import_key=$1",[resourceKey])).rows[0].active,true);
+    await db.query("update public.resources set active=false where import_key=$1",[resourceKey]);
+    assert.equal((await upsert()).error, null, "repeat CSV import succeeds through the real Data API");
+    assert.deepEqual((await db.query("select active,is_demo from public.resources where import_key=$1",[resourceKey])).rows[0],{active:false,is_demo:true},"repeat import preserves the operator's off switch and the demo classification");
+  } finally {
+    await db.query("delete from public.resources where import_key=$1",[resourceKey]);
+  }
   const publicClient = createClient(local.API_URL, local.ANON_KEY, authOptions);
   const signup = await publicClient.auth.signUp({ email: `blocked-signup-${randomUUID()}@example.test`, password: `${randomUUID()}-Synthetic!1` });
   assert.ok(signup.error, "public signup remains disabled while email login is enabled");

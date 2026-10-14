@@ -1,3 +1,4 @@
+import { isResourceAvailable } from "@/lib/matching/resource-availability";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { ResourceMatchRow } from "@/types/family";
 
@@ -7,7 +8,7 @@ export function matchesForPlanContext(
   max: number,
 ): ResourceMatchRow[] {
   return matches
-    .filter((m) => m.status !== "dismissed" && m.resource)
+    .filter((m) => m.status !== "dismissed" && isResourceAvailable(m.resource))
     .sort((a, b) => {
       const pri = (x: ResourceMatchRow) =>
         x.status === "accepted" ? 0 : x.status === "suggested" ? 1 : 2;
@@ -61,5 +62,5 @@ export function formatMatchesForAiPrompt(
     return lines.filter(Boolean).join("\n");
   });
 
-  return `MATCHED_COMMUNITY_RESOURCES (use these real programs in your steps, primary input):\n\n${blocks.join("\n\n")}`;
+  return `MATCHED_COMMUNITY_RESOURCES (directory records only; verify current contacts, eligibility, and availability before use):\n\n${blocks.join("\n\n")}`;
 }

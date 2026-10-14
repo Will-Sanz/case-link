@@ -107,6 +107,34 @@ async function checkDateConfirmation() {
   console.log("Date confirmation: missing/explicit/manual/leap/completed/Waiting/past dates and school-day meetings passed.");
 }
 
+async function checkResourceAvailability() {
+  const family = randomUUID(), resource = randomUUID(), plan = randomUUID(), step = randomUUID();
+  try {
+    await admin.query("insert into public.families(id,name,created_by_id) values($1,'Resource test case',$2)",[family,userA]);
+    await admin.query("insert into public.plans(id,family_id,version,generation_source) values($1,$2,1,'manual')",[plan,family]);
+    await admin.query("insert into public.plan_steps(id,plan_id,phase,title,description,sort_order) values($1,$2,'30','Review resource','Confirm current availability',0)",[step,plan]);
+    await admin.query("insert into public.resources(id,slug,import_key,program_name,office_or_department) values($1,$2,$2,'Directory fixture','Synthetic office')",[resource,`fixture-${resource}`]);
+    const add = () => asUser(userA, client => client.query("select public.add_manual_resource_match($1,$2) id",[family,resource]));
+    const match = (await add()).rows[0].id;
+    for (const state of [{active:false,is_demo:false},{active:true,is_demo:true}]) {
+      await admin.query("update public.resources set active=$2,is_demo=$3 where id=$1",[resource,state.active,state.is_demo]);
+      await expectDbError(add,"unavailable resources cannot be manually added");
+      await expectDbError(() => asUser(userA, client => client.query("select public.replace_suggested_resource_matches($1,$2,1)",[family,JSON.stringify([{resource_id:resource,score:10,match_reason:'Synthetic match'}])])),"unavailable suggestions cannot replace matches");
+      await expectDbError(() => asUser(userA, client => client.query("select public.update_resource_match($1,$2,'status','accepted',null)",[family,match])),"unavailable matches cannot be accepted");
+      await expectDbError(() => asUser(userA, client => client.query("select public.update_resource_match($1,$2,'link',null,$3)",[family,match,step])),"unavailable matches cannot be linked");
+      await asUser(userA, client => client.query("select public.update_resource_match($1,$2,'status','dismissed',null)",[family,match]));
+      await asUser(userA, client => client.query("select public.update_resource_match($1,$2,'unlink',null,null)",[family,match]));
+    }
+    await admin.query("update public.resources set active=true,is_demo=false where id=$1",[resource]);
+    assert.equal((await add()).rows[0].id,match,"available resources can be restored explicitly");
+    await expectDbError(() => asUser(userB, client => client.query("select public.add_manual_resource_match($1,$2)",[family,resource])),"available resources do not bypass family authorization");
+  } finally {
+    await admin.query("delete from public.families where id=$1",[family]);
+    await admin.query("delete from public.resources where id=$1",[resource]);
+  }
+  console.log("Resource availability: inactive/demo rejection, safe dismissal/unlink, restoration, and family authorization passed.");
+}
+
 async function checkLargeFamilyLists() {
   const ids = Array.from({ length: 100 }, () => randomUUID());
   try {
@@ -457,6 +485,7 @@ async function run() {
   await expectDbError(() => asUser(userA,client => client.query("select public.mark_plan_reviewed($1,$2,$3)",[familyA,planA,"ignored"])),"unconfirmed dates cannot be approved directly");
   await checkLargeFamilyLists();
   await checkDateConfirmation();
+  await checkResourceAvailability();
   assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 
   // PostgREST uses PostgreSQL's JSON timestamp representation, including microseconds and offsets.

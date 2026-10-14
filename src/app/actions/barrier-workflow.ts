@@ -4,6 +4,7 @@ import { addCalendarDays, formatDateOnly, schoolDate } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
+import { matchesForPlanContext } from "@/lib/plan-generator/resource-context";
 import { runResourceMatching } from "@/app/actions/resource-matches";
 import { startStagedLeanPlanGeneration, updatePlanStepActionItem } from "@/app/actions/plans";
 import { getFamilyDetail } from "@/lib/services/families";
@@ -133,19 +134,11 @@ function mapFamilyToWorkflowResult(
     });
   }
 
-  const resourceMatchRows = detail.resourceMatches
-    .filter((m) => m.status !== "dismissed" && m.resource)
-    .sort((a, b) => {
-      const pri = (x: "accepted" | "suggested" | "dismissed") =>
-        x === "accepted" ? 0 : x === "suggested" ? 1 : 2;
-      const p = pri(a.status) - pri(b.status);
-      if (p !== 0) return p;
-      return b.score - a.score;
-    })
-    .slice(0, 12);
+  const resourceMatchRows = matchesForPlanContext(detail.resourceMatches, 12);
   const maxMatchScore = maxRawMatchScore(resourceMatchRows.map((m) => m.score));
   const resources: BarrierWorkflowResource[] = resourceMatchRows.map((m) => ({
       id: m.id,
+      directoryUpdatedAt: m.resource!.updated_at,
       name: m.resource!.program_name,
       programName: m.resource!.office_or_department || m.resource!.program_name,
       similarityScore: rawMatchScoreToPercent(m.score, maxMatchScore),

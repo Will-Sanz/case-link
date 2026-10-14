@@ -207,6 +207,9 @@ export async function getFamilyDetail(
         updated_at,
         resource:resources (
           id,
+          active,
+          is_demo,
+          updated_at,
           slug,
           program_name,
           office_or_department,
