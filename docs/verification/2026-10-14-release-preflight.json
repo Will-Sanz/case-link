@@ -1,0 +1,32 @@
+{
+  "project": "prj_1zxzzKu8eljHJvPd6gFY3LhyxwWc",
+  "productionBranch": "main",
+  "autoAssignCustomDomains": true,
+  "failedCandidate": {
+    "commit": "5a3e282718f7cfdc1825807e6c5ebc057956bed4",
+    "exitCode": 1,
+    "reason": "database-security: completed/failure"
+  },
+  "passedCandidate": {
+    "commit": "8257d5fb67233a733d9589f6efcf2b39a5386aed",
+    "exitCode": 0
+  },
+  "productionObservedAfterChecks": {
+    "deployment": "dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW",
+    "commit": "e0cb389feaa0096175b33f05602ed72f0041c467"
+  },
+  "sourceChange": {
+    "gitDeploymentEnabled": {
+      "main": false
+    },
+    "otherBranches": "unspecified; provider default true",
+    "officialGitPropertySchema": "passed",
+    "unitTests": 2
+  },
+  "limitations": [
+    "Preflight command does not deploy, so this is not a provider promotion-denial experiment",
+    "No main merge or Git-trigger rehearsal",
+    "Manual administrator deployment is not blocked by this repository setting",
+    "No production deployment or promotion"
+  ]
+}
