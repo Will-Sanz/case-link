@@ -13,6 +13,15 @@ const step: PlanStepRow = {
 };
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
 describe("account-scoped temporary recovery", () => {
+  it("keeps only directory references in recovery, including when storage contains forged contact text", () => {
+    const contacts = [{ source_resource_id: other, source_updated_at: step.updated_at, name: "Source program", phone: "215-555-0148", email: "source@example.test" }];
+    const value = serializeLocalActionDraft(owner,step.plan_id,{...step,details:{contacts}})!;
+    expect(value).not.toMatch(/215-555|source@|Source program/);
+    const stored = JSON.parse(value); stored.step.details.contacts[0].phone = "215-555-9999";
+    expect(parseLocalActionDraft(JSON.stringify(stored),owner,step.plan_id)?.step.details?.contacts).toEqual([{source_resource_id:other,source_updated_at:step.updated_at}]);
+    expect(serializeLocalActionDraft(owner,step.plan_id,{...step,details:{contacts:[{phone:"215-555-0148"}]}})).toBeNull();
+    expect(parseLocalActionDraft(serializeLocalActionDraft(owner,step.plan_id,{...step,details:{contacts:[{name:"Previous office"}]}}),owner,step.plan_id)?.step.details?.contacts).toEqual([{name:"Previous office"}]);
+  });
   it("round-trips the same account's edits across session renewal, without unused helper content", () => {
     const now = Date.now();
     const value = serializeLocalActionDraft(owner, step.plan_id, { ...step, ai_helper_data: { call_script: "Not edited" } }, now);

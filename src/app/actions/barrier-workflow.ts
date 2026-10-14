@@ -1,5 +1,6 @@
 "use server";
 
+import { contactsForResourceIds, planResourceCatalog } from "@/lib/matching/plan-resources";
 import { addCalendarDays, formatDateOnly, schoolDate } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -139,6 +140,7 @@ function mapFamilyToWorkflowResult(
   const resources: BarrierWorkflowResource[] = resourceMatchRows.map((m) => ({
       id: m.id,
       directoryUpdatedAt: m.resource!.updated_at,
+      planContact: contactsForResourceIds([m.resource!.id], planResourceCatalog([m]))[0],
       name: m.resource!.program_name,
       programName: m.resource!.office_or_department || m.resource!.program_name,
       similarityScore: rawMatchScoreToPercent(m.score, maxMatchScore),

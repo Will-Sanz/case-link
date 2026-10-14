@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { actionUiStatus, actionUserNotes } from "@/lib/domain/plan/action-state";
-import { formatMatchesForPlannerPrompt } from "./resource-context";
+import { formatResourceCatalog, planResourceCatalog, resourceCatalogEntrySchema, matchesForPlanContext } from "@/lib/matching/plan-resources";
 import type { FamilyDetail, PlanGenerationSnapshot } from "@/types/family";
 
 const snapshotSchema = z.object({
@@ -10,6 +10,7 @@ const snapshotSchema = z.object({
   revision: z.string().regex(/^[a-f0-9]{64}$/),
   brief: z.string().min(1).max(80_000),
   resources: z.string().max(15_000),
+  resource_catalog: z.array(resourceCatalogEntrySchema).max(12),
 }).strict();
 
 /** Preserve instructions in full; recent history is bounded and explicitly identified. */
@@ -42,13 +43,14 @@ export function buildPlanningBrief(detail: FamilyDetail, extraFeedback?: string)
 }
 
 function snapshotRevision(snapshot: Omit<PlanGenerationSnapshot, "revision">): string {
-  return createHash("sha256").update(JSON.stringify([snapshot.family_id, snapshot.captured_at, snapshot.brief, snapshot.resources])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([snapshot.family_id, snapshot.captured_at, snapshot.brief, snapshot.resources, snapshot.resource_catalog])).digest("hex");
 }
 
 export function buildPlanningSnapshot(detail: FamilyDetail, feedback?: string, now = new Date()): PlanGenerationSnapshot {
+  const catalog = planResourceCatalog(detail.resourceMatches, 6);
   const content = {
     family_id: detail.id, captured_at: now.toISOString(), brief: buildPlanningBrief(detail, feedback),
-    resources: formatMatchesForPlannerPrompt(detail.resourceMatches, 6),
+    resources: formatResourceCatalog(catalog, matchesForPlanContext(detail.resourceMatches, detail.resourceMatches.length).length - catalog.length), resource_catalog: catalog,
   };
   const snapshot = { ...content, revision: snapshotRevision(content) };
   if (!parsePlanningSnapshot(snapshot, detail.id)) throw new Error("The planning context is too large. Review the saved context before generating a new draft.");

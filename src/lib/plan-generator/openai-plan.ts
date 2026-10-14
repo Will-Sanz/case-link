@@ -8,6 +8,8 @@ import { getEnv } from "@/lib/env";
 import { formatMatchesForPlannerPrompt } from "@/lib/plan-generator/resource-context";
 import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
 import { actionTargetDate } from "@/lib/domain/plan/action-state";
+import { contactReferences, planResourceCatalog } from "@/lib/matching/plan-resources";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 import {
   type DraftStepRefineInput,
   mergeLeanRefineIntoBase,
@@ -44,7 +46,8 @@ function compactDraftJsonForRefine(
         goal: d.stage_goal,
         timing_guidance: d.timing_guidance,
         required_documents: d.required_documents ?? [],
-        contacts: d.contacts ?? [],
+        resource_references: contactReferences(d.contacts),
+        unverified_contacts_omitted: (d.contacts ?? []).filter(contact => !contact.source_resource_id).length,
         expected_outcome: d.expected_outcome,
         priority: d.priority,
         action_items: s.action_items.map(action => ({ ...action, target_date: actionTargetDate(action) })),
@@ -65,6 +68,7 @@ export async function previewRefinePlanStepsWithOpenAI(
   const env = getEnv();
   const logRefine = env.PLAN_REFINE_DEBUG === "1" || env.OPENAI_DEBUG === "1";
   const startedAt = Date.now();
+  const catalog = planResourceCatalog(detail.resourceMatches, 6);
   const context = buildFamilyContextForRefine(detail);
   const draftJson = compactDraftJsonForRefine(draftSteps);
 
@@ -83,8 +87,9 @@ ${feedback.trim()}
 - IDs identify the same work regardless of response order. Never substitute, duplicate, add, remove, or move IDs between goals.
 - Status, ownership, outcomes, progress notes, and completed work are human records. Do not reinterpret or reassign them.
 - For blocked (Waiting) work, target_date means the next follow-up date. Return null to preserve an existing date.
-- Return null for action_items, required_documents, or contacts to leave that list unchanged.
-- Return [] for required_documents or contacts only when the instructions ask to remove every item.
+- Return null for action_items, required_documents, or resource_ids to leave that list unchanged.
+- Return [] for required_documents or resource_ids only when the instructions ask to remove every item.
+- Choose resource_ids only from MATCHED_RESOURCES. Never return contact names, phone numbers, email addresses, URLs, or invented programs in prose. Contact facts are added by the app from the directory. Missing eligibility, hours, and availability must remain unknown; propose checking them.
 - Preserve the exact number of actions, including zero or one; do not add filler tasks, contacts, or documents.
 - JSON only; key \`steps\` matching the schema.
 - Geographic scope: Philadelphia; use matched resources when relevant; do not invent programs.`;
@@ -92,7 +97,7 @@ ${feedback.trim()}
   const instructions =
     "You edit an existing case plan draft for a case manager. " +
     "Return one JSON object with key `steps` only. Each step includes its original id, phase, title, description, " +
-    "required_documents, contacts, expected_outcome, timing_guidance, priority (null to preserve), and action_items " +
+    "required_documents, resource_ids, expected_outcome, timing_guidance, priority (null to preserve), and action_items " +
     "(use null to leave a list unchanged; [] explicitly clears it).";
 
   try {
@@ -181,8 +186,11 @@ ${feedback.trim()}
       };
     }
 
+    if (!validateNoPii([{ field: "proposal", label: "AI proposal", value: JSON.stringify(validated.data) }]).ok || /https?:\/\/|www\./i.test(JSON.stringify(validated.data))) {
+      return { ok: false, reason: "The AI included unsupported contact or identifying information. Nothing was applied; try a smaller edit." };
+    }
     const matched = matchPlanRowsById(draftSteps, validated.data.steps);
-    const merged = draftSteps.map((base, i) => mergeLeanRefineIntoBase(base, matched[i]));
+    const merged = draftSteps.map((base, i) => mergeLeanRefineIntoBase(base, matched[i], catalog));
 
     for (let i = 0; i < merged.length; i++) {
       if (merged[i]!.phase !== draftSteps[i]!.phase) {

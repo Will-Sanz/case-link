@@ -16,6 +16,10 @@ export type RefinementChange = {
 
 function display(value: unknown): string {
   if (Array.isArray(value)) return value.map(display).filter(Boolean).join("\n") || "None";
+  if (value && typeof value === "object" && "source_resource_id" in value) {
+    const contact = value as NonNullable<PlanStepDetails["contacts"]>[number];
+    return [contact.name || "Directory contact", contact.phone, contact.email, contact.notes].filter(Boolean).join(" · ");
+  }
   if (value && typeof value === "object") return Object.values(value).filter(Boolean).join(" · ");
   return value == null || value === "" ? "Not set" : String(value);
 }

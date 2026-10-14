@@ -20,6 +20,8 @@ const planStepDetailsSchema = z.object({
   contacts: z
     .array(
       z.object({
+        source_resource_id: z.string().uuid().optional(),
+        source_updated_at: z.string().datetime({ offset: true }).optional(),
         name: z.string().optional(),
         phone: z.string().optional(),
         email: z.string().optional(),

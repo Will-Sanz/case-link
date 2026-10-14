@@ -17,7 +17,7 @@ const base: DraftStepRefineInput = {
 };
 const unchanged: PlanRefineLeanStep = {
   id: base.id, phase: "30", title: base.title, description: base.description,
-  required_documents: null, contacts: null, expected_outcome: "Intake ready", timing_guidance: "After school", priority: null, action_items: null,
+  required_documents: null, resource_ids: null, expected_outcome: "Intake ready", timing_guidance: "After school", priority: null, action_items: null,
 };
 
 describe("existing-plan refinement preserves cardinality and intentional removals", () => {
@@ -38,8 +38,8 @@ describe("existing-plan refinement preserves cardinality and intentional removal
     expect(mergeLeanRefineIntoBase(base, unchanged)).toEqual(base);
     const withLegacy = { ...base, details: { ...base.details, materials_needed: ["Legacy form"] } };
     expect(mergeLeanRefineIntoBase(withLegacy, unchanged)).toEqual(withLegacy);
-    const cleared = mergeLeanRefineIntoBase(withLegacy, { ...unchanged, required_documents: [], contacts: [] });
-    expect(cleared.details).toEqual({ ...base.details, required_documents: [], contacts: [] });
+    const cleared = mergeLeanRefineIntoBase(withLegacy, { ...unchanged, required_documents: [], resource_ids: [] });
+    expect(cleared.details).toEqual({ ...base.details, required_documents: [], contacts: [], materials_needed: undefined });
     expect(cleared.action_items).toEqual(base.action_items);
     expect(base.details.contacts).toEqual([{ name: "Old contact" }]);
   });

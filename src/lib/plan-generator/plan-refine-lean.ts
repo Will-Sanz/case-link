@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { PlanPhase } from "@/lib/plan-generator/types";
 import type { PlanStepDetails, PlanStepRow, PlanStepActionItemRow } from "@/types/family";
-import { planActionContentSchema, planContactSchema } from "./lean-plan-schema";
+import { planActionContentSchema } from "./lean-plan-schema";
+import { contactsForResourceIds, type ResourceCatalogEntry } from "@/lib/matching/plan-resources";
 import { toStructuredJsonSchema } from "@/lib/ai/structured-json-schema";
 import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
 
@@ -13,7 +14,7 @@ export const planRefineLeanStepSchema = z.strictObject({
   title: z.string().trim().min(1).max(500),
   description: z.string().max(4000),
   required_documents: z.array(z.string().trim().min(1).max(500)).max(20).nullable(),
-  contacts: z.array(planContactSchema).max(12).nullable(),
+  resource_ids: z.array(z.string().uuid()).max(12).nullable(),
   expected_outcome: z.string().max(800),
   timing_guidance: z.string().max(400),
   priority: z.enum(["low", "medium", "high"]).nullable(),
@@ -41,7 +42,7 @@ export type DraftStepRefineInput = {
 };
 
 /** Null leaves a list unchanged; an empty list explicitly clears it. */
-export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRefineLeanStep): DraftStepRefineInput {
+export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRefineLeanStep, catalog: ResourceCatalogEntry[] = []): DraftStepRefineInput {
   matchPlanRowsById([base], [lean]);
   const actions = matchPlanRowsById(base.action_items, lean.action_items ?? base.action_items);
   return {
@@ -52,10 +53,7 @@ export function mergeLeanRefineIntoBase(base: DraftStepRefineInput, lean: PlanRe
     details: {
       ...base.details,
       ...(lean.required_documents !== null ? { required_documents: lean.required_documents.map(value => value.trim()).filter(Boolean), materials_needed: undefined } : {}),
-      ...(lean.contacts !== null ? { contacts: lean.contacts.map(contact => ({
-        name: contact.name.trim(), phone: contact.phone?.trim() || undefined,
-        email: contact.email?.trim() || undefined, notes: contact.notes?.trim() || undefined,
-      })) } : {}),
+      ...(lean.resource_ids !== null ? { contacts: contactsForResourceIds(lean.resource_ids, catalog) } : {}),
       expected_outcome: lean.expected_outcome.trim(),
       timing_guidance: lean.timing_guidance.trim(),
       ...(lean.priority != null ? { priority: lean.priority } : {}),

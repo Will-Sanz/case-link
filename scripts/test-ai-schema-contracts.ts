@@ -1,3 +1,4 @@
+import { assistantResponseSchema, ASSISTANT_RESPONSE_JSON_SCHEMA } from "../src/lib/case-assistant/answer-schema";
 import { pathToFileURL } from "node:url";
 import { OPENAI_MODELS } from "../src/lib/ai/model-allowlist";
 import { buildLeanPhaseRootJsonSchema, planPhaseResponseSchema } from "../src/lib/plan-generator/lean-plan-schema";
@@ -9,6 +10,7 @@ export async function testAiSchemaContracts(apiKey: string, request: typeof fetc
   const cases = [
     ...(["30", "60", "90"] as const).map(phase => ({ name: `phase_${phase}`, schema: buildLeanPhaseRootJsonSchema(phase), validator: planPhaseResponseSchema(phase), example: { steps: [{ ...generatedPlanStep, phase }] } })),
     { name: "refinement", schema: OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA, validator: planRefineLeanResponseSchema, example: { steps: [refinedPlanStep] } },
+    { name: "assistant", schema: ASSISTANT_RESPONSE_JSON_SCHEMA, validator: assistantResponseSchema, example: { answer: "Confirm current intake options.", resource_ids: [] } },
   ];
   const results = [];
   for (const [model, contract] of Object.entries(OPENAI_MODELS)) {
@@ -45,7 +47,7 @@ export async function testAiSchemaContracts(apiKey: string, request: typeof fetc
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (!process.argv.includes("--live") || !process.env.OPENAI_API_KEY?.trim()) {
-    console.error("Supply --live and an operator-provided OPENAI_API_KEY to run eight small synthetic requests.");
+    console.error("Supply --live and an operator-provided OPENAI_API_KEY to run ten small synthetic requests.");
     process.exitCode = 1;
   } else {
     testAiSchemaContracts(process.env.OPENAI_API_KEY).then(results => console.log(JSON.stringify({ checkedAt: new Date().toISOString(), syntheticOnly: true, results }, null, 2))).catch(error => {

@@ -10,9 +10,10 @@ import { askCaseAssistantInputSchema } from "@/lib/validations/ai-actions";
 import { validateFamilyNoPii } from "@/lib/privacy/no-pii";
 import { publicSessionError } from "@/lib/auth/session-errors";
 import { publicMessageFromCaughtError } from "@/lib/errors/public-action-error";
+import { assertResourceCatalogCurrent, planResourceCatalog, type PlanContact } from "@/lib/matching/plan-resources";
 
 export type CaseAssistantResult =
-  | { ok: true; answer: string }
+  | { ok: true; answer: string; contacts: PlanContact[] }
   | { ok: false; error: string };
 
 export type { CaseAssistantHistoryItem } from "@/types/case-assistant";
@@ -60,11 +61,13 @@ export async function askCaseAssistantAction(
       return { ok: false, error: "AI is not configured." };
     }
 
-    return await askCaseAssistant(detail, parsed.data.question, {
+    const result = await askCaseAssistant(detail, parsed.data.question, {
       aiMode: parsed.data.aiMode,
       conversationHistory: parsed.data.conversationHistory,
       requestMeta: { route: "caseAssistant" },
     });
+    if (result.ok) await assertResourceCatalogCurrent(supabase, detail.id, planResourceCatalog(detail.resourceMatches, 10).filter(resource => result.contacts.some(contact => contact.source_resource_id === resource.id)));
+    return result;
   } catch (error) {
     return {
       ok: false,

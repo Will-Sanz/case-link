@@ -13,6 +13,19 @@ beforeEach(() => {
 });
 
 describe("case assistant conversation", () => {
+  it("shows source contacts but sends only conversation prose on a follow-up", async () => {
+    vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ok:true,answer:"Confirm intake availability.",contacts:[{source_resource_id:familyId,source_updated_at:"2026-10-13T12:00:00Z",name:"Housing office",phone:"215-555-0148",email:"intake@example.test"}]});
+    render(<CaseAssistantChat familyId={familyId} familyName="Family 014"/>);
+    fireEvent.change(screen.getByRole("textbox"),{target:{value:"What next?"}});
+    fireEvent.click(screen.getByRole("button",{name:"Send"}));
+    await screen.findByText(/215-555-0148/);
+    vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ok:true,answer:"Discuss the next step.",contacts:[]});
+    fireEvent.change(screen.getByRole("textbox"),{target:{value:"Help prepare the conversation"}});
+    fireEvent.click(screen.getByRole("button",{name:"Send"}));
+    await screen.findByText("Discuss the next step.");
+    expect(JSON.stringify(vi.mocked(askCaseAssistantAction).mock.calls[1][3])).not.toMatch(/215-555|intake@/);
+    expect(vi.mocked(askCaseAssistantAction).mock.calls[1][3]?.at(-1)).toEqual({role:"assistant",content:"Confirm intake availability."});
+  });
   it.each(["returned", "thrown"])("restores a %s failed question for keyboard retry", async (failure) => {
     if (failure === "thrown") vi.mocked(askCaseAssistantAction).mockRejectedValueOnce(new Error("private failure"));
     else vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: false, error: "Please retry." });
@@ -22,14 +35,14 @@ describe("case assistant conversation", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe("Help sequence the intake."));
     expect(screen.queryByText("private failure")).toBeNull();
-    vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: true, answer: "Begin with the intake." });
+    vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: true, contacts: [], answer: "Begin with the intake." });
     fireEvent.keyDown(input, { key: "Enter" });
     await screen.findByText("Begin with the intake.");
     expect(vi.mocked(askCaseAssistantAction).mock.calls[1][3]).toEqual([]);
   });
 
   it("ignores a late reply after clearing and lets a new request complete", async () => {
-    let finish!: (value: { ok: true; answer: string }) => void;
+    let finish!: (value: { ok: true; answer: string; contacts: [] }) => void;
     vi.mocked(askCaseAssistantAction).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     render(<CaseAssistantChat familyId={familyId} familyName="Family 014" />);
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Old question" } });
@@ -37,11 +50,11 @@ describe("case assistant conversation", () => {
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
     expect(askCaseAssistantAction).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
-    vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: true, answer: "New answer" });
+    vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: true, contacts: [], answer: "New answer" });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "New question" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("New answer");
-    await act(async () => finish({ ok: true, answer: "Old answer" }));
+    await act(async () => finish({ ok: true, contacts: [], answer: "Old answer" }));
     expect(screen.queryByText("Old answer")).toBeNull();
     expect(vi.mocked(askCaseAssistantAction).mock.calls[1][3]).toEqual([]);
   });
@@ -49,7 +62,7 @@ describe("case assistant conversation", () => {
   it("continues past twenty exchanges with a bounded complete history", async () => {
     render(<CaseAssistantChat familyId={familyId} familyName="Family 014" />);
     for (let i = 0; i < 23; i++) {
-      vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: true, answer: `Reply ${i}` });
+      vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ ok: true, contacts: [], answer: `Reply ${i}` });
       fireEvent.change(screen.getByRole("textbox"), { target: { value: `Question ${i}` } });
       fireEvent.click(screen.getByRole("button", { name: "Send" }));
       await screen.findByText(`Reply ${i}`);
@@ -63,13 +76,13 @@ describe("case assistant conversation", () => {
   });
 
   it("does not carry a pending response into another family's workspace", async () => {
-    let finish!: (value: { ok: true; answer: string }) => void;
+    let finish!: (value: { ok: true; answer: string; contacts: [] }) => void;
     vi.mocked(askCaseAssistantAction).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     const { rerender } = render(<CaseAssistantChat key={familyId} familyId={familyId} familyName="Family 014" />);
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Old family question" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     rerender(<CaseAssistantChat key="family-b" familyId="family-b" familyName="Family 015" />);
-    await act(async () => finish({ ok: true, answer: "Old family answer" }));
+    await act(async () => finish({ ok: true, contacts: [], answer: "Old family answer" }));
     expect(screen.queryByText("Old family answer")).toBeNull();
     expect(screen.queryByText("Old family question")).toBeNull();
   });

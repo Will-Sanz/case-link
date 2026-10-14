@@ -50,6 +50,12 @@ export function serializeLocalActionDraft(userId: string, planId: string, step: 
   // Store editable content only; provider helper output is not needed for recovery.
   const parsed = draftSchema.safeParse({ v: 2, userId, planId, savedAt: new Date(now).toISOString(), step });
   if (!parsed.success) return null;
+  if (parsed.data.step.details?.contacts) {
+    parsed.data.step.details.contacts = parsed.data.step.details.contacts.map(contact =>
+      contact.source_resource_id && contact.source_updated_at
+        ? { source_resource_id: contact.source_resource_id, source_updated_at: contact.source_updated_at }
+        : contact);
+  }
   const { title, description, details, workflow_data, action_items } = parsed.data.step;
   if (hasIdentifiers([title, description, details, workflow_data, action_items.map(a => [a.title, a.description, a.notes, a.outcome])])) return null;
   const value = JSON.stringify(parsed.data);
@@ -66,7 +72,8 @@ export function parseLocalActionDraft(value: string | null, userId: string, plan
     if (d.userId !== userId || d.planId !== planId || d.step.plan_id !== planId ||
         d.step.action_items.some(a => a.plan_step_id !== d.step.id) ||
         time > now || now - time >= DRAFT_TTL_MS || time <= clearedAt) return null;
-    return serializeLocalActionDraft(userId, planId, d.step, time) ? d : null;
+    const safeValue = serializeLocalActionDraft(userId, planId, d.step, time);
+    return safeValue ? draftSchema.parse(JSON.parse(safeValue)) : null;
   } catch {
     return null;
   }

@@ -4,7 +4,7 @@ import type { ResourceMatchRow } from "@/types/family";
 import { isDemoResource } from "@/lib/matching/resource-availability";
 
 const match = { id: "match", status: "suggested", score: 10, match_reason: "Matches housing", resource: {
-  id: "resource", program_name: "Housing support", office_or_department: "Community office", active: true, is_demo: false, updated_at: "2026-10-13T12:00:00Z",
+  id: "10000000-0000-4000-8000-000000000001", category: null, program_name: "Housing support", office_or_department: "Community office", active: true, is_demo: false, updated_at: "2026-10-13T12:00:00Z",
 } } as ResourceMatchRow;
 
 describe("directory availability in every AI context", () => {

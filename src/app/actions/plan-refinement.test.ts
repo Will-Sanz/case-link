@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { previewRefinePlan, previewRefinePlanStep } from "./plans";
+import { directoryCase, directoryId } from "../../../tests/fixtures/directory-case";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), detail: vi.fn(), refine: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireAppUserWithClient: mocks.session }));
@@ -18,8 +19,18 @@ const step = {
 describe("full plan refinement boundary", () => {
   beforeEach(() => {
     mocks.session.mockResolvedValue({ supabase: {} });
-    mocks.detail.mockResolvedValue({ name: "Household 4", goals: [], barriers: [], members: [], caseNotes: [], plan: { review_revision: "a".repeat(64), steps: [structuredClone(step)] } });
+    mocks.detail.mockResolvedValue({ name: "Household 4", resourceMatches: [], goals: [], barriers: [], members: [], caseNotes: [], plan: { review_revision: "a".repeat(64), steps: [structuredClone(step)] } });
     mocks.refine.mockImplementation(async (_detail, steps) => ({ ok: true, model: "test", steps }));
+  });
+
+  it.each(["step","plan"])("rejects a %s preview if directory data changes while AI responds", async kind => {
+    const lookup = {select:()=>lookup,eq:()=>lookup,in:vi.fn(async()=>({data:[{resource_id:directoryId,status:"accepted",resource:{active:true,is_demo:false,updated_at:"2026-10-14T00:00:00Z"}}],error:null}))};
+    mocks.session.mockResolvedValue({supabase:{from:()=>lookup}});
+    mocks.detail.mockResolvedValue({...directoryCase(),plan:{review_revision:"a".repeat(64),steps:[structuredClone(step)]}});
+    const input = {familyId,expectedRevision:"a".repeat(64),feedback:"Clarify wording"};
+    const result = kind === "step" ? await previewRefinePlanStep({...input,stepId:step.id,draft:step}) : await previewRefinePlan({...input,draft:{steps:[step]}});
+    expect(mocks.refine).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ok:false,error:expect.stringContaining("resource changed")});
   });
 
   it("passes the authorized IDs and progress evidence through the preview without saving", async () => {

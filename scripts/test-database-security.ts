@@ -152,7 +152,7 @@ async function checkRefinedActionPersistence() {
     const original = (await snapshotFor(userA,family)).plan as PlanWithSteps;
     const step = original.steps[0], action = step.action_items![0];
     const proposed = mergeLeanRefineIntoBase(toRefinementDraft(step), {
-      id: stepId, phase: '30', title: step.title, description: step.description, required_documents: null, contacts: null,
+      id: stepId, phase: '30', title: step.title, description: step.description, required_documents: null, resource_ids: null,
       expected_outcome: 'An appointment option is confirmed', timing_guidance: '', priority: null,
       action_items: [{ id: actionId, title: 'Follow up with intake', description: 'Ask whether an appointment is available.', week_index: 1, target_date: '2026-10-20' }],
     });
@@ -179,6 +179,86 @@ async function checkRefinedActionPersistence() {
     await admin.query("delete from public.families where id=$1",[family]);
   }
   console.log("Action refinement: selected wording/follow-up survives atomic save, reload, and exact-revision review.");
+}
+
+async function checkContactProvenance() {
+  for (const signature of ['public.canonical_plan_contacts(uuid,jsonb)','public.plan_contacts_current(uuid,jsonb)']) {
+    assert.equal((await admin.query("select has_function_privilege('anon',$1,'EXECUTE') allowed",[signature])).rows[0].allowed,false);
+  }
+  assert.equal((await admin.query("select has_function_privilege('authenticated','private.enforce_plan_contact_provenance()','EXECUTE') allowed")).rows[0].allowed,false);
+  const family = randomUUID(), plan = randomUUID(), step = randomUUID(), resource = randomUUID();
+  const source = async () => (await admin.query("select id as source_resource_id, to_jsonb(updated_at) #>> '{}' as source_updated_at from public.resources where id=$1",[resource])).rows[0];
+  const save = async (contacts: unknown, actor = userA) => {
+    const row = (await admin.query("select to_jsonb(s) as value from public.plan_steps s where id=$1",[step])).rows[0].value;
+    return asUser(actor, client => client.query("select public.save_plan_edits($1,$2,$3)",[family,plan,JSON.stringify([{stepId:step,expectedUpdatedAt:row.updated_at,patch:{details:{...row.details,contacts}},actionItems:[]}])]));
+  };
+  const approve = async () => asUser(userA, client => client.query("select public.mark_plan_reviewed($1,$2,$3,true)",[family,plan,currentRevision]));
+  const exportable = async (revision: string) => (await asUser(userA,client=>client.query("select public.is_reviewed_plan_revision($1,$2,$3) allowed",[family,plan,revision]))).rows[0].allowed;
+  let currentRevision = "";
+  try {
+    await admin.query("insert into public.families(id,name,created_by_id) values($1,'Contact test case',$2)",[family,userA]);
+    await admin.query("insert into public.plans(id,family_id,version,generation_source) values($1,$2,1,'manual')",[plan,family]);
+    await admin.query(`insert into public.plan_steps(id,plan_id,phase,title,description,sort_order,details) values($1,$2,'30','Confirm intake options','Discuss next steps',0,'{"expected_outcome":"Intake options confirmed"}')`,[step,plan]);
+    await admin.query("insert into public.plan_step_action_items(plan_step_id,title,week_index,sort_order,target_date) values($1,'Confirm intake availability',1,0,'2026-10-20')",[step]);
+    await admin.query("insert into public.resources(id,slug,import_key,program_name,office_or_department,primary_contact_phone,primary_contact_email) values($1,$2,$2,'Directory intake program','Synthetic office','215-555-0148','intake@example.test')",[resource,`fixture-${resource}`]);
+    await asUser(userA,client=>client.query("select public.add_manual_resource_match($1,$2)",[family,resource]));
+    const reference = await source();
+    await save([reference]);
+    const before = await snapshotFor(userA,family);
+    const contact = before.plan.steps[0].details.contacts[0];
+    assert.equal(contact.name,'Directory intake program'); assert.equal(contact.phone,'215-555-0148'); assert.equal(contact.email,'intake@example.test');
+    assert.equal(contact.source_updated_at,reference.source_updated_at); assert.equal(before.plan.resource_contacts_current,true);
+    for (const invalid of [
+      [{...contact,phone:'215-555-9999'}],[{...contact,email:'wrong@example.test'}],[{...contact,name:'Invented office'}],[{...contact,notes:'Guaranteed eligibility'}],
+      [{...reference,source_resource_id:randomUUID()}],[{...reference,source_updated_at:'2020-01-01T00:00:00Z'}],
+      [{source_resource_id:resource}],[{name:'Unverified contact'}],[{...reference,extra:'unsupported'}],[reference,reference],{wrong:'shape'},
+    ]) await expectDbError(()=>save(invalid),'forged, unknown, duplicate, stale or malformed contacts cannot be saved');
+    assert.deepEqual((await snapshotFor(userA,family)).plan.steps[0].details.contacts,[contact],'failed replacements preserve the original contact');
+    await expectDbError(()=>save([reference],userB),'contact sources do not bypass family access');
+    await expectDbError(()=>asUser(userA,client=>client.query("update public.plan_steps set details=jsonb_set(details,'{contacts}',$2) where id=$1",[step,JSON.stringify([{...reference,phone:'215-555-9999'}])])),'direct table writes cannot forge contact facts');
+    currentRevision = before.plan.review_revision; await approve();
+    const approved = (await snapshotFor(userA,family)).plan as PlanWithSteps;
+    assert.equal(await exportable(approved.review_revision!),true);
+    if (process.env.CASELINK_PDF_EVIDENCE_DIR) {
+      const directory = resolve(process.env.CASELINK_PDF_EVIDENCE_DIR); mkdirSync(directory,{recursive:true});
+      const rendered = await renderToBuffer(PlanPdfDocument({familyName:'Contact test case',plan:approved,generatedDate:schoolDate()}));
+      writeFileSync(resolve(directory,'directory-contact.pdf'),await finalizePlanPdf(rendered));
+    }
+    await admin.query("update public.resources set primary_contact_phone='215-555-0188' where id=$1",[resource]);
+    assert.equal(await exportable(approved.review_revision!),false,'source edits invalidate the reviewed PDF');
+    currentRevision = await revisionFor(userA,family);
+    assert.equal((await snapshotFor(userA,family)).plan.resource_contacts_current,false);
+    await expectDbError(approve,'a freshly loaded but outdated contact still cannot be reviewed');
+    await save([await source()]); currentRevision = await revisionFor(userA,family); await approve();
+    const refreshedRevision = await revisionFor(userA,family); assert.equal(await exportable(refreshedRevision),true);
+    await admin.query("update public.resource_matches set status='dismissed' where family_id=$1 and resource_id=$2",[family,resource]);
+    assert.equal(await exportable(refreshedRevision),false,'dismissal invalidates a prepared export');
+    await expectDbError(()=>save([reference]),'dismissed contacts cannot be reused');
+    await admin.query("update public.resource_matches set status='accepted' where family_id=$1 and resource_id=$2",[family,resource]);
+    for (const state of [{active:false,is_demo:false},{active:true,is_demo:true}]) {
+      await admin.query("update public.resources set active=$2,is_demo=$3 where id=$1",[resource,state.active,state.is_demo]);
+      await expectDbError(()=>save([reference]),'inactive and demo sources are not usable');
+      assert.equal((await snapshotFor(userA,family)).plan.resource_contacts_current,false);
+    }
+    await admin.query("update public.resources set active=true,is_demo=false,primary_contact_phone=null,primary_contact_email=null where id=$1",[resource]);
+    await save([await source()]);
+    const missing = (await snapshotFor(userA,family)).plan.steps[0].details.contacts[0];
+    assert.equal(missing.phone,undefined); assert.equal(missing.email,undefined);
+    // Simulate a pre-migration record, then prove ordinary edits preserve it without approving its contacts.
+    await admin.query("alter table public.plan_steps disable trigger plan_steps_contact_provenance");
+    try { await admin.query(`update public.plan_steps set details=jsonb_set(details,'{contacts}','[{"name":"Historical office","phone":"215-555-0133"}]') where id=$1`,[step]); }
+    finally { await admin.query("alter table public.plan_steps enable trigger plan_steps_contact_provenance"); }
+    const historical = (await snapshotFor(userA,family)).plan.steps[0].details.contacts;
+    await asUser(userA,client=>client.query("update public.plan_steps set description='Preserved human wording' where id=$1",[step]));
+    assert.deepEqual((await snapshotFor(userA,family)).plan.steps[0].details.contacts,historical);
+    currentRevision = await revisionFor(userA,family); await expectDbError(approve,'historical unverified contacts prevent approval');
+    await save([]); currentRevision = await revisionFor(userA,family); await approve();
+    assert.equal(await exportable(await revisionFor(userA,family)),true,'explicit removal permits a contact-free reviewed plan');
+  } finally {
+    await admin.query("delete from public.families where id=$1",[family]);
+    await admin.query("delete from public.resources where id=$1",[resource]);
+  }
+  console.log("Contact provenance: canonical facts, forged/stale/unavailable denial, safe legacy edits, review/export invalidation and removal passed.");
 }
 
 async function checkLargeFamilyLists() {
@@ -539,6 +619,7 @@ async function run() {
   await checkLargeFamilyLists();
   await checkDateConfirmation();
   await checkResourceAvailability();
+  await checkContactProvenance();
   await checkRefinedActionPersistence();
   assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 

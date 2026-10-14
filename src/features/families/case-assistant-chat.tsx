@@ -13,11 +13,14 @@ import { recentConversation, MAX_QUESTION_CHARS, MAX_VISIBLE_MESSAGES } from "@/
 import { Button } from "@/components/ui/button";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
+import type { PlanContact } from "@/lib/matching/plan-resources";
+import { formatDateOnly, schoolDate } from "@/lib/dates";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  contacts?: PlanContact[];
 };
 
 const STARTER_PROMPTS = [
@@ -166,7 +169,7 @@ export function CaseAssistantChat({
           textareaRef.current?.focus();
           return;
         }
-        setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: r.answer }]);
+        setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: r.answer, contacts: r.contacts }]);
       } catch {
         if (requestRef.current.id !== requestId) return;
         setError("The message could not be sent. Your question is ready to edit or retry.");
@@ -278,6 +281,11 @@ export function CaseAssistantChat({
                   <div key={m.id} className="flex justify-start">
                     <div className="max-w-[min(100%,36rem)]">
                       <AssistantMarkdown content={m.content} />
+                      {m.contacts?.map(contact => <div key={contact.source_resource_id} className="mt-3 rounded-lg border border-[var(--color-rule)] p-3 text-sm">
+                        <p className="font-medium">Directory contact: {contact.name}</p>
+                        <p>{[contact.phone, contact.email].filter(Boolean).join(" · ") || "Contact details are not supplied; verify with the program."}</p>
+                        <p className="mt-1 text-xs">{contact.notes} Directory updated {contact.source_updated_at ? formatDateOnly(schoolDate(new Date(contact.source_updated_at))) : "unknown"}; this is not a verification date.</p>
+                      </div>)}
                     </div>
                   </div>
                 ),

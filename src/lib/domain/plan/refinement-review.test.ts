@@ -15,6 +15,15 @@ const base: PlanStepRow = {
 };
 
 describe("reviewing individual AI changes", () => {
+  it("shows contact facts without internal identifiers and applies their source only when selected", () => {
+    const next = toRefinementDraft(base);
+    const contact = {source_resource_id:"90000000-0000-4000-8000-000000000009",source_updated_at:stamp,name:"Housing office",phone:"215-555-0148"};
+    next.details = {...next.details,contacts:[contact]};
+    const changes = collectRefinementChanges([base],[next]);
+    expect(changes[0].after).toBe("Housing office · 215-555-0148");
+    expect(applyRefinementChanges([base],changes,[])[0].details?.contacts).toEqual(base.details?.contacts);
+    expect(applyRefinementChanges([base],changes,[changes[0].id])[0].details?.contacts).toEqual([contact]);
+  });
   it("applies only the selected field and preserves unrelated human work", () => {
     const next = toRefinementDraft(base);
     next.title = "New title";

@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { PlanContactPicker } from "./plan-contact-picker";
+import type { PlanContact } from "@/lib/matching/plan-resources";
 import { PlanStepCaseNote } from "@/features/families/plan-step-case-note";
 import type { BarrierWorkflowResult } from "@/types/barrier-workflow";
 import type {
@@ -344,7 +346,8 @@ export function FamilyPlanPanel({
   const [addStepTargetDate, setAddStepTargetDate] = useState(() => addCalendarDays(schoolDate(), 7));
   const [addStepDescription, setAddStepDescription] = useState("");
   const [addStepDocuments, setAddStepDocuments] = useState("");
-  const [addStepContact, setAddStepContact] = useState("");
+  const [addStepContacts, setAddStepContacts] = useState<PlanContact[]>([]);
+  const directoryContacts = workflow?.resources.map(resource => resource.planContact) ?? [];
   const [addStepExpectedOutcome, setAddStepExpectedOutcome] = useState("");
   const [addStepOwner, setAddStepOwner] = useState<NonNullable<PlanStepDetails["owner"]>>(
     "case_manager",
@@ -841,17 +844,11 @@ export function FamilyPlanPanel({
           .split(/\r?\n/)
           .map((line) => line.trim())
           .filter((line) => line.length > 0);
-        const contactLines = addStepContact
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line.length > 0);
         const details: PlanStepDetails = { owner: addStepOwner };
         if (requiredDocuments.length > 0) {
           details.required_documents = requiredDocuments;
         }
-        if (contactLines.length > 0) {
-          details.contacts = contactLines.map((line) => ({ notes: line }));
-        }
+        if (addStepContacts.length > 0) details.contacts = addStepContacts;
         details.expected_outcome = expectedOutcome;
 
         const res = await createManualStep({
@@ -871,7 +868,7 @@ export function FamilyPlanPanel({
         setAddStepDescription("");
         setAddStepTargetDate(addCalendarDays(schoolDate(), 7));
         setAddStepDocuments("");
-        setAddStepContact("");
+        setAddStepContacts([]);
         setAddStepExpectedOutcome("");
         setAddStepOwner("case_manager");
         setSuccess("Action added to the plan.");
@@ -1436,6 +1433,7 @@ export function FamilyPlanPanel({
                             <PlanStepCaseNote
                               key={full.id}
                               step={display}
+                              directoryContacts={directoryContacts}
                               editing={isEditingThis}
                               onPatchStep={(patch) => {
                                 if (editingStepId === full.id) patchEditingStep(patch);
@@ -1590,16 +1588,7 @@ export function FamilyPlanPanel({
                       disabled={addStepPending}
                     />
                   </label>
-                  <label className="space-y-1 text-xs text-[var(--color-ink-muted)]">
-                    <span>Contact</span>
-                    <Textarea
-                      className="min-h-[72px] border-[var(--color-rule)] bg-[var(--color-surface)]"
-                      value={addStepContact}
-                      onChange={(e) => setAddStepContact(e.target.value)}
-                      placeholder="One contact detail per line."
-                      disabled={addStepPending}
-                    />
-                  </label>
+                  <PlanContactPicker value={addStepContacts} choices={directoryContacts} onChange={setAddStepContacts} disabled={addStepPending} />
                 </div>
               </details>
               <div className="flex justify-end">

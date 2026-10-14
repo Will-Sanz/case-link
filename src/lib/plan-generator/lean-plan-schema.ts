@@ -9,13 +9,7 @@ import type { PlanStepDetails } from "@/types/family";
 import type { PlanPhase } from "./types";
 import { dateOnlySchema, updatePlanStepActionItemSchema } from "@/lib/validations/plans";
 import { toStructuredJsonSchema } from "@/lib/ai/structured-json-schema";
-
-export const planContactSchema = z.strictObject({
-  name: z.string().trim().min(1).max(500),
-  phone: z.string().max(200).nullable(),
-  email: z.string().max(320).nullable(),
-  notes: z.string().max(2000).nullable(),
-});
+import { contactsForResourceIds, type ResourceCatalogEntry } from "@/lib/matching/plan-resources";
 
 /** Same editable task limits in AI, manual edits, and persistence. Null dates preserve existing drafts. */
 export const planActionContentSchema = updatePlanStepActionItemSchema.pick({
@@ -34,7 +28,7 @@ export const leanPlanStepBodyZ = z.strictObject({
   action_items: z.array(leanActionItemZ).min(1).max(20),
   timing: z.string().max(400).nullable(),
   required_documents: z.array(z.string().trim().min(1).max(500)).max(20),
-  contacts: z.array(planContactSchema).max(12),
+  resource_ids: z.array(z.string().uuid()).max(12),
   expected_outcome: z.string().trim().min(1).max(800),
   priority: z.enum(["low", "medium", "high", "urgent"]),
   additional_guidance: z.string().max(3000).nullable(),
@@ -54,7 +48,7 @@ function normStr(v: string | null | undefined): string | undefined {
 }
 
 /** Compact details for DB: only user-meaningful keys + optional legacy empties avoided. */
-export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase): PlanStepDetails {
+export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase, catalog: ResourceCatalogEntry[] = []): PlanStepDetails {
   const timing = normStr(lean.timing ?? undefined) ?? undefined;
   const guidance = normStr(lean.additional_guidance ?? undefined) ?? undefined;
   const pri = lean.priority ?? "medium";
@@ -66,12 +60,7 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase):
     detailed_instructions: guidance,
     expected_outcome: lean.expected_outcome.trim(),
     required_documents: lean.required_documents.map((s) => s.trim()).filter(Boolean),
-    contacts: lean.contacts.map((c) => ({
-      name: c.name.trim(),
-      phone: normStr(c.phone as string | null | undefined),
-      email: normStr(c.email as string | null | undefined),
-      notes: normStr(c.notes as string | null | undefined),
-    })),
+    contacts: contactsForResourceIds(lean.resource_ids, catalog),
     checklist: [],
     priority: detailsPriority,
     stage_goal: lean.goal.trim(),
@@ -79,8 +68,8 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase):
 }
 
 /** Persist sparse JSON only (lean draft). */
-export function sparseDetailsForPersistence(lean: LeanPlanPhaseStep): PlanStepDetails {
-  return leanStepToPlanDetails(lean, lean.phase);
+export function sparseDetailsForPersistence(lean: LeanPlanPhaseStep, catalog: ResourceCatalogEntry[] = []): PlanStepDetails {
+  return leanStepToPlanDetails(lean, lean.phase, catalog);
 }
 
 export function buildLeanPhaseRootJsonSchema(phase: PlanPhase) {

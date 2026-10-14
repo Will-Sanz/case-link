@@ -40,6 +40,7 @@ export type BarrierWorkflowPlanSection = {
 
 export type BarrierWorkflowResource = {
   id: string;
+  planContact: NonNullable<import("./family").PlanStepDetails["contacts"]>[number];
   directoryUpdatedAt: string;
   name: string;
   programName: string;

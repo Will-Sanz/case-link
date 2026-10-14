@@ -9,7 +9,7 @@ import type { PlanGenerationSnapshot } from "@/types/family";
 
 vi.mock("@/lib/ai/client", () => ({ createAiResponse: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getEnv: () => ({}) }));
-const snapshot: PlanGenerationSnapshot = { family_id: "synthetic", captured_at: "2026-10-13T12:00:00Z", revision: "a".repeat(64), brief: "Synthetic context", resources: "None" };
+const snapshot: PlanGenerationSnapshot = { family_id: "synthetic", captured_at: "2026-10-13T12:00:00Z", revision: "a".repeat(64), brief: "Synthetic context", resources: "None", resource_catalog: [] };
 
 describe("plan output contracts", () => {
   beforeEach(() => vi.mocked(createAiResponse).mockReset());
@@ -35,7 +35,7 @@ describe("plan output contracts", () => {
   });
 
   it("requires all refinement fields, rejects progress fields, and preserves explicit null lists", () => {
-    expect(planRefineLeanResponseSchema.parse({ steps: [refinedPlanStep] }).steps[0].contacts).toBeNull();
+    expect(planRefineLeanResponseSchema.parse({ steps: [refinedPlanStep] }).steps[0].resource_ids).toBeNull();
     const missing = { ...refinedPlanStep } as Record<string, unknown>;
     delete missing.priority;
     for (const step of [missing, { ...refinedPlanStep, owner: "family" }, { ...refinedPlanStep, action_items: [{ ...refinedPlanStep.action_items[0], status: "completed" }] }]) {

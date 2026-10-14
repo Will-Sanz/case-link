@@ -26,6 +26,9 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
     };
   }
 
+  if (plan.resource_contacts_current === false) {
+    return { state: "needs_attention", label: "Needs attention", issue: "Remove or reselect outdated or unverified directory contacts before reviewing this plan." };
+  }
   const actions = plan.steps.flatMap((step) => step.action_items ?? []);
   if (actions.length === 0) {
     return {

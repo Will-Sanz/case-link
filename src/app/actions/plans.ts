@@ -12,6 +12,7 @@ import { parseAiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
 import { MAX_PLAN_STEPS_PER_PHASE, previewRefinePlanStepsWithOpenAI } from "@/lib/plan-generator/openai-plan";
 import { sparseDetailsForPersistence, type LeanPlanPhaseStep } from "@/lib/plan-generator/lean-plan-schema";
+import { assertResourceCatalogCurrent, planResourceCatalog } from "@/lib/matching/plan-resources";
 import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-phase-summary";
 import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningSnapshot, parsePlanningSnapshot } from "@/lib/plan-generator/planning-brief";
@@ -238,12 +239,15 @@ async function appendLeanPhaseForPlan(
     return { ok: false, error: "No steps to insert for this phase" };
   }
 
+  try { await assertResourceCatalogCurrent(supabase, familyId, generationState.input_snapshot?.resource_catalog ?? []); }
+  catch (error) { return { ok: false, error: error instanceof Error ? error.message : "The resource directory could not be verified." }; }
+
   const rows = phaseSteps.map((lean, i) => ({
     phase: lean.phase,
     title: lean.title.trim(),
     description: lean.summary.trim(),
     sort_order: sortOrderStart + i,
-    details: sparseDetailsForPersistence(lean),
+    details: sparseDetailsForPersistence(lean, generationState.input_snapshot?.resource_catalog ?? []),
     priority:
       lean.priority === "urgent" ? "urgent"
       : lean.priority === "high" ? "high"
@@ -482,6 +486,14 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     });
   }
   const generationMode = parseAiMode(state.ai_mode ?? input.aiMode);
+  try { await assertResourceCatalogCurrent(supabase, input.familyId, snapshot.resource_catalog); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : "The resource directory could not be verified.";
+    await updateStagedPlanState(supabase, { familyId: input.familyId, planId, leaseId,
+      generationState: { ...state, status: "failed", error: message }, aiModel: activePlan.ai_model as string | null,
+      event: "plan.generation_failed", eventDetails: { category: "resource_changed" } });
+    return { ok: false, status: "failed", error: message };
+  }
   const privacy = validateNoPii([
     { field: "planningSnapshot", label: "Planning context", value: snapshot.brief },
     { field: "planningResources", label: "Resource context", value: snapshot.resources },
@@ -1162,6 +1174,10 @@ export async function previewRefinePlanStep(input: unknown): Promise<PreviewRefi
   const result = await previewRefinePlanStepsWithOpenAI(detail, [draft], feedback, {
     aiMode: parseAiMode(aiMode), requestMeta: { route: "previewRefinePlanStep" }, taskType: "step_refinement",
   });
+  if (result.ok) {
+    try { await assertResourceCatalogCurrent(supabase, familyId, planResourceCatalog(detail.resourceMatches, 6)); }
+    catch (error) { return { ok: false, error: error instanceof Error ? error.message : "The resource directory could not be verified." }; }
+  }
   return result.ok ? { ok: true, step: result.steps[0] } : { ok: false, error: result.reason };
 }
 
@@ -1227,6 +1243,9 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   if (!result.ok) {
     return { ok: false, error: result.reason };
   }
+
+  try { await assertResourceCatalogCurrent(supabase, familyId, planResourceCatalog(detail.resourceMatches, 6)); }
+  catch (error) { return { ok: false, error: error instanceof Error ? error.message : "The resource directory could not be verified." }; }
 
   return {
     ok: true,

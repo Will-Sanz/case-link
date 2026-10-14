@@ -14,6 +14,8 @@ import {
 } from "@/lib/plan-generator/lean-plan-schema";
 import { GEO_CONTEXT_FOR_CASE_MANAGER_PROMPTS } from "@/lib/ai/prompt-geo";
 import type { PlanPhase } from "./types";
+import { contactsForResourceIds } from "@/lib/matching/plan-resources";
+import { validateNoPii } from "@/lib/privacy/no-pii";
 
 function shouldLog(): boolean {
   const env = getEnv();
@@ -48,7 +50,7 @@ All phases use the same saved snapshot. Follow explicit case-manager instruction
 - "timing" = due window or cadence (short phrase or null).
 - "additional_guidance" = optional nuance only; use null if not needed.
 - action_items: 1 to 4 concrete tasks per step when possible; titles are calendar-ready. Every action must include a valid YYYY-MM-DD target_date, never null.
-- Put document names in required_documents; put people/agencies in contacts.
+- Put document names in required_documents. Select resource_ids only from MATCHED_RESOURCES, or [] for generic work. The app adds directory contact facts; never return phone numbers, email addresses, URLs, or invented programs in prose. Missing eligibility, hours, or availability are unknown; propose checking them.
 
 ## Matched resources (reference only)
 - MATCHED_RESOURCES are suggestions. **Name a program only when it is clearly relevant** to that step.
@@ -144,6 +146,12 @@ The plan starts on ${planStartDate} in America/New_York. All dates are proposed 
       }
 
       let steps: LeanPlanPhaseStep[] = validated.data.steps;
+
+      if (!validateNoPii([{ field: "proposal", label: "AI proposal", value: JSON.stringify(steps) }]).ok || /https?:\/\/|www\./i.test(JSON.stringify(steps))) {
+        correction = "Remove contact values and identifying information. Use only allowed resource_ids; contact facts are copied by the app.";
+        continue;
+      }
+      for (const step of steps) contactsForResourceIds(step.resource_ids, snapshot.resource_catalog);
 
       steps = dedupeLeanPhaseSteps(steps, prior ?? null);
       if (steps.length === 0) {

@@ -14,6 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { RefinementChangeReview } from "./refinement-change-review";
 import type { RefinementChange } from "@/lib/domain/plan/refinement-review";
+import { PlanContactPicker } from "./plan-contact-picker";
+import type { PlanContact } from "@/lib/matching/plan-resources";
 import { Textarea } from "@/components/ui/textarea";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
@@ -28,8 +30,6 @@ import {
 import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 import {
   buildMainParagraph,
-  contactsFromEditable,
-  contactsToEditable,
   documentsFromEditable,
   documentsToEditable,
   formatContactDisplay,
@@ -39,7 +39,7 @@ import {
   parseMainParagraphOnSave,
 } from "@/features/families/plan-case-note-derive";
 
-type FocusField = "title" | "body" | "documents" | "contact" | "outcome" | null;
+type FocusField = "title" | "body" | "documents" | "outcome" | null;
 
 const sectionLabelClass =
   "text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]";
@@ -126,6 +126,7 @@ function DocumentField({
 
 export function PlanStepCaseNote({
   step,
+  directoryContacts = [],
   editing,
   onPatchStep,
   onPatchDetails,
@@ -153,6 +154,7 @@ export function PlanStepCaseNote({
   onOpenRefine,
 }: {
   step: PlanStepRow;
+  directoryContacts?: PlanContact[];
   editing: boolean;
   onPatchStep: (patch: Partial<PlanStepRow>) => void;
   onPatchDetails: (patch: Partial<PlanStepDetails>) => void;
@@ -187,7 +189,6 @@ export function PlanStepCaseNote({
   const mainParagraphRead = useMemo(() => buildMainParagraph(step), [step]);
   const [bodyDraft, setBodyDraft] = useState("");
   const documentsEditable = useMemo(() => documentsToEditable(d), [d]);
-  const contactEditable = useMemo(() => contactsToEditable(d.contacts), [d.contacts]);
   const outcomeEditable = d.expected_outcome?.trim() ?? "";
   const documentsDisplay = useMemo(() => formatDocumentsDisplay(d), [d]);
   const contactDisplay = useMemo(() => formatContactDisplay(d), [d]);
@@ -641,39 +642,15 @@ export function PlanStepCaseNote({
         {(contactDisplay || editing) && (
           <section className="space-y-1.5">
             <SectionLabel>Contact</SectionLabel>
-            {editing && focus === "contact" ? (
-              <div className="space-y-1.5">
-                <p className="text-xs text-[var(--color-ink-faint)]">
-                  One contact per line; separate name, phone, email, and notes with ·
-                </p>
-                <Textarea
-                  rows={Math.max(2, contactEditable.split(/\r?\n/).length + 1)}
-                  value={contactEditable}
-                  onChange={(e) => onPatchDetails({ contacts: contactsFromEditable(e.target.value) })}
-                  onBlur={() => setFocus(null)}
-                  className="min-h-[3rem] w-full resize-y border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-1 text-[15px] leading-relaxed text-[var(--color-ink-strong)] shadow-none focus-visible:ring-0"
-                  autoFocus
-                />
-              </div>
-            ) : !editing && contactDisplay ? (
-              <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{contactDisplay}</p>
-            ) : editing && !contactDisplay && focus !== "contact" ? (
-              <button
-                type="button"
-                onClick={() => setFocus("contact")}
-                className="w-full text-left text-[var(--color-ink-faint)] italic hover:bg-[var(--color-paper)]"
-              >
-                Add primary contact…
-              </button>
-            ) : editing && contactDisplay && focus !== "contact" ? (
-              <button
-                type="button"
-                onClick={() => setFocus("contact")}
-                className="w-full text-left text-[15px] leading-relaxed text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
-              >
-                {contactDisplay}
-              </button>
-            ) : null}
+            {editing ? (
+              <PlanContactPicker value={d.contacts ?? []} choices={directoryContacts} onChange={contacts => onPatchDetails({ contacts })} />
+            ) : (
+              <>
+                <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{contactDisplay}</p>
+                {(d.contacts ?? []).some(contact => !directoryContacts.some(choice => choice.source_resource_id === contact.source_resource_id && choice.source_updated_at === contact.source_updated_at)) &&
+                  <p className="text-xs text-[var(--color-ink-muted)]">A contact needs a current directory source. Edit this action to remove or reselect it before review.</p>}
+              </>
+            )}
           </section>
         )}
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { directoryCase, directoryId, directoryStamp } from "../../../tests/fixtures/directory-case";
 import { buildPlanningBrief, buildPlanningSnapshot, parsePlanningSnapshot } from "./planning-brief";
 import { startStagedLeanPlanGeneration, advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import { tryGenerateLeanPlanPhaseOpenAI } from "./openai-plan-lean-phase";
@@ -24,6 +25,7 @@ function fixture(): FamilyDetail {
 
 function stagedDatabase(initial?: PlanGenerationState) {
   let state = initial;
+  let directoryChanged = false;
   const counts: Record<string, number> = { "30": 0, "60": 0, "90": 0 };
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     if (name === "start_staged_plan_generation") {
@@ -40,13 +42,14 @@ function stagedDatabase(initial?: PlanGenerationState) {
     let phase = "30";
     const query = {
       select: () => query, order: () => query, limit: () => query,
+      in: async () => ({data:[{resource_id:directoryId,status:"accepted",resource:{active:true,is_demo:false,updated_at:directoryChanged ? "2026-10-14T00:00:00Z" : directoryStamp}}],error:null}),
       eq: (key: string, value: string) => { if (key === "phase") phase = value; return query; },
       maybeSingle: async () => ({ data: table === "plans" ? { id: planId, version: 1, created_at: stamp, generation_state: structuredClone(state), ai_model: null } : { sort_order: 0 }, error: null }),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({ count: counts[phase], error: null }).then(resolve),
     };
     return query;
   });
-  return { client: { rpc, from }, read: () => state };
+  return { client: { rpc, from }, read: () => state, changeDirectory: () => { directoryChanged = true; } };
 }
 
 describe("one durable planning snapshot", () => {
@@ -56,6 +59,21 @@ describe("one durable planning snapshot", () => {
       const phase = request.structuredJsonSchema!.name.slice(-2) as "30" | "60" | "90";
       return { ok: true, model: "test", text: JSON.stringify({ steps: [{ ...generatedPlanStep, phase }] }) };
     });
+  });
+
+  it.each(["before","during"])("refuses contacts changed %s the provider call without persisting a phase", async when => {
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({supabase:db.client});
+    mocks.detail.mockResolvedValue(directoryCase());
+    expect(await startStagedLeanPlanGeneration({familyId})).toMatchObject({ok:true});
+    if (when === "before") db.changeDirectory();
+    else vi.mocked(createAiResponse).mockImplementationOnce(async () => {
+      db.changeDirectory();
+      return {ok:true,model:"test",text:JSON.stringify({steps:[{...generatedPlanStep,resource_ids:[directoryId]}]})};
+    });
+    expect(await advanceStagedLeanPlanGeneration({familyId,planId})).toMatchObject({ok:false});
+    expect(db.read()!.status).toBe("failed");
+    expect(createAiResponse).toHaveBeenCalledTimes(when === "before" ? 0 : 1);
+    expect(db.client.rpc.mock.calls.filter(call=>call[0] === "append_staged_plan_phase")).toHaveLength(0);
   });
 
   it("anchors the prompt to the saved school date instead of the UTC date or the later resume day", async () => {
@@ -94,12 +112,12 @@ describe("one durable planning snapshot", () => {
 
   it("freezes resource recommendations and declares omitted matches without copying contact identifiers", () => {
     const detail = fixture();
-    detail.resourceMatches = Array.from({ length: 8 }, (_, i) => ({ status: "suggested", score: 8 - i, match_reason: "Reason ".repeat(30), resource: { active: true, is_demo: false, updated_at: stamp, program_name: `Program ${i}`, category: "Housing", primary_contact_phone: "215-555-0100", primary_contact_email: "staff@example.test" } })) as FamilyDetail["resourceMatches"];
+    detail.resourceMatches = Array.from({ length: 8 }, (_, i) => ({ status: "suggested", score: 8 - i, match_reason: "Reason ".repeat(30), resource: { id: `10000000-0000-4000-8000-00000000000${i}`, office_or_department: "Community office", active: true, is_demo: false, updated_at: stamp, program_name: `Program ${i}`, category: "Housing", primary_contact_phone: "215-555-0100", primary_contact_email: "staff@example.test" } })) as FamilyDetail["resourceMatches"];
     const snapshot = buildPlanningSnapshot(detail);
     detail.resourceMatches[0].resource!.program_name = "Changed resource";
     expect(snapshot.resources).toContain("Program 0");
     expect(snapshot.resources).toContain("2 additional matches omitted");
-    expect(snapshot.resources).toContain("[shortened]");
+    expect(snapshot.resources).toContain("Reason ".repeat(30));
     expect(snapshot.resources).not.toContain("215-555");
     expect(snapshot.resources).not.toContain("staff@example.test");
     expect(snapshot.resources).not.toContain("Changed resource");

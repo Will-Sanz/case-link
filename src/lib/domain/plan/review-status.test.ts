@@ -52,6 +52,11 @@ function plan(overrides: Partial<PlanWithSteps> = {}): PlanWithSteps {
 }
 
 describe("getPlanReviewStatus", () => {
+  it("blocks review and export after directory sources change or become unavailable", () => {
+    const reviewed = plan({resource_contacts_current:false,material_revision:"a".repeat(64),client_display:{reviewedAt:"2026-10-13T12:00:00Z",reviewedById:"owner",reviewedRevision:"a".repeat(64)}});
+    expect(isPlanReviewed(reviewed)).toBe(false);
+    expect(getPlanReviewStatus(reviewed)).toMatchObject({state:"needs_attention",issue:expect.stringContaining("directory contacts")});
+  });
   it("keeps a complete generated plan in needs-review until explicit approval", () => {
     expect(getPlanReviewStatus(plan()).state).toBe("needs_review");
     expect(isPlanReviewed(plan())).toBe(false);

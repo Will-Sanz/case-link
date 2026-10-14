@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { directoryCase, directoryId } from "../../../tests/fixtures/directory-case";
 import { buildAssistantCaseContext } from "./case-context";
 import { askCaseAssistant } from "./ai-case-assistant";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
@@ -35,9 +36,18 @@ function fixture(): FamilyDetail {
 
 describe("current case context for the assistant", () => {
   beforeEach(() => {
-    vi.mocked(createAiResponse).mockReset().mockResolvedValue({ ok: true, text: "Review the overdue checklist.", model: "test" });
+    vi.mocked(createAiResponse).mockReset().mockResolvedValue({ ok: true, text: JSON.stringify({answer: "Review the overdue checklist.", resource_ids: []}), model: "test" });
     mocks.session.mockReset().mockResolvedValue({ supabase: {} });
     mocks.detail.mockReset().mockResolvedValue(fixture());
+  });
+
+  it("withholds contacts dismissed while the assistant was responding", async () => {
+    mocks.detail.mockResolvedValue(directoryCase());
+    const lookup = {select:()=>lookup,eq:()=>lookup,in:async()=>({data:[],error:null})};
+    mocks.session.mockResolvedValue({supabase:{from:()=>lookup}});
+    vi.mocked(createAiResponse).mockResolvedValue({ok:true,model:"test",text:JSON.stringify({answer:"Confirm current intake options.",resource_ids:[directoryId]})});
+    expect(await askCaseAssistantAction(familyId,"Help plan intake")).toMatchObject({ok:false});
+    expect(createAiResponse).toHaveBeenCalledTimes(1);
   });
 
   it("uses live task dates, Waiting follow-ups, completion, and meeting/recording dates", () => {

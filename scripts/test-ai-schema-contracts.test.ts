@@ -10,8 +10,8 @@ describe("synthetic live-contract runner", () => {
       return Response.json({ status: "completed", output: [{ type: "message", status: "completed", content: [{ type: "output_text", text: body.input }] }], usage: { total_tokens: 100 } });
     });
     const result = await testAiSchemaContracts("synthetic", request);
-    expect(result).toHaveLength(8);
-    expect(request).toHaveBeenCalledTimes(8);
+    expect(result).toHaveLength(10);
+    expect(request).toHaveBeenCalledTimes(10);
     expect(result.every(item => item.passed)).toBe(true);
     expect(JSON.stringify(result)).not.toContain("Prepare documents");
   });

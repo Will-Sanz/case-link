@@ -141,6 +141,8 @@ export type PlanStepDetails = {
   checklist?: string[];
   required_documents?: string[];
   contacts?: Array<{
+    source_resource_id?: string;
+    source_updated_at?: string;
     name?: string;
     phone?: string;
     email?: string;
@@ -243,6 +245,7 @@ export type PlanGenerationSnapshot = {
   revision: string;
   brief: string;
   resources: string;
+  resource_catalog: import("@/lib/matching/plan-resources").ResourceCatalogEntry[];
 };
 
 /** Staged lean generation progress (plans.generation_state JSONB). */
@@ -279,6 +282,7 @@ export type PlanWithSteps = PlanRow & {
   /** Hashes from the same database snapshot as these rows; absent on legacy fixtures. */
   review_revision?: string;
   material_revision?: string;
+  resource_contacts_current?: boolean;
   steps: PlanStepRow[];
   /** Derived on the server for UI, avoids branching on raw `generation_source` in components. */
   presentation: {
