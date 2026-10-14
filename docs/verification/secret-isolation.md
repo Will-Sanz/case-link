@@ -1,8 +1,8 @@
 # Secret isolation and recovery — October 14, 2026
 
-CL-42 remains open. The application safeguards below pass locally; current hosted scope and live rotation do not.
+CL-42 remains open. Local safeguards and the new branch-specific preview configuration are verified; live rotation, old deployment snapshots and full hosted verification remain open.
 
-## Observed hosted configuration
+## Original hosted configuration (before isolation)
 
 Read-only inspection confirmed Vercel project `case-link` (`prj_1zxzzKu8eljHJvPd6gFY3LhyxwWc`) in team `team_wwXXIa3JR9qMrIBopTUBsG5J`. The connected environment-list API returned 403. The already authenticated CLI then returned names, types and target environments only; no values were decrypted, pulled, printed or changed.
 
@@ -18,6 +18,14 @@ Read-only inspection confirmed Vercel project `case-link` (`prj_1zxzzKu8eljHJvPd
 | Direct database credentials, vendor recovery/MFA material | Not listed in this metadata response | Restricted operator vault; never application or ordinary CI variables |
 
 The CLI labels stored entries “Encrypted”; that is not evidence of the current write-only Secret setting. Verify managed Secret type, Production-only scope, operator access/MFA and recovery ownership in the provider. The user has restored the configured production-intended Supabase project `zpfypkizsapvsxeykmdq`; [its legacy schema and separate staging preparation](hosted-database-preflight.md) still block release. The user-created Free staging project is `umnbyupudhunyccqhyrp`; its database and limited SQL role checks are complete. Owners, actual preview connection/credential separation, provider retention and key provenance remain pending. The shared entry targets are sufficient to block release; no comparison of secret values was needed or performed.
+
+## Staging isolation applied later on October 14
+
+The five original shared entries now target **Production only**, preserving their existing values without retrieving or printing them. The original OpenAI and service-role entries now use the provider's write-only Secret type. Preview and Development no longer inherit these entries. Eight non-secret settings are installed only for Preview branch `codex/school-pilot-readiness`: the staging URL and publishable key, its exact HTTPS branch origin, environment and production-project markers, and single-tenant/invite-only/HSTS posture. Other branches do not receive this approved staging configuration automatically.
+
+Each mutation was read back with `decrypt=false` and checked for the intended ID, target, type and branch. The connected environment API was unavailable, so the already authenticated CLI was used after confirming the project/team. [Metadata-only before/after evidence](2026-10-14-preview-environment.json) contains no credentials. This changes future build configuration; existing production and historical preview snapshots remain unchanged. The newest readiness build still has not succeeded.
+
+A separate staging OpenAI key is awaiting private entry by the operator into the branch's Preview Secret field. The legacy service-role key remains Production-only until the protected operator-vault/release step removes it from web hosting. Production markers, old cache/preview exposure, key provenance/rotation, operator MFA, actual hosted sign-in and AI/export remain open. Do not claim all secret isolation or the live site is fixed from this settings change.
 
 ## Implemented controls and measured evidence
 
@@ -40,4 +48,4 @@ A separate controlled provider test verifies: old credential works; provider rev
 5. With release authorization, rebuild/redeploy production with the new credential, verify controlled synthetic requests, then revoke the old credential. Confirm the retired key fails without recording it. A rollback build must also receive the new key; do not revive the retired secret by promoting an old environment snapshot.
 6. Record timestamps, provider key identifiers, deployment IDs, verification results and operator approval. Keep any recovery copy under the restricted vault policy, and remove retired access after the observation window. A failed rollout pauses invitations and AI as appropriate; it does not justify restoring a compromised key.
 
-Use modern Supabase publishable/secret keys when the project supports them and verify every consumer before retiring legacy keys. Do not rotate the shared legacy JWT signing secret as a casual API-key replacement: it affects Auth and legacy clients. See [Supabase API keys](https://supabase.com/docs/guides/getting-started/api-keys) and [signing-key migration](https://supabase.com/docs/guides/auth/signing-keys). Vercel documents [sensitive environment variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables). No live rotation, hosted settings change or production promotion occurred in this work.
+Use modern Supabase publishable/secret keys when the project supports them and verify every consumer before retiring legacy keys. Do not rotate the shared legacy JWT signing secret as a casual API-key replacement: it affects Auth and legacy clients. See [Supabase API keys](https://supabase.com/docs/guides/getting-started/api-keys) and [signing-key migration](https://supabase.com/docs/guides/auth/signing-keys). Vercel documents [sensitive environment variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables). No live rotation or production promotion occurred; the branch-specific staging settings described above were applied.
