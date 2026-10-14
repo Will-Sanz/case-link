@@ -27,7 +27,7 @@
   "smtpConfigured": true,
   "limits": [
     "Shared provider account/domain still shares quota and email reputation; staging uses a separate key and sender label",
-    "Invitation delivery is verified; completed password/recovery/MFA and school-mailbox behavior remain open",
+    "Invitation, private initial-password setup, password sign-in and password-change notification are verified; hosted recovery, MFA challenge and school-mailbox behavior remain open",
     "No paid service created, upgrade, existing-key change or production SMTP change"
   ],
   "tracking": {
