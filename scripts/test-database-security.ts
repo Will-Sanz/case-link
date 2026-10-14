@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Client, Pool, type PoolClient } from "pg";
+import { selectNextFamilyWork } from "../src/lib/domain/family-workspace/next-work";
 import type { PlanWithSteps } from "../src/types/family";
 import { updatePlanStepSchema, updatePlanStepActionItemSchema } from "../src/lib/validations/plans";
 
@@ -65,6 +66,55 @@ async function revisionFor(userId: string, familyId: string): Promise<string> {
 }
 async function canExport(revision: string): Promise<boolean> {
   return asUser(userA, async client => (await client.query("select public.is_reviewed_plan_revision($1, $2, $3) allowed", [familyA, planA, revision])).rows[0].allowed);
+}
+
+async function checkLargeFamilyLists() {
+  const ids = Array.from({ length: 100 }, () => randomUUID());
+  try {
+    await admin.query("insert into public.families(id,name,created_by_id) select id,'Synthetic scale case',$2 from unnest($1::uuid[]) id", [ids,userA]);
+    await admin.query("insert into public.plans(family_id,version,generation_source) select id,version,'rules' from unnest($1::uuid[]) id cross join generate_series(1,12) version", [ids]);
+    await admin.query(`insert into public.plan_steps(plan_id,phase,title,description,sort_order,due_date,details,workflow_data)
+      select p.id,'30','Synthetic goal','Synthetic description',n,'2026-11-10','{"action_needed_now":"Review legacy goal"}','{"needs_escalation":true}'
+      from public.plans p cross join generate_series(0,15) n where p.family_id=any($1::uuid[]) and p.version=12`,[ids]);
+    await admin.query(`insert into public.plan_step_action_items(plan_step_id,title,week_index,sort_order,status,target_date,follow_up_date)
+      select s.id,'Synthetic action ' || n,1,n,
+        case when s.sort_order=0 and n=0 then 'completed' when n=0 then 'blocked' else 'pending' end,
+        case when n=0 then date '2020-01-01' when s.sort_order=15 and n=2 then date '2026-11-03' else date '2026-11-20' end,
+        case when n=0 then date '2026-11-30' else null end
+      from public.plan_steps s join public.plans p on p.id=s.plan_id cross join generate_series(0,2) n
+      where p.family_id=any($1::uuid[]) and p.version=12`,[ids]);
+    await admin.query(`insert into public.plan_steps(plan_id,phase,title,description,sort_order,due_date)
+      select p.id,'30','Obsolete version work','Historical description',0,'2020-01-01' from public.plans p where p.family_id=any($1::uuid[]) and p.version<12`,[ids]);
+    const fixtureCounts = (await admin.query(`select (select count(*)::int from public.plans where family_id=any($1::uuid[])) plans,
+      count(distinct s.id)::int goals,count(a.id)::int actions from public.plan_steps s join public.plans p on p.id=s.plan_id
+      left join public.plan_step_action_items a on a.plan_step_id=s.id where p.family_id=any($1::uuid[])`,[ids])).rows[0];
+    assert.ok(fixtureCounts.plans>1000 && fixtureCounts.goals>1000 && fixtureCounts.actions>1000);
+    await admin.query("delete from public.plans where family_id=$1",[ids[0]]);
+    await admin.query("delete from public.plan_step_action_items where plan_step_id in(select s.id from public.plan_steps s join public.plans p on p.id=s.plan_id where p.family_id=$1)",[ids[1]]);
+    await admin.query("update public.plan_step_action_items set status='completed' where plan_step_id in(select s.id from public.plan_steps s join public.plans p on p.id=s.plan_id where p.family_id=$1)",[ids[2]]);
+    await admin.query("update public.plan_step_action_items set target_date=null,follow_up_date=null where plan_step_id in(select s.id from public.plan_steps s join public.plans p on p.id=s.plan_id where p.family_id=$1)",[ids[3]]);
+    const expected = new Map<string, ReturnType<typeof selectNextFamilyWork>>();
+    for (const row of (await admin.query("select id,public.get_family_plan_snapshot(id) snapshot from unnest($1::uuid[]) id",[ids])).rows) {
+      expected.set(row.id,selectNextFamilyWork(row.snapshot.plan?.steps ?? []));
+    }
+    assert.deepEqual(selectNextFamilyWork((await snapshotFor(userA,ids[99])).plan.steps),expected.get(ids[99]),"the full source agrees under staff authorization");
+    const measurements = [];
+    for (const count of [0,1,10,100]) {
+      const start = performance.now();
+      const result = await asUser(userA,client=>client.query("select * from public.get_family_next_work($1)",[ids.slice(0,count)]));
+      measurements.push({families:count,rows:result.rowCount,bytes:Buffer.byteLength(JSON.stringify(result.rows)),milliseconds:Math.round(performance.now()-start)});
+      assert.equal(result.rowCount,count);
+      for (const row of result.rows) assert.deepEqual(row.current_step,expected.get(row.family_id),"bounded summary matches the complete authorized plan");
+    }
+    const concurrent = await Promise.all([asUser(userA,client=>client.query("select * from public.get_family_next_work($1)",[ids])),
+      asUser(userB,client=>client.query("select * from public.get_family_next_work($1)",[[...ids.slice(0,99),familyB]]))]);
+    assert.equal(concurrent[0].rowCount,100);
+    assert.deepEqual(concurrent[1].rows.map(row=>row.family_id),[familyB],"concurrent staff only see their own families");
+    await expectDbError(()=>asUser(userA,client=>client.query("select * from public.get_family_next_work($1)",[[...ids,familyA]])),"requests are bounded to a supported 100-family page");
+    console.log("Next-work local scale evidence:",JSON.stringify({fixtureCounts,measurements}));
+  } finally {
+    await admin.query("delete from public.families where id=any($1::uuid[])",[ids]);
+  }
 }
 
 async function checkAiBudgetJourneys() {
@@ -365,6 +415,7 @@ async function setup() {
 
 async function run() {
   await setup();
+  await checkLargeFamilyLists();
   assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 
   // PostgREST uses PostgreSQL's JSON timestamp representation, including microseconds and offsets.

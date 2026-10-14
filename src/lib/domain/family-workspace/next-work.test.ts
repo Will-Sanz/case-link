@@ -108,4 +108,11 @@ describe("selectNextFamilyWork", () => {
     expect(selectNextFamilyWork([step({ status: "pending", action_items: [action({ status: "completed" })] })])).toBeNull();
   });
 
+  it("breaks same-date/order ties by stable IDs regardless of input order", () => {
+    const first = step({ id: "step-a", action_items: [action({ id: "action-b", title: "Second" }), action({ id: "action-a", title: "First" })] });
+    const second = step({ id: "step-b", action_items: [action({ title: "Other goal" })] });
+    expect(selectNextFamilyWork([second, first])?.action_needed_now).toBe("First");
+    expect(selectNextFamilyWork([first, second])?.action_needed_now).toBe("First");
+    expect(selectNextFamilyWork([step({ id: "step-b", action_items: [] }), step({ id: "step-a", action_items: [] })])?.id).toBe("step-a");
+  });
 });

@@ -525,11 +525,15 @@ The committed seed is explicitly synthetic; the actual hosted catalog was not in
 
 **Close with:** case-manager-reviewed coverage for the pilot's common barriers, verified contacts/source dates, demo-data exclusion, no-resource cases, inactive/dismissed resources, and source-backed factual claims. **Sources:** [seed policy](/Users/willsanz/homelessness-project/data/README.md), [matching rules](/Users/willsanz/homelessness-project/src/lib/matching/engine.ts), [resource matching action](/Users/willsanz/homelessness-project/src/app/actions/resource-matches.ts).
 
-### [ ] CL-37 — Prevent larger lists from silently losing next-action data
+### [x] CL-37 — Prevent larger lists from silently losing next-action data
 
 **Type:** Fix + Verify · **Responsible:** engineering.
 
-Family-list enrichment fetches all versions for the listed families, then their steps/actions without explicit result paging. The local API cap is 1,000 rows and supported family page size reaches 100. A 100-family page with 15 steps each already exceeds that step cap; even the default page can accumulate enough action rows or historical versions to cross it. The actual hosted cap is unverified.
+**Completed October 13, 2026 — engineering:** one security-invoker database request now returns at most one next-work summary per visible family, using only its latest plan. Stable ID ties preserve consistent ordering; Waiting uses the next follow-up date, completed tasks stay completed, and actionless legacy goals still work. Malformed/missing summaries fail visibly instead of showing an empty workload. Child read policies reuse authorized parent rows, preserving RLS and removing repeated nested permission checks.
+
+**Evidence:** 22 focused tests and the local database security suite pass. Fixtures contain 100 families, 1,200 plan versions, 2,700 goals, and 4,800 actions; every summary matches the complete source. Tests cover 0/1/10/100-family responses, concurrent staff, foreign families, no plan, legacy goals, all-completed work, undated work, and equal-date ties. After a clean migration rebuild, local response measurements were 5/62/331/582 ms respectively; the 100-family response was 27,104 bytes. The initial 100-family query took 19,473 ms; reusing authorized parents removed that bottleneck. These are local measurements, not a hosted SLA. Full session/MFA/offboarding and mutation-isolation tests still pass, and database advisors report no warnings. Normal correctness/security/performance and separate Ponytail deletion reviews completed; full verification runs before push. Commit: `git log --grep='CL-37'`.
+
+Original finding: family-list enrichment fetches all versions for the listed families, then their steps/actions without explicit result paging. The local API cap is 1,000 rows and supported family page size reaches 100. A 100-family page with 15 steps each already exceeds that step cap; even the default page can accumulate enough action rows or historical versions to cross it. The actual hosted cap is unverified.
 
 **Fix:** fetch only the latest relevant plan and bounded next-work data, or explicitly page the child queries. Prefer a small targeted query/RPC over downloading every historical version. Keep authorization on the database path.
 
@@ -712,7 +716,7 @@ For future blank-PDF filling, create a separate validated scope: approved blank 
 | Hosted operation and recovery | Open | CL-36 and current runbook evidence |
 | Managed hosting and release control | Open | CL-41; exact candidate checks gate production; isolated staging; verified rollback |
 | Production secrets and recovery access | Open | CL-42; scoped managed storage; leak checks; rotation/revocation evidence |
-| Larger-case-list behavior | Open | CL-37 synthetic scale results |
+| Larger-case-list behavior | Engineering verified | CL-37 synthetic scale results; hosted response observation at release |
 | Accurate scope and staff guidance | Open | CL-12 and pilot training material |
 
 ### Final pilot launch decision

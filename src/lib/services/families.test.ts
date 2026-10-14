@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
-import { getFamilyDetail } from "./families";
+import { enrichFamiliesWithCurrentStep, getFamilyDetail } from "./families";
 
 function clientWithFailure(failedTable?: string, missingFamily = false) {
   return {
@@ -33,5 +33,31 @@ describe("getFamilyDetail", () => {
     expect(detail?.name).toBe("Snapshot label");
     expect(detail?.plan?.steps).toHaveLength(1);
     expect(detail?.plan?.steps[0].action_items).toEqual([]);
+  });
+});
+
+describe("bounded family next-work summaries", () => {
+  const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
+  const items = ids.map(id => ({ id, name: "Family label" })) as import("@/types/family").FamilyListItem[];
+  function summaryClient(data: unknown, error: unknown = null) {
+    return { rpc: vi.fn().mockResolvedValue({ data, error }) } as unknown as SupabaseClient;
+  }
+  it("joins summaries by ID, preserves list order, and accepts genuinely empty work", async () => {
+    const work = { id: ids[0], title: "Housing goal", phase: "30", status: "blocked", due_date: "2026-11-02", action_needed_now: "Follow up", is_blocked: true, is_escalated: false };
+    const client = summaryClient([{ family_id: ids[1], current_step: null }, { family_id: ids[0], current_step: work }]);
+    const result = await enrichFamiliesWithCurrentStep(client, items);
+    expect(result.map(row => row.current_step)).toEqual([work, null]);
+    expect(client.rpc).toHaveBeenCalledExactlyOnceWith("get_family_next_work", { p_family_ids: ids });
+    expect(await enrichFamiliesWithCurrentStep(client, [])).toEqual([]);
+    expect(client.rpc).toHaveBeenCalledTimes(1);
+  });
+  it.each([null, [], [{ family_id: ids[0], current_step: null }],
+    ids.map(() => ({ family_id: ids[0], current_step: null })),
+    [{ family_id: ids[0], current_step: { id: ids[0] } }],
+  ])("refuses missing, duplicate, or malformed summaries: %j", async data => {
+    await expect(enrichFamiliesWithCurrentStep(summaryClient(data), items)).rejects.toThrow();
+  });
+  it("propagates a database failure instead of showing no work", async () => {
+    await expect(enrichFamiliesWithCurrentStep(summaryClient(null, { message: "Unavailable" }), items)).rejects.toThrow("Unavailable");
   });
 });

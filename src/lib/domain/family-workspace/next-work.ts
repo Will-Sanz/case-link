@@ -43,7 +43,8 @@ export function selectNextFamilyWork(
     if (a.step.sort_order !== b.step.sort_order) {
       return a.step.sort_order - b.step.sort_order;
     }
-    return a.action.sort_order - b.action.sort_order;
+    return a.action.sort_order - b.action.sort_order
+      || a.step.id.localeCompare(b.step.id) || a.action.id.localeCompare(b.action.id);
   });
 
   const nextAction = actionCandidates[0];
@@ -57,7 +58,7 @@ export function selectNextFamilyWork(
       due_date: actionTargetDate(action),
       action_needed_now: action.title,
       is_blocked: action.status === "blocked" || step.status === "blocked",
-      is_escalated: Boolean(step.workflow_data?.needs_escalation),
+      is_escalated: step.workflow_data?.needs_escalation === true,
     };
   }
 
@@ -65,7 +66,7 @@ export function selectNextFamilyWork(
     .filter((step) => OPEN_STATUSES.has(step.status) && !step.action_items?.length)
     .toSorted((a, b) => {
       const dateOrder = compareOptionalDates(a.due_date, b.due_date);
-      return dateOrder !== 0 ? dateOrder : a.sort_order - b.sort_order;
+      return dateOrder || a.sort_order - b.sort_order || a.id.localeCompare(b.id);
     })[0];
 
   if (!nextStep) return null;
@@ -78,6 +79,6 @@ export function selectNextFamilyWork(
     due_date: nextStep.due_date,
     action_needed_now: nextStep.details?.action_needed_now || nextStep.title,
     is_blocked: nextStep.status === "blocked",
-    is_escalated: Boolean(nextStep.workflow_data?.needs_escalation),
+    is_escalated: nextStep.workflow_data?.needs_escalation === true,
   };
 }
