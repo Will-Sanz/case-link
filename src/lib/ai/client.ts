@@ -14,6 +14,7 @@ import { isAllowedOpenAiModelId, OPENAI_MODELS } from "@/lib/ai/model-allowlist"
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
 import { getEnv } from "@/lib/env";
 import { isDev } from "@/lib/env/runtime";
+import { aiBudgetMessage } from "@/lib/rate-limit/ai-budget-message";
 import { consumeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
@@ -116,15 +117,6 @@ export async function createAiResponse(
   }
 
   const meta = options.requestMeta;
-  const budget = await consumeOpenAiRateSlot(options.taskType);
-  if (!budget.allowed) {
-    const msg = "Too many AI requests. Please wait a minute and try again.";
-    if (meta) {
-      logOpenAiUsage(meta, options.taskType, "(rate_limited)", { ok: false, error: msg }, 0);
-    }
-    return { ok: false, error: msg, code: "rate_limited", retryAfter: budget.retryAfter };
-  }
-
   const mode = parseAiMode(options.aiMode);
   const modelOverride = env.OPENAI_MODEL_OVERRIDE?.trim();
   const model = modelOverride || getModelForTask(options.taskType, mode);
@@ -142,6 +134,9 @@ export async function createAiResponse(
     env.OPENAI_MAX_OUTPUT_TOKENS >= 256
       ? Math.min(32_768, Math.floor(env.OPENAI_MAX_OUTPUT_TOKENS))
       : 8192;
+  if (!Number.isInteger(requestedMax) || requestedMax < 1) {
+    return { ok: false, error: "Invalid AI response size. Try again with the default settings." };
+  }
   const maxTokens = Math.min(requestedMax, outputCap, OPENAI_MODELS[model].maxOutputTokens);
 
   const inputSummary = summarizeInput(options.input);
@@ -159,6 +154,15 @@ export async function createAiResponse(
     }
     return { ok: false, error: exposeAiErrorToClient(err, envDebug) };
   }
+  const budget = await consumeOpenAiRateSlot(options.taskType);
+  if (!budget.allowed) {
+    const msg = aiBudgetMessage(budget);
+    if (meta) {
+      logOpenAiUsage(meta, options.taskType, "(rate_limited)", { ok: false, error: msg }, 0);
+    }
+    return { ok: false, error: msg, code: "rate_limited", retryAfter: budget.retryAfter };
+  }
+
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
   const debug = envDebug;

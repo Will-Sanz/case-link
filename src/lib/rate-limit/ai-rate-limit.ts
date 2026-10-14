@@ -1,15 +1,15 @@
 import "server-only";
 
 import type { AiTaskType } from "@/lib/ai/models";
-import { isProd } from "@/lib/env/runtime";
+import { z } from "zod";
 import { logServerError } from "@/lib/logger/server-error";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-type SharedBudgetResult = {
-  allowed: boolean;
-  retryAfter: number;
-  reason?: string;
-};
+const budgetSchema = z.discriminatedUnion("allowed", [
+  z.object({ allowed: z.literal(true), retryAfter: z.literal(0) }),
+  z.object({ allowed: z.literal(false), retryAfter: z.number().int().min(1).max(86400), reason: z.enum(["operation", "user_hour", "deployment_day", "disabled", "control_unavailable"]) }),
+]);
+type SharedBudgetResult = z.infer<typeof budgetSchema>;
 
 function budgetForTask(taskType: AiTaskType): { operation: string; weight: number } {
   if (taskType === "plan_phase_generation") return { operation: "plan_phase", weight: 2 };
@@ -19,7 +19,7 @@ function budgetForTask(taskType: AiTaskType): { operation: string; weight: numbe
   return { operation: "chat", weight: 1 };
 }
 
-/** Consume the shared Postgres budget. Production fails closed if the control is unavailable. */
+/** Consume the shared Postgres budget. Fails closed if the control is unavailable. */
 export async function consumeOpenAiRateSlot(taskType: AiTaskType): Promise<SharedBudgetResult> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -30,20 +30,9 @@ export async function consumeOpenAiRateSlot(taskType: AiTaskType): Promise<Share
     });
     if (error) throw error;
 
-    const value = data as Partial<SharedBudgetResult> | null;
-    if (typeof value?.allowed !== "boolean") throw new Error("Invalid AI budget response");
-    return {
-      allowed: value.allowed,
-      retryAfter:
-        typeof value.retryAfter === "number" && Number.isFinite(value.retryAfter)
-          ? Math.max(1, Math.ceil(value.retryAfter))
-          : 60,
-      reason: typeof value.reason === "string" ? value.reason : undefined,
-    };
+    return budgetSchema.parse(data);
   } catch (error) {
     logServerError("consumeOpenAiRateSlot", error);
-    return isProd()
-      ? { allowed: false, retryAfter: 60, reason: "control_unavailable" }
-      : { allowed: true, retryAfter: 0 };
+    return { allowed: false, retryAfter: 60, reason: "control_unavailable" };
   }
 }

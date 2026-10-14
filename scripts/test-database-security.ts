@@ -67,6 +67,59 @@ async function canExport(revision: string): Promise<boolean> {
   return asUser(userA, async client => (await client.query("select public.is_reviewed_plan_revision($1, $2, $3) allowed", [familyA, planA, revision])).rows[0].allowed);
 }
 
+async function checkAiBudgetJourneys() {
+  const scopes = [`user:${userA}:%`, `user:${userB}:%`];
+  const originalDaily = (await admin.query("select * from private.ai_rate_counters where scope_key='deployment:day'")).rows;
+  const originalEnabled = (await admin.query("select ai_enabled from private.production_controls where singleton")).rows[0].ai_enabled;
+  async function counters() {
+    return (await admin.query("select scope_key,window_start,window_seconds,used from private.ai_rate_counters where scope_key like any($1::text[]) or scope_key='deployment:day' order by scope_key,window_start", [scopes])).rows;
+  }
+  async function clearCounters() {
+    await admin.query("delete from private.ai_rate_counters where scope_key like any($1::text[]) or scope_key='deployment:day'",[scopes]);
+  }
+  async function consume(user: string, operation: string, weight: number) {
+    return (await asUser(user, client => client.query("select public.consume_ai_budget($1,$2) budget", [operation,weight]))).rows[0].budget;
+  }
+  try {
+    await clearCounters();
+    await admin.query("update private.production_controls set ai_enabled=true where singleton");
+    await Promise.all([userA,userB].map(async user => {
+      for (let i=0;i<8;i++) assert.equal((await consume(user,"plan_phase",2)).allowed,true,"two full plans and two malformed-phase repairs fit the pilot allowance");
+      for (let i=0;i<2;i++) assert.equal((await consume(user,"plan",2)).allowed,true,"ordinary refinements remain available after generation");
+      assert.equal((await consume(user,"chat",1)).allowed,true);
+    }));
+    const beforeLocalDenial = await counters();
+    const local = await consume(userA,"plan_phase",2);
+    assert.equal(local.allowed,false); assert.equal(local.reason,"operation"); assert.ok(local.retryAfter>0 && local.retryAfter<=600);
+    assert.deepEqual(await counters(),beforeLocalDenial,"rejected phase does not charge any counter");
+    await admin.query("update private.ai_rate_counters set used=120 where scope_key=$1",[`user:${userA}:hour`]);
+    const beforeHourlyDenial = await counters();
+    assert.equal((await consume(userA,"chat",1)).reason,"user_hour");
+    assert.deepEqual(await counters(),beforeHourlyDenial,"hourly denial rolls back the operation reservation");
+    await admin.query("update private.ai_rate_counters set used=2000 where scope_key='deployment:day'");
+    const beforeDailyDenial = await counters();
+    assert.equal((await consume(userB,"chat",1)).reason,"deployment_day");
+    assert.deepEqual(await counters(),beforeDailyDenial,"daily denial rolls back both user reservations");
+    await admin.query("update private.production_controls set ai_enabled=false where singleton");
+    assert.equal((await consume(userB,"chat",1)).reason,"disabled");
+    assert.deepEqual(await counters(),beforeDailyDenial,"disabled AI does not consume limits");
+    await clearCounters();
+    await admin.query("update private.production_controls set ai_enabled=true where singleton");
+    await admin.query("insert into private.ai_rate_counters(scope_key,window_start,window_seconds,used) values('deployment:day',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',86400,1996)");
+    const race = await Promise.all(Array.from({length:20},(_,i)=>consume(i%2 ? userA:userB,"plan_phase",2)));
+    assert.equal(race.filter(result=>result.allowed).length,2,"concurrent users cannot overspend the remaining daily budget");
+    const lastCounters = await counters();
+    assert.equal(lastCounters.find(row=>row.scope_key==='deployment:day').used,2000);
+    assert.equal(lastCounters.filter(row=>row.scope_key.endsWith(':operation:plan_phase')).reduce((sum,row)=>sum+row.used,0),4,"losing requests do not consume operation quota");
+    assert.equal(lastCounters.filter(row=>row.scope_key.endsWith(':hour')).reduce((sum,row)=>sum+row.used,0),4,"losing requests do not consume hourly quota");
+  } finally {
+    await clearCounters();
+    for (const row of originalDaily) await admin.query("insert into private.ai_rate_counters(scope_key,window_start,window_seconds,used) values($1,$2,$3,$4)",[row.scope_key,row.window_start,row.window_seconds,row.used]);
+    await admin.query("update private.production_controls set ai_enabled=$1 where singleton",[originalEnabled]);
+  }
+  console.log("AI budgets: complete journeys, repairs, accurate limits, and atomic concurrent reservations passed.");
+}
+
 async function checkAtomicPlanEdits() {
   const step2 = randomUUID();
   const action2 = randomUUID();
@@ -1049,6 +1102,7 @@ async function run() {
     "direct action-item writes cannot bypass obvious-identifier DLP",
   );
 
+  await checkAiBudgetJourneys();
   const budgetResults = await Promise.all(
     Array.from({ length: 10 }, () => asUser(userB, async (client) => {
       const result = await client.query<{ consume_ai_budget: { allowed: boolean } }>(

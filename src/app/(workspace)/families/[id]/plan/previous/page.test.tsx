@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ rpc: mocks.rpc }) }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not found"); } }));
 const id = "20000000-0000-4000-8000-000000000002";
-beforeEach(() => mocks.rpc.mockReset());
+beforeEach(() => { mocks.rpc.mockReset(); });
 it("shows the exact saved prior work as read-only reference, including waiting and completed outcomes", async () => {
   mocks.rpc.mockResolvedValue({ data: { version: 2, steps: [{ id: "step", title: "Housing", description: "Prepare the agreed checklist", details: { expected_outcome: "Intake ready" }, action_items: [
     { id: "done", title: "Finish intake", status: "completed", target_date: "2026-10-01", outcome: "Intake completed" },

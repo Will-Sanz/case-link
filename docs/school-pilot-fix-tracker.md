@@ -287,7 +287,7 @@ Application authentication and family-level row policies are good foundations, b
 
 **Close with:** independently fail parent, step, action-item, resource, and progress queries; show an explicit retry state and prohibit consequential writes using incomplete context. **Source:** [family detail loader](/Users/willsanz/homelessness-project/src/lib/services/families.ts:299).
 
-### [ ] CL-10 — Budget AI around complete staff journeys
+### [x] CL-10 — Budget AI around complete staff journeys
 
 **Type:** Fix · **Responsible:** engineering + service owner.
 
@@ -296,6 +296,10 @@ A plan phase costs two units and the per-user phase limit is six units per ten-m
 **Fix:** set measured limits for a complete plan plus ordinary repair/refinement work; retain shared server-side abuse/cost controls. Return a safe reason and actual retry time through callers. Reject invalid oversized input before charging its generation budget; avoid duplicate charges for duplicate jobs where appropriate.
 
 **Close with:** two consecutive family plans, malformed-output repair, local quota, global quota, AI-disabled state, unavailable control, and concurrent-user tests. Show accurate recovery without losing completed stages. **Sources:** [rate policy](/Users/willsanz/homelessness-project/src/lib/rate-limit/ai-rate-limit.ts), [shared counters](/Users/willsanz/homelessness-project/supabase/migrations/20260804173443_production_hardening.sql:720), [AI client](/Users/willsanz/homelessness-project/src/lib/ai/client.ts).
+
+**Completed October 13, 2026 — engineering:** the pilot phase allowance supports two complete plans plus two phase repairs per ten-minute window (16 units); refinements allow six requests (12 units) in a separate ten-minute window. Existing chat, per-user hourly, and deployment daily ceilings remain. All three database counters now reserve atomically; any local/hourly/daily rejection leaves every counter unchanged. Invalid model/size/input requests fail before charging, and malformed/unavailable budget controls fail closed in every environment. Safe messages explain the specific limit and its actual retry period, or disabled/unavailable AI, through the existing caller error flow. Busy/duplicate jobs remain protected by CL-32 leases.
+
+**Evidence:** tests exercise two complete journeys with repairs/refinements for concurrent staff, malformed phase recovery in the same version without duplicate tasks, invalid/oversized preflight, missing/malformed controls, disabled AI, accurate waits, and a 20-request race for the last daily slots. Local/hourly/global denials preserve exact counters. Local database integration and security/performance advisors pass; full verification runs before push. These are request-unit limits, not a dollar spending guarantee; the provider project spending cap and operator alert rehearsal remain CL-42/CL-36. Correctness/security and separate Ponytail reviews completed. Commit: `git log --grep='CL-10'`.
 
 ### [x] CL-12 — Reconcile product scope and remove proven unused paths
 

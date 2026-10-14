@@ -114,3 +114,21 @@ describe("AI terminal results", () => {
     expect(await createAiResponse(options)).toMatchObject({ ok: false, code: "invalid_response" });
   });
 });
+
+describe("budget preflight and recovery messages", () => {
+  it.each(["oversized", "invalid model", "invalid output size"])("rejects %s without spending a request allowance", async kind => {
+    const input = { ...options };
+    if (kind === "oversized") input.input = "x".repeat(120_001);
+    if (kind === "invalid model") mocks.env.OPENAI_MODEL_OVERRIDE = "unsupported-model";
+    expect(await createAiResponse({ ...input, ...(kind === "invalid output size" ? { maxTokens: -1 } : {}) })).toMatchObject({ ok: false });
+    expect(mocks.budget).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["operation", 480, "8 minutes"], ["user_hour", 3300, "55 minutes"], ["deployment_day", 7200, "2 hours"], ["disabled", 3600, "turned off"], ["control_unavailable", 60, "could not be checked"],
+  ] as const)("preserves %s recovery without making a provider request", async (reason, retryAfter, message) => {
+    mocks.budget.mockResolvedValue({ allowed: false, reason, retryAfter });
+    expect(await createAiResponse(options)).toMatchObject({ ok: false, code: "rate_limited", retryAfter, error: expect.stringContaining(message) });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+});

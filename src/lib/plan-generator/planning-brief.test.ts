@@ -125,6 +125,20 @@ describe("one durable planning snapshot", () => {
     }
   });
 
+  it("repairs a malformed phase by resuming the same version and snapshot without duplicate tasks", async () => {
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
+    await startStagedLeanPlanGeneration({ familyId });
+    const snapshot = structuredClone(db.read()!.input_snapshot);
+    vi.mocked(createAiResponse).mockResolvedValueOnce({ ok: true, model: "test", text: "not valid JSON" });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: false, status: "failed" });
+    expect(db.read()!.status).toBe("failed");
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, phaseCompleted: "30" });
+    expect(db.read()!.input_snapshot).toEqual(snapshot);
+    expect(createAiResponse).toHaveBeenCalledTimes(2);
+    expect(db.client.rpc.mock.calls.filter(call => call[0] === "start_staged_plan_generation")).toHaveLength(1);
+    expect(db.client.rpc.mock.calls.filter(call => call[0] === "append_staged_plan_phase")).toHaveLength(1);
+  });
+
   it("returns busy without a provider request or releasing another request's lease", async () => {
     const db = stagedDatabase(); db.client.rpc.mockResolvedValueOnce({ data: false, error: null });
     mocks.session.mockResolvedValue({ supabase: db.client });
