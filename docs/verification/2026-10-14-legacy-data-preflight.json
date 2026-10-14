@@ -1,0 +1,288 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "readOnly": true,
+  "scope": "Aggregate existing-row compatibility counts only; no row content or IDs; not a backup or upgrade approval",
+  "initialQueryCorrection": "Removed activity_log.source check from read-only legacy query because the column is added by the upgrade; it remains checked within the upgrade transaction.",
+  "results": [
+    {
+      "check_name": "activity_log_action_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "activity_log_details_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "app_users_preferred_contact_method_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "case_notes_body_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "case_notes_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "case_progress_updates_family_consistency",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "case_progress_updates_plan_changes_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "case_progress_updates_summary_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "families_household_notes_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "families_name_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "families_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "families_summary_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_barriers_label_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_barriers_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_barriers_preset_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_barriers_sort_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_goals_label_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_goals_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_goals_preset_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_goals_sort_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_members_age_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_members_display_name_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_members_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_members_notes_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "family_members_relationship_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_description_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_no_direct_identifiers_check",
+      "violating_rows": 39
+    },
+    {
+      "check_name": "plan_step_action_items_notes_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_outcome_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_sort_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_status_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_title_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_action_items_week_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_step_activity_family_consistency",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_ai_helper_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_description_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_details_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_no_direct_identifiers_check",
+      "violating_rows": 58
+    },
+    {
+      "check_name": "plan_steps_priority_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_sort_order_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_title_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plan_steps_workflow_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plans_ai_model_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plans_client_display_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plans_generation_state_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plans_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plans_summary_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "plans_version_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "referrals_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "referrals_organization_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "referrals_text_size_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "resource_matches_family_consistency",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "resource_matches_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "resource_matches_reason_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "resource_matches_score_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "tasks_description_length_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "tasks_family_consistency",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "tasks_no_direct_identifiers_check",
+      "violating_rows": 0
+    },
+    {
+      "check_name": "tasks_title_length_check",
+      "violating_rows": 0
+    }
+  ],
+  "fieldBreakdown": [
+    {
+      "table_name": "plan_step_action_items",
+      "field_name": "description",
+      "violating_rows": 31
+    },
+    {
+      "table_name": "plan_step_action_items",
+      "field_name": "notes",
+      "violating_rows": 0
+    },
+    {
+      "table_name": "plan_step_action_items",
+      "field_name": "outcome",
+      "violating_rows": 0
+    },
+    {
+      "table_name": "plan_step_action_items",
+      "field_name": "title",
+      "violating_rows": 8
+    },
+    {
+      "table_name": "plan_steps",
+      "field_name": "description",
+      "violating_rows": 40
+    },
+    {
+      "table_name": "plan_steps",
+      "field_name": "details_without_contacts",
+      "violating_rows": 22
+    },
+    {
+      "table_name": "plan_steps",
+      "field_name": "title",
+      "violating_rows": 0
+    },
+    {
+      "table_name": "plan_steps",
+      "field_name": "workflow_data",
+      "violating_rows": 0
+    }
+  ],
+  "fieldBreakdownMethod": "Same validation_pattern CTE as legacy-data-preflight.sql; lateral VALUES for the named fields, grouped counts only. A row may match multiple fields.",
+  "fieldBreakdownQuerySha256": "dfec4383e1493bc873669d8d374d21ac3b2a392d2881907e617047328f06cc0d"
+}

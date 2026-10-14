@@ -25,6 +25,10 @@ const sections = snapshot => Object.fromEntries(Object.entries(snapshot).map(([k
 ]));
 const fingerprints = snapshot => Object.fromEntries(Object.entries(sections(snapshot)).map(([key, rows]) => [key, { count: rows.length, sha256: hash(encode(rows)) }]));
 const inventorySql = readFileSync("scripts/legacy-schema-inventory.sql", "utf8");
+const dataPreflightSql = readFileSync("docs/verification/legacy-data-preflight.sql", "utf8");
+async function preflight() {
+  return Object.fromEntries((await client.query(dataPreflightSql)).rows.map(row => [row.check_name, Number(row.violating_rows)]));
+}
 async function inventory(connection) {
   await connection.query("set search_path=public");
   return (await connection.query(inventorySql)).rows[0].schema_snapshot;
@@ -115,13 +119,31 @@ try {
   await client.query("insert into public.tasks(family_id,title,created_by_id,plan_step_id) values($1,'Confirm the next conversation',$2,$3)", [family, staff, step]);
   await client.query("insert into public.case_progress_updates(family_id,plan_id,author_id,occurred_on,summary) values($1,$2,$3,current_date,'Discussed available options')", [family, plan, staff]);
   await client.query("insert into public.resource_import_runs(source_path,row_count,success_count) values('synthetic.csv',2,2)");
-  await client.query("insert into public.activity_log(family_id,actor_user_id,action,entity_type,entity_id) values($1,$2,'legacy.created','family',$1::text)", [family, staff]);
+  await client.query("insert into public.activity_log(family_id,actor_user_id,action,entity_type,entity_id) values($1::uuid,$2,'legacy.created','family',$1::uuid::text)", [family, staff]);
   await client.query("insert into public.barrier_plan_records(owner_user_id,reference_id,family_id,selected_barriers,generated_plan_json) values($1,'synthetic-upgrade',$2,'[]','{}')", [staff, family]);
   const before = await oldRows(baseline);
   assert.equal(Object.values(before).filter(rows => rows.length > 0).length, 20, "every legacy application table has preservation coverage");
+  const compatible = await preflight();
+  assert.equal(Object.keys(compatible).length, 59, "all observed legacy compatibility checks execute");
+  assert.ok(Object.values(compatible).every(count => count === 0), "compatible synthetic records pass the read-only preflight");
+  await client.query("begin");
+  try {
+    await client.query("update public.plan_step_action_items set description='Call 202-555-0188' where id=$1", [action]);
+    await client.query("update public.plan_steps set description='Email support@example.test' where id=$1", [step]);
+    await client.query("update public.resource_matches set plan_step_id=$1,family_id=$2 where resource_id=$3", [step, otherFamily, resource]);
+    await client.query("update public.plan_step_activity set family_id=$1 where plan_step_id=$2", [otherFamily, step]);
+    await client.query("update public.tasks set family_id=$1 where plan_step_id=$2", [otherFamily, step]);
+    await client.query("update public.case_progress_updates set family_id=$1 where plan_id=$2", [otherFamily, plan]);
+    const incompatible = await preflight();
+    for (const name of ["plan_step_action_items_no_direct_identifiers_check", "plan_steps_no_direct_identifiers_check",
+      "resource_matches_family_consistency", "plan_step_activity_family_consistency", "tasks_family_consistency", "case_progress_updates_family_consistency"])
+      assert.equal(incompatible[name], 1, `preflight identifies ${name} without exposing record contents`);
+    assert.equal(Object.values(incompatible).reduce((sum, count) => sum + count, 0), 6);
+  } finally { await client.query("rollback"); }
   for (const label of ["blocked@example.test", "name: john smith"]) {
     const invalid = randomUUID();
     await client.query("insert into public.families(id,name,created_by_id) values($1,$2,$3)", [invalid, label, staff]);
+    assert.equal((await preflight()).families_no_direct_identifiers_check, 1, "preflight uses the strengthened detector before migrations");
     await assert.rejects(upgrade(), { code: "23514" }, "initial and strengthened privacy checks must reject the entire upgrade");
     assert.deepEqual(fingerprints(await inventory(client)), expectedBaseline, "a failed upgrade restores every original definition and grant");
     assert.equal((await client.query("select id from public.families where id=$1", [invalid])).rowCount, 1, "failure never deletes incompatible data");
@@ -154,7 +176,7 @@ try {
   evidence = { startedAt, completedAt: new Date(), syntheticOnly: true, localOnly: true, fixtureMatchesHostedDefinitions: true,
     legacyTableCounts: Object.fromEntries(Object.entries(before).map(([name, rows]) => [name, rows.length])),
     appliedMigrations: upgradeNames.map(name => ({ name, sha256: hash(migrationSource(name)) })), bundleSha256: hash(bundle),
-    incompatibleDataRollbackPassed: true, oldColumnsAndRelationshipsPreserved: true, schemaMatchesFreshInstall: true,
+    aggregateDataPreflightPassed: true, incompatibleDataRollbackPassed: true, oldColumnsAndRelationshipsPreserved: true, schemaMatchesFreshInstall: true,
     legacyReviewRequiresApproval: true, administratorMfaEnforced: true, retainedSessionDenied: true, fullDatabaseRegressionPassed: true,
     limits: "No production rows, live upgrade, migration-history repair, backup verification, hosted Auth tokens or operator approval. Live preflight must be repeated against the unchanged definitions and approved backup." };
 } finally {
