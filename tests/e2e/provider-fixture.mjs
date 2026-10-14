@@ -37,8 +37,9 @@ globalThis.fetch = async (input, options) => {
       expected_outcome: "The family and case manager agree on the next step.", priority: "medium", additional_guidance: null }] };
   } else if (schema === "plan_refine_lean_steps") {
     const current = JSON.parse(request.input.split("## Current plan (lean view, preserve unless feedback asks to change)\n")[1].split("\n\n## Instructions")[0]);
+    const title = current.length > 1 ? "Agree the housing support priorities" : "Prepare the agreed housing intake";
     output = { steps: current.map((step, index) => ({ id: step.id, phase: step.phase,
-      title: index === 0 ? "Prepare the agreed housing intake" : step.title, description: step.description,
+      title: index === 0 ? title : step.title, description: step.description,
       action_items: null, required_documents: null, resource_ids: null, expected_outcome: step.expected_outcome,
       timing_guidance: step.timing_guidance ?? "", priority: null })) };
   } else if (schema === "case_assistant_answer") {

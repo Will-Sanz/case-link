@@ -964,7 +964,7 @@ export function FamilyPlanPanel({
   }
 
   function openPlanAiRefine(forceDiscard = false) {
-    if (!plan) return;
+    if (!plan || pending || stepSaveBusy || planAiPending) return;
     if (editingStepId && stepDirty && !forceDiscard) {
       requestConfirmation({
         title: "Discard unsaved edits?",
@@ -1188,7 +1188,7 @@ export function FamilyPlanPanel({
             onClick={() => openPlanAiRefine()}
             variant="secondary"
             className="border-[var(--color-rule)]"
-            disabled={planAiPending}
+            disabled={pending || stepSaveBusy || planAiPending}
           >
             {planAiPending ? "Refining…" : "Refine plan with AI"}
           </Button>

@@ -501,6 +501,8 @@ The browser sends every previous message, but the server accepts at most 40. Aft
 
 ### [x] CL-25 — Recover from failed or superseded AI requests
 
+**October 14 hosted regression:** a synthetic headless run found that full-plan refinement could open the previous plan while an action save refreshed the page. The revision guard safely rejected the preview, but the workflow stalled. The control now reuses the existing pending/save states until fresh data arrives. A new component regression failed before the two-line fix and passes afterward; all 23 panel tests, type checks and targeted lint pass. The browser release journey now also exercises full-plan refinement and exact preservation of the saved action rows. Normal correctness/security/accessibility and separate Ponytail reviews completed. Fresh candidate CI and the hosted rerun remain required. [Reproduction, preceding passes and cleanup](verification/2026-10-14-hosted-refinement-regression.json).
+
 **Completed October 13, 2026 (Codex; correctness/accessibility, React, and Ponytail review):** failed chat questions are restored for editing/keyboard retry without adding failed exchanges to history. Request identities ignore replies after clear, cancellation, or unmount; family-keyed chat/editor instances isolate navigation. Both preview flows catch failures, settle pending state, and invalidate cancelled requests. Ten rendered component tests cover long chat, returned/thrown failures, keyboard retry, duplicate pending sends, clear/new conversation, family switch, cancelled/reopened preview, and both preview failure paths. Targeted checks, typecheck, and lint pass; full verification runs on push. Commit: `git log --grep='CL-25'`.
 
 **Type:** Fix · **Responsible:** engineering.

@@ -111,6 +111,36 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     HTMLDialogElement.prototype.close = function () { this.open = false; };
   });
 
+  it("waits for an action save before opening full-plan refinement with the refreshed plan", async () => {
+    let finishSave!: (value: Awaited<ReturnType<typeof savePlanEdits>>) => void;
+    vi.mocked(savePlanEdits).mockReturnValueOnce(new Promise(resolve => { finishSave = resolve; }));
+    const view = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.change(screen.getByLabelText("Action 1"), { target: { value: "Confirm the agreed preparation checklist" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    const refine = screen.getByRole("button", { name: "Refine plan with AI" }) as HTMLButtonElement;
+    expect(refine.disabled).toBe(true);
+    fireEvent.click(refine);
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    const saved = structuredClone(plan);
+    saved.review_revision = "b".repeat(64);
+    saved.steps[0].action_items![0].title = "Confirm the agreed preparation checklist";
+    saved.steps[0].action_items![0].updated_at = "2026-08-03T12:05:00Z";
+    routerRefresh.mockImplementationOnce(() => view.rerender(<FamilyPlanPanel familyId={saved.family_id} plan={saved} workflow={null} />));
+    await act(async () => { finishSave({ ok: true }); });
+    await waitFor(() => expect(refine.disabled).toBe(false));
+    vi.mocked(previewRefinePlan).mockResolvedValue({ ok: true, model: "test", steps: saved.steps.map(toRefinementDraft) });
+    fireEvent.click(refine);
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "Clarify the goal title" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Generate preview" }));
+    await dialog.findByRole("button", { name: "Apply to working copy" });
+    expect(previewRefinePlan).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: saved.review_revision,
+      draft: { steps: [expect.objectContaining({ action_items: [expect.objectContaining({ title: "Confirm the agreed preparation checklist" })] })] },
+    }));
+  });
+
   it("recovers de-identified edits in the same tab, and removes a recovery copy when identifying text is entered", async () => {
     const key = localActionDraftKey(owner, plan.id);
     const first = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);

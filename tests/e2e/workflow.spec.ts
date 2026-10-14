@@ -55,7 +55,22 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   await expect(article.getByLabel("Action 1", { exact: true })).toHaveValue("Confirm the agreed preparation checklist");
   await expect(article.getByRole("textbox", { name: "Why is this waiting?", exact: true })).toHaveValue("Waiting for the family's preferred review time.");
   await activate(page, article.getByRole("button", { name: "Save edits", exact: true }));
-  await expect(article.getByRole("button", { name: "Prepare the agreed housing intake", exact: true })).toBeVisible();
+  await expect(article.getByRole("button", { name: "Edit action", exact: true })).toBeVisible();
+
+  const savedActions = async () => (await local.db.query("select a.* from public.plan_step_action_items a join public.plan_steps s on s.id=a.plan_step_id where s.plan_id=$1 order by a.id", [first[0].id])).rows;
+  const beforeRefinement = await savedActions();
+  await activate(page, page.getByRole("button", { name: "Refine plan with AI", exact: true }));
+  const refinement = page.getByRole("dialog");
+  await refinement.getByRole("textbox").fill("Clarify only the first goal title. Preserve all tasks, dates and progress notes.");
+  await activate(page, refinement.getByRole("button", { name: "Generate preview", exact: true }));
+  await expect(refinement.getByRole("button", { name: "Apply to working copy", exact: true })).toBeDisabled();
+  await refinement.getByRole("checkbox", { name: /Title/ }).check();
+  await accessible(page);
+  await activate(page, refinement.getByRole("button", { name: "Apply to working copy", exact: true }));
+  await activate(page, refinement.getByRole("button", { name: "Save to plan", exact: true }));
+  await expect(refinement).toHaveCount(0);
+  await expect(article.getByRole("button", { name: "Agree the housing support priorities", exact: true })).toBeVisible();
+  expect(await savedActions()).toEqual(beforeRefinement);
 
   await activate(page, page.getByRole("button", { name: "Mark plan reviewed", exact: true }));
   await accessible(page);
