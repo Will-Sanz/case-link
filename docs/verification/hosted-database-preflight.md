@@ -52,3 +52,14 @@ Next, provision only synthetic accounts through the protected operator path, con
 5. Present the exact change set, backup verification, expected interruption/account effects and recovery procedure before seeking authorization to apply it to the restored project. Run the hosted synthetic role matrix and account-to-PDF journey afterward. Record the one-school boundary and named administrators.
 
 No live upgrade is prepared for execution yet: schema/definition comparison and data-compatibility rehearsal are still required. Until those pass, keep the current preview blocked and do not promote the new application against the legacy database.
+
+
+## Legacy upgrade rehearsal prepared after staging isolation
+
+A second read-only inventory captured all 20 existing application tables, 199 columns, nine enums, 48 indexes, 64 constraints, 58 policies, nine triggers, five functions, explicit ACLs and postgres default privileges. No application or Auth rows were exported. The local-only SQL fixture reproduces those definitions; ten section hashes are recorded in `2026-10-14-legacy-schema-fingerprints.json` and checked before any rehearsal migration runs.
+
+`npm run test:legacy-upgrade` is wired into CI and creates only a disposable database in the CaseLink test container. It uses the installed local Auth schema with new synthetic accounts and records in all 20 legacy tables. It attempts the two observed missing earlier migrations, then the hardening and subsequent migrations, within one transaction with bounded lock/statement waits. It compares the result to a fresh install, preserves every legacy column/relationship, tests incompatible-data rollback, requires renewed review for legacy approvals, and exercises MFA, retained sessions and the complete existing database suite. The intentionally labelled demo fixture may gain `is_demo=true` and a new update timestamp; current hosted aggregate evidence is **54 active resources, zero explicitly demo-labelled**, so that special case is not expected to hide the existing directory.
+
+The rehearsal explicitly rechecks all final CHECK expressions before commit. PostgreSQL does not revalidate stored rows merely because an immutable validation function was strengthened; both the original email detector and a later name-detector case must reject the entire upgrade and retain the invalid record. This is a required part of the eventual reviewed upgrade procedure, not permission to erase or automatically rewrite incompatible records.
+
+Initial state: static syntax/lint and cross-language fingerprint checks pass; first complete execution is pending remote CI to keep local services stopped. This is a test harness, not an approved live-upgrade command. A current metadata match, aggregate data-compatibility preflight, encrypted backup/restore evidence, migration-history reconciliation and explicit operator approval remain mandatory.

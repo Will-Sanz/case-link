@@ -41,7 +41,8 @@
     "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts",
     "prebuild": "node scripts/clear-compiler-cache.mjs",
     "predev": "node scripts/clear-compiler-cache.mjs",
-    "test:legacy-containment": "node scripts/test-legacy-containment.mjs"
+    "test:legacy-containment": "node scripts/test-legacy-containment.mjs",
+    "test:legacy-upgrade": "node scripts/test-legacy-upgrade.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

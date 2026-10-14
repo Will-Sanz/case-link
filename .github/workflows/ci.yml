@@ -83,6 +83,9 @@ jobs:
       - name: Verify legacy account permission containment
         run: npm run test:legacy-containment
 
+      - name: Rehearse legacy schema upgrade and transactional rollback
+        run: npm run test:legacy-upgrade
+
       - name: Verify retained tokens and offboarding with real local Auth
         run: npm run test:auth-security
 
