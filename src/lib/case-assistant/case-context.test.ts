@@ -57,7 +57,7 @@ describe("current case context for the assistant", () => {
     expect(context.actions.map((row: { id: string }) => row.id)).toEqual(["overdue", "waiting", "done"]);
     expect(context.actions[0]).toMatchObject({ overdue: true, notes: "Bring the agreed checklist" });
     expect(context.actions[1]).toMatchObject({ status: "waiting", effective_date: "2026-10-25", overdue: false });
-    expect(context.actions[2]).toMatchObject({ status: "completed", overdue: false, outcome: "Intake completed" });
+    expect(context.actions[2]).toMatchObject({ status: "completed", overdue: false, outcome: "Intake completed", completion_date: null, target_date: "2026-10-01", updated_at: stamp });
     expect(context.recent_meetings[0]).toMatchObject({ occurred_on: "2026-10-12", recorded_at: stamp, summary: "Intake completed; awaiting a decision" });
     expect(context.recent_notes[0].recorded_at).toBe("2026-10-01T12:00:00Z");
     expect(context.goals[0].owner).toBe("family");

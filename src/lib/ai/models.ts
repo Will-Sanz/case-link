@@ -70,7 +70,7 @@ export function augmentInstructionsForMode(
   mode: AiMode,
 ): string {
   if (mode === "fast") {
-    return `${instructions}\n\n## Output mode: Fast\nPrioritize brevity: tight wording, fewer redundant bullets, no filler. Stay accurate and easy to transfer to city forms.`;
+    return `${instructions}\n\n## Output mode: Fast\nPrioritize brevity: tight wording, fewer redundant bullets, no filler. Stay accurate and easy for a school case manager and family to review.`;
   }
   return `${instructions}\n\n## Output mode: Thorough\nBe concrete and precise. Add nuance only where it helps the case manager; avoid repetition or padding.`;
 }

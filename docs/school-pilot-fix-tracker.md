@@ -603,6 +603,9 @@ At the audit baseline, existing tests covered useful units and database controls
 
 ### [ ] CL-34 — Measure AI safety and usefulness with school reviewers
 
+**October 14 engineering evidence:** a versioned 50-case synthetic evaluation now exercises generation, both refinements and the assistant through real production prompts, transport, validators and human-selection merges. Version 7 accepted 299/300 initial tasks; one incomplete provider response was safely rejected, and the targeted six-task retry passed. Zero deterministic critical-check failures does not certify all prose: manual review caught unsupported claims in earlier otherwise-passing runs, which were corrected and retained as regressions. Successful full drafts measured p75 14.15s / p95 16.14s, excluding the failed draft and browser/hosting overhead. Dates are now enforced, completion dates remain explicitly unknown, sparse plans are smaller, and missing history never establishes that outside activity did not happen. [Outputs, failures, costs, source hash and review protocol](verification/ai-quality.md). Normal correctness/security/privacy and separate Ponytail deletion reviews completed. School usefulness/editing-time scores, a fresh unseen validation set and hosted end-to-end timing remain open.
+
+
 **Type:** Verify + Fix · **Responsible:** engineering + case-manager reviewers.
 
 No repeatable, scored evaluation set establishes that generated plans and answers are correct, actionable, respectful, grounded, and worth the user's time. Prompt inspection and mocked output tests cannot establish live model quality.

@@ -34,6 +34,16 @@ describe("plan output contracts", () => {
     expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", { retries: 1 })).toMatchObject({ ok: false });
   });
 
+  it("rejects out-of-window dates and only accepts a corrected provider response", async () => {
+    const invalid = { ...generatedPlanStep, action_items: [{ ...generatedPlanStep.action_items[0], target_date: "2027-01-15" }] };
+    vi.mocked(createAiResponse).mockResolvedValueOnce({ ok: true, model: "test", text: JSON.stringify({ steps: [invalid] }) })
+      .mockResolvedValueOnce({ ok: true, model: "test", text: JSON.stringify({ steps: [generatedPlanStep] }) });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", { retries: 2 })).toMatchObject({ ok: true });
+    expect(vi.mocked(createAiResponse).mock.calls[1][0].input).toContain("between 2026-10-13 and 2027-01-11");
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...invalid, action_items: [{ ...invalid.action_items[0], target_date: "2026-10-12" }] }] }) });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", { retries: 1 })).toMatchObject({ ok: false });
+  });
+
   it("requires all refinement fields, rejects progress fields, and preserves explicit null lists", () => {
     expect(planRefineLeanResponseSchema.parse({ steps: [refinedPlanStep] }).steps[0].resource_ids).toBeNull();
     const missing = { ...refinedPlanStep } as Record<string, unknown>;

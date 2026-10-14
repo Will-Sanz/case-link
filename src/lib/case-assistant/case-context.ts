@@ -38,6 +38,7 @@ export function buildAssistantCaseContext(detail: FamilyDetail, now = new Date()
       const date = actionTargetDate(action);
       return { id: action.id, goal_id: step.id, title: clip(action.title), description: clip(action.description), status: actionUiStatus(action),
         target_date: action.target_date, follow_up_date: action.follow_up_date, effective_date: date,
+        completion_date: null,
         overdue: action.status !== "completed" && date !== null && date < today,
         notes: clip(actionUserNotes(action.notes)), outcome: clip(action.outcome), updated_at: action.updated_at };
     }),

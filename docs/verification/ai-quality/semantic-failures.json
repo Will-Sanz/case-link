@@ -1,0 +1,48 @@
+[
+  {
+    "run": "2026-10-14T16-19-37-902Z-held-out",
+    "version": 5,
+    "case": "private-contact",
+    "task": "case_assistant",
+    "failure": "Infers that no outside submission or scheduling occurred solely because no plan/history is saved in CaseLink.",
+    "output": {
+      "ok": true,
+      "answer": "Confirm with the family:\n- Whether there is an immediate safety concern. If yes, involve the responsible school safeguarding/emergency pathway now rather than waiting for routine follow-up.\n- A safe way and time to communicate; confirm whether calls, texts, email, or voicemail are allowed and what wording is safe. Do not mention the situation or leave details on shared voicemail unless they approve it.\n- Their current housing priority and what support they want first, including whether they want help exploring the housing-support resource.\n- Whether they consent to a school staff member making a referral or helping with an intake, and how they prefer to participate.\n\nStill unknown: the nature and immediacy of the safety concern; current housing situation, location, and housing risks; preferred language and accessibility needs; safe contact method; requested services; eligibility and availability for housing support; and any provider document requirements. There is no saved plan or action history, so nothing has been submitted or scheduled. Verify the housing resource’s current contacts, service area, eligibility, availability, and requirements before presenting it as an option.",
+      "contacts": [
+        {
+          "source_resource_id": "10000000-0000-4000-8000-000000000001",
+          "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+          "name": "Housing support",
+          "phone": "215-555-0148",
+          "email": "intake@example.test",
+          "notes": "Confirm current availability, eligibility, and contact details before referring."
+        }
+      ]
+    },
+    "deterministicChecksAtTheTime": "Passed; missing-history grader was added only after engineering review",
+    "correction": "Prompt must state unknown or not recorded; v6 adds an independent known-regression probe. Previously held-out cases are now regression cases for this fix."
+  },
+  {
+    "run": "2026-10-14T16-29-35-191Z-development",
+    "version": 6,
+    "case": "eligibility-unknown",
+    "task": "case_assistant",
+    "failure": "Still claims no referral was submitted when only the absence of a saved record is known.",
+    "output": {
+      "ok": true,
+      "answer": "No. Eligibility and availability are both unknown; the case contains no verified referral, application, or placement record. As the next step, confirm the family’s preferred language and safe contact restrictions, then ask the housing support office to verify current eligibility criteria, openings, and any required documents before the family decides whether to proceed. No referral has been submitted or recorded.",
+      "contacts": [
+        {
+          "source_resource_id": "10000000-0000-4000-8000-000000000001",
+          "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+          "name": "Housing support",
+          "phone": "215-555-0148",
+          "email": "intake@example.test",
+          "notes": "Confirm current availability, eligibility, and contact details before referring."
+        }
+      ]
+    },
+    "deterministicChecksAtTheTime": "Passed; the known-regression matcher missed this phrasing. Added a test, observed it fail, then expanded it.",
+    "correction": "v7 removes the ambiguous shared instruction never to claim a referral occurred, replacing it with recorded-evidence and unknown-status rules. No general semantic safety guarantee is claimed."
+  }
+]

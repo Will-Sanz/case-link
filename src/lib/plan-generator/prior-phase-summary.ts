@@ -9,6 +9,7 @@ type StepRow = {
   phase: string;
   title: string;
   description: string | null;
+  details?: { stage_goal?: string } | null;
 };
 
 /**
@@ -24,7 +25,7 @@ export async function fetchPriorPhasesSummaryForPlanner(
 
   const { data: steps, error: stepsErr } = await supabase
     .from("plan_steps")
-    .select("id, phase, title, description")
+    .select("id, phase, title, description, details")
     .eq("plan_id", planId)
     .in("phase", phases)
     .order("sort_order", { ascending: true });
@@ -40,8 +41,12 @@ export async function fetchPriorPhasesSummaryForPlanner(
     .in("plan_step_id", ids)
     .order("sort_order", { ascending: true });
 
+  return formatPriorPhasesSummary(stepRows, items ?? []);
+}
+
+export function formatPriorPhasesSummary(stepRows: StepRow[], items: Array<{ plan_step_id: string; title: string; sort_order?: number }>): string {
   const titlesByStep = new Map<string, string[]>();
-  for (const row of items ?? []) {
+  for (const row of items) {
     const sid = row.plan_step_id as string;
     const t = (row.title as string)?.trim();
     if (!t) continue;
@@ -57,7 +62,7 @@ export async function fetchPriorPhasesSummaryForPlanner(
     const shortDesc = desc.length > 100 ? `${desc.slice(0, 97)}…` : desc;
     const ai = titlesByStep.get(s.id)?.join("; ") ?? "";
     const aiPart = ai ? ` | Actions: ${ai.length > 80 ? `${ai.slice(0, 77)}…` : ai}` : "";
-    lines.push(`- [${phase}-day] ${s.title.trim()}${shortDesc ? `, ${shortDesc}` : ""}${aiPart}`);
+    lines.push(`- [${phase}-day] ${s.title.trim()}${shortDesc ? `, ${shortDesc}` : ""}${aiPart}${s.details?.stage_goal ? ` | Goal: ${s.details.stage_goal}` : ""}`);
   }
 
   let text = lines.join("\n");

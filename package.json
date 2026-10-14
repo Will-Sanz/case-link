@@ -39,7 +39,8 @@
     "prepare": "husky",
     "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts",
     "prebuild": "node scripts/clear-compiler-cache.mjs",
-    "predev": "node scripts/clear-compiler-cache.mjs"
+    "predev": "node scripts/clear-compiler-cache.mjs",
+    "test:ai-quality": "NODE_ENV=test vitest run --config vitest.ai.config.mts"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

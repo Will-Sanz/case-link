@@ -10,6 +10,7 @@ import { matchPlanRowsById } from "@/lib/domain/plan/refinement-identity";
 import { actionTargetDate } from "@/lib/domain/plan/action-state";
 import { contactReferences, planResourceCatalog } from "@/lib/matching/plan-resources";
 import { validateNoPii } from "@/lib/privacy/no-pii";
+import { CASEWORK_SAFETY_PROMPT } from "@/lib/ai/casework-safety";
 import {
   type DraftStepRefineInput,
   mergeLeanRefineIntoBase,
@@ -96,6 +97,7 @@ ${feedback.trim()}
 
   const instructions =
     "You edit an existing case plan draft for a case manager. " +
+    CASEWORK_SAFETY_PROMPT + "\nChange only what the case manager explicitly requests. Preserve all other wording and human records exactly. " +
     "Return one JSON object with key `steps` only. Each step includes its original id, phase, title, description, " +
     "required_documents, resource_ids, expected_outcome, timing_guidance, priority (null to preserve), and action_items " +
     "(use null to leave a list unchanged; [] explicitly clears it).";
