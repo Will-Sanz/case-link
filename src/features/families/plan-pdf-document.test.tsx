@@ -62,6 +62,22 @@ const plan: PlanWithSteps = {
 };
 
 describe("PlanPdfDocument", () => {
+  it("refuses unsupported glyphs instead of silently losing reviewed text", () => {
+    expect(() => PlanPdfDocument({ plan, familyName: "確認", generatedDate: "Oct 13, 2026" }))
+      .toThrow(/PDF font/);
+    const unsupportedGoal = structuredClone(plan);
+    unsupportedGoal.steps[0].details!.stage_goal = "Confirm 🙂";
+    expect(() => PlanPdfDocument({ plan: unsupportedGoal, generatedDate: "Oct 13, 2026" }))
+      .toThrow(/PDF font/);
+  });
+
+  it("accepts decomposed Latin accents after normalization", async () => {
+    const accented = structuredClone(plan);
+    accented.summary = "Cafe\u0301 and re\u0301sume\u0301 checklist";
+    const bytes = await renderToBuffer(<PlanPdfDocument plan={accented} generatedDate="Oct 13, 2026" />);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(0);
+  });
+
   it("renders a valid reviewed plan without relying on storage phases", async () => {
     const bytes = await renderToBuffer(
       <PlanPdfDocument

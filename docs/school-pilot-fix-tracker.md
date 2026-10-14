@@ -599,9 +599,13 @@ No repeatable, scored evaluation set establishes that generated plans and answer
 
 **Close with:** zero critical safety/grounding/edit-preservation failures in the release set, recorded human usefulness review, and measured end-to-end latency/cost. Report failed cases, not just an average score. **Sources:** [AI callers](/Users/willsanz/homelessness-project/src/lib/ai/client.ts), [product quality requirements](/Users/willsanz/homelessness-project/docs/intervention-planning-prd.md), [OpenAI evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices).
 
-### [ ] CL-35 — Verify the downloaded PDF visually and against its reviewed source
+### [x] CL-35 — Verify the downloaded PDF visually and against its reviewed source
 
 **Type:** Verify + Fix · **Responsible:** engineering + case-manager reviewer.
+
+**Completed October 13, 2026 — engineering:** a repeatable four-case PDF corpus now checks 368 source fields across 15 rendered pages, including maximum saved text, long unbroken filenames, eight goals/forty actions, exact dates, Waiting, completed/withdrawn work, directory contacts, and composed/decomposed Western European accents. It compares text and repeated-field inventory, margins, overlaps, headings, page numbering, and monochrome pixels. The corpus reproduced and fixed clipped filenames, exposed internal note markers, and a goal heading stranded on a mostly empty page. Withdrawn tasks no longer inflate completed counts on screen or in PDFs.
+
+**Evidence:** all 650 unit/component tests pass, including rendering/finalization failures and retry, identical preview/download bytes, stale-revision checks, late requests, and URL cleanup. Loading/errors are announced; download remains available when the embedded viewer is unavailable. Built-in fonts require no network loading; unsupported glyphs fail clearly without changing the saved plan instead of silently omitting characters. The 15 page images were inspected for legibility and placement. CI runs `npm run test:pdf`; [reproduction and font scope](verification/pdf-regressions.md) and [result metadata](verification/2026-10-14-pdf-regressions.json) are versioned. Normal correctness/privacy/accessibility, separate Ponytail deletion, and React reviews completed. Full production verification runs before push. The authenticated browser and hosted-candidate journey remains CL-08; school acceptance remains CL-34. Commit: `git log --grep='CL-35'`.
 
 Current PDF tests establish useful file/metadata/page/color properties but not complete rendered placement and legibility. A structurally valid file can still clip long content, split rows badly, omit characters, or show the wrong reviewed revision.
 

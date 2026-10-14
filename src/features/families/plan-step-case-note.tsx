@@ -202,7 +202,7 @@ export function PlanStepCaseNote({
       }),
     [step.action_items],
   );
-  const completedActionCount = actions.filter((action) => action.status === "completed").length;
+  const completedActionCount = actions.filter((action) => actionUiStatus(action) === "completed").length;
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const { ref: bodyRef, rows: bodyRows } = useAutosizeTextarea(

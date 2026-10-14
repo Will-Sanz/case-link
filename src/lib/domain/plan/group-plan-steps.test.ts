@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
+import { encodeActionNotes } from "@/lib/domain/plan/action-state";
 import type { PlanStepActionItemRow, PlanStepRow } from "@/types/family";
 
 function action(
@@ -50,6 +51,17 @@ function step(
 }
 
 describe("groupPlanStepsByGoal", () => {
+  it("does not count withdrawn work as completed or reopen its old dates", () => {
+    const withdrawn = { ...action("withdrawn", "2020-01-01", "completed"), notes: encodeActionNotes("No longer needed", true) };
+    const [group] = groupPlanStepsByGoal([
+      step("a", "Housing", 0, [withdrawn, action("done", null, "completed")]),
+      step("b", "Housing", 1, [{ ...withdrawn, id: "withdrawn-again" }]),
+    ]);
+    expect(group.actionCount).toBe(3);
+    expect(group.completedActionCount).toBe(1);
+    expect(group.earliestOpenTargetDate).toBeNull();
+  });
+
   it("groups steps by their case-manager goal instead of storage phase", () => {
     const groups = groupPlanStepsByGoal([
       step("a", "Stabilize housing", 0, [action("a1", "2026-08-06")]),

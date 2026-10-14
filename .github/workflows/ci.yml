@@ -33,6 +33,12 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
 
+      - name: Install PDF verification tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Verify rendered plan text, pagination, margins, and monochrome output
+        run: npm run test:pdf
+
       - name: Typecheck, lint, and production build
         run: npm run ci
         env:

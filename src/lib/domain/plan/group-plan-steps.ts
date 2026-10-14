@@ -1,4 +1,4 @@
-import { actionTargetDate } from "@/lib/domain/plan/action-state";
+import { actionTargetDate, actionUiStatus } from "@/lib/domain/plan/action-state";
 import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 
 export type PlanGoalGroup = {
@@ -53,7 +53,7 @@ export function groupPlanStepsByGoal(steps: PlanStepRow[]): PlanGoalGroup[] {
       existing.steps.push(step);
       existing.actionCount += actions.length;
       existing.completedActionCount += actions.filter(
-        (action) => action.status === "completed",
+        (action) => actionUiStatus(action) === "completed",
       ).length;
       const candidate = earliestDate(actions, true);
       if (
@@ -70,7 +70,7 @@ export function groupPlanStepsByGoal(steps: PlanStepRow[]): PlanGoalGroup[] {
       title,
       steps: [step],
       actionCount: actions.length,
-      completedActionCount: actions.filter((action) => action.status === "completed").length,
+      completedActionCount: actions.filter((action) => actionUiStatus(action) === "completed").length,
       earliestOpenTargetDate: earliestDate(actions, true),
       firstSortOrder: step.sort_order,
     });

@@ -19,6 +19,7 @@
     "lint": "eslint --max-warnings=0",
     "test": "NODE_ENV=test vitest",
     "test:run": "NODE_ENV=test vitest run",
+    "test:pdf": "node --import tsx scripts/test-plan-pdfs.ts",
     "test:auth-security": "tsx scripts/test-auth-security.ts",
     "test:db-security": "tsx scripts/test-database-security.ts",
     "typecheck": "tsc --noEmit",

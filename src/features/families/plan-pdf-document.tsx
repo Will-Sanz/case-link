@@ -3,20 +3,33 @@
 import { formatDateOnly } from "@/lib/dates";
 
 import { Fragment } from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { actionTargetDate, actionUiStatus } from "@/lib/domain/plan/action-state";
+import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { StandardFontEmbedder } from "pdf-lib";
+import { actionTargetDate, actionUiStatus, actionUserNotes } from "@/lib/domain/plan/action-state";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import type { PlanStepDetails, PlanStepRow, PlanWithSteps } from "@/types/family";
 
 export const PLAN_PDF_TITLE = "Family Support Intervention Plan";
 export const PLAN_PDF_PALETTE = { ink: "#000000", paper: "#FFFFFF" } as const;
 
+const printableFont = StandardFontEmbedder.for("Helvetica" as Parameters<typeof StandardFontEmbedder.for>[0]);
+// Bound unbroken words as well as prose, so filenames cannot escape the printable page.
+Font.registerHyphenationCallback((word) => word.match(/.{1,20}/gu) ?? [word]);
+
 function cleanText(value: string | null | undefined): string {
-  return (value ?? "")
+  const text = (value ?? "")
+    .normalize("NFC")
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+([.,;:!?])/g, "$1")
     .trim();
+  try {
+    printableFont.encodeText(text);
+  } catch {
+    // shortcut: built-in Helvetica covers Western European text; embed broader fonts before a multilingual rollout.
+    throw Object.assign(new Error("The PDF font does not support some characters in the plan."), { name: "UnsupportedPdfTextError" });
+  }
+  return text;
 }
 
 function formatOwner(owner: PlanStepDetails["owner"]): string {
@@ -232,7 +245,7 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
 
   return (
     <View style={styles.actionTable}>
-      <View style={styles.actionHeader}>
+      <View style={styles.actionHeader} minPresenceAhead={24}>
         <Text style={styles.actionCell}>Action</Text>
         <Text style={styles.dateCell}>Target / follow-up</Text>
         <Text style={styles.statusCell}>Status</Text>
@@ -244,7 +257,7 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
             <View style={styles.actionCell}>
               <Text style={styles.label}>{cleanText(action.title) || "Untitled action"}</Text>
               {cleanText(action.description) ? <Text style={styles.actionDetail}>{cleanText(action.description)}</Text> : null}
-              {cleanText(action.notes) ? <Text style={styles.actionDetail}>Progress: {cleanText(action.notes)}</Text> : null}
+              {cleanText(actionUserNotes(action.notes)) ? <Text style={styles.actionDetail}>Progress: {cleanText(actionUserNotes(action.notes))}</Text> : null}
               {cleanText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanText(action.outcome)}</Text> : null}
             </View>
             <Text style={styles.dateCell}>{formatDateOnly(displayDate) ?? (action.status === "completed" ? "Not required" : "Not set")}</Text>
@@ -273,26 +286,26 @@ function PdfStep({ step }: { step: PlanStepRow }) {
   const body = narrative(step);
 
   return (
-    <View style={styles.step} minPresenceAhead={80}>
-      <Text style={styles.stepTitle}>{cleanText(step.title) || "Plan action"}</Text>
+    <View style={styles.step}>
+      <Text style={styles.stepTitle} minPresenceAhead={32}>{cleanText(step.title) || "Plan action"}</Text>
       <Text style={styles.meta}>Owner: {formatOwner(details.owner)} · Priority: {formatPriority(step.priority)}</Text>
       {body ? <Text style={styles.narrative}>{body}</Text> : null}
       <PdfActionTable step={step} />
       {documents.length > 0 ? (
         <View>
-          <Text style={styles.fieldHeading}>Documents or materials</Text>
+          <Text style={styles.fieldHeading} minPresenceAhead={14}>Documents or materials</Text>
           {documents.map((line) => <View key={line} style={styles.listRow}><Text style={styles.bullet}>•</Text><Text style={styles.grow}>{line}</Text></View>)}
         </View>
       ) : null}
       {contacts.length > 0 ? (
         <View>
-          <Text style={styles.fieldHeading}>Contacts</Text>
+          <Text style={styles.fieldHeading} minPresenceAhead={14}>Contacts</Text>
           {contacts.map((line) => <Text key={line}>{line}</Text>)}
         </View>
       ) : null}
       {cleanText(details.expected_outcome) ? (
         <View>
-          <Text style={styles.fieldHeading}>Expected outcome</Text>
+          <Text style={styles.fieldHeading} minPresenceAhead={14}>Expected outcome</Text>
           <Text>{cleanText(details.expected_outcome)}</Text>
         </View>
       ) : null}
@@ -321,7 +334,7 @@ export function PlanPdfDocument({
         <View style={styles.titleRule} />
         <View style={styles.metadata}>
           <Text style={styles.metadataItem}><Text style={styles.label}>Family label: </Text>{cleanText(familyName) || "Not provided"}</Text>
-          <Text style={styles.metadataItem}><Text style={styles.label}>Prepared: </Text>{generatedDate}</Text>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Prepared: </Text>{cleanText(generatedDate)}</Text>
           <Text style={styles.metadataItem}><Text style={styles.label}>Plan version: </Text>{plan.version}</Text>
           <Text style={styles.metadataItem}><Text style={styles.label}>Plan status: </Text>{plan.client_display?.reviewedAt ? "Reviewed" : "Draft"}</Text>
         </View>
@@ -345,7 +358,7 @@ export function PlanPdfDocument({
         {goals.map((goal, goalIndex) => (
           <Fragment key={goal.key}>
             <View style={[styles.goal, styles.goalHeader]} minPresenceAhead={160}>
-              <Text style={styles.goalTitle}>Goal {goalIndex + 1}: {goal.title}</Text>
+              <Text style={styles.goalTitle}>Goal {goalIndex + 1}: {cleanText(goal.title)}</Text>
               <Text style={styles.goalProgress}>
                 {goal.completedActionCount} of {goal.actionCount} actions complete
                 {goal.earliestOpenTargetDate ? ` · Next date ${formatDateOnly(goal.earliestOpenTargetDate)}` : ""}

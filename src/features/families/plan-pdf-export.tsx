@@ -84,9 +84,11 @@ export function PlanPdfExport({
         setDownloadName(`family-support-plan-${namePart}${datePart}.pdf`);
         activePreview.current = objectUrl;
         setPreviewUrl(objectUrl);
-      } catch {
+      } catch (cause) {
         if (cancelled) return;
-        setError("The PDF could not be prepared. Try generating it again.");
+        setError(cause instanceof Error && cause.name === "UnsupportedPdfTextError"
+          ? "The PDF font cannot display some characters, such as emoji or non-Latin text. Return to the plan to review them or contact support. Your saved plan has not changed."
+          : "The PDF could not be prepared. Try generating it again.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -110,6 +112,7 @@ export function PlanPdfExport({
       if (activePreview.current !== previewUrl) return;
       if (!approved.ok) {
         URL.revokeObjectURL(previewUrl);
+        activePreview.current = null;
         setPreviewUrl(null);
         setError(approved.error);
         return;
@@ -121,6 +124,9 @@ export function PlanPdfExport({
       link.click();
       link.remove();
     } catch {
+      if (activePreview.current !== previewUrl) return;
+      URL.revokeObjectURL(previewUrl);
+      activePreview.current = null;
       setError("The reviewed plan could not be checked. Please try again.");
       setPreviewUrl(null);
     } finally {
@@ -161,11 +167,14 @@ export function PlanPdfExport({
 
       <div className="bg-[var(--color-paper-2)] p-3 sm:p-5">
         {previewUrl ? (
-          <iframe
-            title={`${familyName ?? "Family"} reviewed plan PDF`}
-            src={`${previewUrl}#toolbar=0&navpanes=0&view=FitH`}
-            className="h-[calc(100dvh-16rem)] min-h-[640px] w-full rounded-lg bg-white"
-          />
+          <>
+            <p className="mb-3 text-sm text-[var(--color-ink-muted)]">If the preview does not display, use Download PDF to open the same document in your preferred PDF reader.</p>
+            <iframe
+              title={`${familyName ?? "Family"} reviewed plan PDF`}
+              src={`${previewUrl}#toolbar=0&navpanes=0&view=FitH`}
+              className="h-[calc(100dvh-16rem)] min-h-[640px] w-full rounded-lg bg-white"
+            />
+          </>
         ) : (
           <div className="grid h-[calc(100dvh-16rem)] min-h-[640px] place-items-center rounded-lg bg-white px-6 text-center">
             <div>
@@ -175,7 +184,7 @@ export function PlanPdfExport({
               <p className="mt-4 text-sm font-semibold text-[var(--color-ink)]">
                 {error ? "PDF preview unavailable" : "Preparing the PDF preview"}
               </p>
-              <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[var(--color-ink-muted)]" role={error ? "alert" : undefined}>
+              <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[var(--color-ink-muted)]" role={error ? "alert" : "status"}>
                 {error ?? "CaseLink is generating the latest document from the reviewed plan."}
               </p>
             </div>
