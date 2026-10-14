@@ -6,6 +6,8 @@
 
 **Recommendation:** complete this first-priority readiness workstream before routine school use. A successful build is not sufficient evidence that account setup, AI recommendations, concurrent edits, and PDF export work together safely. Use synthetic cases for the school demonstration until the applicable release gates below are evidenced.
 
+**October 13 evening checkpoint:** the user requested finishing the current intake fix and resuming the remaining work tomorrow. See the [October 14 continuation handoff](pilot-readiness-handoff.md) for the next failing browser check, reproducible commands, outstanding records, and external launch gates. Thirty-two records are closed; nine required records and the optional Decisions evaluation remain open. This checkpoint is not pilot launch approval.
+
 The current product is family intake → barriers → a goal-based intervention plan with confirmed dates → human review → a professional black-and-white PDF downloaded for manual use. Blank-PDF upload, field detection, form filling, and automatic submission are outside this release. The current decisions in [AGENTS.md](/Users/willsanz/homelessness-project/AGENTS.md) take precedence over older roadmap language.
 
 ## How to use this tracker
@@ -582,6 +584,12 @@ The product requires exact, confirmed target dates and a follow-up date for wait
 ### [ ] CL-08 — Establish the complete release test gate
 
 **Type:** Verify + Fix · **Responsible:** engineering.
+
+**October 13 evening — partial browser evidence and intake fix:** a production-build Chromium harness now uses real isolated local Supabase/Auth/mail and synthetic accounts. Only the AI HTTP response is deterministic; authorization, server actions, persistence, review, and PDF rendering remain real. Invitation, password setup, invalid login, password sign-in, separate-browser recovery, previous-session denial, and anonymous reuse of a recovery link pass. Keyboard activation and automated WCAG scans cover the visited setup/login/intake/overview screens.
+
+The browser reproduced a blocker: intake labels such as “Housing instability” disappeared because planning expected “Housing.” Shared result mapping now preserves the exact saved wording without inferring a more specific health/legal category; saves retain all twelve intake resource-matching keys. Commas and semicolons stay within custom labels, and overlong labels fail visibly instead of being truncated. Seventeen new regression tests failed before the fix; all 26 focused tests now pass. A real browser → action → database → plan run confirms all twelve intake barriers survive generation unchanged. Correctness/security/privacy and separate Ponytail deletion review completed; duplicate label/key mapping and loader logic were removed.
+
+**Checkpoint verification:** full repository verification passes with 667 unit/component tests, typecheck, lint, lockfile/resource/secret checks, and the production build. The browser run has two passing tests and one failing broader workflow assertion after selective AI application; it is not a green browser release gate. **Still open:** the complete edit/refinement/review/download journey, additional browser scenarios and accessibility checks, CI integration, and exact hosted-candidate evidence. The unfinished browser suite stays runnable and failures are retained, not disabled. Reproduction and the next failure are recorded in the [continuation handoff](pilot-readiness-handoff.md). Commit: `git log --grep='CL-08'`.
 
 Existing tests cover useful units and database controls, but no complete authenticated browser, automated accessibility, or AI-quality release suite was found. Compiling and rendering a valid PDF file do not prove the staff workflow.
 

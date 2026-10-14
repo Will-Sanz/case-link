@@ -19,29 +19,18 @@ import {
 } from "@/lib/errors/public-action-error";
 import { validateNoPii } from "@/lib/privacy/no-pii";
 import { logServerError } from "@/lib/logger/server-error";
+import { PRESET_BARRIERS } from "@/lib/constants/intake-options";
 import {
-  type BarrierPresetLabel,
   BARRIER_PRESETS,
   type BarrierWorkflowPlanSection,
   type BarrierWorkflowResource,
   type BarrierWorkflowResult,
 } from "@/types/barrier-workflow";
 
-const BARRIER_KEY_BY_LABEL: Record<BarrierPresetLabel, string> = {
-  Housing: "housing_instability",
-  Employment: "unemployment",
-  "Food access": "food_insecurity",
-  Transportation: "no_transportation",
-  Childcare: "childcare_barrier",
-  "Mental health": "health_barrier",
-  "Physical health": "health_barrier",
-  "Substance use": "health_barrier",
-  "Legal issues": "legal_matter",
-  "Benefits / ID documents": "immigration_documentation",
-  Education: "education_workforce_training",
-  "Domestic violence": "legal_matter",
-  "Financial hardship": "utility_debt",
-};
+const BARRIER_KEY_BY_LABEL = new Map<string, string>([
+  ...BARRIER_PRESETS.map(({ label, key }) => [label, key] as const),
+  ...PRESET_BARRIERS.map(({ label, value }) => [label, value] as const),
+]);
 
 const familyIdSchema = z.string().uuid();
 const barrierLabelSchema = z.string().refine(
@@ -69,7 +58,7 @@ function parseAdditionalBarriers(input: string): string[] {
   return Array.from(
     new Set(
       input
-        .split(/\r?\n|,|;/)
+        .split(/\r?\n/)
         .map((s) => s.trim())
         .filter(Boolean),
     ),
@@ -79,14 +68,16 @@ function parseAdditionalBarriers(input: string): string[] {
 function mapFamilyToWorkflowResult(
   referenceId: string,
   familyId: string,
-  selectedBarriers: string[],
-  additionalBarriers: string,
   additionalDetails: string,
   lastSavedAt: string | null,
   detail: NonNullable<Awaited<ReturnType<typeof getFamilyDetail>>>,
   resourceStatusOverride?: "ready" | "empty" | "unavailable",
   resourceStatusMessage?: string | null,
 ): BarrierWorkflowResult {
+  // Shared preset keys do not imply the same meaning (for example, health categories).
+  const isPlanningPreset = (label: string) => BARRIER_PRESETS.some(preset => preset.label === label);
+  const selectedBarriers = detail.barriers.filter(barrier => isPlanningPreset(barrier.label)).map(barrier => barrier.label);
+  const additionalBarriers = detail.barriers.filter(barrier => !isPlanningPreset(barrier.label)).map(barrier => barrier.label).join("\n");
   const createdAt = detail.plan?.created_at ? new Date(detail.plan.created_at) : new Date();
   const phaseSummaries = detail.plan?.client_display?.phaseSummaries;
   const sections: BarrierWorkflowPlanSection[] = [
@@ -199,20 +190,11 @@ export async function toggleBarrierWorkflowActionItemAction(
     const detail = await getFamilyDetail(supabase, familyId);
     if (!detail) return { ok: false, error: "Workflow session not found." };
 
-    const selectedBarriers = detail.barriers
-      .filter((b) => b.preset_key !== "other")
-      .map((b) => b.label);
-    const additionalBarriers = detail.barriers
-      .filter((b) => b.preset_key === "other")
-      .map((b) => b.label)
-      .join("; ");
     const details = detail.summary ?? detail.household_notes ?? "";
     const referenceId = detail.name;
     const mapped = mapFamilyToWorkflowResult(
       referenceId,
       familyId,
-      selectedBarriers,
-      additionalBarriers,
       details,
       null,
       detail,
@@ -253,6 +235,9 @@ export async function generateBarrierWorkflowForFamilyAction(
   if (selected.length + parsedAdditionalBarriers.length > 20) {
     return { ok: false, error: "Choose no more than 20 barriers." };
   }
+  if (parsedAdditionalBarriers.some(barrier => barrier.length > 200)) {
+    return { ok: false, error: "Keep each barrier to 200 characters or fewer." };
+  }
   const privacy = validateNoPii([
     { field: "additionalDetails", label: "Short description", value: details },
     ...parsedAdditionalBarriers.map((barrier, index) => ({
@@ -284,14 +269,14 @@ export async function generateBarrierWorkflowForFamilyAction(
     }
 
     const barrierRows = selected.map((label, idx) => ({
-      preset_key: BARRIER_KEY_BY_LABEL[label as BarrierPresetLabel] ?? null,
+      preset_key: BARRIER_KEY_BY_LABEL.get(label) ?? "other",
       label,
       sort_order: idx,
     }));
     for (const barrier of parsedAdditionalBarriers) {
       barrierRows.push({
-        preset_key: "other",
-        label: barrier.length > 200 ? `${barrier.slice(0, 197)}...` : barrier,
+        preset_key: BARRIER_KEY_BY_LABEL.get(barrier) ?? "other",
+        label: barrier,
         sort_order: barrierRows.length,
       });
     }
@@ -340,8 +325,6 @@ export async function generateBarrierWorkflowForFamilyAction(
     const mapped = mapFamilyToWorkflowResult(
       detail.name,
       familyId,
-      selected,
-      additionalBarriers,
       details,
       null,
       detail,
@@ -366,21 +349,12 @@ export async function loadBarrierWorkflowForFamilyAction(
     const { supabase } = await requireAppUserWithClient();
     const detail = await getFamilyDetail(supabase, familyId);
     if (!detail) return { ok: false, error: "Family not found." };
-    const selected = detail.barriers
-      .filter((b) => b.preset_key !== "other")
-      .map((b) => b.label);
-    const additionalBarriers = detail.barriers
-      .filter((b) => b.preset_key === "other")
-      .map((b) => b.label)
-      .join("; ");
     const details = detail.summary ?? "";
     return {
       ok: true,
       result: mapFamilyToWorkflowResult(
         detail.name,
         familyId,
-        selected,
-        additionalBarriers,
         details,
         null,
         detail,

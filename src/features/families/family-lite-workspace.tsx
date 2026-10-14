@@ -42,7 +42,7 @@ function savedAdditionalDetails(
 function parseBarrierLinesOrdered(input: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const part of input.split(/\r?\n|,|;/)) {
+  for (const part of input.split(/\r?\n/)) {
     const t = part.trim();
     if (!t) continue;
     const key = t.toLowerCase();

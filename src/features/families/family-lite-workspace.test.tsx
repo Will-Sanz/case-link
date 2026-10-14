@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import { generateBarrierWorkflowForFamilyAction } from "@/app/actions/barrier-workflow";
 import { FamilyLiteWorkspace } from "@/features/families/family-lite-workspace";
+import { PRESET_BARRIERS } from "@/lib/constants/intake-options";
+import { BARRIER_PRESETS } from "@/types/barrier-workflow";
 
 const routerPush = vi.hoisted(() => vi.fn());
 const routerRefresh = vi.hoisted(() => vi.fn());
@@ -35,6 +37,17 @@ vi.mock("@/features/families/case-progress-workspace", () => ({
 vi.mock("@/features/families/family-plan-panel", () => ({ FamilyPlanPanel: () => null }));
 
 const familyId = "20000000-0000-4000-8000-000000000002";
+
+it("displays and resubmits all intake labels and custom punctuation without changing their meaning", async () => {
+  const labels = [...PRESET_BARRIERS.map(p => p.label), "Limited transport, evenings; weekends only"];
+  const additionalBarriers = labels.join("\n");
+  vi.mocked(generateBarrierWorkflowForFamilyAction).mockResolvedValue({ ok: false, error: "Plan unavailable" });
+  render(<FamilyLiteWorkspace familyId={familyId} familyUpdatedAt="2026-10-13T12:00:00Z" familyName="Family 014" barrierOptions={BARRIER_PRESETS} plan={null} tab="overview" initialResult={{ familyId, referenceId: "Family 014", selectedBarriers: [], additionalBarriers, additionalDetails: "", sections: [], resources: [], resourceStatus: "empty", lastSavedAt: null }} />);
+  for (const label of labels) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: "Mental health" }).getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
+  await waitFor(() => expect(generateBarrierWorkflowForFamilyAction).toHaveBeenCalledWith(familyId, expect.objectContaining({ selectedBarriers: [], additionalBarriers })));
+});
 
 describe("FamilyLiteWorkspace plan generation", () => {
   beforeEach(() => {
