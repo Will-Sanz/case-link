@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   findLikelyIdentifiers,
+  validateFamilyNoPii,
   validateNoPii,
 } from "@/lib/privacy/no-pii";
+import { directoryCase } from "../../../tests/fixtures/directory-case";
+import type { PlanWithSteps } from "@/types/family";
 
 describe("findLikelyIdentifiers", () => {
   it("flags common direct identifiers with the exact matching text", () => {
@@ -68,5 +71,32 @@ describe("findLikelyIdentifiers", () => {
     expect(result.error).toContain("Family label");
     expect(result.error).toContain("Jordan Williams");
     expect(result.error).toContain("215-555-0184");
+  });
+});
+
+describe("saved planning text privacy", () => {
+  const paths = [
+    "title","description",...['action_needed_now','rationale','detailed_instructions','contact_script','expected_outcome','timing_guidance','stage_goal','why_now','depends_on','milestone_type','success_marker'].map(key=>`details.${key}`),
+    ...['checklist','required_documents','materials_needed','blockers','fallback_options'].map(key=>`details.${key}.0`),
+    ...['blocker_reason','outcome_notes','contact_attempted_at','outreach_result'].map(key=>`workflow_data.${key}`),
+    ...['title','description','notes','outcome'].map(key=>`action_items.0.${key}`),
+  ];
+  it.each(paths)("detects saved private text in %s", path => {
+    const detail = directoryCase();
+    const step: Record<string,unknown> = {title:"Intake",description:"Review options",details:{},workflow_data:{},action_items:[{}]};
+    const keys = path.split('.'); let current = step;
+    for (const key of keys.slice(0,-1)) { current[key] ??= {}; current=current[key] as Record<string,unknown>; }
+    current[keys.at(-1)!] = "private-person@example.test";
+    detail.plan = {steps:[step]} as unknown as PlanWithSteps;
+    const result = validateFamilyNoPii(detail);
+    expect(result.ok).toBe(false);
+    expect(result.findings[0].field).toBe(`plan.steps.0.${path}`);
+  });
+  it("allows directory contact values only in the separately sourced contact field", () => {
+    const detail = directoryCase();
+    detail.plan = {steps:[{title:"Review intake",description:"Confirm availability",details:{contacts:[{phone:"215-555-0148",email:"intake@example.test"}]}}]} as unknown as PlanWithSteps;
+    expect(validateFamilyNoPii(detail).ok).toBe(true);
+    detail.plan.steps[0].description = "Call 215-555-0148";
+    expect(validateFamilyNoPii(detail).ok).toBe(false);
   });
 });

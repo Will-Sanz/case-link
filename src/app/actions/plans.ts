@@ -29,6 +29,8 @@ import {
 import { logServerError } from "@/lib/logger/server-error";
 import {
   validateFamilyNoPii,
+  planDetailsPrivacyFields,
+  planStepPrivacyFields,
   validateNoPii,
   type PrivacyFieldInput,
 } from "@/lib/privacy/no-pii";
@@ -92,46 +94,6 @@ export type PlanEditActionResult =
 function noPiiError(fields: PrivacyFieldInput[]): string | null {
   const result = validateNoPii(fields);
   return result.ok ? null : (result.error ?? "Remove identifying text before continuing.");
-}
-
-function planDetailsPrivacyFields(
-  details: PlanStepDetails | null | undefined,
-  prefix: string,
-): PrivacyFieldInput[] {
-  if (!details) return [];
-  const singular: Array<[keyof PlanStepDetails, string]> = [
-    ["action_needed_now", "Immediate action"],
-    ["rationale", "Rationale"],
-    ["detailed_instructions", "Instructions"],
-    ["expected_outcome", "Expected outcome"],
-    ["timing_guidance", "Timing guidance"],
-    ["stage_goal", "Goal"],
-    ["why_now", "Why now"],
-    ["depends_on", "Dependency"],
-    ["success_marker", "Success marker"],
-  ];
-  const fields: PrivacyFieldInput[] = singular.map(([key, label]) => ({
-    field: `${prefix}.${key}`,
-    label,
-    value: typeof details[key] === "string" ? details[key] as string : null,
-  }));
-  const lists: Array<[keyof PlanStepDetails, string]> = [
-    ["checklist", "Checklist item"],
-    ["required_documents", "Required document"],
-    ["materials_needed", "Required material"],
-    ["blockers", "Blocker"],
-    ["fallback_options", "Fallback option"],
-  ];
-  for (const [key, label] of lists) {
-    const values = details[key];
-    if (!Array.isArray(values)) continue;
-    values.forEach((value, index) => {
-      if (typeof value === "string") {
-        fields.push({ field: `${prefix}.${key}.${index}`, label, value });
-      }
-    });
-  }
-  return fields;
 }
 
 export type PreviewRefinePlanStepResult =
@@ -1106,40 +1068,6 @@ export async function updatePlanStepActionItem(input: unknown): Promise<PlanEdit
   }
 }
 
-function refinementPrivacyFields(steps: DraftStepRefineInput[]): PrivacyFieldInput[] {
-  return steps.flatMap((step, stepIndex) => [
-      {
-        field: `draft.steps.${stepIndex}.title`,
-        label: "Action title",
-        value: step.title,
-      },
-      {
-        field: `draft.steps.${stepIndex}.description`,
-        label: "Action description",
-        value: step.description,
-      },
-      ...planDetailsPrivacyFields(
-        (step.details ?? {}) as PlanStepDetails,
-        `draft.steps.${stepIndex}.details`,
-      ),
-      ...Object.entries(step.workflow_data ?? {}).flatMap(([key, value]) => typeof value === "string" ? [{ field: `draft.steps.${stepIndex}.workflow_data.${key}`, label: "Action progress", value }] : []),
-      ...step.action_items.flatMap((action, actionIndex) => [
-        {
-          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.title`,
-          label: "Action title",
-          value: action.title,
-        },
-        {
-          field: `draft.steps.${stepIndex}.action_items.${actionIndex}.description`,
-          label: "Action description",
-          value: action.description,
-        },
-        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.notes`, label: "Action progress", value: action.notes },
-        { field: `draft.steps.${stepIndex}.action_items.${actionIndex}.outcome`, label: "Action outcome", value: action.outcome },
-      ]),
-    ]);
-}
-
 function assertCurrentRefinementDraft(current: PlanStepRow[], draft: DraftStepRefineInput[]) {
   const requested = matchPlanRowsById(current, draft);
   current.forEach((step, i) => {
@@ -1167,7 +1095,7 @@ export async function previewRefinePlanStep(input: unknown): Promise<PreviewRefi
   try { assertCurrentRefinementDraft([current], [draft]); }
   catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Reload the current plan before refining." }; }
   const privacy = validateFamilyNoPii(detail, [
-    { field: "feedback", label: "AI revision instructions", value: feedback }, ...refinementPrivacyFields([draft]),
+    { field: "feedback", label: "AI revision instructions", value: feedback }, ...planStepPrivacyFields(draft, "draft.steps.0"),
   ]);
   if (!privacy.ok) return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
   if (!getEnv().OPENAI_API_KEY?.trim()) return { ok: false, error: "AI refinement is not configured." };
@@ -1219,7 +1147,7 @@ export async function previewRefinePlan(input: unknown): Promise<PreviewRefinePl
   }
   const draftSteps: DraftStepRefineInput[] = draft.steps.map(step => ({ ...step, details: step.details ?? {} }));
   const privacy = validateFamilyNoPii(detail, [
-    { field: "feedback", label: "AI revision instructions", value: feedback }, ...refinementPrivacyFields(draftSteps),
+    { field: "feedback", label: "AI revision instructions", value: feedback }, ...draftSteps.flatMap((step,index)=>planStepPrivacyFields(step, `draft.steps.${index}`)),
   ]);
   if (!privacy.ok) {
     return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };

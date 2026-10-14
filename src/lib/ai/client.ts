@@ -16,6 +16,7 @@ import { getEnv } from "@/lib/env";
 import { isDev } from "@/lib/env/runtime";
 import { aiBudgetMessage } from "@/lib/rate-limit/ai-budget-message";
 import { consumeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
+import { findLikelyIdentifiers } from "@/lib/privacy/no-pii";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
 const OPENAI_FETCH_TIMEOUT_MS = 180_000;
@@ -56,13 +57,19 @@ export type CreateResponseOptions = {
   maxTokens?: number;
   /** Defaults to fast when omitted. */
   aiMode?: AiMode;
-  /** When set, applies per-user rate limits and emits lightweight `[openai-usage]` logs. */
+  /** Optional routing metadata for content-free usage logs. All requests are rate limited. */
   requestMeta?: OpenAiRequestMeta;
 };
 
 export type CreateResponseResult =
   | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
-  | { ok: false; error: string; code?: "rate_limited" | "incomplete" | "refused" | "provider_error" | "invalid_response" | "timeout" | "network_error"; retryAfter?: number };
+  | { ok: false; error: string; code?: "privacy_blocked" | "rate_limited" | "incomplete" | "refused" | "provider_error" | "invalid_response" | "timeout" | "network_error"; retryAfter?: number };
+
+function payloadHasIdentifiers(value: unknown): boolean {
+  if (typeof value === "string") return findLikelyIdentifiers(value).length > 0;
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) => findLikelyIdentifiers(key).length > 0 || payloadHasIdentifiers(child));
+}
 
 function summarizeInput(input: string | ChatMessage[]): { chars: number } {
   if (typeof input === "string") {
@@ -154,6 +161,12 @@ export async function createAiResponse(
     }
     return { ok: false, error: exposeAiErrorToClient(err, envDebug) };
   }
+  const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
+  // Freeze the exact provider body before any await; no caller can change it after inspection.
+  const requestBody = buildResponsesBody(model, resolved, mode);
+  if (payloadHasIdentifiers(JSON.parse(requestBody))) {
+    return { ok: false, code: "privacy_blocked", error: "This AI request contains likely identifying information. Review the case text, instructions, and conversation before trying again." };
+  }
   const budget = await consumeOpenAiRateSlot(options.taskType);
   if (!budget.allowed) {
     const msg = aiBudgetMessage(budget);
@@ -162,8 +175,6 @@ export async function createAiResponse(
     }
     return { ok: false, error: msg, code: "rate_limited", retryAfter: budget.retryAfter };
   }
-
-  const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
 
   const debug = envDebug;
   const payloadDebug = env.OPENAI_PAYLOAD_DEBUG === "1";
@@ -192,7 +203,7 @@ export async function createAiResponse(
   }
 
   try {
-    const rawResult = await callResponsesApi(apiKey, model, resolved, debug, mode);
+    const rawResult = await callResponsesApi(apiKey, model, requestBody, options.taskType, debug);
     const result: CreateResponseResult =
       rawResult.ok ?
         rawResult
@@ -275,13 +286,11 @@ function providerHttpError(response: Response): CreateResponseResult {
   return { ok: false, code: "provider_error", error: "The AI service could not complete this request. Try again." };
 }
 
-async function callResponsesApi(
-  apiKey: string,
+function buildResponsesBody(
   model: string,
   options: CreateResponseOptions,
-  debug: boolean,
   mode: AiMode,
-): Promise<CreateResponseResult> {
+): string {
   const body: Record<string, unknown> = {
     model,
     instructions: options.instructions,
@@ -308,13 +317,17 @@ async function callResponsesApi(
     };
   }
 
+  return JSON.stringify(body);
+}
+
+async function callResponsesApi(apiKey: string, model: string, body: string, taskType: AiTaskType, debug: boolean): Promise<CreateResponseResult> {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body,
     signal: openAiAbortSignal(),
   });
 
@@ -334,7 +347,7 @@ async function callResponsesApi(
   if (!text?.trim()) return invalidResponse();
 
   if (debug) {
-    console.info(`[ai] Responses task=${options.taskType} model=${model} tokens=`, data.usage?.total_tokens);
+    console.info(`[ai] Responses task=${taskType} model=${model} tokens=`, data.usage?.total_tokens);
   }
 
   return {

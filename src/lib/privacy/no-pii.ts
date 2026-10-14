@@ -1,4 +1,4 @@
-import type { FamilyDetail } from "@/types/family";
+import type { FamilyDetail, PlanStepDetails, PlanStepRow, PlanStepActionItemRow } from "@/types/family";
 
 export type LikelyIdentifierKind =
   | "email"
@@ -242,7 +242,32 @@ export function validateNoPii(fields: PrivacyFieldInput[]): {
   return { ok: findings.length === 0, findings, error: noPiiErrorMessage(findings) };
 }
 
-/** User-authored family fields that may be included in an AI request. */
+function textPrivacyFields(value: unknown, field: string, label: string): PrivacyFieldInput[] {
+  if (typeof value === "string") return [{field,label,value}];
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key,child])=>textPrivacyFields(child,`${field}.${key}`,label));
+}
+
+/** Directory contacts are source-validated separately and never sent as narrative to AI. */
+export function planDetailsPrivacyFields(details: PlanStepDetails | null | undefined, prefix: string): PrivacyFieldInput[] {
+  const narrative = {...details};
+  delete narrative.contacts;
+  return textPrivacyFields(narrative,prefix,"Plan details");
+}
+
+export function planStepPrivacyFields(step: Pick<PlanStepRow,"title" | "description" | "details" | "workflow_data"> & {
+  action_items?: Array<Pick<PlanStepActionItemRow,"title" | "description" | "notes" | "outcome">>;
+}, prefix: string): PrivacyFieldInput[] {
+  return [
+    {field:`${prefix}.title`,label:"Action title",value:step.title},
+    {field:`${prefix}.description`,label:"Action description",value:step.description},
+    ...planDetailsPrivacyFields(step.details,`${prefix}.details`),
+    ...textPrivacyFields(step.workflow_data,`${prefix}.workflow_data`,"Action progress"),
+    ...(step.action_items ?? []).flatMap((action,index)=>textPrivacyFields({title:action.title,description:action.description,notes:action.notes,outcome:action.outcome},`${prefix}.action_items.${index}`,"Action text")),
+  ];
+}
+
+/** User-authored family and plan text, including historical content that might enter a later request. */
 export function familyPrivacyFields(detail: FamilyDetail): PrivacyFieldInput[] {
   return [
     { field: "name", label: "Family label", value: detail.name, mode: "label" },
@@ -280,6 +305,9 @@ export function familyPrivacyFields(detail: FamilyDetail): PrivacyFieldInput[] {
       label: "Case note",
       value: note.body,
     })),
+    {field:"plan.summary",label:"Plan summary",value:detail.plan?.summary},
+    ...textPrivacyFields(detail.plan?.client_display, "plan.client_display", "Plan display text"),
+    ...(detail.plan?.steps ?? []).flatMap((step,index)=>planStepPrivacyFields(step,`plan.steps.${index}`)),
     ...(detail.progressUpdates ?? []).flatMap((update, updateIndex) => [
       {
         field: `progressUpdates.${updateIndex}.summary`,

@@ -58,6 +58,13 @@ describe("full plan refinement boundary", () => {
     expect(mocks.refine).not.toHaveBeenCalled();
   });
 
+  it.each(["contact_script","milestone_type"])("checks the previously omitted %s before either preview",async field=>{
+    const changed={...structuredClone(step),details:{...step.details,[field]:"Contact private-person@example.test"}};
+    expect(await previewRefinePlanStep({familyId,stepId:step.id,expectedRevision:"a".repeat(64),feedback:"Clarify",draft:changed})).toMatchObject({ok:false});
+    expect(await previewRefinePlan({familyId,expectedRevision:"a".repeat(64),feedback:"Clarify",draft:{steps:[changed]}})).toMatchObject({ok:false});
+    expect(mocks.refine).not.toHaveBeenCalled();
+  });
+
   it("fails closed without an authenticated accessible family", async () => {
     mocks.detail.mockResolvedValue(null);
     expect(await previewRefinePlan({ familyId, expectedRevision: "a".repeat(64), feedback: "Clarify", draft: { steps: [step] } })).toMatchObject({ ok: false });

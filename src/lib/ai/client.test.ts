@@ -116,6 +116,31 @@ describe("AI terminal results", () => {
 });
 
 describe("budget preflight and recovery messages", () => {
+  it.each(["plan_phase_generation", "plan_refinement", "step_refinement", "case_assistant"] as const)("blocks private input for %s before billing or network access", async taskType => {
+    const log = vi.spyOn(console,"info").mockImplementation(()=>{});
+    mocks.env.OPENAI_DEBUG = "1"; mocks.env.OPENAI_PAYLOAD_DEBUG = "1";
+    const result = await createAiResponse({...options,taskType,input:"Call private-person@example.test"});
+    expect(result).toMatchObject({ok:false,code:"privacy_blocked"});
+    expect(JSON.stringify(result)).not.toContain("private-person@example.test");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private-person@example.test");
+    expect(mocks.budget).not.toHaveBeenCalled(); expect(mocks.fetch).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+  it.each(["instructions","system history","user history","assistant history","schema","encoded plan"])("checks the actual %s without a trust exemption", async location => {
+    const request = {...options, input:options.input as string | import("./client").ChatMessage[]};
+    if (location === "instructions") request.instructions = "Student ID: AB1234";
+    else if (location.endsWith("history")) request.input = [{role:location.split(" ")[0] as "system" | "user" | "assistant",content:"Call 215-555-0199"}];
+    else if (location === "encoded plan") request.input = JSON.stringify({steps:[{workflow_data:{outreach_result:"Email family@example.test"}}]});
+    const result = await createAiResponse({...request,...(location === "schema" ? {structuredJsonSchema:{name:"example",strict:true as const,schema:{type:"object",description:"Contact family@example.test"}}} : {})});
+    expect(result).toMatchObject({ok:false,code:"privacy_blocked"});
+    expect(mocks.budget).not.toHaveBeenCalled(); expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it("sends the inspected immutable payload even if a caller changes its objects while waiting for budget", async () => {
+    const request = {...options,input:[{role:"user" as const,content:"Discuss intake options."}]};
+    mocks.budget.mockImplementation(async()=>{request.input[0].content="Email private-person@example.test";return {allowed:true};});
+    expect(await createAiResponse(request)).toMatchObject({ok:true});
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).input).toEqual([{role:"user",content:"Discuss intake options."}]);
+  });
   it.each(["oversized", "invalid model", "invalid output size"])("rejects %s without spending a request allowance", async kind => {
     const input = { ...options };
     if (kind === "oversized") input.input = "x".repeat(120_001);
