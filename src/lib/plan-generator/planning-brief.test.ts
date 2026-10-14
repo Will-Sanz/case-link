@@ -15,6 +15,7 @@ vi.mock("@/lib/ai/client", () => ({ createAiResponse: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const familyId = "20000000-0000-4000-8000-000000000002";
+const planId = "30000000-0000-4000-8000-000000000003";
 const stamp = "2026-10-13T12:00:00Z";
 function fixture(): FamilyDetail {
   return { id: familyId, name: "Family 014", summary: "Housing support", household_notes: null, urgency: "high", status: "active", created_by_id: "owner", created_at: stamp,
@@ -27,7 +28,7 @@ function stagedDatabase(initial?: PlanGenerationState) {
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     if (name === "start_staged_plan_generation") {
       state = structuredClone(args.p_generation_state as PlanGenerationState);
-      return { data: { planId: "plan-1", version: 1 }, error: null };
+      return { data: { planId, version: 1 }, error: null };
     }
     if (name === "append_staged_plan_phase" || name === "update_staged_plan_state") {
       state = structuredClone(args.p_generation_state as PlanGenerationState);
@@ -40,7 +41,7 @@ function stagedDatabase(initial?: PlanGenerationState) {
     const query = {
       select: () => query, order: () => query, limit: () => query,
       eq: (key: string, value: string) => { if (key === "phase") phase = value; return query; },
-      maybeSingle: async () => ({ data: table === "plans" ? { id: "plan-1", version: 1, created_at: stamp, generation_state: structuredClone(state), ai_model: null } : { sort_order: 0 }, error: null }),
+      maybeSingle: async () => ({ data: table === "plans" ? { id: planId, version: 1, created_at: stamp, generation_state: structuredClone(state), ai_model: null } : { sort_order: 0 }, error: null }),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({ count: counts[phase], error: null }).then(resolve),
     };
     return query;
@@ -111,7 +112,7 @@ describe("one durable planning snapshot", () => {
     const changed = fixture(); changed.summary = "New instructions saved after generation began";
     mocks.detail.mockResolvedValue(changed);
     for (const phase of ["30", "60", "90"]) {
-      expect(await advanceStagedLeanPlanGeneration({ familyId })).toMatchObject({ ok: true, phaseCompleted: phase, done: phase === "90" });
+      expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, phaseCompleted: phase, done: phase === "90" });
       expect(db.read()!.input_snapshot).toEqual(snapshot);
     }
     expect(mocks.detail).toHaveBeenCalledTimes(1);
@@ -124,10 +125,28 @@ describe("one durable planning snapshot", () => {
     }
   });
 
+  it("returns busy without a provider request or releasing another request's lease", async () => {
+    const db = stagedDatabase(); db.client.rpc.mockResolvedValueOnce({ data: false, error: null });
+    mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, status: "busy", retryAfter: 5 });
+    expect(db.client.from).not.toHaveBeenCalled(); expect(createAiResponse).not.toHaveBeenCalled();
+    expect(db.client.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires the requested plan identity and releases only its own claim when superseded", async () => {
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
+    const result = await advanceStagedLeanPlanGeneration({ familyId, planId: "40000000-0000-4000-8000-000000000004" });
+    expect(result).toMatchObject({ ok: true, status: "superseded", done: true });
+    expect(createAiResponse).not.toHaveBeenCalled();
+    const claimed = db.client.rpc.mock.calls.find(call => call[0] === "claim_ai_job")![1];
+    expect(claimed.p_lease_id).toMatch(/^[a-f0-9-]{36}$/);
+    expect(db.client.rpc).toHaveBeenCalledWith("release_ai_job", expect.objectContaining({ p_lease_id: claimed.p_lease_id }));
+  });
+
   it("fails old partial jobs before any provider call instead of replacing their context", async () => {
     const db = stagedDatabase({ v: 1, status: "running", pending_phase: "60", planning_brief: "old", phases_complete: { "30": true, "60": false, "90": false }, models_used: [], stage_timings_ms: {} });
     mocks.session.mockResolvedValue({ supabase: db.client });
-    expect(await advanceStagedLeanPlanGeneration({ familyId })).toMatchObject({ ok: false, error: expect.stringContaining("Generate a new draft") });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: false, error: expect.stringContaining("Generate a new draft") });
     expect(db.read()!.status).toBe("failed"); expect(createAiResponse).not.toHaveBeenCalled();
   });
 

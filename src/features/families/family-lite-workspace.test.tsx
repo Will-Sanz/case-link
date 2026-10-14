@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
 import { generateBarrierWorkflowForFamilyAction } from "@/app/actions/barrier-workflow";
@@ -45,6 +46,7 @@ describe("FamilyLiteWorkspace plan generation", () => {
     vi.mocked(generateBarrierWorkflowForFamilyAction).mockResolvedValue({
       ok: true,
       stagedPolling: true,
+      planId: "30000000-0000-4000-8000-000000000003",
       savedContextAt: "2026-08-04T14:00:00.000Z",
       result: {
         referenceId: familyId,
@@ -58,7 +60,7 @@ describe("FamilyLiteWorkspace plan generation", () => {
         lastSavedAt: "2026-08-04T14:00:00.000Z",
       },
     });
-    vi.mocked(advanceStagedLeanPlanGeneration).mockResolvedValue({ ok: true, done: true });
+    vi.mocked(advanceStagedLeanPlanGeneration).mockResolvedValue({ ok: true, status: "complete", done: true });
 
     render(
       <FamilyLiteWorkspace
@@ -94,4 +96,47 @@ it("retains the draft's revision on refresh and advances it when context saved b
   expect(generateBarrierWorkflowForFamilyAction).toHaveBeenLastCalledWith(familyId, expect.objectContaining({ expectedUpdatedAt: firstRevision }));
   fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
   await waitFor(() => expect(generateBarrierWorkflowForFamilyAction).toHaveBeenLastCalledWith(familyId, expect.objectContaining({ expectedUpdatedAt: savedRevision })));
+});
+
+
+it("resumes after another tab is busy and offers manual recovery after a terminal failure", async () => {
+  vi.useFakeTimers();
+  const mockAdvance = vi.mocked(advanceStagedLeanPlanGeneration);
+  mockAdvance.mockReset().mockResolvedValueOnce({ ok: true, status: "busy", done: false, retryAfter: 5 })
+    .mockResolvedValueOnce({ ok: false, status: "failed", error: "AI limit reached" })
+    .mockResolvedValue({ ok: true, status: "complete", done: true });
+  const plan: import("@/types/family").PlanWithSteps = { id: "30000000-0000-4000-8000-000000000003", family_id: familyId, steps: [], version: 2, summary: null, generation_source: "openai", ai_model: null, created_at: "2026-10-13T12:00:00Z", presentation: { sourceKind: "ai" }, generation_state: { v: 1, status: "running", pending_phase: "60", models_used: [], stage_timings_ms: {}, phases_complete: { "30": true, "60": false, "90": false } } };
+  const view = render(<FamilyLiteWorkspace familyId={familyId} familyUpdatedAt="2026-10-13T12:00:00Z" familyName="Family 014" barrierOptions={[]} initialResult={null} plan={plan} tab="plan" hasPreviousReviewedPlan />);
+  try {
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(mockAdvance).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("link", { name: "View previous reviewed plan" }).getAttribute("href")).toBe(`/families/${familyId}/plan/previous`);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(screen.getByRole("alert").textContent).toContain("AI limit reached");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Continue draft" })); });
+    expect(mockAdvance).toHaveBeenCalledTimes(3);
+    expect(mockAdvance).toHaveBeenLastCalledWith(expect.objectContaining({ planId: plan.id }));
+  } finally { view.unmount(); vi.useRealTimers(); }
+});
+
+
+it("restarts a cancelled mount safely and stops advancing after leaving the page", async () => {
+  vi.useFakeTimers();
+  let finish!: (value: Awaited<ReturnType<typeof advanceStagedLeanPlanGeneration>>) => void;
+  const advance = vi.mocked(advanceStagedLeanPlanGeneration);
+  advance.mockReset().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue({ ok: true, status: "complete", done: true });
+  const plan: import("@/types/family").PlanWithSteps = { id: "30000000-0000-4000-8000-000000000003", family_id: familyId, steps: [], version: 2, summary: null, generation_source: "openai", ai_model: null, created_at: "2026-10-13T12:00:00Z", presentation: { sourceKind: "ai" }, generation_state: { v: 1, status: "running", pending_phase: "30", models_used: [], stage_timings_ms: {}, phases_complete: { "30": false, "60": false, "90": false } } };
+  const props = { familyId, familyUpdatedAt: plan.created_at, familyName: "Family 014", barrierOptions: [], initialResult: null, plan, tab: "plan" as const };
+  const view = render(<StrictMode><FamilyLiteWorkspace {...props} /></StrictMode>);
+  try {
+    await act(async () => { finish({ ok: true, status: "busy", done: false, retryAfter: 5 }); await vi.advanceTimersByTimeAsync(0); });
+    expect(advance).toHaveBeenCalledTimes(2);
+    view.unmount();
+    advance.mockReset().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const reopened = render(<FamilyLiteWorkspace {...props} />);
+    reopened.unmount();
+    await act(async () => { finish({ ok: true, status: "advanced", done: false, phaseCompleted: "30" }); await vi.advanceTimersByTimeAsync(30_000); });
+    expect(advance).toHaveBeenCalledTimes(1);
+  } finally { view.unmount(); vi.useRealTimers(); }
 });

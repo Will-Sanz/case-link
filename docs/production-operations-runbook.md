@@ -195,3 +195,10 @@ Each production release ticket must attach:
 - latest restore and incident-tabletop reports;
 - access review date;
 - named approvals, residual risks, owner, and expiry.
+
+
+## Interrupted plan preparation
+
+Each stage is saved before the next begins. Reloading or returning to the plan resumes the same version; another active tab is reported as busy and polled without making a second provider request. After a connection failure, the browser makes at most three consecutive attempts; provider/quota errors require staff to choose Continue draft. Polling stops after twelve minutes and cancels on navigation. No response may hold the browser loop past its deadline.
+
+Each server request owns a unique database lease. A lost lease expires after ten minutes; the previous request cannot release or write using a newer lease. Current generation makes one provider request per stage with a three-minute timeout; plan and overview pages request a five-minute hosting limit. Confirm that the actual hosting deployment applies that limit in the CL-41 rehearsal. Use the saved plan ID when investigating; never restart generation automatically as a new version. While a replacement is unfinished, View previous reviewed plan opens the prior version for reference. It does not authorize exporting stale content.

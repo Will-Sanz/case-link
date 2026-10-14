@@ -239,7 +239,7 @@ export async function generateBarrierWorkflowForFamilyAction(
   familyId: string,
   input: unknown,
 ): Promise<
-  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean; savedContextAt: string }
+  | { ok: true; result: BarrierWorkflowResult; stagedPolling?: boolean; planId?: string; savedContextAt: string }
   | { ok: false; error: string; savedContextAt?: string }
 > {
   const parsed = z.object({
@@ -331,10 +331,6 @@ export async function generateBarrierWorkflowForFamilyAction(
 
     const planRes = await startStagedLeanPlanGeneration({
       familyId,
-      regenerationFeedback:
-        [selected.join("; "), parsedAdditionalBarriers.join("; "), details]
-          .filter(Boolean)
-          .join("\n") || undefined,
       aiMode: parsed.data.input.aiMode,
     });
     if (!planRes.ok) {
@@ -362,7 +358,7 @@ export async function generateBarrierWorkflowForFamilyAction(
     );
     revalidatePath(`/families/${familyId}`);
     revalidatePath("/families");
-    return { ok: true, result: mapped, stagedPolling: true, savedContextAt };
+    return { ok: true, result: mapped, stagedPolling: true, planId: planRes.planId, savedContextAt };
   } catch (error) {
     return { ok: false, error: toClientError(error), savedContextAt };
   }

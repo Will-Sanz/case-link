@@ -6,6 +6,8 @@ import { loadBarrierWorkflowForFamilyAction } from "@/app/actions/barrier-workfl
 import { BARRIER_PRESETS } from "@/types/barrier-workflow";
 import { FamilyLiteWorkspace } from "@/features/families/family-lite-workspace";
 
+export const maxDuration = 300;
+
 type PageProps = {
   params: Promise<{ id: string }>;
 };

@@ -335,6 +335,7 @@ async function run() {
     assert.equal(stale.rowCount, 0, "a stale revision cannot overwrite the saved row");
   }
 
+  assert.deepEqual((await asUser(userA, client => client.query("select id from public.app_users where id=any($1::uuid[]) order by id",[[userA,userB,unprovisionedUser]]))).rows.map(row => row.id),[userA],"combined staff visibility policy still limits unrelated staff profiles");
   await admin.query("update auth.sessions set not_after = now() - interval '1 minute' where id = $1", [sessionIds.get(userA)]);
   assert.equal((await asUser(userA, (client) => client.query("select public.is_active_app_user() as allowed"))).rows[0].allowed, false, "expired sessions lose database access");
   await admin.query("update auth.sessions set not_after = null where id = $1", [sessionIds.get(userA)]);
@@ -858,6 +859,11 @@ async function run() {
   );
   assert.equal(partialPlan.rows[0].count, 0);
 
+  await admin.query("update public.plan_steps set details=jsonb_build_object('expected_outcome','Housing options confirmed') where id=$1", [stepB]);
+  const previousRevision = await revisionFor(userB, familyB);
+  await asUser(userB, client => client.query("select public.mark_plan_reviewed($1,$2,$3)", [familyB,planB,previousRevision]));
+  const generationLease = randomUUID();
+  assert.equal((await asUser(userB, client => client.query("select public.claim_ai_job($1,'staged-plan-advance',$2,600) claimed", [familyB,generationLease]))).rows[0].claimed, true);
   const initialGenerationState = {
     v: 1,
     status: "running",
@@ -886,6 +892,10 @@ async function run() {
   assert.equal(new Set(stagedStarts.map((result) => result.planId)).size, 1);
   assert.equal(stagedStarts.filter((result) => !result.existing).length, 1);
   const stagedPlanId = stagedStarts[0].planId;
+  const previousPlan = (await asUser(userB, client => client.query("select public.get_previous_reviewed_plan($1) plan", [familyB]))).rows[0].plan;
+  assert.equal(previousPlan.id,planB,"previous reviewed plan remains available while replacement is running");
+  assert.equal(previousPlan.steps[0].action_items[0].id,actionB);
+  assert.equal((await asUser(unprovisionedUser, client => client.query("select public.get_previous_reviewed_plan($1) plan",[familyB]))).rows[0].plan,null,"previous plans retain normal row-level access control");
 
   const nextGenerationState = {
     ...initialGenerationState,
@@ -911,8 +921,8 @@ async function run() {
   }];
   await expectDbError(
     () => asUser(userB, (client) => client.query(
-      "select public.append_staged_plan_phase($1, $2, '30', $3::jsonb, $4::jsonb, 'gpt-test', 25)",
-      [familyB, stagedPlanId, JSON.stringify(invalidPhase), JSON.stringify(nextGenerationState)],
+      "select public.append_staged_plan_phase($1, $2, '30', $3::jsonb, $4::jsonb, 'gpt-test', 25, $5)",
+      [familyB, stagedPlanId, JSON.stringify(invalidPhase), JSON.stringify(nextGenerationState), generationLease],
     )),
     "invalid staged children roll back the complete phase transition",
   );
@@ -931,8 +941,8 @@ async function run() {
     action_items: [{ ...invalidPhase[0].action_items[0], title: "Call the housing program" }],
   }];
   const appended = await asUser(userB, (client) => client.query<{ append_staged_plan_phase: boolean }>(
-    "select public.append_staged_plan_phase($1, $2, '30', $3::jsonb, $4::jsonb, 'gpt-test', 25)",
-    [familyB, stagedPlanId, JSON.stringify(validPhase), JSON.stringify(nextGenerationState)],
+    "select public.append_staged_plan_phase($1, $2, '30', $3::jsonb, $4::jsonb, 'gpt-test', 25, $5)",
+    [familyB, stagedPlanId, JSON.stringify(validPhase), JSON.stringify(nextGenerationState), generationLease],
   ));
   assert.equal(appended.rows[0].append_staged_plan_phase, true);
   const savedGenerationSnapshot = await admin.query("select generation_state->'input_snapshot' as snapshot from public.plans where id = $1", [stagedPlanId]);
@@ -950,8 +960,8 @@ async function run() {
   assert.equal(committedPhase.rows[0].pending_phase, "60");
   await expectDbError(
     () => asUser(userB, (client) => client.query(
-      "select public.update_staged_plan_state($1, $2, $3::jsonb, 'gpt-test', 'plan.generation_finished', '{}'::jsonb)",
-      [familyB, stagedPlanId, JSON.stringify(nextGenerationState)],
+      "select public.update_staged_plan_state($1, $2, $3::jsonb, $4, 'gpt-test', 'plan.generation_finished', '{}'::jsonb)",
+      [familyB, stagedPlanId, JSON.stringify(nextGenerationState), generationLease],
     )),
     "generation audit events must match the persisted state",
   );
@@ -962,12 +972,13 @@ async function run() {
   };
   await expectDbError(
     () => asUser(userB, (client) => client.query(
-      "select public.update_staged_plan_state($1, $2, $3::jsonb, 'gpt-test', 'plan.generation_failed', $4::jsonb)",
+      "select public.update_staged_plan_state($1, $2, $3::jsonb, $5, 'gpt-test', 'plan.generation_failed', $4::jsonb)",
       [
         familyB,
         stagedPlanId,
         JSON.stringify(failedGenerationState),
         JSON.stringify({ category: "Call 215-555-0100" }),
+        generationLease,
       ],
     )),
     "generation event metadata cannot bypass identifier DLP",
@@ -975,8 +986,8 @@ async function run() {
   const failedStateUpdated = await asUser(userB, (client) => client.query<{
     update_staged_plan_state: boolean;
   }>(
-    "select public.update_staged_plan_state($1, $2, $3::jsonb, 'gpt-test', 'plan.generation_failed', '{\"category\":\"provider\"}'::jsonb)",
-    [familyB, stagedPlanId, JSON.stringify(failedGenerationState)],
+    "select public.update_staged_plan_state($1, $2, $3::jsonb, $4, 'gpt-test', 'plan.generation_failed', '{\"category\":\"provider\"}'::jsonb)",
+    [familyB, stagedPlanId, JSON.stringify(failedGenerationState), generationLease],
   ));
   assert.equal(failedStateUpdated.rows[0].update_staged_plan_state, true);
   const failedStateEvidence = await admin.query(
@@ -988,6 +999,15 @@ async function run() {
     [stagedPlanId, familyB],
   );
   assert.equal(failedStateEvidence.rows[0].status, "failed");
+  assert.equal((await asUser(userB, client => client.query("select public.get_previous_reviewed_plan($1) plan",[familyB]))).rows[0].plan.id,planB,"previous plan remains available after replacement failure");
+  await admin.query("update private.ai_job_claims set expires_at=clock_timestamp()-interval '1 second' where family_id=$1 and job_key='staged-plan-advance'",[familyB]);
+  const nextLease = randomUUID();
+  assert.equal((await asUser(userB, client => client.query("select public.claim_ai_job($1,'staged-plan-advance',$2,600) claimed",[familyB,nextLease]))).rows[0].claimed,true,"expired request can be resumed");
+  await asUser(userB, client => client.query("select public.release_ai_job($1,'staged-plan-advance',$2)",[familyB,generationLease]));
+  assert.equal((await admin.query("select lease_id from private.ai_job_claims where family_id=$1 and job_key='staged-plan-advance'",[familyB])).rows[0].lease_id,nextLease,"old request cannot release a newer lease held by the same user");
+  await expectDbError(() => asUser(userB, client => client.query("select public.update_staged_plan_state($1,$2,$3::jsonb,$4)",[familyB,stagedPlanId,JSON.stringify(failedGenerationState),generationLease])),"expired request cannot overwrite the new request's state");
+  await expectDbError(() => asUser(userB, client => client.query("select public.append_staged_plan_phase($1,$2,'30',$3::jsonb,$4::jsonb,'gpt-test',25,$5)",[familyB,stagedPlanId,JSON.stringify(validPhase),JSON.stringify(nextGenerationState),generationLease])),"expired request cannot append a phase");
+  await asUser(userB, client => client.query("select public.release_ai_job($1,'staged-plan-advance',$2)",[familyB,nextLease]));
   assert.equal(failedStateEvidence.rows[0].events, 1);
   await expectDbError(
     () => asUser(userB, (client) => client.query(
@@ -1042,8 +1062,8 @@ async function run() {
   const claimResults = await Promise.all(
     Array.from({ length: 8 }, () => asUser(userB, async (client) => {
       const result = await client.query<{ claim_ai_job: boolean }>(
-        "select public.claim_ai_job($1, 'security-concurrency', 60)",
-        [familyB],
+        "select public.claim_ai_job($1, 'security-concurrency', $2, 60)",
+        [familyB, randomUUID()],
       );
       return result.rows[0].claim_ai_job;
     })),

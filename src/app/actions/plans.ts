@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
@@ -142,8 +143,10 @@ export type StagedPlanStartResult =
   | { ok: false; error: string };
 
 export type StagedPlanAdvanceResult =
-  | { ok: true; done: boolean; phaseCompleted?: "30" | "60" | "90" }
-  | { ok: false; error: string };
+  | { ok: true; status: "advanced"; done: false; phaseCompleted?: "30" | "60" | "90" }
+  | { ok: true; status: "complete" | "superseded"; done: true; phaseCompleted?: "30" | "60" | "90" }
+  | { ok: true; status: "busy"; done: false; retryAfter: number }
+  | { ok: false; status: "failed" | "retryable"; error: string; retryAfter?: number };
 
 async function updateStagedPlanState(
   supabase: SupabaseClient,
@@ -151,6 +154,7 @@ async function updateStagedPlanState(
     familyId: string;
     planId: string;
     generationState: PlanGenerationState;
+    leaseId: string;
     aiModel: string | null;
     event?: "plan.generation_failed" | "plan.generation_finished" | "plan.generation_resumed";
     eventDetails?: Record<string, unknown>;
@@ -160,6 +164,7 @@ async function updateStagedPlanState(
     p_family_id: input.familyId,
     p_plan_id: input.planId,
     p_generation_state: input.generationState,
+    p_lease_id: input.leaseId,
     p_ai_model: input.aiModel,
     p_event: input.event ?? null,
     p_event_details: input.eventDetails ?? null,
@@ -190,13 +195,14 @@ async function maxPlanStepSortOrder(
   supabase: SupabaseClient,
   planId: string,
 ): Promise<number> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("plan_steps")
     .select("sort_order")
     .eq("plan_id", planId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (error) throw error;
   return typeof data?.sort_order === "number" ? data.sort_order : -1;
 }
 
@@ -210,7 +216,7 @@ async function countStepsInPhase(
     .select("id", { count: "exact", head: true })
     .eq("plan_id", planId)
     .eq("phase", phase);
-  if (error) return 0;
+  if (error) throw error;
   return count ?? 0;
 }
 
@@ -224,6 +230,7 @@ async function appendLeanPhaseForPlan(
   generationState: PlanGenerationState,
   aiModel: string,
   durationMs: number,
+  leaseId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (phaseSteps.length === 0) {
     return { ok: false, error: "No steps to insert for this phase" };
@@ -261,6 +268,7 @@ async function appendLeanPhaseForPlan(
     p_generation_state: generationState,
     p_ai_model: aiModel,
     p_duration_ms: durationMs,
+    p_lease_id: leaseId,
   });
   if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
   if (!appended) return { ok: false, error: "This plan phase was already saved." };
@@ -365,23 +373,24 @@ export async function startStagedLeanPlanGeneration(input: {
 /** Run the next pending phase (60 or 90) or finalize state. Idempotent if phases already inserted. */
 async function advanceStagedLeanPlanGenerationCore(input: {
   familyId: string;
+  planId: string;
   /** Fallback when `generation_state.ai_mode` is missing (older rows). */
   aiMode?: AiMode;
-}): Promise<StagedPlanAdvanceResult> {
+}, leaseId: string): Promise<StagedPlanAdvanceResult> {
   let supabase: SupabaseClient;
   try {
     const session = await requireAppUserWithClient();
     supabase = session.supabase;
   } catch (error) {
-    return { ok: false, error: publicSessionError(error) };
+    return { ok: false, status: "failed", error: publicSessionError(error) };
   }
 
   const env = getEnv();
   if (!env.OPENAI_API_KEY?.trim()) {
-    return { ok: false, error: "OPENAI_API_KEY required" };
+    return { ok: false, status: "failed", error: "OPENAI_API_KEY required" };
   }
 
-  const { data: planRow } = await supabase
+  const { data: planRow, error: planError } = await supabase
     .from("plans")
     .select("id, created_at, generation_state, version, ai_model")
     .eq("family_id", input.familyId)
@@ -389,18 +398,20 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     .limit(1)
     .maybeSingle();
 
+  if (planError) throw planError;
   if (!planRow?.id) {
-    return { ok: true, done: true };
+    return { ok: false, status: "failed", error: "The saved plan is unavailable. Reload the case before continuing." };
   }
 
+  if (input.planId !== planRow.id) return { ok: true, status: "superseded", done: true };
   const activePlan = planRow;
 
   const rawState = activePlan.generation_state as PlanGenerationState | null | undefined;
   if (!rawState || rawState.v !== 1) {
-    return { ok: true, done: true };
+    return { ok: true, status: "complete", done: true };
   }
   if (rawState.status === "complete") {
-    return { ok: true, done: true };
+    return { ok: true, status: "complete", done: true };
   }
   const planId = activePlan.id as string;
   let state = { ...rawState };
@@ -408,11 +419,12 @@ async function advanceStagedLeanPlanGenerationCore(input: {
   if (!snapshot) {
     const error = "This draft has no valid saved planning context. Generate a new draft to restart safely.";
     await updateStagedPlanState(supabase, {
+      leaseId,
       familyId: input.familyId, planId, generationState: { ...state, status: "failed", error },
       aiModel: activePlan.ai_model as string | null,
       event: "plan.generation_failed", eventDetails: { category: "missing_context" },
     });
-    return { ok: false, error };
+    return { ok: false, status: "failed", error };
   }
 
   if (state.status === "failed") {
@@ -433,6 +445,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         error: undefined,
       };
       await updateStagedPlanState(supabase, {
+        leaseId,
         familyId: input.familyId,
         planId,
         generationState: completedState,
@@ -443,7 +456,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
           duration_ms: totalGenerationDurationMs(state.stage_timings_ms),
         },
       });
-      return { ok: true, done: true };
+      return { ok: true, status: "complete", done: true };
     }
     state = {
       ...state,
@@ -457,6 +470,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       error: undefined,
     };
     await updateStagedPlanState(supabase, {
+      leaseId,
       familyId: input.familyId,
       planId,
       generationState: state as PlanGenerationState,
@@ -477,6 +491,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       error: "Remove identifying text from the family record before generating the plan.",
     };
     await updateStagedPlanState(supabase, {
+      leaseId,
       familyId: input.familyId,
       planId,
       generationState: failedState,
@@ -484,25 +499,22 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       event: "plan.generation_failed",
       eventDetails: { pending_stage: state.pending_phase, category: "privacy_check" },
     });
-    return { ok: false, error: privacy.error ?? "Remove identifying text before continuing." };
+    return { ok: false, status: "failed", error: privacy.error ?? "Remove identifying text before continuing." };
   }
 
-  async function persistState(updates: Partial<PlanGenerationState>, summaryUpdate?: string | null) {
+  async function persistState(updates: Partial<PlanGenerationState>) {
     const previousStatus = state.status;
     const next = { ...state, ...updates };
-    state = next as PlanGenerationState;
-    const generationState = {
-      ...next,
-      ...(summaryUpdate !== undefined ? { summary: summaryUpdate } : {}),
-    } as PlanGenerationState;
+    state = next;
     const event =
       next.status === "failed" && previousStatus !== "failed" ? "plan.generation_failed" as const
       : next.status === "complete" && previousStatus !== "complete" ? "plan.generation_finished" as const
       : undefined;
     await updateStagedPlanState(supabase, {
+      leaseId,
       familyId: input.familyId,
       planId,
-      generationState,
+      generationState: next,
       aiModel: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
       event,
       eventDetails:
@@ -520,7 +532,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         phases_complete: { ...state.phases_complete, "30": true },
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, done: false, phaseCompleted: "30" };
+      return { ok: true, status: "advanced", done: false, phaseCompleted: "30" };
     }
 
     const t = Date.now();
@@ -533,7 +545,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, error: res.reason };
+      return { ok: false, status: "failed", error: res.reason };
     }
     const steps = res.steps
       .map((step) => ({ ...step, phase: "30" as const }))
@@ -542,7 +554,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       const error = "The planning assistant returned no initial actions.";
       await persistState({ status: "failed", error });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, error };
+      return { ok: false, status: "failed", error };
     }
     const modelsUsed = [...state.models_used, res.model];
     const durationMs = Date.now() - t;
@@ -563,14 +575,15 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       nextState,
       modelsUsed.join(" · "),
       durationMs,
+      leaseId,
     );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
-      return { ok: false, error: ins.error };
+      return { ok: false, status: "failed", error: ins.error };
     }
     state = nextState;
     revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, done: false, phaseCompleted: "30" };
+    return { ok: true, status: "advanced", done: false, phaseCompleted: "30" };
   }
 
   // Heal: if DB already has steps for pending phase, advance state only
@@ -582,7 +595,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         phases_complete: { ...state.phases_complete, "60": true },
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, done: false, phaseCompleted: "60" };
+      return { ok: true, status: "advanced", done: false, phaseCompleted: "60" };
     }
 
     const priorFor60 = await fetchPriorPhasesSummaryForPlanner(supabase, planId, ["30"]);
@@ -597,7 +610,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, error: res.reason };
+      return { ok: false, status: "failed", error: res.reason };
     }
     const steps = res.steps
       .map((s) => ({ ...s, phase: "60" as const }))
@@ -608,7 +621,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         error: "AI returned no steps for the 60-day phase.",
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, error: "AI returned no steps for the 60-day phase." };
+      return { ok: false, status: "failed", error: "AI returned no steps for the 60-day phase." };
     }
     const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
     const models_used = [...state.models_used, res.model];
@@ -630,14 +643,15 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       nextState,
       models_used.join(" · "),
       durationMs,
+      leaseId,
     );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
-      return { ok: false, error: ins.error };
+      return { ok: false, status: "failed", error: ins.error };
     }
     state = nextState;
     revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, done: false, phaseCompleted: "60" };
+    return { ok: true, status: "advanced", done: false, phaseCompleted: "60" };
   }
 
   if (state.pending_phase === "90") {
@@ -649,7 +663,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         phases_complete: { ...state.phases_complete, "90": true },
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, done: true, phaseCompleted: "90" };
+      return { ok: true, status: "complete", done: true, phaseCompleted: "90" };
     }
 
     const priorFor90 = await fetchPriorPhasesSummaryForPlanner(supabase, planId, ["30", "60"]);
@@ -664,7 +678,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     if (!res.ok) {
       await persistState({ status: "failed", error: res.reason });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, error: res.reason };
+      return { ok: false, status: "failed", error: res.reason };
     }
     const steps = res.steps
       .map((s) => ({ ...s, phase: "90" as const }))
@@ -675,7 +689,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         error: "AI returned no steps for the 90-day phase.",
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, error: "AI returned no steps for the 90-day phase." };
+      return { ok: false, status: "failed", error: "AI returned no steps for the 90-day phase." };
     }
     const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
     const models_used = [...state.models_used, res.model];
@@ -698,14 +712,15 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       nextState,
       models_used.join(" · "),
       durationMs,
+      leaseId,
     );
     if (!ins.ok) {
       await persistState({ status: "failed", error: ins.error });
-      return { ok: false, error: ins.error };
+      return { ok: false, status: "failed", error: ins.error };
     }
     state = nextState;
     revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, done: true, phaseCompleted: "90" };
+    return { ok: true, status: "complete", done: true, phaseCompleted: "90" };
   }
 
   // Corrupt, raced, or legacy state: recover from the rows already persisted.
@@ -726,7 +741,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         phases_complete: { "30": true, "60": true, "90": true },
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, done: true };
+      return { ok: true, status: "complete", done: true };
     }
     if (recoveredPendingPhase === "90") {
       await persistState({
@@ -734,7 +749,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         phases_complete: { ...state.phases_complete, "60": true },
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, done: false };
+      return { ok: true, status: "advanced", done: false };
     }
     if (recoveredPendingPhase === "60") {
       await persistState({
@@ -742,7 +757,7 @@ async function advanceStagedLeanPlanGenerationCore(input: {
         phases_complete: { ...state.phases_complete, "30": true },
       });
       revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, done: false };
+      return { ok: true, status: "advanced", done: false };
     }
 
     await persistState({
@@ -750,53 +765,55 @@ async function advanceStagedLeanPlanGenerationCore(input: {
       phases_complete: { "30": false, "60": false, "90": false },
     });
     revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, done: false };
+    return { ok: true, status: "advanced", done: false };
   }
 
   revalidatePath(`/families/${input.familyId}`, "page");
-  return { ok: true, done: true };
+  return { ok: true, status: "complete", done: true };
 }
 
 export async function advanceStagedLeanPlanGeneration(input: {
   familyId: string;
+  planId: string;
   aiMode?: AiMode;
 }): Promise<StagedPlanAdvanceResult> {
   const parsed = stagedPlanAdvanceSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Invalid request" };
+  if (!parsed.success) return { ok: false, status: "failed", error: "Invalid request" };
 
   let supabase: SupabaseClient;
   try {
     ({ supabase } = await requireAppUserWithClient());
   } catch (error) {
-    return { ok: false, error: publicSessionError(error) };
+    return { ok: false, status: "failed", error: publicSessionError(error) };
   }
 
   const jobKey = "staged-plan-advance";
+  const leaseId = randomUUID();
   const { data: claimed, error: claimError } = await supabase.rpc("claim_ai_job", {
     p_family_id: parsed.data.familyId,
     p_job_key: jobKey,
-    p_ttl_seconds: 300,
+    p_ttl_seconds: 600,
+    p_lease_id: leaseId,
   });
-  if (claimError) return { ok: false, error: publicMessageFromSupabaseError(claimError) };
-  if (!claimed) return { ok: false, error: "Plan generation is already running." };
+  if (claimError) return { ok: false, status: "failed", error: publicMessageFromSupabaseError(claimError) };
+  if (!claimed) return { ok: true, status: "busy", done: false, retryAfter: 5 };
 
   try {
-    try {
-      return await advanceStagedLeanPlanGenerationCore(parsed.data);
-    } catch (error) {
-      return {
-        ok: false,
-        error: publicMessageFromCaughtError(
-          "advanceStagedLeanPlanGeneration",
-          error,
-          "Could not update plan generation. Try again.",
-        ),
-      };
-    }
+    return await advanceStagedLeanPlanGenerationCore(parsed.data, leaseId);
+  } catch (error) {
+    return {
+      ok: false, status: "retryable", retryAfter: 5,
+      error: publicMessageFromCaughtError(
+        "advanceStagedLeanPlanGeneration",
+        error,
+        "Could not update plan generation. Try again.",
+      ),
+    };
   } finally {
     const { error } = await supabase.rpc("release_ai_job", {
       p_family_id: parsed.data.familyId,
       p_job_key: jobKey,
+      p_lease_id: leaseId,
     });
     if (error) logServerError("advanceStagedLeanPlanGeneration:release", error);
   }

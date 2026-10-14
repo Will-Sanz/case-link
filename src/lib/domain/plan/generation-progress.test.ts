@@ -31,6 +31,9 @@ describe("generation progress", () => {
     [{ "30": 2, "60": 0, "90": 0 }, "60"],
     [{ "30": 2, "60": 2, "90": 0 }, "90"],
     [{ "30": 2, "60": 2, "90": 1 }, null],
+    [{ "30": 0, "60": 2, "90": 1 }, "30"],
+    [{ "30": 2, "60": 0, "90": 1 }, "60"],
+    [{ "30": 0, "60": 0, "90": 1 }, "30"],
   ] as const)("recovers the next stage from persisted row counts", (counts, expected) => {
     expect(pendingPhaseFromPersistedCounts(counts)).toBe(expected);
   });

@@ -18,9 +18,10 @@ beforeEach(() => {
 });
 
 describe("saved planning context", () => {
-  it.each(["  Needs flexible meeting times.  ", ""])("saves description and barriers before either downstream service: %s", async (additionalDetails) => {
+  it.each(["  Needs flexible meeting times.  ", "", "g".repeat(4000)])("saves description and barriers before either downstream service (case %#)", async (additionalDetails) => {
     const result = await generateBarrierWorkflowForFamilyAction(familyId, { selectedBarriers: ["Housing"], expectedUpdatedAt: revision, additionalDetails });
     expect(mocks.rpc).toHaveBeenCalledWith("save_family_planning_context", expect.objectContaining({ p_family_id: familyId, p_expected_updated_at: revision, p_summary: additionalDetails.trim() || null, p_barriers: [expect.objectContaining({ label: "Housing" })] }));
+    expect(mocks.generate).toHaveBeenCalledWith({ familyId, aiMode: undefined });
     expect(mocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.match.mock.invocationCallOrder[0]);
     expect(mocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.generate.mock.invocationCallOrder[0]);
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining("case details were saved") });

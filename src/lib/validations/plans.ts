@@ -68,6 +68,7 @@ export const stagedPlanStartSchema = z.object({
 
 export const stagedPlanAdvanceSchema = z.object({
   familyId: z.string().uuid(),
+  planId: z.string().uuid(),
   aiMode: aiModeSchema,
 });
 
