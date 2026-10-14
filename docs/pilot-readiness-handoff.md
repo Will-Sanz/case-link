@@ -6,51 +6,24 @@ The user asked on October 13 evening to finish the intake-to-plan bug, save the 
 
 - Repository: `/Users/willsanz/homelessness-project`; branch `codex/school-pilot-readiness`.
 - Draft [PR #15](https://github.com/Will-Sanz/case-link/pull/15) is already attached to this chat. Update its description after the remaining work, keeping it draft until launch gates are evidenced.
-- [The main tracker](school-pilot-fix-tracker.md) is the source of truth: 32 closed records, nine required open records, and one optional Decisions evaluation. Closed engineering records still require final candidate regression evidence.
+- [The main tracker](school-pilot-fix-tracker.md) is the source of truth: 33 closed records, eight required open records, and one optional Decisions evaluation. Closed engineering records still require final candidate regression evidence.
 - Follow AGENTS.md: full Ponytail, normal correctness/security/privacy/accessibility review, separate deletion review, and runnable regression tests for non-trivial changes. Read installed Next.js guides before edits. No subagents have been requested.
 - Preserve unrelated untracked design/skill files and artifacts. Stage explicit paths. Do not edit while the push verification hook is running.
 - User approved continuing with the current resource directory and updating its CSV later. Do not require a replacement. The committed seed is explicitly synthetic; preserve it, exclude labelled Demo/inactive rows from real recommendations, and do not claim contact validation from a seed alone.
 
-## Tonight's completed fix and test checkpoint
+## October 14 completed checkpoint
 
-Intake used labels that did not exactly match the planning presets, so a newly created family arrived with its barriers silently dropped. The shared workflow mapper now displays unmatched saved labels as additional barriers; known intake labels keep their exact resource-matching keys on save. It does not convert a general health barrier into a mental-health/substance-use diagnosis. Newline separates custom barriers; punctuation remains part of a label. Overlong labels return a recoverable error rather than silently losing their ending.
+CL-08 is complete locally and committed as the browser-completion item. All seven production-build Chromium scenarios pass in 67 seconds. All 672 unit/component tests, full repository verification/build and real local Auth tests pass. CI now runs the browser suite after database/Auth verification. The test app has no admin/service-role credential; only AI HTTP output is deterministic. Real provider usefulness remains CL-34.
 
-- 17 added unit/rendered regression cases failed before the fix; all 26 focused cases pass afterward.
-- Local production-build browser invitation → initial password → sign-in → separate-browser password reset → old-session denial → one-time-link rejection passes.
-- Local production-build browser intake with all twelve presets → generation → persisted plan passes, with every original label and matching key retained.
-- CL-08 remains open; the latest broader-browser failure is recorded below.
+New browser findings fixed: inline editor names, native-dialog focus and hydration, WebAssembly blocked by production CSP, and the existing assistant being unreachable. The assistant now opens from the plan with a safe return link and blocks navigation from unsaved work. The real PDF download matches the actual preview blob, passes file validation, and was visually displayed in isolated Chromium using the original object policy. See [browser evidence](verification/browser-regressions.md).
 
-### Browser harness
+Local services are currently running: CaseLink Supabase on 54321/54322/54324. The port-3100 browser server ends with each suite. Do not stop the unrelated port-3000 application or other Docker projects. Use synthetic accounts only. At the end, stop only CaseLink's stack, preserving its data.
 
-`tests/e2e/run.mjs` builds with local/synthetic configuration and launches Next on **127.0.0.1:3100**. `tests/e2e/local-stack.mjs` rejects nonlocal database/auth/mail targets. The test app gets no service-role/database credential; test-only provisioning uses the isolated stack. `provider-fixture.mjs` is a Node preload for the test command, never an application feature flag. It checks strict output and `store: false`, blocks external outbound requests, and returns deterministic AI contracts. These tests do not establish live-model quality.
-
-`auth.spec.ts` and `intake.spec.ts` pass. `workflow.spec.ts` is the next active investigation. It now passes interruption/resume with two tabs, recovery of an unsaved edit after refresh, a persisted Waiting task, and title-only AI proposal/application. It then fails its scoped assertion for the Waiting explanation after application (`workflow.spec.ts:56`). The accessibility snapshot still shows the Waiting status and the exact explanation, so investigate the selector/article scope and actual DOM before assuming data loss. Review confirmation/focus, identical preview/download bytes, and assistant checks later in this test have not run. Its unfinished assertions must be completed, not skipped to make a release green.
-
-The run also emitted one sanitized “permission denied for table families” error after an earlier test completed. Check for background prefetches racing synthetic-user cleanup and close browser pages before deleting their accounts if confirmed. Do not weaken authorization to silence it.
-
-Local mail is configured for port 3000. The test asserts the delivered canonical origin and maps only the port to 3100 for the dedicated browser server. Real hosted-domain/redirect and school-mail-scanner checks remain CL-16/CL-41. Do not stop the unrelated application already using port 3000.
-
-```sh
-# Start only CaseLink's isolated local stack if it is stopped.
-npx --yes supabase@2.111.0 start
-
-# Browser runner builds before testing; optional filename selects a focused run.
-npm run test:e2e
-npm run test:e2e -- auth.spec.ts intake.spec.ts
-
-# Regression and security gates; use a separate production build after browser work.
-npm run test:run -- src/app/actions/barrier-workflow.test.ts src/features/families/family-lite-workspace.test.tsx
-npm run test:db-security
-npm run test:auth-security
-npm run test:pdf
-npm run verify
-```
-
-On this Mac, `CASELINK_SUPABASE_CLI` may point to `/Users/willsanz/.npm/_npx/aa8e5c70f9d8d161/node_modules/@supabase/cli-darwin-arm64/bin/supabase` to reuse CLI 2.111.0. Docker socket operations require the existing escalation path. Do not dump Supabase status/start output: it contains local credentials. Browser logs/results are ignored under `tmp/e2e`; synthetic screenshots only. Earlier metadata-only PDF and AI evidence is versioned under `docs/verification`.
+Reproduce with `npm run test:e2e`; it builds the production application. Optional filename arguments select scenarios. The local CLI override is `CASELINK_SUPABASE_CLI=/Users/willsanz/.npm/_npx/aa8e5c70f9d8d161/node_modules/@supabase/cli-darwin-arm64/bin/supabase`. Do not print Supabase status/start output or environment-file values.
 
 ## Remaining work, in order
 
-1. **CL-08 — complete browser and accessibility release coverage.** Start with `workflow.spec.ts`; distinguish a bad test assumption from an application defect before fixing. Complete intake → plan → edit → human review → actual PDF download. Cover interrupted generation, returning users, concurrent/stale edits, stale PDF after another tab changes the plan, session expiry, safe same-account draft recovery and account-switch clearing, MFA enrollment/challenge, keyboard focus, errors/labels, narrow viewport and 200% zoom. Add CI browser execution only when the independent suite is reliable; never hide a failing scenario. Existing database/Auth tests do not replace browser evidence.
+1. **CL-08 — completed locally.** Re-run on the final candidate with the other suites; hosted evidence belongs to CL-41.
 2. **CL-34 — repeatable live AI safety/usefulness evaluation.** Version the first 25 synthetic development cases and at least 50 performance cases with held-out cases; cover generation, both refinement paths, and assistant. Deterministically check schema/IDs/dates, source-backed contacts, privacy, protected edits, failure behavior, and human approval. Include sparse/resource-poor, long/contradictory context, completed/Waiting work, contact restrictions, prompt injection, and high-risk synthetic cases. Record actual latency/token cost and failure cases against the PRD targets. Existing 8- and 10-case live API contract checks are not a usefulness evaluation. School reviewers must assess usefulness and editing effort; do not manufacture their scores.
 3. **CL-36 — operations and recovery.** Reconcile the export-only runbook, including the stale uploaded-PDF rejection check at its current line 64. Prepare and run a safe synthetic local restore rehearsal; collect hosted backup/retention/restore and alert evidence where access permits. Record migration/settings inventory, incidents/support owners, dependency health, recovery targets and vendor/data controls. Local recovery does not establish hosted recovery.
 4. **CL-41 — managed hosting and release controls.** Verify existing Vercel projects before creating anything. Align Node/runtime expectations (CI uses Node 20; inspected Vercel project used 24). Verify isolated synthetic staging, required checks on the exact candidate, rejected-check behavior, the hosted auth-to-PDF journey, and compatible rollback. Check current dependency advisories, including newly installed test tools. Prefer Vercel + Supabase for this pilot; Kubernetes remains unnecessary.
@@ -71,9 +44,6 @@ On this Mac, `CASELINK_SUPABASE_CLI` may point to `/Users/willsanz/.npm/_npx/aa8
 - Production deployment/promotion, paid purchases, live secret rotations, hosted migrations/settings and real staff invitations have not been performed. Complete reviewable preparation first; preserve the authorized scope and distinguish access/approval needs from code defects.
 - Preserve unrelated Docker containers (including pace-mini-db and saybase services) and the unrelated application on port 3000. Stop only CaseLink with the project-specific Supabase CLI after verification, preserving local data.
 
-## Final checkpoint results
+## Continuation status
 
-- Full browser command: **two passed, one failed** (37.1 seconds), from `/tmp/caselink-e2e-checkpoint.log`. The failing workflow remains enabled and is the first task tomorrow; its snapshot is in `tmp/e2e/results/workflow-case-intake-throu-a9b22--and-the-exact-PDF-download-chromium/error-context.md`.
-- Full `npm run verify` passed: lockfile/resource-seed/secret checks, typecheck, lint, **667 unit/component tests across 75 files**, and production build. Log: `/tmp/caselink-cl08-checkpoint-verify.log`. The push hook requires the same gate again; this gate currently does not include the unfinished browser suite.
-- CaseLink's isolated local Supabase services were stopped with their data preserved. Docker and unrelated project services were left running. Restart only the CaseLink stack for tomorrow's database/browser work.
-- One-time in-thread continuation automation: `finish-caselink-pilot-readiness`, scheduled for October 14 at 9 a.m. America/New_York. Do not create a duplicate recurring task.
+The one-time heartbeat `finish-caselink-pilot-readiness` fired October 14 at about 9 a.m. America/New_York. The user confirmed continuing in this chat. Do not create another chat or duplicate daily automation. Next active item is CL-34; no live quality evaluation has been implemented or run yet beyond the previously recorded schema contracts. Continue every independent authorized item, commit and push each, update draft PR #15, then candidly list remaining external gates. Do not declare the pilot ready from local tests.

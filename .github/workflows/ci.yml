@@ -79,6 +79,12 @@ jobs:
       - name: Verify retained tokens and offboarding with real local Auth
         run: npm run test:auth-security
 
+      - name: Install the browser for synthetic workflow checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify account flows, casework, accessibility, and downloaded PDFs
+        run: npm run test:e2e
+
       - name: Stop isolated Supabase
         if: always()
         run: npx --yes supabase@2.111.0 stop --no-backup

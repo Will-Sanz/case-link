@@ -16,19 +16,19 @@ function harness(db: Client) {
   const users: string[] = [];
   return {
     db, users, operator,
-    async staff(invite = false) {
+    async staff(invite = false, role: "case_manager" | "admin" = "case_manager") {
       const email = `browser-${randomUUID()}@example.test`;
       const password = `${randomUUID()}-Synthetic!1`;
       let id: string;
       if (invite) {
-        const result = await inviteUser(operator, { email, role: "case_manager", siteOrigin: MAIL_ORIGIN, actorLabel: "Browser test", reason: "Synthetic invitation journey" });
+        const result = await inviteUser(operator, { email, role, siteOrigin: MAIL_ORIGIN, actorLabel: "Browser test", reason: "Synthetic invitation journey" });
         id = result.userId;
       } else {
         const result = await operator.auth.admin.createUser({ email, password, email_confirm: true });
         expect(result.error).toBeNull();
         id = result.data.user!.id;
         users.push(id);
-        const granted = await operator.rpc("operator_set_user_role", { p_target_user_id: id, p_role: "case_manager", p_actor_label: "Browser test", p_reason: "Synthetic browser journey", p_action: "user.invited" });
+        const granted = await operator.rpc("operator_set_user_role", { p_target_user_id: id, p_role: role, p_actor_label: "Browser test", p_reason: "Synthetic browser journey", p_action: "user.invited" });
         expect(granted.error).toBeNull();
       }
       if (!users.includes(id)) users.push(id);
@@ -72,6 +72,7 @@ export const test = base.extend<{ local: ReturnType<typeof harness> }>({
     });
     try { await provide(state); }
     finally {
+      for (const page of context.pages()) await page.close();
       await db.query("delete from public.families where created_by_id = any($1::uuid[])", [state.users]);
       for (const id of state.users) expect((await state.operator.auth.admin.deleteUser(id)).error).toBeNull();
       await db.query("delete from public.security_audit_log where target_user_id = any($1::uuid[])", [state.users]);
@@ -121,4 +122,18 @@ export async function createFamily(page: Page, label = "Family 014", barriers = 
   await activate(page, page.getByRole("button", { name: "Create family and continue" }));
   await expect(page).toHaveURL(/\/families\/[^/]+\/overview$/);
   return page.url().split("/").at(-2)!;
+}
+
+export async function createPlan(page: Page) {
+  const familyId = await createFamily(page);
+  await activate(page, page.getByRole("button", { name: "Draft action plan", exact: true }));
+  await expect(page).toHaveURL(new RegExp(`/families/${familyId}/plan$`), { timeout: 45_000 });
+  await expect(page.getByRole("button", { name: "Edit action", exact: true })).toHaveCount(3);
+  return familyId;
+}
+
+export async function reviewPlan(page: Page) {
+  await activate(page, page.getByRole("button", { name: "Mark plan reviewed", exact: true }));
+  await activate(page, page.getByRole("button", { name: "Confirm dates and mark reviewed", exact: true }));
+  await expect(page.getByRole("main").getByRole("link", { name: "Review PDF", exact: true })).toBeVisible();
 }

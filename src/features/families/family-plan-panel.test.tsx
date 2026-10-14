@@ -9,11 +9,12 @@ import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
 import { toRefinementDraft } from "@/lib/domain/plan/refinement-review";
 
 const routerRefresh = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
 const owner = "90000000-0000-4000-8000-000000000001";
 vi.mock("@/components/layout/workspace-session-boundary", () => ({ useWorkspaceUserId: () => "90000000-0000-4000-8000-000000000001" }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: routerRefresh }),
+  useRouter: () => ({ refresh: routerRefresh, push: routerPush }),
 }));
 
 vi.mock("@/app/actions/plans", () => ({
@@ -90,6 +91,15 @@ const plan: PlanWithSteps = {
 };
 
 describe("FamilyPlanPanel stale edit recovery", () => {
+  it("opens the saved-plan assistant and prevents leaving unsaved action edits", () => {
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    const ask = screen.getByRole("button", { name: "Ask about this plan" }) as HTMLButtonElement;
+    fireEvent.click(ask);
+    expect(routerPush).toHaveBeenCalledWith(`/families/${plan.family_id}/assistant`);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.change(screen.getByLabelText("Action 1"), { target: { value: "Clarify the next agreed task" } });
+    expect(ask.disabled).toBe(true);
+  });
   beforeEach(() => {
     localStorage.clear(); sessionStorage.clear();
     routerRefresh.mockReset();

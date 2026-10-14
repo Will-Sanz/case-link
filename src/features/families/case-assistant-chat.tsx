@@ -216,7 +216,7 @@ export function CaseAssistantChat({
       <header className="shrink-0 border-b border-[var(--color-rule)] px-5 py-4 sm:px-6">
         <div className="mx-auto flex max-w-2xl flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">Case assistant</h2>
+            <h1 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">Case assistant</h1>
             <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
               <span className="font-medium text-[var(--color-ink-2)]">{familyName}</span>
               <span className="text-[var(--color-ink-faint)]"> · </span>
@@ -335,6 +335,7 @@ export function CaseAssistantChat({
             <textarea
               ref={textareaRef}
               rows={2}
+              aria-label="Message the assistant"
               maxLength={MAX_QUESTION_CHARS}
               aria-describedby="assistant-message-limit"
               value={draft}

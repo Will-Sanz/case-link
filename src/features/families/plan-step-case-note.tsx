@@ -98,6 +98,7 @@ function DocumentField({
         <p className="text-xs text-[var(--color-ink-faint)]">One item per line</p>
         <textarea
           ref={ref}
+          aria-label="Documents"
           rows={rows}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -262,6 +263,7 @@ export function PlanStepCaseNote({
             <textarea
               ref={titleRef}
               id={titleId}
+              aria-label="Title"
               value={step.title}
               onChange={(e) => onPatchStep({ title: e.target.value })}
               onBlur={() => setFocus(null)}
@@ -282,7 +284,7 @@ export function PlanStepCaseNote({
               onClick={() => editing && setFocus("title")}
               aria-labelledby={titleId}
             >
-              <h4 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">{step.title}</h4>
+              <h4 id={titleId} className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">{step.title}</h4>
             </button>
           )}
 
@@ -346,6 +348,7 @@ export function PlanStepCaseNote({
             <textarea
               ref={bodyRef}
               id={bodyId}
+              aria-label="Summary"
               rows={bodyRows}
               value={bodyDraft}
               onChange={(e) => setBodyDraft(e.target.value)}
@@ -659,6 +662,7 @@ export function PlanStepCaseNote({
             <SectionLabel>Expected outcome</SectionLabel>
             {editing && focus === "outcome" ? (
               <Textarea
+                aria-label="Expected outcome"
                 rows={Math.max(2, outcomeEditable.split(/\r?\n/).length + 1)}
                 value={outcomeEditable}
                 onChange={(e) => onPatchDetails({ expected_outcome: e.target.value || undefined })}
@@ -699,6 +703,7 @@ export function PlanStepCaseNote({
           <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Case record</SectionLabel>
             <Textarea
+              aria-label="Case record notes"
               rows={3}
               value={(step.workflow_data?.outcome_notes as string | undefined) ?? ""}
               onChange={(e) =>
@@ -711,6 +716,7 @@ export function PlanStepCaseNote({
               className="w-full resize-y border-[var(--color-rule)] text-sm"
             />
             <Textarea
+              aria-label="Blocker explanation"
               rows={2}
               value={(step.workflow_data?.blocker_reason as string | undefined) ?? ""}
               onChange={(e) =>

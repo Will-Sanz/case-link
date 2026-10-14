@@ -1177,6 +1177,14 @@ export function FamilyPlanPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
+            variant="ghost"
+            disabled={pending || stepDirty || planAiDirty}
+            onClick={() => router.push(`/families/${familyId}/assistant`)}
+          >
+            Ask about this plan
+          </Button>
+          <Button
+            type="button"
             onClick={() => openPlanAiRefine()}
             variant="secondary"
             className="border-[var(--color-rule)]"

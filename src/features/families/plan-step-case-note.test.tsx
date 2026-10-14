@@ -30,6 +30,23 @@ const step: PlanStepRow = {
 };
 
 describe("PlanStepCaseNote AI review", () => {
+  it("names every inline editor and the case-record fields", () => {
+    render(<PlanStepCaseNote step={step} editing onPatchStep={vi.fn()} onPatchDetails={vi.fn()} onPatchActionItem={vi.fn()} onPatchWorkflow={vi.fn()} refineOpen={false} refineInstruction="" refineChanges={null} refineSelected={[]} onRefineSelect={vi.fn()} refinePending={false} onRefineInstruction={vi.fn()} onRefineRun={vi.fn()} onRefineApply={vi.fn()} onRefineClose={vi.fn()} onRefineDiscardPreview={vi.fn()} onOpenRefine={vi.fn()} />);
+    for (const [button, name] of [
+      [/^Call the housing intake line$/, "Title"],
+      [/^Confirm eligibility/, "Summary"],
+      [/^The client will need Proof of address/, "Documents"],
+      [/^Expected outcome:/, "Expected outcome"],
+    ] as const) {
+      fireEvent.click(screen.getByRole("button", { name: button }));
+      const field = screen.getByRole("textbox", { name });
+      expect(document.activeElement).toBe(field);
+      fireEvent.blur(field);
+    }
+    expect(screen.getByRole("textbox", { name: "Case record notes" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Blocker explanation" })).toBeTruthy();
+  });
+
   it("requires selecting the individual proposed changes before applying", () => {
     const selected = vi.fn();
     render(

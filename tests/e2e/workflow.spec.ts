@@ -39,7 +39,7 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   await expect(article.getByLabel("Action 1", { exact: true })).toHaveValue("Confirm the agreed preparation checklist");
   await article.getByRole("combobox", { name: "Status", exact: true })
     .filter({ has: page.locator('option[value="waiting"]') }).selectOption("waiting");
-  await article.getByLabel("Why is this waiting?", { exact: true }).fill("Waiting for the family's preferred review time.");
+  await article.getByRole("textbox", { name: "Why is this waiting?", exact: true }).fill("Waiting for the family's preferred review time.");
   await activate(page, article.getByRole("button", { name: "Save edits", exact: true }));
   await expect(article.getByRole("button", { name: "Edit action", exact: true })).toBeVisible();
   await page.reload();
@@ -53,22 +53,34 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   await article.getByRole("checkbox", { name: /Title/ }).check();
   await activate(page, article.getByRole("button", { name: "Apply to draft", exact: true }));
   await expect(article.getByLabel("Action 1", { exact: true })).toHaveValue("Confirm the agreed preparation checklist");
-  await expect(article.getByLabel("Why is this waiting?", { exact: true })).toHaveValue("Waiting for the family's preferred review time.");
+  await expect(article.getByRole("textbox", { name: "Why is this waiting?", exact: true })).toHaveValue("Waiting for the family's preferred review time.");
   await activate(page, article.getByRole("button", { name: "Save edits", exact: true }));
   await expect(article.getByRole("button", { name: "Prepare the agreed housing intake", exact: true })).toBeVisible();
 
   await activate(page, page.getByRole("button", { name: "Mark plan reviewed", exact: true }));
   await accessible(page);
-  await activate(page, page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }));
+  await activate(page, page.getByRole("alertdialog").getByRole("button", { name: "Cancel", exact: true }));
   await expect(page.getByRole("button", { name: "Mark plan reviewed", exact: true })).toBeFocused();
   await activate(page, page.getByRole("button", { name: "Mark plan reviewed", exact: true }));
   await activate(page, page.getByRole("button", { name: "Confirm dates and mark reviewed", exact: true }));
+  // Observe the real preview blob without fetching it through a different CSP permission.
+  const previewBlobs = await page.evaluateHandle(() => {
+    const blobs = new Map<string, Blob>();
+    const create = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = value => {
+      const url = create(value);
+      if (value instanceof Blob && value.type === "application/pdf") blobs.set(url, value);
+      return url;
+    };
+    return blobs;
+  });
   await activate(page, page.getByRole("main").getByRole("link", { name: "Review PDF", exact: true }));
   await expect(page.getByRole("button", { name: "Download PDF", exact: true })).toBeEnabled();
   await accessible(page);
   const preview = await page.locator("iframe[title$='reviewed plan PDF']").getAttribute("src");
   expect(preview).toMatch(/^blob:/);
-  const previewBytes = await page.evaluate(async source => Array.from(new Uint8Array(await (await fetch(source!.split("#")[0])).arrayBuffer())), preview);
+  const previewBytes = await previewBlobs.evaluate(async (blobs, source) => Array.from(new Uint8Array(await blobs.get(source!.split("#")[0])!.arrayBuffer())), preview);
+  await previewBlobs.dispose();
   const pendingDownload = page.waitForEvent("download");
   await activate(page, page.getByRole("button", { name: "Download PDF", exact: true }));
   const download = await pendingDownload;
@@ -83,8 +95,10 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   expect(reviewed.rows[0].client_display.reviewedAt).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath("reviewed-pdf.png"), fullPage: true });
 
-  await page.goto(`/families/${familyId}/assistant`);
-  await page.getByPlaceholder("Message the assistant…").fill("What should I confirm before a referral?");
+  await page.goto(`/families/${familyId}/plan`);
+  await activate(page, page.getByRole("button", { name: "Ask about this plan", exact: true }));
+  await expect(page).toHaveURL(new RegExp(`/families/${familyId}/assistant$`));
+  await page.getByRole("textbox", { name: "Message the assistant", exact: true }).fill("What should I confirm before a referral?");
   await activate(page, page.getByRole("button", { name: "Send", exact: true }));
   await expect(page.getByText("Review the latest saved task and confirm the family's preferred next step.", { exact: false })).toBeVisible();
   await accessible(page);

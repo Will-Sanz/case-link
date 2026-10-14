@@ -13,6 +13,8 @@ describe("buildSecurityHeaders", () => {
     expect(headers["Content-Security-Policy"]).toContain("object-src 'none'");
     expect(headers["Content-Security-Policy"]).toContain("frame-ancestors 'none'");
     expect(headers["Content-Security-Policy"]).toContain("https://project.supabase.co");
+    expect(headers["Content-Security-Policy"]).toContain("'wasm-unsafe-eval'");
+    expect(headers["Content-Security-Policy"]).not.toContain("'unsafe-eval'");
     expect(headers["Strict-Transport-Security"]).toContain("max-age=63072000");
   });
 

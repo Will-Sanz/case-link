@@ -6,7 +6,7 @@
 
 **Recommendation:** complete this first-priority readiness workstream before routine school use. A successful build is not sufficient evidence that account setup, AI recommendations, concurrent edits, and PDF export work together safely. Use synthetic cases for the school demonstration until the applicable release gates below are evidenced.
 
-**October 13 evening checkpoint:** the user requested finishing the current intake fix and resuming the remaining work tomorrow. See the [October 14 continuation handoff](pilot-readiness-handoff.md) for the next failing browser check, reproducible commands, outstanding records, and external launch gates. Thirty-two records are closed; nine required records and the optional Decisions evaluation remain open. This checkpoint is not pilot launch approval.
+**October 14 continuation:** the intake-to-PDF browser release suite now passes, with CI execution added. Thirty-three engineering records are closed; eight required records and the optional Decisions evaluation remain open. See the [continuation handoff](pilot-readiness-handoff.md) for remaining AI evaluation, operations, hosting, secret-management and external school/hosted gates. This is not pilot launch approval.
 
 The current product is family intake → barriers → a goal-based intervention plan with confirmed dates → human review → a professional black-and-white PDF downloaded for manual use. Blank-PDF upload, field detection, form filling, and automatic submission are outside this release. The current decisions in [AGENTS.md](/Users/willsanz/homelessness-project/AGENTS.md) take precedence over older roadmap language.
 
@@ -581,7 +581,7 @@ The product requires exact, confirmed target dates and a follow-up date for wait
 
 ## Gate C: prove the release and prepare support
 
-### [ ] CL-08 — Establish the complete release test gate
+### [x] CL-08 — Establish the complete release test gate
 
 **Type:** Verify + Fix · **Responsible:** engineering.
 
@@ -589,9 +589,11 @@ The product requires exact, confirmed target dates and a follow-up date for wait
 
 The browser reproduced a blocker: intake labels such as “Housing instability” disappeared because planning expected “Housing.” Shared result mapping now preserves the exact saved wording without inferring a more specific health/legal category; saves retain all twelve intake resource-matching keys. Commas and semicolons stay within custom labels, and overlong labels fail visibly instead of being truncated. Seventeen new regression tests failed before the fix; all 26 focused tests now pass. A real browser → action → database → plan run confirms all twelve intake barriers survive generation unchanged. Correctness/security/privacy and separate Ponytail deletion review completed; duplicate label/key mapping and loader logic were removed.
 
-**Checkpoint verification:** full repository verification passes with 667 unit/component tests, typecheck, lint, lockfile/resource/secret checks, and the production build. The browser run has two passing tests and one failing broader workflow assertion after selective AI application; it is not a green browser release gate. **Still open:** the complete edit/refinement/review/download journey, additional browser scenarios and accessibility checks, CI integration, and exact hosted-candidate evidence. The unfinished browser suite stays runnable and failures are retained, not disabled. Reproduction and the next failure are recorded in the [continuation handoff](pilot-readiness-handoff.md). Commit: `git log --grep='CL-08'`.
+**Completed October 14 — engineering:** all seven independent Chromium scenarios now pass: invite/reset/returning sign-in, MFA, all intake barriers, interrupted generation/resume, session expiry and draft recovery, account switching, concurrent edits, selective refinement, confirmed review, exact PDF download, stale-export denial and assistant use. Keyboard and Axe checks include inline editing, narrow layout and 200% CSS zoom. The browser tests exposed and fixed unnamed fields, review-focus loss, a production CSP block on the PDF's WebAssembly engine, and the assistant's unreachable page. General JavaScript evaluation remains blocked. Native modal rendering avoids hydration errors and restores focus. The assistant uses the existing family authorization and cannot be opened from unsaved edits.
 
-Existing tests cover useful units and database controls, but no complete authenticated browser, automated accessibility, or AI-quality release suite was found. Compiling and rendering a valid PDF file do not prove the staff workflow.
+**Evidence:** 672 unit/component tests across 76 files, full verification/build, seven browser scenarios (67 seconds), and the real local Auth security suite passed. Browser execution now runs in CI against isolated synthetic services and rejects focused tests. The generated preview blob and downloaded PDF have identical SHA-256; the actual two-page download was also displayed and visually checked in isolated Chromium with the restrictive object policy intact. Normal correctness/security/privacy/accessibility/regression, React, and separate Ponytail deletion reviews completed; no new production dependency or custom focus manager was added. [Browser reproduction and limits](verification/browser-regressions.md), [result metadata](verification/2026-10-14-browser-regressions.json). Exact hosted-candidate checks and device/email/school acceptance remain CL-16/CL-34/CL-41; local browser coverage does not prove live AI usefulness or hosted readiness. Commit: `git log --grep='CL-08'`.
+
+At the audit baseline, existing tests covered useful units and database controls, but no complete authenticated browser, automated accessibility, or AI-quality release suite was found. Compiling and rendering a valid PDF file do not prove the staff workflow.
 
 **Fix:** add the smallest useful integration/browser/accessibility coverage for the matrices below, and run the real database suite on an isolated test stack. Connect required checks to CI/release evidence. Preserve tests for regressions fixed under every other record; avoid implementation-mirroring tests.
 
@@ -676,7 +678,7 @@ Use browser tests for cookies/redirects/navigation and real isolated Auth/Postgr
 
 | Feature | Current implementation | Useful behavior to verify |
 | --- | --- | --- |
-| Initial plan / regeneration | Staged lean generation plus retained full-plan generation path | Specific goals/actions grounded in saved barriers, preferences, outcomes, and available resources; proposed dates; explicit partial/failure states |
+| Initial plan / regeneration | Staged lean generation using one immutable saved snapshot | Specific goals/actions grounded in saved barriers, preferences, outcomes, and available resources; proposed dates; explicit partial/failure states |
 | Single-action refinement | Structured model result followed by local preview/apply | Requested change reaches the actual task/date and preserves unrelated human work |
 | Full-plan refinement | Structured result merged into a draft, then saved | Stable identity, narrow changes, explicit review, atomic save, no reassignment of completion history |
 | Case assistant | Text answer from case/resource context plus in-memory conversation | Correct next action, useful scripts/checklists, stated uncertainty, no invented facts or unsupported decisions |
