@@ -58,6 +58,13 @@ describe("one durable planning snapshot", () => {
     });
   });
 
+  it("anchors the prompt to the saved school date instead of the UTC date or the later resume day", async () => {
+    const snapshot = buildPlanningSnapshot(fixture(), undefined, new Date("2026-10-14T02:00:00Z"));
+    await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30");
+    expect(vi.mocked(createAiResponse).mock.calls[0][0].input).toContain("plan starts on 2026-10-13 in America/New_York");
+    expect(vi.mocked(createAiResponse).mock.calls[0][0].input).toContain("All dates are proposed until the case manager confirms");
+  });
+
   it("retains all instructions, long notes, and many barriers/goals without slicing the last constraint", () => {
     const detail = fixture();
     detail.summary = "Existing context. ".repeat(200);

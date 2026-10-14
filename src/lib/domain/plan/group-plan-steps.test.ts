@@ -92,4 +92,11 @@ describe("groupPlanStepsByGoal", () => {
     const [group] = groupPlanStepsByGoal([step("legacy", undefined, 0, [])]);
     expect(group.title).toBe("Step legacy");
   });
+  it("sorts Waiting goals by follow-up, ignoring an older original target", () => {
+    const waiting = { ...action("wait", "2026-08-01", "blocked"), follow_up_date: "2026-08-15" };
+    const groups = groupPlanStepsByGoal([step("waiting", "Housing", 0, [waiting]), step("open", "Food", 1, [action("next", "2026-08-10")])]);
+    expect(groups.map(group => group.title)).toEqual(["Food", "Housing"]);
+    expect(groups[1].earliestOpenTargetDate).toBe("2026-08-15");
+  });
+
 });

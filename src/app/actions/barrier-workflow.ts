@@ -1,5 +1,6 @@
 "use server";
 
+import { addCalendarDays, formatDateOnly, schoolDate } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
@@ -58,12 +59,8 @@ function toClientError(error: unknown): string {
 }
 
 function formatDateRange(start: Date, daysFrom: number, daysTo: number): string {
-  const s = new Date(start);
-  s.setDate(s.getDate() + daysFrom);
-  const e = new Date(start);
-  e.setDate(e.getDate() + daysTo);
-  const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  return `${s.toLocaleDateString("en-US", fmt)} - ${e.toLocaleDateString("en-US", fmt)}`;
+  const date = schoolDate(start);
+  return `${formatDateOnly(addCalendarDays(date, daysFrom))} - ${formatDateOnly(addCalendarDays(date, daysTo))}`;
 }
 
 function parseAdditionalBarriers(input: string): string[] {

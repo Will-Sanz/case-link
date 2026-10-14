@@ -1,4 +1,5 @@
 import "server-only";
+import { schoolDate } from "@/lib/dates";
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import type { OpenAiRequestMeta } from "@/lib/ai/openai-request-meta";
@@ -87,7 +88,8 @@ ${prior}
 `
     : "";
 
-  const planStartDate = options?.planStartDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+  const start = options?.planStartDate ?? snapshot.captured_at;
+  const planStartDate = start.length === 10 ? start : schoolDate(new Date(start));
   const user = `## Saved snapshot ${snapshot.revision}, captured ${snapshot.captured_at}
 ## Planning brief
 ${brief}
@@ -96,7 +98,7 @@ ${brief}
 
 ${priorBlock}## Task
 Generate ONLY the ${phase}-day phase steps (phase field must be "${phase}" on every step). Order by urgency within this phase.
-The plan starts on ${planStartDate}. Set an exact target_date for every action within the 90-day plan window. Use week_index 1-4 for 30-day work, 5-8 for 60-day work, and 9-12 for 90-day work.`;
+The plan starts on ${planStartDate} in America/New_York. All dates are proposed until the case manager confirms them during plan review. Waiting dates mean the next follow-up, not a promised service delivery date. Set an exact target_date for every action within the 90-day plan window. Use week_index 1-4 for 30-day work, 5-8 for 60-day work, and 9-12 for 90-day work.`;
 
   const instructions = buildLeanPhaseInstructions(phase);
   const maxAttempts = options?.retries ?? 2;

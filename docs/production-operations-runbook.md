@@ -59,7 +59,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 ### Release verification
 
 - [ ] `npm ci`, production dependency audit, secret scan, typecheck, lint, unit/integration tests, production build, and database security suite pass on the candidate commit.
-- [ ] Authenticated staging checks cover the complete family → barriers → plan → dated-action review → reviewed-plan PDF preview → download flow.
+- [ ] Authenticated staging checks cover the complete family → barriers → plan → dated-action review → reviewed-plan PDF preview → download flow. Review includes date confirmation and acknowledgement of any earlier open-action dates. Calendar dates use America/New_York for this pilot; Waiting uses its next follow-up date. The review audit records that confirmation.
 - [ ] An automated accessibility scan plus keyboard-only check passes for login, Families, Family workspace, plan review, and paperwork review.
 - [ ] PDF corpus tests reject filled, scanned, encrypted, signed, XFA, active-content, attached, malformed, oversized, over-page, over-field, and excessive-object files without an AI call.
 - [ ] AI safety/evaluation fixtures meet the release rubric for privacy, grounding, unsupported claims, resource fidelity, and human-review requirements.

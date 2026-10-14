@@ -1,8 +1,10 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates";
+
 import { Fragment } from "react";
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { actionUiStatus } from "@/lib/domain/plan/action-state";
+import { actionTargetDate, actionUiStatus } from "@/lib/domain/plan/action-state";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import type { PlanStepDetails, PlanStepRow, PlanWithSteps } from "@/types/family";
 
@@ -29,18 +31,6 @@ function formatPriority(priority: PlanStepRow["priority"]): string {
   if (priority === "high") return "High";
   if (priority === "low") return "Low";
   return "Standard";
-}
-
-function formatDateOnly(value: string | null): string {
-  if (!value) return "Not set";
-  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function narrative(step: PlanStepRow): string | null {
@@ -231,12 +221,12 @@ const styles = StyleSheet.create({
 
 function PdfActionTable({ step }: { step: PlanStepRow }) {
   const actions = [...(step.action_items ?? [])].sort((a, b) => {
-    const aDate = a.status === "blocked" ? a.follow_up_date ?? a.target_date : a.target_date;
-    const bDate = b.status === "blocked" ? b.follow_up_date ?? b.target_date : b.target_date;
+    const aDate = actionTargetDate(a);
+    const bDate = actionTargetDate(b);
     if (aDate && bDate && aDate !== bDate) return aDate.localeCompare(bDate);
     if (aDate && !bDate) return -1;
     if (!aDate && bDate) return 1;
-    return a.sort_order - b.sort_order;
+    return a.sort_order - b.sort_order || a.id.localeCompare(b.id);
   });
   if (actions.length === 0) return null;
 
@@ -248,10 +238,7 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
         <Text style={styles.statusCell}>Status</Text>
       </View>
       {actions.map((action) => {
-        const displayDate =
-          action.status === "blocked"
-            ? action.follow_up_date ?? action.target_date
-            : action.target_date;
+        const displayDate = actionTargetDate(action);
         return (
           <View key={action.id} style={styles.actionRow}>
             <View style={styles.actionCell}>
@@ -260,7 +247,7 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
               {cleanText(action.notes) ? <Text style={styles.actionDetail}>Progress: {cleanText(action.notes)}</Text> : null}
               {cleanText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanText(action.outcome)}</Text> : null}
             </View>
-            <Text style={styles.dateCell}>{formatDateOnly(displayDate)}</Text>
+            <Text style={styles.dateCell}>{formatDateOnly(displayDate) ?? (action.status === "completed" ? "Not required" : "Not set")}</Text>
             <Text style={styles.statusCell}>{actionUiStatus(action).replaceAll("_", " ")}</Text>
           </View>
         );
@@ -360,8 +347,8 @@ export function PlanPdfDocument({
             <View style={[styles.goal, styles.goalHeader]} minPresenceAhead={160}>
               <Text style={styles.goalTitle}>Goal {goalIndex + 1}: {goal.title}</Text>
               <Text style={styles.goalProgress}>
-                {goal.completedActionCount} of {goal.actionCount} dated actions complete
-                {goal.earliestOpenTargetDate ? ` · Next target ${formatDateOnly(goal.earliestOpenTargetDate)}` : ""}
+                {goal.completedActionCount} of {goal.actionCount} actions complete
+                {goal.earliestOpenTargetDate ? ` · Next date ${formatDateOnly(goal.earliestOpenTargetDate)}` : ""}
               </Text>
             </View>
             {goal.steps.map((step) => <PdfStep key={step.id} step={step} />)}

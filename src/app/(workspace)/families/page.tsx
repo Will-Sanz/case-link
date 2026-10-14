@@ -1,3 +1,5 @@
+
+import { formatDateOnly as formatTargetDate } from "@/lib/dates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -20,15 +22,6 @@ export const metadata: Metadata = {
 };
 
 const statusLabel = { active: "Active", on_hold: "On hold", closed: "Closed" } as const;
-
-function formatTargetDate(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
-}
 
 export default async function FamiliesPage({ searchParams }: PageProps) {
   const parsed = parseFamilyListQuery(await searchParams);
@@ -97,7 +90,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                       {family.current_step.action_needed_now || family.current_step.title}
                       <span className="text-[var(--color-ink-faint)]">
                         {family.current_step.due_date
-                          ? ` · Target ${formatTargetDate(family.current_step.due_date)}`
+                          ? ` · ${family.current_step.status === "blocked" ? "Follow up" : "Target"} ${formatTargetDate(family.current_step.due_date)}`
                           : " · Target date needed"}
                       </span>
                     </p>

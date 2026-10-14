@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolDate, formatDateOnly } from "@/lib/dates";
 import { useEffect, useRef, useState } from "react";
 import { validatePlanExport } from "@/app/actions/plans";
 import { Download, Page as FileText, RefreshDouble } from "iconoir-react";
@@ -38,9 +39,7 @@ export function PlanPdfExport({
       setError(null);
       setLoading(true);
 
-      const generatedDate = new Date().toLocaleDateString(undefined, {
-        dateStyle: "medium",
-      });
+      const generatedDate = formatDateOnly(schoolDate())!;
 
       try {
         const approved = await validatePlanExport({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });

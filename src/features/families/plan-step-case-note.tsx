@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates";
+
 import {
   useCallback,
   useEffect,
@@ -16,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
 import {
+  actionTargetDate,
   actionUiStatus,
   actionUserNotes,
   encodeActionNotes,
@@ -43,19 +46,6 @@ const sectionLabelClass =
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return <p className={sectionLabelClass}>{children}</p>;
-}
-
-function formatDateOnly(value: string | null): string | null {
-  if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
-  }).format(parsed);
 }
 
 function ownerLabel(owner: PlanStepDetails["owner"]): string {
@@ -206,12 +196,8 @@ export function PlanStepCaseNote({
   const actions = useMemo(
     () =>
       [...(step.action_items ?? [])].sort((a, b) => {
-        if (a.target_date && b.target_date && a.target_date !== b.target_date) {
-          return a.target_date.localeCompare(b.target_date);
-        }
-        if (a.target_date && !b.target_date) return -1;
-        if (!a.target_date && b.target_date) return 1;
-        return a.sort_order - b.sort_order;
+        const aDate = actionTargetDate(a), bDate = actionTargetDate(b);
+        return (aDate ?? "9999-12-31").localeCompare(bDate ?? "9999-12-31") || a.sort_order - b.sort_order || a.id.localeCompare(b.id);
       }),
     [step.action_items],
   );
@@ -430,13 +416,14 @@ export function PlanStepCaseNote({
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
-                      <span>Target date</span>
+                      <span>{action.status === "blocked" ? "Next follow-up date" : "Target date"}</span>
                       <input
                         type="date"
-                        value={action.target_date ?? ""}
+                        value={actionTargetDate(action) ?? ""}
                         onChange={(event) =>
                           onPatchActionItem(action.id, {
                             target_date: event.target.value || null,
+                            ...(action.status === "blocked" ? { follow_up_date: event.target.value || null } : {}),
                           })
                         }
                         className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
@@ -460,7 +447,8 @@ export function PlanStepCaseNote({
                           onPatchActionItem(action.id, {
                             status: next === "waiting" ? "blocked" : next,
                             notes: encodeActionNotes(action.notes, false),
-                            follow_up_date: next === "waiting" ? action.follow_up_date : null,
+                            follow_up_date: next === "waiting" ? action.follow_up_date ?? action.target_date : null,
+                            ...(next === "waiting" ? { target_date: action.follow_up_date ?? action.target_date } : {}),
                           });
                         }}
                         className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
@@ -506,10 +494,8 @@ export function PlanStepCaseNote({
                         required={action.status === "blocked"}
                       />
                     </label>
-                    <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
-                      <span>
-                        {action.status === "blocked" ? "Next follow-up date" : "Follow-up date (optional)"}
-                      </span>
+                    {action.status !== "blocked" ? <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
+                      <span>Follow-up date (optional)</span>
                       <input
                         type="date"
                         value={action.follow_up_date ?? ""}
@@ -519,9 +505,8 @@ export function PlanStepCaseNote({
                           })
                         }
                         className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
-                        required={action.status === "blocked"}
                       />
-                    </label>
+                    </label> : null}
                   </div>
                   <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>Outcome (optional)</span>
@@ -545,7 +530,7 @@ export function PlanStepCaseNote({
               {actions.map((action) => {
                 const done = action.status === "completed";
                 const noLongerNeeded = isActionNoLongerNeeded(action);
-                const targetLabel = formatDateOnly(action.target_date);
+                const targetLabel = formatDateOnly(actionTargetDate(action));
                 const followUpLabel = formatDateOnly(action.follow_up_date);
                 const userNotes = actionUserNotes(action.notes);
                 return (
@@ -596,12 +581,12 @@ export function PlanStepCaseNote({
                         <span className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           {targetLabel ? (
                             <time
-                              dateTime={action.target_date ?? undefined}
+                              dateTime={actionTargetDate(action) ?? undefined}
                               className="font-medium text-[var(--color-accent)]"
                             >
-                              Target {targetLabel}
+                              {action.status === "blocked" ? "Follow up" : "Target"} {targetLabel}
                             </time>
-                          ) : (
+                          ) : done ? <span>No target date required</span> : (
                             <span className="font-medium text-amber-800">Target date needed</span>
                           )}
                           {action.status === "blocked" ? (
@@ -617,7 +602,7 @@ export function PlanStepCaseNote({
                               In progress
                             </span>
                           ) : null}
-                          {followUpLabel ? (
+                          {followUpLabel && action.status !== "blocked" ? (
                             <time dateTime={action.follow_up_date ?? undefined} className="text-[var(--color-ink-muted)]">
                               Follow up {followUpLabel}
                             </time>

@@ -539,9 +539,15 @@ Original finding: family-list enrichment fetches all versions for the listed fam
 
 **Close with:** 0/1/10/100 families, more than 1,000 aggregate child rows, many versions, and concurrent staff. Compare each displayed next action with the complete source data and record query/response latency. **Sources:** [list enrichment](/Users/willsanz/homelessness-project/src/lib/services/families.ts:88), [page-size validation](/Users/willsanz/homelessness-project/src/lib/validations/family-list-query.ts), [API row cap](/Users/willsanz/homelessness-project/supabase/config.toml:18).
 
-### [ ] CL-39 — Verify date meaning and case-manager confirmation
+### [x] CL-39 — Verify date meaning and case-manager confirmation
 
 **Type:** Verify + Decide · **Responsible:** engineering + case-manager reviewer.
+
+**Completed October 13, 2026 — engineering:** the Philadelphia pilot uses the America/New_York calendar consistently in browser defaults, server meeting validation, AI date anchors, goal ordering, and PDF preparation. Exact YYYY-MM-DD dates display without device-timezone shifts. Waiting shows and edits the next follow-up date; older target dates no longer drive its ordering. Completed work can omit a deadline, and manually chosen dates may extend beyond the AI's 90-day suggestion window.
+
+Review now asks the person to confirm all dates, identifies open work with past dates, and explains that AI dates are proposals. The server and database require explicit confirmation; the revision-bound review event records confirmation, school date/timezone, and past-date count. One confirmation covers the reviewed plan; no extra per-field approvals were added.
+
+**Evidence:** regression tests cover invalid and leap dates, three device timezones, midnight/DST, frozen AI anchors, missing/unconfirmed dates, completed work, Waiting edits and saved values, manual dates, cancellation, stale approvals, and real database review/audit behavior. A clean migration rebuild and full database security suite pass; advisors report no warnings. The real generated one-page PDF was text-extracted and visually inspected: Nov 1, 2026 Waiting follow-up, Feb 29, 2028 manual date, and completed outcome match the source, while the original 2020 Waiting target is absent. Normal correctness/security/accessibility, separate Ponytail deletion, and React reviews completed. Full verification runs before push. School acceptance of the workflow remains CL-34; the wider PDF corpus/browser gate remains CL-35/CL-08. Commit: `git log --grep='CL-39'`.
 
 The product requires exact, confirmed target dates and a follow-up date for waiting work. AI dates and deterministic date fallbacks must not be mistaken for a person's confirmed commitment. Current generation prompts still use 30/60/90 phase language behind a goal/date-oriented product.
 

@@ -1,3 +1,4 @@
+import { actionTargetDate } from "@/lib/domain/plan/action-state";
 import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 
 export type PlanGoalGroup = {
@@ -24,7 +25,7 @@ function isOpenAction(action: PlanStepActionItemRow): boolean {
 function earliestDate(actions: PlanStepActionItemRow[], openOnly: boolean): string | null {
   const dates = actions
     .filter((action) => !openOnly || isOpenAction(action))
-    .map((action) => action.target_date)
+    .map(actionTargetDate)
     .filter((date): date is string => Boolean(date))
     .sort();
   return dates[0] ?? null;

@@ -31,13 +31,14 @@ describe("FamiliesPage", () => {
       updated_at: "2026-08-02T12:00:00.000Z",
       created_by_id: "22222222-2222-4222-8222-222222222222",
       creator: null,
-      current_step: null,
+      current_step: { id: "step", title: "Legacy goal", status: "pending", phase: "30", due_date: "2026-11-01T00:00:00+00:00", action_needed_now: "Review options" },
     };
     mocks.createSupabaseServerClient.mockResolvedValue({});
     mocks.listFamilies.mockResolvedValue({ items: [family], total: 1 });
     mocks.enrichFamiliesWithCurrentStep.mockResolvedValue([family]);
 
     render(await FamiliesPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByText(/Target Nov 1, 2026/)).toBeTruthy();
 
     expect(screen.getByRole("link", { name: /Test household/ }).getAttribute("href")).toBe(
       `/families/${family.id}/profile`,

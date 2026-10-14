@@ -4,7 +4,7 @@ const m = vi.hoisted(() => ({ session: vi.fn(), family: vi.fn(), rpc: vi.fn() })
 vi.mock("@/lib/auth/session", () => ({ requireAppUserWithClient: m.session }));
 vi.mock("@/lib/services/families", () => ({ getFamilyDetail: m.family }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-const input = { familyId: "10000000-0000-4000-8000-000000000001", planId: "10000000-0000-4000-8000-000000000002", expectedRevision: "a".repeat(64) };
+const input = { familyId: "10000000-0000-4000-8000-000000000001", planId: "10000000-0000-4000-8000-000000000002", expectedRevision: "a".repeat(64), datesConfirmed: true };
 beforeEach(() => {
   m.session.mockResolvedValue({ supabase: { rpc: m.rpc } });
   m.rpc.mockResolvedValue({ data: true, error: null });
@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 it("binds approval to the exact displayed revision, even after a read races with a write", async () => {
   expect(await markPlanReviewed(input)).toEqual({ ok: true });
-  expect(m.rpc).toHaveBeenCalledWith("mark_plan_reviewed", { p_family_id: input.familyId, p_plan_id: input.planId, p_expected_revision: input.expectedRevision });
+  expect(m.rpc).toHaveBeenCalledWith("mark_plan_reviewed", { p_family_id: input.familyId, p_plan_id: input.planId, p_expected_revision: input.expectedRevision, p_dates_confirmed: true });
   m.rpc.mockResolvedValue({ data: null, error: { code: "40001" } });
   expect(await markPlanReviewed(input)).toMatchObject({ ok: false, error: expect.stringContaining("plan changed") });
 });
@@ -35,4 +35,12 @@ it("fails closed on stale exports and database failures", async () => {
     expect(response).toMatchObject({ ok: false });
     expect(JSON.stringify(response)).not.toContain("private failure");
   }
+});
+
+it("requires explicit date confirmation while export revalidation only needs the approved revision", async () => {
+  for (const datesConfirmed of [false, undefined, "true"]) {
+    expect(await markPlanReviewed({ ...input, datesConfirmed })).toMatchObject({ ok: false });
+  }
+  expect(m.session).not.toHaveBeenCalled();
+  expect(await validatePlanExport({ familyId: input.familyId, planId: input.planId, expectedRevision: input.expectedRevision })).toEqual({ ok: true });
 });

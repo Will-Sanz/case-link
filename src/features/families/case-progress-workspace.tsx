@@ -1,5 +1,7 @@
 "use client";
 
+import { schoolDate, formatDateOnly as formatDate } from "@/lib/dates";
+
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -34,21 +36,6 @@ type ActionDraft = {
   outcome: string;
 };
 
-function localDateOnly(): string {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function formatDate(value: string): string {
-  const parsed = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(parsed);
-}
-
 function initialDraft(action: PlanStepActionItemRow): ActionDraft {
   return {
     original: action,
@@ -79,7 +66,7 @@ export function CaseProgressWorkspace({
   const router = useRouter();
   const actionOptions = useMemo(() => listProgressActionOptions(plan), [plan]);
   const [formOpen, setFormOpen] = useState(false);
-  const [occurredOn, setOccurredOn] = useState(localDateOnly);
+  const [occurredOn, setOccurredOn] = useState(schoolDate);
   const [summary, setSummary] = useState("");
   const [drafts, setDrafts] = useState<Record<string, ActionDraft>>({});
   const submitting = useRef(false);
@@ -225,7 +212,7 @@ export function CaseProgressWorkspace({
           ) : latestEarlierNote ? (
             <div className="mt-5 border-l border-[var(--color-rule-strong)] pl-4">
               <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{latestEarlierNote.body}</p>
-              <p className="mt-2 text-xs text-[var(--color-ink-faint)]">Earlier note · {formatDate(latestEarlierNote.created_at)}</p>
+              <p className="mt-2 text-xs text-[var(--color-ink-faint)]">Earlier note · {formatDate(schoolDate(new Date(latestEarlierNote.created_at)))}</p>
             </div>
           ) : (
             <p className="mt-5 max-w-xl text-sm leading-6 text-[var(--color-ink-muted)]">No progress update has been recorded yet. Save the next meeting once, with any plan changes, to establish the handoff.</p>
@@ -248,7 +235,7 @@ export function CaseProgressWorkspace({
               </p>
             </div>
           ) : (
-            <p className="mt-3 text-sm leading-6 text-[var(--color-ink-muted)]">All dated actions are complete. Record the outcome before planning new work.</p>
+            <p className="mt-3 text-sm leading-6 text-[var(--color-ink-muted)]">All actions are complete. Record the outcome before planning new work.</p>
           )}
         </div>
       </div>
@@ -277,7 +264,7 @@ export function CaseProgressWorkspace({
             <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
               <label className="block text-sm font-medium text-[var(--color-ink-2)]">
                 Meeting date
-                <input type="date" value={occurredOn} max={localDateOnly()} onChange={(event) => setOccurredOn(event.target.value)} required className="mt-2 min-h-11 w-full rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]" />
+                <input type="date" value={occurredOn} max={schoolDate()} onChange={(event) => setOccurredOn(event.target.value)} required className="mt-2 min-h-11 w-full rounded-lg border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]" />
               </label>
               <label className="block text-sm font-medium text-[var(--color-ink-2)]">
                 What changed since the last meeting?

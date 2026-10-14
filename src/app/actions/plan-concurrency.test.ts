@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { savePlanEdits, updatePlanStepActionItem } from "./plans";
 import { captureCaseProgressUpdate } from "./case-progress";
 
@@ -34,6 +34,8 @@ function database() {
   mocks.session.mockResolvedValue({ supabase: { from, rpc: mocks.rpc } });
   return { predicates, writes };
 }
+
+afterEach(() => vi.useRealTimers());
 
 beforeEach(() => {
   mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "save_plan_edits" ? { ok: true } : planId, error: null }));
@@ -79,4 +81,12 @@ describe("database revision timestamps", () => {
       expect(mocks.session).not.toHaveBeenCalled();
     },
   );
+  it("rejects tomorrow's meeting during the UTC/school-date boundary", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-14T02:00:00Z"));
+    const input = { requestId: "9b731b93-485b-4629-8b25-c088f9743245", familyId, planId, occurredOn: "2026-10-14", summary: "Discussed next steps", changes: [] };
+    expect(await captureCaseProgressUpdate(input)).toEqual({ ok: false, error: "Meeting date cannot be in the future." });
+    expect(mocks.session).not.toHaveBeenCalled();
+    expect(await captureCaseProgressUpdate({ ...input, occurredOn: "2026-10-13" })).toMatchObject({ ok: true });
+  });
+
 });

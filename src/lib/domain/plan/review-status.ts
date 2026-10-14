@@ -1,3 +1,4 @@
+import { parseDateOnly } from "@/lib/dates";
 import type { PlanWithSteps } from "@/types/family";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
 
@@ -11,17 +12,6 @@ export type PlanReviewStatus = {
 
 function hasValidReviewedAt(value: string | undefined): boolean {
   return Boolean(value && !Number.isNaN(Date.parse(value)));
-}
-
-function isValidDateOnly(value: string | null): boolean {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
 }
 
 export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatus {
@@ -62,7 +52,7 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
     actions.some(
       (action) =>
         action.status !== "completed" &&
-        !isValidDateOnly(action.target_date),
+        !parseDateOnly(action.target_date),
     )
   ) {
     return {
@@ -75,7 +65,7 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
     actions.some(
       (action) =>
         action.status === "blocked" &&
-        (!actionUserNotes(action.notes).trim() || !isValidDateOnly(action.follow_up_date)),
+        (!actionUserNotes(action.notes).trim() || !parseDateOnly(action.follow_up_date)),
     )
   ) {
     return {

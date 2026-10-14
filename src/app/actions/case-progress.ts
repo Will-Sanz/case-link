@@ -1,5 +1,6 @@
 "use server";
 
+import { schoolDate } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAppUserWithClient } from "@/lib/auth/session";
@@ -70,7 +71,7 @@ export async function captureCaseProgressUpdate(
     return { ok: false, error: "Check the meeting note and selected action updates." };
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = schoolDate();
   if (parsed.data.occurredOn > today) {
     return { ok: false, error: "Meeting date cannot be in the future." };
   }

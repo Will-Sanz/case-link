@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Client, Pool, type PoolClient } from "pg";
+import { addCalendarDays, schoolDate } from "../src/lib/dates";
 import { selectNextFamilyWork } from "../src/lib/domain/family-workspace/next-work";
 import type { PlanWithSteps } from "../src/types/family";
 import { updatePlanStepSchema, updatePlanStepActionItemSchema } from "../src/lib/validations/plans";
@@ -66,6 +67,44 @@ async function revisionFor(userId: string, familyId: string): Promise<string> {
 }
 async function canExport(revision: string): Promise<boolean> {
   return asUser(userA, async client => (await client.query("select public.is_reviewed_plan_revision($1, $2, $3) allowed", [familyA, planA, revision])).rows[0].allowed);
+}
+
+async function checkDateConfirmation() {
+  const family = randomUUID(), plan = randomUUID(), step = randomUUID(), action = randomUUID();
+  try {
+    await admin.query("insert into public.families(id,name,created_by_id) values($1,'Date confirmation case',$2)",[family,userA]);
+    await admin.query("insert into public.plans(id,family_id,version,generation_source) values($1,$2,1,'manual')",[plan,family]);
+    await admin.query(`insert into public.plan_steps(id,plan_id,phase,title,description,sort_order,details) values($1,$2,'30','Confirm options','Discuss options',0,'{"expected_outcome":"Options confirmed"}')`,[step,plan]);
+    await admin.query("insert into public.plan_step_action_items(id,plan_step_id,title,week_index,sort_order) values($1,$2,'Discuss options',1,0)",[action,step]);
+    const approve = async (confirmed = true) => asUser(userA,client=>client.query("select public.mark_plan_reviewed($1,$2,$3,$4)",[family,plan,currentRevision,confirmed]));
+    let currentRevision = await revisionFor(userA,family);
+    await expectDbError(()=>approve(),"open work with no date cannot be reviewed");
+    await admin.query("update public.plan_step_action_items set target_date='2028-02-29' where id=$1",[action]);
+    currentRevision = await revisionFor(userA,family);
+    await expectDbError(()=>approve(false),"an exact date is still unconfirmed until the person approves it");
+    await approve();
+    const audit = (await admin.query("select details from public.activity_log where family_id=$1 and action='plan.reviewed'",[family])).rows[0].details;
+    assert.equal(audit.dates_confirmed,true); assert.equal(audit.calendar_timezone,'America/New_York');
+    assert.equal(audit.confirmed_on,schoolDate());
+    await admin.query("update public.plan_step_action_items set status='completed',target_date=null where id=$1",[action]);
+    currentRevision = await revisionFor(userA,family); await approve();
+    await admin.query("update public.plan_step_action_items set status='blocked',target_date='2020-01-01',notes='Awaiting callback' where id=$1",[action]);
+    currentRevision = await revisionFor(userA,family);
+    await expectDbError(()=>approve(),"Waiting needs a follow-up date");
+    await admin.query("update public.plan_step_action_items set follow_up_date='2020-01-03' where id=$1",[action]);
+    currentRevision = await revisionFor(userA,family); await approve();
+    const pastAudit = (await admin.query("select details from public.activity_log where family_id=$1 and action='plan.reviewed' order by created_at desc limit 1",[family])).rows[0].details;
+    assert.equal(pastAudit.past_open_actions,1,"the confirmed historical date is recorded explicitly");
+    const meeting = (date: string) => asUser(userA,async client=>{
+      await client.query("set local timezone='Pacific/Auckland'");
+      return client.query("select public.capture_case_progress_update($1,$2,$3,'Discussed dates',$4,'[]')",[family,plan,date,randomUUID()]);
+    });
+    await expectDbError(()=>meeting(addCalendarDays(schoolDate(),1)),"meeting dates use the school day even with a different database session timezone");
+    await meeting(schoolDate());
+  } finally {
+    await admin.query("delete from public.families where id=$1",[family]);
+  }
+  console.log("Date confirmation: missing/explicit/manual/leap/completed/Waiting/past dates and school-day meetings passed.");
 }
 
 async function checkLargeFamilyLists() {
@@ -221,7 +260,7 @@ async function checkAtomicPlanEdits() {
   assert.equal((await save(edits(after.plan))).ok, true, "a fresh unchanged retry is a no-op");
   assert.deepEqual(await state(), after);
 
-  await asUser(userA, client => client.query("select public.mark_plan_reviewed($1,$2,$3)", [familyA,planA,after.plan.review_revision]));
+  await asUser(userA, client => client.query("select public.mark_plan_reviewed($1,$2,$3,true)", [familyA,planA,after.plan.review_revision]));
   const reviewed = await state();
   const action = reviewed.plan.steps.flatMap(s => s.action_items ?? []).find(a => a.id === actionA)!;
   const progress = { action_item_id: action.id, expected_updated_at: action.updated_at, status: "in_progress", target_date: action.target_date, follow_up_date: null, notes: "Intake contacted", outcome: null };
@@ -276,7 +315,7 @@ async function checkReviewRaces() {
   await written;
   const staleReview = asUser(userA, async client => {
     await client.query("set local application_name = 'caselink-review-race'");
-    return client.query("select public.mark_plan_reviewed($1, $2, $3)", [familyA, planA, seen]);
+    return client.query("select public.mark_plan_reviewed($1, $2, $3, true)", [familyA, planA, seen]);
   });
   const rejected = assert.rejects(staleReview, { code: "40001" }, "a review waiting on an edit cannot approve the unseen revision");
   try {
@@ -294,13 +333,13 @@ async function checkReviewRaces() {
   assert.notEqual(current, seen);
   const events = await admin.query("select count(*)::int n from public.activity_log where family_id = $1 and action = 'plan.reviewed'", [familyA]);
   assert.equal(events.rows[0].n, 0, "stale approval adds no audit evidence");
-  await expectDbError(() => asUser(userA, client => client.query("select public.mark_plan_reviewed($1, $2, $3)", [familyA, planA, seen])), "stale screen cannot approve after the edit either");
+  await expectDbError(() => asUser(userA, client => client.query("select public.mark_plan_reviewed($1, $2, $3, true)", [familyA, planA, seen])), "stale screen cannot approve after the edit either");
   let releaseReview!: () => void;
   const holdReview = new Promise<void>(resolve => { releaseReview = resolve; });
   let signalReviewed!: () => void;
   const didReview = new Promise<void>(resolve => { signalReviewed = resolve; });
   const reviewer = asUser(userA, async client => {
-    await client.query("select public.mark_plan_reviewed($1, $2, $3)", [familyA, planA, current]);
+    await client.query("select public.mark_plan_reviewed($1, $2, $3, true)", [familyA, planA, current]);
     signalReviewed();
     await holdReview;
   });
@@ -415,7 +454,9 @@ async function setup() {
 
 async function run() {
   await setup();
+  await expectDbError(() => asUser(userA,client => client.query("select public.mark_plan_reviewed($1,$2,$3)",[familyA,planA,"ignored"])),"unconfirmed dates cannot be approved directly");
   await checkLargeFamilyLists();
+  await checkDateConfirmation();
   assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 
   // PostgREST uses PostgreSQL's JSON timestamp representation, including microseconds and offsets.
@@ -825,7 +866,7 @@ async function run() {
   );
   await checkReviewRaces();
   const reviewed = await asUser(userA, async (client) => client.query<{ mark_plan_reviewed: string }>(
-    "select public.mark_plan_reviewed($1, $2, $3)",
+    "select public.mark_plan_reviewed($1, $2, $3, true)",
     [familyA, planA, await revisionFor(userA, familyA)],
   ));
   assert.ok(Number.isFinite(new Date(String(reviewed.rows[0].mark_plan_reviewed)).getTime()));
@@ -844,7 +885,7 @@ async function run() {
   assert.equal(reviewAfterPlanEdit.rows[0].reviewed, false);
   assert.equal(await canExport(approvedRevision), false, "an old preview is blocked after a material edit");
   await asUser(userA, async (client) => client.query(
-    "select public.mark_plan_reviewed($1, $2, $3)",
+    "select public.mark_plan_reviewed($1, $2, $3, true)",
     [familyA, planA, await revisionFor(userA, familyA)],
   ));
   await asUser(userA, (client) => client.query(
@@ -965,7 +1006,7 @@ async function run() {
 
   await admin.query("update public.plan_steps set details=jsonb_build_object('expected_outcome','Housing options confirmed') where id=$1", [stepB]);
   const previousRevision = await revisionFor(userB, familyB);
-  await asUser(userB, client => client.query("select public.mark_plan_reviewed($1,$2,$3)", [familyB,planB,previousRevision]));
+  await asUser(userB, client => client.query("select public.mark_plan_reviewed($1,$2,$3,true)", [familyB,planB,previousRevision]));
   const generationLease = randomUUID();
   assert.equal((await asUser(userB, client => client.query("select public.claim_ai_job($1,'staged-plan-advance',$2,600) claimed", [familyB,generationLease]))).rows[0].claimed, true);
   const initialGenerationState = {

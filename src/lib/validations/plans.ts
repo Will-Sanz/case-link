@@ -1,18 +1,9 @@
 import { z } from "zod";
+import { parseDateOnly } from "@/lib/dates";
 
 export const dateOnlySchema = (message: string) =>
-  z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, message)
-    .refine((value) => {
-      const [year, month, day] = value.split("-").map(Number);
-      const date = new Date(Date.UTC(year, month - 1, day));
-      return (
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() === month - 1 &&
-        date.getUTCDate() === day
-      );
-    }, message);
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, message)
+    .refine((value) => parseDateOnly(value) !== null, message);
 
 export const aiModeSchema = z.enum(["fast", "thinking"]).optional();
 

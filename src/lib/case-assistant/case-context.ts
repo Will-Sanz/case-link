@@ -1,3 +1,4 @@
+import { schoolDate, SCHOOL_TIME_ZONE } from "@/lib/dates";
 import type { FamilyDetail } from "@/types/family";
 import { actionTargetDate, actionUiStatus, actionUserNotes } from "@/lib/domain/plan/action-state";
 import { selectNextFamilyWork } from "@/lib/domain/family-workspace/next-work";
@@ -14,7 +15,7 @@ export function buildAssistantCaseContext(detail: FamilyDetail, now = new Date()
     shortened = true;
     return `${value.slice(0, max)}… [shortened]`;
   };
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const today = schoolDate(now);
   const allSteps = detail.plan?.steps ?? [];
   const allActions = allSteps.flatMap(step => (step.action_items ?? []).map(action => ({ step, action })));
   allActions.sort((a, b) => {
@@ -25,7 +26,7 @@ export function buildAssistantCaseContext(detail: FamilyDetail, now = new Date()
   });
   const next = selectNextFamilyWork(allSteps);
   const context = {
-    as_of: today, date_timezone: "America/New_York", case_updated_at: detail.updated_at,
+    as_of: today, date_timezone: SCHOOL_TIME_ZONE, case_updated_at: detail.updated_at,
     summary: clip(detail.summary, 2000), circumstances: clip(detail.household_notes, 2000), urgency: detail.urgency,
     stated_goals: detail.goals.slice(0, 20).map(goal => clip(goal.label)), barriers: detail.barriers.slice(0, 20).map(barrier => clip(barrier.label)),
     plan: detail.plan ? { id: detail.plan.id, version: detail.plan.version, revision: detail.plan.review_revision, review: getPlanReviewStatus(detail.plan), generation: detail.plan.generation_state?.status ?? "complete" } : null,

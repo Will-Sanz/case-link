@@ -137,4 +137,13 @@ describe("getPlanReviewStatus", () => {
     waiting.steps[0].action_items![0].follow_up_date = "2026-08-12";
     expect(getPlanReviewStatus(waiting).state).toBe("needs_review");
   });
+  it("accepts a human-selected date outside generation windows and completed work without dates", () => {
+    const manual = plan();
+    manual.steps[0].action_items![0].target_date = "2028-02-29";
+    expect(getPlanReviewStatus(manual).state).toBe("needs_review");
+    manual.steps[0].action_items![0].status = "completed";
+    manual.steps[0].action_items![0].target_date = null;
+    expect(getPlanReviewStatus(manual).state).toBe("needs_review");
+  });
+
 });

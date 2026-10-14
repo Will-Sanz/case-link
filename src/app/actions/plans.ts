@@ -1,7 +1,9 @@
 "use server";
 
+import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { schoolDate } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { publicSessionError } from "@/lib/auth/session-errors";
@@ -908,7 +910,7 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
 }
 
 export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
-  const parsed = markPlanReviewedSchema.safeParse(input);
+  const parsed = markPlanReviewedSchema.extend({ datesConfirmed: z.literal(true) }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid request" };
 
   let supabase;
@@ -937,6 +939,7 @@ export async function markPlanReviewed(input: unknown): Promise<ActionResult> {
     p_family_id: familyId,
     p_plan_id: planId,
     p_expected_revision: expectedRevision,
+    p_dates_confirmed: parsed.data.datesConfirmed,
   });
   if (error?.code === "40001") return { ok: false, error: "The plan changed. Reload it and review the current version before approving." };
   if (error) return { ok: false, error: publicMessageFromSupabaseError(error) };
@@ -1024,19 +1027,7 @@ export async function createManualStep(input: unknown): Promise<ActionResult> {
 
   const { familyId, planId, goal, title, description, target_date, details } = parsed.data;
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const target = new Date(`${target_date}T00:00:00.000Z`);
-  const [targetYear, targetMonth, targetDay] = target_date.split("-").map(Number);
-  if (
-    Number.isNaN(target.getTime()) ||
-    target.getUTCFullYear() !== targetYear ||
-    target.getUTCMonth() !== targetMonth - 1 ||
-    target.getUTCDate() !== targetDay
-  ) {
-    return { ok: false, error: "Choose a valid target date." };
-  }
-  const daysFromToday = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+  const daysFromToday = (Date.parse(target_date) - Date.parse(schoolDate())) / 86_400_000;
   const phase: "30" | "60" | "90" =
     daysFromToday <= 30 ? "30" : daysFromToday <= 60 ? "60" : "90";
 

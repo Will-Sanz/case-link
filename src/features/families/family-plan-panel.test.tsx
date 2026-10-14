@@ -353,15 +353,47 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     expect(region.queryByRole("button", { name: "Apply to draft" })).toBeNull();
   });
 
+  it("shows one Waiting follow-up date and saves it consistently, including a manual leap-day choice", async () => {
+    const waiting = structuredClone(plan);
+    Object.assign(waiting.steps[0].action_items![0], { status: "blocked", target_date: "2020-01-01", follow_up_date: "2026-11-02", notes: "Awaiting callback" });
+    vi.mocked(savePlanEdits).mockResolvedValue({ ok: true });
+    render(<FamilyPlanPanel familyId={waiting.family_id} plan={waiting} workflow={null} />);
+    expect(screen.getByText("Follow up Nov 2, 2026")).toBeTruthy();
+    expect(screen.queryByText("Target Jan 1, 2020")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    const input = screen.getByLabelText("Next follow-up date");
+    expect((input as HTMLInputElement).value).toBe("2026-11-02");
+    expect(screen.queryByDisplayValue("2020-01-01")).toBeNull();
+    fireEvent.change(input, { target: { value: "2028-02-29" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    await screen.findByText("Action saved.");
+    expect(savePlanEdits).toHaveBeenCalledWith(expect.objectContaining({ steps: [expect.objectContaining({ actionItems: [expect.objectContaining({ patch: expect.objectContaining({ target_date: "2028-02-29", follow_up_date: "2028-02-29" }) })] })] }));
+  });
+
+  it("requires date confirmation before approving and allows cancellation", () => {
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Mark plan reviewed" }));
+    expect(markPlanReviewed).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog").textContent).toContain("AI dates are proposals");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(markPlanReviewed).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
   it("submits the displayed revision and recovers from a failed review", async () => {
     vi.mocked(markPlanReviewed).mockResolvedValueOnce({ ok: false, error: "This plan changed in another tab." });
     render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Mark plan reviewed" }));
+    expect(screen.getByRole("alertdialog").textContent).toContain("earlier dates are intentional");
+    fireEvent.click(screen.getByRole("button", { name: "Confirm dates and mark reviewed" }));
     await screen.findByText("This plan changed in another tab.");
     await waitFor(() => expect((screen.getByRole("button", { name: "Mark plan reviewed" }) as HTMLButtonElement).disabled).toBe(false));
-    expect(markPlanReviewed).toHaveBeenCalledWith({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });
+    expect(markPlanReviewed).toHaveBeenCalledWith({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision, datesConfirmed: true });
     vi.mocked(markPlanReviewed).mockRejectedValueOnce(new Error("private service error"));
     fireEvent.click(screen.getByRole("button", { name: "Mark plan reviewed" }));
+    expect(screen.getByRole("alertdialog").textContent).toContain("earlier dates are intentional");
+    fireEvent.click(screen.getByRole("button", { name: "Confirm dates and mark reviewed" }));
     await screen.findByText("The review could not be saved. Your edits are unchanged; try again.");
     await waitFor(() => expect((screen.getByRole("button", { name: "Mark plan reviewed" }) as HTMLButtonElement).disabled).toBe(false));
   });

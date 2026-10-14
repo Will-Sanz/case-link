@@ -1,5 +1,7 @@
 "use client";
 
+import { addCalendarDays, schoolDate, formatDateOnly as formatTargetDate } from "@/lib/dates";
+
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,7 +32,7 @@ import type {
 } from "@/types/family";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
-import { actionUserNotes } from "@/lib/domain/plan/action-state";
+import { actionTargetDate, actionUserNotes } from "@/lib/domain/plan/action-state";
 import { applyRefinementChanges, collectRefinementChanges, toRefinementDraft, type RefinementChange } from "@/lib/domain/plan/refinement-review";
 import { RefinementChangeReview } from "@/features/families/refinement-change-review";
 
@@ -57,27 +59,6 @@ function removeStoredActionDraft(key: string): void {
   } catch {
     // Draft recovery is optional when browser storage is restricted.
   }
-}
-
-function dateInputValueAfterDays(days: number): string {
-  const value = new Date();
-  value.setDate(value.getDate() + days);
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatTargetDate(value: string | null): string | null {
-  if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
-  }).format(parsed);
 }
 
 function workflowStatusLabel(value: string | null | undefined): string {
@@ -360,7 +341,7 @@ export function FamilyPlanPanel({
   const [conflictResolution, setConflictResolution] = useState<"keep_draft" | null>(null);
   const [addStepGoal, setAddStepGoal] = useState("");
   const [addStepTitle, setAddStepTitle] = useState("");
-  const [addStepTargetDate, setAddStepTargetDate] = useState(() => dateInputValueAfterDays(7));
+  const [addStepTargetDate, setAddStepTargetDate] = useState(() => addCalendarDays(schoolDate(), 7));
   const [addStepDescription, setAddStepDescription] = useState("");
   const [addStepDocuments, setAddStepDocuments] = useState("");
   const [addStepContact, setAddStepContact] = useState("");
@@ -888,7 +869,7 @@ export function FamilyPlanPanel({
         }
         setAddStepTitle("");
         setAddStepDescription("");
-        setAddStepTargetDate(dateInputValueAfterDays(7));
+        setAddStepTargetDate(addCalendarDays(schoolDate(), 7));
         setAddStepDocuments("");
         setAddStepContact("");
         setAddStepExpectedOutcome("");
@@ -1119,6 +1100,21 @@ export function FamilyPlanPanel({
 
   const reviewStatus = getPlanReviewStatus(plan);
 
+  function confirmDatesAndReview() {
+    if (!plan) return;
+    const today = schoolDate();
+    const past = plan.steps.flatMap(step => step.action_items ?? []).filter(action => {
+      const date = actionTargetDate(action);
+      return action.status !== "completed" && date && date < today;
+    }).length;
+    requestConfirmation({
+      title: "Confirm dates and review this plan?",
+      description: `Confirm that each open action has the date you intend. Waiting dates are the next follow-up date. ${past ? `${past} open ${past === 1 ? "action has a date" : "actions have dates"} before ${formatTargetDate(today)}. Confirm those earlier dates are intentional, or cancel and update them. ` : ""}AI dates are proposals until you approve them here.`,
+      confirmLabel: "Confirm dates and mark reviewed",
+      onConfirm: reviewPlan,
+    });
+  }
+
   function reviewPlan() {
     if (!plan || reviewPending) return;
     if (stepDirty || planAiDirty) {
@@ -1130,7 +1126,7 @@ export function FamilyPlanPanel({
     setSuccess(null);
     startTransition(async () => {
       try {
-        const result = await markPlanReviewed({ familyId, planId: plan.id, expectedRevision: plan.review_revision });
+        const result = await markPlanReviewed({ familyId, planId: plan.id, expectedRevision: plan.review_revision, datesConfirmed: true });
         if (!result.ok) {
           setError(result.error);
           return;
@@ -1371,9 +1367,9 @@ export function FamilyPlanPanel({
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--color-ink-muted)]">
               {reviewStatus.state === "reviewed"
-                ? `Reviewed ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(plan.client_display!.reviewedAt!))}. Material edits will return the plan to Needs review.`
+                ? `Reviewed ${formatTargetDate(schoolDate(new Date(plan.client_display!.reviewedAt!)))}. Material edits will return the plan to Needs review.`
                 : reviewStatus.state === "needs_review"
-                  ? "Read each goal, action, and target date. Mark reviewed when the plan reflects your judgment; only then can CaseLink create the PDF."
+                  ? "Dates are proposed until you confirm them. Check each goal and action; Waiting dates mean the next follow-up. Confirm the dates and plan before creating the PDF."
                   : reviewStatus.issue}
             </p>
             {(stepDirty || planAiDirty) && reviewStatus.state === "needs_review" ? (
@@ -1394,7 +1390,7 @@ export function FamilyPlanPanel({
           ) : reviewStatus.state === "needs_review" ? (
             <Button
               type="button"
-              onClick={reviewPlan}
+              onClick={confirmDatesAndReview}
               disabled={reviewPending || pending || stepDirty || planAiDirty}
             >
               {reviewPending ? "Marking reviewed…" : "Mark plan reviewed"}
@@ -1426,7 +1422,7 @@ export function FamilyPlanPanel({
                         </p>
                         {nextTargetDate ? (
                           <p className="mt-1 font-medium text-[var(--color-accent)]">
-                            Next target: <time dateTime={group.earliestOpenTargetDate ?? undefined}>{nextTargetDate}</time>
+                            Next date: <time dateTime={group.earliestOpenTargetDate ?? undefined}>{nextTargetDate}</time>
                           </p>
                         ) : null}
                       </div>
@@ -1525,7 +1521,6 @@ export function FamilyPlanPanel({
                   <input
                     type="date"
                     className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
-                    min={dateInputValueAfterDays(0)}
                     value={addStepTargetDate}
                     onChange={(e) => setAddStepTargetDate(e.target.value)}
                     disabled={addStepPending}
