@@ -281,6 +281,8 @@ Full-plan save loops through steps, and each step then saves action items separa
 
 ### [ ] CL-38 — Prove least-privilege access and the one-school boundary
 
+**October 14 hosted finding:** the user-restored configured project is healthy, but it has 44 existing family records, 20 older public tables, no private tables and no recorded migrations. RLS is enabled on all observed public tables; that does not establish the new active-account/session/review controls. Advisors flag a mutable function search path, anonymous access to privileged functions and disabled leaked-password protection. No identities or narratives were read and no hosted data or settings were changed. [Metadata, prepared separate staging project and safe legacy-upgrade procedure](verification/hosted-database-preflight.md). Local role/session/MFA/database and browser tests pass; actual hosted authorization remains blocked on isolated staging and a rehearsed data-preserving upgrade. Do not reset this project or blindly replay/mark the initial migrations.
+
 **Type:** Verify · **Responsible:** engineering + pilot administrator.
 
 Application authentication and family-level row policies are good foundations, but the deployed policy state was not inspected. Current admin authority is installation-wide; the production posture is explicitly single-tenant. That is appropriate only when the installation's trust boundary matches the school pilot.
