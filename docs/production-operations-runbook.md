@@ -2,7 +2,7 @@
 
 **Applies to:** the invitation-only V1 pilot
 
-**Approved deployment shape:** one Vercel project and one Supabase project per school or district
+**Selected deployment shape (hosted configuration and owner approval pending):** one Vercel project and one Supabase project per school or district
 
 **Data posture:** de-identified case context only; browser-generated reviewed-plan PDF export; no PDF uploads or raw PDF bytes sent to OpenAI
 
@@ -61,7 +61,7 @@ Store current phone/email contacts in the restricted operational system, not in 
 - [ ] `npm ci`, production dependency audit, secret scan, typecheck, lint, unit/integration tests, production build, and database security suite pass on the candidate commit.
 - [ ] Authenticated staging checks cover the complete family → barriers → plan → dated-action review → reviewed-plan PDF preview → download flow. Review includes date confirmation and acknowledgement of any earlier open-action dates. Calendar dates use America/New_York for this pilot; Waiting uses its next follow-up date. The review audit records that confirmation.
 - [ ] An automated accessibility scan plus keyboard-only check passes for login, Families, Family workspace, plan review, and paperwork review.
-- [ ] PDF corpus tests reject filled, scanned, encrypted, signed, XFA, active-content, attached, malformed, oversized, over-page, over-field, and excessive-object files without an AI call.
+- [ ] `npm run test:pdf` passes the reviewed-plan export corpus: exact source text, dates, outcomes, directory contacts, pagination, margins, legibility, monochrome output, unsupported-glyph failure, and no stale or unreviewed export. Uploaded or filled forms are outside this release.
 - [ ] AI safety/evaluation fixtures meet the release rubric for privacy, grounding, unsupported claims, resource fidelity, and human-review requirements.
 - [ ] Product/privacy, engineering, and the pilot owner sign the residual-risk section of the release ticket.
 
@@ -138,7 +138,7 @@ Review every user, admin, assignment, service credential, and vendor operator qu
 2. Apply migrations to staging from scratch and run `npm run test:db-security`.
 3. Deploy staging, execute the release verification checks, and review CSP/structured logs for prohibited content.
 4. Take/verify the production recovery point, apply migrations, then deploy the same immutable commit.
-5. Smoke-test `/api/health`, login, one synthetic family read/write, plan review, and blank-form download.
+5. Smoke-test `/api/health`, login, one synthetic family read/write, dated-action review, and reviewed-plan PDF preview/download.
 6. Monitor errors, auth failures, rate limits, latency, and spend for at least 30 minutes.
 
 ### Rollback
@@ -162,6 +162,10 @@ Before launch and quarterly:
 
 An untested backup does not satisfy the launch gate.
 
+Local preparation: `npm run test:restore` creates two randomly named databases inside only the local CaseLink container. It copies schema definitions and migration IDs, seeds new synthetic Auth/case/plan records, checks a custom-format backup against exact row hashes, rejects a corrupt backup, and verifies access, review preservation and stale-export rejection after restoration. It then runs the complete database security suite against the restored target and removes both temporary databases. It never copies existing family rows, sends email/AI requests, or restores over the application database. See [the October 14 drill](verification/2026-10-14-local-restore.json): 49 tables, 37 migration versions, 21.066 seconds including regression checks, no lost synthetic rows. This is not a hosted RPO/RTO, PITR, storage-object, cluster-role, or provider-configuration rehearsal.
+
+Before the hosted exercise, explicitly disable external email delivery, outbound AI and automated jobs, and restrict network/operator access. Restore Auth state as well as application data; then revoke pre-incident sessions before reopening a real restored service, so recovery does not revive access that was revoked after the backup. Reconcile migration history and provider settings separately. Verify backup recency and credential recovery against the actual project; do not assume a successful scheduled-backup indicator means a usable recovery point exists.
+
 ## Monitoring, SLOs, and alerts
 
 Pilot SLO: **99.5% monthly availability** for authenticated non-AI workflows, excluding scheduled maintenance announced at least 24 hours in advance.
@@ -173,7 +177,7 @@ Alert the named operator for:
 - repeated RLS/authorization denials or auth failures above the staging-derived abuse threshold;
 - any audit-write failure or unexpected admin/role event;
 - AI failure above 10% for 15 minutes, p95 latency above 90 seconds, rate-limit spikes, or 80% of the daily spend ceiling;
-- PDF rejection/parse failures above 10% for 15 minutes;
+- PDF rendering/download failures above 10% for 15 minutes, or any stale/unauthorized export attempt;
 - database capacity, connection, or backup failure warnings.
 
 Every alert must carry only time, environment, route/event taxonomy, correlation ID, error fingerprint, status, duration, and aggregate counts. Test alert delivery with synthetic failures before launch and quarterly.

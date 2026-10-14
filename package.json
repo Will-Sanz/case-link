@@ -35,7 +35,8 @@
     "db:invite-user": "tsx scripts/invite-user.ts",
     "db:create-test-user": "tsx scripts/create-test-user.ts",
     "prepare": "husky",
-    "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts"
+    "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts",
+    "test:restore": "node scripts/test-restore.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

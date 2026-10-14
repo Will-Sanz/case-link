@@ -625,6 +625,8 @@ Current PDF tests establish useful file/metadata/page/color properties but not c
 
 ### [ ] CL-36 — Record hosted configuration, recovery, and support evidence
 
+**October 14 engineering evidence:** `npm run test:restore` creates two isolated synthetic databases inside the local CaseLink container, restores a logical backup, compares all 49 tables exactly, preserves the reviewed revision and access denials, rejects corrupt backup data and stale export, then passes the full database security suite. Both temporary databases were removed. All 37 migration IDs survived; recovery plus regression checks took 21.066 seconds with zero lost synthetic rows. Initial setup failures and their corrections are preserved in [the drill record](verification/2026-10-14-local-restore.json). The export-only runbook now distinguishes this rehearsal from hosted PITR, Auth/session recovery, provider settings and real RPO/RTO. Normal correctness/security/privacy and separate Ponytail deletion reviews completed. No existing case rows were copied or remote service contacted. Hosted backup/restore, alert delivery, owners, retention/vendor approval and incident rehearsal remain open.
+
 **Type:** Verify + Decide · **Responsible:** service owner + operator + privacy owner.
 
 Repository settings and old hardening reports do not prove today's hosted state. `/api/health` is liveness only and does not check the database, Auth, or AI. Backup, restore, email delivery, provider configuration, alert routing, and rollout ownership remain unverified.
