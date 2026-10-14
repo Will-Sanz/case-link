@@ -42,5 +42,17 @@
     "requiredChecks": "passed",
     "releasePreflightExitCode": 0,
     "productionDeployed": false
+  },
+  "emailVerificationCandidate": {
+    "sha": "cb54f195b727bb76df9564913c8f645b4d1ffd69",
+    "ciRun": "38643427263",
+    "codeqlRun": "38643427290",
+    "requiredChecks": "passed",
+    "unitTestsPassed": 697,
+    "releasePreflightExitCode": 0,
+    "deployment": "dpl_ENW9pB5KJgRk6rGYRtayTcfwuLMK",
+    "deploymentState": "READY",
+    "region": "iad1",
+    "productionDeployed": false
   }
 }
