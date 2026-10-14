@@ -56,6 +56,35 @@ async function checkPlatformRlsTriggerPrivileges() {
   } finally { await admin.query("rollback"); }
 }
 
+async function checkExplicitApplicationPrivileges() {
+  await admin.query("begin");
+  try {
+    await admin.query("grant truncate on public.app_users to service_role");
+    await admin.query("grant execute on function public.archive_family(uuid) to service_role");
+    await admin.query("alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role");
+    await admin.query("alter default privileges for role postgres in schema public grant all on functions to anon, authenticated, service_role");
+    await admin.query(readFileSync("supabase/migrations/20261014203800_explicit_application_privileges.sql", "utf8"));
+    const unsafeTables = await admin.query(`select count(*)::int n from pg_class c
+      join pg_namespace n on n.oid=c.relnamespace cross join unnest(array['anon','authenticated','service_role']) role_name
+      where n.nspname='public' and c.relkind='r'
+      and has_table_privilege(role_name,c.oid,'TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')`);
+    assert.equal(unsafeTables.rows[0].n, 0, "application roles cannot bypass row policies with table maintenance privileges");
+    assert.equal((await admin.query("select has_function_privilege('service_role','public.archive_family(uuid)','EXECUTE') allowed")).rows[0].allowed, false);
+    assert.equal((await admin.query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.prokind='f' and has_function_privilege('anon',p.oid,'EXECUTE')`)).rows[0].n, 0);
+    await admin.query("create table public.security_permission_probe(id integer)");
+    await admin.query("create function public.security_permission_probe() returns integer language sql as 'select 1'");
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      const access = (await admin.query(`select
+        has_table_privilege($1,'public.security_permission_probe','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') as table_access,
+        has_function_privilege($1,'public.security_permission_probe()','EXECUTE') as function_access`, [role])).rows[0];
+      assert.deepEqual(access, { table_access: false, function_access: false }, "new application objects require explicit grants");
+    }
+    await admin.query("set local role service_role");
+    await assert.rejects(admin.query("truncate public.app_users cascade"), { code: "42501" });
+  } finally { await admin.query("rollback"); }
+}
+
 async function asUser<T>(
   userId: string,
   run: (client: PoolClient) => Promise<T>,
@@ -548,6 +577,7 @@ async function seedMfa(userId: string, status: "unverified" | "verified") {
 async function setup() {
   await admin.connect();
   await checkPlatformRlsTriggerPrivileges();
+  await checkExplicitApplicationPrivileges();
   if (["127.0.0.1", "localhost"].includes(parsedUrl.hostname)) {
     await admin.query(
       `delete from public.families where created_by_id in (
