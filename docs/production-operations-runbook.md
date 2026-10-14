@@ -135,9 +135,9 @@ Review every user, admin, assignment, service credential, and vendor operator qu
 ### Deploy
 
 1. Record the commit SHA, migration list, dependency-audit result, approvals, and backup status.
-2. Apply migrations to staging from scratch and run `npm run test:db-security`.
-3. Deploy staging, execute the release verification checks, and review CSP/structured logs for prohibited content.
-4. Take/verify the production recovery point, apply migrations, then deploy the same immutable commit.
+2. Run `npm run test:db-security` and the database/Auth/restore/browser suites on isolated local or CI infrastructure. Apply migrations only to the dedicated empty synthetic staging project, verify its exact migration inventory, then run bounded hosted checks. Do not redirect destructive local fixture runners to a hosted database. The restored legacy project requires its separately rehearsed data-preserving upgrade and backup approval.
+3. Run `npm run verify:release -- <exact-40-character-SHA>`, deploy the authorized protected staging candidate, execute the hosted release checks, and review CSP/structured logs for prohibited content.
+4. After explicit release approval, verify the production recovery point, apply the separately reviewed compatible migrations, then deploy the same immutable commit with production-scoped credentials.
 5. Smoke-test `/api/health`, login, one synthetic family read/write, dated-action review, and reviewed-plan PDF preview/download.
 6. Monitor errors, auth failures, rate limits, latency, and spend for at least 30 minutes.
 

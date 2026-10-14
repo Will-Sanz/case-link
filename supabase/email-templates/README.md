@@ -50,7 +50,7 @@ Security notifications (password changed, email changed, etc.) must be enabled i
 
 - `{{ .ConfirmationURL }}` — Verification link
 - `{{ .TokenHash }}` — One-use verification credential for the confirmation screen (never log it)
-- `{{ .Token }}` — 6-digit OTP (reauthentication)
+- `{{ .Token }}` — email OTP (reauthentication): six digits in local tests, eight in the new hosted staging project; the form supports both.
 - `{{ .Email }}` — User's email
 - `{{ .NewEmail }}` — New email (email change)
 - `{{ .OldEmail }}` — Previous email (email changed notification)

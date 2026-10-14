@@ -1,12 +1,12 @@
 # CaseLink school-pilot fix tracker
 
-**Reviewed:** October 13, 2026 · **Repository baseline:** `e0cb389` · **Status:** implementation in progress on `codex/school-pilot-readiness`.
+**Reviewed:** October 14, 2026 · **Repository baseline:** `e0cb389` · **Status:** implementation in progress on `codex/school-pilot-readiness`.
 
 **Intended rollout:** a few staff at one school, working with real family circumstances. This is not yet approval to store identifiable education or family records. Current product policy requires non-identifying labels and de-identified narrative.
 
 **Recommendation:** complete this first-priority readiness workstream before routine school use. A successful build is not sufficient evidence that account setup, AI recommendations, concurrent edits, and PDF export work together safely. Use synthetic cases for the school demonstration until the applicable release gates below are evidenced.
 
-**October 14 continuation:** the intake-to-PDF browser release suite now passes, with CI execution added. Thirty-three engineering records are closed; eight required records and the optional Decisions evaluation remain open. See the [continuation handoff](pilot-readiness-handoff.md) for remaining AI evaluation, operations, hosting, secret-management and external school/hosted gates. This is not pilot launch approval.
+**October 14 continuation:** the intake-to-PDF browser release suite now passes, with CI execution added. Thirty-three engineering records are closed; eight required records and the optional Decisions evaluation remain open. The latest code checkpoint `81a9c17` passed GitHub CI and CodeQL. Live AI evaluation, approved legacy permission containment and empty isolated staging are now evidenced. See the [current handoff](pilot-readiness-handoff.md) for the remaining hosted engineering, legacy upgrade, email, secrets and school gates. CaseLink local services are stopped after the user reported workstation slowdown; final code verification ran remotely. This is not pilot launch approval.
 
 The current product is family intake → barriers → a goal-based intervention plan with confirmed dates → human review → a professional black-and-white PDF downloaded for manual use. Blank-PDF upload, field detection, form filling, and automatic submission are outside this release. The current decisions in [AGENTS.md](/Users/willsanz/homelessness-project/AGENTS.md) take precedence over older roadmap language.
 
@@ -71,6 +71,8 @@ Keep a recovery point and test restoration. The runbook currently targets at mos
 An additional external secrets service, an AI gateway, and Kubernetes are not launch prerequisites. Introduce another service only for a documented access, rotation, or institutional requirement, with its data path and failure handling reviewed.
 
 ## Evidence and limits
+
+The table below is the **October 13 audit baseline**, not the current verification result. Current per-item evidence and the October 14 handoff supersede it.
 
 | Check | Observed result | What it establishes |
 | --- | --- | --- |
