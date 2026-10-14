@@ -36,7 +36,9 @@
     "db:create-test-user": "tsx scripts/create-test-user.ts",
     "prepare": "husky",
     "test:ai-contracts": "tsx scripts/test-ai-schema-contracts.ts",
-    "test:restore": "node scripts/test-restore.mjs"
+    "test:restore": "node scripts/test-restore.mjs",
+    "prebuild": "node scripts/clear-compiler-cache.mjs",
+    "predev": "node scripts/clear-compiler-cache.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

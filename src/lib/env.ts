@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { isAllowedOpenAiModelId } from "@/lib/ai/model-allowlist";
-import { productionPostureIssues } from "@/lib/security/production-posture";
+import { deploymentBoundaryIssues } from "@/lib/security/deployment-boundaries";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -24,8 +24,6 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.string().optional(),
   /** @deprecated Prefer NEXT_PUBLIC_SITE_URL; still read for backwards compatibility. */
   NEXT_PUBLIC_APP_URL: z.string().optional(),
-  /** Server-only; required for privileged database scripts. */
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   /** Server-only; required in production for the approved Core workflow. */
   OPENAI_API_KEY: z.string().optional(),
   /** Server-only; overrides plan generation/regeneration model (default: gpt-5.6-luna). */
@@ -79,7 +77,7 @@ function assertOptionalModelEnv(name: string, value: string | undefined): void {
   const id = value.trim();
   if (!isAllowedOpenAiModelId(id)) {
     throw new Error(
-      `Invalid ${name}: "${id}" does not have a supported CaseLink request contract. See src/lib/ai/model-allowlist.ts.`,
+      `Invalid ${name}: the configured value does not have a supported CaseLink request contract. See src/lib/ai/model-allowlist.ts.`,
     );
   }
 }
@@ -99,12 +97,8 @@ export function getEnv(): Env {
   assertOptionalModelEnv("OPENAI_PLAN_PHASE_THINKING_MODEL", data.OPENAI_PLAN_PHASE_THINKING_MODEL);
   assertOptionalModelEnv("OPENAI_THINKING_UI_MODEL", data.OPENAI_THINKING_UI_MODEL);
   assertOptionalModelEnv("OPENAI_UI_MODEL", data.OPENAI_UI_MODEL);
-  if (data.VERCEL_ENV === "production" || data.CASELINK_ENVIRONMENT === "production") {
-    const postureIssues = productionPostureIssues(data);
-    if (postureIssues.length > 0) {
-      throw new Error(`Unsafe production posture:\n${postureIssues.join("\n")}`);
-    }
-  }
+  const postureIssues = deploymentBoundaryIssues(process.env);
+  if (postureIssues.length > 0) throw new Error(`Unsafe hosted configuration:\n${postureIssues.join("\n")}`);
   cached = data;
   return cached;
 }

@@ -49,6 +49,7 @@ jobs:
           CASELINK_HSTS: "1"
           NEXT_PUBLIC_SITE_URL: https://caselink.example
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          CASELINK_PRODUCTION_SUPABASE_URL: https://ci-placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-placeholder
           OPENAI_API_KEY: ci-openai-placeholder
 

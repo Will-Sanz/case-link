@@ -647,6 +647,8 @@ The repo already targets Vercel, but the actual team/project ownership, producti
 
 ### [ ] CL-42 — Inventory, isolate, and test production secrets
 
+**October 14 engineering evidence and hosted blocker:** read-only Vercel metadata shows the database URL/public key, OpenAI key and privileged service-role key assigned to Production, Preview and Development in shared entries. No values were accessed. The build/runtime now reject unsafe hosted scope, mismatched project markers and web-admin credentials. A synthetic canary reproduced server-key retention in Turbopack's persistent compiler cache; disabling and clearing only those caches fixed it. All seven browser scenarios then passed with no canary in complete build/browser artifacts or captured logs and no usable web-admin credentials. Controlled provider tests verify cached-key rotation/restart, revocation and redacted errors. [Inventory, findings, exact hosted change/recovery procedure and limitations](verification/secret-isolation.md). Normal correctness/security/privacy and separate Ponytail deletion reviews completed. Hosted environment separation, managed Secret type/access, cache exposure review and real rotation/revocation remain required; the current hosted configuration must not be promoted.
+
 **Type:** Verify + Fix where missing · **Responsible:** engineering + operator · **Gate:** required before pilot.
 
 Gitignored environment files and a secret scan are useful but do not establish protected production storage, narrow access, environment separation, or recovery. The source only uses the service-role key for privileged scripts; normal web access should retain user-bound database authorization.

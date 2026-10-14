@@ -3,7 +3,7 @@ import { readFileSync, appendFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
 // Loaded only by the test runner's Node command, never by application source or deployment config.
-assert.equal(process.env.OPENAI_API_KEY, "caselink-e2e-not-a-secret");
+assert.ok(/^caselink-synthetic-[a-f0-9-]{36}$/.test(process.env.OPENAI_API_KEY ?? ""), "Synthetic browser-test credential required");
 assert.equal(process.env.CASELINK_ENVIRONMENT, "test");
 assert.equal(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname, "127.0.0.1");
 const realFetch = globalThis.fetch;
