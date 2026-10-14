@@ -2,6 +2,10 @@
 
 CL-42 remains open. Local safeguards and the new branch-specific preview configuration are verified; live rotation, old deployment snapshots and full hosted verification remain open.
 
+## Background hosted-test credential boundary
+
+Metadata-only read-back confirmed no Vercel Development variables. The protected headless test uses a short-lived Vercel OIDC token scoped by request origin; it is never forwarded to Supabase or other origins. The first proposed token-only probe was rejected by automatic review because a generic environment command could load unrelated credentials. After verifying the empty remote scope, the actual guarded runner exposed a further CLI behavior: running from the repository also loads `.env.local`. Its explicit application/provider-key guard failed before browser startup, fixture creation or application requests. No value was printed or saved. Running the same reviewed test from a clean temporary directory, with explicit project/team, passes that guard and reaches the protected staging site. Do not run this verification from the repository, use `env pull`, or disable deployment protection. This does not remediate the pre-existing local production credentials or old deployment snapshots.
+
 ## Original hosted configuration (before isolation)
 
 Read-only inspection confirmed Vercel project `case-link` (`prj_1zxzzKu8eljHJvPd6gFY3LhyxwWc`) in team `team_wwXXIa3JR9qMrIBopTUBsG5J`. The connected environment-list API returned 403. The already authenticated CLI then returned names, types and target environments only; no values were decrypted, pulled, printed or changed.
@@ -9,7 +13,7 @@ Read-only inspection confirmed Vercel project `case-link` (`prj_1zxzzKu8eljHJvPd
 | Name | Observed targets | Intended consumer and storage |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Production, Preview, Development in one entry | Server only; separate approved OpenAI project/key per environment; managed Secret variable |
-| `SUPABASE_SERVICE_ROLE_KEY` | Production, Preview, Development in one entry | Remove from web hosting; restricted operator vault/job only for invitations, offboarding and MFA recovery |
+| `SUPABASE_SERVICE_ROLE_KEY` | Production, Preview, Development in one entry | Remove from web hosting; restricted operator vault/job only for invitations and offboarding |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production, Preview, Development in each entry | Public connection information; separate projects and corresponding publishable/anon keys; database policies enforce access |
 | `NEXT_PUBLIC_SITE_URL` | Production, Preview, Development in one entry | Exact environment-specific HTTPS origin; match Auth redirects and school-approved domain |
 | `CASELINK_TENANCY_MODE`, `CASELINK_INVITE_ONLY`, `CASELINK_HSTS` | Production only | Required posture in each hosted environment |

@@ -59,11 +59,14 @@ async function checkPlatformRlsTriggerPrivileges() {
 async function checkExplicitApplicationPrivileges() {
   await admin.query("begin");
   try {
+    // Recreate the removed function only inside this historical migration's test transaction.
+    await admin.query("create function public.operator_revoke_mfa_sessions(uuid,text,text,text) returns void language plpgsql as $$ begin return; end $$");
     await admin.query("grant truncate on public.app_users to service_role");
     await admin.query("grant execute on function public.archive_family(uuid) to service_role");
     await admin.query("alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role");
     await admin.query("alter default privileges for role postgres in schema public grant all on functions to anon, authenticated, service_role");
     await admin.query(readFileSync("supabase/migrations/20261014203800_explicit_application_privileges.sql", "utf8"));
+    await admin.query("drop function public.operator_revoke_mfa_sessions(uuid,text,text,text)");
     const unsafeTables = await admin.query(`select count(*)::int n from pg_class c
       join pg_namespace n on n.oid=c.relnamespace cross join unnest(array['anon','authenticated','service_role']) role_name
       where n.nspname='public' and c.relkind='r'
@@ -567,12 +570,6 @@ async function expectDbError(run: () => Promise<unknown>, label: string) {
   await assert.rejects(run, label);
 }
 
-async function seedMfa(userId: string, status: "unverified" | "verified") {
-  const id = randomUUID();
-  await admin.query("insert into auth.mfa_factors (id, user_id, factor_type, status, created_at, updated_at, secret) values ($1, $2, 'totp', $3, now(), now(), 'SYNTHETIC_ONLY')", [id, userId, status]);
-  await admin.query("update auth.sessions set aal = 'aal2' where user_id = $1", [userId]);
-  return id;
-}
 
 async function setup() {
   await admin.connect();
@@ -817,30 +814,16 @@ async function run() {
     "select count(*)::int as count from public.families where id = $1",
     [familyA],
   ));
-  assert.equal(passwordOnlyAdminAccess.rows[0].count, 0);
-  assert.equal((await asUser(userB, (client) => client.query("select count(*)::int as count from public.families where id = $1", [familyB]))).rows[0].count, 0, "administrators cannot bypass MFA through an owned case");
-  const factorB = await seedMfa(userB, "unverified");
-  assert.equal((await asUser(userB, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, false, "AAL2 without a verified current factor cannot grant administrator authority");
-  await admin.query("update auth.mfa_factors set status = 'verified' where id = $1", [factorB]);
-  const mfaAdminAccess = await asUser(userB, (client) => client.query(
-    "select count(*)::int as count from public.families where id = $1",
-    [familyA],
-  ), "aal2");
-  assert.equal(mfaAdminAccess.rows[0].count, 1);
-  await admin.query("update auth.sessions set aal = 'aal1' where user_id = $1", [userB]);
-  assert.equal((await asUser(userB, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, false, "an old elevated JWT cannot override a downgraded session");
-  await admin.query("update auth.sessions set aal = 'aal2' where user_id = $1", [userB]);
-  await expectDbError(() => admin.query("select public.operator_revoke_mfa_sessions($1, 'security test', 'Incomplete factor removal', 'ready')", [userB]), "recovery is not ready while a verified factor remains");
-  await expectDbError(() => asUser(userA, (client) => client.query("select public.operator_revoke_mfa_sessions($1, 'forged operator', 'Unauthorized factor recovery', 'started')", [userB])), "browser roles cannot reset MFA");
-  await admin.query("alter table public.security_audit_log add constraint test_reject_mfa_recovery check (action <> 'user.mfa_recovery_started') not valid");
-  try {
-    await expectDbError(() => admin.query("select public.operator_revoke_mfa_sessions($1, 'security test', 'Audit failure must roll back recovery', 'started')", [userB]), "audit failure rolls back session revocation");
-    assert.equal((await admin.query("select count(*)::int as count from auth.sessions where user_id = $1", [userB])).rows[0].count, 1);
-  } finally {
-    await admin.query("alter table public.security_audit_log drop constraint test_reject_mfa_recovery");
+  assert.equal(passwordOnlyAdminAccess.rows[0].count, 1, "password-only administrator can access school casework");
+  assert.equal((await asUser(userB, (client) => client.query("select count(*)::int as count from public.families where id = $1", [familyB]))).rows[0].count, 1, "password-only administrator can access an owned case");
+  assert.equal((await asUser(userB, (client) => client.query("select public.is_app_admin() as allowed"))).rows[0].allowed, true);
+  for (const method of ["otp", "recovery", "invite"]) {
+    assert.equal((await asUser(userB, (client) => client.query("select public.is_app_admin() as allowed"), "aal1", method)).rows[0].allowed, false, "a non-password session cannot use administrator authority");
+    assert.equal((await asUser(userB, (client) => client.query("select count(*)::int as count from public.families"), "aal1", method)).rows[0].count, 0);
   }
-  await admin.query("delete from auth.mfa_factors where id = $1", [factorB]);
-  assert.equal((await asUser(userB, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, false, "removing the factor invalidates a retained AAL2 JWT immediately");
+  assert.equal((await admin.query("select to_regprocedure('public.has_required_mfa()') as removed")).rows[0].removed, null);
+  assert.equal((await admin.query("select to_regprocedure('public.operator_revoke_mfa_sessions(uuid,text,text,text)') as removed")).rows[0].removed, null);
+
   await admin.query(
     "select public.operator_set_user_role($1, 'case_manager', 'security test', 'restore fixture role safely', 'user.role_changed')",
     [userB],
@@ -1440,7 +1423,6 @@ async function run() {
     "select public.operator_offboard_user($1, $2, 'forged operator', 'Unauthorized removal')", [userB, userA],
   )), "browser roles cannot offboard staff");
   await admin.query("select public.operator_set_user_role($1, 'admin', 'security test', 'Verify inactive admin denial', 'user.role_changed')", [userA]);
-  await seedMfa(userA, "verified");
   assert.equal((await asUser(userA, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, true);
   await admin.query("alter table public.security_audit_log add constraint test_reject_offboarding check (action <> 'user.disabled') not valid");
   try {
@@ -1451,7 +1433,6 @@ async function run() {
     await admin.query("alter table public.security_audit_log drop constraint test_reject_offboarding");
   }
   await admin.query("select public.operator_offboard_user($1, $2, 'security test', 'Synthetic offboarding verification')", [userA, userB]);
-  await expectDbError(() => admin.query("select public.operator_revoke_mfa_sessions($1, 'security test', 'Do not reactivate offboarded accounts', 'started')", [userA]), "MFA recovery cannot reactivate an offboarded account");
   assert.equal((await asUser(userA, (client) => client.query("select public.is_app_admin() as allowed"), "aal2")).rows[0].allowed, false);
   for (const table of ["families", "plan_steps", "plan_step_action_items", "resources"]) {
     const denied = await asUser(userA, (client) => client.query(`select count(*)::int as count from public.${table}`), "aal2");

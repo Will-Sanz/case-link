@@ -85,7 +85,7 @@ try {
   assert.equal((await restored.query("select ai_enabled from private.production_controls where singleton")).rows[0].ai_enabled, false);
   // Enable the database-only budget fixtures; neither temporary database has an API service.
   await restored.query("update private.production_controls set ai_enabled=true where singleton");
-  // The complete existing RLS/MFA/transaction/export suite runs only against the new target.
+  // The complete existing RLS/password-session/transaction/export suite runs only against the new target.
   const regression = execFileSync(process.execPath, ["--import", "tsx", "scripts/test-database-security.ts"], { env: { ...process.env, CASELINK_DB_SECURITY_TEST_URL: databaseUrl(target) }, encoding: "utf8", maxBuffer: 5_000_000 });
   assert.match(regression, /Database security integration checks passed/);
   evidence = { startedAt, completedAt: new Date(), syntheticOnly: true, source: "local CaseLink schema; newly seeded isolated database", migrationCount: migrations.length, latestMigration: migrations.at(-1), schemaSha256: hash(schema), backupSha256: hash(backup), backupBytes: backup.length, backupAt, restoreStartedAt, recoverySeconds: (Date.now() - restoreStartedAt.getTime()) / 1000, syntheticDataLossSeconds: 0, restoredTables: expected, corruptBackupRejected: true, reviewedRevisionPreserved: true, unauthorizedReadDenied: true, staleExportDenied: true, fullDatabaseRegressionPassed: true, limits: "Local logical app/Auth restore using existing cluster roles. Does not test hosted PITR, storage objects, SMTP, provider configuration, role recovery, or real outage RPO/RTO." };

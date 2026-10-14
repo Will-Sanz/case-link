@@ -2,6 +2,11 @@
 
 Continue in `/Users/willsanz/homelessness-project` on `codex/school-pilot-readiness`; draft [PR #15](https://github.com/Will-Sanz/case-link/pull/15). The user authorized implementation, meaningful regression tests and a commit/push after each item. Preserve unrelated design/skill/output files. No production deployment/promotion, paid services, live secret rotation, school invitations or full legacy upgrade without the necessary authorization.
 
+**Latest user scope:** complete only (1) known PDF/2FA changes, (2) invited accounts, password login/recovery and core workflow verification, and (3) production settings/secrets and a controlled release. School data/usefulness/resource approval remains separate. Do not add passkeys, Decisions integration, form filling, Kubernetes, or redesign. The user approved the three-step release work; do not alter incompatible legacy records without an explicit data-treatment decision.
+
+**Latest checkpoint:** `07544c5` fixes the PDF task page-break failure and adds the exact live synthetic regression. Five rendered fixtures / 17 pages / 415 source fields pass, with all page images inspected. Prior `bd533c8` passed full CI and the functional hosted workflow, but its PDF failed visual acceptance. Password-only accounts are now implemented with 682 passing unit/component tests and migration `20261014230221`; hosted settings, factor cleanup and remote database/browser evidence remain pending. Existing production has zero enrolled factors; staging has one unfinished, unverified factor and no verified factors. The detailed older checkpoint below is historical where it mentions mandatory MFA or pending full-plan refinement.
+
+
 All seven CaseLink local Supabase services remain stopped with data preserved after workstation slowdown; unrelated Docker projects and the port-3000 app were left alone. Use remote CI for heavy checks. The one-time October 14 heartbeat already ran; do not create another daily automation.
 
 The user now requires background-only work. Do not open visible tabs/files/previews, bring apps forward or change their active chat. Use background connectors and hidden/headless tests. Ask before any screen handoff and continue independent work. Keep actual credential and biometric entry private.

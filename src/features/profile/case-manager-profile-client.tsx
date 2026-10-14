@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { CheckCircle as CheckCircle2, FloppyDisk as Save, LogOut } from "iconoir-react";
 import { signOutAction } from "@/app/actions/auth";
@@ -89,8 +88,6 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
               </dd>
             </div>
           </dl>
-
-          <Link href="/verify-account?mode=manage&next=/profile" className="mt-5 block text-sm font-medium underline underline-offset-2">Manage two-step verification</Link>
 
           <form action={signOutFormAction} onSubmit={clearLocalActionDrafts} className="mt-5">
             {signOutState.error ? <p role="alert" className="mb-3 text-sm text-[var(--color-error)]">{signOutState.error}</p> : null}

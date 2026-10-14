@@ -5,7 +5,6 @@ import {
   AuthenticationRequiredError,
   SessionUnavailableError,
   PasswordSetupRequiredError,
-  MfaRequiredError,
 } from "@/lib/auth/session-errors";
 import type { AppUserRow } from "@/types/database";
 import type { UserRole as UserRoleType } from "@/types/user-role";
@@ -72,9 +71,6 @@ export async function ensureAppUserWithClient(
     const passwordSession = await supabase.rpc("has_password_session");
     if (passwordSession.error) throw new SessionUnavailableError();
     if (passwordSession.data !== true) throw new PasswordSetupRequiredError();
-    const mfa = await supabase.rpc("has_required_mfa");
-    if (mfa.error) throw new SessionUnavailableError();
-    if (mfa.data !== true) throw new MfaRequiredError();
     if (existing.email !== email) {
       const { data: synced, error: syncError } = await supabase.rpc("ensure_app_user");
       if (syncError || !synced) {

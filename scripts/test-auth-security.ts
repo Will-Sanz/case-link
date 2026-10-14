@@ -2,13 +2,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { freshTotp, totp } from "./test-support/totp";
 import { setTimeout as delay } from "node:timers/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { offboardUser } from "./offboard-user-operation";
 import { inviteUser } from "./invite-user-operation";
-import { recoverMfaUser } from "./recover-mfa-operation";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 import { parseResourceCsvFromPath } from "../src/lib/db/resource-import/parse-resource-file";
 import { parsedResourceToDbRow } from "../src/lib/db/resource-import/to-db-row";
@@ -163,66 +161,31 @@ async function retainedRequest(token: string, path: string, body?: unknown) {
   });
 }
 
-async function mfaSecurity(otherFamilyId: string) {
+async function passwordOnlyAdminSecurity(otherFamilyId: string) {
   const account = await staff();
   const owned = await family(account.client);
-  assert.equal((await operator.rpc("operator_set_user_role", { p_target_user_id: account.id, p_role: "admin", p_actor_label: "Auth test", p_reason: "Synthetic MFA administrator test", p_action: "user.role_changed" })).error, null);
-  assert.equal((await account.client.rpc("has_required_mfa")).data, false);
-  assert.deepEqual((await account.client.from("families").select("id")).data, [], "a password-only administrator cannot read even an owned case");
-  const enrolled = await account.client.auth.mfa.enroll({ factorType: "totp", issuer: "CaseLink", friendlyName: "Synthetic authenticator" });
-  assert.equal(enrolled.error, null);
-  const first = enrolled.data!;
-  const invalidCode = totp(first.totp.secret) === "000000" ? "000001" : "000000";
-  assert.ok((await account.client.auth.mfa.challengeAndVerify({ factorId: first.id, code: invalidCode })).error, "an incorrect authenticator code is rejected");
-  const expired = await account.client.auth.mfa.challenge({ factorId: first.id });
-  assert.equal(expired.error, null);
-  await db.query("update auth.mfa_challenges set created_at = now() - interval '10 minutes' where id = $1", [expired.data!.id]);
-  assert.ok((await account.client.auth.mfa.verify({ factorId: first.id, challengeId: expired.data!.id, code: totp(first.totp.secret) })).error, "an expired challenge rejects even a current code");
-  const verified = await account.client.auth.mfa.challengeAndVerify({ factorId: first.id, code: await freshTotp(first.totp.secret) });
-  assert.equal(verified.error, null, "initial authenticator enrollment verifies successfully");
-  assert.equal((await account.client.rpc("is_app_admin")).data, true);
-  assert.equal((await account.client.from("families").select("id").eq("id", otherFamilyId)).data?.length, 1);
-  assert.deepEqual(await (await retainedRequest(account.accessToken, `families?select=id&id=eq.${otherFamilyId}`)).json(), [], "the earlier AAL1 JWT cannot borrow the session's later MFA verification");
-  await deliveredMail(account.email, "Verification method added — CaseLink");
-  assert.equal((await account.client.auth.signOut({ scope: "global" })).error, null);
-  assert.equal((await account.client.auth.signInWithPassword({ email: account.email, password: account.password })).error, null);
-  assert.equal((await account.client.rpc("has_required_mfa")).data, false, "returning password login requires a fresh MFA challenge");
-  const returning = await account.client.auth.mfa.challengeAndVerify({ factorId: first.id, code: await freshTotp(first.totp.secret) });
-  assert.equal(returning.error, null);
-  const elevatedToken = returning.data!.access_token;
-  assert.equal((await account.client.auth.mfa.unenroll({ factorId: first.id })).error, null);
-  assert.deepEqual(await (await retainedRequest(elevatedToken, `families?select=id&id=eq.${owned}`)).json(), [], "factor removal immediately denies the retained AAL2 token");
-  await deliveredMail(account.email, "Verification method removed — CaseLink");
-  const second = await account.client.auth.mfa.enroll({ factorType: "totp", issuer: "CaseLink", friendlyName: "Synthetic replacement" });
-  assert.equal(second.error, null);
-  const secondVerified = await account.client.auth.mfa.challengeAndVerify({ factorId: second.data!.id, code: await freshTotp(second.data!.totp.secret) });
-  assert.equal(secondVerified.error, null);
-  const beforeRecovery = secondVerified.data!.access_token;
-  const ordinaryRecovery = await operator.auth.admin.generateLink({ type: "recovery", email: account.email });
-  assert.equal(ordinaryRecovery.error, null);
-  const recoveryClient = createClient(local.API_URL, local.ANON_KEY, authOptions);
-  assert.equal((await recoveryClient.auth.verifyOtp({ type: "recovery", token_hash: ordinaryRecovery.data.properties.hashed_token })).error, null);
-  assert.equal((await recoveryClient.auth.updateUser({ password: `${randomUUID()}-NotAllowed!1` })).error?.code, "insufficient_aal", "email recovery alone cannot bypass the authenticator");
-  assert.deepEqual((await recoveryClient.from("families").select("id")).data, []);
-  await recoverMfaUser(operator, { targetUserId: account.id, siteOrigin: "http://127.0.0.1:3000", actorLabel: "Auth test", reason: "Synthetic independent identity verification", identityVerified: true });
-  assert.deepEqual(await (await retainedRequest(beforeRecovery, `families?select=id&id=eq.${owned}`)).json(), [], "operator recovery revokes earlier verified sessions");
-  assert.ok((await account.client.auth.signInWithPassword({ email: account.email, password: account.password })).error, "lost-factor recovery also invalidates the previous password");
-  const token = await deliveredToken(account.email, "recovery");
+  assert.equal((await operator.rpc("operator_set_user_role", { p_target_user_id: account.id, p_role: "admin", p_actor_label: "Auth test", p_reason: "Synthetic password-only administrator test", p_action: "user.role_changed" })).error, null);
+  assert.equal((await account.client.rpc("is_app_admin")).data, true, "an invited active administrator needs only a password session");
+  assert.equal((await account.client.from("families").select("id").in("id", [owned, otherFamilyId])).data?.length, 2);
+  assert.equal((await account.client.auth.mfa.enroll({ factorType: "totp" })).error?.code, "mfa_totp_enroll_not_enabled", "provider enrollment is disabled, not just hidden in the UI");
+  const recovery = await operator.auth.admin.generateLink({ type: "recovery", email: account.email });
+  assert.equal(recovery.error, null);
   const recovered = createClient(local.API_URL, local.ANON_KEY, authOptions);
-  assert.equal((await recovered.auth.verifyOtp({ type: "recovery", token_hash: token })).error, null);
-  const newPassword = `${randomUUID()}-Recovered!1`;
-  assert.equal((await recovered.auth.updateUser({ password: newPassword })).error, null);
+  assert.equal((await recovered.auth.verifyOtp({ type: "recovery", token_hash: recovery.data.properties.hashed_token })).error, null);
+  assert.equal((await recovered.rpc("is_app_admin")).data, false, "recovery alone cannot access administrator casework");
+  assert.deepEqual((await recovered.from("families").select("id")).data, []);
+  const password = `${randomUUID()}-Recovered!1`;
+  assert.equal((await recovered.auth.updateUser({ password })).error, null);
   assert.equal((await recovered.auth.signOut({ scope: "global" })).error, null);
-  assert.equal((await recovered.auth.signInWithPassword({ email: account.email, password: newPassword })).error, null);
-  assert.equal((await recovered.rpc("has_required_mfa")).data, false, "recovered administrators must enroll again before reading cases");
-  const replacementFactor = await recovered.auth.mfa.enroll({ factorType: "totp", issuer: "CaseLink", friendlyName: "Recovered authenticator" });
-  assert.equal(replacementFactor.error, null);
-  assert.equal((await recovered.auth.mfa.challengeAndVerify({ factorId: replacementFactor.data!.id, code: await freshTotp(replacementFactor.data!.totp.secret) })).error, null);
-  assert.equal((await recovered.rpc("is_app_admin")).data, true);
+  assert.deepEqual(await (await retainedRequest(account.accessToken, `families?select=id&id=eq.${owned}`)).json(), [], "password reset revokes the earlier admin session");
+  assert.ok((await account.client.auth.signInWithPassword({ email: account.email, password: account.password })).error, "the old password no longer works");
+  assert.equal((await recovered.auth.signInWithPassword({ email: account.email, password })).error, null);
+  assert.equal((await recovered.rpc("is_app_admin")).data, true, "the new password opens administrator casework without MFA");
   assert.equal((await recovered.from("families").select("id").eq("id", owned)).data?.length, 1);
-  assert.equal((await db.query("select created_by_id from public.families where id = $1", [owned])).rows[0].created_by_id, account.id, "MFA recovery preserves case ownership");
-  const audit = await db.query("select action from public.security_audit_log where target_user_id = $1 and action like 'user.mfa_recovery_%' order by created_at", [account.id]);
-  assert.deepEqual(audit.rows.map((row) => row.action), ["user.mfa_recovery_started", "user.mfa_recovery_ready"]);
+  assert.equal((await db.query("select created_by_id from public.families where id = $1", [owned])).rows[0].created_by_id, account.id, "password recovery preserves case history");
+  assert.equal((await operator.rpc("operator_set_user_role", { p_target_user_id: account.id, p_role: "case_manager", p_actor_label: "Auth test", p_reason: "Synthetic administrator downgrade test", p_action: "user.role_changed" })).error, null);
+  assert.equal((await recovered.rpc("is_app_admin")).data, false, "role changes apply to the existing password session immediately");
+  assert.deepEqual((await recovered.from("families").select("id").eq("id", otherFamilyId)).data, []);
   assert.equal((await recovered.auth.signOut({ scope: "global" })).error, null);
 }
 
@@ -285,8 +248,8 @@ async function run() {
   assert.equal(signedOutRead.status, 200);
   assert.deepEqual(await signedOutRead.json(), [], "logout invalidates direct reads even while the JWT is unexpired");
   assert.equal((await retainedRequest(retainedReplacementToken, "rpc/consume_ai_budget", { p_operation: "chat", p_weight: 1 })).status, 403);
-  await mfaSecurity(assigned);
-  console.info("Local Auth security checks passed: invitation/reset/email, MFA setup/challenge/removal/recovery, retained JWT denial, reads/writes, RPCs, reassignment, refresh, and audit.");
+  await passwordOnlyAdminSecurity(assigned);
+  console.info("Local Auth security checks passed: invitation/reset/email, password-only admin access/recovery and disabled factor enrollment, retained JWT denial, reads/writes, RPCs, reassignment, refresh, and audit.");
 }
 run().finally(async () => {
   if (families.length) await db.query("delete from public.families where id = any($1::uuid[])", [families]);

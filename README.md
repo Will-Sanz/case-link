@@ -4,7 +4,7 @@ CaseLink helps school case managers create a family support plan, review it, and
 
 ## Pilot workflow
 
-1. An invited staff member signs in. Administrators enroll and verify an authenticator.
+1. An invited staff member sets a password and signs in. Case managers and administrators use password-only accounts.
 2. Create a family with a non-identifying label and one or more barriers. A short description is optional.
 3. Generate a plan organized by goals and specific target dates. Review suggested resources and verify their suitability.
 4. Edit the draft, confirm responsibility and dates, and record progress. Waiting actions use their next follow-up date.
@@ -37,7 +37,7 @@ PDFs are generated from the reviewed plan in the browser. CaseLink does not acce
 Use a supported, patched Node 24.x release (`.nvmrc`), matching CI and hosting, and install the locked dependencies with `npm ci`. Use `.env.example` as the configuration reference, then start the app with `npm run dev`. Read `AGENTS.md` and the installed Next.js guides before changing framework code.
 
 - `npm run verify`: lockfile/resource/secret checks, typecheck, lint, unit and component tests, and production build. The pre-push hook runs it.
-- `npm run test:auth-security`: real local Auth lifecycle and session/MFA tests.
+- `npm run test:auth-security`: real local Auth lifecycle and password-session and role-access tests.
 - `npm run test:db-security`: real local database authorization, concurrency, rollback, and audit tests.
 - `npm run test:restore`: isolated synthetic backup/restore and authorization rehearsal; no hosted database changes.
 - `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase.

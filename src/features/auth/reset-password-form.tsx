@@ -21,7 +21,6 @@ export function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [nonce, setNonce] = useState("");
   const [needsVerification, setNeedsVerification] = useState(false);
-  const [needsMfa, setNeedsMfa] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
   const [status, setStatus] = useState<"checking" | "ready" | "invalid">("checking");
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +110,7 @@ export function ResetPasswordForm() {
         const { error: updateError } = await supabase.auth.updateUser({ password, ...(needsVerification ? { nonce } : {}) });
         if (updateError) {
           if (updateError.code === "insufficient_aal") {
-            setNeedsMfa(true);
-            setError("Verify your authenticator code before changing this password.");
+            setError("Your account settings need attention. Contact your school administrator to finish resetting your password.");
           } else if (updateError.code === "reauthentication_needed") {
             setNeedsVerification(true);
             setError("Confirm your identity before changing this password. Send a verification code below.");
@@ -159,7 +157,6 @@ export function ResetPasswordForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       {error ? <p className={alertErrorClass} role="alert">{error}</p> : null}
       {info ? <p className={alertInfoClass} role="status">{info}</p> : null}
-      {needsMfa ? <p><Link className="font-medium underline underline-offset-2" href={`/verify-account?next=${encodeURIComponent(`/reset-password?mode=${mode === "setup" ? "setup" : "recovery"}`)}`}>Verify with your authenticator</Link></p> : null}
       {passwordUpdated ? <p role="status">Your password is updated. Finish signing out, then sign in with your new password.</p> : <>
         <div>
           <Label htmlFor="reset-password">New password</Label>

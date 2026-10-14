@@ -150,6 +150,12 @@ try {
     await client.query("delete from public.families where id=$1", [invalid]);
     assert.deepEqual(await oldRows(baseline), before, "failed upgrade preserves all existing content");
   }
+  const oldFactor = randomUUID();
+  await client.query("insert into auth.mfa_factors(id,user_id,factor_type,status,created_at,updated_at,secret) values($1,$2,'totp','verified',now(),now(),'SYNTHETIC_ONLY')", [oldFactor, staff]);
+  await assert.rejects(upgrade(), /Remove enrolled CaseLink factors/, "a password-only upgrade must not strand existing factor-protected accounts");
+  assert.deepEqual(fingerprints(await inventory(client)), expectedBaseline, "factor preflight failure rolls back the whole upgrade");
+  assert.equal((await client.query("select id from auth.mfa_factors where id=$1", [oldFactor])).rowCount, 1, "the upgrade never deletes an Auth credential");
+  await client.query("delete from auth.mfa_factors where id=$1", [oldFactor]);
   await upgrade();
   assert.deepEqual(await oldRows(baseline), before, "successful upgrade preserves legacy columns, relationships and history");
   const target = await inventory(client), fresh = await inventory(admin);
@@ -167,7 +173,7 @@ try {
     assert.equal((await client.query("select public.is_reviewed_plan_revision($1,$2,$3) allowed", [family, plan, revision])).rows[0].allowed, true);
   });
   await asUser(other, otherSession, async () => assert.equal((await client.query("select id from public.families where id=$1", [family])).rowCount, 0));
-  await asUser(operator, operatorSession, async () => assert.equal((await client.query("select id from public.families")).rowCount, 0, "legacy admin now needs MFA"));
+  await asUser(operator, operatorSession, async () => assert.equal((await client.query("select id from public.families")).rowCount, 2, "legacy administrator retains password-only school access"));
   await assert.rejects(asUser(staff, session, () => client.query("update public.app_users set role='admin' where id=$1", [staff])), { code: "42501" });
   await client.query("delete from auth.sessions where id=$1", [session]);
   await asUser(staff, session, async () => assert.equal((await client.query("select id from public.families")).rowCount, 0, "retained claims fail after session revocation"));
@@ -177,7 +183,7 @@ try {
     legacyTableCounts: Object.fromEntries(Object.entries(before).map(([name, rows]) => [name, rows.length])),
     appliedMigrations: upgradeNames.map(name => ({ name, sha256: hash(migrationSource(name)) })), bundleSha256: hash(bundle),
     aggregateDataPreflightPassed: true, incompatibleDataRollbackPassed: true, oldColumnsAndRelationshipsPreserved: true, schemaMatchesFreshInstall: true,
-    legacyReviewRequiresApproval: true, administratorMfaEnforced: true, retainedSessionDenied: true, fullDatabaseRegressionPassed: true,
+    legacyReviewRequiresApproval: true, administratorPasswordAccessVerified: true, retainedSessionDenied: true, fullDatabaseRegressionPassed: true,
     limits: "No production rows, live upgrade, migration-history repair, backup verification, hosted Auth tokens or operator approval. Live preflight must be repeated against the unchanged definitions and approved backup." };
 } finally {
   await client.end();
