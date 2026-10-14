@@ -1,0 +1,41 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "sentAt": "2026-10-14T21:45:20.293Z",
+  "operation": "scripts/invite-user-operation.ts",
+  "delivery": "invitation",
+  "role": "case_manager",
+  "active": true,
+  "confirmationPending": true,
+  "recipient": "Only the operator-controlled inbox explicitly authorized in this chat",
+  "mailboxReceiptVerified": true,
+  "deliveryEvidence": {
+    "inInbox": true,
+    "sender": "CaseLink Staging <staging@thecaselink.com>",
+    "subject": "You're invited to CaseLink",
+    "reportedAuthentication": [
+      "dkim=pass",
+      "dkim=pass",
+      "spf=pass"
+    ],
+    "dmarc": "No result present in the inspected Authentication-Results header",
+    "links": 2,
+    "canonicalStagingCallback": true,
+    "credentialsOnlyInFragment": true,
+    "invitationTypeAndSetupDestination": true,
+    "fifteenMinuteInstructions": true,
+    "credentialValuesPrinted": false
+  },
+  "administratorTest": "Automatic approval review rejected administrator-account creation before execution because privileged scope lacked explicit authorization. The successful alternative provisions only case_manager; hosted admin verification remains open.",
+  "previewGate": {
+    "browserShowsContinue": true,
+    "addressBarCredentialRemoved": true,
+    "authConfirmationStillPending": true,
+    "lastSignInStillAbsent": true
+  },
+  "explicitConfirmation": {
+    "passwordSetupShown": true,
+    "skippedPasswordFamilyRoute": "/families",
+    "deniedDestination": "/reset-password?mode=setup",
+    "passwordEntry": "User handoff pending; credential entry must remain private"
+  }
+}

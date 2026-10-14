@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
 const config = readFileSync("supabase/config.toml", "utf8");
@@ -19,10 +19,18 @@ it.each([["invite", "setup"], ["recovery", "recovery"]])("%s emails use the cano
     expect(new URLSearchParams(url.hash.slice(1)).get("next")).toBe(`/reset-password?mode=${mode}`);
   }
 });
-it("every configured email exists, and security notifications contain no sign-in credential", () => {
+it("every configured email exists", () => {
   for (const match of config.matchAll(/content_path = "(.+)"/g)) {
     const html = readFileSync(match[1].includes("notification") ? `supabase/${match[1]}` : match[1], "utf8");
     expect(html).toContain('<html lang="en">');
-    if (match[1].includes("notification")) expect(html).not.toMatch(/\.(Token|TokenHash|ConfirmationURL)\s/);
+  }
+});
+it("all hosted security notifications contain no sign-in credential", () => {
+  const files = readdirSync("supabase/email-templates").filter((file) => file.endsWith("_notification.html"));
+  expect(files.length).toBeGreaterThan(0);
+  for (const file of files) {
+    const html = readFileSync(`supabase/email-templates/${file}`, "utf8");
+    expect(html).toContain('<html lang="en">');
+    expect(html, file).not.toMatch(/\.(Token|TokenHash|ConfirmationURL)\b/);
   }
 });

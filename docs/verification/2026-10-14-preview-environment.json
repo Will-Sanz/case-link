@@ -286,5 +286,19 @@
     "Existing deployments retain their old environment snapshots. No production promotion or key rotation.",
     "Legacy service-role credential remains Production-only pending operator-vault removal, exposure review and release.",
     "Production origin, environment markers, hosted workflow and credential provenance still require release evidence."
-  ]
+  ],
+  "stagingOpenAIKey": {
+    "savedBy": "user in Vercel dashboard",
+    "verifiedUsing": "Authenticated API with decrypt=false; metadata only",
+    "id": "dwh3QZ0enpXC1SvT",
+    "key": "OPENAI_API_KEY",
+    "type": "sensitive",
+    "target": [
+      "preview"
+    ],
+    "gitBranch": "codex/school-pilot-readiness",
+    "createdAt": 1792009653275,
+    "secretRetrieved": false,
+    "providerProjectAndBudgetVerified": false
+  }
 }

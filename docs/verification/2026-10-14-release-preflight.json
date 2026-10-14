@@ -21,12 +21,26 @@
     },
     "otherBranches": "unspecified; provider default true",
     "officialGitPropertySchema": "passed",
-    "unitTests": 2
+    "unitTests": 2,
+    "hostedPreviewAcceptance": {
+      "commit": "7bdd0a7b9d773241f33986cc9c3032de0a99640a",
+      "deployment": "dpl_7oQ6x69KYmABzzopXfXNMEq7wDgH",
+      "state": "READY",
+      "limits": "Feature-branch configuration accepted; no main merge/trigger experiment."
+    }
   },
   "limitations": [
     "Preflight command does not deploy, so this is not a provider promotion-denial experiment",
     "No main merge or Git-trigger rehearsal",
     "Manual administrator deployment is not blocked by this repository setting",
     "No production deployment or promotion"
-  ]
+  ],
+  "latestCandidate": {
+    "sha": "7bdd0a7b9d773241f33986cc9c3032de0a99640a",
+    "ciRun": "38637903289",
+    "codeqlRun": "38637903272",
+    "requiredChecks": "passed",
+    "releasePreflightExitCode": 0,
+    "productionDeployed": false
+  }
 }

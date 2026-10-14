@@ -1,0 +1,39 @@
+{
+  "provider": "Resend",
+  "existingConnectionFound": true,
+  "credentialValuePrinted": false,
+  "discovery": "Existing provider credential used for authenticated read-only domain and API-key metadata; no credential value or email content printed and no message sent.",
+  "domain": "thecaselink.com",
+  "domainStatus": "verified",
+  "domainRegion": "us-east-1",
+  "dashboardReadback": {
+    "transactionalPlan": "Free",
+    "monthlyLimit": 3000,
+    "dailyLimit": 100,
+    "monthlyUsage": 0,
+    "dailyUsage": 0,
+    "payAsYouGo": false
+  },
+  "preparedCredential": {
+    "name": "caselink-staging-smtp",
+    "permission": "Sending access",
+    "domain": "User instructed to restrict to thecaselink.com; metadata verification pending",
+    "created": true,
+    "providerMetadataId": "b0fde575-f4a0-423b-8463-9e879c7ea973",
+    "createdAt": "2026-10-14 21:15:14.528499+00",
+    "creationVerification": "Official GET /api-keys returned the exact new key name and ID; no secret values are returned."
+  },
+  "authorizedMailbox": "Operator-controlled Gmail address explicitly provided by the user in this chat; omitted from repository evidence.",
+  "smtpConfigured": true,
+  "limits": [
+    "Shared provider account/domain still shares quota and email reputation; staging uses a separate key and sender label",
+    "Invitation delivery is verified; completed password/recovery/MFA and school-mailbox behavior remain open",
+    "No paid service created, upgrade, existing-key change or production SMTP change"
+  ],
+  "tracking": {
+    "open": false,
+    "click": false,
+    "verification": "Official GET /domains/3ed8bea7-d4f3-4dc1-a8cd-b6f64481fb2c"
+  },
+  "smtpDelivery": "Audited standard case-manager invitation accepted; receipt independently verified in the authorized Gmail Inbox. SPF and DKIM passed in Gmail headers; no DMARC result was present."
+}
