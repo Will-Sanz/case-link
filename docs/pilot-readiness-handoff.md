@@ -1,4 +1,12 @@
-# CaseLink production release checkpoint — October 15, 2026
+# CaseLink pilot checkpoint — October 15, 2026
+
+## Later QA work: AI preparation upgrade
+
+The later user-authorized AI upgrade is verified in isolated QA on source `f0ed2be84b77ea08706d00c5e8991a596b25cd68`. Its current status, model comparison, failures and final acceptance evidence are maintained in [the AI upgrade record](verification/2026-10-15-ai-upgrade.md). QA now has 43 migrations; the two additions enable compact generation and an explicit manual handoff after AI failure. These changes have not been promoted to production.
+
+The production alias was read back during this work at `dpl_FesLWbGr9B5jYCs1gwQYpdEtb7uL`, source `2dfb8b83ce93b60e1a8bdc859f65d240d0eb821c`. PR #15 remains draft and unmerged. The earlier release checkpoint below is historical; its source, migration counts and statement that no work is queued describe that earlier checkpoint.
+
+## Earlier production release checkpoint
 
 Continue only within the user-approved narrow pilot scope. Repository: `/Users/willsanz/homelessness-project`, branch `codex/school-pilot-readiness`, draft [PR #15](https://github.com/Will-Sanz/case-link/pull/15). The current release record is [production-release.md](verification/production-release.md); the full historical findings remain in [the tracker](school-pilot-fix-tracker.md).
 

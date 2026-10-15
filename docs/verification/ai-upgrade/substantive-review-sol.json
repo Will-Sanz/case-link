@@ -1,0 +1,90 @@
+{
+  "reviewer": "family_needs",
+  "reviewType": "Independent direct comparison of five substantive narrow edits; model identity known",
+  "sourceDirectory": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-53-45-210Z-pilot-substantive-refinement-step_refinement-task-routing-task-effort",
+  "comparisonDirectory": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-42-21-414Z-pilot-substantive-refinement-task-routing-task-effort",
+  "sourceRevisionReported": "f0ed2be",
+  "model": "gpt-6.1-sol",
+  "reasoningEffort": "medium",
+  "reviewedOutputs": 5,
+  "comparisonIntegrity": "Confirmed exact equality of request, sourceFacts, directoryFacts, originalSteps and reviewCriteria for all five pairs before comparing proposed fields.",
+  "criticalDefectsFound": 0,
+  "conclusion": "Semantic go-ahead for the tested narrow-edit route. Sol preserves the requested edit scope while improving the two weak Luna examples: private school contact is explicit in both rewritten fields, and provider preparation has a clear permission/inquiry/review sequence. Explicit urgent-safety edits still work. Document removal and date edit remain exact. Provider and safety prose could be shorter.",
+  "cases": [
+    {
+      "caseId": "pilot-newer-choice",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "criticalDefects": [],
+      "comparison": "Improved over Luna: both rewritten fields explicitly retain privacy, in-person school contact, no telephone, and referral postponement.",
+      "evidence": "Agree a private, in-person discussion time with the family at school; do not telephone them.",
+      "minorIssues": []
+    },
+    {
+      "caseId": "pilot-provider-hours",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 4,
+        "familyVoice": 5
+      },
+      "criticalDefects": [],
+      "comparison": "Improved over Luna: confirms permission after work, then verifies the recorded weekday-morning information-request window, asks intake questions and returns findings for the family's referral decision. No missed shift, appointment promise or invented requirements.",
+      "evidence": "If permission is given, verify current contact arrangements and the listed weekday-morning information-request window ... Review the information with the family before seeking referral agreement",
+      "minorIssues": [
+        "Summary and action repeat several constraints; concise editing could retain the same safeguards."
+      ]
+    },
+    {
+      "caseId": "pilot-immediate-safety",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 4,
+        "familyVoice": 5
+      },
+      "criticalDefects": [],
+      "comparison": "Improved clarity over Luna: explicitly names immediate assessment and says existing dated follow-up must not delay the response. Expected-result field remains a proposal, not a completed-assessment claim.",
+      "evidence": "use the school's approved safeguarding pathway for immediate assessment ... Existing dated tasks remain separate follow-up and must not delay this response.",
+      "minorIssues": [
+        "Expected result contains a meta-disclaimer about proposal status; accurate but slightly wordy."
+      ]
+    },
+    {
+      "caseId": "pilot-unknown-history",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "criticalDefects": [],
+      "comparison": "Equivalent correct exact edit: removes Photo identification only, retains Agreed preparation checklist, adds no substitute or unrelated change.",
+      "evidence": "required_documents: ['Agreed preparation checklist']",
+      "minorIssues": []
+    },
+    {
+      "caseId": "pilot-completed-work",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "criticalDefects": [],
+      "comparison": "Equivalent correct exact edit: only the first open action target changes from October22 to October25. No invented completion date or other supplied-field edit.",
+      "evidence": "target_date: 2026-10-22 -> 2026-10-25",
+      "minorIssues": []
+    }
+  ],
+  "limitations": [
+    "Five synthetic paired examples, one response each. Supports this tested edit scope, not a general statistical claim about the models.",
+    "Other Waiting/completed goals are outside narrow model input; workflow preservation of those goals is separate from model-visible preservation.",
+    "Does not establish broader multi-goal changes, structural replanning or practitioner usefulness.",
+    "No code edits, paid calls, browser checks or database operations performed for this review."
+  ]
+}

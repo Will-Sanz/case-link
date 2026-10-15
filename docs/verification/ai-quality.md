@@ -10,9 +10,12 @@ Use the existing operator-provided OpenAI key in the environment or local ignore
 CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=development npm run test:ai-quality
 CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=held-out npm run test:ai-quality
 CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=pilot CASELINK_EVAL_DATE=2026-10-15 npm run test:ai-quality
+CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=pilot CASELINK_EVAL_FOCUS=substantive-refinement CASELINK_EVAL_DATE=2026-10-15 npm run test:ai-quality
 ```
 
 Use `CASELINK_EVAL_CASE=<fixture-id>` to reproduce a failure within its split. `CASELINK_EVAL_LIMIT` may shorten a smoke test; a shortened run cannot close the release gate. Generated results go to ignored `tmp/ai-evaluation/<run-id>`; selected final synthetic results and historical failure summaries are versioned with the release evidence. No production case narrative belongs in this directory or the repository.
+
+For a change isolated to one task, `CASELINK_EVAL_TASK` accepts `generation`, `step_refinement`, `plan_refinement`, or `case_assistant`. The substantive focus accepts only the two refinement tasks. The run name and summary record this narrower scope; a task-only result does not replace verification of other changed paths.
 
 The existing 50 fixtures contain 25 development and 25 previously held-out cases. Ten additional pilot cases cover pending applications, changing preferences, private outreach, unknown provider hours, urgent safety, language choice, unsuitable services, missing history, minimal intake and completed work. Each now runs one complete draft, two refinement paths and one assistant answer. Two cases run concurrently. Generation uses the same compact contract and one-attempt policy as the application. The request-scoped database budget is replaced only in this standalone harness; the real shared limits are separately exercised by database integration tests. The production client, immutable case snapshot, outbound privacy check, prompts, structured schemas, directory grounding, and human-selection merger remain in use.
 
@@ -29,6 +32,8 @@ The runner reads each successful network response body once for token metadata a
 - Non-mutating evaluation, safe rejected requests, latency and token cost. Offline provider-failure/privacy/authorization tests supplement the live set, including identifiers rejected before network or budget use.
 
 These deterministic checks are deliberately limited. They cannot certify all prose as factual, respectful or useful. Engineering review must identify remaining unsupported assumptions and unnecessary work; case managers must assess fit for real practice.
+
+The substantive-refinement focus runs five scenarios through both single-goal and full-plan editing: concrete summary/result wording, a newer no-telephone preference, removal of an unverified document demand, an exact open-action date, and provider evidence that conflicts with an after-work assumption. It checks requested scope and preserves Waiting follow-up and completed work. Read the resulting prose against each stored rubric; changing the requested fields alone is not semantic acceptance. See the [October 15 upgrade record](2026-10-15-ai-upgrade.md) for current model selection and verification.
 
 ## October 14 results and corrections
 

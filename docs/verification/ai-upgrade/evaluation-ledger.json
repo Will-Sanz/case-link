@@ -1,0 +1,389 @@
+{
+  "syntheticOnly": true,
+  "availabilityProbes": {
+    "requests": 3,
+    "estimatedUsd": 0.0013552,
+    "evidence": "/private/tmp/caselink-model-availability-2026-10-15.json"
+  },
+  "runs": [
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-07-11-907Z-pilot-gpt-5.6-luna-low/summary.json",
+      "runId": "2026-10-15T19-07-11-907Z-pilot-gpt-5.6-luna-low",
+      "version": 8,
+      "split": "pilot",
+      "focus": null,
+      "selectedTask": null,
+      "taskCount": 40,
+      "acceptedTasks": 39,
+      "requests": 39,
+      "estimatedStandardUsd": 0.028406149999999998,
+      "unknownCostRequests": 0,
+      "sourceHash": "71d77ccc54bd83b5c21b97ad36de1eada76d822dcdc58f5dd675cd92682b96f8",
+      "sourceUnchanged": true,
+      "commit": "5b92699d57d0828765e561a37a1ac98d6df9afa2",
+      "latencyMs": {
+        "completeDraftP75": 6911.726624999999,
+        "completeDraftP95": 7722.221041,
+        "stepRewriteP75": 4877.062999999998
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-12-04-844Z-pilot-gpt-5.6-luna-low/summary.json",
+      "runId": "2026-10-15T19-12-04-844Z-pilot-gpt-5.6-luna-low",
+      "version": 8,
+      "split": "pilot",
+      "focus": null,
+      "selectedTask": null,
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "requests": 40,
+      "estimatedStandardUsd": 0.0176286,
+      "unknownCostRequests": 0,
+      "sourceHash": "e7e0b817ceb17e0aff9bc4ff30dd8995c633e935ba5ac1c90d33a32fbdbb13dd",
+      "sourceUnchanged": true,
+      "commit": "5b92699d57d0828765e561a37a1ac98d6df9afa2",
+      "latencyMs": {
+        "completeDraftP75": 6390.294916999999,
+        "completeDraftP95": 8775.62725,
+        "stepRewriteP75": 6773.114125
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-15-01-358Z-pilot-gpt-6.1-sol-medium/summary.json",
+      "runId": "2026-10-15T19-15-01-358Z-pilot-gpt-6.1-sol-medium",
+      "version": 8,
+      "split": "pilot",
+      "focus": null,
+      "selectedTask": null,
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "requests": 40,
+      "estimatedStandardUsd": 0.2495842,
+      "unknownCostRequests": 0,
+      "sourceHash": "e7e0b817ceb17e0aff9bc4ff30dd8995c633e935ba5ac1c90d33a32fbdbb13dd",
+      "sourceUnchanged": true,
+      "commit": "5b92699d57d0828765e561a37a1ac98d6df9afa2",
+      "latencyMs": {
+        "completeDraftP75": 15850.309458999996,
+        "completeDraftP95": 19018.425749999995,
+        "stepRewriteP75": 3341.6191660000004
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-18-31-467Z-pilot-gpt-6-astra-medium/summary.json",
+      "runId": "2026-10-15T19-18-31-467Z-pilot-gpt-6-astra-medium",
+      "version": 8,
+      "split": "pilot",
+      "focus": null,
+      "selectedTask": null,
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "requests": 40,
+      "estimatedStandardUsd": 1.259442,
+      "unknownCostRequests": 0,
+      "sourceHash": "e7e0b817ceb17e0aff9bc4ff30dd8995c633e935ba5ac1c90d33a32fbdbb13dd",
+      "sourceUnchanged": true,
+      "commit": "6cbaf7b013c527d35ecca10b67755e69793d259a",
+      "latencyMs": {
+        "completeDraftP75": 17841.575791,
+        "completeDraftP95": 19955.601457999997,
+        "stepRewriteP75": 4259.996917000011
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-31-15-116Z-pilot-all-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-31-15-116Z-pilot-all-task-routing-task-effort",
+      "version": 9,
+      "split": "pilot",
+      "focus": "all",
+      "selectedTask": null,
+      "taskCount": 40,
+      "acceptedTasks": 39,
+      "requests": 40,
+      "estimatedStandardUsd": 0.111291825,
+      "unknownCostRequests": 0,
+      "sourceHash": "5887ffd116e10cde9a9ec461fcfe7de26366d64dd9edd9a5007ca2cdf1d8c145",
+      "sourceUnchanged": true,
+      "commit": "3e317d357a4fd8029fdef1e21a19102296acb1a6",
+      "latencyMs": {
+        "completeDraftP75": 14431.486125,
+        "completeDraftP95": 17129.123582999993,
+        "stepRewriteP75": 2886.033457999998
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-41-58-842Z-pilot-all-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-41-58-842Z-pilot-all-task-routing-task-effort",
+      "version": 10,
+      "split": "pilot",
+      "focus": "all",
+      "selectedTask": null,
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "requests": 40,
+      "estimatedStandardUsd": 0.171555475,
+      "unknownCostRequests": 0,
+      "sourceHash": "c6db1308f333d28df775ef4bdcce00004174ee7dbc621fa2bba2a513a2fa35f7",
+      "sourceUnchanged": true,
+      "commit": "187a93f3ef4660bed30cdaf3028691e5f439a4b7",
+      "latencyMs": {
+        "completeDraftP75": 13436.264875,
+        "completeDraftP95": 18045.042666999998,
+        "stepRewriteP75": 2407.601499999997
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-42-21-414Z-pilot-substantive-refinement-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-42-21-414Z-pilot-substantive-refinement-task-routing-task-effort",
+      "version": 10,
+      "split": "pilot",
+      "focus": "substantive-refinement",
+      "selectedTask": null,
+      "taskCount": 10,
+      "acceptedTasks": 10,
+      "requests": 10,
+      "estimatedStandardUsd": 0.07137524999999999,
+      "unknownCostRequests": 0,
+      "sourceHash": "c6db1308f333d28df775ef4bdcce00004174ee7dbc621fa2bba2a513a2fa35f7",
+      "sourceUnchanged": true,
+      "commit": "187a93f3ef4660bed30cdaf3028691e5f439a4b7",
+      "latencyMs": {
+        "completeDraftP75": null,
+        "completeDraftP95": null,
+        "stepRewriteP75": 3711.153625
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-43-48-174Z-development-all-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-43-48-174Z-development-all-task-routing-task-effort",
+      "version": 10,
+      "split": "development",
+      "focus": "all",
+      "selectedTask": null,
+      "taskCount": 100,
+      "acceptedTasks": 100,
+      "requests": 100,
+      "estimatedStandardUsd": 0.47171112499999995,
+      "unknownCostRequests": 0,
+      "sourceHash": "c6db1308f333d28df775ef4bdcce00004174ee7dbc621fa2bba2a513a2fa35f7",
+      "sourceUnchanged": true,
+      "commit": "187a93f3ef4660bed30cdaf3028691e5f439a4b7",
+      "latencyMs": {
+        "completeDraftP75": 12336.789834,
+        "completeDraftP95": 14773.39962500002,
+        "stepRewriteP75": 3066.7723750000005
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-43-54-476Z-held-out-all-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-43-54-476Z-held-out-all-task-routing-task-effort",
+      "version": 10,
+      "split": "held-out",
+      "focus": "all",
+      "selectedTask": null,
+      "taskCount": 100,
+      "acceptedTasks": 100,
+      "requests": 100,
+      "estimatedStandardUsd": 0.4597430000000001,
+      "unknownCostRequests": 0,
+      "sourceHash": "c6db1308f333d28df775ef4bdcce00004174ee7dbc621fa2bba2a513a2fa35f7",
+      "sourceUnchanged": true,
+      "commit": "187a93f3ef4660bed30cdaf3028691e5f439a4b7",
+      "latencyMs": {
+        "completeDraftP75": 11139.390667,
+        "completeDraftP95": 15361.078874999992,
+        "stepRewriteP75": 2973.7737500000003
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-53-45-210Z-pilot-substantive-refinement-step_refinement-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-53-45-210Z-pilot-substantive-refinement-step_refinement-task-routing-task-effort",
+      "version": 11,
+      "split": "pilot",
+      "focus": "substantive-refinement",
+      "selectedTask": "step_refinement",
+      "taskCount": 5,
+      "acceptedTasks": 5,
+      "requests": 5,
+      "estimatedStandardUsd": 0.040595,
+      "unknownCostRequests": 0,
+      "sourceHash": "7d714281da668c3c6c342495ef46597f0fe5296effb649ab0fc6f2c8bd81997d",
+      "sourceUnchanged": true,
+      "commit": "f0ed2be84b77ea08706d00c5e8991a596b25cd68",
+      "latencyMs": {
+        "completeDraftP75": null,
+        "completeDraftP95": null,
+        "stepRewriteP75": 8990.342334
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-55-22-461Z-development-all-step_refinement-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-55-22-461Z-development-all-step_refinement-task-routing-task-effort",
+      "version": 11,
+      "split": "development",
+      "focus": "all",
+      "selectedTask": "step_refinement",
+      "taskCount": 25,
+      "acceptedTasks": 25,
+      "requests": 25,
+      "estimatedStandardUsd": 0.14267249999999998,
+      "unknownCostRequests": 0,
+      "sourceHash": "7d714281da668c3c6c342495ef46597f0fe5296effb649ab0fc6f2c8bd81997d",
+      "sourceUnchanged": true,
+      "commit": "f0ed2be84b77ea08706d00c5e8991a596b25cd68",
+      "latencyMs": {
+        "completeDraftP75": null,
+        "completeDraftP95": null,
+        "stepRewriteP75": 3888.168958999995
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-55-22-461Z-pilot-all-step_refinement-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-55-22-461Z-pilot-all-step_refinement-task-routing-task-effort",
+      "version": 11,
+      "split": "pilot",
+      "focus": "all",
+      "selectedTask": "step_refinement",
+      "taskCount": 10,
+      "acceptedTasks": 10,
+      "requests": 10,
+      "estimatedStandardUsd": 0.0584075,
+      "unknownCostRequests": 0,
+      "sourceHash": "7d714281da668c3c6c342495ef46597f0fe5296effb649ab0fc6f2c8bd81997d",
+      "sourceUnchanged": true,
+      "commit": "f0ed2be84b77ea08706d00c5e8991a596b25cd68",
+      "latencyMs": {
+        "completeDraftP75": null,
+        "completeDraftP95": null,
+        "stepRewriteP75": 4793.575957999999
+      }
+    },
+    {
+      "path": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-55-23-189Z-held-out-all-step_refinement-task-routing-task-effort/summary.json",
+      "runId": "2026-10-15T19-55-23-189Z-held-out-all-step_refinement-task-routing-task-effort",
+      "version": 11,
+      "split": "held-out",
+      "focus": "all",
+      "selectedTask": "step_refinement",
+      "taskCount": 25,
+      "acceptedTasks": 25,
+      "requests": 25,
+      "estimatedStandardUsd": 0.14483,
+      "unknownCostRequests": 0,
+      "sourceHash": "7d714281da668c3c6c342495ef46597f0fe5296effb649ab0fc6f2c8bd81997d",
+      "sourceUnchanged": true,
+      "commit": "f0ed2be84b77ea08706d00c5e8991a596b25cd68",
+      "latencyMs": {
+        "completeDraftP75": null,
+        "completeDraftP95": null,
+        "stepRewriteP75": 3989.422584
+      }
+    }
+  ],
+  "totalEstimatedUsdIncludingProbes": 3.228597825,
+  "callsIncludingProbes": 517,
+  "costNote": "Standard-price token estimate, not invoice. Cache hits and writes differ by run; compare quality and cost with this limitation. Failed runs retained.",
+  "attemptedTaskCount": 515,
+  "mechanicallyAcceptedTasksAcrossAllAttempts": 513,
+  "selectedConfigurationEvidence": {
+    "taskCount": 250,
+    "acceptedTasks": 250,
+    "criticalFailures": 0,
+    "unknownCostRequests": 0,
+    "metrics": {
+      "generation": {
+        "tasks": 60,
+        "acceptedTasks": 60,
+        "calls": 60,
+        "estimatedUsd": 0.3000908,
+        "latencyMs": {
+          "p50": 8627.957999999999,
+          "p75": 11994.73870799999,
+          "p95": 15609.753957999987,
+          "max": 18045.042666999998
+        },
+        "returnedModels": [
+          "gpt-6.1-sol"
+        ],
+        "efforts": [
+          "medium"
+        ],
+        "maxOutputTokens": [
+          16384
+        ]
+      },
+      "plan_refinement": {
+        "tasks": 65,
+        "acceptedTasks": 65,
+        "calls": 65,
+        "estimatedUsd": 0.68261,
+        "latencyMs": {
+          "p50": 7132.739166999992,
+          "p75": 8289.82908299999,
+          "p95": 12755.974083000001,
+          "max": 17340.855
+        },
+        "returnedModels": [
+          "gpt-6.1-sol"
+        ],
+        "efforts": [
+          "medium"
+        ],
+        "maxOutputTokens": [
+          8192
+        ]
+      },
+      "step_refinement": {
+        "tasks": 65,
+        "acceptedTasks": 65,
+        "calls": 65,
+        "estimatedUsd": 0.386505,
+        "latencyMs": {
+          "p50": 3108.5240000000013,
+          "p75": 4291.759666000002,
+          "p95": 7791.037290999999,
+          "max": 12360.268833
+        },
+        "returnedModels": [
+          "gpt-6.1-sol"
+        ],
+        "efforts": [
+          "medium"
+        ],
+        "maxOutputTokens": [
+          4096
+        ]
+      },
+      "case_assistant": {
+        "tasks": 60,
+        "acceptedTasks": 60,
+        "calls": 60,
+        "estimatedUsd": 0.1715738,
+        "latencyMs": {
+          "p50": 5638.960666000028,
+          "p75": 6062.8694579999865,
+          "p95": 6825.872333000007,
+          "max": 11009.299124999961
+        },
+        "returnedModels": [
+          "gpt-6.1-sol"
+        ],
+        "efforts": [
+          "medium"
+        ],
+        "maxOutputTokens": [
+          8192
+        ]
+      }
+    },
+    "reusedSourceHash": "c6db1308f333d28df775ef4bdcce00004174ee7dbc621fa2bba2a513a2fa35f7",
+    "finalSourceHash": "7d714281da668c3c6c342495ef46597f0fe5296effb649ab0fc6f2c8bd81997d",
+    "scope": "Generation, assistant and full refinements reused from 187a93f with unchanged runtime paths. Narrow Sol medium: 65 tasks rerun at f0ed2be after the task routing/filter and PDF-only patch. Title edits and substantive edits are reported together in each refinement latency distribution. Service-only latency excludes hosted browser, persistence and PDF work. Mechanical checks do not establish usefulness or case-manager approval.",
+    "reviews": [
+      "/private/tmp/caselink-ai-blind/root-review.json",
+      "/private/tmp/caselink-ai-blind/family-needs-review.json",
+      "/private/tmp/caselink-substantive-review.json",
+      "/private/tmp/caselink-sol-narrow-review.json"
+    ]
+  }
+}
