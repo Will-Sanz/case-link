@@ -164,6 +164,22 @@ Local preparation: `npm run test:restore` creates two randomly named databases i
 
 Before the hosted exercise, explicitly disable external email delivery, outbound AI and automated jobs, and restrict network/operator access. Restore Auth state as well as application data; then revoke pre-incident sessions before reopening a real restored service, so recovery does not revive access that was revoked after the backup. Reconcile migration history and provider settings separately. Verify backup recency and credential recovery against the actual project; do not assume a successful scheduled-backup indicator means a usable recovery point exists.
 
+### Verified October 15 recovery point
+
+Before the approved demo-data cleanup, the operator took an encrypted, consistent backup of the original hosted project, including application data, Auth, storage metadata and migration history. A fresh isolated database restored all 56 tables and 4,286 rows with identical content hashes; the temporary database was then removed. See [backup evidence](verification/2026-10-15-hosted-backup.json) and [restore evidence](verification/2026-10-15-hosted-restore.json). Nine provider-owned default grants were excluded from the drill and object ownership was assigned to postgres; application grants were retained. This verifies logical recovery, not reconstruction of provider settings, SMTP, cluster ownership or off-machine disaster recovery. No storage objects existed.
+
+The private recovery point is under the operator's `~/.local/share/caselink/backups/` directory, with file mode 600 and directory mode 700. Its AES-256-GCM key is in macOS Keychain under service `CaseLink database backup`, with an account matching the backup filename before `.backup.json`. The filename contains the project reference and UTC timestamp. Keep the encrypted file and key out of Git, tickets, chat, and ordinary email.
+
+To recover a private PostgreSQL custom-format archive on that operator machine:
+
+```sh
+node --import tsx scripts/recover-backup.ts /absolute/path/to/project-timestamp.backup.json /private/recovery/new-archive.dump
+```
+
+The output directory must be private and the output filename unused. The utility authenticates the encrypted metadata, checks the archive SHA-256, refuses to overwrite a file, and writes mode 600. It does not connect to a database. Its unit tests reject corrupted ciphertext, a wrong key, modified metadata, an unsupported format and an invalid archive hash. The actual backup was recovered with this utility, its hash matched the verified archive, and PostgreSQL successfully read the full archive; the temporary plaintext copy was deleted. Normal security/data-loss review and the separate Ponytail deletion pass found no outstanding defects for this single-operator recovery tool; it uses only built-in Node APIs.
+
+Restore only to an isolated target following the procedure above. Reconcile provider-owned privileges and Auth settings explicitly; revoke restored sessions before real access. Delete plaintext recovery files after use. A separately protected off-machine backup/key copy and a recurring backup process remain open operational work; this one recovery point does not establish a daily backup or the stated ongoing RPO.
+
 ## Monitoring, SLOs, and alerts
 
 Pilot SLO: **99.5% monthly availability** for authenticated non-AI workflows, excluding scheduled maintenance announced at least 24 hours in advance.
