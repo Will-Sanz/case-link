@@ -216,8 +216,8 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Allow/disallow new user signups via email to your project.
-enable_signup = false
+# Keep email sign-in enabled. Public signup is disabled by auth.enable_signup above.
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
@@ -242,16 +242,38 @@ otp_expiry = 900
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+[auth.email.template.invite]
+subject = "You're invited to CaseLink"
+content_path = "./supabase/email-templates/invite.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+[auth.email.template.recovery]
+subject = "Reset your password — CaseLink"
+content_path = "./supabase/email-templates/recovery.html"
+
+[auth.email.template.reauthentication]
+subject = "Verify your identity — CaseLink"
+content_path = "./supabase/email-templates/reauthentication.html"
+
+# The pinned CLI resolves notification paths relative to this config directory.
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Password changed — CaseLink"
+content_path = "./email-templates/password_changed_notification.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Email address changed — CaseLink"
+content_path = "./email-templates/email_changed_notification.html"
+
+[auth.email.notification.mfa_factor_enrolled]
+enabled = true
+subject = "Verification method added — CaseLink"
+content_path = "./email-templates/mfa_factor_enrolled_notification.html"
+
+[auth.email.notification.mfa_factor_unenrolled]
+enabled = true
+subject = "Verification method removed — CaseLink"
+content_path = "./email-templates/mfa_factor_unenrolled_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -292,15 +314,15 @@ message_service_sid = ""
 # DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 
-# Multi-factor-authentication is available to Supabase Pro plan.
+# The pilot uses invitation-only password accounts, without a second factor.
 [auth.mfa]
 # Control how many MFA factors can be enrolled at once per user.
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = true
-verify_enabled = true
+enroll_enabled = false
+verify_enabled = false
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]

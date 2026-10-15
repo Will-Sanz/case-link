@@ -1,3 +1,5 @@
+
+import { formatDateOnly as formatTargetDate } from "@/lib/dates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -10,6 +12,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enrichFamiliesWithCurrentStep, listFamilies } from "@/lib/services/families";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
+import { familyCaseStepHref } from "@/lib/routes/family-case";
 
 type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -20,15 +23,6 @@ export const metadata: Metadata = {
 };
 
 const statusLabel = { active: "Active", on_hold: "On hold", closed: "Closed" } as const;
-
-function formatTargetDate(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
-}
 
 export default async function FamiliesPage({ searchParams }: PageProps) {
   const parsed = parseFamilyListQuery(await searchParams);
@@ -81,7 +75,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
       ) : (
         <div className="mt-2 divide-y divide-[var(--color-rule)]">
           {items.map((family) => (
-            <Link key={family.id} href={`/families/${family.id}/profile`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 sm:grid-cols-[1fr_auto] sm:items-center">
+            <Link key={family.id} href={family.current_step ? familyCaseStepHref(family.id, family.current_step.id) : `/families/${family.id}/profile`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="truncate text-lg font-semibold tracking-[-0.015em] text-[var(--color-ink)] group-hover:text-[var(--color-accent)]">{family.name}</h2>
@@ -97,7 +91,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                       {family.current_step.action_needed_now || family.current_step.title}
                       <span className="text-[var(--color-ink-faint)]">
                         {family.current_step.due_date
-                          ? ` · Target ${formatTargetDate(family.current_step.due_date)}`
+                          ? ` · ${family.current_step.status === "blocked" ? "Follow up" : "Target"} ${formatTargetDate(family.current_step.due_date)}`
                           : " · Target date needed"}
                       </span>
                     </p>
@@ -107,6 +101,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                 </div>
               </div>
               <div className="flex items-center gap-3 text-xs text-[var(--color-ink-faint)] sm:justify-end">
+                {family.current_step ? <span className="font-semibold text-[var(--color-accent)]">Continue plan</span> : null}
                 <span>Updated {new Date(family.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 <ArrowRight className="size-4 text-[var(--color-positive)] transition-transform group-hover:translate-x-1" aria-hidden />
               </div>

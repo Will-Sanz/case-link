@@ -1,0 +1,312 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "startedAt": "2026-10-15T00:47:08.343Z",
+  "scratch": "caselink_restore_b67c6ee4e88e3763",
+  "sourceModified": false,
+  "managedProviderDefaultAclsExcluded": [
+    "auth DEFAULT PRIVILEGES FOR SEQUENCES supabase_auth_admin",
+    "auth DEFAULT PRIVILEGES FOR FUNCTIONS supabase_auth_admin",
+    "auth DEFAULT PRIVILEGES FOR TABLES supabase_auth_admin",
+    "extensions DEFAULT PRIVILEGES FOR SEQUENCES supabase_admin",
+    "extensions DEFAULT PRIVILEGES FOR FUNCTIONS supabase_admin",
+    "extensions DEFAULT PRIVILEGES FOR TABLES supabase_admin",
+    "public DEFAULT PRIVILEGES FOR SEQUENCES supabase_admin",
+    "public DEFAULT PRIVILEGES FOR FUNCTIONS supabase_admin",
+    "public DEFAULT PRIVILEGES FOR TABLES supabase_admin"
+  ],
+  "backupCreatedAt": "2026-10-15T00:43:58.149Z",
+  "archiveSha256": "0f77cb53f905b548d49d491bb76d733bd5b912423da7f34d8c5c7ef5a6c56e62",
+  "compared": [
+    {
+      "table": "auth.audit_log_entries",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.custom_oauth_providers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.flow_state",
+      "rows": 16,
+      "matched": true
+    },
+    {
+      "table": "auth.identities",
+      "rows": 13,
+      "matched": true
+    },
+    {
+      "table": "auth.instances",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_amr_claims",
+      "rows": 10,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_challenges",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_factors",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_recovery_code_sets",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_recovery_codes",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_authorizations",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_client_states",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_clients",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_consents",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.one_time_tokens",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.refresh_tokens",
+      "rows": 48,
+      "matched": true
+    },
+    {
+      "table": "auth.saml_providers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.saml_relay_states",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.schema_migrations",
+      "rows": 82,
+      "matched": true
+    },
+    {
+      "table": "auth.scim_tokens",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.scim_users",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.sessions",
+      "rows": 10,
+      "matched": true
+    },
+    {
+      "table": "auth.sso_domains",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.sso_providers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.users",
+      "rows": 13,
+      "matched": true
+    },
+    {
+      "table": "auth.webauthn_challenges",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.webauthn_credentials",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.activity_log",
+      "rows": 283,
+      "matched": true
+    },
+    {
+      "table": "public.app_users",
+      "rows": 11,
+      "matched": true
+    },
+    {
+      "table": "public.barrier_plan_records",
+      "rows": 24,
+      "matched": true
+    },
+    {
+      "table": "public.case_notes",
+      "rows": 5,
+      "matched": true
+    },
+    {
+      "table": "public.case_progress_updates",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.families",
+      "rows": 44,
+      "matched": true
+    },
+    {
+      "table": "public.family_barriers",
+      "rows": 125,
+      "matched": true
+    },
+    {
+      "table": "public.family_case_managers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.family_goals",
+      "rows": 19,
+      "matched": true
+    },
+    {
+      "table": "public.family_members",
+      "rows": 4,
+      "matched": true
+    },
+    {
+      "table": "public.plan_step_action_items",
+      "rows": 1696,
+      "matched": true
+    },
+    {
+      "table": "public.plan_step_activity",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.plan_step_resources",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.plan_steps",
+      "rows": 726,
+      "matched": true
+    },
+    {
+      "table": "public.plans",
+      "rows": 66,
+      "matched": true
+    },
+    {
+      "table": "public.referrals",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.resource_import_runs",
+      "rows": 1,
+      "matched": true
+    },
+    {
+      "table": "public.resource_matches",
+      "rows": 961,
+      "matched": true
+    },
+    {
+      "table": "public.resources",
+      "rows": 54,
+      "matched": true
+    },
+    {
+      "table": "public.tasks",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.buckets",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.buckets_analytics",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.buckets_vectors",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.migrations",
+      "rows": 74,
+      "matched": true
+    },
+    {
+      "table": "storage.objects",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.s3_multipart_uploads",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.s3_multipart_uploads_parts",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.vector_indexes",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "supabase_migrations.schema_migrations",
+      "rows": 1,
+      "matched": true
+    }
+  ],
+  "tables": 56,
+  "rows": 4286,
+  "restoredRowsExactlyMatch": true,
+  "ownership": "Restored objects owned by postgres in isolated scratch database (--no-owner); stored archive retains original ownership metadata.",
+  "applicationGrantsRestored": true,
+  "managedProviderDefaultAclsRestored": false,
+  "tlsCertificateVerified": true,
+  "passed": true,
+  "scratchRemoved": true,
+  "finishedAt": "2026-10-15T00:47:34.206Z",
+  "credentialsPrintedOrPersisted": false
+}

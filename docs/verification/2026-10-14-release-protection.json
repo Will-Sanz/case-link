@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-10-14T16:18:28.660Z",
+  "repository": "Will-Sanz/case-link",
+  "branch": "main",
+  "previousProtection": "404 Branch not protected",
+  "requiredChecks": [
+    {
+      "context": "verify",
+      "app_id": 15368
+    },
+    {
+      "context": "database-security",
+      "app_id": 15368
+    },
+    {
+      "context": "analyze",
+      "app_id": 15368
+    },
+    {
+      "context": "CodeQL",
+      "app_id": 57789
+    }
+  ],
+  "enforceAdmins": true,
+  "strictUpToDate": true,
+  "requiredPullRequestReviews": {
+    "url": "https://api.github.com/repos/Will-Sanz/case-link/branches/main/protection/required_pull_request_reviews",
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false,
+    "required_approving_review_count": 0
+  },
+  "conversationResolution": true,
+  "forcePushes": false,
+  "deletions": false,
+  "mainBefore": "e0cb389feaa0096175b33f05602ed72f0041c467",
+  "mainAfter": "e0cb389feaa0096175b33f05602ed72f0041c467",
+  "productionPromotionPerformed": false,
+  "initialFailure": "422 when legacy contexts and new checks were both supplied; retried with checks only"
+}

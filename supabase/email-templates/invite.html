@@ -26,12 +26,12 @@
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
                 <tr>
                   <td style="padding: 24px;">
-                    <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155;">You've been invited to create an account on CaseLink — the case management workspace for families and community resources.</p>
-                    <p style="margin: 0 0 24px 0; font-size: 15px; color: #334155;">Click below to accept the invite and set up your account.</p>
+                    <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155;">You've been invited to create an account on CaseLink — the family-support planning workspace for school case managers.</p>
+                    <p style="margin: 0 0 24px 0; font-size: 15px; color: #334155;">Open the link, then choose Continue to set your password. This link expires in 15 minutes and can be used once.</p>
                     <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                       <tr>
                         <td style="background-color: #0f766e; border-radius: 8px; box-shadow: 0 1px 2px rgba(15, 118, 110, 0.2);">
-                          <a href="{{ .ConfirmationURL }}" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 500; color: #ffffff; text-decoration: none;">Accept invite</a>
+                          <a href="{{ .SiteURL }}/auth/callback#token_hash={{ .TokenHash }}&amp;type=invite&amp;next=%2Freset-password%3Fmode%3Dsetup" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 500; color: #ffffff; text-decoration: none;">Accept invite</a>
                         </td>
                       </tr>
                     </table>
@@ -42,7 +42,7 @@
           </tr>
           <tr>
             <td style="padding: 0 28px 32px 28px; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 24px 0 0 0; font-size: 12px; color: #94a3b8;">If the button doesn't work, copy and paste this link: <a href="{{ .ConfirmationURL }}" style="color: #0f766e; word-break: break-all;">{{ .ConfirmationURL }}</a></p>
+              <p style="margin: 24px 0 0 0; font-size: 12px; color: #475569;">If the link has expired, ask your administrator for a fresh invitation. You can also copy and paste this link: <a href="{{ .SiteURL }}/auth/callback#token_hash={{ .TokenHash }}&amp;type=invite&amp;next=%2Freset-password%3Fmode%3Dsetup" style="color: #0f766e; word-break: break-all;">{{ .SiteURL }}/auth/callback#token_hash={{ .TokenHash }}&amp;type=invite&amp;next=%2Freset-password%3Fmode%3Dsetup</a></p>
             </td>
           </tr>
         </table>

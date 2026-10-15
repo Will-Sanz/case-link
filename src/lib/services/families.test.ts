@@ -1,0 +1,75 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { describe, expect, it, vi } from "vitest";
+import { enrichFamiliesWithCurrentStep, getFamilyDetail } from "./families";
+import { directoryCase } from "../../../tests/fixtures/directory-case";
+import type { ResourceMatchRow } from "@/types/family";
+
+function clientWithFailure(failedTable?: string, missingFamily = false, resourceMatches: ResourceMatchRow[] = []) {
+  return {
+    rpc: vi.fn().mockResolvedValue({ data: { family: { id: "family", name: "Snapshot label" }, barriers: [], plan: { id: "plan", generation_source: "rules", steps: [{ id: "step", action_items: [] }] } }, error: failedTable === "get_family_plan_snapshot" ? { message: "get_family_plan_snapshot unavailable" } : null }),
+    from: vi.fn((table: string) => {
+      const data = table === "families" ? (missingFamily ? null : { id: "family", creator: null })
+        : table === "plans" ? { id: "plan", generation_source: "rules" }
+        : table === "plan_steps" ? [{ id: "step" }] : table === "resource_matches" ? resourceMatches : [];
+      const result = { data, error: table === failedTable ? { message: `${table} unavailable` } : null };
+      const query = {
+        select: vi.fn(() => query), eq: () => query, in: () => query, order: () => query,
+        limit: () => query, maybeSingle: () => Promise.resolve(result),
+        then: (resolve: (value: unknown) => void) => resolve(result),
+      };
+      return query;
+    }),
+  } as unknown as SupabaseClient;
+}
+
+describe("getFamilyDetail", () => {
+  it("loads the stored service evidence with the authorized family's resource matches", async () => {
+    const matches = directoryCase().resourceMatches;
+    Object.assign(matches[0].resource!, { description: "Housing stabilization", services_select_all: "Intake preparation", additional_info: "School coordination is available." });
+    const client = clientWithFailure(undefined, false, matches);
+    const detail = await getFamilyDetail(client, "family");
+    expect(detail?.resourceMatches[0].resource).toMatchObject(matches[0].resource!);
+    const calls = vi.mocked(client.from).mock;
+    const query = calls.results[calls.calls.findIndex(([table]) => table === "resource_matches")].value;
+    expect(query.select.mock.calls[0][0]).toMatch(/description,\s+services_select_all,\s+additional_info/);
+  });
+  it.each(["families", "family_goals", "family_members", "case_notes", "case_progress_updates", "resource_matches", "get_family_plan_snapshot"])(
+    "refuses a partial workspace when %s fails", async (table) => {
+      await expect(getFamilyDetail(clientWithFailure(table), "family")).rejects.toThrow(`${table} unavailable`);
+    },
+  );
+
+  it("keeps genuinely missing content distinct from a load failure", async () => {
+    expect(await getFamilyDetail(clientWithFailure(undefined, true), "family")).toBeNull();
+    const detail = await getFamilyDetail(clientWithFailure(), "family");
+    expect(detail?.name).toBe("Snapshot label");
+    expect(detail?.plan?.steps).toHaveLength(1);
+    expect(detail?.plan?.steps[0].action_items).toEqual([]);
+  });
+});
+
+describe("bounded family next-work summaries", () => {
+  const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
+  const items = ids.map(id => ({ id, name: "Family label" })) as import("@/types/family").FamilyListItem[];
+  function summaryClient(data: unknown, error: unknown = null) {
+    return { rpc: vi.fn().mockResolvedValue({ data, error }) } as unknown as SupabaseClient;
+  }
+  it("joins summaries by ID, preserves list order, and accepts genuinely empty work", async () => {
+    const work = { id: ids[0], title: "Housing goal", phase: "30", status: "blocked", due_date: "2026-11-02", action_needed_now: "Follow up", is_blocked: true, is_escalated: false };
+    const client = summaryClient([{ family_id: ids[1], current_step: null }, { family_id: ids[0], current_step: work }]);
+    const result = await enrichFamiliesWithCurrentStep(client, items);
+    expect(result.map(row => row.current_step)).toEqual([work, null]);
+    expect(client.rpc).toHaveBeenCalledExactlyOnceWith("get_family_next_work", { p_family_ids: ids });
+    expect(await enrichFamiliesWithCurrentStep(client, [])).toEqual([]);
+    expect(client.rpc).toHaveBeenCalledTimes(1);
+  });
+  it.each([null, [], [{ family_id: ids[0], current_step: null }],
+    ids.map(() => ({ family_id: ids[0], current_step: null })),
+    [{ family_id: ids[0], current_step: { id: ids[0] } }],
+  ])("refuses missing, duplicate, or malformed summaries: %j", async data => {
+    await expect(enrichFamiliesWithCurrentStep(summaryClient(data), items)).rejects.toThrow();
+  });
+  it("propagates a database failure instead of showing no work", async () => {
+    await expect(enrichFamiliesWithCurrentStep(summaryClient(null, { message: "Unavailable" }), items)).rejects.toThrow("Unavailable");
+  });
+});

@@ -41,6 +41,8 @@ export function PrivacyPolicySections() {
         <p>
           This context is sensitive even when de-identified. Do not enter names, contact details,
           student identifiers, signatures, or other information that could identify a person.
+          Automated warnings can miss identifiers and identifying combinations of facts. Review
+          every entry yourself; a passing check is not permission to enter identifiable records.
         </p>
 
         <h3 className="pt-2 text-base font-semibold text-slate-900">
@@ -71,13 +73,13 @@ export function PrivacyPolicySections() {
 
       <LegalSection n="3" title="Use of AI Services">
         <p>
-          CaseLink uses OpenAI to generate plans and propose mappings for standard form fields.
+          CaseLink uses OpenAI to draft plans, suggest edits, and provide casework assistance.
         </p>
         <p>When AI features are used:</p>
         <LegalList
           items={[
-            "Only reviewed, de-identified case context and bounded PDF field metadata may be sent",
-            "Uploaded PDF bytes, completed PDFs, identity fields, and signature fields are not sent to OpenAI",
+            "De-identified case context and instructions may be sent for drafting and assistance",
+            "CaseLink does not accept PDF uploads or send generated PDF bytes to OpenAI",
             "AI output remains a draft until a case manager reviews it",
           ]}
         />
@@ -97,8 +99,8 @@ export function PrivacyPolicySections() {
           ]}
         />
         <p>
-          Blank PDF files and completed drafts remain in the active browser tab. CaseLink does not
-          persist those files on its server, and they are cleared after download or refresh.
+          Reviewed-plan PDFs are generated in the browser from saved plan information. Downloaded
+          copies remain on your device and must be handled under your school’s records policy.
         </p>
       </LegalSection>
 
@@ -241,8 +243,8 @@ export function TermsOfServiceSections(
           ]}
         />
         <p>
-          You must use non-identifying family labels and de-identified context. Upload only blank,
-          unlocked, fillable PDFs; never upload completed, signed, scanned, or identifying forms.
+          You must use non-identifying family labels and de-identified context. Review plan content
+          and dates before downloading a PDF, and handle any submission yourself.
         </p>
       </LegalSection>
 
@@ -251,7 +253,7 @@ export function TermsOfServiceSections(
         <p>You acknowledge that:</p>
         <LegalList
           items={[
-            "AI-generated content and field mappings may be incomplete or inaccurate",
+            "AI-generated content may be incomplete or inaccurate",
             "Outputs are provided for assistance only",
             "You must review every plan, field, and completed PDF page before use",
           ]}

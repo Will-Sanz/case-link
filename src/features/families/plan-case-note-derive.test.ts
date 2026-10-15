@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMainParagraph,
-  contactsFromEditable,
   contactsToEditable,
   documentsFromEditable,
   documentsToEditable,
@@ -10,7 +9,6 @@ import {
   formatOutcomeDisplay,
   formatRecordNotes,
   parseMainParagraphOnSave,
-  stepToCaseNoteDraft,
 } from "@/features/families/plan-case-note-derive";
 import type { PlanStepRow } from "@/types/family";
 
@@ -51,17 +49,14 @@ describe("plan case note derive helpers", () => {
     });
   });
 
-  it("converts contacts to and from editable text", () => {
+  it("formats supplied contacts for display", () => {
     const editable = contactsToEditable([
       { name: "Ava", phone: "555-1000", email: "ava@example.org", notes: "Best after 3pm" },
       { name: "Ben" },
     ]);
 
     expect(editable).toBe("Ava · 555-1000 · ava@example.org · Best after 3pm\nBen");
-    expect(contactsFromEditable(editable)).toEqual([
-      { name: "Ava", phone: "555-1000", email: "ava@example.org", notes: "Best after 3pm" },
-      { name: "Ben" },
-    ]);
+
   });
 
   it("builds and parses the main paragraph with action items and timing", () => {
@@ -138,12 +133,6 @@ describe("plan case note derive helpers", () => {
     expect(formatRecordNotes(step.workflow_data)).toBe(
       "Intake completed.\n\nCurrently blocked: Awaiting landlord signature.",
     );
-    expect(stepToCaseNoteDraft(step)).toEqual({
-      title: "Apply for housing support",
-      mainParagraph: "Help the family complete the application packet.",
-      documentsEditable: "Photo ID\nLease",
-      contactEditable: "Jordan · 555-2000 · jordan@example.org",
-      outcome: "The family is approved for assistance.",
-    });
+
   });
 });

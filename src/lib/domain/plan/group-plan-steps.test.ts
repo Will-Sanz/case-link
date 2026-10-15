@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
+import { encodeActionNotes } from "@/lib/domain/plan/action-state";
 import type { PlanStepActionItemRow, PlanStepRow } from "@/types/family";
 
 function action(
@@ -50,6 +51,17 @@ function step(
 }
 
 describe("groupPlanStepsByGoal", () => {
+  it("does not count withdrawn work as completed or reopen its old dates", () => {
+    const withdrawn = { ...action("withdrawn", "2020-01-01", "completed"), notes: encodeActionNotes("No longer needed", true) };
+    const [group] = groupPlanStepsByGoal([
+      step("a", "Housing", 0, [withdrawn, action("done", null, "completed")]),
+      step("b", "Housing", 1, [{ ...withdrawn, id: "withdrawn-again" }]),
+    ]);
+    expect(group.actionCount).toBe(3);
+    expect(group.completedActionCount).toBe(1);
+    expect(group.earliestOpenTargetDate).toBeNull();
+  });
+
   it("groups steps by their case-manager goal instead of storage phase", () => {
     const groups = groupPlanStepsByGoal([
       step("a", "Stabilize housing", 0, [action("a1", "2026-08-06")]),
@@ -92,4 +104,11 @@ describe("groupPlanStepsByGoal", () => {
     const [group] = groupPlanStepsByGoal([step("legacy", undefined, 0, [])]);
     expect(group.title).toBe("Step legacy");
   });
+  it("sorts Waiting goals by follow-up, ignoring an older original target", () => {
+    const waiting = { ...action("wait", "2026-08-01", "blocked"), follow_up_date: "2026-08-15" };
+    const groups = groupPlanStepsByGoal([step("waiting", "Housing", 0, [waiting]), step("open", "Food", 1, [action("next", "2026-08-10")])]);
+    expect(groups.map(group => group.title)).toEqual(["Food", "Housing"]);
+    expect(groups[1].earliestOpenTargetDate).toBe("2026-08-15");
+  });
+
 });

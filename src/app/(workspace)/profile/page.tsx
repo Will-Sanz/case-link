@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { PasswordSetupRequiredError } from "@/lib/auth/session-errors";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { CaseManagerProfileClient } from "@/features/profile/case-manager-profile-client";
 
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default async function ProfilePage() {
-  const auth = await requireAppUserWithClient().catch(() => null);
+  const auth = await requireAppUserWithClient().catch((error: unknown) => {
+    if (error instanceof PasswordSetupRequiredError) redirect("/reset-password?mode=setup");
+    return null;
+  });
   if (!auth) {
     redirect("/login");
   }

@@ -1,28 +1,44 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates";
+
 import { Fragment } from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { actionUiStatus } from "@/lib/domain/plan/action-state";
+import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { StandardFontEmbedder } from "pdf-lib";
+import { actionTargetDate, actionUiStatus, actionUserNotes } from "@/lib/domain/plan/action-state";
 import { groupPlanStepsByGoal } from "@/lib/domain/plan/group-plan-steps";
 import type { PlanStepDetails, PlanStepRow, PlanWithSteps } from "@/types/family";
 
 export const PLAN_PDF_TITLE = "Family Support Intervention Plan";
 export const PLAN_PDF_PALETTE = { ink: "#000000", paper: "#FFFFFF" } as const;
 
-function cleanText(value: string | null | undefined): string {
-  return (value ?? "")
+const printableFont = StandardFontEmbedder.for("Helvetica" as Parameters<typeof StandardFontEmbedder.for>[0]);
+// Bound unbroken words as well as prose, so filenames cannot escape the printable page.
+Font.registerHyphenationCallback((word) => word.match(/.{1,20}/gu) ?? [word]);
+
+export function cleanPdfText(value: string | null | undefined): string {
+  const text = (value ?? "")
+    .normalize("NFC")
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+([.,;:!?])/g, "$1")
     .trim();
+  try {
+    printableFont.encodeText(text);
+  } catch {
+    // shortcut: built-in Helvetica covers Western European text; embed broader fonts before a multilingual rollout.
+    throw Object.assign(new Error("The PDF font does not support some characters in the plan."), { name: "UnsupportedPdfTextError" });
+  }
+  return text;
 }
 
-function formatOwner(owner: PlanStepDetails["owner"]): string {
+export function formatPlanOwner(owner: PlanStepDetails["owner"]): string {
   if (owner === "family") return "Family";
   if (owner === "shared") return "Shared";
   if (owner === "school_program") return "School / program";
   return "Case manager";
 }
+
 
 function formatPriority(priority: PlanStepRow["priority"]): string {
   if (priority === "urgent") return "Urgent";
@@ -31,24 +47,12 @@ function formatPriority(priority: PlanStepRow["priority"]): string {
   return "Standard";
 }
 
-function formatDateOnly(value: string | null): string {
-  if (!value) return "Not set";
-  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function narrative(step: PlanStepRow): string | null {
   const details = step.details ?? {};
   const values = [
-    cleanText(step.description),
-    cleanText(details.action_needed_now),
-    cleanText(details.detailed_instructions),
+    cleanPdfText(step.description),
+    cleanPdfText(details.action_needed_now),
+    cleanPdfText(details.detailed_instructions),
   ].filter(Boolean);
   const unique = values.filter(
     (value, index) =>
@@ -60,7 +64,7 @@ function narrative(step: PlanStepRow): string | null {
 function uniqueLines(values: Array<string | null | undefined>): string[] {
   const seen = new Set<string>();
   return values.flatMap((raw) => {
-    const value = cleanText(raw);
+    const value = cleanPdfText(raw);
     const key = value.toLowerCase();
     if (!value || seen.has(key)) return [];
     seen.add(key);
@@ -178,21 +182,20 @@ const styles = StyleSheet.create({
   actionTable: {
     marginTop: 8,
     borderTopWidth: 0.75,
+    borderBottomWidth: 0.75,
     borderLeftWidth: 0.75,
     borderRightWidth: 0.75,
     borderColor: PLAN_PDF_PALETTE.ink,
   },
   actionHeader: {
     flexDirection: "row",
-    borderBottomWidth: 0.75,
-    borderBottomColor: PLAN_PDF_PALETTE.ink,
     fontWeight: "bold",
     fontSize: 8,
   },
-  actionRow: {
+  actionHeading: {
     flexDirection: "row",
-    borderBottomWidth: 0.75,
-    borderBottomColor: PLAN_PDF_PALETTE.ink,
+    borderTopWidth: 0.75,
+    borderTopColor: PLAN_PDF_PALETTE.ink,
   },
   actionCell: {
     width: "58%",
@@ -220,7 +223,9 @@ const styles = StyleSheet.create({
     borderLeftColor: PLAN_PDF_PALETTE.ink,
   },
   actionDetail: {
-    marginTop: 2,
+    paddingRight: 6,
+    paddingBottom: 5,
+    paddingLeft: 6,
     fontSize: 8,
   },
   listRow: {
@@ -231,38 +236,35 @@ const styles = StyleSheet.create({
 
 function PdfActionTable({ step }: { step: PlanStepRow }) {
   const actions = [...(step.action_items ?? [])].sort((a, b) => {
-    const aDate = a.status === "blocked" ? a.follow_up_date ?? a.target_date : a.target_date;
-    const bDate = b.status === "blocked" ? b.follow_up_date ?? b.target_date : b.target_date;
+    const aDate = actionTargetDate(a);
+    const bDate = actionTargetDate(b);
     if (aDate && bDate && aDate !== bDate) return aDate.localeCompare(bDate);
     if (aDate && !bDate) return -1;
     if (!aDate && bDate) return 1;
-    return a.sort_order - b.sort_order;
+    return a.sort_order - b.sort_order || a.id.localeCompare(b.id);
   });
   if (actions.length === 0) return null;
 
   return (
-    <View style={styles.actionTable}>
-      <View style={styles.actionHeader}>
+    <View style={styles.actionTable} minPresenceAhead={48}>
+      <View style={styles.actionHeader} wrap={false} minPresenceAhead={24}>
         <Text style={styles.actionCell}>Action</Text>
         <Text style={styles.dateCell}>Target / follow-up</Text>
         <Text style={styles.statusCell}>Status</Text>
       </View>
       {actions.map((action) => {
-        const displayDate =
-          action.status === "blocked"
-            ? action.follow_up_date ?? action.target_date
-            : action.target_date;
+        const displayDate = actionTargetDate(action);
         return (
-          <View key={action.id} style={styles.actionRow}>
-            <View style={styles.actionCell}>
-              <Text style={styles.label}>{cleanText(action.title) || "Untitled action"}</Text>
-              {cleanText(action.description) ? <Text style={styles.actionDetail}>{cleanText(action.description)}</Text> : null}
-              {cleanText(action.notes) ? <Text style={styles.actionDetail}>Progress: {cleanText(action.notes)}</Text> : null}
-              {cleanText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanText(action.outcome)}</Text> : null}
+          <Fragment key={action.id}>
+            <View style={styles.actionHeading} wrap={false} minPresenceAhead={32}>
+              <Text style={[styles.actionCell, styles.label]}>{cleanPdfText(action.title) || "Untitled action"}</Text>
+              <Text style={styles.dateCell}>{formatDateOnly(displayDate) ?? (action.status === "completed" ? "Not required" : "Not set")}</Text>
+              <Text style={styles.statusCell}>{actionUiStatus(action).replaceAll("_", " ")}</Text>
             </View>
-            <Text style={styles.dateCell}>{formatDateOnly(displayDate)}</Text>
-            <Text style={styles.statusCell}>{actionUiStatus(action).replaceAll("_", " ")}</Text>
-          </View>
+            {cleanPdfText(action.description) ? <Text style={styles.actionDetail}>{cleanPdfText(action.description)}</Text> : null}
+            {cleanPdfText(actionUserNotes(action.notes)) ? <Text style={styles.actionDetail}>Progress: {cleanPdfText(actionUserNotes(action.notes))}</Text> : null}
+            {cleanPdfText(action.outcome) ? <Text style={styles.actionDetail}>Outcome: {cleanPdfText(action.outcome)}</Text> : null}
+          </Fragment>
         );
       })}
     </View>
@@ -278,7 +280,7 @@ function PdfStep({ step }: { step: PlanStepRow }) {
   const contacts = uniqueLines(
     (details.contacts ?? []).map((contact) =>
       [contact.name, contact.phone, contact.email, contact.notes]
-        .map(cleanText)
+        .map(cleanPdfText)
         .filter(Boolean)
         .join(" · "),
     ),
@@ -286,28 +288,28 @@ function PdfStep({ step }: { step: PlanStepRow }) {
   const body = narrative(step);
 
   return (
-    <View style={styles.step} minPresenceAhead={80}>
-      <Text style={styles.stepTitle}>{cleanText(step.title) || "Plan action"}</Text>
-      <Text style={styles.meta}>Owner: {formatOwner(details.owner)} · Priority: {formatPriority(step.priority)}</Text>
+    <View style={styles.step}>
+      <Text style={styles.stepTitle} minPresenceAhead={32}>{cleanPdfText(step.title) || "Plan action"}</Text>
+      <Text style={styles.meta}>Owner: {formatPlanOwner(details.owner)} · Priority: {formatPriority(step.priority)}</Text>
       {body ? <Text style={styles.narrative}>{body}</Text> : null}
       <PdfActionTable step={step} />
       {documents.length > 0 ? (
-        <View>
-          <Text style={styles.fieldHeading}>Documents or materials</Text>
+        <Fragment>
+          <Text style={styles.fieldHeading} minPresenceAhead={14}>Documents or materials</Text>
           {documents.map((line) => <View key={line} style={styles.listRow}><Text style={styles.bullet}>•</Text><Text style={styles.grow}>{line}</Text></View>)}
-        </View>
+        </Fragment>
       ) : null}
       {contacts.length > 0 ? (
-        <View>
-          <Text style={styles.fieldHeading}>Contacts</Text>
+        <Fragment>
+          <Text style={styles.fieldHeading} minPresenceAhead={14}>Contacts</Text>
           {contacts.map((line) => <Text key={line}>{line}</Text>)}
-        </View>
+        </Fragment>
       ) : null}
-      {cleanText(details.expected_outcome) ? (
-        <View>
-          <Text style={styles.fieldHeading}>Expected outcome</Text>
-          <Text>{cleanText(details.expected_outcome)}</Text>
-        </View>
+      {cleanPdfText(details.expected_outcome) ? (
+        <Fragment>
+          <Text style={styles.fieldHeading} minPresenceAhead={14}>Expected outcome</Text>
+          <Text>{cleanPdfText(details.expected_outcome)}</Text>
+        </Fragment>
       ) : null}
     </View>
   );
@@ -333,16 +335,16 @@ export function PlanPdfDocument({
         <Text style={styles.title}>{PLAN_PDF_TITLE}</Text>
         <View style={styles.titleRule} />
         <View style={styles.metadata}>
-          <Text style={styles.metadataItem}><Text style={styles.label}>Family label: </Text>{cleanText(familyName) || "Not provided"}</Text>
-          <Text style={styles.metadataItem}><Text style={styles.label}>Prepared: </Text>{generatedDate}</Text>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Family label: </Text>{cleanPdfText(familyName) || "Not provided"}</Text>
+          <Text style={styles.metadataItem}><Text style={styles.label}>Prepared: </Text>{cleanPdfText(generatedDate)}</Text>
           <Text style={styles.metadataItem}><Text style={styles.label}>Plan version: </Text>{plan.version}</Text>
           <Text style={styles.metadataItem}><Text style={styles.label}>Plan status: </Text>{plan.client_display?.reviewedAt ? "Reviewed" : "Draft"}</Text>
         </View>
 
-        {cleanText(plan.summary) ? (
+        {cleanPdfText(plan.summary) ? (
           <View style={styles.section}>
             <Text style={styles.sectionHeading}>Plan summary</Text>
-            <Text>{cleanText(plan.summary)}</Text>
+            <Text>{cleanPdfText(plan.summary)}</Text>
           </View>
         ) : null}
 
@@ -358,10 +360,10 @@ export function PlanPdfDocument({
         {goals.map((goal, goalIndex) => (
           <Fragment key={goal.key}>
             <View style={[styles.goal, styles.goalHeader]} minPresenceAhead={160}>
-              <Text style={styles.goalTitle}>Goal {goalIndex + 1}: {goal.title}</Text>
+              <Text style={styles.goalTitle}>Goal {goalIndex + 1}: {cleanPdfText(goal.title)}</Text>
               <Text style={styles.goalProgress}>
-                {goal.completedActionCount} of {goal.actionCount} dated actions complete
-                {goal.earliestOpenTargetDate ? ` · Next target ${formatDateOnly(goal.earliestOpenTargetDate)}` : ""}
+                {goal.completedActionCount} of {goal.actionCount} actions complete
+                {goal.earliestOpenTargetDate ? ` · Next date ${formatDateOnly(goal.earliestOpenTargetDate)}` : ""}
               </Text>
             </View>
             {goal.steps.map((step) => <PdfStep key={step.id} step={step} />)}

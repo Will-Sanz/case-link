@@ -1,0 +1,57 @@
+{
+  "checkedAt": "2026-10-15T20:29:33.874Z",
+  "project": "zpfypkizsapvsxeykmdq",
+  "backupArchiveSha256": "2389d5a6290f13ce92bf2fc93b2255f0a5b5a44a1a346a7b708a45ebe2f58531",
+  "allComparedRecordsUnchanged": true,
+  "tables": [
+    {
+      "table": "families",
+      "rows": 1
+    },
+    {
+      "table": "family_barriers",
+      "rows": 2
+    },
+    {
+      "table": "family_goals",
+      "rows": 0
+    },
+    {
+      "table": "family_members",
+      "rows": 0
+    },
+    {
+      "table": "case_notes",
+      "rows": 0
+    },
+    {
+      "table": "case_progress_updates",
+      "rows": 0
+    },
+    {
+      "table": "plans",
+      "rows": 1
+    },
+    {
+      "table": "plan_steps",
+      "rows": 3
+    },
+    {
+      "table": "plan_step_action_items",
+      "rows": 6
+    },
+    {
+      "table": "plan_step_resources",
+      "rows": 0
+    },
+    {
+      "table": "resources",
+      "rows": 54
+    },
+    {
+      "table": "app_users",
+      "rows": 11
+    }
+  ],
+  "recordContentPrintedOrPersisted": false
+}

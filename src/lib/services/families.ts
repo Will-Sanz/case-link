@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { buildPlanPresentation } from "@/lib/domain/plan/presentation";
 import type {
   CaseNoteRow,
@@ -11,14 +12,10 @@ import type {
   FamilyMemberRow,
   FamilyWithCurrentStep,
   MatchedResourceSummary,
-  PlanRow,
-  PlanStepActionItemRow,
-  PlanStepRow,
   PlanWithSteps,
   ResourceMatchRow,
 } from "@/types/family";
 import type { FamilyListQuery } from "@/lib/validations/family-list-query";
-import { selectNextFamilyWork } from "@/lib/domain/family-workspace/next-work";
 
 function escapeIlike(s: string): string {
   return s.replace(/[%_\\]/g, "\\$&");
@@ -48,7 +45,8 @@ export async function listFamilies(
       { count: "exact" },
     )
     .is("archived_at", null)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: true });
 
   const q = filters.q?.trim();
   if (q) {
@@ -85,83 +83,34 @@ export async function listFamilies(
   return { items, total: count ?? 0 };
 }
 
-/** Enriches family list items with current active step and action summary */
+const nextWorkRowsSchema = z.array(z.object({
+  family_id: z.uuid(),
+  current_step: z.object({
+    id: z.uuid(), title: z.string(), phase: z.string(),
+    status: z.enum(["pending", "in_progress", "blocked"]),
+    due_date: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).nullable(), action_needed_now: z.string(),
+    is_blocked: z.boolean(), is_escalated: z.boolean(),
+  }).nullable(),
+})).max(100);
+
+/** The database returns one summary per visible family, independent of child-row API limits. */
 export async function enrichFamiliesWithCurrentStep(
   client: SupabaseClient,
   items: FamilyListItem[],
 ): Promise<FamilyWithCurrentStep[]> {
   if (items.length === 0) return [];
 
-  const familyIds = items.map((f) => f.id);
-  const { data: plans, error: plansError } = await client
-    .from("plans")
-    .select("id, family_id")
-    .in("family_id", familyIds)
-    .order("version", { ascending: false });
-
-  if (plansError) throw new Error(plansError.message);
-
-  const latestPlanByFamily = new Map<string, string>();
-  for (const p of plans ?? []) {
-    if (!latestPlanByFamily.has(p.family_id)) {
-      latestPlanByFamily.set(p.family_id, p.id);
-    }
-  }
-
-  const planIds = [...latestPlanByFamily.values()];
-  if (planIds.length === 0) {
-    return items.map((item) => ({ ...item, current_step: null }));
-  }
-
-  const { data: steps, error: stepsError } = await client
-    .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, sort_order, details, workflow_data")
-    .in("plan_id", planIds)
-    .order("sort_order", { ascending: true });
-
-  if (stepsError) throw new Error(stepsError.message);
-
-  const stepIds = (steps ?? []).map((step) => step.id);
-  const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
-  if (stepIds.length > 0) {
-    const { data: actionItems, error: actionItemsError } = await client
-      .from("plan_step_action_items")
-      .select("*")
-      .in("plan_step_id", stepIds)
-      .order("sort_order", { ascending: true });
-
-    if (actionItemsError) throw new Error(actionItemsError.message);
-
-    for (const actionItem of actionItems ?? []) {
-      const current = actionItemsByStep.get(actionItem.plan_step_id) ?? [];
-      current.push(actionItem as PlanStepActionItemRow);
-      actionItemsByStep.set(actionItem.plan_step_id, current);
-    }
-  }
-
-  const familyIdByPlanId = new Map<string, string>();
-  for (const p of plans ?? []) {
-    familyIdByPlanId.set(p.id, p.family_id);
-  }
-
-  const stepsByFamily = new Map<string, PlanStepRow[]>();
-  for (const s of steps ?? []) {
-    const fid = familyIdByPlanId.get(s.plan_id);
-    if (!fid) continue;
-    const current = stepsByFamily.get(fid) ?? [];
-    current.push({
-      ...s,
-      action_items: actionItemsByStep.get(s.id) ?? [],
-    } as PlanStepRow);
-    stepsByFamily.set(fid, current);
-  }
-
-  return items.map((item) => {
-    return {
-      ...item,
-      current_step: selectNextFamilyWork(stepsByFamily.get(item.id) ?? []),
-    };
+  const { data, error } = await client.rpc("get_family_next_work", {
+    p_family_ids: items.map((item) => item.id),
   });
+  if (error) throw new Error(error.message);
+  const parsed = nextWorkRowsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Could not load current family work. Refresh and try again.");
+  const byFamily = new Map(parsed.data.map((row) => [row.family_id, row.current_step]));
+  if (byFamily.size !== items.length || parsed.data.length !== items.length || items.some((item) => !byFamily.has(item.id))) {
+    throw new Error("Family access changed while loading. Refresh and try again.");
+  }
+  return items.map((item) => ({ ...item, current_step: byFamily.get(item.id)! }));
 }
 
 export async function getFamilyDetail(
@@ -199,15 +148,10 @@ export async function getFamilyDetail(
     return null;
   }
 
-  const [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
+  const [goalsRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
     await Promise.all([
     client
       .from("family_goals")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("sort_order", { ascending: true }),
-    client
-      .from("family_barriers")
       .select("*")
       .eq("family_id", familyId)
       .order("sort_order", { ascending: true }),
@@ -263,10 +207,16 @@ export async function getFamilyDetail(
         updated_at,
         resource:resources (
           id,
+          active,
+          is_demo,
+          updated_at,
           slug,
           program_name,
           office_or_department,
           category,
+          description,
+          services_select_all,
+          additional_info,
           primary_contact_name,
           primary_contact_title,
           primary_contact_email,
@@ -282,63 +232,17 @@ export async function getFamilyDetail(
         )
       `,
     ).eq("family_id", familyId),
-    client
-      .from("plans")
-      .select(
-        "id, family_id, version, summary, generation_source, ai_model, created_at, client_display, generation_state",
-      )
-      .eq("family_id", familyId)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    client.rpc("get_family_plan_snapshot", { p_family_id: familyId }),
   ]);
 
-  let plan: PlanWithSteps | null = null;
-  if (planRes.data) {
-    const p = planRes.data as PlanRow;
-    const { data: stepsData } = await client
-      .from("plan_steps")
-      .select("*")
-      .eq("plan_id", p.id)
-      .order("sort_order", { ascending: true });
-
-    const stepIds = (stepsData ?? []).map((s) => s.id);
-    const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
-    if (stepIds.length > 0) {
-      const { data: actionItems } = await client
-        .from("plan_step_action_items")
-        .select("*")
-        .in("plan_step_id", stepIds)
-        .order("sort_order", { ascending: true });
-      for (const ai of actionItems ?? []) {
-        const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
-        list.push(ai as PlanStepActionItemRow);
-        actionItemsByStep.set(ai.plan_step_id, list);
-      }
-    }
-
-    const stepsWithItems = (stepsData ?? []).map((s) => ({
-      ...s,
-      action_items: actionItemsByStep.get(s.id) ?? [],
-    })) as PlanStepRow[];
-
-    plan = {
-      ...p,
-      steps: stepsWithItems,
-      presentation: buildPlanPresentation(p),
-    };
+  for (const res of [goalsRes, membersRes, notesRes, progressRes, matchesRes, planRes]) {
+    if (res.error) throw new Error(res.error.message);
   }
+  if (!planRes.data) return null;
+  const snapshot = planRes.data as { family: FamilyDetail; barriers: FamilyBarrierRow[]; plan: PlanWithSteps | null };
+  const plan = snapshot.plan ? { ...snapshot.plan, presentation: buildPlanPresentation(snapshot.plan) } : null;
 
-  for (const res of [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes]) {
-    if (res.error) {
-      throw new Error(res.error.message);
-    }
-  }
-  if (planRes.error) {
-    throw new Error(planRes.error.message);
-  }
-
-  const f = fam as unknown as FamilyDetail & {
+  const f = { ...fam, ...snapshot.family } as unknown as FamilyDetail & {
     creator: { email: string } | { email: string }[] | null;
   };
   const creatorRaw = f.creator;
@@ -358,7 +262,7 @@ export async function getFamilyDetail(
     updated_at: f.updated_at,
     creator,
     goals: (goalsRes.data ?? []) as FamilyGoalRow[],
-    barriers: (barriersRes.data ?? []) as FamilyBarrierRow[],
+    barriers: snapshot.barriers,
     members: (membersRes.data ?? []) as FamilyMemberRow[],
     caseNotes: normalizeCaseNotes(notesRes.data ?? []),
     progressUpdates: normalizeProgressUpdates(progressRes.data ?? []),

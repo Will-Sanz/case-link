@@ -18,6 +18,12 @@ function state(phases: PlanGenerationState["phases_complete"]): PlanGenerationSt
 }
 
 describe("generation progress", () => {
+  it("finishes a single-plan job after its sole persisted batch without inventing later phases", () => {
+    const single = { ...state({ "30": true, "60": false, "90": false }), generation_strategy: "single" as const };
+    expect(completedGenerationStageCount(single)).toBe(1);
+    expect(pendingPhaseFromPersistedCounts({ "30": 1, "60": 0, "90": 0 }, "single")).toBeNull();
+    expect(pendingPhaseFromPersistedCounts({ "30": 0, "60": 0, "90": 0 }, "single")).toBe("30");
+  });
   it("counts only stages that have been persisted", () => {
     expect(
       completedGenerationStageCount(
@@ -31,6 +37,9 @@ describe("generation progress", () => {
     [{ "30": 2, "60": 0, "90": 0 }, "60"],
     [{ "30": 2, "60": 2, "90": 0 }, "90"],
     [{ "30": 2, "60": 2, "90": 1 }, null],
+    [{ "30": 0, "60": 2, "90": 1 }, "30"],
+    [{ "30": 2, "60": 0, "90": 1 }, "60"],
+    [{ "30": 0, "60": 0, "90": 1 }, "30"],
   ] as const)("recovers the next stage from persisted row counts", (counts, expected) => {
     expect(pendingPhaseFromPersistedCounts(counts)).toBe(expected);
   });

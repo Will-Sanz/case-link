@@ -1,0 +1,241 @@
+{
+  "createdAt": "2026-10-15T00:43:58.149Z",
+  "project": "zpfypkizsapvsxeykmdq",
+  "file": "Operator-private encrypted backup; exact path recorded in the local recovery index.",
+  "keychainService": "CaseLink database backup",
+  "archiveSha256": "0f77cb53f905b548d49d491bb76d733bd5b912423da7f34d8c5c7ef5a6c56e62",
+  "encryptedSha256": "18d1cb4b8937168df428f69da223e766be08ce179601b95043f31ada135d15b2",
+  "bytes": 736896,
+  "tables": [
+    {
+      "table": "auth.audit_log_entries",
+      "rows": 0
+    },
+    {
+      "table": "auth.custom_oauth_providers",
+      "rows": 0
+    },
+    {
+      "table": "auth.flow_state",
+      "rows": 16
+    },
+    {
+      "table": "auth.identities",
+      "rows": 13
+    },
+    {
+      "table": "auth.instances",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_amr_claims",
+      "rows": 10
+    },
+    {
+      "table": "auth.mfa_challenges",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_factors",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_recovery_code_sets",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_recovery_codes",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_authorizations",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_client_states",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_clients",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_consents",
+      "rows": 0
+    },
+    {
+      "table": "auth.one_time_tokens",
+      "rows": 0
+    },
+    {
+      "table": "auth.refresh_tokens",
+      "rows": 48
+    },
+    {
+      "table": "auth.saml_providers",
+      "rows": 0
+    },
+    {
+      "table": "auth.saml_relay_states",
+      "rows": 0
+    },
+    {
+      "table": "auth.schema_migrations",
+      "rows": 82
+    },
+    {
+      "table": "auth.scim_tokens",
+      "rows": 0
+    },
+    {
+      "table": "auth.scim_users",
+      "rows": 0
+    },
+    {
+      "table": "auth.sessions",
+      "rows": 10
+    },
+    {
+      "table": "auth.sso_domains",
+      "rows": 0
+    },
+    {
+      "table": "auth.sso_providers",
+      "rows": 0
+    },
+    {
+      "table": "auth.users",
+      "rows": 13
+    },
+    {
+      "table": "auth.webauthn_challenges",
+      "rows": 0
+    },
+    {
+      "table": "auth.webauthn_credentials",
+      "rows": 0
+    },
+    {
+      "table": "public.activity_log",
+      "rows": 283
+    },
+    {
+      "table": "public.app_users",
+      "rows": 11
+    },
+    {
+      "table": "public.barrier_plan_records",
+      "rows": 24
+    },
+    {
+      "table": "public.case_notes",
+      "rows": 5
+    },
+    {
+      "table": "public.case_progress_updates",
+      "rows": 0
+    },
+    {
+      "table": "public.families",
+      "rows": 44
+    },
+    {
+      "table": "public.family_barriers",
+      "rows": 125
+    },
+    {
+      "table": "public.family_case_managers",
+      "rows": 0
+    },
+    {
+      "table": "public.family_goals",
+      "rows": 19
+    },
+    {
+      "table": "public.family_members",
+      "rows": 4
+    },
+    {
+      "table": "public.plan_step_action_items",
+      "rows": 1696
+    },
+    {
+      "table": "public.plan_step_activity",
+      "rows": 0
+    },
+    {
+      "table": "public.plan_step_resources",
+      "rows": 0
+    },
+    {
+      "table": "public.plan_steps",
+      "rows": 726
+    },
+    {
+      "table": "public.plans",
+      "rows": 66
+    },
+    {
+      "table": "public.referrals",
+      "rows": 0
+    },
+    {
+      "table": "public.resource_import_runs",
+      "rows": 1
+    },
+    {
+      "table": "public.resource_matches",
+      "rows": 961
+    },
+    {
+      "table": "public.resources",
+      "rows": 54
+    },
+    {
+      "table": "public.tasks",
+      "rows": 0
+    },
+    {
+      "table": "storage.buckets",
+      "rows": 0
+    },
+    {
+      "table": "storage.buckets_analytics",
+      "rows": 0
+    },
+    {
+      "table": "storage.buckets_vectors",
+      "rows": 0
+    },
+    {
+      "table": "storage.migrations",
+      "rows": 74
+    },
+    {
+      "table": "storage.objects",
+      "rows": 0
+    },
+    {
+      "table": "storage.s3_multipart_uploads",
+      "rows": 0
+    },
+    {
+      "table": "storage.s3_multipart_uploads_parts",
+      "rows": 0
+    },
+    {
+      "table": "storage.vector_indexes",
+      "rows": 0
+    },
+    {
+      "table": "supabase_migrations.schema_migrations",
+      "rows": 1
+    }
+  ],
+  "tlsCertificateVerified": true,
+  "consistentSnapshot": true,
+  "archiveExpansionPassed": true,
+  "encryptionRoundTripPassed": true,
+  "credentialsPrintedOrPersisted": false,
+  "restorationPending": true
+}

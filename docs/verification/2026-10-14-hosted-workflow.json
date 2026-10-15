@@ -1,0 +1,58 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "deployment": "dpl_39WQKNjvjB8w3x9WLhgtfEjzq2yd",
+  "commit": "bd533c8ba46ee8c88f11a3a30b678c520f7d4261",
+  "startedAt": "2026-10-14T22:42:32.847Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "Short-lived preview credential available",
+    "No application/provider secrets injected into browser runner",
+    "Protected immutable preview login returns 200",
+    "Preview access stays on exact staging origin",
+    "Staging operator is authenticated",
+    "Operator key belongs to the fixed staging key identifier",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Minimal hosted intake persists without a description",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "No invented phone or email in the no-directory draft",
+    "Hosted generated plan passes automated accessibility checks",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Live assistant produces a substantive answer",
+    "No unhandled browser application errors",
+    "Hosted browser logout returns to sign-in"
+  ],
+  "timings": {
+    "generationMilliseconds": 21573,
+    "actionRefinementMilliseconds": 3911,
+    "fullRefinementMilliseconds": 5480,
+    "assistantMilliseconds": 4383
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "pdf": {
+    "pages": 2,
+    "sha256": "7beb54e963a69b0981d85768f9e24deb1812c3af0b6e02b936f8e13ff5b2865d",
+    "bytes": 9007
+  },
+  "finishedAt": "2026-10-14T22:43:47.794Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "9c66d035d2d711a5d2e6490014dc96505b4a1b7a675ff324c0ac6e926771eba2",
+  "functionalWorkflowPassed": true,
+  "pdfVisualAcceptance": false,
+  "pdfVisualFinding": "Task text overlaps footer at a page break. Reproduced and fixed separately in 2026-10-14-pdf-page-boundary.json; this original deployment did not contain the fix.",
+  "generatedSteps": 3
+}

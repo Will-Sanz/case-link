@@ -1,0 +1,76 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://www.thecaselink.com",
+  "commit": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "startedAt": "2026-10-15T20:23:20.924Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Public canonical production login returns 200",
+    "Browser stays on the canonical production origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Operator credential matches exact production project and role",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description",
+    "One saved plan after live hosted generation",
+    "One coherent plan job completes",
+    "Production generation uses the evaluated Sol model",
+    "Live generated steps persist",
+    "Production directory is available for contact provenance checks",
+    "Generated directory contacts exactly match saved public resource contacts",
+    "Hosted generated plan passes automated accessibility checks",
+    "Family priorities and constraints persist and appear beside the draft"
+  ],
+  "timings": {
+    "generationMilliseconds": 53328
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "protection": {
+    "providerTestingCredentialUsed": false,
+    "caseLinkSignInRequired": true,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "generationModel": "gpt-6.1-sol",
+  "generatedGoals": 2,
+  "visibleAlerts": [
+    ""
+  ],
+  "visibleButtons": [
+    "Record meeting progress",
+    "Ask about this plan",
+    "Refine plan with AI",
+    "Mark plan reviewed",
+    "Follow up pending food support",
+    "Review current food needs with the family and follow up the existing application without restarting it.\n\nPlanned tasks include Confirm the agreed transport and food-access next step; Support existing application follow-up; and Check interim food options if needed.",
+    "Add documents the client will need\u2026",
+    "Expected outcome: The family understands the application's next steps and any verified interim food options.",
+    "Refine action",
+    "Remove action",
+    "Cancel",
+    "Saving\u2026",
+    "Address uncovered school travel",
+    "Build on the relative's twice-weekly transport help and identify feasible options for uncovered school trips.\n\nPlanned tasks include Confirm school travel gaps; and Review feasible school travel options.",
+    "Edit action",
+    "Add action"
+  ],
+  "failure": {
+    "stage": "edit recovery and save",
+    "type": "Error",
+    "message": "expect(locator).toBeVisible() failed"
+  },
+  "finishedAt": "2026-10-15T20:25:14.167Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "4ecc4bdc56c06664fed81c3914e86601b0c52817d427b703ec795eca145948fa",
+  "interpretation": "The first public walkthrough stopped at the default five-second visibility assertion while the UI still showed Saving. Production save timing is unresolved until the measured rerun. Cleanup succeeded; no browser or server error appeared during this attempt."
+}
