@@ -12,6 +12,10 @@ import { addCalendarDays, schoolDate } from "../src/lib/dates";
 import { selectNextFamilyWork } from "../src/lib/domain/family-workspace/next-work";
 import type { PlanWithSteps } from "../src/types/family";
 import { updatePlanStepSchema, updatePlanStepActionItemSchema } from "../src/lib/validations/plans";
+import { buildPlanningSnapshot } from "../src/lib/plan-generator/planning-brief";
+import { sparseDetailsForPersistence } from "../src/lib/plan-generator/lean-plan-schema";
+import { directoryCase } from "../tests/fixtures/directory-case";
+import { generatedPlanStep } from "../tests/fixtures/plan-contract";
 
 const databaseUrl = process.env.CASELINK_DB_SECURITY_TEST_URL
   ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
@@ -302,6 +306,25 @@ async function checkContactProvenance() {
     currentRevision = await revisionFor(userA,family); await expectDbError(approve,'historical unverified contacts prevent approval');
     await save([]); currentRevision = await revisionFor(userA,family); await approve();
     assert.equal(await exportable(await revisionFor(userA,family)),true,'explicit removal permits a contact-free reviewed plan');
+
+    await admin.query("update public.resources set primary_contact_phone='215-555-0148',primary_contact_email='intake@example.test' where id=$1",[resource]);
+    const detail = directoryCase(); detail.id = family;
+    detail.resourceMatches[0].resource = (await admin.query("select to_jsonb(r) value from public.resources r where id=$1",[resource])).rows[0].value;
+    const snapshot = buildPlanningSnapshot(detail);
+    const state = {v:1,status:'running',pending_phase:'30',input_snapshot:snapshot,phases_complete:{'30':false,'60':false,'90':false},models_used:[],stage_timings_ms:{},ai_mode:'fast'};
+    assert.equal((await admin.query("select public.contains_direct_identifier($1) blocked",[JSON.stringify(state)])).rows[0].blocked,false,'generation state excludes directory identifiers');
+    const started = (await asUser(userA,client=>client.query("select public.start_staged_plan_generation($1,$2) result",[family,JSON.stringify(state)]))).rows[0].result;
+    const lease = randomUUID();
+    assert.equal((await asUser(userA,client=>client.query("select public.claim_ai_job($1,'staged-plan-advance',$2,600) claimed",[family,lease]))).rows[0].claimed,true);
+    const details = sparseDetailsForPersistence({...generatedPlanStep,resource_ids:[resource]},snapshot.resource_catalog);
+    const rows = [{phase:'30',title:'Confirm intake options',description:'Discuss next steps',sort_order:0,priority:'medium',details,
+      action_items:[{title:'Confirm intake availability',description:null,week_index:1,sort_order:0,target_date:'2026-10-20'}]}];
+    const nextState = {...state,pending_phase:'60',phases_complete:{...state.phases_complete,'30':true}};
+    await asUser(userA,client=>client.query("select public.append_staged_plan_phase($1,$2,'30',$3,$4,'gpt-test',25,$5)",[family,started.planId,JSON.stringify(rows),JSON.stringify(nextState),lease]));
+    const generated = await snapshotFor(userA,family);
+    assert.equal(generated.plan.id,started.planId);
+    assert.deepEqual(generated.plan.steps[0].details.contacts,[{...details.contacts![0],phone:'215-555-0148',email:'intake@example.test'}],'staged generation resolves current source contacts without storing them in its snapshot');
+    assert.deepEqual(generated.plan.generation_state.input_snapshot,snapshot);
   } finally {
     await admin.query("delete from public.families where id=$1",[family]);
     await admin.query("delete from public.resources where id=$1",[resource]);

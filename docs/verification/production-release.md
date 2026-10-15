@@ -1,5 +1,7 @@
 # Production release checkpoint — October 15, 2026
 
+**Latest checkpoint, 03:25 UTC:** the user approved existing authenticated testing access. That access worked without a new bypass secret or protection change. The candidate then failed plan creation because its saved directory snapshot contained phone/email identifiers. The shared snapshot fix and 103 focused tests pass; a production standard-staff database regression proves correct plan start and canonical contacts. Full CI and a new candidate are pending. **Do not promote the old `7c9af9e` candidate.**
+
 The narrow PDF, password-only account and Settings hydration fixes are implemented. The complete hosted staging workflow and account/recovery checks pass. The production database, email templates and future-deployment settings are upgraded. The live application has **not** been switched.
 
 | Item | Recorded state |
@@ -21,12 +23,12 @@ A staging routing rollback rehearsal now passes: the stable preview moved from `
 
 ## Immediate remaining release work
 
-1. Obtain the pending approval for Vercel's authenticated testing access to the protected candidate. The initial short-lived OIDC attempt failed at entry before account creation or application requests. Automatic approval review rejected the proposed official-CLI cookie probe before execution because that specific access method was not approved. Do not disable protection, create a new bypass secret, or use an indirect workaround.
-2. After approval, test the exact production candidate with disposable **standard staff** and cases: password login, intake, the preserved 54-resource directory, live AI generation/refinements/assistant, edits, human review and actual PDF. Check saved contacts against current matched directory sources and inspect the PDF. Production administrator creation was separately rejected and removed from the runner; staging/CI already cover administrators. Preserve every pre-existing account/resource and clean up only the test fixtures.
+1. The user approved existing authenticated testing access; the official CLI cookie path succeeded. The first real production-directory workflow found the plan-start defect recorded above. Check full CI for its fix and build a new exact-SHA production candidate without canonical-domain assignment. Do not disable protection or create a new bypass secret.
+2. Test the newly fixed exact production candidate with disposable **standard staff** and cases: password login, intake, the preserved 54-resource directory, live AI generation/refinements/assistant, edits, human review and actual PDF. Check saved contacts against current matched directory sources and inspect the PDF. Production administrator creation was separately rejected and removed from the runner; staging/CI already cover administrators. Preserve every pre-existing account/resource and clean up only the test fixtures.
 3. Promote this production build only after those checks pass. Never promote the staging Preview, which contains staging credentials. Verify the canonical site's headers/routing and synthetic workflow, inspect content-free error logs and observe at least 30 minutes. Record the actual deployment ID and exact source.
 4. Establish a compatible application recovery candidate and verify switching behavior. Do not blindly roll back to the old live build or reverse the database upgrade. It predates the new schema/guards and retains old environment snapshots. The verified encrypted database recovery point is separate from app rollback.
 
-The user authorized the controlled release but has not yet answered the specific protected-test-access question. No promotion or app rollback has occurred. Do not claim that the live site is fixed or the pilot is launched. No school staff are invited.
+The user authorized the controlled release and explicitly approved the protected-test-access method. No promotion or app rollback has occurred. Do not claim that the live site is fixed or the pilot is launched. No school staff are invited.
 
 ## Remaining operating/school decisions
 

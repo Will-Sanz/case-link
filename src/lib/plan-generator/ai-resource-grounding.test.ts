@@ -38,7 +38,10 @@ beforeEach(() => vi.mocked(createAiResponse).mockReset());
 describe.each(paths)("%s directory grounding", path => {
   it("selects source facts without sending contact values or legacy contacts to AI", async () => {
     vi.mocked(createAiResponse).mockResolvedValue({ok:true,model:"test",text:JSON.stringify(reply(path,[directoryId]))});
-    expect(await run(path,directoryCase())).toMatchObject({ok:true,contacts:[{source_resource_id:directoryId,phone:"215-555-0148",email:"intake@example.test"}]});
+    const result = await run(path,directoryCase());
+    expect(result).toMatchObject({ok:true,contacts:[{source_resource_id:directoryId}]});
+    if (path === "generation") expect(JSON.stringify(result)).not.toMatch(/215-555|intake@/);
+    else expect(result).toMatchObject({contacts:[{phone:"215-555-0148",email:"intake@example.test"}]});
     const payload = JSON.stringify(vi.mocked(createAiResponse).mock.calls[0][0]);
     expect(payload).not.toMatch(/215-555|intake@|legacy@|Directoryperson|Legacy person/);
   });

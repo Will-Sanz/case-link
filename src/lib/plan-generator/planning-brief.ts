@@ -47,7 +47,8 @@ function snapshotRevision(snapshot: Omit<PlanGenerationSnapshot, "revision">): s
 }
 
 export function buildPlanningSnapshot(detail: FamilyDetail, feedback?: string, now = new Date()): PlanGenerationSnapshot {
-  const catalog = planResourceCatalog(detail.resourceMatches, 6);
+  // The database resolves verified contact facts when saving a step; job state must contain no identifiers.
+  const catalog = planResourceCatalog(detail.resourceMatches, 6).map(entry => ({ ...entry, phone: null, email: null }));
   const content = {
     family_id: detail.id, captured_at: now.toISOString(), brief: buildPlanningBrief(detail, feedback),
     resources: formatResourceCatalog(catalog, matchesForPlanContext(detail.resourceMatches, detail.resourceMatches.length).length - catalog.length), resource_catalog: catalog,

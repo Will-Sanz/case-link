@@ -121,6 +121,8 @@ describe("one durable planning snapshot", () => {
     expect(snapshot.resources).not.toContain("215-555");
     expect(snapshot.resources).not.toContain("staff@example.test");
     expect(snapshot.resources).not.toContain("Changed resource");
+    expect(JSON.stringify(snapshot)).not.toMatch(/215-555|staff@example\.test/);
+    expect(snapshot.resource_catalog[0]).toMatchObject({ id: detail.resourceMatches[0].resource!.id, updated_at: stamp, phone: null, email: null });
   });
 
   it("rejects missing, edited, or cross-family snapshots", () => {

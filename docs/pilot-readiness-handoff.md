@@ -23,19 +23,23 @@ Background only: no foreground apps, visible tabs, file/review/preview panels or
 
 Full CI **38666170553** and CodeQL **38666170540** subsequently passed at **123b74e**. A staging routing rollback from that deployment to the verified `7c9af9e` and back also passed health/login, sign-in enforcement, HSTS and the staging connection boundary. The production alias stayed unchanged. See `docs/verification/2026-10-15-staging-rollback.json`; production rollback compatibility is still distinct.
 
+## Latest: production-directory defect found and fixed
+
+The user explicitly approved existing authenticated testing access. It succeeded without any protection changes/new bypass secret. The candidate `7c9af9e` then failed plan creation: the saved resource catalog included phone/email identifiers, correctly rejected by database privacy checks. The shared snapshot now strips those contact values; existing source/version checks and database canonicalization restore exact contacts on step save. A before-fix regression failed; 103 focused tests, typecheck/lint and a disposable standard-staff production database regression passed. Full remote CI and a new exact-source hosted candidate are required. Do not promote `7c9af9e`. See the two `2026-10-15-production-*-regression/failure` records and CL-23.
+
 ## Live release is still pending
 
 Production candidate **`dpl_2bGrr5VGVTrqdRtwRzGq2tu57zpi`** is READY at `https://case-link-p0ljvv1lh-will-sanzs-projects.vercel.app`. It is a Git-source build of exact app commit `7c9af9e`, **target production**, made with `autoAssignCustomDomains: false`.
 
 The canonical **`www.thecaselink.com`** still points to **`dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW`**, old source `e0cb389feaa0096175b33f05602ed72f0041c467`. The database is upgraded but the old application has not been certified against it. Do not tell the user the live site is fixed or the pilot is ready. Do not blindly roll back to that old build after release.
 
-The candidate's headless entry failed because the staging OIDC testing path does not authorize protected Production. It stopped before any account or application request. Automatic approval review then rejected the official CLI test-access-cookie probe before execution. A specific question is pending: allow Vercel authenticated testing access for this temporary candidate browser, without disabling protection or creating a new bypass secret. **Do not work around that rejection or proceed until the user answers.**
+The candidate's headless entry failed because the staging OIDC testing path does not authorize protected Production. It stopped before any account or application request. Automatic approval review then rejected the official CLI test-access-cookie probe before execution. The user subsequently approved that exact existing-access method; the probe and login passed. No protection settings or bypass secrets changed. The subsequent plan-start failure supersedes the original candidate readiness.
 
 Automatic review separately rejected creating a synthetic administrator in production. That step was removed from the prepared runner; safer standard-staff verification passed. Administrator tests remain in staging/CI. Do not restore the rejected production-admin step.
 
-## Next actions after the pending test-access approval
+## Next actions after the directory fix
 
-1. Use the authorized existing Vercel access only. Check the official CLI probe first; do not create a new bypass secret if none exists. The prepared probe is `/tmp/caselink-production-protection-probe.mjs`. Its output is allowlisted metadata only. Do not print cookies/tokens or inject them into unrelated origins.
+1. Check full remote CI and create a new exact-source production candidate without canonical-domain assignment, then use the authorized existing Vercel access only. Check the official CLI probe first; do not create a new bypass secret if none exists. The prepared probe is `/tmp/caselink-production-protection-probe.mjs`. Its output is allowlisted metadata only. Do not print cookies/tokens or inject them into unrelated origins.
 2. Update the prepared **standard-staff-only** `/tmp/caselink-production-workflow.mjs` to use the approved access method and run it against the immutable production candidate. It uses disposable accounts/cases, preserves resources, checks current source contacts, exercises all four live AI paths and downloads a reviewed PDF. Inspect actual output and rendered PDF; record failures honestly, clean only those fixtures. The first blocked attempt is under `/tmp/caselink-production-workflow/result.json`.
 3. Promote only after production checks pass; verify canonical headers/routing/core workflow, inspect sanitized errors and observe 30 minutes. Establish/test a compatible rollback candidate without reversing the upgraded database or reviving old secret snapshots. Never promote the staging Preview.
 4. Record exact evidence in tracker/release doc, update draft PR, commit/push and inspect final CI. Leave school/resource/AI-usefulness acceptance and external operational gaps explicit.
