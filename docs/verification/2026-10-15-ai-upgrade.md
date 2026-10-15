@@ -1,6 +1,6 @@
 # AI preparation upgrade — October 15, 2026
 
-Status: **implemented and verified in isolated QA**. Tested application source: `f0ed2be84b77ea08706d00c5e8991a596b25cd68`. [Open QA](https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app/families). This change does not promote production or close school acceptance.
+Historical checkpoint: **implemented and verified in isolated QA before production approval**. The later authorized rollout is recorded in [the current production release](production-release.md). Tested application source: `f0ed2be84b77ea08706d00c5e8991a596b25cd68`. [Open QA](https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app/families). This change does not promote production or close school acceptance.
 
 ## Behavior
 
@@ -36,7 +36,7 @@ One initial mixed-routing pilot run accepted 39/40 tasks. In the urgent-safety f
 
 ## QA database
 
-The two new migrations were applied transactionally only to `umnbyupudhunyccqhyrp`, bringing it to 43 migrations. Stored hashes match the reviewed source. Existing function privileges and retained account/family/plan/resource counts were asserted unchanged; anonymous execution of manual handoff is denied. [Migration evidence](ai-upgrade/qa-migrations.json).
+At this QA checkpoint, the two new migrations had been applied transactionally only to `umnbyupudhunyccqhyrp`, bringing it to 43 migrations. Stored hashes match the reviewed source. Existing function privileges and retained account/family/plan/resource counts were asserted unchanged; anonymous execution of manual handoff is denied. [Migration evidence](ai-upgrade/qa-migrations.json).
 
 ## Verification and remaining acceptance
 
@@ -52,4 +52,4 @@ The final pilot prose review found no critical defect in 20 generation/assistant
 
 The final immutable QA deployment `dpl_G8D56sndRGkYosU6eWTLU4U9CAq3` passed the complete background browser workflow, including eight real provider calls with returned model `gpt-6.1-sol`. Generation to the visible saved plan took 22.8 seconds; narrow/full revision previews took 5.0/8.1 seconds. Both record pages and the one-page family takeaway were visually checked. No unhandled browser error or Vercel error-level entry occurred in the test window. All disposable synthetic data/accounts were removed. [Final hosted checks](ai-upgrade/hosted-final.json), [provider evidence](ai-upgrade/hosted-final-routing.json), [content and visual review](ai-upgrade/hosted-final-content.json).
 
-The shared QA alias was explicitly moved from its old deployment to this tested build and read back. Its health route returns 200 and its security policy names the isolated staging database. The production alias still points to `dpl_FesLWbGr9B5jYCs1gwQYpdEtb7uL`, source `2dfb8b83ce93b60e1a8bdc859f65d240d0eb821c`. [Deployment/CI checkpoint](ai-upgrade/deployment-checkpoint.json), [QA health](ai-upgrade/qa-link-health.json). The PR stays draft and unmerged; evidence-only commits do not imply a new application release. The broader action plan for email, calls and forms is in [agentic preparation and execution research](../agentic-pdf-service-research.md). School staff must still assess real usefulness and agree permitted data and operating practice. Automated checks and synthetic reviews cannot establish 100% reliability or replace the case manager's judgment.
+The shared QA alias was explicitly moved from its old deployment to this tested build and read back. Its health route returns 200 and its security policy names the isolated staging database. At this pre-production checkpoint, the production alias pointed to `dpl_FesLWbGr9B5jYCs1gwQYpdEtb7uL`, source `2dfb8b83ce93b60e1a8bdc859f65d240d0eb821c`. [Deployment/CI checkpoint](ai-upgrade/deployment-checkpoint.json), [QA health](ai-upgrade/qa-link-health.json). The PR stays draft and unmerged; evidence-only commits do not imply a new application release. The broader action plan for email, calls and forms is in [agentic preparation and execution research](../agentic-pdf-service-research.md). School staff must still assess real usefulness and agree permitted data and operating practice. Automated checks and synthetic reviews cannot establish 100% reliability or replace the case manager's judgment.

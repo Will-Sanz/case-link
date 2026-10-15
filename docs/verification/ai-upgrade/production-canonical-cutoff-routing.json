@@ -1,0 +1,20 @@
+{
+  "deploymentId": "dpl_BtUijxvxRbopdJ5Ebr214t36grWU",
+  "commit": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "scope": "Successful generation call from the first public attempt, which later stopped at its five-second save assertion. This call is retained even though the browser attempt failed.",
+  "records": [
+    {
+      "route": "generateCompletePlan",
+      "taskType": "plan_generation",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:24:15.975Z",
+      "estimatedUsd": 0.0133686,
+      "elapsedMs": 20707,
+      "ok": true
+    }
+  ],
+  "calls": 1,
+  "estimatedUsd": 0.0133686
+}

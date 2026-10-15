@@ -1,0 +1,163 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://www.thecaselink.com",
+  "commit": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "startedAt": "2026-10-15T20:26:06.031Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Public canonical production login returns 200",
+    "Browser stays on the canonical production origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Operator credential matches exact production project and role",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description",
+    "One saved plan after live hosted generation",
+    "One coherent plan job completes",
+    "Production generation uses the evaluated Sol model",
+    "Live generated steps persist",
+    "Production directory is available for contact provenance checks",
+    "Generated directory contacts exactly match saved public resource contacts",
+    "Hosted generated plan passes automated accessibility checks",
+    "Family priorities and constraints persist and appear beside the draft",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Family list resumes the next saved action",
+    "Returning staff reaches their plan without revisiting intake",
+    "Selected narrow title revision is actually saved",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Current saved step title is available for a precise refinement request",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "Selected full-plan title revision is actually saved",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Family takeaway selection passes automated accessibility checks",
+    "Family takeaway has its own title and file",
+    "Family PDF text can be read",
+    "Family PDF includes selected next step and excludes private notes and context",
+    "Family takeaway fits a narrow screen",
+    "Changing family selection removes the prior downloadable document",
+    "Live assistant produces a substantive answer",
+    "Draft an outreach email produces a reviewable answer",
+    "Prepare a call script produces a reviewable answer",
+    "Review a meeting update produces a reviewable answer",
+    "Outreach and meeting assistance do not mutate saved actions",
+    "Assistant preparation passes automated accessibility checks",
+    "Identifying input is rejected and the question stays editable",
+    "Corrected question succeeds after a rejected request",
+    "No unhandled browser application errors",
+    "Hosted browser logout returns to sign-in"
+  ],
+  "timings": {
+    "generationMilliseconds": 23451,
+    "actionRefinementMilliseconds": 5533,
+    "fullRefinementMilliseconds": 10104,
+    "assistantMilliseconds": 9455
+  },
+  "saveMilliseconds": [
+    861,
+    883
+  ],
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": true,
+  "protection": {
+    "providerTestingCredentialUsed": false,
+    "caseLinkSignInRequired": true,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "generationModel": "gpt-6.1-sol",
+  "generatedGoals": 2,
+  "pdf": {
+    "pages": 2,
+    "sha256": "496588ae9846a2207e398b6a4a90db64750aac89b88119f60f41d4f83d163fe1",
+    "bytes": 7059
+  },
+  "familyPdf": {
+    "pages": 1,
+    "bytes": 2689,
+    "sha256": "5c72ee8efb402b22106c1cce325a4694e050482e856893747ca0ff180331873b"
+  },
+  "finishedAt": "2026-10-15T20:28:40.671Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "c47bfd60e0faa665d98934331edad227e4958eda2a8de8881c0f333999e17476",
+  "networkSummary": {
+    "recordedRequests": 430,
+    "statusCounts": {
+      "200": 296
+    },
+    "failureCounts": {
+      "net::ERR_ABORTED": 134
+    },
+    "completedSlowRequests": [
+      {
+        "stage": "live action refinement",
+        "path": "/families/[synthetic-id]/plan",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 5454
+      },
+      {
+        "stage": "live full-plan refinement",
+        "path": "/families/[synthetic-id]/plan",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 10034
+      },
+      {
+        "stage": "live case assistant",
+        "path": "/families/[synthetic-id]/assistant",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 9102
+      },
+      {
+        "stage": "assistant preparation workflows",
+        "path": "/families/[synthetic-id]/assistant",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 13092
+      },
+      {
+        "stage": "assistant preparation workflows",
+        "path": "/families/[synthetic-id]/assistant",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 13768
+      },
+      {
+        "stage": "assistant preparation workflows",
+        "path": "/families/[synthetic-id]/assistant",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 12886
+      },
+      {
+        "stage": "assistant failed request recovery",
+        "path": "/families/[synthetic-id]/assistant",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 5288
+      }
+    ],
+    "interpretation": "Request cancellation events include route transitions, prefetches and PDF blob navigation; the full trace remains private. No claim is made that every cancelled request is a server error or that none occurred. Saved-record, PDF and visible-response assertions passed."
+  }
+}

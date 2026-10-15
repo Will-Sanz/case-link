@@ -141,7 +141,7 @@ The October 14 pilot decision removes CaseLink 2FA. The former authenticator enr
 
 ### Rollback
 
-The October 15 first verified production baseline is `dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8` at source `9e7d0e2`, with 41 migrations through `20261015143343`. Verify compatibility with the schema and secret scopes in effect at the time of any future rollback. The old pre-upgrade `e0cb389` build is not a certified recovery target. Staging routing rollback/restoration and the original encrypted logical restore were separately verified; see the [release evidence](verification/production-release.md).
+The October 15 AI release is `dpl_BtUijxvxRbopdJ5Ebr214t36grWU` at source `59ef91349f0076c1f3d70a515277915a645facd5`, with 43 migrations through `20261015191247`. Retain both new migrations during application rollback. The prior `2dfb8b83` deployment (`dpl_FesLWbGr9B5jYCs1gwQYpdEtb7uL`) can read/edit completed plans and continue legacy drafts, but cannot reliably resume unfinished compact drafts or parse their richer saved context. Before reverting, prevent new generation starts and confirm no unfinished `generation_strategy=single` drafts or in-flight generation workers remain. Complete them in the new release, or have a case manager explicitly continue failed drafts manually. If safe draining is unavailable, keep generation unavailable and forward-fix. Never rewrite generation markers or delete drafts to force compatibility. Verify secret scopes as well. Historical builds are not unconditional recovery targets. See the [current release evidence](verification/production-release.md).
 
 1. Stop traffic or disable the affected feature when data integrity or confidentiality may be at risk.
 2. Roll application code back to the last known-good immutable deployment.

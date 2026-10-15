@@ -1,8 +1,12 @@
 # CaseLink pilot checkpoint — October 15, 2026
 
-## Later QA work: AI preparation upgrade
+## Current production release: AI preparation upgrade
 
-The later user-authorized AI upgrade is verified in isolated QA on source `f0ed2be84b77ea08706d00c5e8991a596b25cd68`. Its current status, model comparison, failures and final acceptance evidence are maintained in [the AI upgrade record](verification/2026-10-15-ai-upgrade.md). QA now has 43 migrations; the two additions enable compact generation and an explicit manual handoff after AI failure. These changes have not been promoted to production.
+The user explicitly authorized promotion. Production now serves source `59ef91349f0076c1f3d70a515277915a645facd5` at deployment `dpl_BtUijxvxRbopdJ5Ebr214t36grWU`, with 43 migrations. The exact production candidate, all eight model calls, saved edits, both PDFs and cleanup passed; the public-site workflow also passed with eight real Sol calls and sub-second measured saves. The 30-minute post-promotion observation passed 20:23–20:53 UTC: all 45 probes succeeded, with no warning/error/fatal log entries. The rollout is complete; no further autonomous release work is queued. Follow the current section of [production-release.md](verification/production-release.md), including its conditional rollback boundary. No further product changes or production promotion are needed to update evidence.
+
+## Earlier QA work: AI preparation upgrade
+
+The later user-authorized AI upgrade is verified in isolated QA on source `f0ed2be84b77ea08706d00c5e8991a596b25cd68`. Its current status, model comparison, failures and final acceptance evidence are maintained in [the AI upgrade record](verification/2026-10-15-ai-upgrade.md). QA now has 43 migrations; the two additions enable compact generation and an explicit manual handoff after AI failure. At this earlier checkpoint these changes had not yet been promoted; the current release is recorded above.
 
 The production alias was read back during this work at `dpl_FesLWbGr9B5jYCs1gwQYpdEtb7uL`, source `2dfb8b83ce93b60e1a8bdc859f65d240d0eb821c`. PR #15 remains draft and unmerged. The earlier release checkpoint below is historical; its source, migration counts and statement that no work is queued describe that earlier checkpoint.
 
