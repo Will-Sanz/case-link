@@ -1,6 +1,16 @@
 # Secret isolation and recovery — October 14, 2026
 
-CL-42 remains open. Local safeguards and the new branch-specific preview configuration are verified; live rotation, old deployment snapshots and full hosted verification remain open.
+CL-42 remains open for production AI use, provider key provenance/budgets, historical snapshots/exposure review and any authorized rotation. The current configuration below supersedes older observations.
+
+## October 15 current configuration
+
+Production now has eight verified Config values and one preserved write-only OpenAI Secret. The canonical origin is `https://www.thecaselink.com`; the database is `zpfypkizsapvsxeykmdq`. Production-only settings include single-tenant, invite-only, HSTS, explicit production environment and the approved project marker. `SUPABASE_SERVICE_ROLE_KEY` and `CASELINK_PDF_MODE` were removed from future web deployments. Preview remains branch-scoped to separate staging and its separate OpenAI Secret; Development has no remote credential entries. [Metadata/read-back](2026-10-15-production-environment.json).
+
+The production candidate `dpl_2bGrr5VGVTrqdRtwRzGq2tu57zpi` is READY with those values. Its application code is the tested `7c9af9e` commit. It has not been promoted; the canonical live address still serves the older deployment and its historical environment snapshot. No live secret was rotated or exposed. Existing production SMTP works: a recovery email reached the authorized owner inbox with SPF/DKIM and the correct canonical fragment-only link. The existing account password was unchanged.
+
+The short-lived development OIDC path used for staging did not authorize the protected production deployment. An official CLI test-access-cookie probe was rejected by automatic approval review before execution; it remains pending explicit approval. No new bypass credential or rule was created and protection remains enabled. A separate proposed synthetic production administrator was also rejected before execution; standard staff tests instead passed without granting administrator access. Do not silently reintroduce that administrator step into the final runner.
+
+The latest full CI includes 686 unit/component tests, seven browser scenarios, database/Auth/restore/legacy/PDF checks and secret scanning. This does not establish removal of historical local keys, old deployment snapshots, or a restricted off-machine recovery vault. Those remain documented operating work, not a reason to rotate live credentials without authorization.
 
 ## Background hosted-test credential boundary
 

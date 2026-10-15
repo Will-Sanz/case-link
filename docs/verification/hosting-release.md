@@ -1,5 +1,14 @@
 # Hosted release control — October 14, 2026
 
+## October 15 current release checkpoint
+
+The original database upgrade, logical backup/restore and production email/environment setup are complete; the historical steps below must not be mistaken for current blockers. Both projects have 40 migrations through `20261014230221`. The 44 approved demo families were removed while resources and accounts were preserved. See [executed upgrade](production-demo-upgrade.md).
+
+Application commit `7c9af9e` passed full CI, CodeQL, exact release preflight and hosted staging auth/AI/PDF checks. A production-scoped build of that exact commit is READY, without canonical-domain assignment. Final protected production browser verification, live AI/resource proof, promotion, compatible rollback and post-release observation remain pending. Automatic approval review requires explicit approval for the proposed authenticated test cookie. No protection rules were changed. [Current release identifiers and next steps](production-release.md).
+
+No paid plan, live secret rotation or school invitation occurred. Free-plan session limits/leaked-password screening, recurring/off-machine backup, budget/alert delivery and school acceptance remain operating decisions. The latest later checkpoint `1217e1d` also passed full CI `38665144461` and CodeQL `38665144419`, including 686 unit/component tests and seven browser scenarios; its changes after the application candidate are recovery tooling and evidence only.
+
+
 CL-41 remains open. Use the existing Vercel + Supabase deployment shape for this small pilot; Kubernetes adds no demonstrated requirement. No production deployment or promotion was performed.
 
 ## Observed and changed

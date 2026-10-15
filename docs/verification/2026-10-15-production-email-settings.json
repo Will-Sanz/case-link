@@ -1,0 +1,76 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "verifiedAt": "2026-10-15T01:19:48.007Z",
+  "templates": [
+    {
+      "file": "invite.html",
+      "sha256": "98075e1904df41424ec212338da7b7bbb3b48969654ef9f3b60e09181cc90ab5",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "recovery.html",
+      "sha256": "4e5c26b547b243016fa348b35fd8864f5e7d6ac9fe3073a41950a1729e2b0fc5",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "confirmation.html",
+      "sha256": "4e07f5f6a481facf290b7bd160fba02ef615393ea4949fc6390dc08d00880adf",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "magic_link.html",
+      "sha256": "23a9e84a433e5a9957c22d034b1e7bde84af44a5a647c995c2b5fbd922e19d39",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "email_change.html",
+      "sha256": "013cbb1af42e059cd54adc613458b216e1e509429a07ce400757cdd1624a3ce8",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "reauthentication.html",
+      "sha256": "e519034de3ac94eb65eb2c5ea97e80e767070b588f823d5a4aa1df3ec667f74b",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "password_changed_notification.html",
+      "sha256": "1a7bf5bcbb838bd4857be49ac718d7132978af6a191c7cf9d3bb8b5edff7b9e9",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "email_changed_notification.html",
+      "sha256": "75bca9b393515d23f76ba248750b92508a98da4f7a30581af412f94bc551c816",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "phone_changed_notification.html",
+      "sha256": "421db4a285c9c3dd8fcd40887243ce43eafdc215223e07168a5695f118bbb2cf",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "identity_linked_notification.html",
+      "sha256": "19989a767052b4a41091a74f3b80e5133312cb328aa2d20fd8df8cc3fae702e7",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "identity_unlinked_notification.html",
+      "sha256": "76107092764671258dd3b9338b8c40ee369ca1c1237012a4d37a79d1d10880c5",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "mfa_factor_enrolled_notification.html",
+      "sha256": "95eb44ce4c0e6223090f06245c6e972a538cde6f098f989a0131aa6da6e023d1",
+      "savedRenderedTextMatches": true
+    },
+    {
+      "file": "mfa_factor_unenrolled_notification.html",
+      "sha256": "97882021680cc76d0e355ba14921de201f142ce377897476602f31bc59962e7e",
+      "savedRenderedTextMatches": true
+    }
+  ],
+  "securityNoticesEnabled": 7,
+  "credentialsReadOrChanged": false,
+  "saveCorrections": [
+    "Initial immediate reload interrupted notification persistence; repeated save and verified after completion."
+  ]
+}
