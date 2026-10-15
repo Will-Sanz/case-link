@@ -1372,7 +1372,7 @@ export function FamilyPlanPanel({
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--color-ink-muted)]">
               {reviewStatus.state === "reviewed"
-                ? `Reviewed ${formatTargetDate(schoolDate(new Date(plan.client_display!.reviewedAt!)))}. Material edits will return the plan to Needs review.`
+                ? `Reviewed ${formatTargetDate(schoolDate(new Date(plan.client_display!.reviewedAt!)))}. Prepare a record PDF or choose steps for a family takeaway. Material edits require a new review.`
                 : reviewStatus.state === "needs_review"
                   ? "Dates are proposed until you confirm them. Check each goal and action; Waiting dates mean the next follow-up. Confirm the dates and plan before creating the PDF."
                   : reviewStatus.issue}

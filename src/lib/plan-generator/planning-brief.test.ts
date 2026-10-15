@@ -95,6 +95,15 @@ describe("one durable planning snapshot", () => {
     expect(brief.barriers).toHaveLength(60); expect(brief.stated_goals).toHaveLength(60);
   });
 
+  it("carries the family's saved priorities, strengths and practical limits into the AI request", async () => {
+    const detail = fixture();
+    detail.summary = "The family wants to keep the school routine steady. A relative helps with transport. Calls after work; an earlier application is waiting.";
+    const snapshot = buildPlanningSnapshot(detail, undefined, new Date(stamp));
+    expect(JSON.parse(snapshot.brief).summary).toBe(detail.summary);
+    await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30");
+    expect(vi.mocked(createAiResponse).mock.calls[0][0].input).toContain(detail.summary);
+  });
+
   it("includes completed outcomes on regeneration and identifies older history omitted from context", () => {
     const detail = fixture();
     detail.plan = { id: "old-plan", version: 2, steps: [{ title: "Housing", description: "Intake", status: "completed", action_items: [{ title: "Finish intake", status: "completed", notes: "Reviewed", outcome: "Intake accepted", target_date: "2026-10-12" }] } as PlanStepRow] } as FamilyDetail["plan"];

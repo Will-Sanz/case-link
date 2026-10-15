@@ -19,7 +19,7 @@
     "lint": "eslint --max-warnings=0",
     "test": "NODE_ENV=test vitest",
     "test:run": "NODE_ENV=test vitest run",
-    "test:pdf": "node --import tsx scripts/test-plan-pdfs.ts",
+    "test:pdf": "node --import tsx scripts/test-plan-pdfs.ts && node --import tsx scripts/test-family-takeaway-pdfs.ts",
     "test:e2e": "node tests/e2e/run.mjs",
     "test:ai-quality": "NODE_ENV=test vitest run --config vitest.ai.config.mts",
     "test:auth-security": "tsx scripts/test-auth-security.ts",

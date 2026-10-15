@@ -38,6 +38,29 @@ vi.mock("@/features/families/family-plan-panel", () => ({ FamilyPlanPanel: () =>
 
 const familyId = "20000000-0000-4000-8000-000000000002";
 
+it("keeps family context after generation failure, restores saved context, and shows it during review", async () => {
+  const context = "The family wants a steady school routine. A relative helps with transport. Calls after work; an earlier application is waiting.";
+  const initialResult = { familyId, referenceId: "Family 014", selectedBarriers: ["Housing"], additionalBarriers: "", additionalDetails: "", sections: [], resources: [], resourceStatus: "empty" as const, lastSavedAt: null };
+  const props = { familyId, familyUpdatedAt: "2026-10-13T12:00:00Z", familyName: "Family 014", barrierOptions: BARRIER_PRESETS, initialResult, plan: null };
+  vi.mocked(generateBarrierWorkflowForFamilyAction).mockResolvedValue({ ok: false, error: "Your case details were saved, but the plan could not be prepared." });
+  const view = render(<FamilyLiteWorkspace {...props} tab="overview" />);
+  const field = screen.getByRole("textbox", { name: /Family priorities and context/ });
+  expect(field.hasAttribute("required")).toBe(false);
+  expect(field.getAttribute("aria-describedby")).toContain("family-context-prompts");
+  fireEvent.change(field, { target: { value: context } });
+  fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
+  await screen.findByRole("alert");
+  expect(generateBarrierWorkflowForFamilyAction).toHaveBeenLastCalledWith(familyId, expect.objectContaining({ additionalDetails: context }));
+  expect((field as HTMLTextAreaElement).value).toBe(context);
+  view.unmount();
+
+  const reloaded = render(<FamilyLiteWorkspace {...props} initialResult={{ ...initialResult, additionalDetails: context }} tab="overview" />);
+  expect((screen.getByRole("textbox", { name: /Family priorities and context/ }) as HTMLTextAreaElement).value).toBe(context);
+  reloaded.rerender(<FamilyLiteWorkspace {...props} initialResult={{ ...initialResult, additionalDetails: context }} tab="plan" />);
+  expect(screen.getByText(context).closest("details")?.hasAttribute("open")).toBe(true);
+  expect(screen.getByText(/later context changes do not automatically update a draft/)).toBeTruthy();
+});
+
 it("displays and resubmits all intake labels and custom punctuation without changing their meaning", async () => {
   const labels = [...PRESET_BARRIERS.map(p => p.label), "Limited transport, evenings; weekends only"];
   const additionalBarriers = labels.join("\n");

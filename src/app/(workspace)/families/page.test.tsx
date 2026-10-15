@@ -20,7 +20,7 @@ vi.mock("@/lib/services/families", () => ({
 import FamiliesPage from "@/app/(workspace)/families/page";
 
 describe("FamiliesPage", () => {
-  it("opens a family on its profile landing page", async () => {
+  it.each(["pending", "blocked", null] as const)("opens current %s work directly and keeps a safe fallback when no action is open", async (status) => {
     const family = {
       id: "11111111-1111-4111-8111-111111111111",
       name: "Test household",
@@ -31,17 +31,20 @@ describe("FamiliesPage", () => {
       updated_at: "2026-08-02T12:00:00.000Z",
       created_by_id: "22222222-2222-4222-8222-222222222222",
       creator: null,
-      current_step: { id: "step", title: "Legacy goal", status: "pending", phase: "30", due_date: "2026-11-01T00:00:00+00:00", action_needed_now: "Review options" },
+      current_step: status ? { id: "step", title: "Legacy goal", status, phase: "30", due_date: "2026-11-01T00:00:00+00:00", action_needed_now: "Review options" } : null,
     };
     mocks.createSupabaseServerClient.mockResolvedValue({});
     mocks.listFamilies.mockResolvedValue({ items: [family], total: 1 });
     mocks.enrichFamiliesWithCurrentStep.mockResolvedValue([family]);
 
     render(await FamiliesPage({ searchParams: Promise.resolve({}) }));
-    expect(screen.getByText(/Target Nov 1, 2026/)).toBeTruthy();
+    if (status) {
+      expect(screen.getByText(status === "blocked" ? /Follow up Nov 1, 2026/ : /Target Nov 1, 2026/)).toBeTruthy();
+      expect(screen.getByText("Continue plan")).toBeTruthy();
+    }
 
     expect(screen.getByRole("link", { name: /Test household/ }).getAttribute("href")).toBe(
-      `/families/${family.id}/profile`,
+      status ? `/families/${family.id}/plan#step-step` : `/families/${family.id}/profile`,
     );
   });
 });

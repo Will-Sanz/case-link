@@ -542,6 +542,17 @@ export function FamilyLiteWorkspace({
               </p>
             ) : null}
           </div>
+          {result?.additionalDetails.trim() ? (
+            <details open className="mt-5 border-t border-[var(--color-rule)] pt-4">
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30">
+                Family priorities and context
+              </summary>
+              <p className="mt-3 max-w-prose whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-muted)]">{result.additionalDetails}</p>
+              <p className="mt-3 text-xs leading-5 text-[var(--color-ink-faint)]">
+                Current saved context. Check the actions against it before approving; later context changes do not automatically update a draft.
+              </p>
+            </details>
+          ) : null}
         </Card>
       ) : null}
 

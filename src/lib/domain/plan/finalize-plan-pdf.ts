@@ -6,7 +6,7 @@ const FOOTER_TEXT_Y = 20;
 const FOOTER_FONT_SIZE = 7.5;
 
 /** Add a dependable neutral footer after layout, when the final page count is known. */
-export async function finalizePlanPdf(bytes: Uint8Array): Promise<Uint8Array> {
+export async function finalizePlanPdf(bytes: Uint8Array, footerTitle = "Family support intervention plan"): Promise<Uint8Array> {
   const document = await PDFDocument.load(bytes);
   const font = await document.embedFont(StandardFonts.Helvetica);
   const pages = document.getPages();
@@ -22,7 +22,7 @@ export async function finalizePlanPdf(bytes: Uint8Array): Promise<Uint8Array> {
       thickness: 0.5,
       color: rgb(0, 0, 0),
     });
-    page.drawText("Family support intervention plan", {
+    page.drawText(footerTitle, {
       x: MARGIN,
       y: FOOTER_TEXT_Y,
       size: FOOTER_FONT_SIZE,

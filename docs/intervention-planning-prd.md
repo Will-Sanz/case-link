@@ -8,6 +8,8 @@ The Core workflow is **family intake → barriers → goals and dated actions �
 
 The pilot is for a few staff at one school with de-identified case circumstances. It has no direct CitySpan or other system integration, no autonomous submission, no arbitrary PDF upload, no field detection or form filling, and no district analytics. Uploaded-form research below is deferred and is not a Core acceptance criterion. The required artifact is the reviewed intervention plan itself.
 
+**October 15 family-support improvements:** Keep creation minimal. Optional planning context prompts capture the family's stated priority, existing support, practical preferences/constraints, and previous attempts in the existing saved context, which is visible during plan review. Families with open work link directly to the next action. Staff may also prepare a separate family takeaway from explicitly selected, discussed open actions and optional directory contacts in the current reviewed plan. It excludes internal narratives and unselected content, requires confirmation that the content is appropriate to share, and uses the existing access/revision checks before preview and download. Selection changes clear the preview and confirmation. Staff manually share the downloaded document; family accounts and automatic delivery are outside this release.
+
 ### Required verification for the current Core release
 
 | Layer | Required evidence |

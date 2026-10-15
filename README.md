@@ -6,9 +6,12 @@ CaseLink helps school case managers create a family support plan, review it, and
 
 1. An invited staff member sets a password and signs in. Case managers and administrators use password-only accounts.
 2. Create a family with a non-identifying label and one or more barriers. A short description is optional.
-3. Generate a plan organized by goals and specific target dates. Review suggested resources and verify their suitability.
+3. Optionally record the family's priorities, existing support, practical constraints, and previous attempts. Generate a plan organized by goals and specific target dates. Review suggested resources and verify their suitability.
 4. Edit the draft, confirm responsibility and dates, and record progress. Waiting actions use their next follow-up date.
 5. Mark the current plan reviewed, preview the PDF, and download it. A material edit requires another review.
+6. If useful, select discussed open actions and optional directory contacts for a separate family takeaway. Confirm the content is suitable to share, preview it, and download it for manual sharing.
+
+Returning staff can open the next action directly from Families. The full record PDF and family takeaway are available only to staff authorized to access that family. There are no family login accounts. The takeaway excludes internal context, action descriptions, progress notes, outcomes, and unselected actions; changing the selection clears its preview and sharing confirmation. It is a selected view of the reviewed plan, not another independently saved plan.
 
 The case manager decides what becomes official and handles any submission outside CaseLink. Blank-PDF upload, field detection, form filling, direct CitySpan integration, automatic submission, district analytics, and broader school operations are deferred.
 
@@ -40,7 +43,7 @@ Use a supported, patched Node 24.x release (`.nvmrc`), matching CI and hosting, 
 - `npm run test:auth-security`: real local Auth lifecycle and password-session and role-access tests.
 - `npm run test:db-security`: real local database authorization, concurrency, rollback, and audit tests.
 - `npm run test:restore`: isolated synthetic backup/restore and authorization rehearsal; no hosted database changes.
-- `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase.
+- `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase; requires Playwright Chromium and Poppler.
 - `npm run test:pdf`: extracted source-content and rendered PDF placement/monochrome checks; requires Python and Poppler.
 - `npm run verify:release -- <exact-commit-SHA>`: confirm required trusted repository checks for that commit; this does not deploy or replace hosted/school approval.
 - `npm run test:ai-contracts -- --live`: opt-in provider format check with eight small synthetic requests. Supply an operator test-project `OPENAI_API_KEY` through the environment; it is excluded from normal CI and prints only pass/fail metadata.

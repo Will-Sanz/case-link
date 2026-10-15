@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { PDFDocument } from "pdf-lib";
 import { test, expect, activate, accessible, signIn, createFamily } from "./helpers";
 
@@ -9,6 +10,8 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   const staff = await local.staff();
   await signIn(page, staff);
   const familyId = await createFamily(page);
+  const familyContext = "The family wants a steady school routine. A relative helps twice a week. Calls should be after work; a previous application is awaiting a response.";
+  await page.getByLabel("Family priorities and context", { exact: false }).fill(familyContext);
   await accessible(page);
   writeFileSync("tmp/e2e/provider-control.json", JSON.stringify({ delayMs: 600, failSchema: "lean_plan_phase_60" }));
   await activate(page, page.getByRole("button", { name: "Draft action plan", exact: true }));
@@ -18,6 +21,9 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   const otherTab = await context.newPage();
   await otherTab.goto(`/families/${familyId}/plan`);
   await expect(page.getByRole("button", { name: "Continue draft", exact: true })).toBeVisible({ timeout: 45_000 });
+  const savedContext = await local.db.query("select f.summary, p.generation_state->'input_snapshot'->>'brief' as brief from public.families f join public.plans p on p.family_id=f.id where f.id=$1", [familyId]);
+  expect(savedContext.rows[0].summary).toBe(familyContext);
+  expect(JSON.parse(savedContext.rows[0].brief).summary).toBe(familyContext);
   const first = (await local.db.query("select p.id, count(s.id)::int as steps from public.plans p left join public.plan_steps s on s.plan_id=p.id where p.family_id=$1 group by p.id", [familyId])).rows;
   expect(first).toHaveLength(1);
   expect(first[0].steps).toBe(1);
@@ -26,6 +32,7 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   await activate(page, page.getByRole("button", { name: "Continue draft", exact: true }));
   await expect(page.getByRole("button", { name: "Edit action", exact: true })).toHaveCount(3, { timeout: 45_000 });
   expect((await local.db.query("select id from public.plans where family_id=$1", [familyId])).rows).toEqual([{ id: first[0].id }]);
+  await expect(page.getByText(familyContext, { exact: true })).toBeVisible();
   await accessible(page);
 
   let article = page.locator("article[id^=step-]").first();
@@ -44,6 +51,13 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   await expect(article.getByRole("button", { name: "Edit action", exact: true })).toBeVisible();
   await page.reload();
   await expect(article).toContainText("Confirm the agreed preparation checklist");
+  const nextStepId = await article.getAttribute("id");
+  await page.goto("/families");
+  const continueFamily = page.getByRole("link").filter({ hasText: "Continue plan" }).filter({ hasText: "Family 014" });
+  await expect(continueFamily).toHaveAttribute("href", `/families/${familyId}/plan#${nextStepId}`);
+  await activate(page, continueFamily);
+  await expect(page).toHaveURL(new RegExp(`/families/${familyId}/plan#${nextStepId}$`));
+  await expect(article).toBeInViewport();
 
   await activate(page, article.getByRole("button", { name: "Edit action", exact: true }));
   await activate(page, article.getByRole("button", { name: "Refine action", exact: true }));
@@ -109,6 +123,37 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   const reviewed = await local.db.query("select client_display from public.plans where id=$1", [first[0].id]);
   expect(reviewed.rows[0].client_display.reviewedAt).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath("reviewed-pdf.png"), fullPage: true });
+
+  await page.getByRole("radio", { name: "Family takeaway", exact: true }).check();
+  const prepareTakeaway = page.getByRole("button", { name: "Prepare family takeaway", exact: true });
+  await expect(prepareTakeaway).toBeDisabled();
+  await page.getByRole("checkbox", { name: /Confirm the agreed preparation checklist/ }).check();
+  await expect(prepareTakeaway).toBeDisabled();
+  await page.getByRole("checkbox", { name: /I discussed these selected steps and dates with the family/ }).check();
+  await accessible(page);
+  await activate(page, prepareTakeaway);
+  await expect(page.getByRole("button", { name: "Download PDF", exact: true })).toBeEnabled();
+  const familyDownload = page.waitForEvent("download");
+  await activate(page, page.getByRole("button", { name: "Download PDF", exact: true }));
+  const familyPath = testInfo.outputPath("family-takeaway.pdf");
+  await (await familyDownload).saveAs(familyPath);
+  const familyBytes = readFileSync(familyPath);
+  const familyPdf = await PDFDocument.load(familyBytes);
+  expect(familyPdf.getTitle()).toBe("Your next steps");
+  const familyText = execFileSync("pdftotext", ["-", "-"], { input: familyBytes, encoding: "utf8" }).replace(/\s+/g, " ").trim();
+  expect(familyText).toContain("Confirm the agreed preparation checklist");
+  expect(familyText).not.toContain("Waiting for the family's preferred review time.");
+  expect(familyText).not.toContain("Check the intake outcome");
+  expect(familyText).not.toContain("Review ongoing arrangements");
+  expect(familyText).not.toContain(familyContext);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await accessible(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("family-takeaway-mobile.png"), fullPage: true });
+  await page.getByRole("checkbox", { name: /Confirm the agreed preparation checklist/ }).uncheck();
+  await expect(page.getByRole("button", { name: "Download PDF", exact: true })).toHaveCount(0);
+  await expect(prepareTakeaway).toBeDisabled();
+  await page.setViewportSize({ width: 1365, height: 900 });
 
   await page.goto(`/families/${familyId}/plan`);
   await activate(page, page.getByRole("button", { name: "Ask about this plan", exact: true }));

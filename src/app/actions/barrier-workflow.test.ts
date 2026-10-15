@@ -23,6 +23,21 @@ beforeEach(() => {
 });
 
 describe("saved planning context", () => {
+  it("reloads the family's priority, strengths and constraints unchanged after AI fails", async () => {
+    const context = "Priority: keep the school routine steady.\nSupport: a relative helps with transport.\nPreference: calls after work.\nAlready tried: an application is waiting for a response.";
+    let savedContext = "";
+    mocks.rpc.mockImplementation(async (name, input) => {
+      if (name === "save_family_planning_context") savedContext = input.p_summary;
+      return { data: revision, error: null };
+    });
+    mocks.detail.mockImplementation(async () => ({ name: "Family 014", summary: savedContext, barriers: [{ label: "Housing" }], plan: null, resourceMatches: [] }));
+    const result = await generateBarrierWorkflowForFamilyAction(familyId, { selectedBarriers: ["Housing"], expectedUpdatedAt: revision, additionalDetails: context });
+    expect(result).toMatchObject({ ok: false, savedContextAt: revision });
+    expect(savedContext).toBe(context);
+    expect(await loadBarrierWorkflowForFamilyAction(familyId)).toMatchObject({ ok: true, result: { additionalDetails: context } });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+
   it.each(["  Needs flexible meeting times.  ", "", "g".repeat(4000)])("saves description and barriers before either downstream service (case %#)", async (additionalDetails) => {
     const result = await generateBarrierWorkflowForFamilyAction(familyId, { selectedBarriers: ["Housing"], expectedUpdatedAt: revision, additionalDetails });
     expect(mocks.rpc).toHaveBeenCalledWith("save_family_planning_context", expect.objectContaining({ p_family_id: familyId, p_expected_updated_at: revision, p_summary: additionalDetails.trim() || null, p_barriers: [expect.objectContaining({ label: "Housing" })] }));

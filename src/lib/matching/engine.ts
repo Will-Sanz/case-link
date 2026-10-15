@@ -6,11 +6,17 @@ import type {
 
 type RuleHit = { points: number; reason: string };
 
+const CHILDCARE_KEYWORDS = ["childcare", "child care", "daycare", "day care", "preschool", "pre-school", "early learning", "head start", "after-school care", "after school care"];
+const GENERIC_CONTEXT_WORDS = new Set([
+  "about", "also", "could", "from", "have", "help", "more", "that", "their", "them", "they", "this", "with", "will", "would",
+  "family", "families", "child", "children", "youth", "need", "needs", "people", "program", "programs", "resource", "resources", "service", "services", "support",
+]);
+
 /** Map preset keys + shared themes to category substrings (case-insensitive). */
 const PRESET_CATEGORY_HINTS: Record<string, string[]> = {
   housing_stability: ["housing", "home", "rent", "tenant", "shelter", "repair", "phdc"],
   eviction_risk: ["housing", "legal", "tenant", "eviction", "landlord", "clsphila"],
-  housing_instability: ["housing", "homeless", "youth", "shelter", "family"],
+  housing_instability: ["housing", "homeless", "shelter", "rental", "tenant"],
   employment: ["workforce", "employment", "job", "career", "paan", "training"],
   unemployment: ["workforce", "employment", "job", "training", "skill"],
   legal_assistance: ["legal", "law", "tenant", "eviction", "advocacy"],
@@ -26,8 +32,8 @@ const PRESET_CATEGORY_HINTS: Record<string, string[]> = {
   bad_credit: ["credit", "housing", "financial", "home"],
   digital_literacy: ["digital", "literacy", "technology", "computer", "tech"],
   low_digital_literacy: ["digital", "literacy", "technology", "computer"],
-  childcare: ["childcare", "child", "early", "daycare"],
-  childcare_barrier: ["childcare", "child", "family"],
+  childcare: CHILDCARE_KEYWORDS,
+  childcare_barrier: CHILDCARE_KEYWORDS,
   youth_programming: ["youth", "student", "school", "teen", "after school"],
   education_workforce_training: ["education", "workforce", "training", "school", "ged"],
   healthcare_access: ["health", "medical", "behavioral", "dbhids", "wellness"],
@@ -37,6 +43,7 @@ const PRESET_CATEGORY_HINTS: Record<string, string[]> = {
 /** Haystack keywords when preset fires (program/description/search). */
 const PRESET_TEXT_KEYWORDS: Record<string, string[]> = {
   housing_stability: ["housing", "home repair", "rent", "tenant", "stabilization"],
+  housing_instability: ["housing", "homeless", "shelter", "rental", "tenant", "eviction", "home repair"],
   eviction_risk: ["eviction", "tenant", "legal aid", "housing court"],
   employment: ["job", "employment", "workforce", "training", "hire"],
   legal_assistance: ["legal", "representation", "law"],
@@ -45,6 +52,8 @@ const PRESET_TEXT_KEYWORDS: Record<string, string[]> = {
   youth_programming: ["youth", "student", "after school", "teen"],
   immigration_documentation: ["immigration", "documentation", "citizenship"],
   digital_literacy: ["digital", "computer", "literacy", "technology"],
+  childcare: CHILDCARE_KEYWORDS,
+  childcare_barrier: CHILDCARE_KEYWORDS,
 };
 
 function norm(s: string): string {
@@ -121,14 +130,13 @@ function scoreResource(
     }
   }
 
-  // Free-text: family narrative overlaps resource haystack (lightweight keyword overlap).
-  const familyTokens = familyBlob
-    .split(/\W+/)
-    .filter((t) => t.length > 3)
-    .slice(0, 40);
+  // Repeated or generic casework words do not establish service fit.
+  const familyTokens = [...new Set(familyBlob.split(/\W+/)
+    .filter((t) => t.length > 3 && !GENERIC_CONTEXT_WORDS.has(t)))].slice(0, 40);
+  const resourceTokens = new Set(hay.split(/\W+/));
   let overlap = 0;
   for (const t of familyTokens) {
-    if (hay.includes(t)) overlap++;
+    if (resourceTokens.has(t)) overlap++;
   }
   if (overlap >= 3) {
     hits.push({
@@ -148,11 +156,7 @@ function scoreResource(
     });
   }
 
-  if (
-    presetKeys.has("youth_programming") ||
-    presetKeys.has("childcare") ||
-    presetKeys.has("childcare_barrier")
-  ) {
+  if (presetKeys.has("youth_programming")) {
     if (cat.includes("youth")) {
       hits.push({ points: 14, reason: "Youth-focused category" });
     }

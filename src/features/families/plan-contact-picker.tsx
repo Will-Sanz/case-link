@@ -15,6 +15,17 @@ export function PlanContactPicker({ value, choices, onChange, disabled = false }
     <fieldset disabled={disabled} className="space-y-2 text-sm">
       <legend className="font-medium">Directory contacts</legend>
       <p className="text-xs text-[var(--color-ink-muted)]">Select matched programs. Confirm current availability, eligibility, and contact details before referring.</p>
+      <details className="rounded border border-[var(--color-rule)] p-2 text-xs text-[var(--color-ink-muted)]">
+        <summary className="cursor-pointer rounded font-medium text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">Prepare the referral</summary>
+        <p className="mt-2">Ask the family which option feels workable and what help they would want. Before asking them to call or travel, check with the program:</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>Can it serve this family and location?</li>
+          <li>Is it accepting requests, and is there a wait?</li>
+          <li>How do people apply, and what documents or costs are involved?</li>
+          <li>What language, accessibility, transport, or scheduling support is available?</li>
+        </ul>
+        <p className="mt-2">Agree who will make contact. Record the result and next follow-up in the plan.</p>
+      </details>
       {value.filter(contact => !current(contact)).map((contact, index) => (
         <div key={`${contact.source_resource_id ?? "legacy"}-${index}`} className="rounded border border-[var(--color-rule)] p-2">
           <p>{contact.name || "Previous contact"}: needs a current directory source. Remove this contact, then select its updated entry if available.</p>
