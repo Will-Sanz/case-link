@@ -9,7 +9,7 @@ export type AiTaskType = "plan_generation" | "plan_phase_generation" | "plan_ref
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export const MODELS = {
-  PLAN_GENERATION: "gpt-6-astra",
+  PLAN_GENERATION: "gpt-6.1-sol",
   PLAN_REFINEMENT: "gpt-6.1-sol",
   CASE_ASSISTANT: "gpt-6.1-sol",
   STEP_REFINEMENT: "gpt-6-luna",

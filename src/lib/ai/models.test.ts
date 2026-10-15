@@ -7,8 +7,8 @@ beforeEach(() => { state.env = {}; });
 
 describe("AI model defaults", () => {
   it.each([
-    ["plan_generation", "gpt-6-astra", "medium", 16384],
-    ["plan_phase_generation", "gpt-6-astra", "medium", 16384],
+    ["plan_generation", "gpt-6.1-sol", "medium", 16384],
+    ["plan_phase_generation", "gpt-6.1-sol", "medium", 16384],
     ["plan_refinement", "gpt-6.1-sol", "medium", 8192],
     ["case_assistant", "gpt-6.1-sol", "medium", 8192],
     ["step_refinement", "gpt-6-luna", "low", 4096],

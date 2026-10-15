@@ -10,12 +10,12 @@ import type { FamilyDetail, PlanStepRow } from "../src/types/family";
 import { estimateAiCost, type AiUsage } from "../src/lib/ai/usage";
 
 export const REQUESTED_TITLE = "Prepare the agreed next step";
-export const EVALUATION_VERSION = 8;
+export const EVALUATION_VERSION = 9;
 export type EvaluationCheck = { code: string; passed: boolean; severity: "critical" | "quality" };
 
 export function evaluationSourceHash() {
   const files = ["src/lib/ai/client.ts", "src/lib/ai/models.ts", "src/lib/ai/model-allowlist.ts", "src/lib/ai/casework-safety.ts", "src/lib/plan-generator/openai-plan.ts", "src/lib/plan-generator/openai-plan-lean-phase.ts", "src/lib/plan-generator/lean-plan-schema.ts", "src/lib/plan-generator/plan-refine-lean.ts", "src/lib/plan-generator/planning-brief.ts", "src/lib/case-assistant/ai-case-assistant.ts", "src/lib/case-assistant/case-context.ts", "src/lib/case-assistant/answer-schema.ts", "src/lib/matching/plan-resources.ts", "src/lib/domain/plan/refinement-review.ts", "src/lib/privacy/no-pii.ts", "tests/fixtures/ai-evaluation-cases.ts", "scripts/ai-evaluation.ts", "tests/ai/evaluation.live.ts", "src/lib/plan-generator/prior-phase-summary.ts"];
-  files.push("src/lib/ai/usage.ts", "src/lib/ai/case-facts.ts", "tests/ai/pilot-cases.ts");
+  files.push("src/lib/ai/usage.ts", "src/lib/ai/case-facts.ts", "tests/ai/pilot-cases.ts", "tests/ai/refinement-cases.ts");
   return createHash("sha256").update(files.map(file => `${file}\n${readFileSync(file, "utf8")}`).join("\n")).digest("hex");
 }
 
@@ -74,6 +74,14 @@ export function gradeMissingHistory(answer: string, detail: FamilyDetail): Evalu
   return check("missing_history_is_unknown", Boolean(detail.plan) || !claimsNone.test(answer));
 }
 
+function humanRecords(steps: PlanStepRow[], requestedDateAction?: string) {
+  return steps.map(step => ({ id: step.id, phase: step.phase, status: step.status, assigned_to_id: step.assigned_to_id,
+    workflow_data: step.workflow_data, owner: step.details?.owner, goal: step.details?.stage_goal,
+    completed: step.status === "completed" ? step : null,
+    actions: step.action_items?.map(action => ({ id: action.id, status: action.status, notes: action.notes, outcome: action.outcome,
+      date: action.id === requestedDateAction ? undefined : action.target_date, followUp: action.follow_up_date, completed: action.status === "completed" ? action : null })) }));
+}
+
 export function gradeRefinement(base: PlanStepRow[], proposed: DraftStepRefineInput[]): EvaluationCheck[] {
   const checks: EvaluationCheck[] = [];
   try {
@@ -81,19 +89,38 @@ export function gradeRefinement(base: PlanStepRow[], proposed: DraftStepRefineIn
     const untouched = applyRefinementChanges(base, changes, []);
     checks.push(check("explicit_selection_required", JSON.stringify(untouched) === JSON.stringify(base)));
     const applied = applyRefinementChanges(base, changes, changes.map(change => change.id));
-    // Compare independent protected fields after the same human-review path the UI uses.
-    const protectedFields = (steps: PlanStepRow[]) => steps.map(step => ({ id: step.id, phase: step.phase, status: step.status, assigned_to_id: step.assigned_to_id,
-      workflow_data: step.workflow_data, owner: step.details?.owner, goal: step.details?.stage_goal,
-      completed: step.status === "completed" ? step : null,
-      actions: step.action_items?.map(action => ({ id: action.id, status: action.status, notes: action.notes, outcome: action.outcome,
-        date: action.target_date, followUp: action.follow_up_date, completed: action.status === "completed" ? action : null })) }));
-    checks.push(check("human_records_preserved", JSON.stringify(protectedFields(applied)) === JSON.stringify(protectedFields(base))));
+    checks.push(check("human_records_preserved", JSON.stringify(humanRecords(applied)) === JSON.stringify(humanRecords(base))));
     checks.push(check("requested_title_changed", applied[0].title === REQUESTED_TITLE, "quality"));
     checks.push(check("no_unrequested_proposal", changes.length === 1 && changes[0].id === `${base[0].id}:title`, "quality"));
   } catch {
     checks.push(check("valid_refinement_identity", false));
   }
   return checks;
+}
+
+export type SupportedRefinementRequest = {
+  feedback: string;
+  expectedChanges: string[];
+  expectedDate?: { actionId: string; value: string };
+  expectedDocuments?: { stepId: string; value: string[] };
+  reviewCriteria: string[];
+};
+
+/** Mechanical scope/preservation checks; the supplied review criteria still require reading the prose. */
+export function gradeSupportedRefinement(base: PlanStepRow[], proposed: DraftStepRefineInput[], request: SupportedRefinementRequest): EvaluationCheck[] {
+  try {
+    const changes = collectRefinementChanges(base, proposed);
+    const applied = applyRefinementChanges(base, changes, changes.map(change => change.id));
+    const checks = [
+      check("explicit_selection_required", JSON.stringify(applyRefinementChanges(base, changes, [])) === JSON.stringify(base)),
+      check("human_records_preserved", JSON.stringify(humanRecords(applied, request.expectedDate?.actionId)) === JSON.stringify(humanRecords(base, request.expectedDate?.actionId))),
+      check("no_unrequested_proposal", changes.every(change => request.expectedChanges.includes(change.id))),
+      check("requested_fields_changed", request.expectedChanges.every(id => changes.some(change => change.id === id)), "quality"),
+    ];
+    if (request.expectedDate) checks.push(check("requested_exact_date", applied.flatMap(step => step.action_items ?? []).find(action => action.id === request.expectedDate!.actionId)?.target_date === request.expectedDate.value));
+    if (request.expectedDocuments) checks.push(check("requested_document_removal", JSON.stringify(applied.find(step => step.id === request.expectedDocuments!.stepId)?.details?.required_documents) === JSON.stringify(request.expectedDocuments.value)));
+    return checks;
+  } catch { return [check("valid_refinement_identity", false)]; }
 }
 
 export function percentile(values: number[], fraction: number): number | null {

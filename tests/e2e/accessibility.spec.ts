@@ -9,7 +9,7 @@ test("inline plan fields have names and the workflow reflows on narrow and zoome
   await accessible(page);
   await expect(article.getByRole("textbox", { name: "Title", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
-  await activate(page, article.getByRole("button", { name: /^Discuss the family's preferences/ }));
+  await activate(page, article.getByRole("button", { name: /^Confirm which preparation materials the family has agreed to gather\./ }));
   await accessible(page);
   await expect(article.getByRole("textbox", { name: "Summary", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
