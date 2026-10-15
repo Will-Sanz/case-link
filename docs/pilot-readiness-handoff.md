@@ -1,4 +1,4 @@
-# Paused checkpoint — October 15, 2026
+# Reliability follow-up — October 15, 2026
 
 Continue in `/Users/willsanz/homelessness-project`, branch `codex/school-pilot-readiness`, draft [PR #15](https://github.com/Will-Sanz/case-link/pull/15). Use the current tracker and [production release record](verification/production-release.md); older historical entries are superseded by the October 15 evidence.
 
@@ -10,7 +10,7 @@ The user authorized routine SQL without repeated prompts, identified the origina
 
 Background only: no foreground apps, visible tabs, file/review/preview panels or chat navigation. Use hidden/headless tools. All seven CaseLink local Supabase services remain stopped with data preserved; keep unrelated services/port 3000 untouched. Heavy checks run in remote CI. The one-time continuation already ran; do not create a recurring automation. Use Ponytail full, normal security/correctness review and a separate deletion pass. Preserve unrelated AGENTS/design/skill/output files and stage exact paths only. Commit/push each completed item; use `HUSKY=0 git push` to keep heavy pre-push checks off the workstation, then inspect remote CI.
 
-The user asked for a natural stopping point before bed. The final production-candidate workflow has finished and its fixtures are cleaned up. Save this checkpoint and stop; do not begin promotion or another long diagnostic tonight. No new scheduled continuation was requested.
+The user's overnight stopping point is preserved below. The October 15 one-time continuation resumed reliability work; that automation has now been paused to prevent any further daily run. The overnight documentation commit `b2b629f` passed CI/CodeQL. A representative measurement identified eight repeated plan evaluations; the pending `20261015143343_materialize_plan_snapshot.sql` changes only that evaluation strategy and preserves identical content/review hashes. Its regression counts actual action reads, with typecheck/lint passed. Full remote and hosted checks are required before applying the migration to production. See `docs/verification/2026-10-15-plan-snapshot-measurement.json` and CL-41; production has not been promoted.
 
 ## Completed and verified
 

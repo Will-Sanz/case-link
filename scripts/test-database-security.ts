@@ -325,6 +325,18 @@ async function checkContactProvenance() {
     assert.equal(generated.plan.id,started.planId);
     assert.deepEqual(generated.plan.steps[0].details.contacts,[{...details.contacts![0],phone:'215-555-0148',email:'intake@example.test'}],'staged generation resolves current source contacts without storing them in its snapshot');
     assert.deepEqual(generated.plan.generation_state.input_snapshot,snapshot);
+    // Count actual repeated reads instead of using a machine-dependent timing threshold.
+    const snapshotSql = (await admin.query("select prosrc from pg_proc where oid='public.get_family_plan_snapshot(uuid)'::regprocedure")).rows[0].prosrc.replaceAll('p_family_id', '$1');
+    const execution = (await asUser(userA,client=>client.query(`explain (analyze,format json) ${snapshotSql}`,[family]))).rows[0]['QUERY PLAN'][0];
+    type Scan = { 'Relation Name'?: string; 'Actual Loops': number; 'Actual Rows': number; Plans?: Scan[] };
+    const pending: Scan[] = [execution.Plan];
+    let actionRowsRead = 0;
+    while (pending.length) {
+      const scan = pending.pop()!;
+      if (scan['Relation Name'] === 'plan_step_action_items') actionRowsRead += scan['Actual Loops'] * scan['Actual Rows'];
+      pending.push(...(scan.Plans ?? []));
+    }
+    assert.equal(actionRowsRead,1,'one snapshot reads each saved action once, including revision hashes');
   } finally {
     await admin.query("delete from public.families where id=$1",[family]);
     await admin.query("delete from public.resources where id=$1",[resource]);
