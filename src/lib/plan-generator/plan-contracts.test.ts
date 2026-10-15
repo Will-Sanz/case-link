@@ -22,6 +22,26 @@ describe("plan output contracts", () => {
     expect(sparseDetailsForPersistence(step)).toMatchObject({ owner: "case_manager", stage_goal: step.goal, required_documents: [], contacts: [] });
   });
 
+  it("keeps exact generated action dates without adding a default timing window", async () => {
+    const step = { ...generatedPlanStep, phase: "60" as const, action_items: [{ ...generatedPlanStep.action_items[0], week_index: 5, target_date: "2026-12-03" }] };
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [step] }) });
+    const result = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "60", { retries: 1, planStartDate: "2026-10-15" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.steps[0].action_items[0].target_date).toBe("2026-12-03");
+    expect(sparseDetailsForPersistence(result.steps[0])).not.toHaveProperty("timing_guidance");
+  });
+
+  it.each(["Weeks 5–6", "Calls only after school"])("rejects non-null generated timing (%s), accepting constraints in the action description", async timing => {
+    const corrected = { ...generatedPlanStep, action_items: [{ ...generatedPlanStep.action_items[0], description: "Call only after school, as requested by the family." }] };
+    vi.mocked(createAiResponse).mockResolvedValueOnce({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...generatedPlanStep, timing }] }) })
+      .mockResolvedValueOnce({ ok: true, model: "test", text: JSON.stringify({ steps: [corrected] }) });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", { retries: 2 })).toMatchObject({ ok: true, steps: [corrected] });
+    expect(createAiResponse).toHaveBeenCalledTimes(2);
+    expect(sparseDetailsForPersistence(corrected)).not.toHaveProperty("timing_guidance");
+    expect(buildLeanPhaseRootJsonSchema("30")).toMatchObject({ properties: { steps: { items: { properties: { timing: { type: "null" } } } } } });
+  });
+
   it.each(["missing", "extra", "impossible date", "null date", "wrong phase", "empty title", "unknown contact field"])("rejects %s before generation can be persisted", async kind => {
     const step: Record<string, unknown> = structuredClone(generatedPlanStep);
     if (kind === "missing") delete step.timing;

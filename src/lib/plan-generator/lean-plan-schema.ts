@@ -1,6 +1,6 @@
 /**
- * Lean plan step shape for generation + refinement: maps into existing plan_steps / details JSONB.
- * "summary" → column `description`; "timing" → details.timing_guidance;
+ * Lean plan step shape for generation: maps into existing plan_steps / details JSONB.
+ * "summary" → column `description`; exact action dates provide the schedule.
  * "additional_guidance" → details.detailed_instructions; no default bloat fields in output.
  */
 
@@ -26,7 +26,7 @@ export const leanPlanStepBodyZ = z.strictObject({
   summary: z.string().trim().min(1).max(4000),
   // The staged-insert RPC accepts up to 20 new tasks per goal.
   action_items: z.array(leanActionItemZ).min(1).max(20),
-  timing: z.string().max(400).nullable(),
+  timing: z.null(),
   required_documents: z.array(z.string().trim().min(1).max(500)).max(20),
   resource_ids: z.array(z.string().uuid()).max(12),
   expected_outcome: z.string().trim().min(1).max(800),
@@ -48,15 +48,13 @@ function normStr(v: string | null | undefined): string | undefined {
 }
 
 /** Compact details for DB: only user-meaningful keys + optional legacy empties avoided. */
-export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase, catalog: ResourceCatalogEntry[] = []): PlanStepDetails {
-  const timing = normStr(lean.timing ?? undefined) ?? undefined;
+export function leanStepToPlanDetails(lean: LeanPlanStepBody, catalog: ResourceCatalogEntry[] = []): PlanStepDetails {
   const guidance = normStr(lean.additional_guidance ?? undefined) ?? undefined;
   const pri = lean.priority ?? "medium";
   const detailsPriority = pri === "urgent" ? "high" : pri;
 
   return {
     owner: "case_manager",
-    timing_guidance: timing ?? `Within the ${phase}-day window; confirm dates with each agency.`,
     detailed_instructions: guidance,
     expected_outcome: lean.expected_outcome.trim(),
     required_documents: lean.required_documents.map((s) => s.trim()).filter(Boolean),
@@ -69,7 +67,7 @@ export function leanStepToPlanDetails(lean: LeanPlanStepBody, phase: PlanPhase, 
 
 /** Persist sparse JSON only (lean draft). */
 export function sparseDetailsForPersistence(lean: LeanPlanPhaseStep, catalog: ResourceCatalogEntry[] = []): PlanStepDetails {
-  return leanStepToPlanDetails(lean, lean.phase, catalog);
+  return leanStepToPlanDetails(lean, catalog);
 }
 
 export function buildLeanPhaseRootJsonSchema(phase: PlanPhase) {

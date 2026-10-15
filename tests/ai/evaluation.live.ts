@@ -90,7 +90,7 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
         for (const [index, step] of response.steps.entries()) {
           const id = `${phase}-${index}`;
           priorSteps.push({ id, phase, title: step.title, description: step.summary, details: { stage_goal: step.goal } });
-          priorActions.push(...step.action_items.map(action => ({ plan_step_id: id, title: action.title })));
+          priorActions.push(...step.action_items.map(action => ({ plan_step_id: id, title: action.title, status: "pending" as const, target_date: action.target_date, follow_up_date: null })));
         }
         prior = formatPriorPhasesSummary(priorSteps, priorActions);
         const checks = gradeGeneratedSteps(response.steps, detail, now);

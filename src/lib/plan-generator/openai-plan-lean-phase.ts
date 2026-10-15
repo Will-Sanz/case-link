@@ -48,7 +48,7 @@ All phases use the same saved snapshot. Follow explicit case-manager instruction
 - "goal" = a short, outcome-focused goal that can group related actions across the plan (for example, "Secure stable housing"). Reuse the exact same goal wording when steps contribute to the same outcome.
 - "summary" = concise what-to-do for a case manager.
 - Keep each summary, action description and expected outcome to one short sentence, ideally 20 words or fewer. Retain every applicable fact, safe-contact restriction and immediate human escalation even when that needs more words. Avoid repeating general disclaimers across fields; additional_guidance is only for a distinct case-specific instruction.
-- "timing" = due window or cadence (short phrase or null).
+- "timing" = null. Exact action target_date values provide the schedule; do not add relative week windows. Put any stated scheduling constraint or recurring cadence in the relevant action description.
 - "additional_guidance" = optional nuance only; use null if not needed.
 - action_items: prefer 1 or 2 concrete tasks per step; add more only for documented needs. Titles are calendar-ready. Every action must include a valid YYYY-MM-DD target_date, never null.
 - Put document names in required_documents. Select resource_ids only from MATCHED_RESOURCES, or [] for generic work. The app adds directory contact facts; never return phone numbers, email addresses, URLs, or invented programs in prose. Missing eligibility, hours, or availability are unknown; propose checking them.
