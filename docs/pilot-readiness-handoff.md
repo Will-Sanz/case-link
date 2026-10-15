@@ -21,6 +21,8 @@ Background only: no foreground apps, visible tabs, file/review/preview panels or
 - Production environment: eight Config settings verified, existing production OpenAI Secret retained, `SUPABASE_SERVICE_ROLE_KEY` and obsolete PDF flag removed from future web deployment configuration. Staging has separate branch-scoped database/AI/SMTP. No Secret value printed or rotated. Old deployment snapshots still exist.
 - Later checkpoint **`1217e1d`** passed full CI **`38665144461`** and CodeQL **`38665144419`**: **686 unit/component tests**, seven browser scenarios, database/Auth/restore/legacy/PDF checks. Commits after the app candidate add only recovery tooling and evidence; no app runtime changes. Subsequent documentation commits have their own CI runs.
 
+Full CI **38666170553** and CodeQL **38666170540** subsequently passed at **123b74e**. A staging routing rollback from that deployment to the verified `7c9af9e` and back also passed health/login, sign-in enforcement, HSTS and the staging connection boundary. The production alias stayed unchanged. See `docs/verification/2026-10-15-staging-rollback.json`; production rollback compatibility is still distinct.
+
 ## Live release is still pending
 
 Production candidate **`dpl_2bGrr5VGVTrqdRtwRzGq2tu57zpi`** is READY at `https://case-link-p0ljvv1lh-will-sanzs-projects.vercel.app`. It is a Git-source build of exact app commit `7c9af9e`, **target production**, made with `autoAssignCustomDomains: false`.

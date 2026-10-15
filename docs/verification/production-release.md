@@ -17,6 +17,8 @@ The narrow PDF, password-only account and Settings hydration fixes are implement
 | Original database | `zpfypkizsapvsxeykmdq`, upgraded to 40 migrations; [preservation/access evidence](production-demo-upgrade.md) |
 | Separate staging database | `umnbyupudhunyccqhyrp`; synthetic accounts/cases, separate AI/SMTP credentials |
 
+A staging routing rollback rehearsal now passes: the stable preview moved from `123b74e` to the previously verified `7c9af9e` deployment and back. Both passed health/login, anonymous workspace denial, HSTS and the staging-only connection boundary. Alias read-back confirmed each target and the unchanged production domain. App, dependencies, hosting config and migrations are identical across that pair. No data or protection rules changed. [Evidence and limits](2026-10-15-staging-rollback.json). Full CI `38666170553` and CodeQL `38666170540` also passed at `123b74e`.
+
 ## Immediate remaining release work
 
 1. Obtain the pending approval for Vercel's authenticated testing access to the protected candidate. The initial short-lived OIDC attempt failed at entry before account creation or application requests. Automatic approval review rejected the proposed official-CLI cookie probe before execution because that specific access method was not approved. Do not disable protection, create a new bypass secret, or use an indirect workaround.
