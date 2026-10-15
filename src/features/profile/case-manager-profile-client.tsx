@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { selectInputClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
+import { SCHOOL_TIME_ZONE } from "@/lib/dates";
 import type { AppUserRow } from "@/types/database";
 
 const initialSaveState: ProfileSaveState = { ok: false, message: null };
@@ -53,7 +54,8 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
   );
   const [signOutState, signOutFormAction, signOutPending] = useActionState(signOutAction, { error: null });
   const displayName = profile.display_name?.trim() || profile.email;
-  const updatedAt = new Date(profile.updated_at).toLocaleString(undefined, {
+  const updatedAt = new Date(profile.updated_at).toLocaleString("en-US", {
+    timeZone: SCHOOL_TIME_ZONE,
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -84,7 +86,7 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
             <div className="py-3.5">
               <dt className="text-xs font-semibold text-[var(--color-ink-faint)]">Member since</dt>
               <dd className="mt-1 text-[var(--color-ink-2)]">
-                {new Date(profile.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}
+                {new Date(profile.created_at).toLocaleDateString("en-US", { timeZone: SCHOOL_TIME_ZONE, dateStyle: "long" })}
               </dd>
             </div>
           </dl>
