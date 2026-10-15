@@ -1,0 +1,410 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "startedAt": "2026-10-15T00:51:26.044Z",
+  "scratch": "caselink_restore_1cfa99f9dfc7616e",
+  "sourceModified": false,
+  "managedProviderDefaultAclsExcluded": [
+    "auth DEFAULT PRIVILEGES FOR SEQUENCES supabase_auth_admin",
+    "auth DEFAULT PRIVILEGES FOR FUNCTIONS supabase_auth_admin",
+    "auth DEFAULT PRIVILEGES FOR TABLES supabase_auth_admin",
+    "extensions DEFAULT PRIVILEGES FOR SEQUENCES supabase_admin",
+    "extensions DEFAULT PRIVILEGES FOR FUNCTIONS supabase_admin",
+    "extensions DEFAULT PRIVILEGES FOR TABLES supabase_admin",
+    "public DEFAULT PRIVILEGES FOR SEQUENCES supabase_admin",
+    "public DEFAULT PRIVILEGES FOR FUNCTIONS supabase_admin",
+    "public DEFAULT PRIVILEGES FOR TABLES supabase_admin"
+  ],
+  "upgradeRehearsal": {
+    "passed": true,
+    "demoFamiliesRemoved": 44,
+    "demoActivityEntriesArchivedInBackup": 283,
+    "remainingDemoActivityEntries": 0,
+    "retainedAccounts": 11,
+    "retainedResources": 54,
+    "retainedResourceImports": 1,
+    "allRetainedColumnsUnchanged": true,
+    "constraintsChecked": 67,
+    "migrations": [
+      {
+        "name": "20260802120000_demo_requests.sql",
+        "sha256": "46c6acc080f5be68907345456d51917b898d1d82dd4381199347e1251a012f69"
+      },
+      {
+        "name": "20260802143000_replace_family_barriers_rpc.sql",
+        "sha256": "09eae120d1956f23943b6ea04a8f5b0ab7203e9585da8772f064326922c4d779"
+      },
+      {
+        "name": "20260804173443_production_hardening.sql",
+        "sha256": "e5322274892b437d4f0c54145b8c8f1f14eb61c295061adde17646465193538e"
+      },
+      {
+        "name": "20261013203641_save_family_planning_context.sql",
+        "sha256": "c94bb72337940205cf3aaf966b41e0695b64cdec3049d51cb5020d597315075d"
+      },
+      {
+        "name": "20261013204624_enforce_active_accounts.sql",
+        "sha256": "80eadaca6ff6693520eab858af683cd51983de348d8e57fba6e444e3cc20d50e"
+      },
+      {
+        "name": "20261013205809_require_live_sessions.sql",
+        "sha256": "ff9efb30c841ea1374fd3334e7a47342bf3c7c6ace7da97aebcf163f6bab5fc9"
+      },
+      {
+        "name": "20261013211053_require_initial_password.sql",
+        "sha256": "e838c4560b64fbcfa5d2a875e26509a911b73fa821713fb0e0da4c4840a3d95e"
+      },
+      {
+        "name": "20261013220007_enforce_mfa_access_and_recovery.sql",
+        "sha256": "69e0b807a9ebd155aafa05ce30d7ab01943351fe6468d4b878fbdd3b718834ce"
+      },
+      {
+        "name": "20261013222316_bind_plan_review_to_snapshot.sql",
+        "sha256": "99af470f61bdcc41b9ddfd2e9f4b417af7f5141cf93557316a9f322d91ecbb57"
+      },
+      {
+        "name": "20261013224711_atomic_plan_edits_and_progress.sql",
+        "sha256": "a6368bd8dbdae288aa677ca7f24a0148145a8953c7c835e7603cea5660c0db85"
+      },
+      {
+        "name": "20261013235624_generation_resume_leases.sql",
+        "sha256": "3ecce61a6a11d6704c1b807aa440271ae0926e190ae7614ffc3df7b44e6d0e7b"
+      },
+      {
+        "name": "20261014000822_atomic_ai_journey_budgets.sql",
+        "sha256": "4f14a9b2455e3a9b7226d4ae84113db574b4bad05efc322ed3cf759fe5f07eff"
+      },
+      {
+        "name": "20261014002118_bounded_family_next_work.sql",
+        "sha256": "602f00d7a7439e989ae07c08bf503797f7119cdd92d632c85954c26c07cbf9aa"
+      },
+      {
+        "name": "20261014002544_reuse_authorized_parent_reads.sql",
+        "sha256": "40ffd105b83ced1003c948272ec9d37c1edcb132d3c4c041d08e84c11fd73b13"
+      },
+      {
+        "name": "20261014003444_confirm_school_calendar_dates.sql",
+        "sha256": "537c404484b5749ed688f32d00a776d630734303363aaa79621e97bb2eadc3e8"
+      },
+      {
+        "name": "20261014005053_resource_directory_availability.sql",
+        "sha256": "f526016711364827a873ed1f2035a050ca578303266e2f1bd679ce24ccea8fc2"
+      },
+      {
+        "name": "20261014010429_identifier_variants.sql",
+        "sha256": "a70089a0104ef78264c29c0fff32c8874089928588ceb3e32ac74a7e126c0caa"
+      },
+      {
+        "name": "20261014012912_contact_provenance.sql",
+        "sha256": "d7f29ced0c2d9d78e3b511ee3c279739198df6cb0eda9ddbffe082257e65d7e8"
+      },
+      {
+        "name": "20261014174244_restrict_platform_rls_trigger.sql",
+        "sha256": "100080081d283918aecd31735b64bc14bc56f3a735db3bf164baa14a96e46bf5"
+      },
+      {
+        "name": "20261014203800_explicit_application_privileges.sql",
+        "sha256": "0cfb5d2cfa9e13b7415ec844ff85c427c6dbf3849a5eb5847aa5e1997ac81793"
+      },
+      {
+        "name": "20261014230221_password_only_pilot_accounts.sql",
+        "sha256": "d0ff2b2babd4cbd61ea4a2fd955e46f60381675e6ad4b6a777b453d08c102c4a"
+      }
+    ],
+    "transactionRolledBack": true
+  },
+  "backupCreatedAt": "2026-10-15T00:43:58.149Z",
+  "archiveSha256": "0f77cb53f905b548d49d491bb76d733bd5b912423da7f34d8c5c7ef5a6c56e62",
+  "compared": [
+    {
+      "table": "auth.audit_log_entries",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.custom_oauth_providers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.flow_state",
+      "rows": 16,
+      "matched": true
+    },
+    {
+      "table": "auth.identities",
+      "rows": 13,
+      "matched": true
+    },
+    {
+      "table": "auth.instances",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_amr_claims",
+      "rows": 10,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_challenges",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_factors",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_recovery_code_sets",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.mfa_recovery_codes",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_authorizations",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_client_states",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_clients",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.oauth_consents",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.one_time_tokens",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.refresh_tokens",
+      "rows": 48,
+      "matched": true
+    },
+    {
+      "table": "auth.saml_providers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.saml_relay_states",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.schema_migrations",
+      "rows": 82,
+      "matched": true
+    },
+    {
+      "table": "auth.scim_tokens",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.scim_users",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.sessions",
+      "rows": 10,
+      "matched": true
+    },
+    {
+      "table": "auth.sso_domains",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.sso_providers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.users",
+      "rows": 13,
+      "matched": true
+    },
+    {
+      "table": "auth.webauthn_challenges",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "auth.webauthn_credentials",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.activity_log",
+      "rows": 283,
+      "matched": true
+    },
+    {
+      "table": "public.app_users",
+      "rows": 11,
+      "matched": true
+    },
+    {
+      "table": "public.barrier_plan_records",
+      "rows": 24,
+      "matched": true
+    },
+    {
+      "table": "public.case_notes",
+      "rows": 5,
+      "matched": true
+    },
+    {
+      "table": "public.case_progress_updates",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.families",
+      "rows": 44,
+      "matched": true
+    },
+    {
+      "table": "public.family_barriers",
+      "rows": 125,
+      "matched": true
+    },
+    {
+      "table": "public.family_case_managers",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.family_goals",
+      "rows": 19,
+      "matched": true
+    },
+    {
+      "table": "public.family_members",
+      "rows": 4,
+      "matched": true
+    },
+    {
+      "table": "public.plan_step_action_items",
+      "rows": 1696,
+      "matched": true
+    },
+    {
+      "table": "public.plan_step_activity",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.plan_step_resources",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.plan_steps",
+      "rows": 726,
+      "matched": true
+    },
+    {
+      "table": "public.plans",
+      "rows": 66,
+      "matched": true
+    },
+    {
+      "table": "public.referrals",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "public.resource_import_runs",
+      "rows": 1,
+      "matched": true
+    },
+    {
+      "table": "public.resource_matches",
+      "rows": 961,
+      "matched": true
+    },
+    {
+      "table": "public.resources",
+      "rows": 54,
+      "matched": true
+    },
+    {
+      "table": "public.tasks",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.buckets",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.buckets_analytics",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.buckets_vectors",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.migrations",
+      "rows": 74,
+      "matched": true
+    },
+    {
+      "table": "storage.objects",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.s3_multipart_uploads",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.s3_multipart_uploads_parts",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "storage.vector_indexes",
+      "rows": 0,
+      "matched": true
+    },
+    {
+      "table": "supabase_migrations.schema_migrations",
+      "rows": 1,
+      "matched": true
+    }
+  ],
+  "tables": 56,
+  "rows": 4286,
+  "restoredRowsExactlyMatch": true,
+  "ownership": "Restored objects owned by postgres in isolated scratch database (--no-owner); stored archive retains original ownership metadata.",
+  "applicationGrantsRestored": true,
+  "managedProviderDefaultAclsRestored": false,
+  "tlsCertificateVerified": true,
+  "passed": true,
+  "scratchRemoved": true,
+  "finishedAt": "2026-10-15T00:51:57.726Z",
+  "credentialsPrintedOrPersisted": false
+}
