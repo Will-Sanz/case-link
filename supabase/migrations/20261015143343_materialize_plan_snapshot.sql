@@ -41,4 +41,3 @@ CREATE OR REPLACE FUNCTION public.get_family_plan_snapshot (
     'material_revision', encode(sha256(convert_to(material_content::text, 'UTF8')), 'hex')
   ) end) from revisions;
 $function$;
-
