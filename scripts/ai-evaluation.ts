@@ -7,13 +7,15 @@ import { collectRefinementChanges, applyRefinementChanges } from "../src/lib/dom
 import type { DraftStepRefineInput } from "../src/lib/plan-generator/plan-refine-lean";
 import type { LeanPlanPhaseStep } from "../src/lib/plan-generator/lean-plan-schema";
 import type { FamilyDetail, PlanStepRow } from "../src/types/family";
+import { estimateAiCost, type AiUsage } from "../src/lib/ai/usage";
 
 export const REQUESTED_TITLE = "Prepare the agreed next step";
-export const EVALUATION_VERSION = 7;
+export const EVALUATION_VERSION = 8;
 export type EvaluationCheck = { code: string; passed: boolean; severity: "critical" | "quality" };
 
 export function evaluationSourceHash() {
   const files = ["src/lib/ai/client.ts", "src/lib/ai/models.ts", "src/lib/ai/model-allowlist.ts", "src/lib/ai/casework-safety.ts", "src/lib/plan-generator/openai-plan.ts", "src/lib/plan-generator/openai-plan-lean-phase.ts", "src/lib/plan-generator/lean-plan-schema.ts", "src/lib/plan-generator/plan-refine-lean.ts", "src/lib/plan-generator/planning-brief.ts", "src/lib/case-assistant/ai-case-assistant.ts", "src/lib/case-assistant/case-context.ts", "src/lib/case-assistant/answer-schema.ts", "src/lib/matching/plan-resources.ts", "src/lib/domain/plan/refinement-review.ts", "src/lib/privacy/no-pii.ts", "tests/fixtures/ai-evaluation-cases.ts", "scripts/ai-evaluation.ts", "tests/ai/evaluation.live.ts", "src/lib/plan-generator/prior-phase-summary.ts"];
+  files.push("src/lib/ai/usage.ts", "src/lib/ai/case-facts.ts", "tests/ai/pilot-cases.ts");
   return createHash("sha256").update(files.map(file => `${file}\n${readFileSync(file, "utf8")}`).join("\n")).digest("hex");
 }
 
@@ -99,9 +101,28 @@ export function percentile(values: number[], fraction: number): number | null {
   return [...values].sort((a, b) => a - b)[Math.max(0, Math.ceil(values.length * fraction) - 1)];
 }
 
-/** Standard short-context USD estimate, checked against official pricing 2026-10-14; not an invoice. */
-export function estimatedCost(usage: { input_tokens: number; output_tokens: number; input_tokens_details?: { cached_tokens?: number; cache_creation_tokens?: number } }) {
-  const cached = usage.input_tokens_details?.cached_tokens ?? 0;
-  const writes = usage.input_tokens_details?.cache_creation_tokens ?? 0;
-  return (Math.max(0, usage.input_tokens - cached - writes) * 0.20 + cached * 0.02 + writes * 0.25 + usage.output_tokens * 1.20) / 1_000_000;
+/** Historical default preserves old report callers; comparisons must supply the returned model and tier. */
+export function estimatedCost(usage: AiUsage, model = "gpt-5.6-luna", serviceTier = "default") {
+  return estimateAiCost(model, usage, serviceTier);
+}
+
+/** Synthetic-run guard: reserve before concurrent dispatch; retain the bound when billed usage is unknown. */
+export function evaluationBudget(limitUsd: number, requestLimit = 400) {
+  const totals = { requests: 0, measuredUsd: 0, reservedUsd: 0, unknownCostRequests: 0, unknownCostReserveUsd: 0 };
+  return {
+    totals,
+    reserve(model: string, requestBytes: number, outputTokens: number) {
+      const inputBound = requestBytes + 2048;
+      const reserve = estimatedCost({ input_tokens: inputBound, output_tokens: outputTokens,
+        input_tokens_details: model === "gpt-4o" ? undefined : { cache_write_tokens: inputBound } }, model);
+      if (reserve === null || totals.requests >= requestLimit || totals.measuredUsd + totals.unknownCostReserveUsd + totals.reservedUsd + reserve > limitUsd) throw new Error("Evaluation request/cost limit reached before dispatch.");
+      totals.requests++;
+      totals.reservedUsd += reserve;
+      return (actualUsd: number | null) => {
+        totals.reservedUsd -= reserve;
+        if (actualUsd === null) { totals.unknownCostRequests++; totals.unknownCostReserveUsd += reserve; }
+        else totals.measuredUsd += actualUsd;
+      };
+    },
+  };
 }

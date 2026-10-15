@@ -1,21 +1,27 @@
-/**
- * AI model configuration and task routing (per user AI mode: fast vs thinking).
- *
- * Overrides still apply: OPENAI_MODEL_OVERRIDE wins all. Per-mode env tuning:
- * - OPENAI_PLAN_MODEL, OPENAI_PLAN_PHASE_MODEL, OPENAI_UI_MODEL
- * - OPENAI_PLAN_PHASE_THINKING_MODEL,_OPENAI_THINKING_UI_MODEL
- */
+/** Server-controlled task routing; global and legacy operator overrides remain supported. */
 
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
 import { isAllowedOpenAiModelId, OPENAI_MODELS } from "./model-allowlist";
 
 /** Task types for model routing */
-export type AiTaskType = "plan_phase_generation" | "plan_refinement" | "step_refinement" | "case_assistant";
+export type AiTaskType = "plan_generation" | "plan_phase_generation" | "plan_refinement" | "step_refinement" | "case_assistant";
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export const MODELS = {
-  PLAN_GENERATION: "gpt-5.6-luna",
-  CHAT_UI_EDITS: "gpt-5.6-luna",
+  PLAN_GENERATION: "gpt-6-astra",
+  PLAN_REFINEMENT: "gpt-6.1-sol",
+  CASE_ASSISTANT: "gpt-6.1-sol",
+  STEP_REFINEMENT: "gpt-6-luna",
+} as const;
+
+const PLAN_CONFIG = { model: MODELS.PLAN_GENERATION, effort: "medium", maxTokens: 16384, prefix: "OPENAI_PLAN_GENERATION" } as const;
+const TASK_CONFIG = {
+  plan_generation: PLAN_CONFIG,
+  plan_phase_generation: PLAN_CONFIG,
+  plan_refinement: { model: MODELS.PLAN_REFINEMENT, effort: "medium", maxTokens: 8192, prefix: "OPENAI_PLAN_REFINEMENT" },
+  step_refinement: { model: MODELS.STEP_REFINEMENT, effort: "low", maxTokens: 4096, prefix: "OPENAI_STEP_REFINEMENT" },
+  case_assistant: { model: MODELS.CASE_ASSISTANT, effort: "medium", maxTokens: 8192, prefix: "OPENAI_CASE_ASSISTANT" },
 } as const;
 
 /** Models that accept configurable reasoning effort. */
@@ -29,40 +35,25 @@ export function getModelForTask(taskType: AiTaskType, mode: AiMode): string {
   const override = env.OPENAI_MODEL_OVERRIDE?.trim();
   if (override) return override;
 
-  if (mode === "thinking") {
-    if (taskType === "plan_phase_generation") {
-      return (
-        env.OPENAI_PLAN_PHASE_THINKING_MODEL?.trim() ||
-        env.OPENAI_PLAN_MODEL?.trim() ||
-        MODELS.PLAN_GENERATION
-      );
-    }
-    return (
-      env.OPENAI_THINKING_UI_MODEL?.trim() ||
-      env.OPENAI_PLAN_MODEL?.trim() ||
-      MODELS.PLAN_GENERATION
-    );
-  }
-
-  if (taskType === "plan_phase_generation") {
-    return env.OPENAI_PLAN_PHASE_MODEL?.trim() || env.OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
-  }
-  return env.OPENAI_UI_MODEL?.trim() || MODELS.CHAT_UI_EDITS;
+  const config = TASK_CONFIG[taskType];
+  const explicit = env[`${config.prefix}_MODEL`]?.trim();
+  if (explicit) return explicit;
+  const planning = taskType === "plan_generation" || taskType === "plan_phase_generation";
+  // Preserve old operator overrides while task-specific settings take precedence.
+  const legacy = mode === "thinking"
+    ? (planning ? env.OPENAI_PLAN_PHASE_THINKING_MODEL : env.OPENAI_THINKING_UI_MODEL) || env.OPENAI_PLAN_MODEL
+    : (planning ? env.OPENAI_PLAN_PHASE_MODEL : undefined) || env.OPENAI_UI_MODEL;
+  return legacy?.trim() || config.model;
 }
 
-export function getDefaultMaxTokensForTask(taskType: AiTaskType, mode: AiMode): number {
-  const fast = mode === "fast";
-  switch (taskType) {
-    case "plan_phase_generation":
-      return fast ? 4096 : 6144;
-    /** Full-plan preview refine: lean JSON plus reviewed changes. */
-    case "plan_refinement":
-      return fast ? 3584 : 5120;
-    case "step_refinement":
-      return fast ? 3072 : 4096;
-    default:
-      return fast ? 2048 : 3072;
-  }
+export function getReasoningEffortForTask(taskType: AiTaskType): ReasoningEffort {
+  const config = TASK_CONFIG[taskType];
+  return getEnv()[`${config.prefix}_REASONING_EFFORT`] ?? config.effort;
+}
+
+export function getDefaultMaxTokensForTask(taskType: AiTaskType): number {
+  const config = TASK_CONFIG[taskType];
+  return getEnv()[`${config.prefix}_MAX_OUTPUT_TOKENS`] ?? config.maxTokens;
 }
 
 export function augmentInstructionsForMode(

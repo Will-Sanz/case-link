@@ -7,7 +7,9 @@ import {
   augmentInstructionsForMode,
   getDefaultMaxTokensForTask,
   getModelForTask,
+  getReasoningEffortForTask,
   modelSupportsReasoningEffort,
+  type ReasoningEffort,
   type AiTaskType,
 } from "@/lib/ai/models";
 import { isAllowedOpenAiModelId, OPENAI_MODELS } from "@/lib/ai/model-allowlist";
@@ -17,6 +19,7 @@ import { isDev } from "@/lib/env/runtime";
 import { aiBudgetMessage } from "@/lib/rate-limit/ai-budget-message";
 import { consumeOpenAiRateSlot } from "@/lib/rate-limit/ai-rate-limit";
 import { findLikelyIdentifiers } from "@/lib/privacy/no-pii";
+import { aiUsageSchema, estimateAiCost, type AiUsage } from "@/lib/ai/usage";
 
 /** Wall-clock cap for OpenAI HTTP requests (large plan payloads + reasoning can be slow). */
 const OPENAI_FETCH_TIMEOUT_MS = 180_000;
@@ -61,9 +64,10 @@ export type CreateResponseOptions = {
   requestMeta?: OpenAiRequestMeta;
 };
 
-export type CreateResponseResult =
-  | { ok: true; text: string; model: string; usage?: { total_tokens?: number } }
-  | { ok: false; error: string; code?: "privacy_blocked" | "rate_limited" | "incomplete" | "refused" | "provider_error" | "invalid_response" | "timeout" | "network_error"; retryAfter?: number };
+type ResponseUsage = { usage?: AiUsage; returnedModel?: string; serviceTier?: string };
+export type CreateResponseResult = ResponseUsage & (
+  | { ok: true; text: string; model: string }
+  | { ok: false; error: string; code?: "privacy_blocked" | "rate_limited" | "incomplete" | "refused" | "provider_error" | "model_unavailable" | "safety_review" | "invalid_response" | "timeout" | "network_error"; retryAfter?: number });
 
 function payloadHasIdentifiers(value: unknown): boolean {
   if (typeof value === "string") return findLikelyIdentifiers(value).length > 0;
@@ -102,8 +106,11 @@ function logOpenAiUsage(
     route: meta.route,
     taskType,
     model,
+    returnedModel: result.returnedModel ?? null,
     ok: result.ok,
-    total_tokens: result.ok ? (result.usage?.total_tokens ?? null) : null,
+    usage: result.usage ?? null,
+    serviceTier: result.serviceTier ?? null,
+    estimatedUsd: estimateAiCost(result.returnedModel ?? model, result.usage, result.serviceTier),
     elapsedMs,
     ts: new Date().toISOString(),
   });
@@ -128,23 +135,26 @@ export async function createAiResponse(
   const modelOverride = env.OPENAI_MODEL_OVERRIDE?.trim();
   const model = modelOverride || getModelForTask(options.taskType, mode);
   if (!isAllowedOpenAiModelId(model)) {
-    const internal = `Resolved model id is not allowed: ${model}`;
+    const internal = "The configured AI model is not supported.";
     console.error("[ai]", internal);
     return { ok: false, error: exposeAiErrorToClient(internal, envDebug) };
   }
 
   const instructions = augmentInstructionsForMode(options.instructions, mode);
-  const requestedMax = options.maxTokens ?? getDefaultMaxTokensForTask(options.taskType, mode);
+  const effort = getReasoningEffortForTask(options.taskType);
+  if (!["low", "medium", "high", "xhigh", "max"].includes(effort)) return { ok: false, error: "Invalid AI reasoning configuration." };
+  const taskCap = getDefaultMaxTokensForTask(options.taskType);
+  const requestedMax = options.maxTokens ?? taskCap;
   const outputCap =
     typeof env.OPENAI_MAX_OUTPUT_TOKENS === "number" &&
     Number.isFinite(env.OPENAI_MAX_OUTPUT_TOKENS) &&
     env.OPENAI_MAX_OUTPUT_TOKENS >= 256
       ? Math.min(32_768, Math.floor(env.OPENAI_MAX_OUTPUT_TOKENS))
-      : 8192;
-  if (!Number.isInteger(requestedMax) || requestedMax < 1) {
+      : 32768;
+  if (!Number.isInteger(requestedMax) || requestedMax < 1 || !Number.isInteger(taskCap) || taskCap < 256 || taskCap > 32768) {
     return { ok: false, error: "Invalid AI response size. Try again with the default settings." };
   }
-  const maxTokens = Math.min(requestedMax, outputCap, OPENAI_MODELS[model].maxOutputTokens);
+  const maxTokens = Math.min(requestedMax, taskCap, outputCap, OPENAI_MODELS[model].maxOutputTokens);
 
   const inputSummary = summarizeInput(options.input);
   const maxInputChars =
@@ -163,7 +173,7 @@ export async function createAiResponse(
   }
   const resolved: CreateResponseOptions = { ...options, instructions, maxTokens };
   // Freeze the exact provider body before any await; no caller can change it after inspection.
-  const requestBody = buildResponsesBody(model, resolved, mode);
+  const requestBody = buildResponsesBody(model, resolved, effort);
   if (payloadHasIdentifiers(JSON.parse(requestBody))) {
     return { ok: false, code: "privacy_blocked", error: "This AI request contains likely identifying information. Review the case text, instructions, and conversation before trying again." };
   }
@@ -181,13 +191,11 @@ export async function createAiResponse(
   const startedAt = Date.now();
 
   if (debug || payloadDebug) {
-    const reasoning =
-      modelSupportsReasoningEffort(model) ? (mode === "thinking" ? "high" : "low") : null;
     console.info("[ai] request:start", {
       taskType: options.taskType,
       model,
       aiMode: mode,
-      reasoningEffort: reasoning,
+      reasoningEffort: modelSupportsReasoningEffort(model) ? effort : null,
       api: "responses",
       hasStructuredJsonSchema: Boolean(options.structuredJsonSchema),
       inputChars: inputSummary.chars,
@@ -257,8 +265,9 @@ export async function createAiResponse(
   }
 }
 
-const usageSchema = z.object({ total_tokens: z.number().int().nonnegative().optional() }).optional();
 const responsesBodySchema = z.object({
+  model: z.string().max(200).regex(/^[a-zA-Z0-9._-]+$/).optional(),
+  service_tier: z.string().max(40).regex(/^[a-z_]+$/).optional(),
   status: z.string(),
   error: z.unknown().optional(),
   output: z.array(z.object({
@@ -267,15 +276,17 @@ const responsesBodySchema = z.object({
     text: z.string().optional(),
     content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional(),
   })),
-  usage: usageSchema,
+  usage: aiUsageSchema.optional(),
 });
 function invalidResponse(): CreateResponseResult {
   return { ok: false, code: "invalid_response", error: "The AI returned an unusable answer. Your saved work is unchanged. Try again." };
 }
 
-function providerHttpError(response: Response): CreateResponseResult {
-  // Provider error bodies can echo case input; never expose or log them.
-  void response.body?.cancel().catch(() => {});
+async function providerHttpError(response: Response): Promise<CreateResponseResult> {
+  // Inspect only known codes; provider messages can echo case input and are never exposed or logged.
+  const body = await response.json().catch(() => null);
+  if (body?.error?.code === "misalignment_policy_violation") return { ok: false, code: "safety_review", error: "The AI request needs an administrator's review. Edit the saved plan manually; do not retry this AI request." };
+  if (response.status === 403 || response.status === 404 || body?.error?.code === "model_not_found") return { ok: false, code: "model_unavailable", error: "The configured AI model is unavailable for this environment. Your saved work is unchanged. Ask an administrator to check model access." };
   if (response.status === 429) {
     const header = response.headers.get("retry-after");
     const seconds = header && /^\d+(?:\.\d+)?$/.test(header) ? Number(header)
@@ -289,7 +300,7 @@ function providerHttpError(response: Response): CreateResponseResult {
 function buildResponsesBody(
   model: string,
   options: CreateResponseOptions,
-  mode: AiMode,
+  effort: ReasoningEffort,
 ): string {
   const body: Record<string, unknown> = {
     model,
@@ -297,9 +308,10 @@ function buildResponsesBody(
     input: typeof options.input === "string" ? options.input : options.input.map(({ role, content }) => ({ role, content })),
     max_output_tokens: options.maxTokens ?? 4096,
     store: false,
+    service_tier: "default",
   };
   if (modelSupportsReasoningEffort(model)) {
-    body.reasoning = { effort: mode === "thinking" ? "high" : "low" };
+    body.reasoning = { effort };
   }
   if (!modelSupportsReasoningEffort(model)) {
     body.temperature = options.temperature ?? 0.4;
@@ -336,15 +348,16 @@ async function callResponsesApi(apiKey: string, model: string, body: string, tas
   const parsed = responsesBodySchema.safeParse(await res.json());
   if (!parsed.success) return invalidResponse();
   const data = parsed.data;
-  if (data.error) return { ok: false, code: "provider_error", error: "The AI service could not complete this request. Try again." };
+  const telemetry: ResponseUsage = { usage: data.usage, returnedModel: data.model, serviceTier: data.service_tier };
+  if (data.error) return { ...telemetry, ok: false, code: "provider_error", error: "The AI service could not complete this request. Try again." };
   if (data.output.some((item) => item.content?.some((part) => part.type === "refusal"))) {
-    return { ok: false, code: "refused", error: "The AI could not help with that request. Reword it or edit the plan yourself." };
+    return { ...telemetry, ok: false, code: "refused", error: "The AI could not help with that request. Reword it or edit the plan yourself." };
   }
   if (data.status !== "completed" || data.output.some((item) => item.status && item.status !== "completed")) {
-    return { ok: false, code: "incomplete", error: "The AI answer was incomplete and was not applied. Try a shorter request." };
+    return { ...telemetry, ok: false, code: "incomplete", error: "The AI answer was incomplete and was not applied. Try a shorter request." };
   }
   const text = extractOutputText(data);
-  if (!text?.trim()) return invalidResponse();
+  if (!text?.trim()) return { ...telemetry, ...invalidResponse() };
 
   if (debug) {
     console.info(`[ai] Responses task=${taskType} model=${model} tokens=`, data.usage?.total_tokens);
@@ -355,6 +368,8 @@ async function callResponsesApi(apiKey: string, model: string, body: string, tas
     text,
     model,
     usage: data.usage,
+    returnedModel: data.model,
+    serviceTier: data.service_tier,
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { testAiSchemaContracts } from "./test-ai-schema-contracts";
+import { OPENAI_MODELS } from "../src/lib/ai/model-allowlist";
 
 describe("synthetic live-contract runner", () => {
   it("checks every supported model/schema without provider storage and emits metadata only", async () => {
@@ -10,8 +11,9 @@ describe("synthetic live-contract runner", () => {
       return Response.json({ status: "completed", output: [{ type: "message", status: "completed", content: [{ type: "output_text", text: body.input }] }], usage: { total_tokens: 100 } });
     });
     const result = await testAiSchemaContracts("synthetic", request);
-    expect(result).toHaveLength(10);
-    expect(request).toHaveBeenCalledTimes(10);
+    expect(result).toHaveLength(Object.keys(OPENAI_MODELS).length * 6);
+    expect(request).toHaveBeenCalledTimes(Object.keys(OPENAI_MODELS).length * 6);
+    expect(result.some(item => item.task === "compact_plan")).toBe(true);
     expect(result.every(item => item.passed)).toBe(true);
     expect(JSON.stringify(result)).not.toContain("Prepare documents");
   });

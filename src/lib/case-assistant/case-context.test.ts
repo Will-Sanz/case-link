@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { directoryCase, directoryId } from "../../../tests/fixtures/directory-case";
+import { directoryCase, directoryId, directoryStamp } from "../../../tests/fixtures/directory-case";
 import { buildAssistantCaseContext } from "./case-context";
 import { askCaseAssistant } from "./ai-case-assistant";
 import { askCaseAssistantAction } from "@/app/actions/case-assistant";
@@ -50,6 +50,27 @@ describe("current case context for the assistant", () => {
     expect(createAiResponse).toHaveBeenCalledTimes(1);
   });
 
+  it.each([false, true])("checks supplied directory evidence even without returned contacts (changed: %s)", async changed => {
+    const detail = directoryCase();
+    detail.resourceMatches[0].resource!.description = "Support for adults only.";
+    mocks.detail.mockResolvedValue(detail);
+    let currentStamp = directoryStamp;
+    const lookup = { select: () => lookup, eq: () => lookup, in: vi.fn(async () => ({ data: [{
+      resource_id: directoryId, status: "suggested", resource: { id: directoryId, updated_at: currentStamp, active: true, is_demo: false },
+    }], error: null })) };
+    mocks.session.mockResolvedValue({ supabase: { from: () => lookup } });
+    vi.mocked(createAiResponse).mockImplementationOnce(async () => {
+      if (changed) currentStamp = "2026-10-15T12:00:00Z";
+      return { ok: true, model: "test", text: JSON.stringify({ answer: "The recorded service is for adults only; confirm suitability.", resource_ids: [] }) };
+    });
+    const result = await askCaseAssistantAction(familyId, "Is this service suitable?");
+    expect(result).toMatchObject({ ok: !changed });
+    expect(lookup.in).toHaveBeenCalledWith("resource_id", [directoryId]);
+    expect(createAiResponse).toHaveBeenCalledTimes(1);
+    if (changed) expect(result).not.toHaveProperty("answer");
+    else expect(result).toHaveProperty("contacts", []);
+  });
+
   it("uses live task dates, Waiting follow-ups, completion, and meeting/recording dates", () => {
     const context = JSON.parse(buildAssistantCaseContext(fixture(), new Date("2026-10-14T02:00:00Z")));
     expect(context.as_of).toBe("2026-10-13");
@@ -75,7 +96,7 @@ describe("current case context for the assistant", () => {
     expect(JSON.parse(buildAssistantCaseContext(detail))).toMatchObject({ plan: null, next_by_due_date: null, goals: [], actions: [] });
   });
 
-  it("bounds large records, declares omissions, and keeps earliest open work first", () => {
+  it("rejects oversized context instead of cutting off restrictions or current work", async () => {
     const detail = fixture();
     const step = detail.plan!.steps[0];
     const long = "General context. ".repeat(500);
@@ -86,13 +107,9 @@ describe("current case context for the assistant", () => {
     detail.caseNotes = Array.from({ length: 10 }, (_, i) => ({ ...detail.caseNotes[0], id: `note-${i}`, body: long }));
     detail.plan!.steps = Array.from({ length: 15 }, (_, i) => ({ ...step, id: `goal-${i}`, description: long, details: { ...step.details, stage_goal: long, expected_outcome: long },
       action_items: Array.from({ length: 20 }, (_, j) => action(`task-${i}-${j}`, { description: long, notes: long, outcome: long, target_date: i === 0 && j === 0 ? "2026-10-01" : "2026-12-01" })) }));
-    const raw = buildAssistantCaseContext(detail);
-    expect(raw.length).toBeLessThanOrEqual(70_000);
-    const context = JSON.parse(raw);
-    expect(context.actions[0].id).toBe("task-0-0");
-    expect(context.limits.actions_omitted).toBe(300 - context.actions.length);
-    expect(context.limits).toMatchObject({ shortened_text: true, stated_goals_omitted: 5, barriers_omitted: 5, meetings_omitted: 5, notes_omitted: 5 });
-    expect(raw).toContain("[shortened]");
+    expect(() => buildAssistantCaseContext(detail)).toThrow("no instructions were discarded");
+    expect(await askCaseAssistant(detail, "What next?")).toMatchObject({ ok: false, error: expect.stringContaining("Use the plan editor") });
+    expect(createAiResponse).not.toHaveBeenCalled();
   });
 
   it("sends current state with instructions to handle historical conflicts and missing context honestly", async () => {

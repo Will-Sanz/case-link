@@ -22,7 +22,7 @@ export function getPlanReviewStatus(plan: PlanWithSteps | null): PlanReviewStatu
     return {
       state: "needs_attention",
       label: "Needs attention",
-      issue: "Finish or regenerate the incomplete plan before reviewing it.",
+      issue: "Continue drafting or choose Continue manually before reviewing this plan.",
     };
   }
 

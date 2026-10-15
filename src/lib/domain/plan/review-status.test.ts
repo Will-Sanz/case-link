@@ -62,6 +62,19 @@ describe("getPlanReviewStatus", () => {
     expect(isPlanReviewed(plan())).toBe(false);
   });
 
+  it("allows manual handoff to proceed through normal action validation and explicit review", () => {
+    const manual = plan({ generation_source: "manual", generation_state: {
+      v: 1, status: "complete", completion_method: "manual", pending_phase: null,
+      phases_complete: { "30": false, "60": false, "90": false }, models_used: [], stage_timings_ms: {},
+    } });
+    expect(getPlanReviewStatus(manual).state).toBe("needs_review");
+    expect(isPlanReviewed(manual)).toBe(false);
+    manual.steps[0].action_items![0].target_date = null;
+    expect(getPlanReviewStatus(manual).issue).toContain("target date");
+    manual.steps = [];
+    expect(getPlanReviewStatus(manual).issue).toContain("at least one dated action");
+  });
+
   it("recognizes explicit case-manager approval", () => {
     const reviewed = plan({
       material_revision: "a".repeat(64),

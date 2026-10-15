@@ -4,22 +4,26 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { expect, it, vi } from "vitest";
 import { aiEvaluationCases, evaluationFamily, type EvaluationCase } from "../fixtures/ai-evaluation-cases";
-import { evaluationPlan, evaluationSourceHash, estimatedCost, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE, EVALUATION_VERSION, type EvaluationCheck } from "../../scripts/ai-evaluation";
-import { tryGenerateLeanPlanPhaseOpenAI } from "../../src/lib/plan-generator/openai-plan-lean-phase";
+import { evaluationPlan, evaluationSourceHash, estimatedCost, evaluationBudget, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE, EVALUATION_VERSION, type EvaluationCheck } from "../../scripts/ai-evaluation";
+import { tryGenerateLeanPlanOpenAI } from "../../src/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningSnapshot } from "../../src/lib/plan-generator/planning-brief";
 import { previewRefinePlanStepsWithOpenAI } from "../../src/lib/plan-generator/openai-plan";
 import { askCaseAssistant } from "../../src/lib/case-assistant/ai-case-assistant";
-import { formatPriorPhasesSummary } from "../../src/lib/plan-generator/prior-phase-summary";
 import { toRefinementDraft } from "../../src/lib/domain/plan/refinement-review";
 import { contactsForResourceIds, planResourceCatalog } from "../../src/lib/matching/plan-resources";
 import { findLikelyIdentifiers } from "../../src/lib/privacy/no-pii";
+import { isAllowedOpenAiModelId } from "../../src/lib/ai/model-allowlist";
+import { getModelForTask, getReasoningEffortForTask, getDefaultMaxTokensForTask } from "../../src/lib/ai/models";
+import { aiUsageSchema, type AiUsage } from "../../src/lib/ai/usage";
+import { pilotEvaluationCases, applyPilotCaseFacts, gradePilotPlan, pilotReviewCriteria } from "./pilot-cases";
 
 // Only environment selection and the request-scoped database budget are replaced.
 // Prompts, serialization, privacy, provider transport, validation and review merging stay real.
-vi.mock("../../src/lib/env", () => ({ getEnv: () => ({ OPENAI_API_KEY: process.env.CASELINK_EVAL_API_KEY }) }));
+const configuration = vi.hoisted(() => ({ env: {} as Record<string, unknown> }));
+vi.mock("../../src/lib/env", () => ({ getEnv: () => ({ ...configuration.env, OPENAI_API_KEY: process.env.CASELINK_EVAL_API_KEY }) }));
 vi.mock("../../src/lib/rate-limit/ai-rate-limit", () => ({ consumeOpenAiRateSlot: async () => ({ allowed: true, retryAfter: 0 }) }));
 
-type Call = { task: string; model: string; returnedModel: string | null; status: number; durationMs: number; inputTokens: number | null; cachedTokens: number | null; outputTokens: number | null; totalTokens: number | null; estimatedUsd: number | null; responseStatus: string | null; serviceTier: string | null };
+type Call = { task: string; model: string; returnedModel: string | null; effort: string | null; maxOutputTokens: number; status: number; durationMs: number; inputTokens: number | null; cachedTokens: number | null; cacheWriteTokens: number | null; reasoningTokens: number | null; outputTokens: number | null; totalTokens: number | null; estimatedUsd: number | null; responseStatus: string | null; serviceTier: string | null; errorCode: string | null };
 type TaskResult = { task: string; ok: boolean; durationMs: number; checks: EvaluationCheck[]; output?: unknown; failure?: string };
 type CaseResult = { id: string; split: string; tasks: TaskResult[]; calls: Call[]; manualReview: "pending" };
 const scope = new AsyncLocalStorage<{ result: CaseResult; task: string }>();
@@ -27,7 +31,15 @@ const scope = new AsyncLocalStorage<{ result: CaseResult; task: string }>();
 it("evaluates synthetic casework with the actual production AI pipeline", async () => {
   if (process.env.CASELINK_LIVE_AI !== "1") throw new Error("This evaluation is opt-in. Set CASELINK_LIVE_AI=1; all cases are synthetic.");
   const split = process.env.CASELINK_EVAL_SPLIT ?? "development";
-  if (!["development", "held-out"].includes(split)) throw new Error("Choose development or held-out; keep the evaluation splits separate.");
+  if (!["development", "held-out", "pilot"].includes(split)) throw new Error("Choose development, held-out or pilot; keep the evaluation splits separate.");
+  const comparisonModel = process.env.CASELINK_EVAL_MODEL?.trim();
+  const comparisonEffort = process.env.CASELINK_EVAL_REASONING_EFFORT?.trim();
+  if (comparisonModel && !isAllowedOpenAiModelId(comparisonModel)) throw new Error("Unsupported comparison model.");
+  if (comparisonEffort && !["low", "medium", "high", "xhigh", "max"].includes(comparisonEffort)) throw new Error("Unsupported comparison reasoning effort.");
+  configuration.env = comparisonModel ? { OPENAI_MODEL_OVERRIDE: comparisonModel } : {};
+  if (comparisonEffort) for (const prefix of ["OPENAI_PLAN_GENERATION", "OPENAI_PLAN_REFINEMENT", "OPENAI_STEP_REFINEMENT", "OPENAI_CASE_ASSISTANT"]) configuration.env[`${prefix}_REASONING_EFFORT`] = comparisonEffort;
+  const budgetUsd = Number(process.env.CASELINK_EVAL_MAX_USD ?? 3);
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0 || budgetUsd > 10) throw new Error("Set an evaluation budget above $0 and at most $10.");
   // Read only the existing provider key, never import other local or hosted credentials.
   const key = process.env.OPENAI_API_KEY?.trim() || parse(readFileSync(".env.local"))["OPENAI_API_KEY"]?.trim();
   if (!key) throw new Error("An existing operator-provided OpenAI API key is required.");
@@ -35,68 +47,65 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
   const count = Number(process.env.CASELINK_EVAL_LIMIT ?? 25);
   if (!Number.isInteger(count) || count < 1 || count > 25) throw new Error("Evaluation limit must be between 1 and 25.");
   const selectedId = process.env.CASELINK_EVAL_CASE;
-  const cases = aiEvaluationCases.filter(item => item.split === split && (!selectedId || item.id === selectedId)).slice(0, count);
+  const cases = [...aiEvaluationCases, ...pilotEvaluationCases].filter(item => item.split === split && (!selectedId || item.id === selectedId)).slice(0, count);
   if (!cases.length) throw new Error("No evaluation case matches the selected split and ID.");
-  const now = new Date();
-  const runId = `${now.toISOString().replaceAll(/[:.]/g, "-")}-${split}`;
+  const startedAt = new Date();
+  const sourceHash = evaluationSourceHash();
+  const requestedDate = process.env.CASELINK_EVAL_DATE;
+  const now = requestedDate ? new Date(`${requestedDate}T12:00:00Z`) : startedAt;
+  if (!Number.isFinite(now.getTime()) || (requestedDate && now.toISOString().slice(0, 10) !== requestedDate)) throw new Error("Set CASELINK_EVAL_DATE to a valid YYYY-MM-DD date.");
+  const runId = `${startedAt.toISOString().replaceAll(/[:.]/g, "-")}-${split}-${comparisonModel ?? "task-routing"}-${comparisonEffort ?? "task-effort"}`;
   const directory = `tmp/ai-evaluation/${runId}`;
   mkdirSync(directory, { recursive: true });
   const results: CaseResult[] = [];
   const originalFetch = globalThis.fetch;
-  let requests = 0, measuredUsd = 0;
+  const budget = evaluationBudget(budgetUsd);
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const context = scope.getStore();
     if (!context || url !== "https://api.openai.com/v1/responses") throw new Error("Evaluation refuses unrelated network access.");
-    if (++requests > 400 || measuredUsd > 4.90) throw new Error("Evaluation request/cost limit reached.");
     const body = JSON.parse(String(init?.body));
-    if (body.store !== false || body.text?.format?.strict !== true || body.model !== "gpt-5.6-luna") throw new Error("Unexpected model or storage/structured-output contract.");
+    if (body.store !== false || body.text?.format?.strict !== true || body.service_tier !== "default" || !isAllowedOpenAiModelId(body.model)) throw new Error("Unexpected model or storage/structured-output contract.");
+    const settle = budget.reserve(body.model, Buffer.byteLength(String(init?.body), "utf8"), body.max_output_tokens);
     const started = performance.now();
-    const response = await originalFetch(input, init);
-    let data: { model?: string; status?: string; service_tier?: string; usage?: { input_tokens: number; output_tokens: number; total_tokens: number; input_tokens_details?: { cached_tokens?: number; cache_creation_tokens?: number } } } = {};
-    // Read the network body once. Reconstruct the same bytes for the production parser;
-    // teeing a second reader caused intermittent native body-read failures in the harness.
-    const bytes = response.ok ? await response.arrayBuffer() : null;
-    if (bytes) {
+    let cost: number | null = null;
+    try {
+      const response = await originalFetch(input, init);
+      let data: { model?: string; status?: string; service_tier?: string; usage?: AiUsage; error?: { code?: string } } = {};
+      // Read the network body once. Reconstruct identical bytes for the production parser.
+      const bytes = await response.arrayBuffer();
       try { data = JSON.parse(new TextDecoder().decode(bytes)); } catch { /* Production validation rejects malformed JSON. */ }
+      const usage = aiUsageSchema.safeParse(data.usage);
+      cost = usage.success ? estimatedCost(usage.data, data.model ?? body.model, data.service_tier ?? "default") : null;
+      const call: Call = { task: context.task, model: body.model, returnedModel: data.model ?? null, effort: body.reasoning?.effort ?? null, maxOutputTokens: body.max_output_tokens, status: response.status, durationMs: performance.now() - started,
+        inputTokens: data.usage?.input_tokens ?? null, cachedTokens: data.usage?.input_tokens_details?.cached_tokens ?? null,
+        outputTokens: data.usage?.output_tokens ?? null, totalTokens: data.usage?.total_tokens ?? null, estimatedUsd: cost,
+        cacheWriteTokens: data.usage?.input_tokens_details?.cache_write_tokens ?? data.usage?.input_tokens_details?.cache_creation_tokens ?? null, reasoningTokens: data.usage?.output_tokens_details?.reasoning_tokens ?? null,
+        responseStatus: data.status ?? null, serviceTier: data.service_tier ?? null, errorCode: ["model_not_found", "insufficient_quota", "rate_limit_exceeded", "misalignment_policy_violation"].includes(data.error?.code ?? "") ? data.error!.code! : null };
+      context.result.calls.push(call);
+      return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
+    } finally {
+      settle(cost);
     }
-    const cost = data.usage ? estimatedCost(data.usage) : null;
-    measuredUsd += cost ?? 0;
-    const call: Call = { task: context.task, model: body.model, returnedModel: data.model ?? null, status: response.status, durationMs: performance.now() - started,
-      inputTokens: data.usage?.input_tokens ?? null, cachedTokens: data.usage?.input_tokens_details?.cached_tokens ?? null,
-      outputTokens: data.usage?.output_tokens ?? null, totalTokens: data.usage?.total_tokens ?? null, estimatedUsd: cost,
-      responseStatus: data.status ?? null, serviceTier: data.service_tier ?? null };
-    context.result.calls.push(call);
-    return bytes ? new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers }) : response;
   });
 
   async function runCase(scenario: EvaluationCase) {
     const result: CaseResult = { id: scenario.id, split: scenario.split, tasks: [], calls: [], manualReview: "pending" };
     const detail = evaluationFamily(scenario, now);
+    if (scenario.split === "pilot") applyPilotCaseFacts(detail, scenario.id, now);
     const original = JSON.stringify(detail);
     async function task(name: string, run: () => Promise<Omit<TaskResult, "task" | "durationMs">>) {
       const started = performance.now();
       try { result.tasks.push({ ...await scope.run({ result, task: name }, run), task: name, durationMs: performance.now() - started }); }
       catch { result.tasks.push({ task: name, ok: false, durationMs: performance.now() - started, checks: [], failure: "pipeline_exception" }); }
     }
-    let prior = "";
-    const priorSteps: Parameters<typeof formatPriorPhasesSummary>[0] = [];
-    const priorActions: Parameters<typeof formatPriorPhasesSummary>[1] = [];
-    for (const phase of ["30", "60", "90"] as const) {
-      await task(`generation_${phase}`, async () => {
-        const snapshot = buildPlanningSnapshot(detail, undefined, now);
-        const response = await tryGenerateLeanPlanPhaseOpenAI(snapshot, phase, { priorPhasesSummary: prior, retries: 1 });
-        if (!response.ok) return { ok: false, checks: [], failure: response.reason };
-        for (const [index, step] of response.steps.entries()) {
-          const id = `${phase}-${index}`;
-          priorSteps.push({ id, phase, title: step.title, description: step.summary, details: { stage_goal: step.goal } });
-          priorActions.push(...step.action_items.map(action => ({ plan_step_id: id, title: action.title, status: "pending" as const, target_date: action.target_date, follow_up_date: null })));
-        }
-        prior = formatPriorPhasesSummary(priorSteps, priorActions);
-        const checks = gradeGeneratedSteps(response.steps, detail, now);
-        return { ok: checks.every(check => check.passed), checks, output: response.steps };
-      });
-    }
+    await task("generation", async () => {
+      const snapshot = buildPlanningSnapshot(detail, undefined, now);
+      const response = await tryGenerateLeanPlanOpenAI(snapshot, { retries: 1 });
+      if (!response.ok) return { ok: false, checks: [], failure: response.reason };
+      const checks = [...gradeGeneratedSteps(response.steps, detail, now), ...(scenario.split === "pilot" ? gradePilotPlan(scenario.id, response.steps, now) : [])];
+      return { ok: checks.every(check => check.passed), checks, output: response.steps };
+    });
     for (const type of ["step_refinement", "plan_refinement"] as const) {
       await task(type, async () => {
         const base = evaluationPlan(detail, now).slice(0, type === "step_refinement" ? 1 : 3);
@@ -136,21 +145,25 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
     vi.unstubAllGlobals();
     delete process.env.CASELINK_EVAL_API_KEY;
     const tasks = results.flatMap(result => result.tasks);
-    const completeDraftTimes = results.filter(result => result.tasks.filter(task => task.task.startsWith("generation_")).every(task => task.ok))
-      .map(result => result.tasks.filter(task => task.task.startsWith("generation_")).reduce((sum, task) => sum + task.durationMs, 0));
+    const completeDraftTimes = results.flatMap(result => result.tasks.filter(task => task.task === "generation" && task.ok).map(task => task.durationMs));
     const times = (name: string) => tasks.filter(task => task.task === name && task.ok).map(task => task.durationMs);
+    const { requests, measuredUsd, unknownCostRequests, unknownCostReserveUsd } = budget.totals;
     const summary = {
-      version: EVALUATION_VERSION, runId, startedAt: now.toISOString(), completedAt: new Date().toISOString(), split, selectedId: selectedId ?? null, requestedCases: cases.length, completedCases: results.length,
-      syntheticOnly: true, model: "gpt-5.6-luna", mode: "fast", sourceHash: evaluationSourceHash(), commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+      version: EVALUATION_VERSION, runId, startedAt: startedAt.toISOString(), planningDate: now.toISOString(), completedAt: new Date().toISOString(), split, selectedId: selectedId ?? null, requestedCases: cases.length, completedCases: results.length,
+      syntheticOnly: true, comparisonModel: comparisonModel ?? null, comparisonEffort: comparisonEffort ?? null,
+      taskConfiguration: Object.fromEntries((["plan_generation", "plan_refinement", "step_refinement", "case_assistant"] as const).map(task => [task, { model: getModelForTask(task, "fast"), effort: getReasoningEffortForTask(task), maxOutputTokens: getDefaultMaxTokensForTask(task) }])),
+      sourceHash, sourceUnchanged: sourceHash === evaluationSourceHash(), commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
       scope: "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
-      requests, estimatedStandardUsd: measuredUsd, priceSource: "https://developers.openai.com/api/docs/pricing", priceChecked: "2026-10-14", costNote: "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+      requests, estimatedStandardUsd: measuredUsd, budgetUsd, unknownCostRequests, unknownCostReserveUsd, priceSource: "https://developers.openai.com/api/docs/pricing", priceChecked: "2026-10-15", costNote: "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
       taskCount: tasks.length, acceptedTasks: tasks.filter(task => task.ok).length, criticalFailures: tasks.flatMap(task => task.checks.filter(check => !check.passed && check.severity === "critical")).length,
-      latencyMs: { firstPhaseP75: percentile(times("generation_30"), .75), firstPhaseP95: percentile(times("generation_30"), .95), completeDraftP75: percentile(completeDraftTimes, .75), completeDraftP95: percentile(completeDraftTimes, .95), stepRewriteP75: percentile(times("step_refinement"), .75) },
+      latencyMs: { completeDraftP75: percentile(completeDraftTimes, .75), completeDraftP95: percentile(completeDraftTimes, .95), stepRewriteP75: percentile(times("step_refinement"), .75) },
+      pilotReviewCriteria: split === "pilot" ? pilotReviewCriteria : undefined,
       humanUsefulnessReview: "pending", firstProgressAndEndToEndLatency: "not measured by this service-only harness", cases: results.map(result => ({ id: result.id, split: result.split, failedTasks: result.tasks.filter(task => !task.ok).map(task => ({ task: task.task, failure: task.failure, checks: task.checks.filter(check => !check.passed) })) })),
     };
     writeFileSync(`${directory}/summary.json`, JSON.stringify(summary, null, 2) + "\n");
     console.info(`[synthetic-evaluation] Evidence: ${directory}/summary.json`);
   }
   expect(results).toHaveLength(cases.length);
+  expect(evaluationSourceHash()).toBe(sourceHash);
   expect(results.flatMap(result => result.tasks.filter(task => !task.ok).map(task => `${result.id}/${task.task}`))).toEqual([]);
 });

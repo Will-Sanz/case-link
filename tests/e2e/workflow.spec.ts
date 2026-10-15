@@ -4,6 +4,57 @@ import { execFileSync } from "node:child_process";
 import { PDFDocument } from "pdf-lib";
 import { test, expect, activate, accessible, signIn, createFamily } from "./helpers";
 
+test("failed AI draft can be explicitly continued manually, reviewed and downloaded", async ({ page, local }, testInfo) => {
+  const staff = await local.staff();
+  await signIn(page, staff);
+  const familyId = await createFamily(page);
+  const context = "The family wants to agree a manageable next step before any provider contact.";
+  await page.getByLabel("Family priorities and context", { exact: false }).fill(context);
+  writeFileSync("tmp/e2e/provider-control.json", JSON.stringify({ failSchema: "lean_intervention_plan" }));
+  try {
+    await activate(page, page.getByRole("button", { name: "Draft action plan", exact: true }));
+    await expect(page).toHaveURL(new RegExp(`/families/${familyId}/plan$`), { timeout: 45_000 });
+    const manual = page.getByRole("button", { name: "Continue manually", exact: true });
+    await expect(manual).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Mark plan reviewed", exact: true })).toHaveCount(0);
+    const failed = (await local.db.query("select id,generation_state from public.plans where family_id=$1",[familyId])).rows[0];
+    expect(failed.generation_state.status).toBe("failed");
+    expect((await local.db.query("select count(*)::int n from public.plan_steps where plan_id=$1",[failed.id])).rows[0].n).toBe(0);
+    await accessible(page);
+    await activate(page, manual);
+    await expect(page.getByText(/You chose to finish this draft manually/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mark plan reviewed", exact: true })).toHaveCount(0);
+    const saved = (await local.db.query("select generation_source,generation_state from public.plans where id=$1",[failed.id])).rows[0];
+    expect(saved.generation_source).toBe("manual");
+    expect(saved.generation_state).toMatchObject({ status:"complete",pending_phase:null,completion_method:"manual",input_snapshot:failed.generation_state.input_snapshot });
+    const add = page.locator("section").filter({ has: page.getByRole("heading", { name:"Add an action",exact:true }) });
+    await add.getByLabel("Goal", { exact:true }).fill("Agree the next support priority");
+    await add.getByLabel("Action", { exact:true }).fill("Discuss the family priority before provider contact");
+    await add.getByLabel("Target date", { exact:true }).fill("2026-10-20");
+    await add.getByLabel("Expected result", { exact:true }).fill("The family and case manager agree a safe next step.");
+    await activate(page, add.getByRole("button", { name:"Add action",exact:true }));
+    await expect(page.getByRole("button", { name:"Edit action",exact:true })).toHaveCount(1);
+    await accessible(page);
+    await activate(page, page.getByRole("button", { name:"Mark plan reviewed",exact:true }));
+    await activate(page, page.getByRole("button", { name:"Confirm dates and mark reviewed",exact:true }));
+    await activate(page, page.getByRole("main").getByRole("link", { name:"Review PDF",exact:true }));
+    await expect(page.getByRole("button", { name:"Download PDF",exact:true })).toBeEnabled();
+    const pendingDownload = page.waitForEvent("download");
+    await activate(page, page.getByRole("button", { name:"Download PDF",exact:true }));
+    const path = testInfo.outputPath("manually-prepared-plan.pdf");
+    await (await pendingDownload).saveAs(path);
+    const bytes = readFileSync(path);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(0);
+    const text = execFileSync("pdftotext", ["-","-"], { input:bytes,encoding:"utf8" }).replace(/\s+/g," ");
+    expect(text).toContain("Discuss the family priority before provider contact");
+    expect(text).toContain("The family and case manager agree a safe next step.");
+    const audit = (await local.db.query("select action from public.activity_log where entity_id=$1",[failed.id])).rows.map(row=>row.action);
+    expect(audit).toContain("plan.continued_manually");
+    expect(audit).toContain("plan.reviewed");
+    expect(audit).not.toContain("plan.generation_finished");
+  } finally { writeFileSync("tmp/e2e/provider-control.json", "{}\n"); }
+});
+
 test("case intake through resumed generation, recovered edits, AI review, and the exact PDF download", async ({ page, context, local }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -13,7 +64,7 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   const familyContext = "The family wants a steady school routine. A relative helps twice a week. Calls should be after work; a previous application is awaiting a response.";
   await page.getByLabel("Family priorities and context", { exact: false }).fill(familyContext);
   await accessible(page);
-  writeFileSync("tmp/e2e/provider-control.json", JSON.stringify({ delayMs: 600, failSchema: "lean_plan_phase_60" }));
+  writeFileSync("tmp/e2e/provider-control.json", JSON.stringify({ delayMs: 600, failSchema: "lean_intervention_plan" }));
   await activate(page, page.getByRole("button", { name: "Draft action plan", exact: true }));
   await expect.poll(async () => (await local.db.query("select count(*)::int as n from public.plans where family_id=$1", [familyId])).rows[0].n).toBe(1);
   await page.reload();
@@ -26,7 +77,7 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   expect(JSON.parse(savedContext.rows[0].brief).summary).toBe(familyContext);
   const first = (await local.db.query("select p.id, count(s.id)::int as steps from public.plans p left join public.plan_steps s on s.plan_id=p.id where p.family_id=$1 group by p.id", [familyId])).rows;
   expect(first).toHaveLength(1);
-  expect(first[0].steps).toBe(1);
+  expect(first[0].steps).toBe(0);
   await otherTab.close();
   writeFileSync("tmp/e2e/provider-control.json", "{}\n");
   await activate(page, page.getByRole("button", { name: "Continue draft", exact: true }));

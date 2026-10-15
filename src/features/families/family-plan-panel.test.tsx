@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, savePlanEdits } from "@/app/actions/plans";
+import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, savePlanEdits, continuePlanManually } from "@/app/actions/plans";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
 import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
@@ -19,6 +19,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/app/actions/plans", () => ({
   markPlanReviewed: vi.fn(),
+  continuePlanManually: vi.fn(),
   previewRefinePlanStep: vi.fn(),
   previewRefinePlan: vi.fn(),
   createManualStep: vi.fn(),
@@ -104,11 +105,32 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     localStorage.clear(); sessionStorage.clear();
     routerRefresh.mockReset();
     vi.mocked(markPlanReviewed).mockReset();
+    vi.mocked(continuePlanManually).mockReset();
     vi.mocked(savePlanEdits).mockReset();
     vi.mocked(previewRefinePlanStep).mockReset();
     vi.mocked(previewRefinePlan).mockReset();
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     HTMLDialogElement.prototype.close = function () { this.open = false; };
+  });
+
+  it("offers explicit manual recovery for an empty failed plan and leaves review gated until actions exist", async () => {
+    const failed: PlanWithSteps = { ...plan, steps: [], generation_state: { ...plan.generation_state!, status: "failed", error: "Provider unavailable" } };
+    const view = render(<FamilyPlanPanel familyId={plan.family_id} plan={failed} workflow={null} />);
+    expect(screen.queryByRole("button", { name: "Mark plan reviewed" })).toBeNull();
+    vi.mocked(continuePlanManually).mockResolvedValueOnce({ ok: false, error: "The draft changed. Reload it." });
+    fireEvent.click(screen.getByRole("button", { name: "Continue manually" }));
+    await screen.findByText("The draft changed. Reload it.");
+    expect(routerRefresh).not.toHaveBeenCalled();
+    vi.mocked(continuePlanManually).mockResolvedValueOnce({ ok: true });
+    routerRefresh.mockImplementationOnce(() => view.rerender(<FamilyPlanPanel familyId={plan.family_id} plan={{ ...failed,
+      generation_source: "manual", generation_state: { ...failed.generation_state!, status: "complete", pending_phase: null, completion_method: "manual" },
+    }} workflow={null} />));
+    fireEvent.click(screen.getByRole("button", { name: "Continue manually" }));
+    await screen.findByText(/You chose to finish this draft manually/);
+    expect(continuePlanManually).toHaveBeenLastCalledWith({ familyId: plan.family_id, planId: plan.id, expectedRevision: plan.review_revision });
+    expect(screen.queryByRole("button", { name: "Continue manually" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mark plan reviewed" })).toBeNull();
+    expect(screen.getByText("Add an action")).toBeTruthy();
   });
 
   it("waits for an action save before opening full-plan refinement with the refreshed plan", async () => {

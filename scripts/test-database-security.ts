@@ -344,6 +344,127 @@ async function checkContactProvenance() {
   console.log("Contact provenance: canonical facts, forged/stale/unavailable denial, safe legacy edits, review/export invalidation and removal passed.");
 }
 
+async function checkCompactPlanGeneration() {
+  const family = randomUUID();
+  let lease = randomUUID();
+  try {
+    await admin.query("insert into public.families(id,name,created_by_id) values($1,'Synthetic compact plan',$2)", [family,userA]);
+    const state = { v:1, status:"running", pending_phase:"30", input_snapshot:{ family_id:family, brief:"Synthetic context", resources:"None" },
+      phases_complete:{ "30":false,"60":false,"90":false }, models_used:[], stage_timings_ms:{} };
+    const start = async (value: object) => (await asUser(userA, client => client.query(
+      "select public.start_staged_plan_generation($1,$2::jsonb) result", [family,JSON.stringify(value)]))).rows[0].result.planId as string;
+    const claim = async () => assert.equal((await asUser(userA, client => client.query(
+      "select public.claim_ai_job($1,'staged-plan-advance',$2,600) claimed", [family,lease]))).rows[0].claimed,true);
+    const complete = { ...state, status:"complete", pending_phase:null, phases_complete:{ "30":true,"60":false,"90":false } };
+    const today = schoolDate();
+    const rows = [{ phase:"30", title:"Agree the next step", description:"Review the family priority.", sort_order:0, priority:"medium", details:{expected_outcome:"A next step is agreed."},
+      action_items:[{title:"Discuss the next step",description:null,week_index:1,target_date:today,sort_order:0},
+        {title:"Review the agreed outcome",description:null,week_index:13,target_date:addCalendarDays(today,90),sort_order:1}] }];
+    const append = (plan: string, next: object, steps: object | null = rows, user = userA) => asUser(user, client => client.query(
+      "select public.append_staged_plan_phase($1,$2,'30',$3::jsonb,$4::jsonb,'gpt-test',25,$5) saved",
+      [family,plan,steps === null ? null : JSON.stringify(steps),JSON.stringify(next),lease]));
+    const update = (plan: string, next: object) => asUser(userA, client => client.query(
+      "select public.update_staged_plan_state($1,$2,$3::jsonb,$4)", [family,plan,JSON.stringify(next),lease]));
+
+    const legacyPlan = await start(state);
+    await claim();
+    await expectDbError(() => append(legacyPlan,complete), "legacy jobs cannot skip the remaining phases");
+    await expectDbError(() => append(legacyPlan,{...complete,generation_strategy:"single"}), "legacy jobs cannot switch strategy during append");
+    await expectDbError(() => update(legacyPlan,complete), "state updates cannot complete unsaved legacy work");
+    await update(legacyPlan,{...state,status:"failed"});
+
+    const compactState = {...state,generation_strategy:"single"};
+    const compactComplete = {...complete,generation_strategy:"single"};
+    const plan = await start(compactState);
+    await expectDbError(() => append(plan,compactComplete,null), "SQL-null action batches cannot mark an empty plan complete");
+    await expectDbError(() => append(plan,{...compactComplete,input_snapshot:{...state.input_snapshot,brief:"Changed instructions"}}), "appends cannot change the saved snapshot");
+    await expectDbError(() => update(plan,{...compactState,generation_strategy:undefined}), "recovery cannot remove the generation strategy");
+    await expectDbError(() => update(plan,compactComplete), "compact state cannot complete before actions are saved");
+    await expectDbError(() => append(plan,compactComplete,rows,userB), "another case manager cannot append to this family");
+    await admin.query("update private.ai_job_claims set expires_at=clock_timestamp()-interval '1 second' where family_id=$1", [family]);
+    await expectDbError(() => append(plan,compactComplete), "expired compact leases cannot append");
+    lease = randomUUID(); await claim();
+    for (const target_date of [null,addCalendarDays(today,-1),addCalendarDays(today,91)]) {
+      await expectDbError(() => append(plan,compactComplete,[{...rows[0],action_items:[{...rows[0].action_items[0],target_date}]}]), "compact actions require exact dates within the plan window");
+    }
+    await expectDbError(() => append(plan,compactComplete,[{...rows[0],action_items:[{...rows[0].action_items[0],title:""}]}]), "invalid children roll back the complete plan");
+    assert.equal((await admin.query("select count(*)::int n from public.plan_steps where plan_id=$1",[plan])).rows[0].n,0);
+    assert.equal((await admin.query("select generation_state->>'status' status from public.plans where id=$1",[plan])).rows[0].status,"running");
+    const attempts = await Promise.allSettled(Array.from({length:4},() => append(plan,compactComplete)));
+    assert.equal(attempts.filter(result => result.status === "fulfilled" && result.value.rows[0].saved === true).length,1,"concurrent duplicate appends save exactly once");
+    const saved = await snapshotFor(userA,family);
+    assert.equal(saved.plan.generation_state.status,"complete");
+    assert.deepEqual(saved.plan.generation_state.input_snapshot,state.input_snapshot);
+    assert.equal(saved.plan.steps.length,1);
+    assert.equal(saved.plan.steps[0].action_items.length,2);
+    assert.equal((await admin.query("select count(*)::int n from public.activity_log where entity_id=$1 and action='plan.generation_finished'",[plan])).rows[0].n,1);
+    await expectDbError(() => append(plan,compactComplete), "repeated compact append cannot duplicate saved actions");
+    await expectDbError(() => update(plan,{...compactState,status:"failed"}), "late failure cannot overwrite completed work");
+    await update(plan,compactComplete); // An idempotent state recovery retains exactly the saved actions.
+    assert.equal((await snapshotFor(userA,family)).plan.steps[0].action_items.length,2);
+  } finally {
+    await admin.query("delete from public.families where id=$1",[family]);
+  }
+  console.log("Compact generation: atomic completion, legacy transitions, snapshot/strategy identity, exact dates, access, leases and duplicate saves passed.");
+}
+
+async function checkManualPlanHandoff() {
+  for (const partial of [false,true]) {
+    const family = randomUUID(); const plan = randomUUID(); const olderPlan = randomUUID(); const lease = randomUUID();
+    try {
+      await admin.query("insert into public.families(id,name,created_by_id) values($1,'Synthetic manual recovery',$2)",[family,userA]);
+      const state = { v:1, ...(partial ? {} : {generation_strategy:"single"}), status:"failed", pending_phase:partial?"60":"30",
+        input_snapshot:{family_id:family,brief:"Keep the agreed family restrictions.",resources:"None"},
+        phases_complete:{"30":partial,"60":false,"90":false},models_used:partial?["gpt-test"]:[],stage_timings_ms:{},error:"Provider unavailable" };
+      await admin.query("insert into public.plans(id,family_id,version,generation_source,generation_state) values($1,$3,1,'openai',$4::jsonb),($2,$3,2,'openai',$4::jsonb)",[olderPlan,plan,family,JSON.stringify(state)]);
+      if (partial) await asUser(userA,client=>client.query("select public.create_manual_plan_step($1,$2,'30','Preserved agreed action','Discuss the safe next step',$3::date,$4::jsonb)",
+        [family,plan,schoolDate(),JSON.stringify({owner:"case_manager",stage_goal:"Agree support",expected_outcome:"A safe next step is agreed."})]));
+      const before = (await snapshotFor(userA,family)).plan;
+      const handoff = (revision: string, user = userA, id = plan) => asUser(user,client=>client.query("select public.continue_plan_manually($1,$2,$3) switched",[family,id,revision]));
+      await expectDbError(()=>handoff(before.review_revision,userB),"unassigned users cannot take over a failed draft");
+      await expectDbError(()=>handoff(before.review_revision,userA,olderPlan),"historical drafts cannot be handed off");
+      await expectDbError(()=>handoff("0".repeat(64)),"handoff requires the exact displayed revision");
+      await admin.query("update public.plans set generation_state=jsonb_set(generation_state,'{status}','\"running\"') where id=$1",[plan]);
+      const runningRevision = await revisionFor(userA,family);
+      await expectDbError(()=>handoff(runningRevision),"running drafts cannot be handed off");
+      await admin.query("update public.plans set generation_state=$2::jsonb where id=$1",[plan,JSON.stringify(state)]);
+      const revision = await revisionFor(userA,family);
+      await asUser(userA,client=>client.query("select public.claim_ai_job($1,'staged-plan-advance',$2,600)",[family,lease]));
+      await admin.query("alter table public.activity_log add constraint test_manual_handoff_audit check(action <> 'plan.continued_manually') not valid");
+      try { await expectDbError(()=>handoff(revision),"audit failure rolls back manual handoff and lease cancellation"); }
+      finally { await admin.query("alter table public.activity_log drop constraint test_manual_handoff_audit"); }
+      assert.equal((await snapshotFor(userA,family)).plan.generation_state.status,"failed");
+      assert.equal((await admin.query("select count(*)::int n from private.ai_job_claims where family_id=$1",[family])).rows[0].n,1);
+      assert.equal((await handoff(revision)).rows[0].switched,true);
+      const manual = (await snapshotFor(userA,family)).plan;
+      assert.equal(manual.generation_source,"manual");
+      assert.deepEqual(manual.generation_state,{...state,status:"complete",pending_phase:null,completion_method:"manual"});
+      assert.deepEqual(manual.steps,before.steps,"saved actions survive manual handoff unchanged");
+      assert.equal(manual.client_display.reviewedAt,undefined,"handoff never approves the plan");
+      assert.equal((await admin.query("select count(*)::int n from private.ai_job_claims where family_id=$1",[family])).rows[0].n,0);
+      await expectDbError(()=>handoff(revision),"repeated or stale handoff cannot repeat the audit event");
+      const append = (token: string) => asUser(userA,client=>client.query("select public.append_staged_plan_phase($1,$2,'30',$3::jsonb,$4::jsonb,'gpt-test',25,$5)",
+        [family,plan,JSON.stringify([{phase:"30",title:"Late AI work",description:"Late answer",sort_order:5,details:{expected_outcome:"Late"},action_items:[{title:"Late task",week_index:1,target_date:schoolDate(),sort_order:0}]}]),
+          JSON.stringify({...state,status:partial?"running":"complete",pending_phase:partial?"60":null,phases_complete:{"30":true,"60":false,"90":false}}),token]));
+      await expectDbError(()=>append(lease),"the cancelled worker cannot append after manual handoff");
+      const newLease = randomUUID(); await asUser(userA,client=>client.query("select public.claim_ai_job($1,'staged-plan-advance',$2,600)",[family,newLease]));
+      await expectDbError(()=>append(newLease),"even a new lease cannot append AI work to a manually completed draft");
+      await expectDbError(()=>asUser(userA,client=>client.query("select public.update_staged_plan_state($1,$2,$3::jsonb,$4)",[family,plan,JSON.stringify({...state,status:"complete",pending_phase:null}),newLease])),"AI state updates cannot erase the manual handoff marker");
+      assert.equal((await admin.query("select count(*)::int n from public.activity_log where entity_id=$1 and action='plan.continued_manually'",[plan])).rows[0].n,1);
+      assert.equal((await admin.query("select count(*)::int n from public.activity_log where entity_id=$1 and action='plan.generation_finished'",[plan])).rows[0].n,0);
+      const approve = async (confirmed: boolean) => asUser(userA,client=>client.query("select public.mark_plan_reviewed($1,$2,$3,$4)",[family,plan,manual.review_revision,confirmed]));
+      if (!partial) await expectDbError(()=>approve(true),"an empty manually continued plan still needs an action");
+      else {
+        await expectDbError(()=>approve(false),"manual handoff never bypasses date confirmation");
+        await approve(true);
+        const reviewedRevision = await revisionFor(userA,family);
+        assert.equal((await asUser(userA,client=>client.query("select public.is_reviewed_plan_revision($1,$2,$3) ready",[family,plan,reviewedRevision]))).rows[0].ready,true);
+      }
+    } finally { await admin.query("delete from public.families where id=$1",[family]); }
+  }
+  console.log("Manual recovery: explicit revision-bound handoff, access, latest draft, atomic audit, preserved work, late-worker denial and normal review gates passed.");
+}
+
 async function checkLargeFamilyLists() {
   const ids = Array.from({ length: 100 }, () => randomUUID());
   try {
@@ -699,6 +820,8 @@ async function run() {
   await checkDateConfirmation();
   await checkResourceAvailability();
   await checkContactProvenance();
+  await checkCompactPlanGeneration();
+  await checkManualPlanHandoff();
   await checkRefinedActionPersistence();
   assert.equal(await snapshotFor(userA, familyB), null, "snapshot respects cross-family permissions");
 

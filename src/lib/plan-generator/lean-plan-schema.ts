@@ -38,6 +38,13 @@ export function planPhaseResponseSchema(phase: PlanPhase) {
   return z.strictObject({ steps: z.array(leanPlanStepBodyZ.extend({ phase: z.literal(phase) })).min(1).max(5) });
 }
 
+/** New plans have one compact goal/date response. Phase and week are storage compatibility fields only. */
+export const leanPlanResponseSchema = z.strictObject({
+  steps: z.array(leanPlanStepBodyZ.extend({
+    action_items: z.array(leanActionItemZ.omit({ week_index: true })).min(1).max(3),
+  })).min(1).max(5),
+});
+
 export type LeanPlanStepBody = z.infer<typeof leanPlanStepBodyZ>;
 export type LeanPlanPhaseStep = z.infer<ReturnType<typeof planPhaseResponseSchema>>["steps"][number];
 
@@ -72,4 +79,8 @@ export function sparseDetailsForPersistence(lean: LeanPlanPhaseStep, catalog: Re
 
 export function buildLeanPhaseRootJsonSchema(phase: PlanPhase) {
   return toStructuredJsonSchema(planPhaseResponseSchema(phase));
+}
+
+export function buildLeanPlanRootJsonSchema() {
+  return toStructuredJsonSchema(leanPlanResponseSchema);
 }

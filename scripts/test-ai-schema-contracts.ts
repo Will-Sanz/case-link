@@ -1,13 +1,14 @@
 import { assistantResponseSchema, ASSISTANT_RESPONSE_JSON_SCHEMA } from "../src/lib/case-assistant/answer-schema";
 import { pathToFileURL } from "node:url";
 import { OPENAI_MODELS } from "../src/lib/ai/model-allowlist";
-import { buildLeanPhaseRootJsonSchema, planPhaseResponseSchema } from "../src/lib/plan-generator/lean-plan-schema";
+import { buildLeanPhaseRootJsonSchema, buildLeanPlanRootJsonSchema, leanPlanResponseSchema, planPhaseResponseSchema } from "../src/lib/plan-generator/lean-plan-schema";
 import { OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA, planRefineLeanResponseSchema } from "../src/lib/plan-generator/plan-refine-lean";
-import { generatedPlanStep, refinedPlanStep } from "../tests/fixtures/plan-contract";
+import { generatedPlanStep, generatedCompactPlanStep, refinedPlanStep } from "../tests/fixtures/plan-contract";
 
 /** Opt-in synthetic schema smoke test. Never reads family data or prints provider content/credentials. */
 export async function testAiSchemaContracts(apiKey: string, request: typeof fetch = fetch) {
   const cases = [
+    { name: "compact_plan", schema: buildLeanPlanRootJsonSchema(), validator: leanPlanResponseSchema, example: { steps: [generatedCompactPlanStep] } },
     ...(["30", "60", "90"] as const).map(phase => ({ name: `phase_${phase}`, schema: buildLeanPhaseRootJsonSchema(phase), validator: planPhaseResponseSchema(phase), example: { steps: [{ ...generatedPlanStep, phase }] } })),
     { name: "refinement", schema: OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA, validator: planRefineLeanResponseSchema, example: { steps: [refinedPlanStep] } },
     { name: "assistant", schema: ASSISTANT_RESPONSE_JSON_SCHEMA, validator: assistantResponseSchema, example: { answer: "Confirm current intake options.", resource_ids: [] } },
@@ -47,7 +48,7 @@ export async function testAiSchemaContracts(apiKey: string, request: typeof fetc
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (!process.argv.includes("--live") || !process.env.OPENAI_API_KEY?.trim()) {
-    console.error("Supply --live and an operator-provided OPENAI_API_KEY to run ten small synthetic requests.");
+    console.error("Supply --live and an operator-provided OPENAI_API_KEY to check every allowed model and output schema using synthetic requests.");
     process.exitCode = 1;
   } else {
     testAiSchemaContracts(process.env.OPENAI_API_KEY).then(results => console.log(JSON.stringify({ checkedAt: new Date().toISOString(), syntheticOnly: true, results }, null, 2))).catch(error => {

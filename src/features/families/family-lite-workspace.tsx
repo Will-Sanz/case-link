@@ -236,8 +236,11 @@ export function FamilyLiteWorkspace({
   const serverPlanStillGenerating = plan?.generation_state?.status === "running";
   const planGenerateBusy = localPlanGenerating || (serverPlanStillGenerating && !pollPaused);
   const savedGenerationStages = completedGenerationStageCount(plan?.generation_state);
+  const singlePlanGeneration = !plan?.generation_state || plan.generation_state.generation_strategy === "single";
   const generationStageLabel =
-    savedGenerationStages === 0
+    singlePlanGeneration
+      ? "Drafting your plan"
+      : savedGenerationStages === 0
       ? "Drafting the first actions"
       : savedGenerationStages === 1
         ? "Adding follow-up actions"
@@ -292,6 +295,7 @@ export function FamilyLiteWorkspace({
         if (typeof outcome === "object") {
           setPollPaused(true);
           setError(`Plan preparation paused. Your completed work is saved. ${outcome.error}`);
+          if (tab === "overview") router.push(`/families/${familyId}/plan`);
         } else if (outcome === "complete" && tab === "overview") {
           router.push(`/families/${familyId}/plan`);
         } else if (outcome === "superseded") {
@@ -580,16 +584,16 @@ export function FamilyLiteWorkspace({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-medium">{generationStageLabel}…</p>
-            <p className="text-xs text-[var(--color-ink-muted)]">{savedGenerationStages} of 3 stages safely saved</p>
+            {!singlePlanGeneration ? <p className="text-xs text-[var(--color-ink-muted)]">{savedGenerationStages} of 3 stages safely saved</p> : null}
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-rule)]" aria-hidden>
+          {!singlePlanGeneration ? <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-rule)]" aria-hidden>
             <div
               className="h-full origin-left rounded-full bg-[var(--color-positive)] transition-transform duration-500"
               style={{ transform: `scaleX(${savedGenerationStages / 3})` }}
             />
-          </div>
+          </div> : null}
           <p className="mt-2 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-            You can leave this page and return. Each completed pass is saved automatically.
+            You can leave this page and return. Your planning context is saved, and the draft is saved when it is ready.
           </p>
         </div>
       ) : null}

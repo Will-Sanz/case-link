@@ -103,6 +103,9 @@ export type MatchedResourceSummary = {
   program_name: string;
   office_or_department: string;
   category: string | null;
+  description?: string | null;
+  services_select_all?: string | null;
+  additional_info?: string | null;
   primary_contact_name: string | null;
   primary_contact_title: string | null;
   primary_contact_email: string | null;
@@ -251,6 +254,10 @@ export type PlanGenerationSnapshot = {
 /** Staged lean generation progress (plans.generation_state JSONB). */
 export type PlanGenerationState = {
   v: 1;
+  /** Missing on legacy drafts that still resume their saved three-stage workflow. */
+  generation_strategy?: "single";
+  /** Explicit human handoff ends the AI job; it does not mean AI generation succeeded. */
+  completion_method?: "manual";
   status: "running" | "complete" | "failed";
   pending_phase: "30" | "60" | "90" | null;
   /** Legacy rows need a fresh generation run; never mix their partial context with current data. */

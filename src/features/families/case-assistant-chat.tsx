@@ -24,11 +24,11 @@ type ChatMessage = {
 };
 
 const STARTER_PROMPTS = [
-  "What should I prioritize this week?",
-  "Draft outreach talking points for the top resource.",
-  "What could block this plan and how should I prepare?",
-  "How should I sequence the next three plan steps?",
-  "What risks should I surface in supervision?",
+  { label: "Choose the next useful action", question: "What is the most useful next action for this family? Respect their priorities, consent, existing support and pending work. Explain what needs confirming first." },
+  { label: "Draft an outreach email", question: "Prepare a short, non-identifying outreach email for my review, with a subject and body. Use only supported resource facts. Respect the family's contact restrictions and flag any consent I must confirm before outreach. Ask about unknown intake requirements or availability without assuming eligibility. Do not send anything or include family identifiers." },
+  { label: "Prepare a call script", question: "Prepare a brief call opening and practical questions for my review. Respect the family's consent, safe contact and voicemail restrictions. Distinguish family availability from unknown provider hours. Use no family identifiers and do not claim a call has been made." },
+  { label: "Review a meeting update", question: "Help me turn a meeting update into proposed changes to this plan. First ask me for a brief non-identifying account of what changed. Distinguish reported events from proposed next steps. Do not update records; I will review and record the changes." },
+  { label: "Find a practical backup", question: "What could block the next agreed action, and what practical backup should I discuss with the family? Use their existing support and respect declined options. Keep unknown service facts explicit." },
 ];
 
 const FOLLOW_UP_CHIPS = [
@@ -220,7 +220,7 @@ export function CaseAssistantChat({
             <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
               <span className="font-medium text-[var(--color-ink-2)]">{familyName}</span>
               <span className="text-[var(--color-ink-faint)]"> · </span>
-              Grounded in this family&apos;s plan, barriers, and matched resources.
+              Uses saved family context, recent notes, the plan, and directory information.
             </p>
           </div>
           {!empty ? (
@@ -249,8 +249,7 @@ export function CaseAssistantChat({
                 <Spark className="h-6 w-6" strokeWidth={2} aria-hidden="true" />
               </div>
               <p className="max-w-md text-base leading-relaxed text-[var(--color-ink-2)]">
-                Ask for guidance on execution, sequencing, risks, barriers, resources, or outreach,
-                using this case&apos;s live context.
+                Prepare the next action, an outreach draft, or a meeting follow-up using this case&apos;s saved context.
               </p>
               <p className="mt-6 text-[11px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
                 Suggested prompts
@@ -258,12 +257,12 @@ export function CaseAssistantChat({
               <div className="mt-3 flex w-full max-w-lg flex-wrap justify-center gap-2">
                 {STARTER_PROMPTS.map((prompt) => (
                   <button
-                    key={prompt}
+                    key={prompt.label}
                     type="button"
-                    onClick={() => applySuggestion(prompt)}
+                    onClick={() => applySuggestion(prompt.question)}
                     className="max-w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] px-3.5 py-2.5 text-left text-[13px] leading-snug text-[var(--color-ink-2)] shadow-sm transition-colors hover:border-[var(--color-rule-strong)] hover:bg-[var(--color-paper)]"
                   >
-                    {prompt}
+                    {prompt.label}
                   </button>
                 ))}
               </div>
@@ -331,6 +330,9 @@ export function CaseAssistantChat({
               {error}
             </p>
           ) : null}
+          <p className="mb-2 text-xs text-[var(--color-ink-muted)]">
+            Drafts for your review. The assistant does not send emails, make calls, submit forms, or change the plan.
+          </p>
           <div className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-1.5 shadow-inner">
             <textarea
               ref={textareaRef}

@@ -37,12 +37,17 @@ function reply(path: Path, ids: string[], prose = "Confirm available intake opti
 beforeEach(() => vi.mocked(createAiResponse).mockReset());
 describe.each(paths)("%s directory grounding", path => {
   it("selects source facts without sending contact values or legacy contacts to AI", async () => {
+    const detail = directoryCase();
+    Object.assign(detail.resourceMatches[0].resource!, { description: "Housing stabilization for adults only.", services_select_all: "Intake preparation", additional_info: "Call 215-555-0148 for details." });
     vi.mocked(createAiResponse).mockResolvedValue({ok:true,model:"test",text:JSON.stringify(reply(path,[directoryId]))});
-    const result = await run(path,directoryCase());
+    const result = await run(path,detail);
     expect(result).toMatchObject({ok:true,contacts:[{source_resource_id:directoryId}]});
     if (path === "generation") expect(JSON.stringify(result)).not.toMatch(/215-555|intake@/);
     else expect(result).toMatchObject({contacts:[{phone:"215-555-0148",email:"intake@example.test"}]});
     const payload = JSON.stringify(vi.mocked(createAiResponse).mock.calls[0][0]);
+    expect(payload).toContain("Housing stabilization for adults only.");
+    expect(payload).toContain("Intake preparation");
+    expect(payload).toContain("contact_or_identifying_text");
     expect(payload).not.toMatch(/215-555|intake@|legacy@|Directoryperson|Legacy person/);
   });
   it.each(["unknown","duplicate","dismissed","inactive","demo","no resource","phone","email","url","extra contacts"])("rejects %s model facts without a substitute", async kind => {

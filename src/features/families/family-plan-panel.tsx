@@ -9,6 +9,7 @@ import { useWorkspaceUserId } from "@/components/layout/workspace-session-bounda
 import { CheckCircle as CheckCircle2, WarningCircle as CircleAlert } from "iconoir-react";
 import {
   markPlanReviewed,
+  continuePlanManually,
   previewRefinePlanStep,
   previewRefinePlan,
   createManualStep,
@@ -331,6 +332,7 @@ export function FamilyPlanPanel({
   const [stepSaveBusy, setStepSaveBusy] = useState(false);
   const [planBulkSaving, setPlanBulkSaving] = useState(false);
   const [reviewPending, setReviewPending] = useState(false);
+  const [manualHandoffPending, setManualHandoffPending] = useState(false);
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
@@ -1306,6 +1308,12 @@ export function FamilyPlanPanel({
         </p>
       ) : null}
 
+      {plan?.generation_state?.completion_method === "manual" ? (
+        <p role="status" className="text-sm text-[var(--color-ink-muted)]">
+          You chose to finish this draft manually. Add or edit actions, then review the plan and confirm its dates before exporting.
+        </p>
+      ) : null}
+
       {plan?.generation_state?.status === "failed" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <p className="font-semibold">
@@ -1315,17 +1323,36 @@ export function FamilyPlanPanel({
             {plan.generation_state.error ??
               "The unfinished part could not be prepared. Any actions already shown below are safely saved."}
           </p>
+          <p className="mt-2 text-xs leading-relaxed">
+            Continue with AI, or keep the saved work and finish the plan manually. Both paths still require your review.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
           {onContinueDraft ? (
             <Button
               type="button"
               variant="secondary"
-              className="mt-3"
               onClick={onContinueDraft}
-              disabled={continueDraftPending}
+              disabled={continueDraftPending || manualHandoffPending}
             >
               {continueDraftPending ? "Continuing…" : "Continue draft"}
             </Button>
           ) : null}
+          <Button type="button" variant="secondary" disabled={continueDraftPending || manualHandoffPending || !plan.review_revision}
+            onClick={async () => {
+              if (!plan.review_revision || manualHandoffPending) return;
+              setManualHandoffPending(true);
+              setError(null);
+              try {
+                const result = await continuePlanManually({ familyId, planId: plan.id, expectedRevision: plan.review_revision });
+                if (!result.ok) setError(result.error);
+                else router.refresh();
+              } catch {
+                setError("Could not confirm the switch to manual preparation. Reload the plan before trying again.");
+              } finally { setManualHandoffPending(false); }
+            }}>
+            {manualHandoffPending ? "Switching…" : "Continue manually"}
+          </Button>
+          </div>
         </div>
       ) : null}
 
@@ -1731,8 +1758,9 @@ export function FamilyPlanPanel({
               </section>
             ) : null}
             <p id="plan-ai-description" className="mt-1 text-xs text-[var(--color-ink-faint)]">
-              Preview updates a working copy of this plan. After you apply a preview, use{" "}
-              <strong>Save to plan</strong> to write only the actions that changed.
+              Refine wording, dates, documents, and resource choices on existing actions. Use the plan editor
+              to add or remove work or change responsibility. Select the proposed changes you want, then use{" "}
+              <strong>Save to plan</strong> to save them.
             </p>
 
             <label htmlFor="plan-ai-instruction" className="mt-4 block text-sm font-medium text-[var(--color-ink-strong)]">

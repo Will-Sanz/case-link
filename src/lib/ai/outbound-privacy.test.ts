@@ -37,6 +37,14 @@ describe("complete serializer to provider privacy boundary",()=>{
     noTransmission();
   });
   describe.each(["step_refinement","plan_refinement"] as const)("%s",taskType=>{
+    it.each(["goal", "meeting", "note"])("rejects identifying %s context newly shared with refinement before HTTP", async field => {
+      const detail = directoryCase();
+      if (field === "goal") detail.goals = [{ id: "goal", family_id: detail.id, label: privateText, preset_key: null, sort_order: 0, created_at: detail.created_at }];
+      if (field === "meeting") detail.progressUpdates = [{ id: "meeting", family_id: detail.id, plan_id: null, author_id: "staff", author: null, occurred_on: "2026-10-14", created_at: detail.created_at, summary: privateText, plan_changes: [] }];
+      if (field === "note") detail.caseNotes = [{ id: "note", family_id: detail.id, author_id: "staff", author: null, created_at: detail.created_at, body: privateText }];
+      expect(await previewRefinePlanStepsWithOpenAI(detail, [draft()], "Clarify", { taskType })).toMatchObject({ ok: false });
+      noTransmission();
+    });
     it.each(["feedback","title","description","goal","timing","documents","outcome","workflow","action title","action description","action notes","action outcome"])("rejects an unsaved %s before HTTP",async field=>{
       const step=draft();
       if(field==="title")step.title=privateText;
@@ -58,8 +66,15 @@ describe("complete serializer to provider privacy boundary",()=>{
     ]})).toMatchObject({ok:false});
     noTransmission();
   });
+  it("sends a non-identifying What is question without treating the prompt heading as a name", async () => {
+    successfulResponse({ answer: "The completion date is not recorded; confirm it with the case manager.", resource_ids: [] });
+    expect(await askCaseAssistant(directoryCase(), "What is already done, when was it completed, and what remains?")).toMatchObject({ ok: true });
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.budget).toHaveBeenCalledTimes(1);
+  });
   it.each(["generation","step_refinement","plan_refinement","assistant"] as const)("keeps legitimate source contacts usable through the full %s serializer",async path=>{
     const detail=directoryCase();
+    Object.assign(detail.resourceMatches[0].resource!, { description: "Housing stabilization for adults only.", additional_info: privateText });
     successfulResponse(path==="assistant"?{answer:"Confirm intake availability.",resource_ids:[directoryId]}:{steps:[path==="generation"?{...generatedPlanStep,resource_ids:[directoryId]}:{...refinedPlanStep,resource_ids:[directoryId]}]});
     const result=path==="assistant"?await askCaseAssistant(detail,"Help prepare intake"):
       path==="generation"?await tryGenerateLeanPlanPhaseOpenAI(buildPlanningSnapshot(detail),"30",{retries:1}):
@@ -67,6 +82,8 @@ describe("complete serializer to provider privacy boundary",()=>{
     expect(result).toMatchObject({ok:true});
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     expect(mocks.fetch.mock.calls[0][1].body).not.toMatch(/215-555|intake@|Directoryperson/);
+    expect(mocks.fetch.mock.calls[0][1].body).not.toContain("private-person");
+    expect(mocks.fetch.mock.calls[0][1].body).toContain("Housing stabilization for adults only.");
     expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).store).toBe(false);
   });
   it("continues a real assistant exchange while its displayed directory contact remains outside the provider request",async()=>{

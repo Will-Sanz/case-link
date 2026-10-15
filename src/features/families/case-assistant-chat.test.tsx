@@ -13,6 +13,20 @@ beforeEach(() => {
 });
 
 describe("case assistant conversation", () => {
+  it.each([
+    ["Draft an outreach email", "subject and body"],
+    ["Prepare a call script", "voicemail restrictions"],
+    ["Review a meeting update", "Do not update records"],
+  ])("prepares %s for review without submitting it", (label, expected) => {
+    render(<CaseAssistantChat familyId={familyId} familyName="Family 014" />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const input = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(input.value).toContain(expected);
+    expect(document.activeElement).toBe(input);
+    expect(askCaseAssistantAction).not.toHaveBeenCalled();
+    expect(screen.getByText(/does not send emails, make calls, submit forms, or change the plan/)).toBeTruthy();
+  });
+
   it("shows source contacts but sends only conversation prose on a follow-up", async () => {
     vi.mocked(askCaseAssistantAction).mockResolvedValueOnce({ok:true,answer:"Confirm intake availability.",contacts:[{source_resource_id:familyId,source_updated_at:"2026-10-13T12:00:00Z",name:"Housing office",phone:"215-555-0148",email:"intake@example.test"}]});
     render(<CaseAssistantChat familyId={familyId} familyName="Family 014"/>);

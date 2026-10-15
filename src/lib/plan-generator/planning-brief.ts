@@ -3,30 +3,29 @@ import { z } from "zod";
 import { actionUiStatus, actionUserNotes } from "@/lib/domain/plan/action-state";
 import { formatResourceCatalog, planResourceCatalog, resourceCatalogEntrySchema, matchesForPlanContext } from "@/lib/matching/plan-resources";
 import type { FamilyDetail, PlanGenerationSnapshot } from "@/types/family";
+import { buildCaseFacts, serializeCaseContext } from "@/lib/ai/case-facts";
+import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 
 const snapshotSchema = z.object({
   family_id: z.string().uuid(),
   captured_at: z.iso.datetime(),
   revision: z.string().regex(/^[a-f0-9]{64}$/),
   brief: z.string().min(1).max(80_000),
-  resources: z.string().max(15_000),
+  resources: z.string().max(40_000),
   resource_catalog: z.array(resourceCatalogEntrySchema).max(12),
 }).strict();
 
 /** Preserve instructions in full; recent history is bounded and explicitly identified. */
 export function buildPlanningBrief(detail: FamilyDetail, extraFeedback?: string): string {
-  const meetings = [...detail.progressUpdates].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at));
-  const notes = [...detail.caseNotes].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const brief = JSON.stringify({
+  return serializeCaseContext({
+    ...buildCaseFacts(detail),
     instructions: extraFeedback?.trim() || null,
-    barriers: detail.barriers.map(b => b.label.trim()),
-    stated_goals: detail.goals.map(g => g.label.trim()),
-    summary: detail.summary,
-    household_context: detail.household_notes,
     previous_plan: detail.plan ? {
-      id: detail.plan.id, version: detail.plan.version,
+      id: detail.plan.id, version: detail.plan.version, review: getPlanReviewStatus(detail.plan).state,
+      generation_source: detail.plan.generation_source,
       goals: detail.plan.steps.map(step => ({
-        title: step.title, summary: step.description, status: step.status,
+        title: step.title, goal: step.details?.stage_goal, summary: step.description, status: step.status,
+        owner: step.details?.owner ?? "case_manager", expected_result: step.details?.expected_outcome,
         actions: (step.action_items ?? []).map(action => ({
           title: action.title, description: action.description, status: actionUiStatus(action),
           target_date: action.target_date, follow_up_date: action.follow_up_date,
@@ -34,12 +33,7 @@ export function buildPlanningBrief(detail: FamilyDetail, extraFeedback?: string)
         })),
       })),
     } : null,
-    recent_meetings: meetings.slice(0, 5).map(m => ({ date: m.occurred_on, recorded_at: m.created_at, summary: m.summary })),
-    recent_notes: notes.slice(0, 5).map(n => ({ recorded_at: n.created_at, text: n.body })),
-    history_limits: { older_meetings_omitted: Math.max(0, meetings.length - 5), older_notes_omitted: Math.max(0, notes.length - 5) },
   });
-  if (brief.length > 80_000) throw new Error("This case has too much planning context for one draft. Shorten the saved notes or use the plan editor; no instructions were discarded.");
-  return brief;
 }
 
 function snapshotRevision(snapshot: Omit<PlanGenerationSnapshot, "revision">): string {

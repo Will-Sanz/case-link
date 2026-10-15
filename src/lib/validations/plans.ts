@@ -65,6 +65,12 @@ export const stagedPlanAdvanceSchema = z.object({
   aiMode: aiModeSchema,
 });
 
+export const continuePlanManuallySchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
 export const planClientDisplaySchema = z.object({
   title: z.string().max(200).optional(),
   phaseSummaries: z

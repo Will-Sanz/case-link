@@ -4,6 +4,28 @@ import { directoryCase, directoryId, directoryStamp } from "../../../tests/fixtu
 import { assertResourceCatalogCurrent, contactsForResourceIds, formatResourceCatalog, planResourceCatalog } from "./plan-resources";
 
 describe("directory contact provenance", () => {
+  it("includes complete stored service evidence and identifies omissions without leaking contacts", () => {
+    const detail = directoryCase();
+    Object.assign(detail.resourceMatches[0].resource!, {
+      description: "Housing stabilization for adults; youth-only shelter is not provided.",
+      services_select_all: "Application follow-up; appointment preparation",
+      additional_info: "Ask private-person@example.test about eligibility.",
+    });
+    const catalog = planResourceCatalog(detail.resourceMatches);
+    expect(catalog[0].evidence).toEqual({
+      description: "Housing stabilization for adults; youth-only shelter is not provided.",
+      services_select_all: "Application follow-up; appointment preparation", additional_info: null,
+      omitted_fields: [{ field: "additional_info", reason: "contact_or_identifying_text" }],
+    });
+    const prompt = formatResourceCatalog(catalog);
+    expect(prompt).toContain("youth-only shelter is not provided");
+    expect(prompt).toContain("database edit time, not a verification date");
+    expect(prompt).not.toContain("private-person");
+    detail.resourceMatches[0].resource!.description = "Supports families. ".repeat(100) + "Only serves adults.";
+    const bounded = planResourceCatalog(detail.resourceMatches)[0].evidence!;
+    expect(bounded.description).toBeNull();
+    expect(bounded.omitted_fields).toContainEqual({ field: "description", reason: "too_long" });
+  });
   it("copies only supplied program facts and keeps contact values out of prompts", () => {
     const catalog = planResourceCatalog(directoryCase().resourceMatches);
     expect(contactsForResourceIds([directoryId],catalog)).toEqual([expect.objectContaining({ source_resource_id: directoryId, source_updated_at: directoryStamp, name: "Housing support", phone: "215-555-0148", email: "intake@example.test" })]);

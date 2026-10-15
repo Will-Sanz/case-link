@@ -11,23 +11,21 @@ import { actionTargetDate } from "@/lib/domain/plan/action-state";
 import { contactReferences, planResourceCatalog } from "@/lib/matching/plan-resources";
 import { validateNoPii } from "@/lib/privacy/no-pii";
 import { CASEWORK_SAFETY_PROMPT } from "@/lib/ai/casework-safety";
+import { buildCaseFacts, serializeCaseContext } from "@/lib/ai/case-facts";
+import { getPlanReviewStatus } from "@/lib/domain/plan/review-status";
 import {
   type DraftStepRefineInput,
   mergeLeanRefineIntoBase,
   OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA,
   planRefineLeanResponseSchema,
 } from "./plan-refine-lean";
-export const MAX_PLAN_STEPS_PER_PHASE = 5;
 
-/** Shorter context for plan-level refine (compact resources, minimal prose). */
+/** Refinement must see the same family preferences and dated history as drafting. */
 function buildFamilyContextForRefine(detail: FamilyDetail): string {
-  const notes =
-    [detail.summary?.trim(), detail.household_notes?.trim()].filter(Boolean).join(" · ") || "none";
-  const barriers =
-    detail.barriers.length > 0 ?
-      detail.barriers.map((b) => b.label).join("; ")
-    : "none";
-  return `Barriers: ${barriers}\nCase notes: ${notes}\n${formatMatchesForPlannerPrompt(detail.resourceMatches, 6)}`;
+  const facts = serializeCaseContext({ ...buildCaseFacts(detail), saved_plan: detail.plan ? {
+    id: detail.plan.id, version: detail.plan.version, review: getPlanReviewStatus(detail.plan).state,
+  } : null });
+  return `${facts}\n${formatMatchesForPlannerPrompt(detail.resourceMatches, 6)}`;
 }
 
 function compactDraftJsonForRefine(
@@ -69,8 +67,10 @@ export async function previewRefinePlanStepsWithOpenAI(
   const env = getEnv();
   const logRefine = env.PLAN_REFINE_DEBUG === "1" || env.OPENAI_DEBUG === "1";
   const startedAt = Date.now();
+  let context: string;
+  try { context = buildFamilyContextForRefine(detail); }
+  catch (error) { return { ok: false, reason: error instanceof Error ? error.message : "The case context could not be prepared." }; }
   const catalog = planResourceCatalog(detail.resourceMatches, 6);
-  const context = buildFamilyContextForRefine(detail);
   const draftJson = compactDraftJsonForRefine(draftSteps);
 
   const user = `## Context

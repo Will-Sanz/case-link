@@ -10,11 +10,11 @@ import { publicSessionError } from "@/lib/auth/session-errors";
 import type { AiMode } from "@/lib/ai/ai-mode";
 import { parseAiMode } from "@/lib/ai/ai-mode";
 import { getEnv } from "@/lib/env";
-import { MAX_PLAN_STEPS_PER_PHASE, previewRefinePlanStepsWithOpenAI } from "@/lib/plan-generator/openai-plan";
+import { previewRefinePlanStepsWithOpenAI } from "@/lib/plan-generator/openai-plan";
 import { sparseDetailsForPersistence, type LeanPlanPhaseStep } from "@/lib/plan-generator/lean-plan-schema";
 import { assertResourceCatalogCurrent, planResourceCatalog } from "@/lib/matching/plan-resources";
 import { fetchPriorPhasesSummaryForPlanner } from "@/lib/plan-generator/prior-phase-summary";
-import { tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
+import { tryGenerateLeanPlanOpenAI, tryGenerateLeanPlanPhaseOpenAI } from "@/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningSnapshot, parsePlanningSnapshot } from "@/lib/plan-generator/planning-brief";
 import { resolveActionTargetDate } from "@/lib/domain/plan/action-target-date";
 import { actionUserNotes } from "@/lib/domain/plan/action-state";
@@ -45,6 +45,7 @@ import {
   createManualStepSchema,
   deletePlanStepSchema,
   stagedPlanAdvanceSchema,
+  continuePlanManuallySchema,
   stagedPlanStartSchema,
   markPlanReviewedSchema,
   savePlanEditsSchema,
@@ -246,8 +247,8 @@ async function appendLeanPhaseForPlan(
 
 /**
  * Start a durable generation job without waiting for a model response. The client
- * advances each stage independently, so navigation or a dropped request never
- * discards already-saved work.
+ * advances the saved job independently, so a dropped response can be recovered
+ * without discarding the context or duplicating a completed plan.
  */
 export async function startStagedLeanPlanGeneration(input: {
   familyId: string;
@@ -299,6 +300,7 @@ export async function startStagedLeanPlanGeneration(input: {
   const stagedMode = parseAiMode(input.aiMode);
   const generationState = {
     v: 1,
+    generation_strategy: "single",
     status: "running",
     pending_phase: "30",
     input_snapshot: snapshot,
@@ -338,7 +340,7 @@ export async function startStagedLeanPlanGeneration(input: {
   };
 }
 
-/** Run the next pending phase (60 or 90) or finalize state. Idempotent if phases already inserted. */
+/** Generate one complete plan, or resume a legacy draft at its next unsaved phase. */
 async function advanceStagedLeanPlanGenerationCore(input: {
   familyId: string;
   planId: string;
@@ -395,65 +397,47 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     return { ok: false, status: "failed", error };
   }
 
-  if (state.status === "failed") {
-    const n30 = await countStepsInPhase(supabase, planId, "30");
-    const n60 = await countStepsInPhase(supabase, planId, "60");
-    const n90 = await countStepsInPhase(supabase, planId, "90");
-    const recoveredPendingPhase = pendingPhaseFromPersistedCounts({
-      "30": n30,
-      "60": n60,
-      "90": n90,
-    });
-    if (recoveredPendingPhase === null) {
-      const completedState: PlanGenerationState = {
-        ...state,
-        status: "complete",
-        pending_phase: null,
-        phases_complete: { "30": true, "60": true, "90": true },
-        error: undefined,
-      };
-      await updateStagedPlanState(supabase, {
-        leaseId,
-        familyId: input.familyId,
-        planId,
-        generationState: completedState,
-        aiModel: activePlan.ai_model as string | null,
-        event: "plan.generation_finished",
-        eventDetails: {
-          recovered: true,
-          duration_ms: totalGenerationDurationMs(state.stage_timings_ms),
-        },
-      });
-      return { ok: true, status: "complete", done: true };
-    }
-    state = {
-      ...state,
-      status: "running",
-      pending_phase: recoveredPendingPhase,
-      phases_complete: {
-        "30": n30 > 0,
-        "60": n60 > 0,
-        "90": n90 > 0,
-      },
-      error: undefined,
-    };
+  const singlePlan = state.generation_strategy === "single";
+  const counts = {
+    "30": await countStepsInPhase(supabase, planId, "30"),
+    "60": singlePlan ? 0 : await countStepsInPhase(supabase, planId, "60"),
+    "90": singlePlan ? 0 : await countStepsInPhase(supabase, planId, "90"),
+  };
+  const pendingPhase = pendingPhaseFromPersistedCounts(counts, state.generation_strategy);
+  const phasesComplete = { "30": counts["30"] > 0, "60": counts["60"] > 0, "90": counts["90"] > 0 };
+
+  async function persistState(updates: Partial<PlanGenerationState>) {
+    const previousStatus = state.status;
+    const next = { ...state, ...updates };
+    const event =
+      next.status === "failed" && previousStatus !== "failed" ? "plan.generation_failed" as const
+      : next.status === "complete" && previousStatus !== "complete" ? "plan.generation_finished" as const
+      : next.status === "running" && previousStatus === "failed" ? "plan.generation_resumed" as const
+      : undefined;
     await updateStagedPlanState(supabase, {
-      leaseId,
-      familyId: input.familyId,
-      planId,
-      generationState: state as PlanGenerationState,
-      aiModel: activePlan.ai_model as string | null,
-      event: "plan.generation_resumed",
-      eventDetails: { pending_stage: recoveredPendingPhase },
+      leaseId, familyId: input.familyId, planId, generationState: next,
+      aiModel: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
+      event,
+      eventDetails: event === "plan.generation_finished"
+        ? { duration_ms: totalGenerationDurationMs(next.stage_timings_ms) }
+        : { pending_stage: next.pending_phase, category: "generation" },
     });
+    state = next;
   }
-  const generationMode = parseAiMode(state.ai_mode ?? input.aiMode);
+
+  if (pendingPhase === null) {
+    await persistState({ status: "complete", pending_phase: null, phases_complete: phasesComplete, error: undefined });
+    revalidatePath(`/families/${input.familyId}`, "page");
+    return { ok: true, status: "complete", done: true };
+  }
+  if (state.status === "failed" || state.pending_phase !== pendingPhase) {
+    await persistState({ status: "running", pending_phase: pendingPhase, phases_complete: phasesComplete, error: undefined });
+  }
+
   try { await assertResourceCatalogCurrent(supabase, input.familyId, snapshot.resource_catalog); }
   catch (error) {
     const message = error instanceof Error ? error.message : "The resource directory could not be verified.";
-    await updateStagedPlanState(supabase, { familyId: input.familyId, planId, leaseId,
-      generationState: { ...state, status: "failed", error: message }, aiModel: activePlan.ai_model as string | null,
-      event: "plan.generation_failed", eventDetails: { category: "resource_changed" } });
+    await persistState({ status: "failed", error: message });
     return { ok: false, status: "failed", error: message };
   }
   const privacy = validateNoPii([
@@ -461,291 +445,57 @@ async function advanceStagedLeanPlanGenerationCore(input: {
     { field: "planningResources", label: "Resource context", value: snapshot.resources },
   ]);
   if (!privacy.ok) {
-    const failedState: PlanGenerationState = {
-      ...state,
-      status: "failed",
-      error: "Remove identifying text from the family record before generating the plan.",
-    };
-    await updateStagedPlanState(supabase, {
-      leaseId,
-      familyId: input.familyId,
-      planId,
-      generationState: failedState,
-      aiModel: activePlan.ai_model as string | null,
-      event: "plan.generation_failed",
-      eventDetails: { pending_stage: state.pending_phase, category: "privacy_check" },
-    });
-    return { ok: false, status: "failed", error: privacy.error ?? "Remove identifying text before continuing." };
+    const error = privacy.error ?? "Remove identifying text before continuing.";
+    await persistState({ status: "failed", error });
+    return { ok: false, status: "failed", error };
   }
 
-  async function persistState(updates: Partial<PlanGenerationState>) {
-    const previousStatus = state.status;
-    const next = { ...state, ...updates };
-    state = next;
-    const event =
-      next.status === "failed" && previousStatus !== "failed" ? "plan.generation_failed" as const
-      : next.status === "complete" && previousStatus !== "complete" ? "plan.generation_finished" as const
-      : undefined;
-    await updateStagedPlanState(supabase, {
-      leaseId,
-      familyId: input.familyId,
-      planId,
-      generationState: next,
-      aiModel: [...new Set(next.models_used)].join(" · ") || (activePlan.ai_model as string | null),
-      event,
-      eventDetails:
-        event === "plan.generation_failed" ? { pending_stage: next.pending_phase, category: "generation" }
-        : event === "plan.generation_finished" ? { duration_ms: totalGenerationDurationMs(next.stage_timings_ms) }
-        : undefined,
-    });
-  }
-
-  if (state.pending_phase === "30") {
-    const n30 = await countStepsInPhase(supabase, planId, "30");
-    if (n30 > 0) {
-      await persistState({
-        pending_phase: "60",
-        phases_complete: { ...state.phases_complete, "30": true },
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, status: "advanced", done: false, phaseCompleted: "30" };
-    }
-
-    const t = Date.now();
-    const res = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30", {
-      retries: generationMode === "fast" ? 1 : 2,
-      aiMode: generationMode,
-      requestMeta: { route: "stagedPlanPhase30" },
-      planStartDate: activePlan.created_at as string,
-    });
-    if (!res.ok) {
-      await persistState({ status: "failed", error: res.reason });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, status: "failed", error: res.reason };
-    }
-    const steps = res.steps
-      .map((step) => ({ ...step, phase: "30" as const }))
-      .slice(0, MAX_PLAN_STEPS_PER_PHASE);
-    if (steps.length === 0) {
-      const error = "The planning assistant returned no initial actions.";
-      await persistState({ status: "failed", error });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, status: "failed", error };
-    }
-    const modelsUsed = [...state.models_used, res.model];
-    const durationMs = Date.now() - t;
-    const nextState: PlanGenerationState = {
-      ...state,
-      pending_phase: "60",
-      phases_complete: { ...state.phases_complete, "30": true },
-      models_used: modelsUsed,
-      stage_timings_ms: { ...state.stage_timings_ms, "30": durationMs },
-    };
-    const ins = await appendLeanPhaseForPlan(
-      supabase,
-      input.familyId,
-      planId,
-      steps,
-      0,
-      activePlan.created_at as string,
-      nextState,
-      modelsUsed.join(" · "),
-      durationMs,
-      leaseId,
-    );
-    if (!ins.ok) {
-      await persistState({ status: "failed", error: ins.error });
-      return { ok: false, status: "failed", error: ins.error };
-    }
-    state = nextState;
+  const generationMode = parseAiMode(state.ai_mode ?? input.aiMode);
+  const priorPhases = pendingPhase === "60" ? ["30"] as const : ["30", "60"] as const;
+  const priorSummary = !singlePlan && pendingPhase !== "30"
+    ? await fetchPriorPhasesSummaryForPlanner(supabase, planId, [...priorPhases]) : undefined;
+  const started = Date.now();
+  const options = {
+    retries: generationMode === "fast" ? 1 : 2,
+    aiMode: generationMode,
+    priorPhasesSummary: priorSummary,
+    requestMeta: { route: singlePlan ? "generateCompletePlan" : `stagedPlanPhase${pendingPhase}` },
+    planStartDate: activePlan.created_at as string,
+  };
+  const result = singlePlan
+    ? await tryGenerateLeanPlanOpenAI(snapshot, options)
+    : await tryGenerateLeanPlanPhaseOpenAI(snapshot, pendingPhase, options);
+  if (!result.ok) {
+    await persistState({ status: "failed", error: result.reason });
     revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, status: "advanced", done: false, phaseCompleted: "30" };
+    return { ok: false, status: "failed", error: result.reason };
   }
 
-  // Heal: if DB already has steps for pending phase, advance state only
-  if (state.pending_phase === "60") {
-    const n60 = await countStepsInPhase(supabase, planId, "60");
-    if (n60 > 0) {
-      await persistState({
-        pending_phase: "90",
-        phases_complete: { ...state.phases_complete, "60": true },
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, status: "advanced", done: false, phaseCompleted: "60" };
-    }
-
-    const priorFor60 = await fetchPriorPhasesSummaryForPlanner(supabase, planId, ["30"]);
-    const t = Date.now();
-    const res = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "60", {
-      retries: generationMode === "fast" ? 1 : 2,
-      aiMode: generationMode,
-      priorPhasesSummary: priorFor60 || undefined,
-      requestMeta: { route: "stagedPlanPhase60" },
-      planStartDate: activePlan.created_at as string,
-    });
-    if (!res.ok) {
-      await persistState({ status: "failed", error: res.reason });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, status: "failed", error: res.reason };
-    }
-    const steps = res.steps
-      .map((s) => ({ ...s, phase: "60" as const }))
-      .slice(0, MAX_PLAN_STEPS_PER_PHASE);
-    if (steps.length === 0) {
-      await persistState({
-        status: "failed",
-        error: "AI returned no steps for the 60-day phase.",
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, status: "failed", error: "AI returned no steps for the 60-day phase." };
-    }
-    const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
-    const models_used = [...state.models_used, res.model];
-    const durationMs = Date.now() - t;
-    const nextState: PlanGenerationState = {
-      ...state,
-      pending_phase: "90",
-      phases_complete: { ...state.phases_complete, "60": true },
-      models_used,
-      stage_timings_ms: { ...state.stage_timings_ms, "60": durationMs },
-    };
-    const ins = await appendLeanPhaseForPlan(
-      supabase,
-      input.familyId,
-      planId,
-      steps,
-      start,
-      activePlan.created_at as string,
-      nextState,
-      models_used.join(" · "),
-      durationMs,
-      leaseId,
-    );
-    if (!ins.ok) {
-      await persistState({ status: "failed", error: ins.error });
-      return { ok: false, status: "failed", error: ins.error };
-    }
-    state = nextState;
-    revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, status: "advanced", done: false, phaseCompleted: "60" };
+  const nextPhase = singlePlan || pendingPhase === "90" ? null : pendingPhase === "30" ? "60" : "90";
+  const modelsUsed = [...state.models_used, result.model];
+  const durationMs = Date.now() - started;
+  const nextState: PlanGenerationState = {
+    ...state,
+    status: nextPhase === null ? "complete" : "running",
+    pending_phase: nextPhase,
+    phases_complete: { ...phasesComplete, [pendingPhase]: true },
+    models_used: modelsUsed,
+    stage_timings_ms: { ...state.stage_timings_ms, [pendingPhase]: durationMs },
+    error: undefined,
+  };
+  const startOrder = pendingPhase === "30" ? 0 : (await maxPlanStepSortOrder(supabase, planId)) + 1;
+  const inserted = await appendLeanPhaseForPlan(
+    supabase, input.familyId, planId, result.steps, startOrder,
+    activePlan.created_at as string, nextState, modelsUsed.join(" · "), durationMs, leaseId,
+  );
+  if (!inserted.ok) {
+    await persistState({ status: "failed", error: inserted.error });
+    return { ok: false, status: "failed", error: inserted.error };
   }
-
-  if (state.pending_phase === "90") {
-    const n90 = await countStepsInPhase(supabase, planId, "90");
-    if (n90 > 0) {
-      await persistState({
-        pending_phase: null,
-        status: "complete",
-        phases_complete: { ...state.phases_complete, "90": true },
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, status: "complete", done: true, phaseCompleted: "90" };
-    }
-
-    const priorFor90 = await fetchPriorPhasesSummaryForPlanner(supabase, planId, ["30", "60"]);
-    const t = Date.now();
-    const res = await tryGenerateLeanPlanPhaseOpenAI(snapshot, "90", {
-      retries: generationMode === "fast" ? 1 : 2,
-      aiMode: generationMode,
-      priorPhasesSummary: priorFor90 || undefined,
-      requestMeta: { route: "stagedPlanPhase90" },
-      planStartDate: activePlan.created_at as string,
-    });
-    if (!res.ok) {
-      await persistState({ status: "failed", error: res.reason });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, status: "failed", error: res.reason };
-    }
-    const steps = res.steps
-      .map((s) => ({ ...s, phase: "90" as const }))
-      .slice(0, MAX_PLAN_STEPS_PER_PHASE);
-    if (steps.length === 0) {
-      await persistState({
-        status: "failed",
-        error: "AI returned no steps for the 90-day phase.",
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: false, status: "failed", error: "AI returned no steps for the 90-day phase." };
-    }
-    const start = (await maxPlanStepSortOrder(supabase, planId)) + 1;
-    const models_used = [...state.models_used, res.model];
-    const durationMs = Date.now() - t;
-    const nextState: PlanGenerationState = {
-      ...state,
-      pending_phase: null,
-      status: "complete",
-      phases_complete: { ...state.phases_complete, "90": true },
-      models_used,
-      stage_timings_ms: { ...state.stage_timings_ms, "90": durationMs },
-    };
-    const ins = await appendLeanPhaseForPlan(
-      supabase,
-      input.familyId,
-      planId,
-      steps,
-      start,
-      activePlan.created_at as string,
-      nextState,
-      models_used.join(" · "),
-      durationMs,
-      leaseId,
-    );
-    if (!ins.ok) {
-      await persistState({ status: "failed", error: ins.error });
-      return { ok: false, status: "failed", error: ins.error };
-    }
-    state = nextState;
-    revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, status: "complete", done: true, phaseCompleted: "90" };
-  }
-
-  // Corrupt, raced, or legacy state: recover from the rows already persisted.
-  if (state.status === "running") {
-    const n30 = await countStepsInPhase(supabase, planId, "30");
-    const n60 = await countStepsInPhase(supabase, planId, "60");
-    const n90 = await countStepsInPhase(supabase, planId, "90");
-    const recoveredPendingPhase = pendingPhaseFromPersistedCounts({
-      "30": n30,
-      "60": n60,
-      "90": n90,
-    });
-
-    if (recoveredPendingPhase === null) {
-      await persistState({
-        pending_phase: null,
-        status: "complete",
-        phases_complete: { "30": true, "60": true, "90": true },
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, status: "complete", done: true };
-    }
-    if (recoveredPendingPhase === "90") {
-      await persistState({
-        pending_phase: "90",
-        phases_complete: { ...state.phases_complete, "60": true },
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, status: "advanced", done: false };
-    }
-    if (recoveredPendingPhase === "60") {
-      await persistState({
-        pending_phase: "60",
-        phases_complete: { ...state.phases_complete, "30": true },
-      });
-      revalidatePath(`/families/${input.familyId}`, "page");
-      return { ok: true, status: "advanced", done: false };
-    }
-
-    await persistState({
-      pending_phase: recoveredPendingPhase,
-      phases_complete: { "30": false, "60": false, "90": false },
-    });
-    revalidatePath(`/families/${input.familyId}`, "page");
-    return { ok: true, status: "advanced", done: false };
-  }
-
   revalidatePath(`/families/${input.familyId}`, "page");
-  return { ok: true, status: "complete", done: true };
+  return nextPhase === null
+    ? { ok: true, status: "complete", done: true, phaseCompleted: pendingPhase }
+    : { ok: true, status: "advanced", done: false, phaseCompleted: pendingPhase };
 }
 
 export async function advanceStagedLeanPlanGeneration(input: {
@@ -792,6 +542,30 @@ export async function advanceStagedLeanPlanGeneration(input: {
       p_lease_id: leaseId,
     });
     if (error) logServerError("advanceStagedLeanPlanGeneration:release", error);
+  }
+}
+
+/** End a failed AI job only after the case manager explicitly chooses manual preparation. */
+export async function continuePlanManually(input: unknown): Promise<ActionResult> {
+  const parsed = continuePlanManuallySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Reload the saved plan before continuing manually." };
+  let supabase: SupabaseClient;
+  try {
+    ({ supabase } = await requireAppUserWithClient());
+  } catch (error) {
+    return { ok: false, error: publicSessionError(error) };
+  }
+  try {
+    const { data, error } = await supabase.rpc("continue_plan_manually", {
+      p_family_id: parsed.data.familyId,
+      p_plan_id: parsed.data.planId,
+      p_expected_revision: parsed.data.expectedRevision,
+    });
+    if (error || data !== true) return { ok: false, error: publicMessageFromSupabaseError(error, "Could not switch this draft to manual preparation. Reload and try again.") };
+    revalidatePath(`/families/${parsed.data.familyId}`, "page");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: publicMessageFromCaughtError("continuePlanManually", error, "Could not switch this draft to manual preparation. Reload and try again.") };
   }
 }
 

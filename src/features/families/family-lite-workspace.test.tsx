@@ -78,7 +78,7 @@ describe("FamilyLiteWorkspace plan generation", () => {
     routerRefresh.mockReset();
   });
 
-  it("routes to the plan page when staged generation finishes", async () => {
+  it.each(["complete", "failed"] as const)("routes to the saved plan page after generation is %s so recovery is available", async outcome => {
     vi.mocked(generateBarrierWorkflowForFamilyAction).mockResolvedValue({
       ok: true,
       stagedPolling: true,
@@ -96,7 +96,9 @@ describe("FamilyLiteWorkspace plan generation", () => {
         lastSavedAt: "2026-08-04T14:00:00.000Z",
       },
     });
-    vi.mocked(advanceStagedLeanPlanGeneration).mockResolvedValue({ ok: true, status: "complete", done: true });
+    vi.mocked(advanceStagedLeanPlanGeneration).mockResolvedValue(outcome === "complete"
+      ? { ok: true, status: "complete", done: true }
+      : { ok: false, status: "failed", error: "Provider unavailable" });
 
     render(
       <FamilyLiteWorkspace
@@ -162,10 +164,12 @@ it("restarts a cancelled mount safely and stops advancing after leaving the page
   let finish!: (value: Awaited<ReturnType<typeof advanceStagedLeanPlanGeneration>>) => void;
   const advance = vi.mocked(advanceStagedLeanPlanGeneration);
   advance.mockReset().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue({ ok: true, status: "complete", done: true });
-  const plan: import("@/types/family").PlanWithSteps = { id: "30000000-0000-4000-8000-000000000003", family_id: familyId, steps: [], version: 2, summary: null, generation_source: "openai", ai_model: null, created_at: "2026-10-13T12:00:00Z", presentation: { sourceKind: "ai" }, generation_state: { v: 1, status: "running", pending_phase: "30", models_used: [], stage_timings_ms: {}, phases_complete: { "30": false, "60": false, "90": false } } };
+  const plan: import("@/types/family").PlanWithSteps = { id: "30000000-0000-4000-8000-000000000003", family_id: familyId, steps: [], version: 2, summary: null, generation_source: "openai", ai_model: null, created_at: "2026-10-13T12:00:00Z", presentation: { sourceKind: "ai" }, generation_state: { v: 1, generation_strategy: "single", status: "running", pending_phase: "30", models_used: [], stage_timings_ms: {}, phases_complete: { "30": false, "60": false, "90": false } } };
   const props = { familyId, familyUpdatedAt: plan.created_at, familyName: "Family 014", barrierOptions: [], initialResult: null, plan, tab: "plan" as const };
   const view = render(<StrictMode><FamilyLiteWorkspace {...props} /></StrictMode>);
   try {
+    expect(screen.getByRole("status").textContent).toContain("Drafting your plan");
+    expect(screen.queryByText(/of 3 stages/)).toBeNull();
     await act(async () => { finish({ ok: true, status: "busy", done: false, retryAfter: 5 }); await vi.advanceTimersByTimeAsync(0); });
     expect(advance).toHaveBeenCalledTimes(2);
     view.unmount();

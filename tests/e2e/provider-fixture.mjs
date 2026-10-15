@@ -22,7 +22,22 @@ globalThis.fetch = async (input, options) => {
   if (control.delayMs) await delay(control.delayMs, undefined, { signal: options.signal });
   if (control.failSchema === schema) return new Response("Synthetic provider unavailable", { status: 503 });
   let output;
-  if (schema.startsWith("lean_plan_phase_")) {
+  if (schema === "lean_intervention_plan") {
+    const start = request.input.match(/The plan starts on (\d{4}-\d{2}-\d{2})/)[1];
+    output = { steps: [
+      ["Prepare a housing intake", "Gather the agreed materials", "Confirm which preparation materials the family has agreed to gather.", "The family has a clear preparation checklist."],
+      ["Follow up on the referral", "Check the intake outcome", "Ask about the response to the existing referral and record its outcome.", "The case manager knows the referral status."],
+      ["Sustain the agreed support", "Review ongoing arrangements", "Review whether the chosen support is working and discuss any changed needs.", "The family agrees whether to continue the arrangement."],
+    ].map(([title, task, summary, expected_outcome], index) => {
+      const target = new Date(start + "T12:00:00Z");
+      target.setUTCDate(target.getUTCDate() + 7 + index * 14);
+      return { goal: "Agree a housing support plan", title,
+        summary,
+        action_items: [{ title: task, description: "Confirm the family's preferred next step.", target_date: target.toISOString().slice(0, 10) }],
+        timing: null, required_documents: ["Agreed preparation checklist"], resource_ids: [],
+        expected_outcome, priority: "medium", additional_guidance: null };
+    }) };
+  } else if (schema.startsWith("lean_plan_phase_")) {
     const phase = schema.slice(-2);
     const inputText = request.input;
     const start = inputText.match(/The plan starts on (\d{4}-\d{2}-\d{2})/)[1];
@@ -47,5 +62,5 @@ globalThis.fetch = async (input, options) => {
   } else {
     throw new Error("Unexpected AI contract in the browser journey");
   }
-  return Response.json({ status: "completed", output: [{ type: "message", status: "completed", content: [{ type: "output_text", text: JSON.stringify(output) }] }], usage: { total_tokens: 1 } });
+  return Response.json({ model: request.model, status: "completed", output: [{ type: "message", status: "completed", content: [{ type: "output_text", text: JSON.stringify(output) }] }], usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } });
 };

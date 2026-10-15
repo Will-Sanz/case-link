@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aiEvaluationCases, evaluationFamily } from "../tests/fixtures/ai-evaluation-cases";
-import { estimatedCost, evaluationPlan, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE } from "./ai-evaluation";
+import { estimatedCost, evaluationBudget, evaluationPlan, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE } from "./ai-evaluation";
 import { buildPlanningSnapshot } from "../src/lib/plan-generator/planning-brief";
 import { toRefinementDraft } from "../src/lib/domain/plan/refinement-review";
 import { generatedPlanStep } from "../tests/fixtures/plan-contract";
@@ -51,5 +51,22 @@ describe("synthetic AI evaluation", () => {
     expect(gradeMissingHistory("No referral or submission has occurred.", detail).passed).toBe(false);
     expect(gradeMissingHistory("No referral has been submitted or recorded.", detail).passed).toBe(false);
     expect(gradeMissingHistory("No referral or submission is recorded; confirm whether anything occurred outside CaseLink.", detail).passed).toBe(true);
+  });
+  it("bounds concurrent paid dispatch and preserves unknown charges after a failed response read", () => {
+    const budget = evaluationBudget(.1);
+    const settle = budget.reserve("gpt-6-astra", 1000, 1000);
+    expect(() => budget.reserve("gpt-6-astra", 1000, 1000)).toThrow("before dispatch");
+    settle(null);
+    expect(budget.totals).toMatchObject({ requests: 1, reservedUsd: 0, unknownCostRequests: 1 });
+    expect(budget.totals.unknownCostReserveUsd).toBeCloseTo(.0881);
+    expect(() => budget.reserve("gpt-6-astra", 1000, 1000)).toThrow("before dispatch");
+  });
+  it("uses actual costs after completion and stops at the request limit or unknown price", () => {
+    const budget = evaluationBudget(.1, 2);
+    budget.reserve("gpt-6-astra", 1000, 1000)(.001);
+    budget.reserve("gpt-6-astra", 1000, 1000)(.002);
+    expect(budget.totals.measuredUsd).toBeCloseTo(.003);
+    expect(() => budget.reserve("gpt-6-astra", 0, 0)).toThrow("before dispatch");
+    expect(() => evaluationBudget(10).reserve("unknown", 0, 0)).toThrow("before dispatch");
   });
 });

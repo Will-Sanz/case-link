@@ -3,7 +3,7 @@ import { addCalendarDays, schoolDate } from "../../src/lib/dates";
 import { directoryCase, directoryStamp } from "./directory-case";
 
 type Scenario = { id: string; barriers: string[]; summary: string; question?: string; resources?: "none" | "inactive" | "dismissed" | "demo"; history?: "waiting" | "completed" | "conflict" | "long"; injection?: "resource" | "history" };
-export type EvaluationCase = Scenario & { split: "development" | "held-out" };
+export type EvaluationCase = Scenario & { split: "development" | "held-out" | "pilot" };
 
 const development: Scenario[] = [
   { id: "sparse-housing", barriers: ["Housing instability"], summary: "", resources: "none" },

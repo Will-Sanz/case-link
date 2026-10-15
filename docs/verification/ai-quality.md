@@ -1,21 +1,22 @@
 # Synthetic AI evaluation and school review
 
-This gate evaluates CaseLink's four text features: staged plan generation, one-goal refinement, whole-plan refinement, and case assistant. It does not authorize a model to approve a plan, determine eligibility, submit records, or replace a school safeguarding procedure.
+This gate evaluates CaseLink's four text features: complete-plan generation, one-goal refinement, whole-plan refinement, and case assistant. It does not authorize a model to approve a plan, determine eligibility, submit records, or replace a school safeguarding procedure. Existing unfinished drafts retain their older staged recovery path; new drafts use one coherent response.
 
 ## Reproduce
 
-Use the existing operator-provided OpenAI key in the environment or local ignored environment file. The harness reads only that key, not local database or administrative credentials. Every case is synthetic. Requests use the approved default `gpt-5.6-luna`, strict structured output and `store: false`.
+Use the existing operator-provided OpenAI key in the environment or local ignored environment file. The harness reads only that key, not local database or administrative credentials. Every case is synthetic. Requests use the application's task-specific model settings, strict structured output and `store: false`. That flag prevents response storage; it does not establish zero provider retention or replace the school's data-policy approval.
 
 ```
 CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=development npm run test:ai-quality
 CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=held-out npm run test:ai-quality
+CASELINK_LIVE_AI=1 CASELINK_EVAL_SPLIT=pilot CASELINK_EVAL_DATE=2026-10-15 npm run test:ai-quality
 ```
 
 Use `CASELINK_EVAL_CASE=<fixture-id>` to reproduce a failure within its split. `CASELINK_EVAL_LIMIT` may shorten a smoke test; a shortened run cannot close the release gate. Generated results go to ignored `tmp/ai-evaluation/<run-id>`; selected final synthetic results and historical failure summaries are versioned with the release evidence. No production case narrative belongs in this directory or the repository.
 
-The 50 fixtures contain 25 development and 25 held-out cases. Each runs three generation stages, two refinement paths and one assistant answer. Two cases run concurrently. Generation uses the same compact prior-phase formatter and one-attempt fast-mode policy as the application. The request-scoped database budget is replaced only in this standalone harness; the real shared limits are separately exercised by database integration tests. The production client, immutable case snapshot, outbound privacy check, prompts, structured schemas, directory grounding, and human-selection merger remain in use.
+The existing 50 fixtures contain 25 development and 25 previously held-out cases. Ten additional pilot cases cover pending applications, changing preferences, private outreach, unknown provider hours, urgent safety, language choice, unsuitable services, missing history, minimal intake and completed work. Each now runs one complete draft, two refinement paths and one assistant answer. Two cases run concurrently. Generation uses the same compact contract and one-attempt policy as the application. The request-scoped database budget is replaced only in this standalone harness; the real shared limits are separately exercised by database integration tests. The production client, immutable case snapshot, outbound privacy check, prompts, structured schemas, directory grounding, and human-selection merger remain in use.
 
-Version 4 reads each successful network response body once for token metadata and returns the identical bytes to the production parser. This avoids the additional response reader used by earlier measurement runs. Failed HTTP bodies are never logged. Recorded costs are estimates from returned token usage, not invoices or a provider-enforced spending cap. The runner stops at 400 attempted requests or its estimated-cost threshold.
+The runner reads each successful network response body once for token metadata and returns the identical bytes to the production parser. Failed HTTP bodies are never logged. Recorded costs are estimates from returned token usage, not invoices or a provider-enforced spending cap. It records the requested and returned model, reasoning setting, service tier, cached/input/output/reasoning tokens and latency. It reserves a conservative request-cost allowance before dispatch and stops before its configured budget or 400 attempted requests. Unknown charges remain reserved. Use `CASELINK_EVAL_MAX_USD` to set the run ceiling; use `CASELINK_EVAL_MODEL` and `CASELINK_EVAL_REASONING_EFFORT` for controlled comparisons. Keep the same fixed date, fixtures and source hash across compared runs. Preserve failures when rerunning after a correction.
 
 ## What is checked
 

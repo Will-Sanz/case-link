@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { directoryCase, directoryId, directoryStamp } from "../../../tests/fixtures/directory-case";
 import { buildPlanningBrief, buildPlanningSnapshot, parsePlanningSnapshot } from "./planning-brief";
-import { startStagedLeanPlanGeneration, advanceStagedLeanPlanGeneration } from "@/app/actions/plans";
-import { tryGenerateLeanPlanPhaseOpenAI } from "./openai-plan-lean-phase";
+import { startStagedLeanPlanGeneration, advanceStagedLeanPlanGeneration, continuePlanManually } from "@/app/actions/plans";
+import { tryGenerateLeanPlanOpenAI } from "./openai-plan-lean-phase";
 import { createAiResponse } from "@/lib/ai/client";
-import { generatedPlanStep } from "../../../tests/fixtures/plan-contract";
+import { generatedCompactPlanStep, generatedPlanStep } from "../../../tests/fixtures/plan-contract";
 import type { FamilyDetail, PlanGenerationState, PlanStepRow } from "@/types/family";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), detail: vi.fn(), prior: vi.fn() }));
@@ -23,10 +23,10 @@ function fixture(): FamilyDetail {
     updated_at: stamp, creator: null, members: [], goals: [], barriers: [], resourceMatches: [], plan: null, caseNotes: [], progressUpdates: [] };
 }
 
-function stagedDatabase(initial?: PlanGenerationState) {
+function stagedDatabase(initial?: PlanGenerationState, initialCounts: Record<string, number> = {}) {
   let state = initial;
   let directoryChanged = false;
-  const counts: Record<string, number> = { "30": 0, "60": 0, "90": 0 };
+  const counts: Record<string, number> = { "30": 0, "60": 0, "90": 0, ...initialCounts };
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     if (name === "start_staged_plan_generation") {
       state = structuredClone(args.p_generation_state as PlanGenerationState);
@@ -57,7 +57,8 @@ describe("one durable planning snapshot", () => {
     mocks.session.mockReset(); mocks.detail.mockReset().mockResolvedValue(fixture()); mocks.prior.mockReset().mockResolvedValue("");
     vi.mocked(createAiResponse).mockReset().mockImplementation(async request => {
       const phase = request.structuredJsonSchema!.name.slice(-2) as "30" | "60" | "90";
-      return { ok: true, model: "test", text: JSON.stringify({ steps: [{ ...generatedPlanStep, phase }] }) };
+      const step = request.taskType === "plan_generation" ? generatedCompactPlanStep : { ...generatedPlanStep, phase };
+      return { ok: true, model: "test", text: JSON.stringify({ steps: [step] }) };
     });
   });
 
@@ -68,7 +69,7 @@ describe("one durable planning snapshot", () => {
     if (when === "before") db.changeDirectory();
     else vi.mocked(createAiResponse).mockImplementationOnce(async () => {
       db.changeDirectory();
-      return {ok:true,model:"test",text:JSON.stringify({steps:[{...generatedPlanStep,resource_ids:[directoryId]}]})};
+      return {ok:true,model:"test",text:JSON.stringify({steps:[{...generatedCompactPlanStep,resource_ids:[directoryId]}]})};
     });
     expect(await advanceStagedLeanPlanGeneration({familyId,planId})).toMatchObject({ok:false});
     expect(db.read()!.status).toBe("failed");
@@ -78,7 +79,7 @@ describe("one durable planning snapshot", () => {
 
   it("anchors the prompt to the saved school date instead of the UTC date or the later resume day", async () => {
     const snapshot = buildPlanningSnapshot(fixture(), undefined, new Date("2026-10-14T02:00:00Z"));
-    await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30");
+    await tryGenerateLeanPlanOpenAI(snapshot);
     expect(vi.mocked(createAiResponse).mock.calls[0][0].input).toContain("plan starts on 2026-10-13 in America/New_York");
     expect(vi.mocked(createAiResponse).mock.calls[0][0].input).toContain("All dates are proposed until the case manager confirms");
   });
@@ -100,16 +101,17 @@ describe("one durable planning snapshot", () => {
     detail.summary = "The family wants to keep the school routine steady. A relative helps with transport. Calls after work; an earlier application is waiting.";
     const snapshot = buildPlanningSnapshot(detail, undefined, new Date(stamp));
     expect(JSON.parse(snapshot.brief).summary).toBe(detail.summary);
-    await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30");
+    await tryGenerateLeanPlanOpenAI(snapshot);
     expect(vi.mocked(createAiResponse).mock.calls[0][0].input).toContain(detail.summary);
   });
 
   it("includes completed outcomes on regeneration and identifies older history omitted from context", () => {
     const detail = fixture();
-    detail.plan = { id: "old-plan", version: 2, steps: [{ title: "Housing", description: "Intake", status: "completed", action_items: [{ title: "Finish intake", status: "completed", notes: "Reviewed", outcome: "Intake accepted", target_date: "2026-10-12" }] } as PlanStepRow] } as FamilyDetail["plan"];
+    detail.plan = { id: "old-plan", version: 2, steps: [{ title: "Housing", description: "Intake", status: "completed", details: { stage_goal: "Housing stability", owner: "shared", expected_outcome: "Agree the next support" }, action_items: [{ title: "Finish intake", status: "completed", notes: "Reviewed", outcome: "Intake accepted", target_date: "2026-10-12" }] } as PlanStepRow] } as FamilyDetail["plan"];
     detail.caseNotes = Array.from({ length: 8 }, (_, i) => ({ id: `note-${i}`, family_id: familyId, author_id: "owner", body: `Note ${i}`, created_at: `2026-10-${10 + i}T12:00:00Z`, author: null }));
     const brief = JSON.parse(buildPlanningBrief(detail));
     expect(brief.previous_plan.goals[0].actions[0]).toMatchObject({ status: "completed", outcome: "Intake accepted" });
+    expect(brief.previous_plan).toMatchObject({ review: "needs_review", goals: [{ goal: "Housing stability", owner: "shared", expected_result: "Agree the next support" }] });
     expect(brief.recent_notes[0].text).toBe("Note 7");
     expect(brief.history_limits.older_notes_omitted).toBe(3);
   });
@@ -141,18 +143,20 @@ describe("one durable planning snapshot", () => {
     expect(parsePlanningSnapshot(snapshot, "another-family")).toBeNull();
   });
 
-  it("uses exactly the saved context after refresh and a concurrent family edit, across every stage", async () => {
+  it("saves one complete plan from the saved context after refresh and a concurrent family edit", async () => {
     const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
     expect(await startStagedLeanPlanGeneration({ familyId, regenerationFeedback: "Do not contact the landlord." })).toMatchObject({ ok: true });
     const snapshot = structuredClone(db.read()!.input_snapshot!);
     const changed = fixture(); changed.summary = "New instructions saved after generation began";
     mocks.detail.mockResolvedValue(changed);
-    for (const phase of ["30", "60", "90"]) {
-      expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, phaseCompleted: phase, done: phase === "90" });
-      expect(db.read()!.input_snapshot).toEqual(snapshot);
-    }
+    expect(db.read()!.generation_strategy).toBe("single");
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, done: true });
+    expect(db.read()).toMatchObject({ status: "complete", pending_phase: null, input_snapshot: snapshot, phases_complete: { "30": true, "60": false, "90": false } });
+    // A lost successful response or another refresh must not issue another paid request.
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, done: true });
     expect(mocks.detail).toHaveBeenCalledTimes(1);
-    expect(createAiResponse).toHaveBeenCalledTimes(3);
+    expect(createAiResponse).toHaveBeenCalledTimes(1);
+    expect(db.client.rpc.mock.calls.filter(call => call[0] === "append_staged_plan_phase")).toHaveLength(1);
     for (const [request] of vi.mocked(createAiResponse).mock.calls) {
       expect(request.input).toContain(snapshot.brief);
       expect(request.input).toContain(snapshot.revision);
@@ -161,18 +165,41 @@ describe("one durable planning snapshot", () => {
     }
   });
 
-  it("repairs a malformed phase by resuming the same version and snapshot without duplicate tasks", async () => {
+  it("repairs a malformed complete plan by resuming the same version and snapshot without duplicate tasks", async () => {
     const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
     await startStagedLeanPlanGeneration({ familyId });
     const snapshot = structuredClone(db.read()!.input_snapshot);
     vi.mocked(createAiResponse).mockResolvedValueOnce({ ok: true, model: "test", text: "not valid JSON" });
     expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: false, status: "failed" });
     expect(db.read()!.status).toBe("failed");
-    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, phaseCompleted: "30" });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, done: true });
     expect(db.read()!.input_snapshot).toEqual(snapshot);
     expect(createAiResponse).toHaveBeenCalledTimes(2);
     expect(db.client.rpc.mock.calls.filter(call => call[0] === "start_staged_plan_generation")).toHaveLength(1);
     expect(db.client.rpc.mock.calls.filter(call => call[0] === "append_staged_plan_phase")).toHaveLength(1);
+  });
+
+  it("resumes an existing legacy job through its remaining phases without replacing saved work", async () => {
+    const snapshot = buildPlanningSnapshot(fixture(), undefined, new Date(stamp));
+    const db = stagedDatabase({ v: 1, status: "failed", pending_phase: "30", input_snapshot: snapshot,
+      phases_complete: { "30": false, "60": false, "90": false }, models_used: ["previous"], stage_timings_ms: {} }, { "30": 1 });
+    mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, phaseCompleted: "60", done: false });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, phaseCompleted: "90", done: true });
+    expect(db.read()!.input_snapshot).toEqual(snapshot);
+    expect(vi.mocked(createAiResponse).mock.calls.map(([request]) => request.structuredJsonSchema!.name)).toEqual(["lean_plan_phase_60", "lean_plan_phase_90"]);
+    expect(db.client.rpc.mock.calls.filter(call => call[0] === "append_staged_plan_phase").map(call => call[1].p_phase)).toEqual(["60", "90"]);
+  });
+
+  it("recovers a saved compact batch without adding follow-up phases", async () => {
+    const db = stagedDatabase({ v: 1, generation_strategy: "single", status: "failed", pending_phase: "30",
+      input_snapshot: buildPlanningSnapshot(fixture(), undefined, new Date(stamp)),
+      phases_complete: { "30": false, "60": false, "90": false }, models_used: ["previous"], stage_timings_ms: {} }, { "30": 1 });
+    mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, done: true });
+    expect(db.read()).toMatchObject({ status: "complete", phases_complete: { "30": true, "60": false, "90": false } });
+    expect(createAiResponse).not.toHaveBeenCalled();
+    expect(db.client.rpc.mock.calls.filter(call => call[0] === "append_staged_plan_phase")).toHaveLength(0);
   });
 
   it("returns busy without a provider request or releasing another request's lease", async () => {
@@ -181,6 +208,28 @@ describe("one durable planning snapshot", () => {
     expect(await advanceStagedLeanPlanGeneration({ familyId, planId })).toMatchObject({ ok: true, status: "busy", retryAfter: 5 });
     expect(db.client.from).not.toHaveBeenCalled(); expect(createAiResponse).not.toHaveBeenCalled();
     expect(db.client.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("delegates manual handoff to the authenticated revision-checked transaction without using AI", async () => {
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await continuePlanManually({ familyId, planId, expectedRevision: "a".repeat(64) })).toEqual({ ok: true });
+    expect(db.client.rpc).toHaveBeenCalledExactlyOnceWith("continue_plan_manually", {
+      p_family_id: familyId, p_plan_id: planId, p_expected_revision: "a".repeat(64),
+    });
+    expect(createAiResponse).not.toHaveBeenCalled();
+    expect(mocks.detail).not.toHaveBeenCalled();
+  });
+
+  it("refuses manual handoff without a current revision, authorized session or successful transaction", async () => {
+    const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
+    expect(await continuePlanManually({ familyId, planId })).toMatchObject({ ok: false });
+    expect(db.client.rpc).not.toHaveBeenCalled();
+    mocks.session.mockRejectedValueOnce(new Error("signed out"));
+    expect(await continuePlanManually({ familyId, planId, expectedRevision: "a".repeat(64) })).toMatchObject({ ok: false });
+    expect(db.client.rpc).not.toHaveBeenCalled();
+    db.client.rpc.mockResolvedValueOnce({ data: false, error: null });
+    expect(await continuePlanManually({ familyId, planId, expectedRevision: "a".repeat(64) })).toMatchObject({ ok: false });
+    expect(createAiResponse).not.toHaveBeenCalled();
   });
 
   it("requires the requested plan identity and releases only its own claim when superseded", async () => {
@@ -202,7 +251,7 @@ describe("one durable planning snapshot", () => {
 
   it("blocks identifying current action outcomes before storing or sending a snapshot", async () => {
     const detail = fixture();
-    detail.plan = { id: "old", version: 1, steps: [{ action_items: [{ title: "Finish intake", status: "completed", outcome: "Email private-person@example.test" }] } as PlanStepRow] } as FamilyDetail["plan"];
+    detail.plan = { id: "old", version: 1, steps: [{ title: "Housing", action_items: [{ title: "Finish intake", status: "completed", outcome: "Email private-person@example.test" }] } as PlanStepRow] } as FamilyDetail["plan"];
     mocks.detail.mockResolvedValue(detail);
     const db = stagedDatabase(); mocks.session.mockResolvedValue({ supabase: db.client });
     expect(await startStagedLeanPlanGeneration({ familyId })).toMatchObject({ ok: false });
@@ -210,7 +259,7 @@ describe("one durable planning snapshot", () => {
   });
 
   it("tells the model to respect completed outcomes and the snapshot's history limits", async () => {
-    await tryGenerateLeanPlanPhaseOpenAI(buildPlanningSnapshot(fixture()), "30");
+    await tryGenerateLeanPlanOpenAI(buildPlanningSnapshot(fixture()));
     const request = vi.mocked(createAiResponse).mock.calls[0][0];
     expect(request.instructions).toContain("Do not restart them");
     expect(request.instructions).toContain("history_limits");

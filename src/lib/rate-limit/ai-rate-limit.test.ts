@@ -7,7 +7,7 @@ vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () =
 vi.mock("@/lib/logger/server-error", () => ({ logServerError: vi.fn() }));
 beforeEach(() => { mocks.rpc.mockReset().mockResolvedValue({ data: { allowed: true, retryAfter: 0 } }); });
 it.each([
-  ["plan_phase_generation", "plan_phase", 2], ["plan_refinement", "plan", 2], ["step_refinement", "plan", 2], ["case_assistant", "chat", 1],
+  ["plan_generation", "plan_phase", 2], ["plan_phase_generation", "plan_phase", 2], ["plan_refinement", "plan", 2], ["step_refinement", "plan", 2], ["case_assistant", "chat", 1],
 ] as const)("meters the active %s task using the shared counter", async (task, operation, weight) => {
   expect(await consumeOpenAiRateSlot(task)).toEqual({ allowed: true, retryAfter: 0 });
   expect(mocks.rpc).toHaveBeenCalledWith("consume_ai_budget", { p_operation: operation, p_weight: weight });

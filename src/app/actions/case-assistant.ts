@@ -66,7 +66,7 @@ export async function askCaseAssistantAction(
       conversationHistory: parsed.data.conversationHistory,
       requestMeta: { route: "caseAssistant" },
     });
-    if (result.ok) await assertResourceCatalogCurrent(supabase, detail.id, planResourceCatalog(detail.resourceMatches, 10).filter(resource => result.contacts.some(contact => contact.source_resource_id === resource.id)));
+    if (result.ok) await assertResourceCatalogCurrent(supabase, detail.id, planResourceCatalog(detail.resourceMatches, 10));
     return result;
   } catch (error) {
     return {

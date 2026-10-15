@@ -12,7 +12,7 @@ const budgetSchema = z.discriminatedUnion("allowed", [
 type SharedBudgetResult = z.infer<typeof budgetSchema>;
 
 function budgetForTask(taskType: AiTaskType): { operation: string; weight: number } {
-  if (taskType === "plan_phase_generation") return { operation: "plan_phase", weight: 2 };
+  if (taskType === "plan_generation" || taskType === "plan_phase_generation") return { operation: "plan_phase", weight: 2 };
   if (taskType === "plan_refinement" || taskType === "step_refinement") {
     return { operation: "plan", weight: 2 };
   }

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { generatedPlanStep, refinedPlanStep } from "../../../tests/fixtures/plan-contract";
-import { buildLeanPhaseRootJsonSchema, planPhaseResponseSchema, leanActionItemZ, sparseDetailsForPersistence } from "./lean-plan-schema";
+import { generatedCompactPlanStep, generatedPlanStep, refinedPlanStep } from "../../../tests/fixtures/plan-contract";
+import { buildLeanPlanRootJsonSchema, leanPlanResponseSchema, buildLeanPhaseRootJsonSchema, planPhaseResponseSchema, leanActionItemZ, sparseDetailsForPersistence } from "./lean-plan-schema";
 import { OPENAI_PLAN_REFINE_STEPS_ROOT_SCHEMA, planRefineLeanResponseSchema } from "./plan-refine-lean";
-import { tryGenerateLeanPlanPhaseOpenAI } from "./openai-plan-lean-phase";
+import { tryGenerateLeanPlanOpenAI, tryGenerateLeanPlanPhaseOpenAI } from "./openai-plan-lean-phase";
 import { updatePlanStepActionItemSchema } from "@/lib/validations/plans";
 import { createAiResponse } from "@/lib/ai/client";
 import type { PlanGenerationSnapshot } from "@/types/family";
@@ -13,6 +13,57 @@ const snapshot: PlanGenerationSnapshot = { family_id: "synthetic", captured_at: 
 
 describe("plan output contracts", () => {
   beforeEach(() => vi.mocked(createAiResponse).mockReset());
+
+  it("generates one complete goal/date plan with no phase or week obligations", async () => {
+    const step = { ...generatedCompactPlanStep, action_items: [
+      { ...generatedCompactPlanStep.action_items[0], target_date: "2026-10-13" },
+      { ...generatedCompactPlanStep.action_items[0], title: "Review the agreed outcome", target_date: "2027-01-11" },
+    ] };
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [step] }) });
+    const result = await tryGenerateLeanPlanOpenAI(snapshot, { retries: 1 });
+    expect(result).toMatchObject({ ok: true, steps: [{ phase: "30", action_items: [
+      { target_date: "2026-10-13", week_index: 1 }, { target_date: "2027-01-11", week_index: 13 },
+    ] }] });
+    expect(createAiResponse).toHaveBeenCalledTimes(1);
+    const request = vi.mocked(createAiResponse).mock.calls[0][0];
+    expect(request.taskType).toBe("plan_generation");
+    expect(request.structuredJsonSchema).toEqual({ name: "lean_intervention_plan", schema: buildLeanPlanRootJsonSchema(), strict: true });
+    expect(request.instructions).toContain("exactly one step with at most two actions");
+    expect(request.input).not.toContain("Use week_index");
+    expect(leanPlanResponseSchema.safeParse({ steps: [generatedPlanStep] }).success).toBe(false);
+    expect(leanPlanResponseSchema.safeParse({ steps: [{ ...step, action_items: Array(4).fill(step.action_items[0]) }] }).success).toBe(false);
+  });
+
+  it.each(["2026-10-12", "2027-01-12", "2026-02-30", null])("rejects an invalid compact-plan date %s without saving a weaker contract", async target_date => {
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...generatedCompactPlanStep,
+      action_items: [{ ...generatedCompactPlanStep.action_items[0], target_date }],
+    }] }) });
+    expect(await tryGenerateLeanPlanOpenAI(snapshot, { retries: 1 })).toMatchObject({ ok: false });
+  });
+
+  it("preserves similar goal wording when the concrete actions are different", async () => {
+    const distinctStep = { ...generatedCompactPlanStep, action_items: [{ ...generatedCompactPlanStep.action_items[0], title: "Follow up after the family discussion" }] };
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [generatedCompactPlanStep, distinctStep] }) });
+    const result = await tryGenerateLeanPlanOpenAI(snapshot, { retries: 1 });
+    expect(result).toMatchObject({ ok: true, steps: [{ action_items: [{ title: "Review the checklist" }] }, { action_items: [{ title: "Follow up after the family discussion" }] }] });
+    expect(createAiResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests correction for identical whole steps instead of silently dropping them", async () => {
+    vi.mocked(createAiResponse).mockResolvedValueOnce({ ok: true, model: "test", text: JSON.stringify({ steps: [generatedCompactPlanStep,
+      { ...generatedCompactPlanStep, title: `  ${generatedCompactPlanStep.title.toUpperCase()}  ` },
+    ] }) }).mockResolvedValueOnce({ ok: true, model: "test", text: JSON.stringify({ steps: [generatedCompactPlanStep] }) });
+    expect(await tryGenerateLeanPlanOpenAI(snapshot, { retries: 2 })).toMatchObject({ ok: true });
+    expect(createAiResponse).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(createAiResponse).mock.calls[1][0].input).toContain("without losing constraints or distinct tasks");
+  });
+
+  it("fails a legacy phase containing only work already covered instead of reinserting duplicates", async () => {
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: true, model: "test", text: JSON.stringify({ steps: [{ ...generatedPlanStep, phase: "60" }] }) });
+    expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "60", {
+      retries: 1, priorPhasesSummary: `${generatedPlanStep.title} ${generatedPlanStep.summary}`,
+    })).toMatchObject({ ok: false });
+  });
 
   it.each(["30", "60", "90"] as const)("enforces the same complete phase %s contract in the provider and parser", async phase => {
     const step = { ...generatedPlanStep, phase };
@@ -92,6 +143,12 @@ describe("plan output contracts", () => {
   it("does not retry provider schema rejection as a weaker contract", async () => {
     vi.mocked(createAiResponse).mockResolvedValue({ ok: false, code: "provider_error", error: "Schema unsupported" });
     expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot, "30")).toMatchObject({ ok: false });
+    expect(createAiResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["model_unavailable", "safety_review"] as const)("does not automatically retry a complete plan after %s", async code => {
+    vi.mocked(createAiResponse).mockResolvedValue({ ok: false, code, error: "The request needs attention." });
+    expect(await tryGenerateLeanPlanOpenAI(snapshot, { retries: 2 })).toMatchObject({ ok: false, reason: "The request needs attention." });
     expect(createAiResponse).toHaveBeenCalledTimes(1);
   });
 });

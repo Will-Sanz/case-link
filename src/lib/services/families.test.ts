@@ -1,17 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { enrichFamiliesWithCurrentStep, getFamilyDetail } from "./families";
+import { directoryCase } from "../../../tests/fixtures/directory-case";
+import type { ResourceMatchRow } from "@/types/family";
 
-function clientWithFailure(failedTable?: string, missingFamily = false) {
+function clientWithFailure(failedTable?: string, missingFamily = false, resourceMatches: ResourceMatchRow[] = []) {
   return {
     rpc: vi.fn().mockResolvedValue({ data: { family: { id: "family", name: "Snapshot label" }, barriers: [], plan: { id: "plan", generation_source: "rules", steps: [{ id: "step", action_items: [] }] } }, error: failedTable === "get_family_plan_snapshot" ? { message: "get_family_plan_snapshot unavailable" } : null }),
     from: vi.fn((table: string) => {
       const data = table === "families" ? (missingFamily ? null : { id: "family", creator: null })
         : table === "plans" ? { id: "plan", generation_source: "rules" }
-        : table === "plan_steps" ? [{ id: "step" }] : [];
+        : table === "plan_steps" ? [{ id: "step" }] : table === "resource_matches" ? resourceMatches : [];
       const result = { data, error: table === failedTable ? { message: `${table} unavailable` } : null };
       const query = {
-        select: () => query, eq: () => query, in: () => query, order: () => query,
+        select: vi.fn(() => query), eq: () => query, in: () => query, order: () => query,
         limit: () => query, maybeSingle: () => Promise.resolve(result),
         then: (resolve: (value: unknown) => void) => resolve(result),
       };
@@ -21,6 +23,16 @@ function clientWithFailure(failedTable?: string, missingFamily = false) {
 }
 
 describe("getFamilyDetail", () => {
+  it("loads the stored service evidence with the authorized family's resource matches", async () => {
+    const matches = directoryCase().resourceMatches;
+    Object.assign(matches[0].resource!, { description: "Housing stabilization", services_select_all: "Intake preparation", additional_info: "School coordination is available." });
+    const client = clientWithFailure(undefined, false, matches);
+    const detail = await getFamilyDetail(client, "family");
+    expect(detail?.resourceMatches[0].resource).toMatchObject(matches[0].resource!);
+    const calls = vi.mocked(client.from).mock;
+    const query = calls.results[calls.calls.findIndex(([table]) => table === "resource_matches")].value;
+    expect(query.select.mock.calls[0][0]).toMatch(/description,\s+services_select_all,\s+additional_info/);
+  });
   it.each(["families", "family_goals", "family_members", "case_notes", "case_progress_updates", "resource_matches", "get_family_plan_snapshot"])(
     "refuses a partial workspace when %s fails", async (table) => {
       await expect(getFamilyDetail(clientWithFailure(table), "family")).rejects.toThrow(`${table} unavailable`);

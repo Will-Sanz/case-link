@@ -10,12 +10,14 @@ The pilot is for a few staff at one school with de-identified case circumstances
 
 **October 15 family-support improvements:** Keep creation minimal. Optional planning context prompts capture the family's stated priority, existing support, practical preferences/constraints, and previous attempts in the existing saved context, which is visible during plan review. Families with open work link directly to the next action. Staff may also prepare a separate family takeaway from explicitly selected, discussed open actions and optional directory contacts in the current reviewed plan. It excludes internal narratives and unselected content, requires confirmation that the content is appropriate to share, and uses the existing access/revision checks before preview and download. Selection changes clear the preview and confirmation. Staff manually share the downloaded document; family accounts and automatic delivery are outside this release.
 
+**October 15 AI upgrade acceptance:** New drafts should use one coherent goal/date planning pass with a small manageable workload, while older staged jobs remain recoverable. Generation, editing and the assistant must receive relevant saved family goals, recent meeting decisions, restrictions and honest resource facts. Compare current and candidate models on frozen synthetic cases before selecting task-specific defaults; evaluate consent order, factual support, practical sequencing, workload, human-record preservation, latency and cost. No automatic fallback may silently replace a failed AI plan with fabricated generic work. The assistant may prepare email and call drafts and discuss proposed meeting changes; it does not execute outreach or change records. See the [agentic preparation and execution roadmap](agentic-pdf-service-research.md).
+
 ### Required verification for the current Core release
 
 | Layer | Required evidence |
 | --- | --- |
 | Unit | Goal/action ordering, exact dates, Waiting/completed state, schema limits, provenance/privacy, stale versions, selected AI edit preservation |
-| Database | Real signed-in user/RLS access, cross-family and unrelated staff denial, administrator MFA, ownership, reviewed revisions, audit and transactional rollback, archive/offboarding |
+| Database | Real signed-in user/RLS access, cross-family and unrelated staff denial, administrator authorization, ownership, reviewed revisions, audit and transactional rollback, archive/offboarding |
 | Integration | Family intake, draft recovery, AI and resource errors, generation resume, concurrent edits, meeting updates, review/export boundary |
 | End to end | Invited first use through downloaded PDF; returning user; refresh during generation; expired/revoked session; unsaved work; review after material edits |
 | Accessibility | Keyboard critical path, focus restoration, semantic headings/labels, live progress, associated errors, 200% zoom, contrast |

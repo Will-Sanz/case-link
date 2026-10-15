@@ -32,16 +32,23 @@ describe("model request contracts", () => {
 
   it.each(["fast", "thinking"] as const)("preserves the fast-only product policy for incoming %s mode", async (aiMode) => {
     await createAiResponse({ ...options, aiMode });
-    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ model: "gpt-5.6-luna", reasoning: { effort: "low" } });
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ model: "gpt-6.1-sol", reasoning: { effort: "medium" } });
     expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).not.toHaveProperty("temperature");
   });
 
-  it.each(["plan_phase_generation", "plan_refinement", "step_refinement", "case_assistant"] as const)("uses Responses for the active %s task", async (taskType) => {
+  it("uses configured task effort and bounds requested output by task and deployment caps", async () => {
+    Object.assign(mocks.env, { OPENAI_PLAN_GENERATION_MODEL: "gpt-6-astra", OPENAI_PLAN_GENERATION_REASONING_EFFORT: "high", OPENAI_PLAN_GENERATION_MAX_OUTPUT_TOKENS: 12000, OPENAI_MAX_OUTPUT_TOKENS: 10000 });
+    await createAiResponse({ ...options, taskType: "plan_generation", maxTokens: 20000 });
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ model: "gpt-6-astra", reasoning: { effort: "high" }, max_output_tokens: 10000, service_tier: "default", store: false });
+  });
+
+  it.each(["plan_generation", "plan_phase_generation", "plan_refinement", "step_refinement", "case_assistant"] as const)("uses Responses for the active %s task", async (taskType) => {
     expect(await createAiResponse({ ...options, taskType })).toMatchObject({ ok: true });
     expect(mocks.fetch.mock.calls[0][0]).toBe("https://api.openai.com/v1/responses");
     const body = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(body).toHaveProperty("max_output_tokens");
     expect(body).toMatchObject({ store: false });
+    if (taskType === "plan_generation") expect(body.max_output_tokens).toBe(16384);
   });
 
   it.each(["gpt-5-fake", "gpt-4-turbo", "gpt-3.5-turbo", "o9-test", "gpt-4o-2024-05-13"])("rejects untested or incompatible model %s", async (model) => {
@@ -95,6 +102,31 @@ describe("AI terminal results", () => {
     mocks.fetch.mockResolvedValue(new Response("private provider content", { status }));
     expect(await createAiResponse(options)).toMatchObject({ ok: false, code: "provider_error" });
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([[404, "model_not_found", "model_unavailable"], [403, "misalignment_policy_violation", "safety_review"]])("handles model access or safety errors without exposing provider content", async (status, providerCode, code) => {
+    mocks.fetch.mockResolvedValue(Response.json({ error: { code: providerCode, message: "private-person@example.test" } }, { status: Number(status) }));
+    const result = await createAiResponse(options);
+    expect(result).toMatchObject({ ok: false, code });
+    expect(JSON.stringify(result)).not.toContain("private-person");
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains content-free usage for incomplete answers and records the actual returned model", async () => {
+    const usage = { input_tokens: 1000, output_tokens: 500, total_tokens: 1500, input_tokens_details: { cached_tokens: 100, cache_write_tokens: 200 }, output_tokens_details: { reasoning_tokens: 400 } };
+    mocks.fetch.mockResolvedValue(Response.json({ ...completed("private output must not be logged"), status: "incomplete", model: "gpt-6.1-sol", service_tier: "default", usage }));
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    const result = await createAiResponse({ ...options, requestMeta: { route: "test" } });
+    expect(result).toMatchObject({ ok: false, code: "incomplete", returnedModel: "gpt-6.1-sol", usage });
+    expect(log).toHaveBeenCalledWith("[openai-usage]", expect.objectContaining({ returnedModel: "gpt-6.1-sol", usage, estimatedUsd: expect.any(Number) }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private output");
+    log.mockRestore();
+  });
+
+  it.each(["error", "empty"])("retains validated usage when a completed provider answer is rejected for %s", async kind => {
+    const usage = { input_tokens: 20, output_tokens: 10 };
+    mocks.fetch.mockResolvedValue(Response.json({ ...completed(kind === "empty" ? "" : "Ignored"), usage, error: kind === "error" ? { message: "Private details" } : undefined }));
+    expect(await createAiResponse(options)).toMatchObject({ ok: false, usage });
   });
 
   it.each([new DOMException("abort", "AbortError"), new DOMException("timeout", "TimeoutError")])("handles request cancellation and timeouts", async (error) => {
