@@ -6,6 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 const navigation = vi.hoisted(() => ({
   pathname: "/families",
   replace: vi.fn(),
+  pending: false,
+}));
+
+vi.mock("next/link", async (importOriginal) => ({
+  ...await importOriginal<typeof import("next/link")>(),
+  useLinkStatus: () => ({ pending: navigation.pending }),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -64,6 +70,29 @@ describe("account navigation", () => {
     expect(screen.queryByText(/User ID:/)).toBeNull();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
+});
+
+it("announces a pending destination without changing its accessible name or current page", () => {
+  navigation.pending = true;
+  navigation.pathname = "/families";
+  const view = render(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  const account = within(screen.getByRole("navigation", { name: "Account and help" }));
+  const settings = account.getByRole("link", { name: "Settings" });
+  expect(within(settings).getByRole("status").textContent).toBe("Opening Settings…");
+  expect(settings.getAttribute("aria-current")).toBeNull();
+  navigation.pending = false;
+  view.rerender(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  expect(within(settings).getByRole("status").textContent).toBe("");
+});
+
+it("closes the mobile menu after navigation completes", () => {
+  navigation.pathname = "/families";
+  const view = render(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  const menu = view.container.querySelector("details")!;
+  menu.open = true;
+  navigation.pathname = "/profile";
+  view.rerender(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  expect(view.container.querySelector("details")!.open).toBe(false);
 });
 
 it("shows sign-out failure and keeps the retry button available", async () => {
