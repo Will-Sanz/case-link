@@ -4,13 +4,13 @@
 
 The explicitly approved production build **`dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8`**, source **`9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b`**, is live at `https://www.thecaselink.com`. CI **38753128811**, CodeQL **38753128797**, exact-source preflight and the complete staging/candidate/canonical workflows pass. Promotion used the already-tested production build; the staging Preview was not promoted. Both databases have **41 migrations** through `20261015143343`, with original resources/accounts preserved. [Live release record](production-release.md).
 
-The 30-minute observation is running. Canonical login, minimal intake, all four live AI paths, repeated loads, recovered edits, selective refinements, human review, actual PDF and logout pass. The two-page PDF was visually inspected and matches its preview bytes. All disposable accounts/cases were removed. Public routing, closed signup, anonymous workspace denial and security headers pass. Required source checks include 686 unit/component tests, seven browser scenarios and database/Auth/restore/legacy/PDF verification.
+The 30-minute observation passed all 45 probes, with no Vercel error/fatal entries in that window. [Observation evidence](2026-10-15-release-observation.json). Canonical login, minimal intake, all four live AI paths, repeated loads, recovered edits, selective refinements, human review, actual PDF and logout pass. The two-page PDF was visually inspected and matches its preview bytes. All disposable accounts/cases were removed. Public routing, closed signup, anonymous workspace denial and security headers pass. Required source checks include 686 unit/component tests, seven browser scenarios and database/Auth/restore/legacy/PDF verification.
 
 The approved encrypted backup and isolated restore reproduced 56 tables / 4,286 rows. Staging alias switching/restoration was rehearsed; this is the first verified production baseline, and the old pre-upgrade live build is not a certified rollback. No paid plan, live-secret rotation or school invitation occurred. Recurring/off-machine backups, budget/alert delivery, provider-access/operating ownership and school acceptance remain open. PR #15 is still draft/unmerged; later documentation commits do not change the live source.
 
 ## Historical release-control preparation
 
-The dated observations and procedure below record earlier checkpoints. Current release evidence above supersedes claims that the upgrade, hosted workflow, domain or promotion remain unverified. CL-41 remains open only for the current observation and applicable operating decisions; it does not require another hosting platform or Kubernetes.
+The dated observations and procedure below record earlier checkpoints. Current release evidence above supersedes claims that the upgrade, hosted workflow, domain or promotion remain unverified. CL-41 remains open only for applicable operating decisions; it does not require another hosting platform or Kubernetes.
 
 ## Observed and changed
 

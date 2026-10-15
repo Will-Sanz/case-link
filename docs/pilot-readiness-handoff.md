@@ -8,7 +8,9 @@ Continue only within the user-approved narrow pilot scope. Repository: `/Users/w
 
 **Canonical verification passed:** the full live workflow ran 15:02:52.672–15:04:14.052 UTC, including all four AI paths, preserved edits, repeated reads, human review and the visually inspected two-page PDF. No browser/HTTP error was recorded, and all disposable fixtures were removed. [Canonical evidence](verification/2026-10-15-canonical-workflow.json).
 
-**Still running:** the required 30-minute observation. Do not mark it complete from a partial result. Runner: `/tmp/caselink-release-observation.mjs`; result: `/tmp/caselink-release-observation.json`. It started at approximately 15:02 UTC on October 15 and writes progress after each sample. When finished, retain the exact result in `docs/verification/`, reconcile the release record/tracker, commit/push only task files, update the attached draft PR and inspect remote checks.
+**Release observation complete:** 11:02:54–11:32:54 a.m. America/New_York on October 15 (15:02:54–15:32:54 UTC). All **45 probes** passed over 30 minutes; no Vercel error/fatal entries appeared in that window. Alias read-back still identifies the same released build. [Observation evidence](verification/2026-10-15-release-observation.json). The hidden browsers and temporary test/observation runners are finished; Docker/local CaseLink services were never restarted.
+
+**No further autonomous launch work is queued.** The narrow engineering/release task is complete, and the one-time automation remains paused. School/operating decisions below are still open. The evidence checkpoint `15d5f18` passed CI **38758405925** and CodeQL **38758405788**. Further evidence-only commits do not require a new production deployment.
 
 The deployed source is pinned; later evidence-only commits do not imply a different live build. PR #15 remains draft and unmerged. Do not merge or publish another build merely to update documentation.
 

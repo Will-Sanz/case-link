@@ -1,6 +1,6 @@
 # Production release — October 15, 2026
 
-**Live:** [www.thecaselink.com](https://www.thecaselink.com) now serves the approved production build. The complete candidate and canonical-site synthetic workflows pass. The required **30-minute observation is in progress**; its final result is still required before closing this release checkpoint.
+**Live:** [www.thecaselink.com](https://www.thecaselink.com) now serves the approved production build. The complete candidate and canonical-site synthetic workflows pass. The **30-minute observation passed**, with all 45 probes successful and no Vercel error/fatal entries in the observed window. The user-approved narrow engineering/release work is complete; the school/operating gates below remain open.
 
 This completes the actual publishing step for the user's narrow scope: corrected PDF pagination, password-only CaseLink accounts, verified invitation/recovery and core casework, and production configuration. School acceptance of real-case use remains separate. No school staff were invited, paid service purchased or live secret rotated.
 
@@ -66,4 +66,4 @@ Staging alias rollback and restoration passed previously. The original pre-clean
 
 School approval of de-identified information, resource accuracy, AI usefulness, staff access and support contacts remains open. Recurring/off-machine backup, provider budget/alert delivery and historical-secret exposure/rotation are not established. Free Supabase does not provide configurable session timebox/inactivity limits or leaked-password screening. These limits remain in the tracker; no paid plan or key rotation was performed. The production deployment does not authorize identifiable student/family records or substitute for school sign-off.
 
-The 30-minute release observation is still running. The one-time continuation automation is paused; it must not recur daily.
+The release observation ran **11:02:54–11:32:54 a.m. America/New_York** (15:02:54–15:32:54 UTC): 31 health samples plus seven login and seven anonymous-workspace checks, all successful; maximum probe time 944 ms. The exact alias remained unchanged and Vercel error/fatal counts were empty. This is a bounded observation, not ongoing monitoring or sustained-load certification. [Complete observation](2026-10-15-release-observation.json). The one-time continuation automation is paused, and the temporary browser/test runners are finished. Docker/local test services were not restarted. Evidence commit `15d5f18` also passed CI **38758405925** and CodeQL **38758405788**; the live source remains `9e7d0e2`.

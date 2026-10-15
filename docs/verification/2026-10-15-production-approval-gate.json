@@ -17,7 +17,8 @@
     "recordedAt": "2026-10-15T14:50:47.448262+00:00"
   },
   "approvedMigrationExecuted": true,
-  "status": "Approved database fix and production release applied; canonical workflow passed; 30-minute observation running",
+  "status": "Approved database fix and production release applied; candidate/canonical workflow and 30-minute observation passed",
   "productionCandidate": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
-  "canonicalWorkflowEvidence": "2026-10-15-canonical-workflow.json"
+  "canonicalWorkflowEvidence": "2026-10-15-canonical-workflow.json",
+  "observationEvidence": "2026-10-15-release-observation.json"
 }

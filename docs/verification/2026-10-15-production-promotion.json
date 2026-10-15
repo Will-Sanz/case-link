@@ -12,8 +12,9 @@
   "previousDeployment": "dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW",
   "previousDeploymentCertifiedAsRollback": false,
   "stagingPreviewPromoted": false,
-  "observationStatus": "in progress",
+  "observationStatus": "passed: 45 checks over 30 minutes; no probe failures or Vercel error/fatal entries",
   "schoolInvitationsSent": false,
   "paidUpgrade": false,
-  "liveSecretRotation": false
+  "liveSecretRotation": false,
+  "observationEvidence": "2026-10-15-release-observation.json"
 }
