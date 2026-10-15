@@ -246,7 +246,7 @@ function PdfActionTable({ step }: { step: PlanStepRow }) {
   if (actions.length === 0) return null;
 
   return (
-    <View style={styles.actionTable}>
+    <View style={styles.actionTable} minPresenceAhead={48}>
       <View style={styles.actionHeader} wrap={false} minPresenceAhead={24}>
         <Text style={styles.actionCell}>Action</Text>
         <Text style={styles.dateCell}>Target / follow-up</Text>

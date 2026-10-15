@@ -12,7 +12,7 @@ export const MODELS = {
   PLAN_GENERATION: "gpt-6.1-sol",
   PLAN_REFINEMENT: "gpt-6.1-sol",
   CASE_ASSISTANT: "gpt-6.1-sol",
-  STEP_REFINEMENT: "gpt-6-luna",
+  STEP_REFINEMENT: "gpt-6.1-sol",
 } as const;
 
 const PLAN_CONFIG = { model: MODELS.PLAN_GENERATION, effort: "medium", maxTokens: 16384, prefix: "OPENAI_PLAN_GENERATION" } as const;
@@ -20,7 +20,7 @@ const TASK_CONFIG = {
   plan_generation: PLAN_CONFIG,
   plan_phase_generation: PLAN_CONFIG,
   plan_refinement: { model: MODELS.PLAN_REFINEMENT, effort: "medium", maxTokens: 8192, prefix: "OPENAI_PLAN_REFINEMENT" },
-  step_refinement: { model: MODELS.STEP_REFINEMENT, effort: "low", maxTokens: 4096, prefix: "OPENAI_STEP_REFINEMENT" },
+  step_refinement: { model: MODELS.STEP_REFINEMENT, effort: "medium", maxTokens: 4096, prefix: "OPENAI_STEP_REFINEMENT" },
   case_assistant: { model: MODELS.CASE_ASSISTANT, effort: "medium", maxTokens: 8192, prefix: "OPENAI_CASE_ASSISTANT" },
 } as const;
 

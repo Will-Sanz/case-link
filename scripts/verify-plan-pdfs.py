@@ -48,6 +48,9 @@ def verify(case):
         if not any(normalized(action["title"]) in page_text and action["date"] in page_text and action["status"] in page_text
                    for page_text in page_texts):
             errors.append("Action title separated from its date/status: " + action["title"][:90])
+    for preceding, following in case.get("samePageText", []):
+        if not any(normalized(preceding) in page_text and normalized(following) in page_text for page_text in page_texts):
+            errors.append("Related content separated across pages: " + preceding[:90])
     for index, page in enumerate(pages):
         width, height = float(page.attrib["width"]), float(page.attrib["height"])
         words = page.findall(".//{*}word")

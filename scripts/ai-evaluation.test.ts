@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aiEvaluationCases, evaluationFamily } from "../tests/fixtures/ai-evaluation-cases";
-import { estimatedCost, evaluationBudget, evaluationPlan, evaluationSourceManifest, evaluationSourceHash, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE } from "./ai-evaluation";
+import { estimatedCost, evaluationBudget, evaluationPlan, evaluationSourceManifest, evaluationSourceHash, evaluationTaskSelection, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE } from "./ai-evaluation";
 import { buildPlanningSnapshot } from "../src/lib/plan-generator/planning-brief";
 import { toRefinementDraft } from "../src/lib/domain/plan/refinement-review";
 import { generatedPlanStep } from "../tests/fixtures/plan-contract";
@@ -8,6 +8,13 @@ import { findLikelyIdentifiers } from "../src/lib/privacy/no-pii";
 
 const now = new Date("2026-10-14T12:00:00Z");
 describe("synthetic AI evaluation", () => {
+  it("selects only existing tasks and rejects a task absent from the chosen focus", () => {
+    expect(evaluationTaskSelection(undefined, "all")).toBeNull();
+    for (const task of ["generation", "step_refinement", "plan_refinement", "case_assistant"]) expect(evaluationTaskSelection(task, "all")).toBe(task);
+    for (const task of ["step_refinement", "plan_refinement"]) expect(evaluationTaskSelection(task, "substantive-refinement")).toBe(task);
+    expect(() => evaluationTaskSelection("plan_generation", "all")).toThrow("existing evaluation task");
+    for (const task of ["generation", "case_assistant"]) expect(() => evaluationTaskSelection(task, "substantive-refinement")).toThrow("only refinement tasks");
+  });
   it("fingerprints runtime helpers, configuration and evaluation fixtures without environment secrets", () => {
     const files = evaluationSourceManifest();
     expect(files).toEqual(expect.arrayContaining(["src/lib/domain/plan/action-state.ts", "src/lib/domain/plan/refinement-identity.ts", "src/lib/ai/models.ts", "tests/ai/refinement-cases.ts", "package-lock.json"]));

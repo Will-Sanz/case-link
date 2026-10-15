@@ -10,8 +10,17 @@ import type { FamilyDetail, PlanStepRow } from "../src/types/family";
 import { estimateAiCost, type AiUsage } from "../src/lib/ai/usage";
 
 export const REQUESTED_TITLE = "Prepare the agreed next step";
-export const EVALUATION_VERSION = 10;
+export const EVALUATION_VERSION = 11;
 export type EvaluationCheck = { code: string; passed: boolean; severity: "critical" | "quality" };
+
+/** Optional task-only reruns retain the same fixtures, production calls and graders. */
+export function evaluationTaskSelection(value: string | undefined, focus: string): string | null {
+  const task = value?.trim();
+  if (!task) return null;
+  if (!["generation", "step_refinement", "plan_refinement", "case_assistant"].includes(task)) throw new Error("Choose an existing evaluation task.");
+  if (focus === "substantive-refinement" && !["step_refinement", "plan_refinement"].includes(task)) throw new Error("Substantive refinement supports only refinement tasks.");
+  return task;
+}
 
 /** Exact manifest, without environment files or secrets. Runtime helpers cannot silently escape the fingerprint. */
 export function evaluationSourceManifest() {

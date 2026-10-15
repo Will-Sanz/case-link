@@ -16,7 +16,7 @@ function plan(steps: PlanStepRow[]): PlanWithSteps {
     created_at:stamp,review_revision:"a".repeat(64),material_revision:"b".repeat(64),resource_contacts_current:true,
     client_display:{reviewedAt:stamp,reviewedById:"30000000-0000-4000-8000-000000000003",reviewedRevision:"b".repeat(64)},presentation:{sourceKind:"manual"},steps};
 }
-export function pdfPlanFixtures(): Array<{name:string;plan:PlanWithSteps;barriers:string[];minimumPages:number;expectedText?:string[]}> {
+export function pdfPlanFixtures(): Array<{name:string;plan:PlanWithSteps;barriers:string[];minimumPages:number;expectedText?:string[];samePageText?:[string,string][]}> {
   const dated=step(1);
   dated.details!.contacts=[{source_resource_id:"40000000-0000-4000-8000-000000000004",source_updated_at:stamp,name:"Directory intake program",phone:"215-555-0148",email:"intake@example.test",notes:"Confirm current availability and eligibility before referring."}];
   dated.action_items=[
@@ -94,11 +94,42 @@ export function pdfPlanFixtures(): Array<{name:string;plan:PlanWithSteps;barrier
       ],
     },
   ];
+  // The compact hosted plan left only the second goal's expected outcome on page two.
+  const outcomeBoundary: PlanStepRow[] = [
+    {
+      ...step(201),
+      title: "Agree practical food and transport priorities",
+      description: "Confirm immediate food needs and agree on follow-up for the existing food-support application. If permission remains unresolved, clarify it before provider contact; keep application identifiers and personal documents outside CaseLink.",
+      details: {
+        owner: "case_manager", stage_goal: "Maintain reliable food access",
+        expected_outcome: "The family has a clear next step for its pending application and any immediate food-access gaps.",
+      },
+      action_items: [
+        {...action(201), title: "Confirm the agreed transport and food-access next step", description: "Call after work to clarify current food needs, identify the pending application’s provider, and confirm permission for provider contact.", status: "blocked", target_date: "2026-10-15", follow_up_date: "2026-10-15", notes: "Waiting for the family to confirm a preferred review time."},
+        {...action(202), title: "Check the pending application", description: "With family permission, verify provider availability, request an application update, and clarify any requirements without restarting the application.", target_date: "2026-10-16"},
+      ],
+    },
+    {
+      ...step(202),
+      title: "Build a travel plan around existing family support",
+      description: "Identify uncovered school trips and explore practical options that complement the relative’s twice-weekly transport help.",
+      details: {
+        owner: "case_manager", stage_goal: "Maintain reliable school travel",
+        expected_outcome: "The family identifies a workable next step for school trips not covered by its relative.",
+      },
+      action_items: [
+        {...action(203), title: "Confirm school travel gaps with the family", description: "During the after-work discussion, confirm which trips the relative covers twice weekly and the family’s preferences for remaining trips.", target_date: "2026-10-15"},
+        {...action(204), title: "Review school travel options", description: "Check available school travel supports and requirements, then discuss feasible choices with the family after work before pursuing an option.", target_date: "2026-10-16"},
+      ],
+    },
+  ];
   return [
     {name:"dated-states",plan:plan([dated]),barriers:["Housing","Transportation"],minimumPages:1,expectedText:["1 of 6 actions complete"]},
     {name:"many-goals",plan:plan(many),barriers:["Housing","Food access","Childcare"],minimumPages:3},
     {name:"maximum-fields",plan:plan([maximum]),barriers:["Housing"],minimumPages:3},
     {name:"latin-characters",plan:plan([accented]),barriers:["Educación & formación"],minimumPages:1},
     {name:"hosted-page-boundary",plan:{...plan(boundary),summary:null},barriers:["No transportation","Food insecurity"],minimumPages:2},
+    {name:"hosted-outcome-boundary",plan:{...plan(outcomeBoundary),summary:null},barriers:["No transportation","Food insecurity"],minimumPages:2,
+      samePageText:[["Review school travel options",outcomeBoundary[1].details!.expected_outcome!]]},
   ];
 }

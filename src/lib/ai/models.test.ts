@@ -11,7 +11,7 @@ describe("AI model defaults", () => {
     ["plan_phase_generation", "gpt-6.1-sol", "medium", 16384],
     ["plan_refinement", "gpt-6.1-sol", "medium", 8192],
     ["case_assistant", "gpt-6.1-sol", "medium", 8192],
-    ["step_refinement", "gpt-6-luna", "low", 4096],
+    ["step_refinement", "gpt-6.1-sol", "medium", 4096],
   ] as const)("routes %s independently of the legacy client mode", (task, model, effort, cap) => {
     expect(getModelForTask(task, "fast")).toBe(model);
     expect(getReasoningEffortForTask(task)).toBe(effort);

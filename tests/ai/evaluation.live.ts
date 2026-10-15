@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { expect, it, vi } from "vitest";
 import { aiEvaluationCases, evaluationFamily, type EvaluationCase } from "../fixtures/ai-evaluation-cases";
-import { evaluationPlan, evaluationSourceHash, evaluationSourceManifest, estimatedCost, evaluationBudget, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, gradeSupportedRefinement, percentile, REQUESTED_TITLE, EVALUATION_VERSION, type EvaluationCheck } from "../../scripts/ai-evaluation";
+import { evaluationPlan, evaluationSourceHash, evaluationSourceManifest, evaluationTaskSelection, estimatedCost, evaluationBudget, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, gradeSupportedRefinement, percentile, REQUESTED_TITLE, EVALUATION_VERSION, type EvaluationCheck } from "../../scripts/ai-evaluation";
 import { tryGenerateLeanPlanOpenAI } from "../../src/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningSnapshot } from "../../src/lib/plan-generator/planning-brief";
 import { previewRefinePlanStepsWithOpenAI } from "../../src/lib/plan-generator/openai-plan";
@@ -36,6 +36,7 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
   if (!["development", "held-out", "pilot"].includes(split)) throw new Error("Choose development, held-out or pilot; keep the evaluation splits separate.");
   const focus = process.env.CASELINK_EVAL_FOCUS ?? "all";
   if (!["all", "substantive-refinement"].includes(focus) || (focus === "substantive-refinement" && split !== "pilot")) throw new Error("Substantive refinement requires the pilot split; otherwise use focus all.");
+  const selectedTask = evaluationTaskSelection(process.env.CASELINK_EVAL_TASK, focus);
   const comparisonModel = process.env.CASELINK_EVAL_MODEL?.trim();
   const comparisonEffort = process.env.CASELINK_EVAL_REASONING_EFFORT?.trim();
   if (comparisonModel && !isAllowedOpenAiModelId(comparisonModel)) throw new Error("Unsupported comparison model.");
@@ -58,7 +59,7 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
   const requestedDate = process.env.CASELINK_EVAL_DATE;
   const now = requestedDate ? new Date(`${requestedDate}T12:00:00Z`) : startedAt;
   if (!Number.isFinite(now.getTime()) || (requestedDate && now.toISOString().slice(0, 10) !== requestedDate)) throw new Error("Set CASELINK_EVAL_DATE to a valid YYYY-MM-DD date.");
-  const runId = `${startedAt.toISOString().replaceAll(/[:.]/g, "-")}-${split}-${focus}-${comparisonModel ?? "task-routing"}-${comparisonEffort ?? "task-effort"}`;
+  const runId = `${startedAt.toISOString().replaceAll(/[:.]/g, "-")}-${split}-${focus}-${selectedTask ?? "all-tasks"}-${comparisonModel ?? "task-routing"}-${comparisonEffort ?? "task-effort"}`;
   const directory = `tmp/ai-evaluation/${runId}`;
   mkdirSync(directory, { recursive: true });
   const results: CaseResult[] = [];
@@ -101,6 +102,7 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
     const supportedRequest = supportedBase ? substantiveRefinementRequest(scenario.id, detail, supportedBase, now) : null;
     const original = JSON.stringify(detail);
     async function task(name: string, run: () => Promise<Omit<TaskResult, "task" | "durationMs">>) {
+      if (selectedTask && name !== selectedTask) return;
       const started = performance.now();
       try { result.tasks.push({ ...await scope.run({ result, task: name }, run), task: name, durationMs: performance.now() - started }); }
       catch { result.tasks.push({ task: name, ok: false, durationMs: performance.now() - started, checks: [], failure: "pipeline_exception" }); }
@@ -170,7 +172,7 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
     const times = (name: string) => tasks.filter(task => task.task === name && task.ok).map(task => task.durationMs);
     const { requests, measuredUsd, unknownCostRequests, unknownCostReserveUsd } = budget.totals;
     const summary = {
-      version: EVALUATION_VERSION, runId, startedAt: startedAt.toISOString(), planningDate: now.toISOString(), completedAt: new Date().toISOString(), split, focus, selectedId: selectedId ?? null, requestedCases: cases.length, completedCases: results.length,
+      version: EVALUATION_VERSION, runId, startedAt: startedAt.toISOString(), planningDate: now.toISOString(), completedAt: new Date().toISOString(), split, focus, selectedTask, selectedId: selectedId ?? null, requestedCases: cases.length, completedCases: results.length,
       syntheticOnly: true, comparisonModel: comparisonModel ?? null, comparisonEffort: comparisonEffort ?? null,
       taskConfiguration: Object.fromEntries((["plan_generation", "plan_refinement", "step_refinement", "case_assistant"] as const).map(task => [task, { model: getModelForTask(task, "fast"), effort: getReasoningEffortForTask(task), maxOutputTokens: getDefaultMaxTokensForTask(task) }])),
       sourceHash, sourceManifest: evaluationSourceManifest(), sourceUnchanged: sourceHash === evaluationSourceHash(), commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
