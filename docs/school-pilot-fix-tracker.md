@@ -273,6 +273,8 @@ Full-plan AI input omits step/action IDs and action status/outcomes. Application
 
 ### [x] CL-30 — Save one reviewed edit transactionally
 
+**October 15 hosted-build test correction:** Vercel Preview `dpl_31fem9LnVRymBT3XGhpBx3p2gtAh` at `8c614d0` failed one of 686 tests because the test dispatched `beforeunload` immediately after observing the save message, before React completed passive-effect cleanup. The equivalent GitHub verification passed. The assertion now waits for that observable cleanup and still fails if the unload warning remains; no application code or assertion was removed. All 23 plan-panel tests and targeted lint passed. Correctness and Ponytail review confirmed this is a test synchronization change. The new exact commit still requires full remote and hosted checks. [Failure record](verification/2026-10-15-preview-test-timing.json).
+
 **Additional finding during CL-05:** `capture_case_progress_update` still executes with the browser role even though the hardening migration revoked the required direct case-progress/activity/family writes. Include a real successful meeting-progress transaction, its permissions and rollback tests here; preserve material approval for progress-only updates instead of clearing review unconditionally.
 
 **Type:** Fix · **Responsible:** engineering.

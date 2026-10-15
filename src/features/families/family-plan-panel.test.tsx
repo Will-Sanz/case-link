@@ -249,9 +249,11 @@ describe("FamilyPlanPanel stale edit recovery", () => {
     await waitFor(() => expect((dialog.getByRole("button", { name: "Save to plan" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(dialog.getByRole("button", { name: "Save to plan" }));
     await screen.findByText("Plan updates saved.");
-    const savedExit = new Event("beforeunload", { cancelable: true });
-    window.dispatchEvent(savedExit);
-    expect(savedExit.defaultPrevented).toBe(false);
+    await waitFor(() => {
+      const savedExit = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(savedExit);
+      expect(savedExit.defaultPrevented).toBe(false);
+    });
     expect(vi.mocked(savePlanEdits).mock.calls[1][0]).toEqual(firstRequest);
   });
 
