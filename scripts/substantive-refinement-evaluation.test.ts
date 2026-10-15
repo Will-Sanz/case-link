@@ -38,3 +38,13 @@ it("rejects the wrong requested date even when the edit stays within the allowed
   proposed[0].action_items[0].target_date = "2026-10-26";
   expect(gradeSupportedRefinement(base, proposed, request).filter(check => !check.passed).map(check => check.code)).toEqual(["requested_exact_date"]);
 });
+
+it.each(["title", "date"])("flags a proposed completed-record %s edit even though the app safely ignores it", field => {
+  const { base, request, proposed } = prepared("pilot-completed-work");
+  proposed[0].action_items[0].target_date = request.expectedDate!.value;
+  if (field === "title") proposed[2].title = "Restart the completed work";
+  else proposed[2].action_items[0].target_date = "2026-12-01";
+  const checks = gradeSupportedRefinement(base, proposed, request);
+  expect(checks.find(check => check.code === "human_records_preserved")?.passed).toBe(true);
+  expect(checks.filter(check => !check.passed).map(check => check.code)).toEqual(["completed_records_preserved_in_proposal"]);
+});

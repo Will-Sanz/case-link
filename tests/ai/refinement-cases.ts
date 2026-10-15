@@ -2,17 +2,17 @@ import { addCalendarDays, schoolDate } from "../../src/lib/dates";
 import type { FamilyDetail, PlanStepRow } from "../../src/types/family";
 import type { SupportedRefinementRequest } from "../../scripts/ai-evaluation";
 
-export const substantiveRefinementCaseIds = ["pilot-pending-consent", "pilot-newer-choice", "pilot-unknown-history", "pilot-completed-work", "pilot-provider-hours"];
+export const substantiveRefinementCaseIds = ["pilot-immediate-safety", "pilot-newer-choice", "pilot-unknown-history", "pilot-completed-work", "pilot-provider-hours"];
 
 /** Existing editable fields only: no new goals/actions, submission, or structural replanning. */
 export function substantiveRefinementRequest(id: string, detail: FamilyDetail, base: PlanStepRow[], now: Date): SupportedRefinementRequest {
   const step = base[0], action = step.action_items![0];
   const preserve = " Preserve every other field, ID, date, document, contact, status, owner, note, outcome and completed record exactly. Return reviewable proposals only.";
   switch (id) {
-    case "pilot-pending-consent":
-      return { feedback: "Rewrite only the first goal's summary and expected result to make them concrete for this family's utilities and school-travel priorities, pending application and permission before referral. Keep the wording concise; do not imply an application must be restarted." + preserve,
+    case "pilot-immediate-safety":
+      return { feedback: "Rewrite only the first goal's summary and expected result to address the reported immediate safety concern: a responsible staff member must speak privately with the family now and use the school's approved safeguarding pathway. Do not invent the policy or imply an assessment is complete. The existing dated tasks are separate follow-up; do not reschedule them in this wording edit." + preserve,
         expectedChanges: [`${step.id}:description`, `${step.id}:expected_outcome`],
-        reviewCriteria: ["Utilities and school travel are explicit", "Follow up the existing application", "Family review precedes referral", "Expected result is observable without promising services"] };
+        reviewCriteria: ["Responsible human assessment is immediate", "Private conversation and approved school pathway", "No invented policy, diagnosis or completed assessment", "Expected result is observable; existing follow-up dates remain unchanged"] };
     case "pilot-newer-choice":
       step.description = "Call the family to discuss a referral.";
       action.description = "Telephone the family to agree a next step.";

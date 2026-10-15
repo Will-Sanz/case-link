@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aiEvaluationCases, evaluationFamily } from "../tests/fixtures/ai-evaluation-cases";
-import { estimatedCost, evaluationBudget, evaluationPlan, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE } from "./ai-evaluation";
+import { estimatedCost, evaluationBudget, evaluationPlan, evaluationSourceManifest, evaluationSourceHash, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, percentile, REQUESTED_TITLE } from "./ai-evaluation";
 import { buildPlanningSnapshot } from "../src/lib/plan-generator/planning-brief";
 import { toRefinementDraft } from "../src/lib/domain/plan/refinement-review";
 import { generatedPlanStep } from "../tests/fixtures/plan-contract";
@@ -8,6 +8,12 @@ import { findLikelyIdentifiers } from "../src/lib/privacy/no-pii";
 
 const now = new Date("2026-10-14T12:00:00Z");
 describe("synthetic AI evaluation", () => {
+  it("fingerprints runtime helpers, configuration and evaluation fixtures without environment secrets", () => {
+    const files = evaluationSourceManifest();
+    expect(files).toEqual(expect.arrayContaining(["src/lib/domain/plan/action-state.ts", "src/lib/domain/plan/refinement-identity.ts", "src/lib/ai/models.ts", "tests/ai/refinement-cases.ts", "package-lock.json"]));
+    expect(files.some(file => file.includes(".env") || file.endsWith(".test.ts"))).toBe(false);
+    expect(evaluationSourceHash()).toMatch(/^[a-f0-9]{64}$/);
+  });
   it("keeps 25 development and 25 distinct held-out cases with valid non-identifying snapshots", () => {
     expect(aiEvaluationCases.filter(item => item.split === "development")).toHaveLength(25);
     expect(aiEvaluationCases.filter(item => item.split === "held-out")).toHaveLength(25);

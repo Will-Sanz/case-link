@@ -1,22 +1,27 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { addCalendarDays, schoolDate } from "../src/lib/dates";
 import { contactsForResourceIds, planResourceCatalog } from "../src/lib/matching/plan-resources";
 import { findLikelyIdentifiers } from "../src/lib/privacy/no-pii";
-import { collectRefinementChanges, applyRefinementChanges } from "../src/lib/domain/plan/refinement-review";
+import { collectRefinementChanges, applyRefinementChanges, toRefinementDraft } from "../src/lib/domain/plan/refinement-review";
 import type { DraftStepRefineInput } from "../src/lib/plan-generator/plan-refine-lean";
 import type { LeanPlanPhaseStep } from "../src/lib/plan-generator/lean-plan-schema";
 import type { FamilyDetail, PlanStepRow } from "../src/types/family";
 import { estimateAiCost, type AiUsage } from "../src/lib/ai/usage";
 
 export const REQUESTED_TITLE = "Prepare the agreed next step";
-export const EVALUATION_VERSION = 9;
+export const EVALUATION_VERSION = 10;
 export type EvaluationCheck = { code: string; passed: boolean; severity: "critical" | "quality" };
 
+/** Exact manifest, without environment files or secrets. Runtime helpers cannot silently escape the fingerprint. */
+export function evaluationSourceManifest() {
+  const sources = ["src", "tests/fixtures", "tests/ai"].flatMap(root => readdirSync(root, { recursive: true, encoding: "utf8" })
+    .filter(file => /\.tsx?$/.test(file) && !/\.(test|spec)\.tsx?$/.test(file)).map(file => `${root}/${file}`));
+  return [...sources, "package.json", "package-lock.json", "tsconfig.json", "next.config.ts", "vitest.config.mts", "vitest.ai.config.mts", "scripts/ai-evaluation.ts"].sort();
+}
+
 export function evaluationSourceHash() {
-  const files = ["src/lib/ai/client.ts", "src/lib/ai/models.ts", "src/lib/ai/model-allowlist.ts", "src/lib/ai/casework-safety.ts", "src/lib/plan-generator/openai-plan.ts", "src/lib/plan-generator/openai-plan-lean-phase.ts", "src/lib/plan-generator/lean-plan-schema.ts", "src/lib/plan-generator/plan-refine-lean.ts", "src/lib/plan-generator/planning-brief.ts", "src/lib/case-assistant/ai-case-assistant.ts", "src/lib/case-assistant/case-context.ts", "src/lib/case-assistant/answer-schema.ts", "src/lib/matching/plan-resources.ts", "src/lib/domain/plan/refinement-review.ts", "src/lib/privacy/no-pii.ts", "tests/fixtures/ai-evaluation-cases.ts", "scripts/ai-evaluation.ts", "tests/ai/evaluation.live.ts", "src/lib/plan-generator/prior-phase-summary.ts"];
-  files.push("src/lib/ai/usage.ts", "src/lib/ai/case-facts.ts", "tests/ai/pilot-cases.ts", "tests/ai/refinement-cases.ts");
-  return createHash("sha256").update(files.map(file => `${file}\n${readFileSync(file, "utf8")}`).join("\n")).digest("hex");
+  return createHash("sha256").update(evaluationSourceManifest().map(file => `${file}\n${readFileSync(file, "utf8")}`).join("\n")).digest("hex");
 }
 
 /** Known human records make edit-preservation checks independent of generated drafts. */
@@ -82,6 +87,15 @@ function humanRecords(steps: PlanStepRow[], requestedDateAction?: string) {
       date: action.id === requestedDateAction ? undefined : action.target_date, followUp: action.follow_up_date, completed: action.status === "completed" ? action : null })) }));
 }
 
+function completedProposalPreserved(base: PlanStepRow[], proposed: DraftStepRefineInput[]) {
+  return base.map(toRefinementDraft).every(step => {
+    const next = proposed.find(item => item.id === step.id);
+    if (step.status === "completed") return JSON.stringify(next) === JSON.stringify(step);
+    return step.action_items.filter(action => action.status === "completed").every(action =>
+      JSON.stringify(next?.action_items.find(item => item.id === action.id)) === JSON.stringify(action));
+  });
+}
+
 export function gradeRefinement(base: PlanStepRow[], proposed: DraftStepRefineInput[]): EvaluationCheck[] {
   const checks: EvaluationCheck[] = [];
   try {
@@ -90,6 +104,7 @@ export function gradeRefinement(base: PlanStepRow[], proposed: DraftStepRefineIn
     checks.push(check("explicit_selection_required", JSON.stringify(untouched) === JSON.stringify(base)));
     const applied = applyRefinementChanges(base, changes, changes.map(change => change.id));
     checks.push(check("human_records_preserved", JSON.stringify(humanRecords(applied)) === JSON.stringify(humanRecords(base))));
+    checks.push(check("completed_records_preserved_in_proposal", completedProposalPreserved(base, proposed), "quality"));
     checks.push(check("requested_title_changed", applied[0].title === REQUESTED_TITLE, "quality"));
     checks.push(check("no_unrequested_proposal", changes.length === 1 && changes[0].id === `${base[0].id}:title`, "quality"));
   } catch {
@@ -114,6 +129,7 @@ export function gradeSupportedRefinement(base: PlanStepRow[], proposed: DraftSte
     const checks = [
       check("explicit_selection_required", JSON.stringify(applyRefinementChanges(base, changes, [])) === JSON.stringify(base)),
       check("human_records_preserved", JSON.stringify(humanRecords(applied, request.expectedDate?.actionId)) === JSON.stringify(humanRecords(base, request.expectedDate?.actionId))),
+      check("completed_records_preserved_in_proposal", completedProposalPreserved(base, proposed), "quality"),
       check("no_unrequested_proposal", changes.every(change => request.expectedChanges.includes(change.id))),
       check("requested_fields_changed", request.expectedChanges.every(id => changes.some(change => change.id === id)), "quality"),
     ];

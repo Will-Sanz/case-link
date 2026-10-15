@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { expect, it, vi } from "vitest";
 import { aiEvaluationCases, evaluationFamily, type EvaluationCase } from "../fixtures/ai-evaluation-cases";
-import { evaluationPlan, evaluationSourceHash, estimatedCost, evaluationBudget, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, gradeSupportedRefinement, percentile, REQUESTED_TITLE, EVALUATION_VERSION, type EvaluationCheck } from "../../scripts/ai-evaluation";
+import { evaluationPlan, evaluationSourceHash, evaluationSourceManifest, estimatedCost, evaluationBudget, gradeGeneratedSteps, gradeCompletionDate, gradeMissingHistory, gradeRefinement, gradeSupportedRefinement, percentile, REQUESTED_TITLE, EVALUATION_VERSION, type EvaluationCheck } from "../../scripts/ai-evaluation";
 import { tryGenerateLeanPlanOpenAI } from "../../src/lib/plan-generator/openai-plan-lean-phase";
 import { buildPlanningSnapshot } from "../../src/lib/plan-generator/planning-brief";
 import { previewRefinePlanStepsWithOpenAI } from "../../src/lib/plan-generator/openai-plan";
@@ -173,7 +173,7 @@ it("evaluates synthetic casework with the actual production AI pipeline", async 
       version: EVALUATION_VERSION, runId, startedAt: startedAt.toISOString(), planningDate: now.toISOString(), completedAt: new Date().toISOString(), split, focus, selectedId: selectedId ?? null, requestedCases: cases.length, completedCases: results.length,
       syntheticOnly: true, comparisonModel: comparisonModel ?? null, comparisonEffort: comparisonEffort ?? null,
       taskConfiguration: Object.fromEntries((["plan_generation", "plan_refinement", "step_refinement", "case_assistant"] as const).map(task => [task, { model: getModelForTask(task, "fast"), effort: getReasoningEffortForTask(task), maxOutputTokens: getDefaultMaxTokensForTask(task) }])),
-      sourceHash, sourceUnchanged: sourceHash === evaluationSourceHash(), commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+      sourceHash, sourceManifest: evaluationSourceManifest(), sourceUnchanged: sourceHash === evaluationSourceHash(), commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
       scope: "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
       requests, estimatedStandardUsd: measuredUsd, budgetUsd, unknownCostRequests, unknownCostReserveUsd, priceSource: "https://developers.openai.com/api/docs/pricing", priceChecked: "2026-10-15", costNote: "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
       taskCount: tasks.length, acceptedTasks: tasks.filter(task => task.ok).length, criticalFailures: tasks.flatMap(task => task.checks.filter(check => !check.passed && check.severity === "critical")).length,

@@ -97,7 +97,7 @@ ${feedback.trim()}
 
   const instructions =
     "You edit an existing case plan draft for a case manager. " +
-    CASEWORK_SAFETY_PROMPT + "\nChange only what the case manager explicitly requests. Preserve all other wording and human records exactly. " +
+    CASEWORK_SAFETY_PROMPT + "\nChange only what the case manager explicitly requests. Casework guidance constrains the requested edits; it does not authorize changing additional fields. Return every unrequested field verbatim, including existing summary wording, and preserve completed work. Apply safety guidance within the requested fields when the request involves safety. " +
     "Return one JSON object with key `steps` only. Each step includes its original id, phase, title, description, " +
     "required_documents, resource_ids, expected_outcome, timing_guidance, priority (null to preserve), and action_items " +
     "(use null to leave a list unchanged; [] explicitly clears it).";
