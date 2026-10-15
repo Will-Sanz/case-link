@@ -4,12 +4,11 @@
 
 The original database upgrade, logical backup/restore and production email/environment setup are complete; the historical steps below must not be mistaken for current blockers. Both projects have 40 migrations through `20261014230221`. The 44 approved demo families were removed while resources and accounts were preserved. See [executed upgrade](production-demo-upgrade.md).
 
-Application commit `7c9af9e` passed full CI, CodeQL, exact release preflight and hosted staging auth/AI/PDF checks. A production-scoped build of that exact commit is READY, without canonical-domain assignment. Final protected production browser verification, live AI/resource proof, promotion, compatible rollback and post-release observation remain pending. Automatic approval review requires explicit approval for the proposed authenticated test cookie. No protection rules were changed. [Current release identifiers and next steps](production-release.md).
+Application/test source `8ace965` passes full CI `38676628477` (attempt 2), CodeQL `38676628671`, exact release preflight and the full hosted staging workflow. Production candidate `dpl_7TyYy3KhJREBvVer5YY4x6rLnmNh` is READY without canonical-domain assignment. The final full production-candidate workflow also passes, including repeated reads and a visually checked PDF. Earlier database/navigation timeouts remain recorded for reliability follow-up; promotion, canonical verification and observation remain pending at the user's requested stopping point. The user approved existing authenticated testing access, which works without protection changes or a new bypass secret. [Current identifiers, failures and next steps](production-release.md).
 
-No paid plan, live secret rotation or school invitation occurred. Free-plan session limits/leaked-password screening, recurring/off-machine backup, budget/alert delivery and school acceptance remain operating decisions. The latest later checkpoint `1217e1d` also passed full CI `38665144461` and CodeQL `38665144419`, including 686 unit/component tests and seven browser scenarios; its changes after the application candidate are recovery tooling and evidence only.
+No paid plan, live secret rotation or school invitation occurred. Free-plan session limits/leaked-password screening, recurring/off-machine backup, budget/alert delivery and school acceptance remain operating decisions. Exact final-source checks include 686 unit/component tests, seven browser scenarios and database/Auth/restore/legacy/PDF verification.
 
-
-CL-41 remains open. Use the existing Vercel + Supabase deployment shape for this small pilot; Kubernetes adds no demonstrated requirement. No production deployment or promotion was performed.
+CL-41 remains open. Use the existing Vercel + Supabase shape for this small pilot; Kubernetes adds no demonstrated requirement. Production candidates have been built, but the canonical production alias has not been promoted. The historical observations below describe earlier checkpoints, not current pending approvals.
 
 ## Observed and changed
 

@@ -1,4 +1,4 @@
-# Current checkpoint — October 14 evening / October 15 UTC, 2026
+# Paused checkpoint — October 15, 2026
 
 Continue in `/Users/willsanz/homelessness-project`, branch `codex/school-pilot-readiness`, draft [PR #15](https://github.com/Will-Sanz/case-link/pull/15). Use the current tracker and [production release record](verification/production-release.md); older historical entries are superseded by the October 15 evidence.
 
@@ -9,6 +9,8 @@ The user narrowed the work to (1) PDF pagination and removal of all CaseLink 2FA
 The user authorized routine SQL without repeated prompts, identified the original 44 families as demo data, and explicitly approved clearing those demo cases after the verified backup/rehearsal and applying the upgrade. That transaction is complete. Preserve the 54 resources and all existing accounts. Never change the owner's existing password. Synthetic mail tests are authorized only for the owner inbox named in the chat; no school invitations. No paid plan or live-secret rotation is authorized.
 
 Background only: no foreground apps, visible tabs, file/review/preview panels or chat navigation. Use hidden/headless tools. All seven CaseLink local Supabase services remain stopped with data preserved; keep unrelated services/port 3000 untouched. Heavy checks run in remote CI. The one-time continuation already ran; do not create a recurring automation. Use Ponytail full, normal security/correctness review and a separate deletion pass. Preserve unrelated AGENTS/design/skill/output files and stage exact paths only. Commit/push each completed item; use `HUSKY=0 git push` to keep heavy pre-push checks off the workstation, then inspect remote CI.
+
+The user asked for a natural stopping point before bed. The final production-candidate workflow has finished and its fixtures are cleaned up. Save this checkpoint and stop; do not begin promotion or another long diagnostic tonight. No new scheduled continuation was requested.
 
 ## Completed and verified
 
@@ -23,26 +25,43 @@ Background only: no foreground apps, visible tabs, file/review/preview panels or
 
 Full CI **38666170553** and CodeQL **38666170540** subsequently passed at **123b74e**. A staging routing rollback from that deployment to the verified `7c9af9e` and back also passed health/login, sign-in enforcement, HSTS and the staging connection boundary. The production alias stayed unchanged. See `docs/verification/2026-10-15-staging-rollback.json`; production rollback compatibility is still distinct.
 
-## Latest: production-directory defect found and fixed
+## Latest source and exact release state
 
-The user explicitly approved existing authenticated testing access. It succeeded without any protection changes/new bypass secret. The candidate `7c9af9e` then failed plan creation: the saved resource catalog included phone/email identifiers, correctly rejected by database privacy checks. The shared snapshot now strips those contact values; existing source/version checks and database canonicalization restore exact contacts on step save. A before-fix regression failed; 103 focused tests, typecheck/lint and a disposable standard-staff production database regression passed. Full remote CI and a new exact-source hosted candidate are required. Do not promote `7c9af9e`. See the two `2026-10-15-production-*-regression/failure` records and CL-23.
+- **Final verified app/test source:** `8ace965e86fc556844d63318680b255ca57cbff9`. Runtime fix `8c614d0` removes directory phone/email from durable generation snapshots; the existing database provenance trigger supplies exact current source contacts on step save. The previous production candidate failed before any AI call because the snapshot correctly triggered privacy checks. A regression failed before the fix; 103 focused tests and a disposable production start/append/contact regression passed afterward. No migration, dependency, RLS or privacy relaxation.
+- `8ace965` only fixes test timing: wait for React's passive-effect cleanup before checking that a successful save removed the unload warning. All 23 plan-panel tests pass; the assertion and product code remain intact.
+- **Full CI `38676628477`, attempt 2, and CodeQL `38676628671` pass at exactly `8ace965`.** This includes 686 unit/component tests, seven browser scenarios and database/Auth/restore/legacy-upgrade/PDF checks. The first database job failed during remote setup (registry rate limit/occupied port), before tests; rerunning only that failed job passed. Release preflight passed before candidate creation.
+- **Final staging Preview:** `dpl_ETfuSDhVtDE6jrab3g5TsThwGGKr`, READY, `https://case-link-7hgb7ony3-will-sanzs-projects.vercel.app`. Full hosted workflow passed with zero browser errors; both downloaded PDF pages were visually inspected. Evidence: `2026-10-15-hosted-directory-fix.json`.
+- **Final production candidate:** `dpl_7TyYy3KhJREBvVer5YY4x6rLnmNh`, READY, `https://case-link-oxq4j9up0-will-sanzs-projects.vercel.app`. Production environment, Git-source `8ace965`, created with `autoAssignCustomDomains: false`. Already built: do not create it again.
+- **Canonical live is unchanged:** `https://www.thecaselink.com` still maps to `dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW`, source `e0cb389feaa0096175b33f05602ed72f0041c467`. The old app is not certified against the upgraded database. Do not call the live site fixed or use that old build as a safe rollback.
 
-## Live release is still pending
+## Production test results and unresolved reliability issue
 
-Production candidate **`dpl_2bGrr5VGVTrqdRtwRzGq2tu57zpi`** is READY at `https://case-link-p0ljvv1lh-will-sanzs-projects.vercel.app`. It is a Git-source build of exact app commit `7c9af9e`, **target production**, made with `autoAssignCustomDomains: false`.
+The user-approved official Vercel CLI existing-access cookie works, with no new bypass secret/protection change. Keep it in memory and on the exact candidate origin. Execute the CLI from unlinked `/tmp`, never from the repo or with a full deployment URL, so it cannot create a missing bypass secret or load local application credentials.
 
-The canonical **`www.thecaselink.com`** still points to **`dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW`**, old source `e0cb389feaa0096175b33f05602ed72f0041c467`. The database is upgraded but the old application has not been certified against it. Do not tell the user the live site is fixed or the pilot is ready. Do not blindly roll back to that old build after release.
+1. First `8ace965` run generated three steps in about 25 seconds with 24 matches from the preserved 54-resource directory. A reload failed: `get_family_plan_snapshot` raised PostgreSQL `57014`; the edge request took 12,837 ms. RLS remains enabled and authenticated statement timeout is 8 seconds. Five direct reads of a smaller one-step fixture passed in 273–411 ms. This does not reproduce the full failing shape. Evidence: `2026-10-15-production-plan-read-timeout.json` and `2026-10-15-production-plan-read-diagnostic.json`.
+2. A retry passed password login but timed out loading Settings after 30 seconds. The matching Vercel/Supabase log window contained no runtime error, database cancellation or edge 5xx. Cause unresolved. Evidence: `2026-10-15-production-navigation-timeout.json`.
+3. **Final bounded retry passed** at 04:19:51–04:21:51 UTC: password login/Settings, minimal intake, four saved steps, generation, both selective refinements, recovered edits, exact preservation of action identities/dates/progress, review, downloaded PDF, assistant and logout. Three full plan reloads took 1.853/1.143/1.070 seconds. Both PDF pages are readable with no clipping/overlap/blank page; preview/download SHA-256 matches. No HTTP errors, unhandled browser errors or Vercel runtime errors in its window. All test families/accounts removed. Independent read-back confirms 0 families, 54 resources, 11 application accounts, 13 Auth accounts and no disposable workflow accounts. Evidence: `2026-10-15-production-candidate-workflow.json`.
 
-The candidate's headless entry failed because the staging OIDC testing path does not authorize protected Production. It stopped before any account or application request. Automatic approval review then rejected the official CLI test-access-cookie probe before execution. The user subsequently approved that exact existing-access method; the probe and login passed. No protection settings or bypass secrets changed. The subsequent plan-start failure supersedes the original candidate readiness.
+The final sparse-input plan selected zero directory contacts; it asked for clarification before a referral. The separate production/database regression verifies exact source contact persistence. School usefulness is not established. Measured generation/action-refinement/full-refinement/assistant times: 24.024/3.941/14.120/4.873 seconds; password token issuance took 7.312 seconds. Do not call these a representative latency percentile or erase the two prior failures. No speculative database optimization or global timeout increase has been applied.
 
-Automatic review separately rejected creating a synthetic administrator in production. That step was removed from the prepared runner; safer standard-staff verification passed. Administrator tests remain in staging/CI. Do not restore the rejected production-admin step.
+Automatic review separately rejected creating a synthetic production administrator. That step was removed, and standard-staff checks passed; administrator coverage remains in staging/CI. Do not restore the rejected step.
 
-## Next actions after the directory fix
+## Resume here
 
-1. Check full remote CI and create a new exact-source production candidate without canonical-domain assignment, then use the authorized existing Vercel access only. Check the official CLI probe first; do not create a new bypass secret if none exists. The prepared probe is `/tmp/caselink-production-protection-probe.mjs`. Its output is allowlisted metadata only. Do not print cookies/tokens or inject them into unrelated origins.
-2. Update the prepared **standard-staff-only** `/tmp/caselink-production-workflow.mjs` to use the approved access method and run it against the immutable production candidate. It uses disposable accounts/cases, preserves resources, checks current source contacts, exercises all four live AI paths and downloads a reviewed PDF. Inspect actual output and rendered PDF; record failures honestly, clean only those fixtures. The first blocked attempt is under `/tmp/caselink-production-workflow/result.json`.
-3. Promote only after production checks pass; verify canonical headers/routing/core workflow, inspect sanitized errors and observe 30 minutes. Establish/test a compatible rollback candidate without reversing the upgraded database or reviving old secret snapshots. Never promote the staging Preview.
-4. Record exact evidence in tracker/release doc, update draft PR, commit/push and inspect final CI. Leave school/resource/AI-usefulness acceptance and external operational gaps explicit.
+1. Inspect the branch/tree and the linked evidence. Documentation commits after `8ace965` do not change this verified app candidate. Keep unrelated AGENTS/design/skill/output files untouched. Local Docker/test services remain stopped; use remote CI and bounded hidden/headless tests.
+2. Follow up on the intermittent production database/navigation delays. Use a representative saved plan and sanitized request timings; obtain actual query-plan evidence before making a query change. A single failed read plus later passing reads does not establish a root cause. Do not weaken RLS, increase global timeouts, buy a plan or rotate keys. If a fix is necessary, include a failing regression, exact-source checks and a rebuilt production candidate. The prior production candidate `7c9af9e` is superseded and must not be promoted.
+3. Once reliability is adequately established, promote the verified production candidate only. Run canonical headers/routing and the full synthetic workflow, inspect content-free runtime logs and observe 30 minutes. The staging Preview must never be promoted to production. Keep school invitations closed.
+4. Record the first verified production baseline and recovery procedure. Staging switching passed; the old live build is not a certified production rollback. Do not reverse data migrations or create a pointless duplicate build just to label it a rollback.
+5. Update tracker/release record/draft PR, commit/push each completed item and inspect remote checks. Report live deployment status separately from school/operating approval.
+
+### Prepared temporary runners
+
+- `/tmp/caselink-production-workflow.mjs`: current exact candidate, approved existing Vercel access, standard staff only, three plan reloads, all four live AI paths, exact edit preservation, reviewed PDF and cleanup. Last result/artifacts: `/tmp/caselink-production-final-diagnostic/`. It records sanitized paths/status/timing only; no cookies/keys/headers or case content in request metadata.
+- `/tmp/caselink-production-read-diagnostic.ts`: smaller one-step/five-read diagnostic, no AI calls/resource changes. Result `/tmp/caselink-production-read-diagnostic.json`. Do not mistake this for the representative full-plan reproduction.
+- `/tmp/caselink-canonical-workflow.mjs`: prepared but **not run**; same workflow on `www`, no protection cookie. Only run after promotion and confirm source IDs first.
+- `/tmp/caselink-production-public-smoke.mjs`: prepared but **not run** against the new canonical release. Checks routing, headers and production connection boundary.
+- `/tmp/caselink-release-observation.mjs`: prepared but **not started**; 30-minute read-only observation. Only start after promotion. Its health checks supplement, not replace, the full workflow/error review.
+- `/tmp/caselink-create-production.mjs` has **already created** `dpl_7TyYy3KhJREBvVer5YY4x6rLnmNh`; do not rerun blindly.
 
 ## Provider limits and remaining outside decisions
 
