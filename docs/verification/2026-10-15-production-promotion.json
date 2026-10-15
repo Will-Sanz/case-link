@@ -1,0 +1,19 @@
+{
+  "productionSource": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "deploymentId": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+  "canonicalOrigin": "https://www.thecaselink.com",
+  "aliasUpdatedAt": "2026-10-15T15:01:54.806Z",
+  "target": "production",
+  "userExplicitlyApproved": true,
+  "candidateWorkflow": "2026-10-15-production-snapshot-workflow.json",
+  "canonicalWorkflow": "2026-10-15-canonical-workflow.json",
+  "publicChecks": "2026-10-15-canonical-public-checks.json",
+  "databaseMigration": "2026-10-15-production-snapshot-migration.json",
+  "previousDeployment": "dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW",
+  "previousDeploymentCertifiedAsRollback": false,
+  "stagingPreviewPromoted": false,
+  "observationStatus": "in progress",
+  "schoolInvitationsSent": false,
+  "paidUpgrade": false,
+  "liveSecretRotation": false
+}

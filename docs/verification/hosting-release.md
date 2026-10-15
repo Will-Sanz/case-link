@@ -1,14 +1,16 @@
 # Hosted release control — October 14, 2026
 
-## October 15 current release checkpoint
+## October 15 current release
 
-The original database upgrade, logical backup/restore and production email/environment setup are complete; the historical steps below must not be mistaken for current blockers. Both projects have 40 migrations through `20261014230221`. The 44 approved demo families were removed while resources and accounts were preserved. See [executed upgrade](production-demo-upgrade.md).
+The explicitly approved production build **`dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8`**, source **`9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b`**, is live at `https://www.thecaselink.com`. CI **38753128811**, CodeQL **38753128797**, exact-source preflight and the complete staging/candidate/canonical workflows pass. Promotion used the already-tested production build; the staging Preview was not promoted. Both databases have **41 migrations** through `20261015143343`, with original resources/accounts preserved. [Live release record](production-release.md).
 
-Application/test source `8ace965` passes full CI `38676628477` (attempt 2), CodeQL `38676628671`, exact release preflight and the full hosted staging workflow. Production candidate `dpl_7TyYy3KhJREBvVer5YY4x6rLnmNh` is READY without canonical-domain assignment. The final full production-candidate workflow also passes, including repeated reads and a visually checked PDF. Earlier database/navigation timeouts remain recorded for reliability follow-up; promotion, canonical verification and observation remain pending at the user's requested stopping point. The user approved existing authenticated testing access, which works without protection changes or a new bypass secret. [Current identifiers, failures and next steps](production-release.md).
+The 30-minute observation is running. Canonical login, minimal intake, all four live AI paths, repeated loads, recovered edits, selective refinements, human review, actual PDF and logout pass. The two-page PDF was visually inspected and matches its preview bytes. All disposable accounts/cases were removed. Public routing, closed signup, anonymous workspace denial and security headers pass. Required source checks include 686 unit/component tests, seven browser scenarios and database/Auth/restore/legacy/PDF verification.
 
-No paid plan, live secret rotation or school invitation occurred. Free-plan session limits/leaked-password screening, recurring/off-machine backup, budget/alert delivery and school acceptance remain operating decisions. Exact final-source checks include 686 unit/component tests, seven browser scenarios and database/Auth/restore/legacy/PDF verification.
+The approved encrypted backup and isolated restore reproduced 56 tables / 4,286 rows. Staging alias switching/restoration was rehearsed; this is the first verified production baseline, and the old pre-upgrade live build is not a certified rollback. No paid plan, live-secret rotation or school invitation occurred. Recurring/off-machine backups, budget/alert delivery, provider-access/operating ownership and school acceptance remain open. PR #15 is still draft/unmerged; later documentation commits do not change the live source.
 
-CL-41 remains open. Use the existing Vercel + Supabase shape for this small pilot; Kubernetes adds no demonstrated requirement. Production candidates have been built, but the canonical production alias has not been promoted. The historical observations below describe earlier checkpoints, not current pending approvals.
+## Historical release-control preparation
+
+The dated observations and procedure below record earlier checkpoints. Current release evidence above supersedes claims that the upgrade, hosted workflow, domain or promotion remain unverified. CL-41 remains open only for the current observation and applicable operating decisions; it does not require another hosting platform or Kubernetes.
 
 ## Observed and changed
 
@@ -24,7 +26,7 @@ The project API confirms `main` is the production branch and automatic custom-do
 
 The live preflight rejected `5a3e282718f7cfdc1825807e6c5ebc057956bed4` with exit 1 because `database-security` failed, and accepted `8257d5fb67233a733d9589f6efcf2b39a5386aed` with exit 0 after all four trusted checks passed. The production deployment remains `dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW`, source `e0cb389feaa0096175b33f05602ed72f0041c467`. This proves the command rejects a real failed candidate; it is not proof of provider-enforced promotion denial. Two focused preflight tests pass. The changed Git setting passes Vercel's official property schema. Full-schema validation could not run: the vendor schema declares draft-04 but contains numeric exclusiveMinimum keywords from newer drafts. No application check was disabled. Vercel subsequently accepted the configuration in READY preview `dpl_7oQ6x69KYmABzzopXfXNMEq7wDgH` at `7bdd0a7b9d773241f33986cc9c3032de0a99640a`; its full CI run `38637903289` and CodeQL run `38637903272` also passed.
 
-## Candidate release procedure
+## Historical candidate preparation procedure
 
 1. The restored project `zpfypkizsapvsxeykmdq` is healthy but contains 44 existing family records and an older schema. Only the explicitly approved permission containment is recorded there; a full data-preserving upgrade and backup rehearsal remain required. The user created Free `caselink-staging` (`umnbyupudhunyccqhyrp`) in the same organization/region. All 39 repository migrations and the limited rolled-back hosted SQL role check pass. See [the current database evidence](hosted-database-preflight.md). Record billing/recovery owners, permitted operators and MFA before provisioning. No paid service or production application deployment occurred.
 2. Review the remaining production environment changes in [secret isolation](secret-isolation.md). The isolated readiness Preview now builds with its own staging configuration and user-entered OpenAI Secret; protected health/login/routing checks pass. Exact staging redirects, session settings and Free Resend SMTP are saved; template installation and actual delivery are tracked separately under CL-16. Production still needs compatible database/configuration, removal of web-admin credentials, provider budgets and the remaining approvals. Source requests five-minute plan/overview functions and caps each AI request at three minutes; the deployed limit and killed-request recovery still need evidence.
@@ -35,7 +37,7 @@ The live preflight rejected `5a3e282718f7cfdc1825807e6c5ebc057956bed4` with exit
 
 ## Still required externally
 
-The canonical production domain; safe reconciliation of the restored legacy database; hosted Auth and school-mailbox/link-scanner verification; remaining provider budget/access and historical secret-exposure checks; actual function limits and budget alerts; deployment-check/no-bypass evidence; hosted auth-to-PDF and rollback/restore; named owners and launch sign-off. The branch policy and preflight are implemented, but they do not close those gates. See the [runbook](../production-operations-runbook.md) and [tracker](../school-pilot-fix-tracker.md).
+School mailbox/filter acceptance, provider budget/alert delivery and access review, historical-secret exposure/remediation, recurring/off-machine backup, named support/recovery owners and school launch sign-off remain open. The controlled promotion is verified; provider administrators can still bypass a procedural gate, and a main-branch deployment-trigger experiment has not been performed. See the [runbook](../production-operations-runbook.md) and [tracker](../school-pilot-fix-tracker.md).
 
 ## Dependency and runtime verification
 

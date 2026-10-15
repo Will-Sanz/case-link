@@ -1,0 +1,136 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "startedAt": "2026-10-15T14:50:25.804Z",
+  "syntheticOnly": true,
+  "providerCalls": 0,
+  "resourceMutations": 0,
+  "checks": [
+    "Fixed production operator authenticated",
+    "Production keys available only in memory",
+    "Disposable standard account created",
+    "Audited case-manager provisioning",
+    "Real password login",
+    "Synthetic family created",
+    "Six current directory sources available",
+    "Current resource matched without changing directory",
+    "Current resource matched without changing directory",
+    "Current resource matched without changing directory",
+    "Current resource matched without changing directory",
+    "Current resource matched without changing directory",
+    "Current resource matched without changing directory",
+    "Saved snapshot excludes source contact values",
+    "Production staged plan starts with the current directory",
+    "Generation lease acquired",
+    "Production saves a generated phase",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Direct read-only connection prepared through official CLI",
+    "Direct connection target is fixed",
+    "Deployed snapshot evaluates its input once",
+    "Query measurements use live standard-staff permissions",
+    "Comparison uses the exact deployed snapshot function",
+    "Materialized comparison preserves the complete snapshot and revision hashes"
+  ],
+  "cleanup": {
+    "family": true,
+    "account": true
+  },
+  "passed": true,
+  "shape": {
+    "resources": 6,
+    "steps": 4,
+    "actions": 12,
+    "generationStateBytes": 3980
+  },
+  "sequentialReadMilliseconds": [
+    182,
+    237,
+    113,
+    123,
+    98
+  ],
+  "concurrentReadMilliseconds": [
+    [
+      288,
+      582,
+      115
+    ],
+    [
+      141,
+      95,
+      112
+    ],
+    [
+      172,
+      140,
+      116
+    ]
+  ],
+  "explain": [
+    {
+      "variant": "previous_unmaterialized_comparison",
+      "planningMilliseconds": 5.615,
+      "executionMilliseconds": 212.203,
+      "sharedHitBlocks": 2172,
+      "sharedReadBlocks": 0,
+      "nodes": 250,
+      "actionRowsRead": 96
+    },
+    {
+      "variant": "deployed_materialized",
+      "planningMilliseconds": 0.998,
+      "executionMilliseconds": 31.553,
+      "sharedHitBlocks": 294,
+      "sharedReadBlocks": 0,
+      "nodes": 40,
+      "actionRowsRead": 12
+    },
+    {
+      "variant": "previous_unmaterialized_comparison",
+      "planningMilliseconds": 5.399,
+      "executionMilliseconds": 216.562,
+      "sharedHitBlocks": 2172,
+      "sharedReadBlocks": 0,
+      "nodes": 250,
+      "actionRowsRead": 96
+    },
+    {
+      "variant": "deployed_materialized",
+      "planningMilliseconds": 0.946,
+      "executionMilliseconds": 30.815,
+      "sharedHitBlocks": 294,
+      "sharedReadBlocks": 0,
+      "nodes": 40,
+      "actionRowsRead": 12
+    }
+  ],
+  "finishedAt": "2026-10-15T14:50:40.174Z",
+  "credentialsPersistedOrPrinted": false,
+  "interpretation": "Representative bounded synthetic read verification, not a latency percentile or proof of the sole cause of the earlier intermittent timeout."
+}

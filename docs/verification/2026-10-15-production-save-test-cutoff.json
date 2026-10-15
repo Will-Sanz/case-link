@@ -1,0 +1,107 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://case-link-5r6jnsdzo-will-sanzs-projects.vercel.app",
+  "commit": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "startedAt": "2026-10-15T14:54:50.630Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "Protected immutable production login returns 200",
+    "Testing access stays on exact production candidate origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Standard staff profile has no MFA prompt",
+    "Five consecutive Settings loads succeed",
+    "Minimal hosted intake persists without a description",
+    "Live generation reaches the saved plan",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "The current 54-resource directory supplies matched programs",
+    "Generated directory contact exactly matches its current source",
+    "Hosted generated plan passes automated accessibility checks",
+    "Unsaved browser edit recovers and waiting edit survives reload"
+  ],
+  "timings": {
+    "generationMilliseconds": 32069,
+    "actionRefinementMilliseconds": 4477
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "settingsReloadMilliseconds": [
+    6557,
+    2969,
+    752,
+    704,
+    972
+  ],
+  "generatedPlanSteps": 3,
+  "directory": {
+    "resources": 54,
+    "matched": 24,
+    "generatedContacts": 1
+  },
+  "planReloadMilliseconds": [
+    900,
+    2142,
+    750
+  ],
+  "visibleAlerts": [
+    ""
+  ],
+  "visibleButtons": [
+    "Record meeting progress",
+    "Ask about this plan",
+    "Refine plan with AI",
+    "Mark plan reviewed",
+    "Prepare practical support options",
+    "Hold one brief conversation to clarify which needs matter most, preferred supports, language, consent, and safe contact methods.\n\nPlanned tasks include Confirm the agreed transport and food-access next step; and Record agreed next steps.\n\nTiming: Within one week",
+    "Add documents the client will need\u2026",
+    "Expected outcome: The family\u2019s priorities, preferences, consent, and desired next steps are documented for review.",
+    "Refine action",
+    "Remove action",
+    "Cancel",
+    "Saving\u2026",
+    "Review agreed food and transportation next steps",
+    "Review with the family whether agreed actions occurred and identify any remaining barriers or preferred follow-up.\n\nPlanned tasks include Check status of agreed next steps; and Verify current food-support options if still requested.\n\nTiming: During the 60-day review window",
+    "Edit action",
+    "Complete 90-day family progress review",
+    "Review progress with the family and identify which food or transportation support they want to pursue next.\n\nPlanned tasks include Hold 90-day family review; and Record the family's next choice.\n\nTiming: During the final week of the 90-day window",
+    "Edit action",
+    "Add action"
+  ],
+  "failure": {
+    "stage": "live action refinement",
+    "type": "Error",
+    "message": "expect(locator).toBeVisible() failed"
+  },
+  "finishedAt": "2026-10-15T14:56:10.254Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "3e40d4f199c19697bd0ee91f6daa0bc7240a1e63a32a1e3c77e75fd23832cd97",
+  "requestSummary": {
+    "count": 483,
+    "httpErrors": [],
+    "abortedRequests": 81
+  },
+  "testDeadlineMilliseconds": 5000,
+  "diagnosis": {
+    "evidence": "Installed Playwright expect defaults to 5000 ms. The screenshot shows Saving with no nonempty alert; the runner aborted the active POST and deleted its disposable account during cleanup. A later AuthenticationRequiredError was logged after cleanup began.",
+    "conclusion": "Early test cutoff demonstrated; application save success is not yet established. Recheck with a bounded explicit 30-second save wait and capture exact save durations. No product timeout changes.",
+    "supabaseLogs": "Connector denied access for this interval; no database-log conclusion asserted."
+  }
+}

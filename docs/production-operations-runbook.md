@@ -2,7 +2,7 @@
 
 **Applies to:** the invitation-only V1 pilot
 
-**Selected deployment shape (hosted configuration and owner approval pending):** one Vercel project and one Supabase project per school or district
+**Current deployment:** one managed Vercel application and a dedicated Supabase production project for this school pilot, plus separate synthetic staging. School/operating acceptance remains open; see the [live release record](verification/production-release.md).
 
 **Data posture:** de-identified case context only; browser-generated reviewed-plan PDF export; no PDF uploads or raw PDF bytes sent to OpenAI
 
@@ -140,6 +140,8 @@ The October 14 pilot decision removes CaseLink 2FA. The former authenticator enr
 6. Monitor errors, auth failures, rate limits, latency, and spend for at least 30 minutes.
 
 ### Rollback
+
+The October 15 first verified production baseline is `dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8` at source `9e7d0e2`, with 41 migrations through `20261015143343`. Verify compatibility with the schema and secret scopes in effect at the time of any future rollback. The old pre-upgrade `e0cb389` build is not a certified recovery target. Staging routing rollback/restoration and the original encrypted logical restore were separately verified; see the [release evidence](verification/production-release.md).
 
 1. Stop traffic or disable the affected feature when data integrity or confidentiality may be at risk.
 2. Roll application code back to the last known-good immutable deployment.

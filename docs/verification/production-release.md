@@ -1,49 +1,69 @@
-# Production release checkpoint — October 15, 2026
+# Production release — October 15, 2026
 
-**Morning reliability follow-up:** the overnight documentation commit `b2b629f` passed CI `38681566563` and CodeQL `38681566571`. A representative staff-authorized query comparison found eight repeated plan evaluations; materializing the filtered snapshot reduces measured database execution from about 212 ms to 28 ms with identical full output/review hashes. The narrow migration and executed-read regression are prepared; full remote and hosted verification must pass before applying it to production. [Measurement and limits](2026-10-15-plan-snapshot-measurement.json). The one-time continuation automation is now paused so it cannot repeat daily.
+**Live:** [www.thecaselink.com](https://www.thecaselink.com) now serves the approved production build. The complete candidate and canonical-site synthetic workflows pass. The required **30-minute observation is in progress**; its final result is still required before closing this release checkpoint.
 
-**Release held at the user's requested stopping point:** candidate `8ace965` includes the directory snapshot fix and passes full CI, CodeQL, exact-source release preflight and the complete hosted staging workflow. The production candidate builds and generates a plan using the preserved resource directory. A subsequent plan read failed with a database statement timeout; another attempt timed out navigating to Settings. These failures are recorded below and must not be erased by a successful retry. The canonical site has not been switched. **Do not promote the superseded `7c9af9e` candidate.**
+This completes the actual publishing step for the user's narrow scope: corrected PDF pagination, password-only CaseLink accounts, verified invitation/recovery and core casework, and production configuration. School acceptance of real-case use remains separate. No school staff were invited, paid service purchased or live secret rotated.
 
-The narrow PDF, password-only account and Settings hydration fixes are implemented. The complete hosted staging workflow and account/recovery checks pass. The production database, email templates and future-deployment settings are upgraded. The live application has **not** been switched.
-
-| Item | Recorded state |
+| Item | Verified state |
 | --- | --- |
-| App source | `8ace965e86fc556844d63318680b255ca57cbff9` (runtime fix `8c614d0`; final commit corrects test synchronization) |
-| Exact source checks | CI `38676628477`, attempt 2; CodeQL `38676628671`; release preflight passed |
-| Hosted staging workflow | [Passed, zero browser errors, PDF visually checked](2026-10-15-hosted-directory-fix.json) |
-| Hosted setup/recovery | [Passed](2026-10-15-hosted-account-recovery.json) |
+| Live source | `9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b` |
+| Exact-source checks | CI **38753128811**, CodeQL **38753128797**, release preflight before build and again before promotion |
+| Test coverage | 686 unit/component tests; seven browser scenarios; database/Auth/concurrency/restore/legacy-upgrade/rendered-PDF checks |
+| Production deployment | `dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8`, READY, production environment |
+| Immutable candidate | `https://case-link-5r6jnsdzo-will-sanzs-projects.vercel.app` |
+| Canonical promotion | Alias read-back confirms the exact build; updated **15:01:54.806 UTC** |
 | Vercel team/project | `team_wwXXIa3JR9qMrIBopTUBsG5J` / `prj_1zxzzKu8eljHJvPd6gFY3LhyxwWc` |
-| Production candidate | `dpl_7TyYy3KhJREBvVer5YY4x6rLnmNh`, READY |
-| Candidate URL | https://case-link-oxq4j9up0-will-sanzs-projects.vercel.app |
-| Build mode | Production environment; Git-source exact SHA; `autoAssignCustomDomains: false` |
-| Canonical live alias | `https://www.thecaselink.com` still maps to `dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW` |
-| Old live source | `e0cb389feaa0096175b33f05602ed72f0041c467`; not certified against the upgraded schema |
-| Original database | `zpfypkizsapvsxeykmdq`, upgraded to 40 migrations; [preservation/access evidence](production-demo-upgrade.md) |
-| Separate staging database | `umnbyupudhunyccqhyrp`; synthetic accounts/cases, separate AI/SMTP credentials |
+| Production database | `zpfypkizsapvsxeykmdq`, **41 migrations**, latest `20261015143343` |
+| Separate staging | `umnbyupudhunyccqhyrp`, same 41 migrations, synthetic cases and separate AI/SMTP credentials |
+| Canonical cleanup | 0 families/plans, 54 resources, 11 application accounts, 13 Auth accounts, 0 MFA factors/scratch databases |
+| Access read-back | No public table without RLS; no anonymous privileged-function execution |
+| Branch and PR | `codex/school-pilot-readiness`; [PR #15](https://github.com/Will-Sanz/case-link/pull/15) remains draft/unmerged |
 
-A staging routing rollback rehearsal now passes: the stable preview moved from `123b74e` to the previously verified `7c9af9e` deployment and back. Both passed health/login, anonymous workspace denial, HSTS and the staging-only connection boundary. Alias read-back confirmed each target and the unchanged production domain. App, dependencies, hosting config and migrations are identical across that pair. No data or protection rules changed. [Evidence and limits](2026-10-15-staging-rollback.json). Full CI `38666170553` and CodeQL `38666170540` also passed at `123b74e`.
+The build was created without assigning production domains, tested at its immutable address, then promoted after the user's explicit approval. It is a production build, not the staging Preview. Evidence-only commits after `9e7d0e2` do not change the live source. [Promotion](2026-10-15-production-promotion.json), [source checks](2026-10-15-snapshot-fix-checks.json), [authorization](2026-10-15-production-approval-gate.json).
 
-## Latest failures and verification
+## What passed on the live site
 
-- The initial production-directory plan-start failure is fixed by removing directory phone/email values from durable generation snapshots. Existing database provenance validation supplies exact current contacts when saving steps. A before-fix regression failed, 103 focused tests passed afterward, and the real snapshot → start → append → canonical-contact assertion passes in the full database suite and an isolated production fixture. No privacy guard, RLS policy or source-freshness check was weakened.
-- Full final-source checks pass: 686 unit/component tests, seven browser scenarios, database/Auth/restore/legacy-upgrade/PDF checks. The first remote database job failed during infrastructure setup (registry rate limit/occupied port), before tests; retrying only that failed job passed. No gate was removed. A separate Vercel test timing failure was fixed by waiting for React's existing effect cleanup; no product behavior or assertion was removed. [Exact candidate evidence](2026-10-15-final-candidate-checks.json).
-- Final staging generation/refinement/assistant timings were 22.164 / 3.428 / 6.514 / 3.853 seconds. The two-page reviewed PDF matches its preview byte-for-byte and was visually inspected. All disposable fixtures were removed. This staging directory is empty, so it is not evidence for production resource usefulness.
-- The production candidate generated three saved steps in about 25 seconds, with 24 matches from the 54-resource catalog. Reopening the plan then hit PostgreSQL `57014` in `get_family_plan_snapshot` (edge origin 12,837 ms). A separate one-step fixture passed five direct snapshot reads in 273–411 ms. A later browser attempt passed login but timed out loading Settings; the matching provider log window contains no database cancellation or Vercel runtime error. Its cause is unresolved. [Plan-read failure](2026-10-15-production-plan-read-timeout.json), [Settings navigation failure](2026-10-15-production-navigation-timeout.json).
-- The final bounded production attempt **passed** at 04:19:51–04:21:51 UTC: password login/Settings, minimal intake, four saved steps, live generation and both refinements, recovered edits, exact action identity/date/progress preservation, human review, byte-identical preview/download, assistant and logout. Three full plan reloads took **1.853 / 1.143 / 1.070 seconds**. AI timings were **24.024 / 3.941 / 14.120 / 4.873 seconds**. Both PDF pages were visually inspected with no clipping, overlap or blank pages. There were no HTTP 4xx/5xx responses, unhandled browser errors or Vercel runtime errors in its window; navigation-aborted requests are counted separately. All fixtures were removed. [Complete retry evidence](2026-10-15-production-candidate-workflow.json).
+The canonical browser test ran **15:02:52.672–15:04:14.052 UTC** with a disposable standard-staff account and synthetic family. It passed real password login, five Settings reloads, minimal intake, live plan generation using the preserved directory, three plan reloads, unsaved edit recovery, action and full-plan AI refinement, exact preservation of action identities/dates/progress, human review, PDF preview/download, assistant and logout. Automated accessibility checks and browser-error checks passed. Test fixtures were removed, and an independent aggregate query verified retained counts and permissions. [Complete evidence](2026-10-15-canonical-workflow.json).
 
-The final sparse-input AI sample selected no directory contacts; it proposed clarification and follow-up rather than claiming a referral or eligibility. The assistant used the saved Waiting state and asked about priorities, consent, language and safe contact. The 24 matches prove use of the preserved directory; exact selected-contact persistence is demonstrated by the separate database regression. This is still not school usefulness sign-off or a representative latency percentile. Password token issuance took 7.312 seconds and full-plan refinement 14.120 seconds in the final run; performance remains part of the timeout follow-up.
+| Canonical measurement | Result |
+| --- | --- |
+| Live generation | 24.045 seconds |
+| Action / full-plan refinement | 3.446 / 4.984 seconds |
+| Assistant | 7.425 seconds |
+| Two human saves | 858 / 855 ms |
+| Five Settings loads | 2.438 / 2.753 / 1.670 / 0.925 / 0.700 seconds |
+| Three plan reloads | 0.930 / 1.166 / 0.603 seconds |
+| Reviewed PDF | 2 pages; 8,480 bytes; preview/download SHA-256 identical; both pages visually inspected |
 
-These observations do not justify increasing global timeouts, weakening access controls or guessing at an index/query rewrite. Obtain representative execution timings and a bounded reproduction before changing the database. The official authenticated testing access is approved and works; no protection change or new bypass credential is needed.
+Public checks confirm health/login 200, anonymous Families access redirects to sign-in, public signup redirects to request-demo, apex redirects to www, and HSTS/nosniff/frame restrictions/CSP use the production database boundary. The test browser needed no Vercel bypass credential at the canonical address. [Routing and headers](2026-10-15-canonical-public-checks.json).
 
-## Immediate remaining release work
+The AI sample asked for priorities, consent, language and safe contact, respected the saved Waiting state/date and did not claim eligibility or completed referrals. The sparse-input canonical plan selected no contacts; separate production validation checked a selected contact against its actual matched source, and database regressions verify canonical contact persistence. These samples do not establish school usefulness or a population latency percentile.
 
-1. Resolve or adequately bound the observed production timeouts using the existing exact-source candidate. Preserve their failure evidence. If a code/query fix is needed, include a regression, run the exact new SHA's checks and rebuild a production candidate without canonical-domain assignment. Do not disable protection or create a new bypass secret.
-2. Complete the representative production-candidate reliability check with disposable **standard staff** and cases: password login, intake, the preserved 54-resource directory, all four AI paths, repeated reads, saved edits, review and actual PDF. Check selected contacts against current matched sources and inspect the PDF. Production administrator creation was separately rejected and removed from the runner; staging/CI cover administrators. Preserve every pre-existing account/resource and clean up only test fixtures.
-3. Promote this production build only after those checks pass. Never promote the staging Preview, which contains staging credentials. Verify the canonical site's headers/routing and synthetic workflow, inspect content-free error logs and observe at least 30 minutes. Record the actual deployment ID and exact source.
-4. Record the first verified production baseline and its recovery procedure. Staging switching has been rehearsed; the old production build is not a certified rollback candidate because it predates the new schema/guards and retains old environment snapshots. Do not reverse the database upgrade or manufacture a duplicate deployment merely to label it a rollback. The verified encrypted database recovery point is separate from app rollback.
+The full staging and protected production-candidate workflows also pass. Earlier hosted invitation/recovery checks cover expired/renewed invitations, deliberate confirmation, initial password setup, cross-browser recovery, old-session/password denial and one-time links. Actual owner-inbox recovery mail passed SPF/DKIM and the correct canonical link without changing the owner's password. Administrator coverage is from staging/CI; the production browser runs used standard staff only. [Staging](2026-10-15-hosted-snapshot-fix.json), [candidate](2026-10-15-production-snapshot-workflow.json), [account setup/recovery](2026-10-15-hosted-account-recovery.json).
 
-The user authorized the controlled release and explicitly approved the protected-test-access method. No promotion or app rollback has occurred. Do not claim that the live site is fixed or the pilot is launched. No school staff are invited.
+## Reliability work and retained failures
 
-## Remaining operating/school decisions
+A representative four-step/twelve-action query showed each action evaluated eight times. The narrow migration materializes only the already-filtered authorized snapshot. Under live staff permissions, the same output and review hashes now require twelve action reads instead of 96; measured execution dropped from about 214 ms to about 31 ms. Five sequential and nine concurrent production reads passed after application. The regression counts executed action rows instead of enforcing a machine-dependent speed threshold. Function ownership, grants, SECURITY INVOKER, search path, RLS and existing records are unchanged. Normal security/correctness review and the separate Ponytail deletion pass found no broader rewrite necessary. [Measurement](2026-10-15-plan-snapshot-measurement.json), [production migration](2026-10-15-production-snapshot-migration.json), [production reads](2026-10-15-production-snapshot-reads.json).
 
-School approval of allowed de-identified information, resource accuracy, AI usefulness, staff access and support contacts remains separate. The current Free database plan lacks configurable timebox/inactivity limits and leaked-password screening. Recurring/off-machine backups, provider budgets/alert delivery and historical-secret exposure/rotation are not established by the successful local and hosted tests. These are recorded limits; no paid service or live key rotation was performed.
+The original directory generation failure was fixed by removing directory phone/email from the durable generation input snapshot. The existing database provenance check supplies exact current contacts when saving steps. A failing-before-fix regression and 103 focused tests established that repair; no privacy or source-freshness guard was weakened.
+
+Failures remain part of the record:
+
+- An overnight production plan read hit PostgreSQL `57014`, and a separate Settings navigation timed out at 30 seconds. The repeated-evaluation measurement demonstrates excess work, not the sole cause of every earlier delay. [Plan-read failure](2026-10-15-production-plan-read-timeout.json), [navigation failure](2026-10-15-production-navigation-timeout.json).
+- The first current-candidate test stopped at Playwright's default five-second assertion while the page showed Saving. Its cleanup aborted the request and removed the synthetic account; an authentication error followed. The measured rerun used an explicit bounded 30-second save assertion and passed with 883/845 ms saves. No application timeout, security control or assertion was removed. [Failed test cutoff](2026-10-15-production-save-test-cutoff.json).
+- A Settings navigation before logout in the successful candidate run took **10.561 seconds**. The canonical repeat loads were faster. Intermittent hosted latency remains an operating observation; these tests are not sustained-load certification.
+- The Supabase log connector denied access during this continuation. No claim is made that its database logs were clear. Vercel error/fatal scans for the successful candidate and canonical windows returned no entries. The earlier cleanup-associated error is retained separately.
+
+The initial automatic review rejected the production migration until separate production authorization was supplied. The user then explicitly approved the database fix and release; execution followed that approval. A previously rejected synthetic production-administrator grant was never executed. No protection setting was disabled or new bypass secret created.
+
+## Recovery boundary
+
+This is the **first verified production baseline**. For a future application regression, first verify compatibility with then-current schema and secrets, then deliberately promote this exact known-good deployment. Do not reverse migrations blindly. The old `e0cb389` deployment and superseded candidates are not certified rollback targets: they predate current privacy/schema controls or retain older environment snapshots. No duplicate build was manufactured to label it a rollback.
+
+Staging alias rollback and restoration passed previously. The original pre-cleanup encrypted backup restored **56 tables / 4,286 rows** with exact hashes; the real archive was also recovered through the checked-in recovery utility. This establishes a recoverable historical point, not a recurring/off-machine backup or provider-settings restore. [Staging switching](2026-10-15-staging-rollback.json), [backup](2026-10-15-hosted-backup.json), [restore](2026-10-15-hosted-restore.json), [operating procedure](../production-operations-runbook.md).
+
+## Remaining operating and school gates
+
+School approval of de-identified information, resource accuracy, AI usefulness, staff access and support contacts remains open. Recurring/off-machine backup, provider budget/alert delivery and historical-secret exposure/rotation are not established. Free Supabase does not provide configurable session timebox/inactivity limits or leaked-password screening. These limits remain in the tracker; no paid plan or key rotation was performed. The production deployment does not authorize identifiable student/family records or substitute for school sign-off.
+
+The 30-minute release observation is still running. The one-time continuation automation is paused; it must not recur daily.

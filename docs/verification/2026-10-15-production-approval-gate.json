@@ -1,0 +1,23 @@
+{
+  "recordedAt": "2026-10-15T14:46:36.395794+00:00",
+  "source": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "productionDatabase": "zpfypkizsapvsxeykmdq",
+  "requestedAction": "Apply 20261015143343_materialize_plan_snapshot.sql to production",
+  "automaticApprovalReview": "rejected",
+  "reason": "Persistent production schema/function change requires separate necessary production authorization under the retained continuation instructions. Staging verification does not supply that authorization.",
+  "userApprovalRequested": true,
+  "productionPromotionPerformed": true,
+  "newProductionCandidateCreated": true,
+  "stagingEvidence": "2026-10-15-hosted-snapshot-fix.json",
+  "migrationEvidence": "2026-10-15-production-snapshot-migration.json",
+  "initialAttemptExecuted": false,
+  "userApproval": {
+    "response": "Approve the database fix and production release",
+    "scope": "Apply the tested database plan-loading fix, verify a production candidate, release it at www.thecaselink.com and observe for 30 minutes.",
+    "recordedAt": "2026-10-15T14:50:47.448262+00:00"
+  },
+  "approvedMigrationExecuted": true,
+  "status": "Approved database fix and production release applied; canonical workflow passed; 30-minute observation running",
+  "productionCandidate": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+  "canonicalWorkflowEvidence": "2026-10-15-canonical-workflow.json"
+}
