@@ -123,6 +123,26 @@ export function pdfPlanFixtures(): Array<{name:string;plan:PlanWithSteps;barrier
       ],
     },
   ];
+  // A live compact plan fitted all text on page one but split its trailing padding onto a blank page.
+  const trailingBoundary: PlanStepRow[] = [
+    {
+      ...step(301), priority: "medium", title: "Agree on practical routine supports",
+      description: "Review family priorities and agree on manageable supports using the relative’s twice-weekly help where the family wishes.",
+      details: { owner: "case_manager", stage_goal: "Maintain a steady school routine", expected_outcome: "The family identifies practical supports for a steadier school routine." },
+      action_items: [
+        { ...action(301), title: "Agree on a manageable school routine", description: "Identify needed school-day supports and clarify how the family wants to use the relative’s twice-weekly help." },
+        { ...action(302), title: "Confirm the family preferred school travel support", description: "Call after work; leave no voicemail; confirm preferred language, routine priorities, pending application details, and consent before any provider contact.", status: "blocked", target_date: "2026-10-23", follow_up_date: "2026-10-23", notes: "Waiting for the family preferred review time." },
+      ],
+    },
+    {
+      ...step(302), priority: "medium", title: "Follow up the existing application",
+      description: "Clarify the pending application’s status without starting a replacement application. Do not restart without a recorded reason and family agreement; keep identifying application details and documents outside CaseLink.",
+      details: { owner: "case_manager", stage_goal: "Resolve the pending application", expected_outcome: "The application’s status and any necessary next action are clarified, or unresolved consent is recorded." },
+      action_items: [
+        { ...action(303), title: "Check pending application status with permission", description: "Only after family consent, verify provider availability, request an application update, and clarify any document requirements before preparation.", target_date: "2026-10-22" },
+      ],
+    },
+  ];
   return [
     {name:"dated-states",plan:plan([dated]),barriers:["Housing","Transportation"],minimumPages:1,expectedText:["1 of 6 actions complete"]},
     {name:"many-goals",plan:plan(many),barriers:["Housing","Food access","Childcare"],minimumPages:3},
@@ -131,5 +151,6 @@ export function pdfPlanFixtures(): Array<{name:string;plan:PlanWithSteps;barrier
     {name:"hosted-page-boundary",plan:{...plan(boundary),summary:null},barriers:["No transportation","Food insecurity"],minimumPages:2},
     {name:"hosted-outcome-boundary",plan:{...plan(outcomeBoundary),summary:null},barriers:["No transportation","Food insecurity"],minimumPages:2,
       samePageText:[["Review school travel options",outcomeBoundary[1].details!.expected_outcome!]]},
+    {name:"hosted-trailing-boundary",plan:{...plan(trailingBoundary),summary:null},barriers:["Housing instability"],minimumPages:1},
   ];
 }

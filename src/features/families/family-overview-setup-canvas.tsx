@@ -1,5 +1,7 @@
 "use client";
 
+import { formatSchoolTimestamp } from "@/lib/dates";
+
 import { useState, type KeyboardEvent } from "react";
 import { Check, Xmark } from "iconoir-react";
 import { Button } from "@/components/ui/button";
@@ -87,7 +89,7 @@ export function FamilyOverviewSetupCanvas({
           <h1 className="workspace-display mt-1 text-2xl text-[var(--color-ink)]">{familyName}</h1>
         </div>
         {lastSavedAt ? (
-          <p className="text-xs text-[var(--color-ink-faint)]">Updated {new Date(lastSavedAt).toLocaleString()}</p>
+          <p className="text-xs text-[var(--color-ink-faint)]">Updated {formatSchoolTimestamp(lastSavedAt)}</p>
         ) : null}
       </header>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatSchoolTimestamp } from "@/lib/dates";
+
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -542,7 +544,7 @@ export function FamilyLiteWorkspace({
             </div>
             {result?.lastSavedAt ? (
               <p className="text-xs text-[var(--color-ink-faint)]">
-                Updated {new Date(result.lastSavedAt).toLocaleString()}
+                Updated {formatSchoolTimestamp(result.lastSavedAt)}
               </p>
             ) : null}
           </div>

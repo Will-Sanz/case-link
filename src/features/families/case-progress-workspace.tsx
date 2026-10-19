@@ -1,6 +1,6 @@
 "use client";
 
-import { schoolDate, formatDateOnly as formatDate } from "@/lib/dates";
+import { schoolDate, formatSchoolTimestamp, formatDateOnly as formatDate } from "@/lib/dates";
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -344,7 +344,7 @@ export function CaseProgressWorkspace({
               <li key={update.id} className="py-4">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
                   <p className="text-sm font-semibold text-[var(--color-ink)]">Meeting {formatDate(update.occurred_on)}</p>
-                  <p className="text-xs text-[var(--color-ink-faint)]">Saved {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(update.created_at))} · {update.author?.email ?? "Case manager"}</p>
+                  <p className="text-xs text-[var(--color-ink-faint)]">Saved {formatSchoolTimestamp(update.created_at)} · {update.author?.email ?? "Case manager"}</p>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{update.summary}</p>
                 {update.plan_changes.length > 0 ? (
@@ -360,7 +360,7 @@ export function CaseProgressWorkspace({
               <li key={note.id} className="py-4">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
                   <p className="text-sm font-semibold text-[var(--color-ink)]">Earlier case note</p>
-                  <p className="text-xs text-[var(--color-ink-faint)]">{new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(note.created_at))} · {note.author?.email ?? "Case manager"}</p>
+                  <p className="text-xs text-[var(--color-ink-faint)]">{formatSchoolTimestamp(note.created_at)} · {note.author?.email ?? "Case manager"}</p>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{note.body}</p>
               </li>

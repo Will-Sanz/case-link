@@ -157,7 +157,6 @@ const styles = StyleSheet.create({
   step: {
     paddingTop: 11,
     paddingRight: 8,
-    paddingBottom: 11,
     paddingLeft: 8,
     borderBottomWidth: 0.75,
     borderBottomColor: PLAN_PDF_PALETTE.ink,

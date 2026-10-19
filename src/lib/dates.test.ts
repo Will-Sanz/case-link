@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { addCalendarDays, formatDateOnly, parseDateOnly, schoolDate } from "./dates";
+import { addCalendarDays, formatDateOnly, formatSchoolTimestamp, parseDateOnly, schoolDate } from "./dates";
 
 const originalTimezone = process.env.TZ;
 afterEach(() => { if (originalTimezone === undefined) delete process.env.TZ; else process.env.TZ = originalTimezone; });
@@ -11,6 +11,7 @@ describe("school calendar dates", () => {
     expect(schoolDate(new Date("2026-10-14T04:00:00Z"))).toBe("2026-10-14");
     expect(formatDateOnly("2028-02-29")).toBe("Feb 29, 2028");
     expect(formatDateOnly("2026-11-01T00:00:00+00:00")).toBe("Nov 1, 2026");
+    expect(formatSchoolTimestamp("2026-10-19T03:30:00Z")).toBe("Oct 18, 2026, 11:30 PM");
   });
   it("handles leap days and daylight saving changes as calendar arithmetic", () => {
     expect(addCalendarDays("2028-02-28", 1)).toBe("2028-02-29");

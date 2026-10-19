@@ -9,6 +9,7 @@ import {
 } from "@/features/families/plan-pdf-document";
 import { finalizePlanPdf } from "@/lib/domain/plan/finalize-plan-pdf";
 import type { PlanWithSteps } from "@/types/family";
+import { pdfPlanFixtures } from "../../../tests/fixtures/pdf-plans";
 
 const plan: PlanWithSteps = {
   id: "10000000-0000-4000-8000-000000000001",
@@ -62,6 +63,11 @@ const plan: PlanWithSteps = {
 };
 
 describe("PlanPdfDocument", () => {
+  it("keeps the compact boundary plan on one page without a trailing decoration-only page", async () => {
+    const fixture = pdfPlanFixtures().find(item => item.name === "hosted-trailing-boundary")!;
+    const bytes = await renderToBuffer(<PlanPdfDocument plan={fixture.plan} familyName="Family 014" generatedDate="Oct 13, 2026" barrierLabels={fixture.barriers} />);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
   it("refuses unsupported glyphs instead of silently losing reviewed text", () => {
     expect(() => PlanPdfDocument({ plan, familyName: "確認", generatedDate: "Oct 13, 2026" }))
       .toThrow(/PDF font/);

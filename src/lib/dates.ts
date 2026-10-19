@@ -7,6 +7,13 @@ export function schoolDate(now = new Date()): string {
   }).format(now);
 }
 
+/** Keep saved case timestamps identical during server rendering and browser hydration. */
+export function formatSchoolTimestamp(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: SCHOOL_TIME_ZONE, dateStyle: "medium", timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export function parseDateOnly(value: string | null | undefined): Date | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith("0000")) return null;
   const date = new Date(`${value}T00:00:00Z`);

@@ -61,6 +61,23 @@ describe("CaseProgressWorkspace", () => {
     vi.mocked(captureCaseProgressUpdate).mockReset();
   });
 
+  it("renders saved history in the school timezone even when the server uses UTC", () => {
+    const previous = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      render(<CaseProgressWorkspace familyId={plan.family_id} plan={plan} updates={[{
+        id: "update", family_id: plan.family_id, plan_id: plan.id, author_id: "author", author: null,
+        occurred_on: "2026-10-18", summary: "Discussed the next step.", plan_changes: [], created_at: "2026-10-19T03:30:00Z",
+      }]} earlierNotes={[{
+        id: "note", family_id: plan.family_id, author_id: "author", author: null,
+        body: "Earlier discussion.", created_at: "2026-10-19T03:30:00Z",
+      }]} />);
+      expect(screen.getAllByText(/Oct 18, 2026, 11:30 PM/)).toHaveLength(2);
+    } finally {
+      if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous;
+    }
+  });
+
   it("captures a meeting note and a selected plan change in one save", async () => {
     vi.mocked(captureCaseProgressUpdate).mockResolvedValue({
       ok: true,
