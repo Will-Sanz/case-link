@@ -8,7 +8,7 @@ import {
 } from "iconoir-react";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getFamilyDetail } from "@/lib/services/families";
+import { getFamilyProfile } from "@/lib/services/families";
 import { UpdateFamilyForm } from "@/features/families/update-family-form";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -18,7 +18,7 @@ export default async function FamilyProfilePage({ params }: PageProps) {
   const parsed = z.string().uuid().safeParse(id);
   if (!parsed.success) notFound();
   const supabase = await createSupabaseServerClient();
-  const family = await getFamilyDetail(supabase, parsed.data);
+  const family = await getFamilyProfile(supabase, parsed.data);
   if (!family) notFound();
 
   return (
@@ -51,9 +51,9 @@ export default async function FamilyProfilePage({ params }: PageProps) {
           <section className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-5">
             <div className="flex items-center gap-2 text-[var(--color-ink)]"><ListChecks className="size-4 text-[var(--color-positive)]" aria-hidden /><h2 className="text-sm font-semibold">Planning context</h2></div>
             <dl className="mt-4 divide-y divide-[var(--color-rule-soft)] text-sm">
-              <div className="flex justify-between gap-4 py-3"><dt className="text-[var(--color-ink-faint)]">Goals</dt><dd className="font-semibold text-[var(--color-ink-2)]">{family.goals.length}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-[var(--color-ink-faint)]">Barriers</dt><dd className="font-semibold text-[var(--color-ink-2)]">{family.barriers.length}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-[var(--color-ink-faint)]">Plan</dt><dd className="font-semibold text-[var(--color-ink-2)]">{family.plan ? "Created" : "Not created"}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[var(--color-ink-faint)]">Goals</dt><dd className="font-semibold text-[var(--color-ink-2)]">{family.goalCount}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[var(--color-ink-faint)]">Barriers</dt><dd className="font-semibold text-[var(--color-ink-2)]">{family.barrierCount}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-[var(--color-ink-faint)]">Plan</dt><dd className="font-semibold text-[var(--color-ink-2)]">{family.hasPlan ? "Created" : "Not created"}</dd></div>
             </dl>
           </section>
         </aside>

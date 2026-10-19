@@ -108,8 +108,13 @@ test("saved context refreshes previously loaded tabs", async ({ page, local }) =
   const navigation = page.getByRole("navigation", { name: "Family workspace", exact: true });
   await navigation.getByRole("link", { name: "Family profile", exact: true }).click();
   await page.getByLabel("Summary", { exact: true }).fill("The family now prefers a meeting after school.");
+  const duplicateRefreshes: string[] = [];
+  page.on("request", request => {
+    if (request.method() === "GET" && new URL(request.url()).pathname === `/families/${familyId}/profile`) duplicateRefreshes.push(request.url());
+  });
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByRole("button", { name: "Save changes", exact: true })).toBeEnabled();
+  expect(duplicateRefreshes).toEqual([]);
   await navigation.getByRole("link", { name: "Barriers", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/families/${familyId}/overview$`));
   await expect(page.locator("#family-additional-context")).toHaveValue("The family now prefers a meeting after school.");

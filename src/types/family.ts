@@ -326,3 +326,9 @@ export type FamilyDetail = {
     actor_email?: string;
   }>;
 };
+
+export type FamilyProfile = Pick<FamilyDetail, "id" | "name" | "summary" | "urgency" | "household_notes" | "status" | "updated_at"> & {
+  goalCount: number;
+  barrierCount: number;
+  hasPlan: boolean;
+};

@@ -79,6 +79,10 @@ test("case intake through resumed generation, recovered edits, AI review, and th
   expect(first).toHaveLength(1);
   expect(first[0].steps).toBe(0);
   await otherTab.close();
+  // Let every in-flight failed attempt settle before restoring the provider.
+  await expect.poll(async () => (await local.db.query("select generation_state->>'status' as status from public.plans where id=$1", [first[0].id])).rows[0].status).toBe("failed");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Continue draft", exact: true })).toBeVisible();
   writeFileSync("tmp/e2e/provider-control.json", "{}\n");
   await activate(page, page.getByRole("button", { name: "Continue draft", exact: true }));
   await expect(page.getByRole("button", { name: "Edit action", exact: true })).toHaveCount(3, { timeout: 45_000 });

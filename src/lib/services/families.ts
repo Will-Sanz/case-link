@@ -7,6 +7,7 @@ import type {
   CaseProgressUpdateRow,
   FamilyBarrierRow,
   FamilyDetail,
+  FamilyProfile,
   FamilyGoalRow,
   FamilyListItem,
   FamilyMemberRow,
@@ -111,6 +112,19 @@ export async function enrichFamiliesWithCurrentStep(
     throw new Error("Family access changed while loading. Refresh and try again.");
   }
   return items.map((item) => ({ ...item, current_step: byFamily.get(item.id)! }));
+}
+
+/** Profile fields and counts in one RLS-protected read; no plan, notes, or directory payload. */
+export async function getFamilyProfile(client: SupabaseClient, familyId: string): Promise<FamilyProfile | null> {
+  const { data, error } = await client.from("families")
+    .select("id,name,summary,urgency,household_notes,status,updated_at,goals:family_goals(count),barriers:family_barriers(count),plans(count)")
+    .eq("id", familyId).is("archived_at", null).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const { goals, barriers, plans, ...profile } = data as unknown as Omit<FamilyProfile, "goalCount" | "barrierCount" | "hasPlan"> & {
+    goals: { count: number }[]; barriers: { count: number }[]; plans: { count: number }[];
+  };
+  return { ...profile, goalCount: goals[0]?.count ?? 0, barrierCount: barriers[0]?.count ?? 0, hasPlan: (plans[0]?.count ?? 0) > 0 };
 }
 
 export async function getFamilyDetail(
