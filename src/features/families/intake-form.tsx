@@ -124,7 +124,6 @@ export function IntakeForm() {
     } else {
       router.push("/families");
     }
-    router.refresh();
   }
 
   return (

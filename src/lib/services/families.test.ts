@@ -8,13 +8,13 @@ function clientWithFailure(failedTable?: string, missingFamily = false, resource
   return {
     rpc: vi.fn().mockResolvedValue({ data: { family: { id: "family", name: "Snapshot label" }, barriers: [], plan: { id: "plan", generation_source: "rules", steps: [{ id: "step", action_items: [] }] } }, error: failedTable === "get_family_plan_snapshot" ? { message: "get_family_plan_snapshot unavailable" } : null }),
     from: vi.fn((table: string) => {
-      const data = table === "families" ? (missingFamily ? null : { id: "family", creator: null })
+      const data = table === "families" ? (missingFamily ? null : { id: "family", creator: null, goals: [], members: [], caseNotes: [], progressUpdates: [], resourceMatches })
         : table === "plans" ? { id: "plan", generation_source: "rules" }
         : table === "plan_steps" ? [{ id: "step" }] : table === "resource_matches" ? resourceMatches : [];
       const result = { data, error: table === failedTable ? { message: `${table} unavailable` } : null };
       const query = {
-        select: vi.fn(() => query), eq: () => query, in: () => query, order: () => query,
-        limit: () => query, maybeSingle: () => Promise.resolve(result),
+        select: vi.fn(() => query), eq: vi.fn(() => query), is: vi.fn(() => query), in: () => query, order: vi.fn(() => query),
+        limit: vi.fn(() => query), maybeSingle: () => Promise.resolve(result),
         then: (resolve: (value: unknown) => void) => resolve(result),
       };
       return query;
@@ -30,10 +30,27 @@ describe("getFamilyDetail", () => {
     const detail = await getFamilyDetail(client, "family");
     expect(detail?.resourceMatches[0].resource).toMatchObject(matches[0].resource!);
     const calls = vi.mocked(client.from).mock;
-    const query = calls.results[calls.calls.findIndex(([table]) => table === "resource_matches")].value;
+    const query = calls.results[calls.calls.findIndex(([table]) => table === "families")].value;
     expect(query.select.mock.calls[0][0]).toMatch(/description,\s+services_select_all,\s+additional_info/);
   });
-  it.each(["families", "family_goals", "family_members", "case_notes", "case_progress_updates", "resource_matches", "get_family_plan_snapshot"])(
+  it("loads scoped relations and bounded histories in one family query plus the existing plan snapshot", async () => {
+    const client = clientWithFailure();
+    await getFamilyDetail(client, "family");
+    expect(client.from).toHaveBeenCalledExactlyOnceWith("families");
+    expect(client.rpc).toHaveBeenCalledExactlyOnceWith("get_family_plan_snapshot", { p_family_id: "family" });
+    const query = vi.mocked(client.from).mock.results[0].value;
+    expect(query.eq).toHaveBeenCalledWith("id", "family");
+    expect(query.is).toHaveBeenCalledWith("archived_at", null);
+    expect(query.order.mock.calls).toEqual([
+      ["sort_order", { referencedTable: "goals", ascending: true }],
+      ["created_at", { referencedTable: "members", ascending: true }],
+      ["created_at", { referencedTable: "caseNotes", ascending: false }],
+      ["occurred_on", { referencedTable: "progressUpdates", ascending: false }],
+      ["created_at", { referencedTable: "progressUpdates", ascending: false }],
+    ]);
+    expect(query.limit.mock.calls).toEqual([[50, { referencedTable: "caseNotes" }], [50, { referencedTable: "progressUpdates" }]]);
+  });
+  it.each(["families", "get_family_plan_snapshot"])(
     "refuses a partial workspace when %s fails", async (table) => {
       await expect(getFamilyDetail(clientWithFailure(table), "family")).rejects.toThrow(`${table} unavailable`);
     },

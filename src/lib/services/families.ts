@@ -145,10 +145,39 @@ export async function getFamilyDetail(
       created_at,
       updated_at,
       archived_at,
-      creator:app_users!families_created_by_id_fkey ( email )
+      creator:app_users!families_created_by_id_fkey ( email ),
+      goals:family_goals (*),
+      members:family_members (*),
+      caseNotes:case_notes (
+        id, family_id, author_id, body, created_at,
+        author:app_users!case_notes_author_id_fkey ( email )
+      ),
+      progressUpdates:case_progress_updates (
+        id, family_id, plan_id, author_id, occurred_on, summary, plan_changes, created_at,
+        author:app_users!case_progress_updates_author_id_fkey ( email )
+      ),
+      resourceMatches:resource_matches (
+        id, family_id, resource_id, match_reason, score, status, plan_step_id, created_at, updated_at,
+        resource:resources (
+          id, active, is_demo, updated_at, slug, program_name, office_or_department,
+          category, description, services_select_all, additional_info,
+          primary_contact_name, primary_contact_title, primary_contact_email, primary_contact_phone,
+          secondary_contact_name, secondary_contact_email, secondary_contact_phone,
+          recruit_for_grocery_giveaways, tabling_at_events, promotional_materials,
+          educational_workshops, volunteer_recruitment_support
+        )
+      )
     `,
     )
     .eq("id", familyId)
+    .is("archived_at", null)
+    .order("sort_order", { referencedTable: "goals", ascending: true })
+    .order("created_at", { referencedTable: "members", ascending: true })
+    .order("created_at", { referencedTable: "caseNotes", ascending: false })
+    .limit(50, { referencedTable: "caseNotes" })
+    .order("occurred_on", { referencedTable: "progressUpdates", ascending: false })
+    .order("created_at", { referencedTable: "progressUpdates", ascending: false })
+    .limit(50, { referencedTable: "progressUpdates" })
     .maybeSingle();
 
   if (famErr) {
@@ -162,96 +191,9 @@ export async function getFamilyDetail(
     return null;
   }
 
-  const [goalsRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
-    await Promise.all([
-    client
-      .from("family_goals")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("sort_order", { ascending: true }),
-    client
-      .from("family_members")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("created_at", { ascending: true }),
-    client
-      .from("case_notes")
-      .select(
-        `
-        id,
-        family_id,
-        author_id,
-        body,
-        created_at,
-        author:app_users!case_notes_author_id_fkey ( email )
-      `,
-      )
-      .eq("family_id", familyId)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    client
-      .from("case_progress_updates")
-      .select(
-        `
-        id,
-        family_id,
-        plan_id,
-        author_id,
-        occurred_on,
-        summary,
-        plan_changes,
-        created_at,
-        author:app_users!case_progress_updates_author_id_fkey ( email )
-      `,
-      )
-      .eq("family_id", familyId)
-      .order("occurred_on", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(50),
-    client.from("resource_matches").select(
-      `
-        id,
-        family_id,
-        resource_id,
-        match_reason,
-        score,
-        status,
-        plan_step_id,
-        created_at,
-        updated_at,
-        resource:resources (
-          id,
-          active,
-          is_demo,
-          updated_at,
-          slug,
-          program_name,
-          office_or_department,
-          category,
-          description,
-          services_select_all,
-          additional_info,
-          primary_contact_name,
-          primary_contact_title,
-          primary_contact_email,
-          primary_contact_phone,
-          secondary_contact_name,
-          secondary_contact_email,
-          secondary_contact_phone,
-          recruit_for_grocery_giveaways,
-          tabling_at_events,
-          promotional_materials,
-          educational_workshops,
-          volunteer_recruitment_support
-        )
-      `,
-    ).eq("family_id", familyId),
-    client.rpc("get_family_plan_snapshot", { p_family_id: familyId }),
-  ]);
-
-  for (const res of [goalsRes, membersRes, notesRes, progressRes, matchesRes, planRes]) {
-    if (res.error) throw new Error(res.error.message);
-  }
+  // Embedded relations retain their own RLS without six simultaneous network reads.
+  const planRes = await client.rpc("get_family_plan_snapshot", { p_family_id: familyId });
+  if (planRes.error) throw new Error(planRes.error.message);
   if (!planRes.data) return null;
   const snapshot = planRes.data as { family: FamilyDetail; barriers: FamilyBarrierRow[]; plan: PlanWithSteps | null };
   const plan = snapshot.plan ? { ...snapshot.plan, presentation: buildPlanPresentation(snapshot.plan) } : null;
@@ -275,13 +217,13 @@ export async function getFamilyDetail(
     created_at: f.created_at,
     updated_at: f.updated_at,
     creator,
-    goals: (goalsRes.data ?? []) as FamilyGoalRow[],
+    goals: (fam.goals ?? []) as FamilyGoalRow[],
     barriers: snapshot.barriers,
-    members: (membersRes.data ?? []) as FamilyMemberRow[],
-    caseNotes: normalizeCaseNotes(notesRes.data ?? []),
-    progressUpdates: normalizeProgressUpdates(progressRes.data ?? []),
+    members: (fam.members ?? []) as FamilyMemberRow[],
+    caseNotes: normalizeCaseNotes(fam.caseNotes ?? []),
+    progressUpdates: normalizeProgressUpdates(fam.progressUpdates ?? []),
     resourceMatches: sortResourceMatches(
-      normalizeResourceMatches(matchesRes.data ?? []),
+      normalizeResourceMatches(fam.resourceMatches ?? []),
     ),
     plan,
   };
