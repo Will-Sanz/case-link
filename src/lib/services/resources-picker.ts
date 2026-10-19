@@ -21,6 +21,7 @@ export async function searchResourcesForPicker(
     .from("resources")
     .select("id, program_name, office_or_department, category")
     .eq("active", true)
+    .eq("is_demo", false)
     .order("program_name", { ascending: true })
     .limit(limit);
 

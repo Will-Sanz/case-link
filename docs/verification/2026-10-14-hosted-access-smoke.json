@@ -1,0 +1,50 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "startedAt": "2026-10-14T21:57:55.254Z",
+  "syntheticOnly": true,
+  "administratorAccountsCreated": 0,
+  "emailsRequested": 0,
+  "checks": [
+    "Staging operator authentication available",
+    "Keys match fixed staging project identifiers",
+    "Baseline account inventory available",
+    "Disposable standard Auth account created without email",
+    "Audited standard case-manager provisioning succeeds",
+    "Real hosted password login succeeds",
+    "Disposable standard Auth account created without email",
+    "Audited standard case-manager provisioning succeeds",
+    "Real hosted password login succeeds",
+    "Authenticated minimal intake succeeds",
+    "Authenticated minimal intake succeeds",
+    "All fixtures are distinct from pre-existing accounts",
+    "Owner can read its hosted family",
+    "Unassigned staff cannot read another family",
+    "Unassigned staff cannot write a note through the RPC",
+    "Denied write left the family unchanged",
+    "Retained token remains cryptographically unexpired during denial checks",
+    "Offboarded unexpired token cannot read the owned family",
+    "Offboarded unexpired token cannot mutate through RPC",
+    "Offboarded refresh token cannot issue a session",
+    "Offboarded credentials cannot log in again",
+    "Replacement can read the case with original creator preserved",
+    "Replacement retains access to its own family",
+    "Global logout succeeds",
+    "Logged-out unexpired token loses assigned-family access",
+    "Logged-out token cannot consume an AI budget"
+  ],
+  "harnessCorrections": [
+    "Initial temporary MJS runner expected a default export; corrected to the named export before any hosted request or fixture creation"
+  ],
+  "cleanup": {
+    "families": true,
+    "authAccounts": true
+  },
+  "passed": true,
+  "preExistingAccountsPreserved": true,
+  "syntheticAccounts": 2,
+  "syntheticFamilies": 2,
+  "finishedAt": "2026-10-14T21:58:01.579Z",
+  "sourceSha256": "456f71e6d91dc72edaa8a6ff8f2077e2340b18e5c0e130be39b6723bf17172b6",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistory": "Synthetic operator audit records retained; no audit log erased"
+}

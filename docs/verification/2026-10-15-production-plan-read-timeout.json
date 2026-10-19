@@ -1,0 +1,71 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://case-link-oxq4j9up0-will-sanzs-projects.vercel.app",
+  "commit": "8ace965e86fc556844d63318680b255ca57cbff9",
+  "startedAt": "2026-10-15T03:47:18.394Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "Protected immutable production login returns 200",
+    "Testing access stays on exact production candidate origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Standard staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description",
+    "Live generation reaches the saved plan",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "The current 54-resource directory supplies matched programs",
+    "Hosted generated plan passes automated accessibility checks"
+  ],
+  "timings": {
+    "generationMilliseconds": 25000
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "generatedGoals": 3,
+  "directory": {
+    "resources": 54,
+    "matched": 24,
+    "generatedContacts": 0
+  },
+  "visibleAlerts": [
+    ""
+  ],
+  "visibleButtons": [
+    "Try again"
+  ],
+  "failure": {
+    "stage": "edit recovery and save",
+    "type": "TimeoutError",
+    "message": "locator.click: Timeout 20000ms exceeded."
+  },
+  "finishedAt": "2026-10-15T03:48:35.024Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "681593bf80201a2bfeebc7cbc8ababa7951219d2176153bc78db4ed2f8cc429a",
+  "diagnosis": {
+    "providerSqlState": "57014",
+    "failingRpc": "get_family_plan_snapshot",
+    "originMilliseconds": 12837,
+    "databaseStatementTimeoutSeconds": 8,
+    "jit": "off",
+    "source": "Supabase edge/Postgres logs and Vercel runtime error",
+    "rootCause": "under investigation"
+  }
+}

@@ -1,140 +1,72 @@
-# CaseLink: Family Support Planning and Paperwork
+# CaseLink: Family Support Planning
 
-## Product north star
+CaseLink helps school case managers create a family support plan, review it, and download a professional black-and-white PDF for records or manual use in the school's required system.
 
-**CaseLink helps school case managers turn family needs into a structured intervention plan and reviewed, ready-to-submit paperwork.** A case manager creates a family profile, records barriers, generates and edits the plan, uploads a blank required form, reviews the AI-prepared draft, and downloads the completed PDF for their required school system.
+## Pilot workflow
 
-The near-term product is deliberately narrow. It is built for **speed, clarity, and professional judgment**, not for replacing case managers or the school's required system of record. Broader school-operations automation remains a future possibility only after this core workflow proves useful.
+1. An invited staff member sets a password and signs in. Case managers and administrators use password-only accounts.
+2. Create a family with a non-identifying label and one or more barriers. A short description is optional.
+3. Optionally record the family's priorities, existing support, practical constraints, and previous attempts. Generate a plan organized by goals and specific target dates. Review suggested resources and verify their suitability.
+4. Edit the draft, confirm responsibility and dates, and record progress. Waiting actions use their next follow-up date.
+5. Mark the current plan reviewed, preview the PDF, and download it. A material edit requires another review.
+6. If useful, select discussed open actions and optional directory contacts for a separate family takeaway. Confirm the content is suitable to share, preview it, and download it for manual sharing.
 
-The staged path from the current application to that north star is documented in the [Product Redesign Plan](docs/product-redesign-plan.md).
+Returning staff can open the next action directly from Families. The full record PDF and family takeaway are available only to staff authorized to access that family. There are no family login accounts. The takeaway excludes internal context, action descriptions, progress notes, outcomes, and unselected actions; changing the selection clears its preview and sharing confirmation. It is a selected view of the reviewed plan, not another independently saved plan.
 
-The product definition for CaseLink's core AI experience is documented in the [Adaptive Intervention Planning PRD](docs/intervention-planning-prd.md).
+The case manager decides what becomes official and handles any submission outside CaseLink. Blank-PDF upload, field detection, form filling, direct CitySpan integration, automatic submission, district analytics, and broader school operations are deferred.
 
----
+## Invite a new user
 
-## The problem
+1. Sign in as an administrator and open **Settings**.
+2. Under **Invite a user**, enter the person's email address.
+3. Choose **Send invitation email**. For a link you can share yourself, choose **Create invite link → Copy link** and send it privately.
+4. The recipient opens the link, chooses **Continue to password setup**, sets a password, and signs in.
 
-Case managers juggle fragile timelines, referrals, documentation, and constant context-switching. Information lives in **notes, spreadsheets, email threads, and separate directories**—easy to lose, hard to hand off, expensive to reconstruct for every family.
+Invitations grant case-manager access, work once, and expire after 15 minutes. Create a fresh invitation if it expires. Existing accounts use **Sign in** or **Forgot password**. Invitations cannot restore a deactivated account or change an administrator's permissions.
 
-The cost is not only time. It is **cognitive load**: deciding what matters *this week*, what can wait, and which community resources actually fit the case. When that work is fragmented, plans drift, steps duplicate, and families wait longer for coherent support.
+## School demo and acceptance
 
-CaseLink exists to **reduce that fragmentation** and make the path from intake to action **visible, editable, and accountable**.
+Use synthetic information until the [pilot checklist](docs/school-pilot-fix-tracker.md) and hosted launch gates are signed off. Show the complete workflow above, including one manual date edit, one selected AI wording change, a waiting follow-up, a saved meeting outcome, and a reviewed PDF. Reopen the family and verify those changes persist. Demonstrate a recoverable AI failure without losing edits. Do not demonstrate uploaded-form filling.
 
----
+The pilot supports a few staff at one school, with one dedicated deployment. Real case circumstances must be de-identified: use family labels, omit names, birth dates, contact details, addresses, student IDs, and other identifying narrative. Automated checks cannot guarantee de-identification; staff practice and the school's approval remain required.
 
-## The solution
+## Architecture
 
-CaseLink brings **family intake**, **barrier assessment**, **intervention planning**, and **paperwork preparation** into one focused workflow. A case manager captures the approved family context and barriers in structured forms. When enabled, **OpenAI** turns that context into a structured plan and helps map reviewed information into an uploaded blank PDF.
+| Layer | Technology |
+| --- | --- |
+| Application | Next.js App Router, React, TypeScript, Tailwind |
+| Identity and database | Supabase Auth and Postgres, with row-level security |
+| AI | Server-side OpenAI Responses API; allowed models and validated task outputs |
+| PDF | Browser rendering with `@react-pdf/renderer`; finalization with `pdf-lib` |
+| Hosting target | Managed Vercel application and a dedicated Supabase project |
 
-Everything downstream is **editable**. Plans and populated form fields remain drafts until a case manager reviews them. CaseLink produces a completed PDF; it does not submit directly to external school systems in the initial scope.
+Interactive casework requests use the signed-in user's database permissions. Privileged service credentials belong only to protected operator jobs and the administrator-only invitation Edge Function; they never enter the Next.js deployment. The function independently verifies the caller's live password session and administrator permissions, provisions audited case-manager access, then issues the invitation. AI drafting, refinement, and the case assistant use family-scoped context and explicit human review. Generation is staged and persisted; failures must remain visible and retryable. There is no legacy rules fallback presented as an AI-generated plan.
 
----
+PDFs are generated from the reviewed plan in the browser. CaseLink does not accept PDF uploads or send PDF bytes to OpenAI. Downloaded files become the user's responsibility under school policy.
 
-## Key features
+## Development and verification
 
-- **Families** — Create a family support case and reopen it from one simple list.
-- **Barrier intake** — Record the needs and context that should shape the intervention.
-- **Editable intervention plans** — Generate a structured plan, trace it to approved barriers, and edit it before approval.
-- **Paperwork preparation** — Upload a blank required PDF, map approved information into a draft, review uncertain or missing fields, and download the completed form.
-- **Human review** — Plans and forms remain drafts until the case manager approves them.
+Use a supported, patched Node 24.x release (`.nvmrc`), matching CI and hosting, and install the locked dependencies with `npm ci`. Use `.env.example` as the configuration reference, then start the app with `npm run dev`. Read `AGENTS.md` and the installed Next.js guides before changing framework code.
 
-Supporting resource, timeline, task, and case-assistant capabilities remain subordinate to that narrow V1 workflow. They should expand only when pilot evidence justifies it.
+- `npm run verify`: lockfile/resource/secret checks, typecheck, lint, unit and component tests, and production build. The pre-push hook runs it.
+- `npm run test:auth-security`: real local Auth lifecycle and password-session and role-access tests.
+- `npm run test:db-security`: real local database authorization, concurrency, rollback, and audit tests.
+- `npm run test:restore`: isolated synthetic backup/restore and authorization rehearsal; no hosted database changes.
+- `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase; requires Playwright Chromium and Poppler.
+- `npm run test:pdf`: extracted source-content and rendered PDF placement/monochrome checks; requires Python and Poppler.
+- `npm run verify:release -- <exact-commit-SHA>`: confirm required trusted repository checks for that commit; this does not deploy or replace hosted/school approval.
+- `npm run test:ai-contracts -- --live`: opt-in provider format checks across the allowed models using small synthetic requests. Supply an operator test-project `OPENAI_API_KEY` through the environment; it is excluded from normal CI and prints only pass/fail metadata.
 
----
+Local Supabase uses Docker to isolate synthetic development/test data. Docker is a local testing tool; staff do not install it, and this does not select production hosting. See the [operations runbook](docs/production-operations-runbook.md) for environment separation and required hosted rehearsals.
 
-## How it works (high level)
+The resource CSV shipped in the repository is synthetic. An approved, verified school directory is a separate launch gate; see [data/README.md](data/README.md).
 
-**Input → processing → output**, end to end:
+## Current requirements and launch status
 
-```
-Case manager creates a family and enters approved context and barriers
-        ↓
-AI drafts a structured intervention plan
-        ↓
-Case manager reviews and edits the plan
-        ↓
-Case manager uploads a blank PDF; CaseLink drafts form entries
-        ↓
-Case manager reviews, downloads, and manually submits the PDF to the required system
-```
-
-The loop is intentional: **capture → draft → human edit → prepare form → human review → download**. AI accelerates drafting; **the case manager controls what becomes official**.
-
----
-
-## Technical architecture
-
-| Layer | Choice | Why it’s there |
-|--------|--------|----------------|
-| **Frontend** | Next.js (App Router), React, TypeScript, Tailwind | Server Components where they help; cohesive UI; fast iteration without sacrificing type safety. |
-| **Application server** | Next.js server actions, route handlers, Node **proxy** for session refresh | Keeps auth/session handling aligned with the current Supabase + Next stack; avoids fragile Edge + cookie patterns for this product. |
-| **Database** | Supabase **Postgres** | Relational model fits families, plans, steps, referrals, and audit-style activity. |
-| **Authorization** | **Row Level Security (RLS)** | Every data path uses the **end-user JWT**; policies gate rows (e.g. via `can_access_family`: creator, assignee, or admin). No “trust the client” for tenancy. |
-| **Auth** | Supabase Auth | Hosted identity, email flows, and sessions integrated with the same project as the database. |
-| **AI** | OpenAI API (**server-only** key) | Structured completions for plans and assistance; models restricted by an **allowlist** at startup. |
-| **Hosting** | Vercel (typical) | Fits the Next.js deployment model; environment separation is an operator concern, not assumed in product code paths. |
-
-**Data flow (simplified):** The browser holds a **Supabase anon key** and session; queries and mutations go through PostgREST **as the signed-in user**, so RLS is always in play. Privileged keys (e.g. service role) are **not** part of the web client—they exist only for trusted offline operations like bulk import scripts, not for interactive app traffic.
-
-**Validation:** User input is checked with **Zod** on the server; AI-facing actions use **dedicated schemas** so prompts and payloads stay bounded.
-
----
-
-## AI integration
-
-OpenAI is used **where structured language generation clearly helps**:
-
-- **Plan phases** — Context includes barriers, case notes, and **matched resources** (so suggestions can name real programs). Responses are expected as **JSON** matching strict shapes, then **validated** (with repair/retry paths where implemented).
-- **Step-level refinement** — Adjust one step without throwing away the rest of the plan.
-- **Case assistant & step helpers** — Short-form assistance grounded in family-scoped data.
-
-Design principles:
-
-- **Structured prompts and schemas** — Reduce rambling outputs and make downstream UI predictable.
-- **Human-in-the-loop** — Outputs are **editable**; the product assumes review before reliance, especially for high-stakes decisions.
-- **Support, not substitution** — CaseLink is a **tool for case managers**, not an autonomous agent making decisions for families.
-
-Operational guardrails include **shared atomic per-user and deployment AI budgets**, **one-owner generation claims**, **payload and output token caps**, and **generic user-facing errors in production** with privacy-filtered diagnostics in server logs.
-
----
-
-## Security & privacy approach
-
-- **Secrets stay server-side** — Only public Supabase URL + anon key belong in the browser; OpenAI and service-role credentials never ship to the client.
-- **RLS and narrow RPCs** — Family access, value constraints, immutable ownership, cross-family integrity, and consequential transactions are enforced in Postgres, not only in UI checks.
-- **Validated inputs** — Server actions, AI entry points, and critical database boundaries reject malformed, identifying, or oversized input.
-- **Throttled AI** — Database-backed minute, hour, and deployment-day budgets coordinate across application instances and fail closed in production.
-- **Bounded paperwork** — Only blank, unlocked, fillable PDFs are accepted; the file remains in the active browser tab, while only bounded field metadata may be sent for mapping.
-- **No ads, no third-party analytics baked into the product narrative** — The app is built for case work, not ad profiles.
-- **Sensitive data** — The V1 pilot permits de-identified case context only and requires one dedicated environment per school or district. Operators must complete the hosted controls and exercises in the production runbook.
-
-HTTP security headers (e.g. frame options, content-type options, referrer and permissions policies) are set at the framework layer to reduce common browser-level risks.
-
----
-
-## Design philosophy
-
-The UI targets **usable density**: clear hierarchy, minimal noise, and flows that match how teams actually work—in the spirit of **modern productivity tools** (clean dashboards, structured documents) rather than cluttered “enterprise” forms. The goal is to **get to the next right action** with less hunting and less retyping.
-
----
-
-## Limitations & future work
-
-- **Account lifecycle** — Accounts are invitation-only; access, offboarding, archive retention, and deletion are operator-controlled.
-- **Dependence on third-party AI** — When OpenAI is enabled, content generation relies on vendor availability, policy, and pricing; the stack includes **rules-based** paths where AI is off or fails.
-- **Paperwork profile** — V1 supports blank standard AcroForm PDFs only; scanned, completed, signed, encrypted, XFA, attached, or active-content documents are rejected.
-- **Resource matching** — Deliberately **not** embedding-based; weights and rules live in code for transparency and predictability, at the cost of semantic “nearest neighbor” search. The repo ships a **small synthetic CSV** for demos; full partner exports stay **local** (see `data/README.md`).
-- **Early-stage product** — Scope is described honestly; the codebase is structured for review and iteration, not for claiming completeness.
-
----
-
-## Legal
-
-- **Privacy Policy:** `/privacy`
-- **Terms of Service:** `/terms`
-
-## Production readiness
-
-- [Production hardening audit](docs/production-hardening-audit.md)
-- [Remediation and finding closure](docs/production-hardening-remediation.md)
+- [Current pilot requirements and historical PRD](docs/intervention-planning-prd.md)
+- [Pilot fix tracker and launch gates](docs/school-pilot-fix-tracker.md)
 - [Production operations runbook](docs/production-operations-runbook.md)
+- [Deferred PDF research](docs/agentic-pdf-service-research.md)
+- Privacy and terms are available at `/privacy` and `/terms`.
+
+A passing build is not pilot approval. Hosted email, permissions, backup restoration, school data approval, resource verification, and staff acceptance must be evidenced before invitations are sent for real use.

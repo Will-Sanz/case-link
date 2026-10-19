@@ -32,13 +32,15 @@ describe("createManualStepSchema", () => {
 });
 
 describe("markPlanReviewedSchema", () => {
-  it("accepts only family and plan identifiers", () => {
+  it("requires family, plan, and the displayed revision", () => {
     expect(
       markPlanReviewedSchema.safeParse({
         familyId: baseInput.familyId,
         planId: baseInput.planId,
+        expectedRevision: "a".repeat(64),
       }).success,
     ).toBe(true);
+    expect(markPlanReviewedSchema.safeParse({ familyId: baseInput.familyId, planId: baseInput.planId }).success).toBe(false);
     expect(markPlanReviewedSchema.safeParse({ familyId: "not-a-family", planId: baseInput.planId }).success).toBe(false);
   });
 });

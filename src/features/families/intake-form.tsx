@@ -124,7 +124,6 @@ export function IntakeForm() {
     } else {
       router.push("/families");
     }
-    router.refresh();
   }
 
   return (
@@ -286,7 +285,7 @@ export function IntakeForm() {
       </Card>
 
       <div className="flex flex-col-reverse gap-3 border-t border-[var(--color-rule)] pt-6 sm:flex-row sm:items-center">
-        <Link href="/families" className="sm:mr-auto">
+        <Link prefetch={false} href="/families" className="sm:mr-auto">
           <Button type="button" variant="outline" className="w-full sm:w-auto">
             Cancel
           </Button>

@@ -1,0 +1,122 @@
+{
+  "date": "2026-10-14",
+  "syntheticOnly": true,
+  "problem": "The live synthetic PDF split an action title/description over the footer and placed its date/status on the following page.",
+  "originalHostedPdfSha256": "7beb54e963a69b0981d85768f9e24deb1812c3af0b6e02b936f8e13ff5b2865d",
+  "fixture": "hosted-page-boundary",
+  "before": {
+    "syntheticOnly": true,
+    "results": [
+      {
+        "fixture": "dated-states",
+        "pages": 2,
+        "checkedSourceFields": 45,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "many-goals",
+        "pages": 8,
+        "checkedSourceFields": 289,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "maximum-fields",
+        "pages": 4,
+        "checkedSourceFields": 18,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "latin-characters",
+        "pages": 1,
+        "checkedSourceFields": 16,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "hosted-page-boundary",
+        "pages": 2,
+        "checkedSourceFields": 44,
+        "errors": [
+          "Source text inventory is incomplete (including repeated fields)",
+          "Page 1: text outside print margins: Update",
+          "Page 1: text outside print margins: support",
+          "Page 1: text outside print margins: plan",
+          "Page 1: text outside print margins: the",
+          "Page 1: text outside print margins: family\u2019s",
+          "Page 1: text outside print margins: preferred",
+          "Page 1: text outside print margins: next",
+          "Page 1: text outside print margins: steps",
+          "Page 1: text outside print margins: and",
+          "Page 1: text outside print margins: If",
+          "Page 1: text outside print margins: needs",
+          "Page 1: text outside print margins: the",
+          "Page 1: text outside print margins: remain",
+          "Page 1: text outside print margins: family",
+          "Page 1: text outside print margins: unresolved,",
+          "Page 1: text outside print margins: document",
+          "Page 1: overlapping text: Update / If",
+          "Page 1: overlapping text: Update / needs",
+          "Page 1: overlapping text: Update / remain"
+        ],
+        "passed": false
+      }
+    ]
+  },
+  "after": {
+    "syntheticOnly": true,
+    "results": [
+      {
+        "fixture": "dated-states",
+        "pages": 2,
+        "checkedSourceFields": 45,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "many-goals",
+        "pages": 9,
+        "checkedSourceFields": 289,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "maximum-fields",
+        "pages": 3,
+        "checkedSourceFields": 18,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "latin-characters",
+        "pages": 1,
+        "checkedSourceFields": 16,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "hosted-page-boundary",
+        "pages": 2,
+        "checkedSourceFields": 47,
+        "errors": [],
+        "passed": true
+      }
+    ]
+  },
+  "fix": "Keep the bounded task title/date/status together; allow full-width details to wrap. Remove layout-only containers so heading presence rules can see preceding content.",
+  "visualReview": "All 17 rendered pages inspected; the reproduced task moves together to the next page, maximum text remains complete, and the contact heading stays with its content.",
+  "componentTests": 5,
+  "typecheck": "passed",
+  "targetedLint": "passed",
+  "review": "Correctness/privacy/accessibility/regression review and separate Ponytail deletion pass: existing renderer and wrapping primitives reused; no dependency, authorization, saved data, review rule, or download-path change.",
+  "limit": "Fresh hosted candidate verification is still required after the account changes; school acceptance is separate.",
+  "renderedPdfHashes": {
+    "hosted-page-boundary.pdf": "b8001af494d21ad3d70ef67e3873f39dbc62ce081d07f7f04938619c646daf62",
+    "dated-states.pdf": "488b1879c7ec1d5cb26841ae1a6404cad5149828e58e01bcdce6c56e161f7ef2",
+    "maximum-fields.pdf": "d84bd6a2da8c03244bdee58c1d3813375689a3d63725a27a5f7f72acdbfbd69a",
+    "many-goals.pdf": "edf7740877a887209c0d966b489022de1a508cf7080b64bce0af483c4a005ff3",
+    "latin-characters.pdf": "6e719d694340ec613507685be37350d292f9e0ddd2913a03f5d45eff2421b36f"
+  }
+}

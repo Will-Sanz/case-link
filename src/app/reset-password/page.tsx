@@ -3,13 +3,14 @@ import { ResetPasswordForm } from "@/features/auth/reset-password-form";
 
 export const dynamic = "force-dynamic";
 
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const isSetup = (await searchParams).mode === "setup";
   return (
     <AuthShell
       title="CaseLink"
       subtitle="Set a new password to secure your account."
     >
-      <h2 className="text-base font-semibold text-[var(--public-ink)]">Reset password</h2>
+      <h2 className="text-base font-semibold text-[var(--public-ink)]">{isSetup ? "Set your password" : "Reset password"}</h2>
       <div className="mt-5">
         <ResetPasswordForm />
       </div>

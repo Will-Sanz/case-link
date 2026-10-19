@@ -1,0 +1,185 @@
+{
+  "checkedOn": "2026-10-14",
+  "project": "zpfypkizsapvsxeykmdq",
+  "state": "Before explicitly approved containment",
+  "readOnlyDefinitions": [
+    {
+      "kind": "policy",
+      "metadata": {
+        "name": "app_users_insert_self",
+        "check": "(id = ( SELECT auth.uid() AS uid))",
+        "roles": [
+          "authenticated"
+        ],
+        "table": "app_users",
+        "using": null,
+        "command": "INSERT"
+      }
+    },
+    {
+      "kind": "policy",
+      "metadata": {
+        "name": "app_users_select_family_peers",
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "table": "app_users",
+        "using": "((EXISTS ( SELECT 1\n   FROM families f\n  WHERE ((f.created_by_id = app_users.id) AND can_access_family(f.id)))) OR (EXISTS ( SELECT 1\n   FROM family_case_managers m\n  WHERE ((m.user_id = app_users.id) AND can_access_family(m.family_id)))) OR (EXISTS ( SELECT 1\n   FROM case_notes cn\n  WHERE ((cn.author_id = app_users.id) AND can_access_family(cn.family_id)))))",
+        "command": "SELECT"
+      }
+    },
+    {
+      "kind": "policy",
+      "metadata": {
+        "name": "app_users_select_self",
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "table": "app_users",
+        "using": "(id = ( SELECT auth.uid() AS uid))",
+        "command": "SELECT"
+      }
+    },
+    {
+      "kind": "policy",
+      "metadata": {
+        "name": "app_users_update_self",
+        "check": "(id = ( SELECT auth.uid() AS uid))",
+        "roles": [
+          "authenticated"
+        ],
+        "table": "app_users",
+        "using": "(id = ( SELECT auth.uid() AS uid))",
+        "command": "UPDATE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "INSERT"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "SELECT"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "UPDATE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "DELETE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "TRUNCATE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "REFERENCES"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "anon",
+        "privilege": "TRIGGER"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "INSERT"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "SELECT"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "UPDATE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "DELETE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "TRUNCATE"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "REFERENCES"
+      }
+    },
+    {
+      "kind": "grant",
+      "metadata": {
+        "table": "app_users",
+        "grantee": "authenticated",
+        "privilege": "TRIGGER"
+      }
+    },
+    {
+      "kind": "function",
+      "metadata": {
+        "name": "can_access_family",
+        "definition": "CREATE OR REPLACE FUNCTION public.can_access_family(p_family_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  select\n    public.is_app_admin()\n    or exists (\n      select 1\n      from public.families f\n      where f.id = p_family_id\n        and f.created_by_id = (select auth.uid())\n    )\n    or exists (\n      select 1\n      from public.family_case_managers m\n      where m.family_id = p_family_id\n        and m.user_id = (select auth.uid())\n    );\n$function$\n"
+      }
+    },
+    {
+      "kind": "function",
+      "metadata": {
+        "name": "is_app_admin",
+        "definition": "CREATE OR REPLACE FUNCTION public.is_app_admin()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  select exists (\n    select 1\n    from public.app_users u\n    where u.id = (select auth.uid())\n      and u.role = 'admin'\n  );\n$function$\n"
+      }
+    }
+  ]
+}

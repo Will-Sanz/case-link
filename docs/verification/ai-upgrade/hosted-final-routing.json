@@ -1,0 +1,97 @@
+{
+  "deploymentId": "dpl_G8D56sndRGkYosU6eWTLU4U9CAq3",
+  "commit": "f0ed2be84b77ea08706d00c5e8991a596b25cd68",
+  "scope": "Content-free metadata for all eight successful synthetic hosted model calls. Identifying input was rejected before a provider call. Vercel error-level scan of same test window returned zero rows.",
+  "records": [
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:00:17.386Z",
+      "estimatedUsd": 0.0051722,
+      "elapsedMs": 3879.0,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:00:10.163Z",
+      "estimatedUsd": 0.0048097,
+      "elapsedMs": 4896.0,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:00:04.040Z",
+      "estimatedUsd": 0.0066622,
+      "elapsedMs": 8697.0,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:59:54.349Z",
+      "estimatedUsd": 0.0057047,
+      "elapsedMs": 5846.0,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:59:47.428Z",
+      "estimatedUsd": 0.0055471999999999995,
+      "elapsedMs": 7449.0,
+      "ok": true
+    },
+    {
+      "route": "previewRefinePlan",
+      "taskType": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:59:28.221Z",
+      "estimatedUsd": 0.0097835,
+      "elapsedMs": 7555.0,
+      "ok": true
+    },
+    {
+      "route": "previewRefinePlanStep",
+      "taskType": "step_refinement",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:59:18.730Z",
+      "estimatedUsd": 0.0065335,
+      "elapsedMs": 4320.0,
+      "ok": true
+    },
+    {
+      "route": "generateCompletePlan",
+      "taskType": "plan_generation",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:59:07.716Z",
+      "estimatedUsd": 0.008653600000000001,
+      "elapsedMs": 19391.0,
+      "ok": true
+    }
+  ],
+  "vercelErrorEntries": 0,
+  "estimatedHostedUsd": 0.0528666
+}

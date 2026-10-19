@@ -1,0 +1,43 @@
+import { test, expect, activate, accessible, signIn, createPlan, reviewPlan } from "./helpers";
+
+test("stale edits need an explicit comparison and changes invalidate an already-open PDF", async ({ page, context, local }) => {
+  await signIn(page, await local.staff());
+  const familyId = await createPlan(page);
+  const first = page.locator("article[id^=step-]").first();
+  const stepId = (await first.getAttribute("id"))!.slice(5);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  const second = other.locator(`#step-${stepId}`);
+  await activate(page, first.getByRole("button", { name: "Edit action", exact: true }));
+  await activate(other, second.getByRole("button", { name: "Edit action", exact: true }));
+  await first.getByRole("textbox", { name: "Action 1", exact: true }).fill("Confirm the agreed weekday appointment");
+  await second.getByRole("textbox", { name: "Action 1", exact: true }).fill("Confirm the agreed weekend appointment");
+  await activate(page, first.getByRole("button", { name: "Save edits", exact: true }));
+  await expect(first.getByRole("button", { name: "Edit action", exact: true })).toBeVisible();
+  await activate(other, second.getByRole("button", { name: "Save edits", exact: true }));
+  await expect(other.getByRole("heading", { name: "Another tab saved this action" })).toBeVisible();
+  await accessible(other);
+  expect((await local.db.query("select title from public.plan_step_action_items where plan_step_id=$1", [stepId])).rows[0].title).toBe("Confirm the agreed weekday appointment");
+  await activate(other, other.getByRole("button", { name: "Keep my draft", exact: true }));
+  await expect(second.getByRole("button", { name: "Save edits", exact: true })).toBeEnabled();
+  await activate(other, second.getByRole("button", { name: "Save edits", exact: true }));
+  await expect(second.getByRole("button", { name: "Edit action", exact: true })).toBeVisible();
+  expect((await local.db.query("select title from public.plan_step_action_items where plan_step_id=$1", [stepId])).rows[0].title).toBe("Confirm the agreed weekend appointment");
+
+  await page.reload();
+  await reviewPlan(page);
+  await page.goto(`/families/${familyId}/paperwork`);
+  await expect(page.getByRole("button", { name: "Download PDF", exact: true })).toBeEnabled();
+  const downloads: string[] = [];
+  page.on("download", download => downloads.push(download.suggestedFilename()));
+  await other.reload();
+  await activate(other, second.getByRole("button", { name: "Edit action", exact: true }));
+  await second.getByRole("textbox", { name: "Action 1", exact: true }).fill("Review the newly agreed appointment");
+  await activate(other, second.getByRole("button", { name: "Save edits", exact: true }));
+  await expect(second.getByRole("button", { name: "Edit action", exact: true })).toBeVisible();
+  await activate(page, page.getByRole("button", { name: "Download PDF", exact: true }));
+  await expect(page.getByRole("alert").filter({ hasText: /plan changed or needs review/i })).toBeVisible();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  expect(downloads).toEqual([]);
+  await accessible(page);
+});

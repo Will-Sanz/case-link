@@ -1,0 +1,105 @@
+{
+  "change": "Soft table pagination hint keeps the compact final action table with the following expected outcome; long tables can still split.",
+  "regressionBefore": {
+    "syntheticOnly": true,
+    "results": [
+      {
+        "fixture": "dated-states",
+        "pages": 2,
+        "checkedSourceFields": 45,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "many-goals",
+        "pages": 9,
+        "checkedSourceFields": 289,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "maximum-fields",
+        "pages": 3,
+        "checkedSourceFields": 18,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "latin-characters",
+        "pages": 1,
+        "checkedSourceFields": 16,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "hosted-page-boundary",
+        "pages": 2,
+        "checkedSourceFields": 47,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "hosted-outcome-boundary",
+        "pages": 2,
+        "checkedSourceFields": 32,
+        "errors": [
+          "Related content separated across pages: Review school travel options"
+        ],
+        "passed": false
+      }
+    ]
+  },
+  "regressionAfter": {
+    "syntheticOnly": true,
+    "results": [
+      {
+        "fixture": "dated-states",
+        "pages": 2,
+        "checkedSourceFields": 45,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "many-goals",
+        "pages": 9,
+        "checkedSourceFields": 289,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "maximum-fields",
+        "pages": 3,
+        "checkedSourceFields": 18,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "latin-characters",
+        "pages": 1,
+        "checkedSourceFields": 16,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "hosted-page-boundary",
+        "pages": 2,
+        "checkedSourceFields": 47,
+        "errors": [],
+        "passed": true
+      },
+      {
+        "fixture": "hosted-outcome-boundary",
+        "pages": 2,
+        "checkedSourceFields": 32,
+        "errors": [],
+        "passed": true
+      }
+    ]
+  },
+  "review": {
+    "root": "Both new boundary pages visually checked; no clipping or collision.",
+    "independent": "Eight pages across boundary, many-goal and maximum-field fixtures visually checked. No correctness or deletion finding.",
+    "tests": "Six rendered record fixtures and five focused component tests pass.",
+    "scopeLimit": "A soft pagination hint improves this boundary, not a guarantee that every possible long document stays on one page."
+  }
+}

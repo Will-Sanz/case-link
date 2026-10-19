@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,10 +16,11 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (pending) return;
+    if (submitting.current) return;
 
     setError(null);
     setInfo(null);
@@ -30,6 +31,7 @@ export function ForgotPasswordForm() {
       return;
     }
 
+    submitting.current = true;
     setPending(true);
     try {
       const supabase = createSupabaseBrowserClient();
@@ -45,7 +47,10 @@ export function ForgotPasswordForm() {
       }
 
       setInfo("If an account exists for that email, we've sent a secure reset link.");
+    } catch {
+      setError("We couldn't send a reset link right now. Please try again.");
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   }

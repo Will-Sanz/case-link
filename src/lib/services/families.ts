@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { buildPlanPresentation } from "@/lib/domain/plan/presentation";
 import type {
   CaseNoteRow,
@@ -6,19 +7,16 @@ import type {
   CaseProgressUpdateRow,
   FamilyBarrierRow,
   FamilyDetail,
+  FamilyProfile,
   FamilyGoalRow,
   FamilyListItem,
   FamilyMemberRow,
   FamilyWithCurrentStep,
   MatchedResourceSummary,
-  PlanRow,
-  PlanStepActionItemRow,
-  PlanStepRow,
   PlanWithSteps,
   ResourceMatchRow,
 } from "@/types/family";
 import type { FamilyListQuery } from "@/lib/validations/family-list-query";
-import { selectNextFamilyWork } from "@/lib/domain/family-workspace/next-work";
 
 function escapeIlike(s: string): string {
   return s.replace(/[%_\\]/g, "\\$&");
@@ -48,7 +46,8 @@ export async function listFamilies(
       { count: "exact" },
     )
     .is("archived_at", null)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: true });
 
   const q = filters.q?.trim();
   if (q) {
@@ -85,83 +84,47 @@ export async function listFamilies(
   return { items, total: count ?? 0 };
 }
 
-/** Enriches family list items with current active step and action summary */
+const nextWorkRowsSchema = z.array(z.object({
+  family_id: z.uuid(),
+  current_step: z.object({
+    id: z.uuid(), title: z.string(), phase: z.string(),
+    status: z.enum(["pending", "in_progress", "blocked"]),
+    due_date: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).nullable(), action_needed_now: z.string(),
+    is_blocked: z.boolean(), is_escalated: z.boolean(),
+  }).nullable(),
+})).max(100);
+
+/** The database returns one summary per visible family, independent of child-row API limits. */
 export async function enrichFamiliesWithCurrentStep(
   client: SupabaseClient,
   items: FamilyListItem[],
 ): Promise<FamilyWithCurrentStep[]> {
   if (items.length === 0) return [];
 
-  const familyIds = items.map((f) => f.id);
-  const { data: plans, error: plansError } = await client
-    .from("plans")
-    .select("id, family_id")
-    .in("family_id", familyIds)
-    .order("version", { ascending: false });
-
-  if (plansError) throw new Error(plansError.message);
-
-  const latestPlanByFamily = new Map<string, string>();
-  for (const p of plans ?? []) {
-    if (!latestPlanByFamily.has(p.family_id)) {
-      latestPlanByFamily.set(p.family_id, p.id);
-    }
-  }
-
-  const planIds = [...latestPlanByFamily.values()];
-  if (planIds.length === 0) {
-    return items.map((item) => ({ ...item, current_step: null }));
-  }
-
-  const { data: steps, error: stepsError } = await client
-    .from("plan_steps")
-    .select("id, plan_id, title, phase, status, due_date, sort_order, details, workflow_data")
-    .in("plan_id", planIds)
-    .order("sort_order", { ascending: true });
-
-  if (stepsError) throw new Error(stepsError.message);
-
-  const stepIds = (steps ?? []).map((step) => step.id);
-  const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
-  if (stepIds.length > 0) {
-    const { data: actionItems, error: actionItemsError } = await client
-      .from("plan_step_action_items")
-      .select("*")
-      .in("plan_step_id", stepIds)
-      .order("sort_order", { ascending: true });
-
-    if (actionItemsError) throw new Error(actionItemsError.message);
-
-    for (const actionItem of actionItems ?? []) {
-      const current = actionItemsByStep.get(actionItem.plan_step_id) ?? [];
-      current.push(actionItem as PlanStepActionItemRow);
-      actionItemsByStep.set(actionItem.plan_step_id, current);
-    }
-  }
-
-  const familyIdByPlanId = new Map<string, string>();
-  for (const p of plans ?? []) {
-    familyIdByPlanId.set(p.id, p.family_id);
-  }
-
-  const stepsByFamily = new Map<string, PlanStepRow[]>();
-  for (const s of steps ?? []) {
-    const fid = familyIdByPlanId.get(s.plan_id);
-    if (!fid) continue;
-    const current = stepsByFamily.get(fid) ?? [];
-    current.push({
-      ...s,
-      action_items: actionItemsByStep.get(s.id) ?? [],
-    } as PlanStepRow);
-    stepsByFamily.set(fid, current);
-  }
-
-  return items.map((item) => {
-    return {
-      ...item,
-      current_step: selectNextFamilyWork(stepsByFamily.get(item.id) ?? []),
-    };
+  const { data, error } = await client.rpc("get_family_next_work", {
+    p_family_ids: items.map((item) => item.id),
   });
+  if (error) throw new Error(error.message);
+  const parsed = nextWorkRowsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Could not load current family work. Refresh and try again.");
+  const byFamily = new Map(parsed.data.map((row) => [row.family_id, row.current_step]));
+  if (byFamily.size !== items.length || parsed.data.length !== items.length || items.some((item) => !byFamily.has(item.id))) {
+    throw new Error("Family access changed while loading. Refresh and try again.");
+  }
+  return items.map((item) => ({ ...item, current_step: byFamily.get(item.id)! }));
+}
+
+/** Profile fields and counts in one RLS-protected read; no plan, notes, or directory payload. */
+export async function getFamilyProfile(client: SupabaseClient, familyId: string): Promise<FamilyProfile | null> {
+  const { data, error } = await client.from("families")
+    .select("id,name,summary,urgency,household_notes,status,updated_at,goals:family_goals(count),barriers:family_barriers(count),plans(count)")
+    .eq("id", familyId).is("archived_at", null).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const { goals, barriers, plans, ...profile } = data as unknown as Omit<FamilyProfile, "goalCount" | "barrierCount" | "hasPlan"> & {
+    goals: { count: number }[]; barriers: { count: number }[]; plans: { count: number }[];
+  };
+  return { ...profile, goalCount: goals[0]?.count ?? 0, barrierCount: barriers[0]?.count ?? 0, hasPlan: (plans[0]?.count ?? 0) > 0 };
 }
 
 export async function getFamilyDetail(
@@ -182,10 +145,39 @@ export async function getFamilyDetail(
       created_at,
       updated_at,
       archived_at,
-      creator:app_users!families_created_by_id_fkey ( email )
+      creator:app_users!families_created_by_id_fkey ( email ),
+      goals:family_goals (*),
+      members:family_members (*),
+      caseNotes:case_notes (
+        id, family_id, author_id, body, created_at,
+        author:app_users!case_notes_author_id_fkey ( email )
+      ),
+      progressUpdates:case_progress_updates (
+        id, family_id, plan_id, author_id, occurred_on, summary, plan_changes, created_at,
+        author:app_users!case_progress_updates_author_id_fkey ( email )
+      ),
+      resourceMatches:resource_matches (
+        id, family_id, resource_id, match_reason, score, status, plan_step_id, created_at, updated_at,
+        resource:resources (
+          id, active, is_demo, updated_at, slug, program_name, office_or_department,
+          category, description, services_select_all, additional_info,
+          primary_contact_name, primary_contact_title, primary_contact_email, primary_contact_phone,
+          secondary_contact_name, secondary_contact_email, secondary_contact_phone,
+          recruit_for_grocery_giveaways, tabling_at_events, promotional_materials,
+          educational_workshops, volunteer_recruitment_support
+        )
+      )
     `,
     )
     .eq("id", familyId)
+    .is("archived_at", null)
+    .order("sort_order", { referencedTable: "goals", ascending: true })
+    .order("created_at", { referencedTable: "members", ascending: true })
+    .order("created_at", { referencedTable: "caseNotes", ascending: false })
+    .limit(50, { referencedTable: "caseNotes" })
+    .order("occurred_on", { referencedTable: "progressUpdates", ascending: false })
+    .order("created_at", { referencedTable: "progressUpdates", ascending: false })
+    .limit(50, { referencedTable: "progressUpdates" })
     .maybeSingle();
 
   if (famErr) {
@@ -199,146 +191,14 @@ export async function getFamilyDetail(
     return null;
   }
 
-  const [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes, planRes] =
-    await Promise.all([
-    client
-      .from("family_goals")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("sort_order", { ascending: true }),
-    client
-      .from("family_barriers")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("sort_order", { ascending: true }),
-    client
-      .from("family_members")
-      .select("*")
-      .eq("family_id", familyId)
-      .order("created_at", { ascending: true }),
-    client
-      .from("case_notes")
-      .select(
-        `
-        id,
-        family_id,
-        author_id,
-        body,
-        created_at,
-        author:app_users!case_notes_author_id_fkey ( email )
-      `,
-      )
-      .eq("family_id", familyId)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    client
-      .from("case_progress_updates")
-      .select(
-        `
-        id,
-        family_id,
-        plan_id,
-        author_id,
-        occurred_on,
-        summary,
-        plan_changes,
-        created_at,
-        author:app_users!case_progress_updates_author_id_fkey ( email )
-      `,
-      )
-      .eq("family_id", familyId)
-      .order("occurred_on", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(50),
-    client.from("resource_matches").select(
-      `
-        id,
-        family_id,
-        resource_id,
-        match_reason,
-        score,
-        status,
-        plan_step_id,
-        created_at,
-        updated_at,
-        resource:resources (
-          id,
-          slug,
-          program_name,
-          office_or_department,
-          category,
-          primary_contact_name,
-          primary_contact_title,
-          primary_contact_email,
-          primary_contact_phone,
-          secondary_contact_name,
-          secondary_contact_email,
-          secondary_contact_phone,
-          recruit_for_grocery_giveaways,
-          tabling_at_events,
-          promotional_materials,
-          educational_workshops,
-          volunteer_recruitment_support
-        )
-      `,
-    ).eq("family_id", familyId),
-    client
-      .from("plans")
-      .select(
-        "id, family_id, version, summary, generation_source, ai_model, created_at, client_display, generation_state",
-      )
-      .eq("family_id", familyId)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  // Embedded relations retain their own RLS without six simultaneous network reads.
+  const planRes = await client.rpc("get_family_plan_snapshot", { p_family_id: familyId });
+  if (planRes.error) throw new Error(planRes.error.message);
+  if (!planRes.data) return null;
+  const snapshot = planRes.data as { family: FamilyDetail; barriers: FamilyBarrierRow[]; plan: PlanWithSteps | null };
+  const plan = snapshot.plan ? { ...snapshot.plan, presentation: buildPlanPresentation(snapshot.plan) } : null;
 
-  let plan: PlanWithSteps | null = null;
-  if (planRes.data) {
-    const p = planRes.data as PlanRow;
-    const { data: stepsData } = await client
-      .from("plan_steps")
-      .select("*")
-      .eq("plan_id", p.id)
-      .order("sort_order", { ascending: true });
-
-    const stepIds = (stepsData ?? []).map((s) => s.id);
-    const actionItemsByStep = new Map<string, PlanStepActionItemRow[]>();
-    if (stepIds.length > 0) {
-      const { data: actionItems } = await client
-        .from("plan_step_action_items")
-        .select("*")
-        .in("plan_step_id", stepIds)
-        .order("sort_order", { ascending: true });
-      for (const ai of actionItems ?? []) {
-        const list = actionItemsByStep.get(ai.plan_step_id) ?? [];
-        list.push(ai as PlanStepActionItemRow);
-        actionItemsByStep.set(ai.plan_step_id, list);
-      }
-    }
-
-    const stepsWithItems = (stepsData ?? []).map((s) => ({
-      ...s,
-      action_items: actionItemsByStep.get(s.id) ?? [],
-    })) as PlanStepRow[];
-
-    plan = {
-      ...p,
-      steps: stepsWithItems,
-      presentation: buildPlanPresentation(p),
-    };
-  }
-
-  for (const res of [goalsRes, barriersRes, membersRes, notesRes, progressRes, matchesRes]) {
-    if (res.error) {
-      throw new Error(res.error.message);
-    }
-  }
-  if (planRes.error) {
-    throw new Error(planRes.error.message);
-  }
-
-  const f = fam as unknown as FamilyDetail & {
+  const f = { ...fam, ...snapshot.family } as unknown as FamilyDetail & {
     creator: { email: string } | { email: string }[] | null;
   };
   const creatorRaw = f.creator;
@@ -357,13 +217,13 @@ export async function getFamilyDetail(
     created_at: f.created_at,
     updated_at: f.updated_at,
     creator,
-    goals: (goalsRes.data ?? []) as FamilyGoalRow[],
-    barriers: (barriersRes.data ?? []) as FamilyBarrierRow[],
-    members: (membersRes.data ?? []) as FamilyMemberRow[],
-    caseNotes: normalizeCaseNotes(notesRes.data ?? []),
-    progressUpdates: normalizeProgressUpdates(progressRes.data ?? []),
+    goals: (fam.goals ?? []) as FamilyGoalRow[],
+    barriers: snapshot.barriers,
+    members: (fam.members ?? []) as FamilyMemberRow[],
+    caseNotes: normalizeCaseNotes(fam.caseNotes ?? []),
+    progressUpdates: normalizeProgressUpdates(fam.progressUpdates ?? []),
     resourceMatches: sortResourceMatches(
-      normalizeResourceMatches(matchesRes.data ?? []),
+      normalizeResourceMatches(fam.resourceMatches ?? []),
     ),
     plan,
   };

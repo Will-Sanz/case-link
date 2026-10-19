@@ -1,17 +1,35 @@
-# CaseLink Structured Intervention Planning and Agentic Paperwork
+# CaseLink intervention planning requirements
 
-## Product requirements document
+## Current pilot scope — October 13, 2026
 
-**Status:** Production-ready product baseline
-**Date:** August 3, 2026
-**Owner:** CaseLink  
-**Scope:** The family-context → dated intervention-plan → agentic-paperwork experience
-**Primary user:** A school case manager supporting individual families  
-**Related product principle:** Perfect the family intake → barriers → intervention plan → paperwork workflow before expanding into broader school operations.
+**Status:** Implementation and verification in progress. This document does not certify launch readiness. The [school pilot tracker](school-pilot-fix-tracker.md) is the release gate.
 
-> **Scope update — August 4, 2026:** Agentic blank-PDF upload and filling are deferred. The current product ends with a professional PDF export of the reviewed intervention plan. The agentic-paperwork sections below are retained as prior research, not current implementation scope. See `docs/agentic-pdf-service-research.md`.
+The Core workflow is **family intake → barriers → goals and dated actions → human review → professional black-and-white plan PDF → manual use outside CaseLink**. Family creation requires only a non-identifying label and selected barriers; the description is optional. Every reviewed open action has a case-manager-confirmed target date; Waiting uses its next follow-up date. Human edits, completion, outcomes, and ownership must survive AI suggestions and failures. Material changes invalidate the prior review and PDF.
 
----
+The pilot is for a few staff at one school with de-identified case circumstances. It has no direct CitySpan or other system integration, no autonomous submission, no arbitrary PDF upload, no field detection or form filling, and no district analytics. Uploaded-form research below is deferred and is not a Core acceptance criterion. The required artifact is the reviewed intervention plan itself.
+
+**October 15 family-support improvements:** Keep creation minimal. Optional planning context prompts capture the family's stated priority, existing support, practical preferences/constraints, and previous attempts in the existing saved context, which is visible during plan review. Families with open work link directly to the next action. Staff may also prepare a separate family takeaway from explicitly selected, discussed open actions and optional directory contacts in the current reviewed plan. It excludes internal narratives and unselected content, requires confirmation that the content is appropriate to share, and uses the existing access/revision checks before preview and download. Selection changes clear the preview and confirmation. Staff manually share the downloaded document; family accounts and automatic delivery are outside this release.
+
+**October 15 AI upgrade acceptance:** New drafts should use one coherent goal/date planning pass with a small manageable workload, while older staged jobs remain recoverable. Generation, editing and the assistant must receive relevant saved family goals, recent meeting decisions, restrictions and honest resource facts. Compare current and candidate models on frozen synthetic cases before selecting task-specific defaults; evaluate consent order, factual support, practical sequencing, workload, human-record preservation, latency and cost. No automatic fallback may silently replace a failed AI plan with fabricated generic work. The assistant may prepare email and call drafts and discuss proposed meeting changes; it does not execute outreach or change records. See the [agentic preparation and execution roadmap](agentic-pdf-service-research.md).
+
+### Required verification for the current Core release
+
+| Layer | Required evidence |
+| --- | --- |
+| Unit | Goal/action ordering, exact dates, Waiting/completed state, schema limits, provenance/privacy, stale versions, selected AI edit preservation |
+| Database | Real signed-in user/RLS access, cross-family and unrelated staff denial, administrator authorization, ownership, reviewed revisions, audit and transactional rollback, archive/offboarding |
+| Integration | Family intake, draft recovery, AI and resource errors, generation resume, concurrent edits, meeting updates, review/export boundary |
+| End to end | Invited first use through downloaded PDF; returning user; refresh during generation; expired/revoked session; unsaved work; review after material edits |
+| Accessibility | Keyboard critical path, focus restoration, semantic headings/labels, live progress, associated errors, 200% zoom, contrast |
+| Adversarial | Empty/long/special-character input, duplicate clicks, outdated tabs, malformed/refused/incomplete AI output, unauthorized IDs, impossible dates |
+| AI evaluation | Safety, source grounding, useful actions, readable language, preservation of family voice and human edits, honest unknowns, latency/cost |
+| PDF and visual | Compare saved/reviewed values with extracted PDF text and rendered pages; long and multi-page plans; special characters; black-and-white print; no clipping; reviewed dates/status/ownership; narrow/laptop UI |
+
+Use synthetic, de-identified fixtures. Include zero/one/ten/one-hundred families, one/many barriers, missing and maximum descriptions, long resource names, all generation terminal states, and multi-page exports. A happy-path preview, schema validity, or compilation alone is insufficient. External school/privacy approval, email delivery, restore/rollback, and resource validation remain separate gates.
+
+## Historical design — August 3, 2026 (superseded where inconsistent)
+
+The original research and broader acceptance criteria below are retained for context. References to agentic paperwork, uploaded templates, mapping, or a “production-ready baseline” describe the prior proposal; they do not authorize implementation or define the current pilot. The current scope and verification matrix above take precedence. See [deferred PDF research](agentic-pdf-service-research.md) before revisiting that work.
 
 ## 1. Executive decision
 

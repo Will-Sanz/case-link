@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-19",
+  "project": "zpfypkizsapvsxeykmdq",
+  "scope": "Simplify the invitation email and match the existing CaseLink website design",
+  "subject": "You've been invited to CaseLink",
+  "templateSha256": "683a562bf2c410ce06c2a9c9824697d71afb176273494cc45f963f763534f0c1",
+  "hostedSaveAndReloadVerified": true,
+  "renderChecks": [
+    {
+      "width": 760,
+      "accessible": true,
+      "noOverflow": true,
+      "oneInvitationLink": true
+    },
+    {
+      "width": 375,
+      "accessible": true,
+      "noOverflow": true,
+      "oneInvitationLink": true
+    }
+  ],
+  "templateSecurityTests": 4,
+  "liveTest": {
+    "startedAt": "2026-10-19T15:52:37.490Z",
+    "origin": "https://www.thecaselink.com",
+    "syntheticOnly": true,
+    "checks": [
+      "Public Settings sends a native invitation to the delivery simulator",
+      "Configured mail service retains the accepted test email",
+      "Sent email uses the simplified CaseLink invitation and one acceptance button",
+      "Accepted template uses the canonical confirmation page and fragment-only token",
+      "The actual emailed link completes password setup and fresh sign-in"
+    ],
+    "cleanup": {
+      "accountsRemoved": true
+    },
+    "delivery": {
+      "id": "01a154dd-81c0-77ce-bb22-db810306c68b",
+      "createdAt": "2026-10-19 15:52:45.429000+00",
+      "lastEvent": "queued",
+      "simulated": true,
+      "humanInboxPlacementVerified": false,
+      "providerAccepted": true,
+      "simulatedDeliveryConfirmed": false
+    },
+    "passed": true,
+    "auditHistoryRetained": true,
+    "finishedAt": "2026-10-19T15:52:50.221Z"
+  },
+  "normalReview": "Preserved the exact canonical fragment-only invitation URL, deliberate confirmation, one-use behavior and 900-second provider expiry. Only invitation content and subject changed. Verified accessibility and mobile/desktop layout, then inspected a native sent email and completed its password setup/sign-in with a disposable account.",
+  "ponytailReview": "Removed explanatory paragraphs, duplicate raw link, nested callout, old CL badge and teal styling. Reused the website palette and serif hierarchy with email-safe font fallbacks. No dependencies, remote font/image requests, tracking, schema changes or web release needed.",
+  "retainedFirstAttempt": {
+    "note": "The first test email still used the prior cached provider template; a fresh invitation after propagation passed all five checks.",
+    "cleanup": true
+  },
+  "limits": [
+    "Browser previews and a provider-simulator email do not establish identical rendering in every email app.",
+    "Human inbox placement was not retested."
+  ]
+}

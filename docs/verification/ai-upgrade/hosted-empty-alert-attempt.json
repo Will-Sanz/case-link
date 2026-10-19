@@ -1,0 +1,96 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "deploymentUrl": "https://case-link-kvhgwxjye-will-sanzs-projects.vercel.app",
+  "commit": "187a93f3ef4660bed30cdaf3028691e5f439a4b7",
+  "startedAt": "2026-10-15T19:44:19.161Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "No application/provider secrets injected into browser runner",
+    "Protected immutable preview login returns 200",
+    "Preview access stays on exact staging origin",
+    "Staging operator is authenticated",
+    "Operator key belongs to the fixed staging key identifier",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description",
+    "One saved plan after live hosted generation",
+    "One coherent plan job completes",
+    "Live generated steps persist",
+    "Staging directory is available for contact provenance checks",
+    "Generated directory contacts exactly match saved public resource contacts",
+    "Hosted generated plan passes automated accessibility checks",
+    "Family priorities and constraints persist and appear beside the draft",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Family list resumes the next saved action",
+    "Returning staff reaches their plan without revisiting intake",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Current saved step title is available for a precise refinement request",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Family takeaway selection passes automated accessibility checks",
+    "Family takeaway has its own title and file",
+    "Family PDF text can be read",
+    "Family PDF includes selected next step and excludes private notes and context",
+    "Family takeaway fits a narrow screen",
+    "Changing family selection removes the prior downloadable document",
+    "Live assistant produces a substantive answer"
+  ],
+  "timings": {
+    "generationMilliseconds": 22520,
+    "actionRefinementMilliseconds": 5502,
+    "fullRefinementMilliseconds": 8569,
+    "assistantMilliseconds": 7448
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "generationModel": "gpt-6.1-sol",
+  "generatedGoals": 2,
+  "pdf": {
+    "pages": 2,
+    "sha256": "60c4e0fae8956d0a28ac4660a8ca3f36a4cf7d4510f74e91f7dec1d91e264db6",
+    "bytes": 6786
+  },
+  "familyPdf": {
+    "pages": 1,
+    "bytes": 2676,
+    "sha256": "ef6c4bd34f98336746dc4dc880e9b01473c8e683afcf7a8e6d97a6516691ba10"
+  },
+  "visibleAlerts": [
+    ""
+  ],
+  "visibleButtons": [
+    "New conversation",
+    "Go deeper on concrete next actions",
+    "Suggest a short call script for the first resource",
+    "What documents should I gather before outreach?",
+    "Send"
+  ],
+  "failure": {
+    "stage": "assistant preparation workflows",
+    "type": "Error",
+    "message": "expect(locator).toHaveCount(expected) failed"
+  },
+  "finishedAt": "2026-10-15T19:45:44.689Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "f20503a955750b9bcdedc5066d355302e6f9aee294da45f2970404114786a7fb",
+  "diagnosis": "Temporary browser runner counted the empty Next.js route-announcer alert as an error after successful email-draft generation. Failure screenshot shows the completed draft; no nonempty application alert or browser error. Updated runner asserts no nonempty alert and waits for a new answer after correcting rejected input. No product source change."
+}

@@ -1,5 +1,7 @@
 # CaseLink production-hardening remediation
 
+> Historical record. Current product scope, implementation status, and launch gates are in [the pilot tracker](school-pilot-fix-tracker.md), [current requirements](intervention-planning-prd.md), and [operations runbook](production-operations-runbook.md). Earlier uploaded-form and legacy-generation descriptions are not current capabilities.
+
 **Remediation date:** 2026-08-04
 
 **Branch:** `codex/production-hardening-remediation`

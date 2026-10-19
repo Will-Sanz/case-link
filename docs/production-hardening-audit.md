@@ -1,5 +1,7 @@
 # CaseLink production-hardening audit and plan
 
+> Historical record. Current product scope, implementation status, and launch gates are in [the pilot tracker](school-pilot-fix-tracker.md), [current requirements](intervention-planning-prd.md), and [operations runbook](production-operations-runbook.md). Earlier uploaded-form and legacy-generation descriptions are not current capabilities.
+
 **Audit date:** 2026-08-04
 
 **Audit branch:** `codex/production-hardening-audit`

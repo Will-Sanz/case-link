@@ -1,5 +1,7 @@
 # CaseLink Architecture Audit (Phase 0)
 
+> Historical record. Current product scope, implementation status, and launch gates are in [the pilot tracker](school-pilot-fix-tracker.md), [current requirements](intervention-planning-prd.md), and [operations runbook](production-operations-runbook.md). Earlier uploaded-form and legacy-generation descriptions are not current capabilities.
+
 > Read-only audit of the current codebase. Produced before any redesign work. Confirm with user before starting Phase 1.
 
 **Date:** 2026-05-06

@@ -1,0 +1,136 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://case-link-oxq4j9up0-will-sanzs-projects.vercel.app",
+  "commit": "8ace965e86fc556844d63318680b255ca57cbff9",
+  "startedAt": "2026-10-15T04:19:51.416Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "Protected immutable production login returns 200",
+    "Testing access stays on exact production candidate origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Standard staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description",
+    "Live generation reaches the saved plan",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "The current 54-resource directory supplies matched programs",
+    "Hosted generated plan passes automated accessibility checks",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Current saved step title is available for a precise refinement request",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Live assistant produces a substantive answer",
+    "No unhandled browser application errors",
+    "Hosted browser logout returns to sign-in"
+  ],
+  "timings": {
+    "generationMilliseconds": 24024,
+    "actionRefinementMilliseconds": 3941,
+    "fullRefinementMilliseconds": 14120,
+    "assistantMilliseconds": 4873
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": true,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "directory": {
+    "resources": 54,
+    "matched": 24,
+    "generatedContacts": 0
+  },
+  "planReloadMilliseconds": [
+    1853,
+    1143,
+    1070
+  ],
+  "pdf": {
+    "pages": 2,
+    "sha256": "9c8a155ca223a5a9f67842e88fcbdcde3d5b2fa97cd9abdb1c5015d59c9113d7",
+    "bytes": 9103
+  },
+  "finishedAt": "2026-10-15T04:21:51.880Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "27d4ad1ff253ad40e9c05eed5822793d5cd257d6c189269e66260119c7693253",
+  "requestSummary": {
+    "count": 494,
+    "httpErrors": [],
+    "slowCompletedRequests": [
+      {
+        "stage": "synthetic account",
+        "path": "/auth/v1/token",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 7312
+      },
+      {
+        "stage": "live full-plan refinement",
+        "path": "/families/[synthetic-id]/plan",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 13676
+      }
+    ],
+    "abortedRequests": 115,
+    "abortedRequestsNotClassifiedAsApplicationErrors": true
+  },
+  "pdfVisualReview": {
+    "pagesInspected": [
+      1,
+      2
+    ],
+    "readable": true,
+    "clippingOrOverlappingText": false,
+    "blankPages": false,
+    "editedActionAndWaitingNotePresent": true,
+    "rendererDiagnosticsBytes": 0
+  },
+  "aiSampleReview": {
+    "asksForPriorityConsentLanguageSafeContact": true,
+    "claimsReferralOrEligibilityConfirmed": false,
+    "usesSavedWaitingState": true,
+    "schoolUsefulnessSignoff": false,
+    "selectedDirectoryContacts": 0,
+    "limit": "Minimal intake produced clarification and follow-up actions; selected-contact provenance is covered separately by the production database regression, not this zero-contact AI sample."
+  },
+  "providerLogReview": {
+    "windowStart": "2026-10-15T04:19:45Z",
+    "windowEnd": "2026-10-15T04:22:10Z",
+    "vercelRuntimeErrors": 0
+  },
+  "releaseDecision": {
+    "promoted": false,
+    "reason": "User-requested stopping point; earlier intermittent database/navigation timeouts remain unexplained; canonical verification and 30-minute observation not performed."
+  },
+  "generatedPlanSteps": 4,
+  "finalDatabaseCounts": {
+    "verifiedAt": "2026-10-15T04:27:01.491500+00:00",
+    "families": 0,
+    "resources": 54,
+    "appAccounts": 11,
+    "authAccounts": 13,
+    "syntheticWorkflowAccounts": 0
+  }
+}
