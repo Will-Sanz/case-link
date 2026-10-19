@@ -29,7 +29,7 @@ function NavigationFeedback({ label }: { label: string }) {
 
 function WorkspaceLink({ href, label, icon: Icon, active }: { href: string; label: string; icon: typeof UsersRound; active: boolean }) {
   return (
-    <Link href={href} prefetch={true} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-10 items-center gap-3 whitespace-nowrap rounded-lg py-2 pl-3 pr-6 text-sm font-medium transition-colors duration-[var(--dur-short)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2", active ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)]")}>
+    <Link href={href} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-10 items-center gap-3 whitespace-nowrap rounded-lg py-2 pl-3 pr-6 text-sm font-medium transition-colors duration-[var(--dur-short)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2", active ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)]")}>
       <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
       {label}
       <NavigationFeedback label={label} />

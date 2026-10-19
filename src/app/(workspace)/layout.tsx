@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { ensureAppUser, getSessionUser } from "@/lib/auth/session";
-import { PasswordSetupRequiredError } from "@/lib/auth/session-errors";
+import { requireAppUserWithClient } from "@/lib/auth/session";
+import { AuthenticationRequiredError, PasswordSetupRequiredError } from "@/lib/auth/session-errors";
 import { AppShell } from "@/components/layout/app-shell";
 import { WorkspaceSessionBoundary } from "@/components/layout/workspace-session-boundary";
 
@@ -12,16 +12,11 @@ export default async function WorkspaceLayout({
 }: {
   children: ReactNode;
 }) {
-  const authUser = await getSessionUser();
-  if (!authUser) {
-    redirect("/login");
-  }
-  try {
-    await ensureAppUser(authUser);
-  } catch (error) {
+  const { user } = await requireAppUserWithClient().catch((error: unknown) => {
+    if (error instanceof AuthenticationRequiredError) redirect("/login");
     if (error instanceof PasswordSetupRequiredError) redirect("/reset-password?mode=setup");
     throw error;
-  }
+  });
 
-  return <WorkspaceSessionBoundary key={authUser.id} userId={authUser.id}><AppShell>{children}</AppShell></WorkspaceSessionBoundary>;
+  return <WorkspaceSessionBoundary key={user.id} userId={user.id}><AppShell>{children}</AppShell></WorkspaceSessionBoundary>;
 }

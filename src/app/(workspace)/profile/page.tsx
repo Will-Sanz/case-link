@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { PasswordSetupRequiredError } from "@/lib/auth/session-errors";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { CaseManagerProfileClient } from "@/features/profile/case-manager-profile-client";
+import { StaffInvitationForm } from "@/features/profile/staff-invitation-form";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function ProfilePage() {
       <Suspense fallback={<p className="mt-8 text-sm text-[var(--color-ink-muted)]">Loading settings…</p>}>
         <CaseManagerProfileClient profile={profile} />
       </Suspense>
+      {user.role === "admin" ? <StaffInvitationForm /> : null}
     </div>
   );
 }

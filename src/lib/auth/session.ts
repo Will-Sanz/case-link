@@ -1,4 +1,5 @@
 import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
+import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logServerError } from "@/lib/logger/server-error";
 import {
@@ -98,11 +99,12 @@ export async function ensureAppUser(supabaseUser: SupabaseUser): Promise<AppUser
 }
 
 export async function getAppUser(): Promise<AppUser | null> {
-  const authUser = await getSessionUser();
-  if (!authUser) {
-    return null;
+  try {
+    return (await requireAppUserWithClient()).user;
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) return null;
+    throw error;
   }
-  return ensureAppUser(authUser);
 }
 
 export async function requireAppUser(): Promise<AppUser> {
@@ -114,10 +116,10 @@ export async function requireAppUser(): Promise<AppUser> {
 }
 
 /** One Supabase client for auth + DB in the same request (required for reliable RLS JWT). */
-export async function requireAppUserWithClient(): Promise<{
+export const requireAppUserWithClient = cache(async (): Promise<{
   user: AppUser;
   supabase: SupabaseClient;
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user: authUser },
@@ -135,4 +137,4 @@ export async function requireAppUserWithClient(): Promise<{
   }
   const user = await ensureAppUserWithClient(supabase, authUser);
   return { user, supabase };
-}
+});

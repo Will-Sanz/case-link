@@ -31,7 +31,6 @@ async function main() {
   });
   const result = await inviteUser(supabase, { email, role, siteOrigin, actorLabel, reason, resend: resend === "true" });
   console.info(`${role === "admin" ? "Administrator" : "Case manager"} permissions saved. ${result.delivery === "none" ? "Existing confirmed account; no email sent. Use CASELINK_INVITE_RESEND=true if a fresh setup/recovery link is needed." : `${result.delivery === "invitation" ? "Invitation" : "Recovery email"} accepted for delivery.`}`);
-  if (role === "admin") console.info("Require TOTP enrollment before granting production access.");
 }
 
 main().catch((error: unknown) => {

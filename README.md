@@ -13,6 +13,8 @@ CaseLink helps school case managers create a family support plan, review it, and
 
 Returning staff can open the next action directly from Families. The full record PDF and family takeaway are available only to staff authorized to access that family. There are no family login accounts. The takeaway excludes internal context, action descriptions, progress notes, outcomes, and unselected actions; changing the selection clears its preview and sharing confirmation. It is a selected view of the reviewed plan, not another independently saved plan.
 
+Administrators can invite a case manager from **Settings → Invite a user**. Enter their email, then choose **Send invitation email** or **Create invite link** and copy it into a private message. The recipient opens the link, confirms password setup, chooses a password, and signs in. Invitations work once and expire after 15 minutes; create another if needed. Existing accounts use Sign in or Forgot password. Invitations cannot restore a deactivated account or change an administrator's permissions.
+
 The case manager decides what becomes official and handles any submission outside CaseLink. Blank-PDF upload, field detection, form filling, direct CitySpan integration, automatic submission, district analytics, and broader school operations are deferred.
 
 ## School demo and acceptance
@@ -31,7 +33,7 @@ The pilot supports a few staff at one school, with one dedicated deployment. Rea
 | PDF | Browser rendering with `@react-pdf/renderer`; finalization with `pdf-lib` |
 | Hosting target | Managed Vercel application and a dedicated Supabase project |
 
-Interactive requests use the signed-in user's database permissions. Privileged service credentials belong only to protected operator jobs. AI drafting, refinement, and the case assistant use family-scoped context and explicit human review. Generation is staged and persisted; failures must remain visible and retryable. There is no legacy rules fallback presented as an AI-generated plan.
+Interactive casework requests use the signed-in user's database permissions. Privileged service credentials belong only to protected operator jobs and the administrator-only invitation Edge Function; they never enter the Next.js deployment. The function independently verifies the caller's live password session and administrator permissions, provisions audited case-manager access, then issues the invitation. AI drafting, refinement, and the case assistant use family-scoped context and explicit human review. Generation is staged and persisted; failures must remain visible and retryable. There is no legacy rules fallback presented as an AI-generated plan.
 
 PDFs are generated from the reviewed plan in the browser. CaseLink does not accept PDF uploads or send PDF bytes to OpenAI. Downloaded files become the user's responsibility under school policy.
 

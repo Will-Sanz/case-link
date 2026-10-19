@@ -1,5 +1,24 @@
 import { test, expect, signIn, createFamily, accessible, activate, createPlan } from "./helpers";
 
+test("background family navigation fetches loading shells instead of complete family records", async ({ page, local }) => {
+  await signIn(page, await local.staff());
+  let capture!: (body: string) => void;
+  const prefetched = new Promise<string>(resolve => { capture = resolve; });
+  await page.route("**/families/*/profile?*", async route => {
+    if (route.request().headers()["next-router-prefetch"] !== "1") return route.continue();
+    const response = await route.fetch();
+    capture(await response.text());
+    await route.fulfill({ response });
+  });
+  const familyId = await createFamily(page);
+  const body = await prefetched;
+  expect(body).not.toContain("Family 014");
+  await page.getByRole("navigation", { name: "Family workspace", exact: true })
+    .getByRole("link", { name: "Family profile", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/families/${familyId}/profile$`));
+  await expect(page.getByRole("heading", { name: "Family 014", exact: true })).toBeVisible();
+});
+
 test("family tabs respond and keep the workspace available", async ({ page, local }, testInfo) => {
   await signIn(page, await local.staff());
   const familyId = await createFamily(page);

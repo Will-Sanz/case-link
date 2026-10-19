@@ -4,6 +4,11 @@
 # working directory name when running `supabase init`.
 project_id = "caselink"
 
+[functions.invite-staff]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/invite-staff/index.js"
+
 [api]
 enabled = true
 # Port to use for the API URL.
@@ -393,7 +398,7 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
 [edge_runtime]
-enabled = false
+enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
 # `per_worker` (default) — enables hot reload during local development.
 # `oneshot` — fallback mode if hot reload causes issues (e.g. in large repos or with symlinks).
