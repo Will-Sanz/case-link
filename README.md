@@ -48,7 +48,7 @@ Use a supported, patched Node 24.x release (`.nvmrc`), matching CI and hosting, 
 - `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase; requires Playwright Chromium and Poppler.
 - `npm run test:pdf`: extracted source-content and rendered PDF placement/monochrome checks; requires Python and Poppler.
 - `npm run verify:release -- <exact-commit-SHA>`: confirm required trusted repository checks for that commit; this does not deploy or replace hosted/school approval.
-- `npm run test:ai-contracts -- --live`: opt-in provider format check with eight small synthetic requests. Supply an operator test-project `OPENAI_API_KEY` through the environment; it is excluded from normal CI and prints only pass/fail metadata.
+- `npm run test:ai-contracts -- --live`: opt-in provider format checks across the allowed models using small synthetic requests. Supply an operator test-project `OPENAI_API_KEY` through the environment; it is excluded from normal CI and prints only pass/fail metadata.
 
 Local Supabase uses Docker to isolate synthetic development/test data. Docker is a local testing tool; staff do not install it, and this does not select production hosting. See the [operations runbook](docs/production-operations-runbook.md) for environment separation and required hosted rehearsals.
 

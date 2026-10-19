@@ -1413,7 +1413,7 @@ export function FamilyPlanPanel({
         </div>
         <div className="mt-4 shrink-0 sm:mt-0">
           {reviewStatus.state === "reviewed" ? (
-            <Link
+            <Link prefetch={false}
               href={`/families/${familyId}/paperwork`}
               className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-focus)]/25"
             >

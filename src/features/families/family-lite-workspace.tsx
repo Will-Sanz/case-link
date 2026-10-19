@@ -561,7 +561,7 @@ export function FamilyLiteWorkspace({
       ) : null}
 
       {tab === "plan" && hasPreviousReviewedPlan ? (
-        <Link href={`/families/${familyId}/plan/previous`} className="inline-block rounded-lg border border-[var(--color-rule)] px-4 py-3 text-sm underline">
+        <Link prefetch={false} href={`/families/${familyId}/plan/previous`} className="inline-block rounded-lg border border-[var(--color-rule)] px-4 py-3 text-sm underline">
           View previous reviewed plan
         </Link>
       ) : null}

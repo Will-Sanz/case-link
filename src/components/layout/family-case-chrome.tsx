@@ -29,7 +29,7 @@ function NavigationFeedback({ label }: { label: string }) {
 
 function WorkspaceLink({ href, label, icon: Icon, active }: { href: string; label: string; icon: typeof UsersRound; active: boolean }) {
   return (
-    <Link href={href} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-10 items-center gap-3 whitespace-nowrap rounded-lg py-2 pl-3 pr-6 text-sm font-medium transition-colors duration-[var(--dur-short)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2", active ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)]")}>
+    <Link prefetch={false} href={href} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-10 items-center gap-3 whitespace-nowrap rounded-lg py-2 pl-3 pr-6 text-sm font-medium transition-colors duration-[var(--dur-short)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2", active ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)]")}>
       <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
       {label}
       <NavigationFeedback label={label} />
@@ -51,7 +51,7 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
     <div className="workspace-shell flex min-h-dvh items-start">
       <a href="#main-content" className="sr-only z-[100] rounded-lg bg-[var(--color-surface)] px-4 py-3 font-semibold text-[var(--color-accent)] shadow-[var(--shadow-menu)] focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to main content</a>
       <aside className="sticky top-0 hidden h-dvh w-[244px] shrink-0 flex-col border-r border-[var(--color-rule)] bg-[var(--color-surface)] lg:flex">
-        <Link href="/families" className="flex h-[76px] items-center border-b border-[var(--color-rule-soft)] px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)]/30">
+        <Link prefetch={false} href="/families" className="flex h-[76px] items-center border-b border-[var(--color-rule-soft)] px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)]/30">
           <CaseLinkWordmark />
         </Link>
         <nav className="space-y-1 p-3" aria-label="Workspace">
@@ -74,7 +74,7 @@ export function FamilyCaseChrome({ children }: { children: ReactNode }) {
 
       <div className="flex h-dvh max-h-dvh min-w-0 flex-1 flex-col overflow-hidden">
         <header className="z-20 flex h-[76px] shrink-0 items-center justify-between border-b border-[var(--color-rule)] bg-[var(--color-surface)] px-5 lg:hidden">
-          <Link href="/families" className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"><CaseLinkWordmark /></Link>
+          <Link prefetch={false} href="/families" className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"><CaseLinkWordmark /></Link>
           <details key={pathname} className="group relative">
             <summary className="grid size-10 cursor-pointer list-none place-items-center rounded-lg border border-[var(--color-rule)] text-[var(--color-ink-2)] transition-colors hover:bg-[var(--color-paper-2)] [&::-webkit-details-marker]:hidden"><Menu className="size-5 group-open:hidden" aria-hidden /><PanelLeftClose className="hidden size-5 group-open:block" aria-hidden /><span className="sr-only">Open navigation</span></summary>
             <nav className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] p-2 [box-shadow:var(--shadow-menu)]" aria-label="Mobile workspace">

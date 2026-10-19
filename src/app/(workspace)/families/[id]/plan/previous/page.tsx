@@ -15,7 +15,7 @@ export default async function PreviousPlanPage({ params }: { params: Promise<{ i
   const plan = data as PlanWithSteps;
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-8">
-      <Link href={`/families/${id}/plan`} className="text-sm underline">Back to current draft</Link>
+      <Link prefetch={false} href={`/families/${id}/plan`} className="text-sm underline">Back to current draft</Link>
       <header>
         <h1 className="text-2xl font-semibold">Previous reviewed plan · Version {plan.version}</h1>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">

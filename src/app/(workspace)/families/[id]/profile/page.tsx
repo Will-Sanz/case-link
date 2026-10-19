@@ -25,11 +25,11 @@ export default async function FamilyProfilePage({ params }: PageProps) {
     <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
       <header className="flex flex-col gap-5 border-b border-[var(--color-rule)] pb-7 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Link href="/families" className="text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-accent)]">Families</Link>
+          <Link prefetch={false} href="/families" className="text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-accent)]">Families</Link>
           <h1 className="workspace-display mt-3 text-3xl text-[var(--color-ink)] sm:text-4xl">{family.name}</h1>
           <p className="mt-2 text-sm text-[var(--color-ink-faint)]">Family profile · Updated {new Date(family.updated_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
         </div>
-        <Link href={`/families/${family.id}/overview`} className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] transition-colors hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 focus-visible:ring-offset-2 active:bg-[var(--color-accent)]">
+        <Link prefetch={false} href={`/families/${family.id}/overview`} className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] transition-colors hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 focus-visible:ring-offset-2 active:bg-[var(--color-accent)]">
           Review barriers <ArrowRight className="size-4" aria-hidden />
         </Link>
       </header>
