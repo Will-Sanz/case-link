@@ -41,7 +41,7 @@ async function deliveredMail(email: string, subject: string) {
   throw new Error("The expected synthetic account email was not delivered.");
 }
 async function deliveredToken(email: string, type: "invite" | "recovery") {
-  const html = await deliveredMail(email, type === "invite" ? "You're invited to CaseLink" : "Reset your password — CaseLink");
+  const html = await deliveredMail(email, type === "invite" ? "You've been invited to CaseLink" : "Reset your password — CaseLink");
   for (const link of html.matchAll(/href="([^"]+)"/g)) {
     const url = new URL(link[1].replaceAll("&amp;", "&"));
     const fragment = new URLSearchParams(url.hash.slice(1));

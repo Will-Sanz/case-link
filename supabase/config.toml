@@ -248,7 +248,7 @@ otp_expiry = 900
 # sender_name = "Admin"
 
 [auth.email.template.invite]
-subject = "You're invited to CaseLink"
+subject = "You've been invited to CaseLink"
 content_path = "./supabase/email-templates/invite.html"
 
 [auth.email.template.recovery]

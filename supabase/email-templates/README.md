@@ -1,6 +1,6 @@
 # CaseLink — Supabase Email Templates
 
-Branded HTML templates for Supabase Auth emails. These match the CaseLink website design (teal accent, slate text, clean card layout).
+HTML templates for Supabase Auth emails. The invitation uses CaseLink's current violet action, navy text, lavender background, and serif wordmark with email-safe font fallbacks. Its body contains only the invitation heading and acceptance button. Other templates retain their existing styling.
 
 ## Two different password emails
 
@@ -31,7 +31,7 @@ Set hosted email OTP expiry to **900 seconds (15 minutes)**. Retain the hosted s
 | Supabase Template           | File                                  | Suggested subject line              |
 |-----------------------------|---------------------------------------|-------------------------------------|
 | Confirm signup              | `confirmation.html`                   | Confirm your email — CaseLink       |
-| Invite user                 | `invite.html`                         | You're invited to CaseLink          |
+| Invite user                 | `invite.html`                         | You've been invited to CaseLink     |
 | Magic Link                  | `magic_link.html`                     | Sign in — CaseLink                  |
 | Change Email Address        | `email_change.html`                   | Confirm email change — CaseLink     |
 | Reset Password              | `recovery.html`                       | Reset your password — CaseLink      |

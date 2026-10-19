@@ -5,7 +5,7 @@ const config = readFileSync("supabase/config.toml", "utf8");
 it.each([["invite", "setup"], ["recovery", "recovery"]])("%s emails use the canonical confirmation screen without a token in the request URL", (type, mode) => {
   const html = readFileSync(`supabase/email-templates/${type}.html`, "utf8");
   expect(config).toContain(`content_path = "./supabase/email-templates/${type}.html"`);
-  expect(html).toContain("15 minutes");
+  if (type === "recovery") expect(html).toContain("15 minutes");
   expect(config).toContain("otp_expiry = 900");
   expect(html).not.toContain(".ConfirmationURL");
   const rendered = html.replaceAll("{{ .SiteURL }}", "https://school.example").replaceAll("{{ .TokenHash }}", "synthetic-token");
