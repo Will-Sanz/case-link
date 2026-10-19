@@ -13,9 +13,16 @@ CaseLink helps school case managers create a family support plan, review it, and
 
 Returning staff can open the next action directly from Families. The full record PDF and family takeaway are available only to staff authorized to access that family. There are no family login accounts. The takeaway excludes internal context, action descriptions, progress notes, outcomes, and unselected actions; changing the selection clears its preview and sharing confirmation. It is a selected view of the reviewed plan, not another independently saved plan.
 
-Administrators can invite a case manager from **Settings → Invite a user**. Enter their email, then choose **Send invitation email** or **Create invite link** and copy it into a private message. The recipient opens the link, confirms password setup, chooses a password, and signs in. Invitations work once and expire after 15 minutes; create another if needed. Existing accounts use Sign in or Forgot password. Invitations cannot restore a deactivated account or change an administrator's permissions.
-
 The case manager decides what becomes official and handles any submission outside CaseLink. Blank-PDF upload, field detection, form filling, direct CitySpan integration, automatic submission, district analytics, and broader school operations are deferred.
+
+## Invite a new user
+
+1. Sign in as an administrator and open **Settings**.
+2. Under **Invite a user**, enter the person's email address.
+3. Choose **Send invitation email**. For a link you can share yourself, choose **Create invite link → Copy link** and send it privately.
+4. The recipient opens the link, chooses **Continue to password setup**, sets a password, and signs in.
+
+Invitations grant case-manager access, work once, and expire after 15 minutes. Create a fresh invitation if it expires. Existing accounts use **Sign in** or **Forgot password**. Invitations cannot restore a deactivated account or change an administrator's permissions.
 
 ## School demo and acceptance
 
