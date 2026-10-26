@@ -1,0 +1,29 @@
+{
+  "recordedAt": "2026-10-26T21:18:15.336Z",
+  "syntheticOnly": true,
+  "providerReplay": true,
+  "liveCompass": false,
+  "checks": 120,
+  "cleanupPassed": true,
+  "serviceContexts": 3,
+  "completedChecks": 1,
+  "cancelledContexts": 1,
+  "expiredContexts": 1,
+  "protectedScreenshots": 0,
+  "householdInputs": 0,
+  "modelCalls": 0,
+  "accessibility": [
+    {
+      "state": "desktop-challenge",
+      "violations": []
+    },
+    {
+      "state": "mobile-challenge",
+      "violations": []
+    },
+    {
+      "state": "mobile-completed",
+      "violations": []
+    }
+  ]
+}
