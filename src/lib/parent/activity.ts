@@ -8,14 +8,17 @@ export async function listRequestOperations(requestId: string) {
   const { data, error } = await supabase
     .from("parent_operations")
     .select(
-      "id,request_id,request_version,program_id,action,packet_hash,state,evidence,created_at,executed_at,artifact_id",
+      "id,request_id,request_version,need,program_id,action,packet_hash,state,evidence,created_at,executed_at,artifact_id",
     )
     .eq("request_id", uuid.parse(requestId))
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(101);
   if (error)
     throw new Error("The activity could not be loaded. Please try again.");
-  return data ?? [];
+  return {
+    operations: (data ?? []).slice(0, 100),
+    historyLimited: (data?.length ?? 0) > 100,
+  };
 }
 export async function getExactOperation(
   requestId: string,

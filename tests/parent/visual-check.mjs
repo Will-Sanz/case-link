@@ -34,6 +34,18 @@ const request = fixtureRequest({
   ],
   documents: [],
 });
+const snapIntake = fixtureIntake({ needs: ["snap_new"], urgency: "soon" });
+const snapMandate = fixtureMandate({
+  recipientIds: ["snap-pa", "uesf-benefits"],
+});
+const snapRequest = fixtureRequest({
+  intake: snapIntake,
+  mandate: snapMandate,
+  plan: buildSupportPlan(snapIntake, snapMandate, fixtureNow),
+  required_actions: requiredActions(snapIntake, snapMandate),
+  events: [],
+  documents: [],
+});
 const progress = {
   state: "service_offline",
   summary:
@@ -57,6 +69,7 @@ try {
       reducedMotion: "reduce",
     });
     const page = await context.newPage();
+    let currentRequest = request;
     await page.route("**/api/parent/**", async (route) => {
       const url = new URL(route.request().url());
       const body = url.pathname.endsWith("/authorization-window")
@@ -111,39 +124,47 @@ try {
                   },
                 ],
               }
-            : url.pathname.endsWith("/assistant")
+            : url.pathname.endsWith("/browser")
               ? {
                   ok: true,
-                  messages: [],
                   available: false,
-                  unavailableReason:
-                    "The assistant is not currently connected. Your recorded progress and direct program options remain available.",
-                  historyLimited: false,
+                  reason:
+                    "The synthetic browser fixture has no application connection. No application is being filled or submitted.",
+                  session: null,
                 }
-              : url.pathname.endsWith("/capabilities")
-                ? { ok: true, capabilities: [] }
-                : url.pathname.endsWith("/operations")
-                  ? { ok: true, operations: [] }
-                  : url.pathname.endsWith("/account")
-                    ? {
-                        ok: true,
-                        account: {
-                          email: "family@example.test",
-                          preferences: {
-                            contactPreference: "in_app",
-                            language: "en",
-                            quietHoursStart: 19,
-                            quietHoursEnd: 9,
-                          },
-                        },
-                      }
-                    : url.pathname.endsWith("/requests")
+              : url.pathname.endsWith("/assistant")
+                ? {
+                    ok: true,
+                    messages: [],
+                    available: false,
+                    unavailableReason:
+                      "The assistant is not currently connected. Your recorded progress and direct program options remain available.",
+                    historyLimited: false,
+                  }
+                : url.pathname.endsWith("/capabilities")
+                  ? { ok: true, capabilities: [] }
+                  : url.pathname.endsWith("/operations")
+                    ? { ok: true, operations: [], historyLimited: false }
+                    : url.pathname.endsWith("/account")
                       ? {
                           ok: true,
-                          requests: [request],
-                          progress: { [request.id]: progress },
+                          account: {
+                            email: "family@example.test",
+                            preferences: {
+                              contactPreference: "in_app",
+                              language: "en",
+                              quietHoursStart: 19,
+                              quietHoursEnd: 9,
+                            },
+                          },
                         }
-                      : { ok: true, request, progress };
+                      : url.pathname.endsWith("/requests")
+                        ? {
+                            ok: true,
+                            requests: [currentRequest],
+                            progress: { [request.id]: progress },
+                          }
+                        : { ok: true, request: currentRequest, progress };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -156,6 +177,7 @@ try {
       ["permission", "/get-support?need=food"],
       ["support", "/my-support"],
       ["detail", `/support/${request.id}`],
+      ["snap-detail", `/support/${request.id}`],
       ["account", "/account"],
       ["signin", "/sign-in"],
       ["product", "/product"],
@@ -164,10 +186,14 @@ try {
       ["terms", "/support/terms"],
     ]) {
       if (name === "wide" && label !== "home") continue;
+      if (process.argv.includes("--snap-only") && label !== "snap-detail")
+        continue;
+      currentRequest = label === "snap-detail" ? snapRequest : request;
       await page.goto(origin + path, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
       if (label === "permission") {
-        await page.getByLabel("Apply for SNAP", { exact: true }).check();
+        await page.getByRole("checkbox", { name: /Food for now/ }).check();
+        await page.getByRole("checkbox", { name: /Apply for SNAP/ }).check();
         await page
           .getByRole("button", { name: "Continue", exact: true })
           .click();
@@ -287,6 +313,50 @@ try {
           nodes: v.nodes.map((n) => n.target),
         })),
       });
+      if (label === "detail") {
+        await page
+          .getByRole("button", { name: "Ask CaseLink for assistance" })
+          .click();
+        const chat = page.getByRole("dialog", {
+          name: "Ask CaseLink",
+          exact: true,
+        });
+        await chat
+          .getByText(
+            "The assistant is not currently connected. Your recorded progress and direct program options remain available.",
+            { exact: true },
+          )
+          .waitFor();
+        const bounds = await chat.boundingBox();
+        assert.ok(
+          bounds &&
+            bounds.x >= 0 &&
+            bounds.y >= 0 &&
+            bounds.x + bounds.width <= width + 1 &&
+            bounds.y + bounds.height <= height + 1,
+          "Chat must fit the actual viewport at every responsive width.",
+        );
+        await chat.screenshot({
+          path: `tmp/parent-verification/${name}-chat.png`,
+        });
+        const chatAxe = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+          .analyze();
+        results.push({
+          viewport: name,
+          state: "chat",
+          path,
+          overflow: await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth,
+          ),
+          violations: chatAxe.violations.map((v) => ({
+            id: v.id,
+            impact: v.impact,
+            nodes: v.nodes.map((n) => n.target),
+          })),
+        });
+        await chat.getByRole("button", { name: "Minimize chat" }).click();
+      }
     }
     await context.close();
   }

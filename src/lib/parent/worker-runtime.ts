@@ -675,6 +675,28 @@ export async function runOneParentJob(
             );
           },
         },
+        readiness: {
+          requiredFields: (operation.form?.missingFields ?? []).map(
+            (field) => ({
+              field,
+              label: field,
+              present: false,
+              source: "unverified" as const,
+              verifiedAt: null,
+              validUntil: null,
+              conflicted: false,
+            }),
+          ),
+          formVerified:
+            operation.action === "follow_up" ||
+            !capability.requiresForm ||
+            Boolean(
+              operation.form?.validated &&
+              operation.form.artifactId &&
+              operation.form.contentSha256 &&
+              !operation.form.missingFields.length,
+            ),
+        },
         transport: transport
           ? {
               execute: async (frozen) => {

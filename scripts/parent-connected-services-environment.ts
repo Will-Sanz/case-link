@@ -16,10 +16,11 @@ export const connectedServicesSchema = z
 export type ConnectedServices = z.infer<typeof connectedServicesSchema>;
 
 export function connectedServiceEnvironment(
-  service: "worker" | "broker" | "retention",
+  service: "worker" | "broker" | "retention" | "browser",
   config: ConnectedServices,
   approval: Record<string, string | undefined>,
   system: Record<string, string | undefined> = process.env,
+  browserPublicKey?: string,
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...Object.fromEntries(
@@ -50,7 +51,8 @@ export function connectedServiceEnvironment(
       "Connected private services cannot run in a hosted deployment.",
     );
   const brokerOrigin = "http://127.0.0.1:3310";
-  const databaseUrl = config[`${service}DatabaseUrl`];
+  const databaseUrl =
+    config[`${service === "browser" ? "worker" : service}DatabaseUrl`];
   if (
     !connectedParentServiceAllowed(
       env,
@@ -86,6 +88,12 @@ export function connectedServiceEnvironment(
       CASELINK_PARENT_RETENTION_DATABASE_URL: databaseUrl,
       CASELINK_PARENT_RETENTION_SUPABASE_URL: config.projectUrl,
       CASELINK_PARENT_RETENTION_STORAGE_KEY: config.storageKey,
+    });
+  if (service === "browser")
+    Object.assign(env, {
+      CASELINK_PARENT_BROWSER_SUPABASE_URL: config.projectUrl,
+      CASELINK_PARENT_BROWSER_PUBLIC_KEY: browserPublicKey,
+      CASELINK_PARENT_BROWSER_APPROVED_UNTIL: config.approvedUntil,
     });
   return env;
 }

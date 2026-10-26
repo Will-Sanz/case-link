@@ -5,28 +5,37 @@ import {
   OUTCOME_LABELS,
   type SupportRequest,
   type OutcomeState,
+  type SupportNeed,
 } from "@/lib/parent/domain";
 import { getProgram } from "@/lib/parent/programs";
 import { parentApi, displayDate } from "./api";
-import { useParentResource } from "./use-parent-resource";
 import styles from "./parent.module.css";
-type RecordedOperation = {
+export type RecordedOperation = {
   id: string;
   program_id: string;
   state: string;
   created_at: string;
   artifact_id?: string | null;
+  request_version?: number;
+  need?: SupportNeed | null;
+  action?: string;
+};
+export type OperationHistory = {
+  data: { operations: RecordedOperation[]; historyLimited: boolean } | null;
+  loading: boolean;
+  error: Error | null;
+  reload: () => void;
 };
 export function SupportActivity({
   request,
   onChange,
+  history,
 }: {
   request: SupportRequest;
   onChange: () => void;
+  history: OperationHistory;
 }) {
-  const { data, error, reload } = useParentResource<{
-    operations: RecordedOperation[];
-  }>(`/requests/${request.id}/operations`);
+  const { data, error, reload } = history;
   const [need, setNeed] = useState(request.intake.needs[0]),
     [outcome, setOutcome] = useState("support_received"),
     [reference, setReference] = useState("");
@@ -97,6 +106,16 @@ export function SupportActivity({
               </li>
             ))}
           </ul>
+          {data.historyLimited && (
+            <p className={`${styles.hint} ${styles.space}`}>
+              Showing the latest 100 recorded operations. Earlier submissions or
+              uncertain deliveries may not appear here.{" "}
+              <a className={styles.textLink} href="/api/parent/account/export">
+                Download your retained information
+              </a>{" "}
+              to review earlier history before starting another application.
+            </p>
+          )}
         </section>
       )}
       {error && (

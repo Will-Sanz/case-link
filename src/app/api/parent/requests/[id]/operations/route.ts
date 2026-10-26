@@ -14,7 +14,7 @@ export async function GET(
       );
     return parentJson({
       ok: true,
-      operations: await listRequestOperations(id),
+      ...(await listRequestOperations(id)),
     });
   } catch (error) {
     return parentError(error);

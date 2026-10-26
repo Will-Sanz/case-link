@@ -66,6 +66,7 @@ async function main() {
       "Your support, in one place.",
       ...NEEDS.map((need) => NEED_LABELS[need]),
       "Preparation only",
+      "Guidance ready",
       "not an agency application",
       "Parent reported outcome:",
       "SYNTHETIC-OUTCOME-456",

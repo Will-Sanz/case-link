@@ -4,6 +4,8 @@ import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
 import { ChatGptFuturesBanner } from "@/components/brand/chatgpt-futures-banner";
 import styles from "./parent.module.css";
 import { ParentNavigation } from "./parent-navigation";
+import { FloatingAssistant } from "./floating-assistant";
+import chatStyles from "./floating-assistant.module.css";
 
 export function ParentShell({
   children,
@@ -13,7 +15,7 @@ export function ParentShell({
   signedIn?: boolean;
 }) {
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${chatStyles.shell}`}>
       <a className={styles.skip} href="#main-content">
         Skip to content
       </a>
@@ -47,6 +49,7 @@ export function ParentShell({
           </nav>
         </div>
       </footer>
+      <FloatingAssistant signedIn={signedIn} />
     </div>
   );
 }

@@ -41,7 +41,12 @@ const fixture = (): SupportRequest => ({
 const response = (request: SupportRequest) => ({
   ok: true,
   status: 200,
-  json: async () => ({ ok: true, request }),
+  json: async () => ({
+    ok: true,
+    request,
+    operations: [],
+    historyLimited: false,
+  }),
 });
 afterEach(() => {
   cleanup();
@@ -49,6 +54,108 @@ afterEach(() => {
 });
 
 describe("support detail", () => {
+  it("does not ask for completion while paused and keeps resume and permission controls", async () => {
+    const request = fixture();
+    request.status = "paused";
+    request.required_actions = [
+      {
+        id: "need-zip",
+        need: "electricity",
+        reason: "missing_fact",
+        resolver: "parent",
+        field: "zip",
+        title: "Confirm the ZIP for this account",
+        explanation: "A required routing fact.",
+      },
+    ];
+    const fetch = vi.fn().mockResolvedValue(response(request));
+    vi.stubGlobal("fetch", fetch);
+    render(<SupportDetail requestId={requestId} />);
+    expect(
+      await screen.findByText(
+        "No new personal steps are requested while this request is paused or finished.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Confirm the ZIP for this account",
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Save and continue" }),
+    ).toBeNull();
+    expect(screen.queryByText("Add a document or take a photo")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Change or renew permission" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Resume support" }));
+    await waitFor(() =>
+      expect(fetch.mock.calls.some((call) => call[1]?.method === "POST")).toBe(
+        true,
+      ),
+    );
+    expect(
+      JSON.parse(
+        fetch.mock.calls.find((call) => call[1]?.method === "POST")![1].body,
+      ),
+    ).toEqual({ action: "resume" });
+  });
+  it.each([
+    { need: "electricity", version: 1, label: "Application prepared" },
+    { need: "gas", version: 1, label: "Guidance ready" },
+    { need: "electricity", version: 0, label: "Guidance ready" },
+  ])(
+    "only shows a form prepared for the exact current need ($need, version $version)",
+    async ({ need, version, label }) => {
+      const request = fixture();
+      request.plan = buildSupportPlan(
+        request.intake,
+        request.mandate,
+        new Date(request.created_at),
+      );
+      request.plan.routes[0].state = "prepared";
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) =>
+          url.endsWith("/operations")
+            ? {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                  ok: true,
+                  historyLimited: false,
+                  operations: [
+                    {
+                      id: "form-operation",
+                      program_id: request.plan!.routes[0].programId,
+                      need,
+                      request_version: version,
+                      state: "prepared",
+                      created_at: request.created_at,
+                      artifact_id: "form-id",
+                    },
+                  ],
+                }),
+              }
+            : response(request),
+        ),
+      );
+      render(<SupportDetail requestId={requestId} />);
+      const article = (
+        await screen.findByRole("heading", { name: /^Electric bill$/ })
+      ).closest("article")!;
+      await waitFor(() =>
+        expect(within(article).getByText(label)).toBeTruthy(),
+      );
+      if (label !== "Application prepared")
+        expect(within(article).queryByText("Application prepared")).toBeNull();
+      expect(
+        await screen.findByRole("link", {
+          name: "Download this prepared form",
+        }),
+      ).toBeTruthy();
+    },
+  );
   it.each([
     "snap_new",
     "snap_renewal",
@@ -83,9 +190,14 @@ describe("support detail", () => {
             .getByRole("link", { name: "Official program & direct access" })
             .getAttribute("href"),
         ).toBe(getProgram("snap-pa")!.officialUrl);
-      const shortcut = screen.queryByRole("link", {
-        name: "Start a new SNAP application with DHS",
-      });
+      const shortcut =
+        need === "snap_new"
+          ? await screen.findByRole("link", {
+              name: "Start a new SNAP application with DHS",
+            })
+          : screen.queryByRole("link", {
+              name: "Start a new SNAP application with DHS",
+            });
       expect(shortcut?.getAttribute("href") ?? null).toBe(
         need === "snap_new" ? SNAP_NEW_APPLICATION_URL : null,
       );
@@ -461,7 +573,7 @@ describe("support detail", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
     render(<SupportDetail requestId={requestId} />);
     expect(
-      await screen.findByText("CaseLink is handling a service step"),
+      await screen.findByText("A CaseLink service step is unresolved"),
     ).toBeTruthy();
     expect(screen.getByText("Parent reported")).toBeTruthy();
     expect(

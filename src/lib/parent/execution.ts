@@ -1,11 +1,11 @@
 import type { SupportRequest } from "./domain";
 import type { z } from "zod";
 import {
-  authorizeOperation,
   receiptSchema,
   type ProposedOperation,
   type ProviderCapability,
 } from "./policy";
+import { applicationReadiness } from "./application-readiness";
 
 export type ExecutablePacket = {
   operationId: string;
@@ -39,20 +39,34 @@ export async function executeSupportOperation(input: {
   revoked: boolean;
   documentsValid: boolean;
   statusReferences?: readonly string[];
+  readiness: Pick<
+    Parameters<typeof applicationReadiness>[0],
+    "requiredFields" | "formVerified" | "modelJudgmentUsed" | "calibration"
+  >;
 }): Promise<{
   state: string;
   reason?: string;
   receipt?: z.infer<typeof receiptSchema>;
 }> {
-  const decision = authorizeOperation(input);
-  if (!decision.allowed) return { state: "blocked", reason: decision.reason };
-  if (!input.transport)
-    return { state: "blocked", reason: "transport_not_configured" };
+  const readiness = applicationReadiness({
+    authority: input,
+    ...input.readiness,
+    transportReady: Boolean(input.transport),
+  });
+  if (!readiness.automaticHandlingAllowed)
+    return {
+      state: "blocked",
+      reason:
+        readiness.authorityDeniedReason ??
+        (!input.transport
+          ? "transport_not_configured"
+          : "application_evidence_requires_resolution"),
+    };
   const operationId = await input.store.prepare(input.operation);
   const frozen = await input.store.begin(operationId);
   try {
     const receipt = receiptSchema.parse(
-      await input.transport.execute({
+      await input.transport!.execute({
         ...frozen,
         idempotencyKey: input.operation.idempotencyKey,
         signal: AbortSignal.timeout(60000),

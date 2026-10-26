@@ -11,6 +11,7 @@ import { displayDate, parentApi } from "./api";
 import { ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import styles from "./parent.module.css";
+import chatStyles from "./floating-assistant.module.css";
 
 const suggestions = [
   "What’s happening with my request?",
@@ -18,7 +19,17 @@ const suggestions = [
   "Has an application been sent?",
 ];
 
-export function SupportAssistant({ request }: { request: SupportRequest }) {
+export function SupportAssistant({
+  request,
+  onAction,
+  onAnswer,
+  onRefresh,
+}: {
+  request: SupportRequest;
+  onAction?: () => void;
+  onAnswer?: () => void;
+  onRefresh?: () => void;
+}) {
   const path = `/requests/${request.id}/assistant`;
   const { data, error, loading, reload } =
     useParentResource<ParentAssistantConversation>(path);
@@ -34,6 +45,14 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
   const conversation = useRef<HTMLOListElement>(null);
   const followLatest = useRef(true);
   const latestMessage = data?.messages?.at(-1);
+  useEffect(() => {
+    if (latestMessage?.status === "answered") onAnswer?.();
+  }, [
+    latestMessage?.id,
+    latestMessage?.status,
+    latestMessage?.updated_at,
+    onAnswer,
+  ]);
   useEffect(() => {
     const list = conversation.current;
     if (list && followLatest.current)
@@ -115,27 +134,29 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
   }
   return (
     <section
-      className={`${styles.surface} ${styles.assistant} ${styles.hidePrint}`}
-      aria-labelledby="assistant-title"
+      className={chatStyles.assistant}
+      aria-label="Ask about your saved request"
     >
       <div className={styles.between}>
-        <h2 id="assistant-title" className={styles.inline}>
+        <h2 className={chatStyles.sectionTitle}>
           <ChatBubble width={22} height={22} aria-hidden="true" />
-          Ask CaseLink
+          Your conversation
         </h2>
         <button
           className={styles.quiet}
-          onClick={reload}
+          onClick={() => {
+            reload();
+            onRefresh?.();
+          }}
           aria-label="Refresh assistant conversation"
         >
           <Refresh width={16} height={16} aria-hidden="true" />
           Refresh
         </button>
       </div>
-      <p className={styles.assistantIntro}>
-        Ask about this family’s saved request, program progress or next steps.
-        Answers use your request’s recorded information and verified program
-        sources. Questions do not submit applications or change your answers.
+      <p className={chatStyles.intro}>
+        Ask about your progress or next step. Chat does not submit applications
+        or change your answers.
       </p>
       {loading && (
         <p role="status" className={styles.hint}>
@@ -163,7 +184,7 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
       {!!data?.messages?.length && (
         <ol
           ref={conversation}
-          className={styles.conversation}
+          className={`${styles.conversation} ${chatStyles.conversation}`}
           aria-label="Conversation about this request"
           tabIndex={0}
           onScroll={(event) => {
@@ -214,7 +235,7 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
                     {message.answer.actionIds.map((id) => {
                       const action = request.required_actions.find(
                         (item) =>
-                          ["active", "paused"].includes(request.status) &&
+                          request.status === "active" &&
                           item.id === id &&
                           !item.resolved &&
                           (!item.resolver || item.resolver === "parent"),
@@ -223,7 +244,8 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
                         <a
                           key={id}
                           className={styles.textLink}
-                          href={`#step-${encodeURIComponent(id)}`}
+                          href={`/support/${request.id}#step-${encodeURIComponent(id)}`}
+                          onClick={onAction}
                         >
                           Go to your step: {action.title}
                         </a>
@@ -273,7 +295,7 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
           includes retained earlier messages.
         </p>
       )}
-      <form className={styles.assistantForm} onSubmit={submit}>
+      <form className={chatStyles.form} onSubmit={submit}>
         {!data?.messages?.length && (
           <div className={styles.suggestions} aria-label="Question suggestions">
             {suggestions.map((suggestion) => (
@@ -299,7 +321,8 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
           <textarea
             id="assistant-question"
             ref={questionField}
-            className={styles.textarea}
+            className={`${styles.textarea} ${chatStyles.composer}`}
+            rows={2}
             required
             maxLength={2000}
             value={question}
@@ -311,9 +334,9 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
             disabled={pending}
           />
           <p id="assistant-privacy" className={styles.hint}>
-            Keep names, Social Security numbers, birth dates, addresses, account
-            numbers, passwords, codes and PINs out of chat. Enter required
-            identity details directly with the official program.
+            Keep identity details, account numbers, passwords and PINs out of
+            chat. Required identity information belongs in a protected
+            application field.
           </p>
         </div>
         <label className={styles.checkbox}>
@@ -323,8 +346,8 @@ export function SupportAssistant({ request }: { request: SupportRequest }) {
             onChange={(event) => setConsented(event.target.checked)}
           />
           <span>
-            I agree to send my question and the minimum relevant saved request
-            information to OpenAI to answer this question.
+            Use my question and relevant saved request details with OpenAI to
+            answer.
           </span>
         </label>
         <div className={styles.between}>

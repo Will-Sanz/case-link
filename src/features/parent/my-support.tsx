@@ -23,7 +23,7 @@ export function requestStatus(request: SupportRequest): string {
     return "A step needs you";
   if (request.required_actions.some((action) => !action.resolved))
     return "Waiting on a service step";
-  return request.plan ? "Preparation saved" : "Request saved";
+  return request.plan ? "Guidance ready" : "Request saved";
 }
 
 export function MySupport() {
@@ -77,7 +77,7 @@ export function MySupport() {
                 <p>
                   {data.progress?.[request.id]?.summary ??
                     request.plan?.summary ??
-                    "Your request is saved. Preparation and any required next steps will appear here."}
+                    "Your request is saved. Application progress and your next step will appear here."}
                 </p>
                 <div className={styles.requestMeta}>
                   <span className={styles.inline}>
@@ -117,10 +117,10 @@ export function MySupport() {
       <div className={`${styles.trustLine} ${styles.space}`}>
         <Clock width={22} height={22} aria-hidden="true" />
         <div>
-          <strong>Know what’s happening.</strong>Each request shows whether work
-          is running, waiting or needs you. Signing out protects this device; it
-          doesn’t cancel your permission. A saved request is different from an
-          application sent to a program.
+          <strong>Know what’s happening.</strong> Each request shows whether
+          work is running, waiting or needs you. Signing out protects this
+          device; it doesn’t cancel your permission. A saved request is
+          different from an application sent to a program.
         </div>
       </div>
     </div>

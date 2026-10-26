@@ -1,0 +1,208 @@
+/* The assistant stays secondary to the application; closed chat reserves a clear footer lane. */
+.shell {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+.launcher {
+  position: fixed;
+  z-index: 40;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  right: max(1rem, env(safe-area-inset-right));
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  box-shadow: var(--shadow-action);
+  cursor: pointer;
+}
+.launcher:hover {
+  background: var(--color-accent-hover);
+}
+.window {
+  position: fixed;
+  inset: auto max(1rem, env(safe-area-inset-right))
+    calc(5.25rem + env(safe-area-inset-bottom)) auto;
+  width: min(400px, calc(100vw - 2rem));
+  max-width: none;
+  height: min(680px, calc(100dvh - 7rem));
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-feature);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-menu);
+  z-index: 50;
+  font: inherit;
+  overflow: hidden;
+}
+.window[open] {
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: var(--color-paper-2);
+  border-bottom: 1px solid var(--color-rule);
+  flex: none;
+}
+.header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+.header p {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--color-accent-soft);
+}
+.body {
+  min-height: 0;
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 1rem;
+  font-size: var(--text-sm);
+}
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem !important;
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
+.context a {
+  margin-left: auto;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0.25rem 0;
+}
+.assistant .sectionTitle,
+.generalHelp .helpTitle {
+  font-size: var(--text-md);
+}
+.assistant .sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.assistant :global(button) {
+  font-size: var(--text-sm);
+}
+.intro {
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+  margin: 0.5rem 0 1rem !important;
+}
+.assistant .conversation {
+  max-height: min(20rem, 40dvh);
+  overflow-y: auto;
+  margin-top: 0.75rem !important;
+}
+.form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.assistant .composer {
+  min-height: 72px;
+  max-height: 160px;
+  resize: vertical;
+}
+.form :global(label) {
+  font-size: var(--text-sm);
+}
+.generalHelp {
+  display: grid;
+  gap: 0.75rem;
+}
+.helpLinks {
+  display: grid;
+  gap: 0.25rem;
+}
+.helpLinks a {
+  padding: 0.6rem 0;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .launcher {
+    width: 56px;
+    height: 56px;
+    padding: 0;
+  }
+  .launcher span {
+    display: none;
+  }
+  .window {
+    inset: calc(var(--chat-viewport-top, 0px) + 0.5rem) 0.5rem auto;
+    width: calc(100vw - 1rem);
+    height: calc(
+      var(--chat-viewport-height, 100dvh) - 1rem - env(safe-area-inset-bottom)
+    );
+  }
+  .window::backdrop {
+    background: rgb(21 32 79 / 35%);
+  }
+  .body {
+    padding: 0.75rem;
+  }
+  .header {
+    padding: 0.75rem;
+  }
+}
+@media print {
+  .launcher,
+  .window {
+    display: none !important;
+  }
+  .shell {
+    padding-bottom: 0;
+  }
+}
+
+.websiteStatus {
+  display: grid;
+  gap: var(--space-2xs);
+  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+}
+.websiteStatus time {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}

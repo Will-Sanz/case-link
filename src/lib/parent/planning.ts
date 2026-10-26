@@ -72,7 +72,7 @@ export function buildSupportPlan(
       steps: [
         existing
           ? "Continue the existing benefit journey; do not start a duplicate application."
-          : "Prepare the relevant program information from your household facts.",
+          : "Check the exact required application fields and reuse the household information already saved.",
         ...selected.personalSteps,
         "Check an actual receipt and follow the outcome; opening a link is not submission.",
       ],
@@ -85,7 +85,7 @@ export function buildSupportPlan(
   return {
     version: 1,
     summary:
-      "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+      "Each need has its own support path. Track guidance, completed application forms and confirmed submissions separately.",
     routes,
     generatedAt: now.toISOString(),
     model: null,

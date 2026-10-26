@@ -95,16 +95,16 @@ async function main() {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
+    await page.getByRole("checkbox", { name: /Food for now/ }).check();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     check(
       await page
-        .getByText(
-          "We can prepare. Applications are not connected yet.",
-          { exact: true },
-        )
+        .getByText("We can prepare. Applications are not connected yet.", {
+          exact: true,
+        })
         .isVisible(),
       "The smoke cannot authorize a partner submission or external action.",
     );
@@ -133,6 +133,59 @@ async function main() {
       "The actual recorded mandate excludes external execution.",
     );
     await page.waitForURL(`${origin}/support/${request.id}`);
+    stage = "actual floating assistant context, draft and keyboard controls";
+    const launcher = page.getByRole("button", {
+      name: "Ask CaseLink for assistance",
+    });
+    await launcher.click();
+    const chat = page.getByRole("dialog", {
+      name: "Ask CaseLink",
+      exact: true,
+    });
+    const question = chat.getByLabel("Your question about this request");
+    await question.waitFor();
+    check(
+      (await chat
+        .getByRole("link", { name: "View progress" })
+        .getAttribute("href")) === `/support/${request.id}`,
+      "The actual floating assistant uses the exact authenticated support request.",
+    );
+    await question.fill("What happens next for this request?");
+    check(
+      !(await chat.getByRole("checkbox").isChecked()),
+      "Opening actual chat never grants AI processing consent automatically.",
+    );
+    await page.keyboard.press("Escape");
+    check(
+      !(await chat.isVisible()) &&
+        (await launcher.evaluate(
+          (element) => document.activeElement === element,
+        )),
+      "Escape minimizes actual chat and restores keyboard focus.",
+    );
+    await launcher.click();
+    check(
+      (await question.inputValue()) === "What happens next for this request?",
+      "An unsent actual chat draft survives minimizing without browser storage.",
+    );
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() =>
+      document.querySelector("#caselink-assistant")?.matches(":modal"),
+    );
+    await chat.getByRole("button", { name: "Minimize chat" }).focus();
+    await page.keyboard.press("Shift+Tab");
+    check(
+      await chat.evaluate((element) =>
+        element.contains(document.activeElement),
+      ),
+      "The actual phone chat keeps keyboard focus inside its native modal.",
+    );
+    await chat.getByRole("button", { name: "Minimize chat" }).click();
+    check(
+      !(await chat.isVisible()),
+      "Phone chat closes before the underlying application controls are used.",
+    );
+    await page.setViewportSize({ width: 1280, height: 720 });
     stage = "private document consent and actual Storage upload";
     await page
       .getByText("Add a document or take a photo", { exact: true })

@@ -210,16 +210,16 @@ async function main() {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
+    await page.getByRole("checkbox", { name: /Food for now/ }).check();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     check(
       await page
-        .getByText(
-          "Preparation is available; external actions are not connected yet.",
-          { exact: true },
-        )
+        .getByText("We can prepare. Applications are not connected yet.", {
+          exact: true,
+        })
         .isVisible(),
       "The actual permission screen describes the unconnected preparation-only scope honestly.",
     );

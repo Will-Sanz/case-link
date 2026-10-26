@@ -1,5 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { parse } from "dotenv";
+import { publicKeyIsSafe } from "../src/lib/parent/configuration";
 import { resolve, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import {
@@ -36,6 +38,42 @@ async function main() {
     "retention",
     config,
     process.env,
+  );
+  const publicSource: Record<string, string> = {};
+  for (const file of [
+    ".env.production.local",
+    ".env.local",
+    ".env.production",
+    ".env",
+  ])
+    if (existsSync(file))
+      for (const [key, value] of Object.entries(parse(readFileSync(file))))
+        if (
+          [
+            "NEXT_PUBLIC_SUPABASE_URL",
+            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+            "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+          ].includes(key) &&
+          !(key in publicSource)
+        )
+          publicSource[key] = value;
+  const browserPublicKey =
+    publicSource.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    publicSource.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "";
+  if (
+    publicSource.NEXT_PUBLIC_SUPABASE_URL !== config.projectUrl ||
+    !publicKeyIsSafe(browserPublicKey)
+  )
+    throw new Error(
+      "The website viewer requires the same approved public project credential.",
+    );
+  const browserEnv = connectedServiceEnvironment(
+    "browser",
+    config,
+    process.env,
+    process.env,
+    browserPublicKey,
   );
   const children = new Set<ChildProcess>();
   let stopping = false;
@@ -80,6 +118,7 @@ async function main() {
     }
     if (!ready)
       throw new Error("The private storage broker did not become ready.");
+    start("scripts/parent-application-browser.ts", browserEnv);
     const worker = start("scripts/parent-support-worker.ts", workerEnv, true);
     const runRetention = () => {
       if (retention || stopping) return;

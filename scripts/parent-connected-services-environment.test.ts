@@ -47,6 +47,27 @@ it("separates each private principal and credential and never inherits the opera
     approval,
     inherited,
   );
+  const browser = connectedServiceEnvironment(
+    "browser",
+    config,
+    approval,
+    inherited,
+    "sb_publishable_synthetic",
+  );
+  expect(browser.CASELINK_PARENT_BROWSER_PUBLIC_KEY).toBe(
+    "sb_publishable_synthetic",
+  );
+  expect(browser.CASELINK_PARENT_BROWSER_APPROVED_UNTIL).toBe(
+    config.approvedUntil,
+  );
+  for (const key of [
+    "OPENAI_API_KEY",
+    "CASELINK_PARENT_WORKER_DATABASE_URL",
+    "CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL",
+    "CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY",
+    "CASELINK_PARENT_RETENTION_DATABASE_URL",
+  ])
+    expect(browser[key]).toBeUndefined();
   expect(worker.OPENAI_API_KEY).toBe(config.openaiApiKey);
   expect(worker.CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY).toBeUndefined();
   expect(worker.CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL).toBeUndefined();
@@ -58,7 +79,7 @@ it("separates each private principal and credential and never inherits the opera
   expect(retention.CASELINK_PARENT_RETENTION_DATABASE_URL).toBe(
     config.retentionDatabaseUrl,
   );
-  for (const env of [worker, broker, retention]) {
+  for (const env of [worker, broker, retention, browser]) {
     expect(env.SUPABASE_SERVICE_ROLE_KEY).toBeUndefined();
     expect(env.RESEND_API_KEY).toBeUndefined();
     expect(env.OPENAI_DEBUG).toBe("0");

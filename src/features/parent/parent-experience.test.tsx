@@ -311,7 +311,10 @@ describe("informed support start", () => {
       }),
     );
     render(<ParentIntake initialNeed="food" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: /Food for now/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.change(screen.getByLabelText("Household ZIP code"), {
       target: { value: "19104" },
     });

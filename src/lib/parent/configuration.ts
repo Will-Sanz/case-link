@@ -18,7 +18,7 @@ export class ParentConfigurationError extends Error {
     this.name = "ParentConfigurationError";
   }
 }
-function publicKeyIsSafe(key: string): boolean {
+export function publicKeyIsSafe(key: string): boolean {
   if (key.startsWith("sb_secret_")) return false;
   if (key.startsWith("sb_publishable_")) return true;
   try {

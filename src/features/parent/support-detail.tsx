@@ -18,22 +18,18 @@ import type {
   SupportIntake,
   SupportRequest,
 } from "@/lib/parent/domain";
-import {
-  getProgram,
-  PROGRAMS,
-  SNAP_NEW_APPLICATION_URL,
-} from "@/lib/parent/programs";
+import { getProgram, PROGRAMS } from "@/lib/parent/programs";
 import { displayDate, parentApi } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { requestStatus } from "./my-support";
 import { SupportDocuments } from "./support-documents";
-import { SupportActivity } from "./support-activity";
-import { SupportAssistant } from "./support-assistant";
+import { SupportActivity, type RecordedOperation } from "./support-activity";
 import { FoodSites } from "./food-sites";
 import { SupportPartners } from "./support-partners";
 import { NecessaryAnswer } from "./necessary-answer";
 import { SavedAccountAnswers } from "./saved-account-answers";
 import { ANSWER_FIELDS } from "@/lib/parent/answers";
+import { supportRouteLabel } from "@/lib/parent/application-readiness";
 import {
   PermissionEditor,
   type PermissionEditorHandle,
@@ -41,6 +37,8 @@ import {
 import { useParentResource } from "./use-parent-resource";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { ProgressBadge, SupportProgressPanel } from "./support-progress";
+import { ApplicationWorkspace, supportTitle } from "./application-workspace";
+import workspace from "./application-workspace.module.css";
 import { UrgentHelp } from "./landing";
 import styles from "./parent.module.css";
 
@@ -400,6 +398,11 @@ export function SupportDetail({ requestId }: { requestId: string }) {
     request: SupportRequest;
     progress?: SupportProgress;
   }>(`/requests/${requestId}`);
+  const history = useParentResource<{
+    operations: RecordedOperation[];
+    historyLimited: boolean;
+  }>(`/requests/${requestId}/operations`);
+  const reloadHistory = history.reload;
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<Error | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -407,13 +410,21 @@ export function SupportDetail({ requestId }: { requestId: string }) {
   const permissionEditor = useRef<PermissionEditorHandle>(null);
   const request = data?.request;
   const requestState = request?.status;
+  const requestVersion = request?.version;
+  const requestUpdated = request?.updated_at;
+  useEffect(() => {
+    if (requestVersion !== undefined) reloadHistory();
+  }, [requestVersion, requestUpdated, reloadHistory]);
   useEffect(() => {
     if (requestState !== "active") return;
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") reload();
+      if (document.visibilityState === "visible") {
+        reload();
+        reloadHistory();
+      }
     }, 30000);
     return () => clearInterval(interval);
-  }, [requestState, reload]);
+  }, [requestState, reload, reloadHistory]);
   async function changeState(action: "pause" | "resume" | "cancel") {
     setPending(true);
     setActionError(null);
@@ -464,6 +475,17 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       </div>
     );
   const inactive = ["cancelled", "closed"].includes(request.status);
+  const acceptingActions = request.status === "active";
+  const currentOperations = history.error
+    ? []
+    : (history.data?.operations ?? [])
+        .filter((operation) => operation.request_version === request.version)
+        .map((operation) => ({
+          programId: operation.program_id,
+          need: operation.need ?? undefined,
+          state: operation.state,
+          artifactId: operation.artifact_id,
+        }));
   const actions = request.required_actions.filter(
     (action) =>
       !action.resolved && (!action.resolver || action.resolver === "parent"),
@@ -483,10 +505,10 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       </Link>
       <div className={`${styles.pageTop} ${styles.space}`}>
         <div>
-          <h1>Your family’s support</h1>
+          <h1>{supportTitle(request)}</h1>
           <p>
-            {request.plan?.summary ??
-              "Your request is saved. Check the status below to see what is happening and what needs you."}
+            Your saved information, the work actually completed, and your next
+            step are together here.
           </p>
         </div>
         {data?.progress && !error ? (
@@ -506,28 +528,53 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       )}
       {actionError && <ServiceError error={actionError} />}
       {error && <ServiceError error={error} retry={reload} />}
-      <SupportProgressPanel
+      <ApplicationWorkspace
+        request={request}
         progress={error ? undefined : data?.progress}
-        onRefresh={reload}
-      />
-      {request.intake.urgency === "today" && (
-        <div className={styles.space}>
-          <UrgentHelp />
-        </div>
-      )}
-      {request.status === "paused" && (
-        <div className={`${styles.notice} ${styles.space}`}>
-          <Pause width={22} height={22} aria-hidden="true" />
-          <p>
-            <strong>Paused by you.</strong> No future actions will run while
-            paused. Resume when you’re ready; expired permission may need
-            renewal.
-          </p>
-        </div>
-      )}
-      <div className={`${styles.detailGrid} ${styles.space}`}>
-        <div className={styles.detailMain}>
-          {!inactive &&
+        history={history}
+      >
+        <SupportProgressPanel
+          progress={error ? undefined : data?.progress}
+          onRefresh={reload}
+        />
+        {request.intake.urgency === "today" && (
+          <div className={styles.space}>
+            <UrgentHelp />
+          </div>
+        )}
+        {request.status === "paused" && (
+          <div className={styles.notice}>
+            <Pause width={22} height={22} aria-hidden="true" />
+            <p>
+              <strong>Paused by you.</strong> No future actions will run while
+              paused. Resume when you’re ready; expired permission may need
+              renewal.
+            </p>
+          </div>
+        )}
+        <section
+          id="your-next-steps"
+          className={workspace.section}
+          tabIndex={-1}
+          aria-labelledby="your-steps-heading"
+        >
+          <h2 id="your-steps-heading" className={workspace.sectionHeading}>
+            Your next steps
+          </h2>
+          {acceptingActions && actions.length > 0 && (
+            <p className={styles.subtle}>
+              These are all the personal steps currently recorded for this
+              request. Other work follows the current status above.
+            </p>
+          )}
+          {(!actions.length || !acceptingActions) && (
+            <p className={styles.subtle}>
+              {!acceptingActions
+                ? "No new personal steps are requested while this request is paused or finished."
+                : "Nothing is currently requested from you. Check the application and work status above; this does not mean an application has been submitted."}
+            </p>
+          )}
+          {acceptingActions &&
             actions.map((action) => (
               <RequiredStep
                 key={action.id}
@@ -539,7 +586,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             ))}
           {!inactive && serviceActions.length > 0 && (
             <details className={styles.disclosure}>
-              <summary>CaseLink is handling a service step</summary>
+              <summary>A CaseLink service step is unresolved</summary>
               <div>
                 <p className={`${styles.subtle} ${styles.small}`}>
                   These steps belong to CaseLink or the program. You don’t need
@@ -558,193 +605,200 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               </div>
             </details>
           )}
-          {request.intake.needs.includes("food_now") && (
-            <FoodSites zip={request.intake.zip} />
-          )}
-          <SupportAssistant key={request.id} request={request} />
-          <section className={styles.surface}>
-            <h2>Program progress</h2>
-            {request.intake.needs.includes("snap_new") && (
-              <p className={`${styles.small} ${styles.space}`}>
-                <a className={styles.textLink} href={SNAP_NEW_APPLICATION_URL}>
-                  Start a new SNAP application with DHS
-                </a>
-                . No COMPASS account is needed to begin. This opens the official
-                site; opening it does not file an application. Enter sensitive
-                identifiers directly with DHS if asked.
-              </p>
-            )}
-            {request.plan?.routes.length ? (
-              request.plan.routes.map((route, i) => {
-                const program = getProgram(route.programId);
-                return (
-                  <article
-                    className={styles.needRow}
-                    key={`${route.need}-${route.programId}-${i}`}
-                  >
-                    <div className={styles.between}>
-                      <h3>{NEED_LABELS[route.need]}</h3>
-                      <span
-                        className={`${styles.badge} ${["checking", "unresolved"].includes(route.state) ? styles.badgeWait : ""}`}
-                      >
-                        {OUTCOME_LABELS[route.state]}
-                      </span>
-                    </div>
-                    <p>
-                      <strong>{route.title}</strong>
-                      {program && route.title !== program.name && (
-                        <> · {program.name}</>
-                      )}
-                    </p>
-                    <p>{route.summary}</p>
-                    {route.limitation && <p>{route.limitation}</p>}
-                    <p>
-                      <strong>Next:</strong>{" "}
-                      {route.nextActor === "caselink"
-                        ? "CaseLink"
-                        : route.nextActor === "parent"
-                          ? "Your personal step"
-                          : route.nextActor === "agency"
-                            ? "Agency response"
-                            : "Program response"}
-                    </p>
-                    {route.steps.length > 0 && (
-                      <details className={styles.disclosure}>
-                        <summary>See the planned steps</summary>
-                        <div>
-                          <ol>
-                            {route.steps.map((step, index) => (
-                              <li key={index} className={styles.small}>
-                                {step}
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      </details>
-                    )}
-                    {program && (
-                      <a
-                        className={`${styles.textLink} ${styles.small}`}
-                        href={program.officialUrl}
-                      >
-                        Official program & direct access
-                      </a>
-                    )}
-                  </article>
-                );
-              })
-            ) : (
-              <div className={styles.stack}>
-                <p className={styles.subtle}>Your selected needs are saved:</p>
-                <ul>
-                  {request.intake.needs.map((need) => (
-                    <li key={need}>{NEED_LABELS[need]}</li>
-                  ))}
-                </ul>
-                <div className={styles.trustLine}>
-                  <Clock width={21} height={21} aria-hidden="true" />
-                  <p>
-                    Preparation is pending. A saved request is not an
-                    application or a confirmed appointment. You can use official
-                    programs directly while you wait.
-                  </p>
-                </div>
-              </div>
-            )}
-          </section>
-          <SupportPartners request={request} />
-          <section className={styles.surface}>
-            <h2>Activity & receipts</h2>
-            <p className={`${styles.subtle} ${styles.small}`}>
-              Prepared, sent, received, approved and support actually received
-              are different steps. We show only recorded evidence.
-            </p>
-            {request.events?.length ? (
-              <ol className={`${styles.timeline} ${styles.space}`}>
-                {request.events.map((event) => (
-                  <li key={event.id}>
-                    <div>
-                      <strong>{event.summary}</strong>
-                      {event.kind === "parent.outcome_reported" &&
-                        event.actor === "parent" && (
-                          <>
-                            {typeof event.evidence?.outcome === "string" &&
-                              Object.hasOwn(
-                                OUTCOME_LABELS,
-                                event.evidence.outcome,
-                              ) && (
-                                <p>
-                                  Reported outcome:{" "}
-                                  {
-                                    OUTCOME_LABELS[
-                                      event.evidence
-                                        .outcome as keyof typeof OUTCOME_LABELS
-                                    ]
-                                  }
-                                </p>
-                              )}
-                            {typeof event.evidence?.reference === "string" && (
-                              <p>{event.evidence.reference}</p>
-                            )}
-                          </>
-                        )}
-                      <p>
-                        {event.actor === "parent"
-                          ? "Parent reported"
-                          : event.actor === "operator"
-                            ? "Operator confirmed"
-                            : event.actor === "agency" ||
-                                event.actor === "partner"
-                              ? "Program update"
-                              : "CaseLink activity"}
-                      </p>
-                      <time dateTime={event.created_at}>
-                        {displayDate(event.created_at, true)}
-                      </time>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className={`${styles.hint} ${styles.space}`}>
-                No additional activity recorded yet. We won’t mark a request
-                sent or received without evidence.
-              </p>
-            )}
-            {request.events_truncated && (
-              <p className={`${styles.hint} ${styles.space}`}>
-                Showing the latest 200 updates.{" "}
-                <a
-                  className={styles.textLink}
-                  href="/api/parent/account/export"
+        </section>
+        {request.intake.needs.includes("food_now") && (
+          <FoodSites zip={request.intake.zip} />
+        )}
+        <section
+          id="application-programs"
+          className={`${styles.surface} ${workspace.section}`}
+          tabIndex={-1}
+        >
+          <h2>Program progress</h2>
+          {request.plan?.routes.length ? (
+            request.plan.routes.map((route, i) => {
+              const program = getProgram(route.programId);
+              return (
+                <article
+                  className={styles.needRow}
+                  key={`${route.need}-${route.programId}-${i}`}
                 >
-                  Download your information
-                </a>{" "}
-                for retained earlier history.
-              </p>
-            )}
-            <a
-              className={`${styles.secondary} ${styles.space} ${styles.hidePrint}`}
-              href={`/api/parent/requests/${requestId}/export`}
-            >
-              <Download width={18} height={18} aria-hidden="true" />
-              Download current summary
-            </a>
+                  <div className={styles.between}>
+                    <h3>{NEED_LABELS[route.need]}</h3>
+                    <span
+                      className={`${styles.badge} ${["checking", "unresolved"].includes(route.state) ? styles.badgeWait : ""}`}
+                    >
+                      {supportRouteLabel(route, currentOperations)}
+                    </span>
+                  </div>
+                  <p>
+                    <strong>{route.title}</strong>
+                    {program && route.title !== program.name && (
+                      <> · {program.name}</>
+                    )}
+                  </p>
+                  <p>{route.summary}</p>
+                  {route.limitation && <p>{route.limitation}</p>}
+                  <p>
+                    <strong>Next:</strong>{" "}
+                    {route.nextActor === "caselink"
+                      ? "CaseLink"
+                      : route.nextActor === "parent"
+                        ? "Your personal step"
+                        : route.nextActor === "agency"
+                          ? "Agency response"
+                          : "Program response"}
+                  </p>
+                  {route.steps.length > 0 && (
+                    <details className={styles.disclosure}>
+                      <summary>See the planned steps</summary>
+                      <div>
+                        <ol>
+                          {route.steps.map((step, index) => (
+                            <li key={index} className={styles.small}>
+                              {step}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </details>
+                  )}
+                  {program && (
+                    <a
+                      className={`${styles.textLink} ${styles.small}`}
+                      href={program.officialUrl}
+                    >
+                      Official program & direct access
+                    </a>
+                  )}
+                </article>
+              );
+            })
+          ) : (
+            <div className={styles.stack}>
+              <p className={styles.subtle}>Your selected needs are saved:</p>
+              <ul>
+                {request.intake.needs.map((need) => (
+                  <li key={need}>{NEED_LABELS[need]}</li>
+                ))}
+              </ul>
+              <div className={styles.trustLine}>
+                <Clock width={21} height={21} aria-hidden="true" />
+                <p>
+                  Preparation is pending. A saved request is not an application
+                  or a confirmed appointment. You can use official programs
+                  directly while you wait.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+        <SupportPartners request={request} />
+        <section
+          id="application-receipts"
+          className={`${styles.surface} ${workspace.section}`}
+          tabIndex={-1}
+        >
+          <h2>Activity & receipts</h2>
+          <p className={`${styles.subtle} ${styles.small}`}>
+            Prepared, sent, received, approved and support actually received are
+            different steps. We show only recorded evidence.
+          </p>
+          {request.events?.length ? (
+            <ol className={`${styles.timeline} ${styles.space}`}>
+              {request.events.map((event) => (
+                <li key={event.id}>
+                  <div>
+                    <strong>{event.summary}</strong>
+                    {event.kind === "parent.outcome_reported" &&
+                      event.actor === "parent" && (
+                        <>
+                          {typeof event.evidence?.outcome === "string" &&
+                            Object.hasOwn(
+                              OUTCOME_LABELS,
+                              event.evidence.outcome,
+                            ) && (
+                              <p>
+                                Reported outcome:{" "}
+                                {
+                                  OUTCOME_LABELS[
+                                    event.evidence
+                                      .outcome as keyof typeof OUTCOME_LABELS
+                                  ]
+                                }
+                              </p>
+                            )}
+                          {typeof event.evidence?.reference === "string" && (
+                            <p>{event.evidence.reference}</p>
+                          )}
+                        </>
+                      )}
+                    <p>
+                      {event.actor === "parent"
+                        ? "Parent reported"
+                        : event.actor === "operator"
+                          ? "Operator confirmed"
+                          : event.actor === "agency" ||
+                              event.actor === "partner"
+                            ? "Program update"
+                            : "CaseLink activity"}
+                    </p>
+                    <time dateTime={event.created_at}>
+                      {displayDate(event.created_at, true)}
+                    </time>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
             <p className={`${styles.hint} ${styles.space}`}>
-              Your download reflects the recorded state. Submitted packet
-              versions and receipts are preserved when a permitted channel
-              produces them.
+              No additional activity recorded yet. We won’t mark a request sent
+              or received without evidence.
             </p>
-          </section>
-          <SupportActivity request={request} onChange={reload} />
+          )}
+          {request.events_truncated && (
+            <p className={`${styles.hint} ${styles.space}`}>
+              Showing the latest 200 updates.{" "}
+              <a className={styles.textLink} href="/api/parent/account/export">
+                Download your information
+              </a>{" "}
+              for retained earlier history.
+            </p>
+          )}
+          <a
+            className={`${styles.secondary} ${styles.space} ${styles.hidePrint}`}
+            href={`/api/parent/requests/${requestId}/export`}
+          >
+            <Download width={18} height={18} aria-hidden="true" />
+            Download current summary
+          </a>
+          <p className={`${styles.hint} ${styles.space}`}>
+            Your download reflects the recorded state. Submitted packet versions
+            and receipts are preserved when a permitted channel produces them.
+          </p>
+        </section>
+        <SupportActivity
+          request={request}
+          onChange={reload}
+          history={history}
+        />
+        <div
+          id="application-documents"
+          className={workspace.section}
+          tabIndex={-1}
+        >
           <SupportDocuments
             requestId={requestId}
             documents={request.documents ?? []}
-            inactive={inactive}
+            inactive={!acceptingActions}
             onChange={reload}
           />
         </div>
-        <aside className={styles.detailAside}>
+        <div
+          id="application-controls"
+          className={workspace.section}
+          tabIndex={-1}
+        >
           <section className={styles.surface}>
             <h2>Your details</h2>
             <dl className={styles.factList}>
@@ -891,8 +945,8 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               No program outcome is guaranteed.
             </div>
           </div>
-        </aside>
-      </div>
+        </div>
+      </ApplicationWorkspace>
       <p className={`${styles.hint} ${styles.space}`}>
         Last recorded request update: {displayDate(request.updated_at, true)}.
         This page checks for updates every 30 seconds while visible. The status

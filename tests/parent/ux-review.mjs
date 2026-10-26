@@ -114,6 +114,14 @@ try {
         };
       else if (url.pathname.endsWith("/partners"))
         body = { ok: true, partners: [] };
+      else if (url.pathname.endsWith("/browser"))
+        body = {
+          ok: true,
+          available: false,
+          reason:
+            "The synthetic browser fixture has no application connection. No application is being filled or submitted.",
+          session: null,
+        };
       else if (url.pathname.endsWith("/assistant")) {
         if (method === "POST") {
           const submitted = route.request().postDataJSON();
@@ -155,7 +163,7 @@ try {
           body = { ok: true };
         } else body = { ok: true, ...assistantConversation };
       } else if (url.pathname.endsWith("/operations"))
-        body = { ok: true, operations: [] };
+        body = { ok: true, operations: [], historyLimited: false };
       else if (url.pathname.endsWith("/requests") && method === "GET")
         body = {
           ok: true,
@@ -244,11 +252,35 @@ try {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
+    await page.getByRole("checkbox", { name: /Food for now/ }).check();
     await page.getByLabel("Electric bill", { exact: true }).check();
     await snapshot("needs");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByLabel(/18 or older/).check();
+    const zipBox = await page.getByLabel("Household ZIP code").boundingBox();
+    const languageBox = await page
+      .getByLabel("Preferred service language")
+      .boundingBox();
+    assert.ok(
+      zipBox && languageBox,
+      "Both household routing fields must be rendered.",
+    );
+    assert.ok(
+      [zipBox.height, languageBox.height].every(
+        (value) => value >= 48 && value <= 54,
+      ),
+      "ZIP and language controls must have matching usable heights.",
+    );
+    assert.ok(
+      Math.abs(zipBox.height - languageBox.height) <= 2,
+      "Input and select control heights must align.",
+    );
+    if (width >= 600)
+      assert.ok(
+        Math.abs(zipBox.y - languageBox.y) <= 2,
+        "Help text must not push the adjacent language control out of alignment.",
+      );
     await snapshot("details");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await snapshot("permission-review");
@@ -256,14 +288,81 @@ try {
       waitUntil: "networkidle",
     });
     await snapshot("support-detail");
-    await snapshot(
-      "assistant-answer",
-      page.getByRole("region", { name: "Ask CaseLink" }),
+    const launcher = page.getByRole("button", {
+      name: "Ask CaseLink for assistance",
+    });
+    await launcher.click();
+    const chat = page.getByRole("dialog", {
+      name: "Ask CaseLink",
+      exact: true,
+    });
+    await chat.waitFor();
+    await page
+      .getByText("No application has been sent for this request.", {
+        exact: true,
+      })
+      .waitFor();
+    const question = chat.getByLabel("Your question about this request");
+    await question.fill("A draft about this request");
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await chat.isVisible(),
+      false,
+      "Escape must minimize the chat.",
     );
+    assert.equal(
+      await launcher.evaluate((element) => document.activeElement === element),
+      true,
+      "Minimizing chat must return focus to its launcher.",
+    );
+    await launcher.click();
+    assert.equal(
+      await question.inputValue(),
+      "A draft about this request",
+      "Minimizing must preserve the unsent draft.",
+    );
+    assert.equal(
+      await chat.getByRole("checkbox").isChecked(),
+      false,
+      "Opening chat must never authorize AI processing automatically.",
+    );
+    if (width < 600) {
+      await chat.getByRole("button", { name: "Minimize chat" }).focus();
+      await page.keyboard.press("Shift+Tab");
+      assert.equal(
+        await chat.evaluate((element) =>
+          element.contains(document.activeElement),
+        ),
+        true,
+        "Phone chat must retain keyboard focus inside its native modal.",
+      );
+      await page.setViewportSize({ width, height: 480 });
+      await page.waitForFunction(() => {
+        const bounds = document
+          .querySelector("#caselink-assistant")
+          ?.getBoundingClientRect();
+        return (
+          bounds && bounds.y >= 0 && bounds.bottom <= window.innerHeight + 1
+        );
+      });
+      const compactBounds = await chat.boundingBox();
+      assert.ok(
+        compactBounds &&
+          compactBounds.y >= 0 &&
+          compactBounds.y + compactBounds.height <= 481,
+        "The phone chat must fit the shortened viewport without covering its close control.",
+      );
+      await page.setViewportSize({ width, height });
+    }
+    await snapshot("assistant-answer", chat);
     await page
       .getByLabel("Your question about this request")
       .fill("What happens next?");
-    await page.getByLabel(/I agree to send my question/).check();
+    await page
+      .getByLabel(
+        /Use my question and relevant saved request details with OpenAI/,
+      )
+      .check();
     await page
       .getByRole("button", { name: "Ask CaseLink", exact: true })
       .click();
@@ -281,7 +380,7 @@ try {
     });
     await snapshot(
       "assistant-queued",
-      page.getByRole("region", { name: "Ask CaseLink" }),
+      page.getByRole("dialog", { name: "Ask CaseLink", exact: true }),
     );
     await page
       .getByRole("button", { name: "Cancel question", exact: true })
@@ -289,7 +388,7 @@ try {
     await page.getByText("You cancelled this question.").waitFor();
     await snapshot(
       "assistant-cancelled",
-      page.getByRole("region", { name: "Ask CaseLink" }),
+      page.getByRole("dialog", { name: "Ask CaseLink", exact: true }),
     );
     assistantConversation = {
       ...answeredConversation,
@@ -374,7 +473,13 @@ try {
       .waitFor();
     await snapshot(
       "assistant-offline",
-      page.getByRole("region", { name: "Ask CaseLink" }),
+      page.getByRole("dialog", { name: "Ask CaseLink", exact: true }),
+    );
+    await chat.getByRole("button", { name: "Minimize chat" }).click();
+    assert.equal(
+      await chat.isVisible(),
+      false,
+      "Close chat before returning to the application controls.",
     );
     rejectAnswer = true;
     await page

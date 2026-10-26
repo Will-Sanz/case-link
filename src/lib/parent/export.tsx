@@ -7,6 +7,7 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { NEED_LABELS, OUTCOME_LABELS, type SupportRequest } from "./domain";
+import { supportRouteLabel } from "./application-readiness";
 import { getProgram } from "./programs";
 import { finalizePlanPdf } from "../domain/plan/finalize-plan-pdf";
 const styles = StyleSheet.create({
@@ -46,7 +47,7 @@ export function ParentSummaryDocument({
         {request.plan?.routes.map((route) => (
           <View key={route.need} style={styles.route} wrap={false}>
             <Text style={styles.label}>
-              {NEED_LABELS[route.need]} · {OUTCOME_LABELS[route.state]}
+              {NEED_LABELS[route.need]} · {supportRouteLabel(route)}
             </Text>
             <Text>{route.title}</Text>
             <Text>{route.summary}</Text>

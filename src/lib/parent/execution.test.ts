@@ -49,9 +49,72 @@ function setup() {
     attempts: 0,
     revoked: false,
     documentsValid: true,
+    readiness: { requiredFields: [], formVerified: true },
   };
 }
 describe("execution side effect and receipts", () => {
+  it("blocks actual dispatch until required application evidence is current and the form is verified", async () => {
+    const input = setup();
+    const incomplete = {
+      ...input,
+      readiness: {
+        requiredFields: [
+          {
+            field: "householdSize",
+            label: "People in your household",
+            present: false,
+            source: "unverified" as const,
+            verifiedAt: null,
+            validUntil: null,
+            conflicted: false,
+          },
+        ],
+        formVerified: true,
+      },
+    };
+    expect(await executeSupportOperation(incomplete)).toEqual({
+      state: "blocked",
+      reason: "application_evidence_requires_resolution",
+    });
+    expect(
+      await executeSupportOperation({
+        ...input,
+        readiness: { requiredFields: [], formVerified: false },
+      }),
+    ).toEqual({
+      state: "blocked",
+      reason: "application_evidence_requires_resolution",
+    });
+    expect(input.store.prepare).not.toHaveBeenCalled();
+    expect(input.transport.execute).not.toHaveBeenCalled();
+  });
+  it("does not replace measured decision readiness with a routine final-review click", async () => {
+    const input = setup();
+    const readiness = {
+      requiredFields: [],
+      formVerified: true,
+      modelJudgmentUsed: true,
+    };
+    expect((await executeSupportOperation({ ...input, readiness })).state).toBe(
+      "blocked",
+    );
+    expect(input.transport.execute).not.toHaveBeenCalled();
+    const approved = await executeSupportOperation({
+      ...input,
+      readiness: {
+        ...readiness,
+        calibration: {
+          score: 0.92,
+          threshold: 0.9,
+          evaluationId: "versioned-synthetic-route-evaluation",
+          evaluatedAt: fixtureNow.toISOString(),
+          validUntil: "2026-11-01T12:00:00Z",
+        },
+      },
+    });
+    expect(approved.state).toBe("agency_submitted");
+    expect(input.transport.execute).toHaveBeenCalledOnce();
+  });
   it("rechecks database authority before transport and retains exact receipt", async () => {
     const input = setup();
     expect(await executeSupportOperation(input)).toMatchObject({

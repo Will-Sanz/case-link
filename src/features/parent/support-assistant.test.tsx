@@ -31,6 +31,46 @@ afterEach(() => {
 });
 
 describe("request-connected assistant", () => {
+  it("refreshes current request steps when a completed answer arrives", async () => {
+    const onAnswer = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        json(
+          conversation({
+            messages: [
+              {
+                id: "answer",
+                question: "What next?",
+                status: "answered",
+                answer: {
+                  intro: "Check your next step.",
+                  paragraphs: [],
+                  actionIds: [],
+                },
+                error: null,
+                created_at: "2026-10-26T16:00:00Z",
+                updated_at: "2026-10-26T16:01:00Z",
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    const { rerender } = render(
+      <SupportAssistant request={fixtureRequest()} onAnswer={onAnswer} />,
+    );
+    await screen.findByText("Check your next step.");
+    await waitFor(() => expect(onAnswer).toHaveBeenCalledOnce());
+    rerender(
+      <SupportAssistant
+        request={fixtureRequest({ version: 2 })}
+        onAnswer={onAnswer}
+      />,
+    );
+    expect(onAnswer).toHaveBeenCalledOnce();
+  });
+
   it("follows new replies inside the conversation while preserving a parent reading earlier history", async () => {
     const message = {
       id: "first",
@@ -305,9 +345,14 @@ describe("request-connected assistant", () => {
       screen
         .getByRole("link", { name: /Go to your step/ })
         .getAttribute("href"),
-    ).toBe("#step-authority-electricity");
+    ).toBe(`/support/${request.id}#step-authority-electricity`);
     expect(screen.queryByText("invented-step")).toBeNull();
     expect(screen.getByText(/Showing your latest 40 questions/)).toBeTruthy();
+    rerender(<SupportAssistant request={{ ...request, status: "paused" }} />);
+    expect(screen.queryByRole("link", { name: /Go to your step/ })).toBeNull();
+    expect(
+      screen.getByText("Your request has not been submitted."),
+    ).toBeTruthy();
     rerender(
       <SupportAssistant request={{ ...request, status: "cancelled" }} />,
     );

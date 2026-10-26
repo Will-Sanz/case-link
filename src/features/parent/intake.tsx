@@ -107,12 +107,9 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
   }>("/capabilities");
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
-    needs:
-      initialNeed === "food"
-        ? ["food_now"]
-        : initialNeed === "utilities"
-          ? ["electricity"]
-          : [],
+    needs: [...foodNeeds, ...utilityNeeds].includes(initialNeed as SupportNeed)
+      ? [initialNeed as SupportNeed]
+      : [],
   }));
   const [step, setStep] = useState(0);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
@@ -131,6 +128,16 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
   const router = useRouter();
   const programs = getProgramsForNeeds(intake.needs);
   const hasUtility = intake.needs.some((n) => utilityNeeds.includes(n));
+  const hasBenefits = intake.needs.some((need) =>
+    [
+      "snap_new",
+      "snap_renewal",
+      "snap_pending",
+      "snap_problem",
+      "wic_new",
+      "wic_continuing",
+    ].includes(need),
+  );
   const connected = (id: string) =>
     connections.data?.capabilities?.some(
       (connection) =>
@@ -287,7 +294,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
       ) : (
         <>
           <ol className={styles.progress} aria-label="Support request steps">
-            {["Your needs", "A few details", "Your permission"].map(
+            {["Your needs", "Household details", "Your permission"].map(
               (label, i) => (
                 <li key={label} aria-current={i === step ? "step" : undefined}>
                   <span>
@@ -309,7 +316,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                   {
                     [
                       "What would help your household?",
-                      "Just enough to find useful options",
+                      "Your household details, in one place",
                       "You’re in control of what happens next",
                     ][step]
                   }
@@ -318,7 +325,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                   {
                     [
                       "Choose everything that applies. Food and utility support can move forward together.",
-                      "Start with what you know. Optional details can help avoid questions later.",
+                      "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
                       "These are the specific programs and limits for this request. No unknown recipients or open-ended permission.",
                     ][step]
                   }
@@ -339,7 +346,24 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                           <span>
                             <strong>{NEED_LABELS[need]}</strong>
                             {need === "food_now" && (
-                              <small>Food today or in the next few days</small>
+                              <small>
+                                Find groceries or meals now. This does not start
+                                a SNAP application.
+                              </small>
+                            )}
+                            {need === "snap_new" && (
+                              <small>
+                                A new application for help paying for groceries
+                              </small>
+                            )}
+                            {need === "snap_renewal" && (
+                              <small>Keep benefits you already receive</small>
+                            )}
+                            {need === "snap_pending" && (
+                              <small>
+                                Follow an application you already sent; avoid
+                                applying twice
+                              </small>
                             )}
                             {need === "snap_problem" && (
                               <small>
@@ -488,97 +512,31 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       </div>
                     </fieldset>
                   )}
-                  <details className={styles.disclosure}>
-                    <summary>Add helpful household details (optional)</summary>
-                    <div className={styles.stack}>
-                      <div className={styles.field}>
-                        <label htmlFor="household-size">
-                          People in your household
-                        </label>
-                        <input
-                          id="household-size"
-                          className={styles.input}
-                          type="number"
-                          min={1}
-                          max={30}
-                          value={intake.householdSize ?? ""}
-                          onChange={(e) =>
-                            change(
-                              "householdSize",
-                              e.target.value === ""
-                                ? null
-                                : Number(e.target.value),
-                            )
-                          }
-                        />
-                        <p className={styles.hint}>
-                          Leave blank if you’re not sure who a program will
-                          count.
-                        </p>
-                      </div>
-                      {intake.needs.some(
-                        (need) =>
-                          need === "wic_new" || need === "wic_continuing",
-                      ) && (
-                        <div className={styles.row}>
-                          <div className={styles.field}>
-                            <label htmlFor="children-under-five">
-                              Any children under five?
-                            </label>
-                            <select
-                              id="children-under-five"
-                              className={styles.select}
-                              value={booleanValue(intake.childrenUnderFive)}
-                              onChange={(e) =>
-                                change(
-                                  "childrenUnderFive",
-                                  optionalBoolean(e.target.value),
-                                )
-                              }
-                            >
-                              <option value="unknown">Not sure / skip</option>
-                              <option value="yes">Yes</option>
-                              <option value="no">No</option>
-                            </select>
-                          </div>
-                          <div className={styles.field}>
-                            <label htmlFor="pregnancy">
-                              Pregnant or postpartum?
-                            </label>
-                            <select
-                              id="pregnancy"
-                              className={styles.select}
-                              value={booleanValue(intake.pregnantOrPostpartum)}
-                              onChange={(e) =>
-                                change(
-                                  "pregnantOrPostpartum",
-                                  optionalBoolean(e.target.value),
-                                )
-                              }
-                            >
-                              <option value="unknown">Not sure / skip</option>
-                              <option value="yes">Yes</option>
-                              <option value="no">No</option>
-                            </select>
-                          </div>
-                        </div>
-                      )}
-                      <div className={styles.row}>
+                  {hasBenefits || hasUtility ? (
+                    <fieldset className={styles.fieldset}>
+                      <legend className={styles.legend}>
+                        Household & income
+                      </legend>
+                      <p className={styles.hint}>
+                        These answers can be reused for the programs you choose.
+                        They are optional here; you can still access official
+                        help without them.
+                      </p>
+                      <div className={styles.stack}>
                         <div className={styles.field}>
-                          <label htmlFor="income-amount">
-                            Household income before taxes ($)
+                          <label htmlFor="household-size">
+                            People in your household
                           </label>
                           <input
+                            id="household-size"
                             className={styles.input}
-                            id="income-amount"
                             type="number"
-                            min={0}
-                            max={1000000}
-                            step="0.01"
-                            value={intake.incomeAmount ?? ""}
+                            min={1}
+                            max={30}
+                            value={intake.householdSize ?? ""}
                             onChange={(e) =>
                               change(
-                                "incomeAmount",
+                                "householdSize",
                                 e.target.value === ""
                                   ? null
                                   : Number(e.target.value),
@@ -586,40 +544,133 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                             }
                           />
                           <p className={styles.hint}>
-                            Zero income is okay. Leave blank if variable or
-                            unknown.
+                            Leave blank if you’re not sure who a program will
+                            count.
                           </p>
                         </div>
-                        <div className={styles.field}>
-                          <label htmlFor="income-frequency">
-                            How often is that amount received?
-                          </label>
-                          <select
-                            id="income-frequency"
-                            className={styles.select}
-                            value={intake.incomeFrequency}
-                            onChange={(e) =>
-                              change(
-                                "incomeFrequency",
-                                e.target
-                                  .value as SupportIntake["incomeFrequency"],
-                              )
-                            }
-                          >
-                            <option value="unknown">Not sure / skip</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="biweekly">Every two weeks</option>
-                            <option value="twice_monthly">Twice a month</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="yearly">Yearly</option>
-                          </select>
+                        {intake.needs.some(
+                          (need) =>
+                            need === "wic_new" || need === "wic_continuing",
+                        ) && (
+                          <div className={styles.row}>
+                            <div className={styles.field}>
+                              <label htmlFor="children-under-five">
+                                Any children under five?
+                              </label>
+                              <select
+                                id="children-under-five"
+                                className={styles.select}
+                                value={booleanValue(intake.childrenUnderFive)}
+                                onChange={(e) =>
+                                  change(
+                                    "childrenUnderFive",
+                                    optionalBoolean(e.target.value),
+                                  )
+                                }
+                              >
+                                <option value="unknown">Not sure / skip</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                              </select>
+                            </div>
+                            <div className={styles.field}>
+                              <label htmlFor="pregnancy">
+                                Pregnant or postpartum?
+                              </label>
+                              <select
+                                id="pregnancy"
+                                className={styles.select}
+                                value={booleanValue(
+                                  intake.pregnantOrPostpartum,
+                                )}
+                                onChange={(e) =>
+                                  change(
+                                    "pregnantOrPostpartum",
+                                    optionalBoolean(e.target.value),
+                                  )
+                                }
+                              >
+                                <option value="unknown">Not sure / skip</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                        <div className={styles.row}>
+                          <div className={styles.field}>
+                            <label htmlFor="income-amount">
+                              Household income before taxes ($)
+                            </label>
+                            <input
+                              className={styles.input}
+                              id="income-amount"
+                              type="number"
+                              min={0}
+                              max={1000000}
+                              step="0.01"
+                              value={intake.incomeAmount ?? ""}
+                              onChange={(e) =>
+                                change(
+                                  "incomeAmount",
+                                  e.target.value === ""
+                                    ? null
+                                    : Number(e.target.value),
+                                )
+                              }
+                            />
+                            <p className={styles.hint}>
+                              Zero income is okay. Leave blank if variable or
+                              unknown.
+                            </p>
+                          </div>
+                          <div className={styles.field}>
+                            <label htmlFor="income-frequency">
+                              How often is that amount received?
+                            </label>
+                            <select
+                              id="income-frequency"
+                              className={styles.select}
+                              value={intake.incomeFrequency}
+                              onChange={(e) =>
+                                change(
+                                  "incomeFrequency",
+                                  e.target
+                                    .value as SupportIntake["incomeFrequency"],
+                                )
+                              }
+                            >
+                              <option value="unknown">Not sure / skip</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="biweekly">Every two weeks</option>
+                              <option value="twice_monthly">
+                                Twice a month
+                              </option>
+                              <option value="monthly">Monthly</option>
+                              <option value="yearly">Yearly</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
+                    </fieldset>
+                  ) : null}
+                  {hasBenefits && (
+                    <div className={styles.notice}>
+                      <Lock width={22} height={22} aria-hidden="true" />
+                      <p>
+                        Names, addresses, dates of birth and required identity
+                        numbers belong in a protected application step. Don’t
+                        put them in chat or these household fields. We’ll reuse
+                        your saved answers; a provider may still require a
+                        personal identity check or declaration.
+                      </p>
                     </div>
-                  </details>
+                  )}
                   {hasUtility && (
-                    <details className={styles.disclosure}>
-                      <summary>Add utility information (optional)</summary>
+                    <fieldset className={styles.fieldset}>
+                      <legend className={styles.legend}>
+                        Your utility information
+                      </legend>
                       <div className={styles.stack}>
                         <fieldset className={styles.fieldset}>
                           <legend className={styles.legend}>
@@ -691,7 +742,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                           </div>
                         )}
                       </div>
-                    </details>
+                    </fieldset>
                   )}
                   <div className={styles.field}>
                     <label htmlFor="contact-preference">
