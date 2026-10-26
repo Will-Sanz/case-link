@@ -27,7 +27,7 @@ const fixture = (): SupportRequest => ({
     ["peco-cap"],
     "prepare_only",
     "ask_me",
-    new Date("2026-10-25T12:00:00Z"),
+    "2026-11-24T12:00:00.000Z",
   ),
   plan: null,
   required_actions: [],
@@ -48,9 +48,79 @@ afterEach(() => {
 });
 
 describe("support detail", () => {
+  it("shows the parent's actual outcome and reference with attribution after reload", async () => {
+    const request = fixture();
+    request.events = [
+      {
+        id: "parent-report",
+        request_id: requestId,
+        kind: "parent.outcome_reported",
+        actor: "parent",
+        summary: "You reported an outcome for electricity.",
+        created_at: request.updated_at,
+        evidence: {
+          need: "electricity",
+          outcome: "support_received",
+          reference: "Pantry pickup on Monday.",
+          attribution: "parent_reported",
+        },
+      },
+    ];
+    request.events_truncated = true;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
+    render(<SupportDetail requestId={requestId} />);
+    expect(
+      await screen.findByText("Reported outcome: Support received"),
+    ).toBeTruthy();
+    expect(screen.getByText("Pantry pickup on Monday.")).toBeTruthy();
+    expect(screen.getByText("Parent reported")).toBeTruthy();
+    expect(screen.getByText(/Showing the latest 200 updates/)).toBeTruthy();
+  });
+  it("allows correcting WIC household answers without inventing an answer for Not sure", async () => {
+    const request = fixture();
+    request.intake.needs = ["wic_new"];
+    const fetch = vi.fn().mockResolvedValue(response(request));
+    vi.stubGlobal("fetch", fetch);
+    render(<SupportDetail requestId={requestId} />);
+    fireEvent.click(
+      await screen.findByText("Correct household or bill information"),
+    );
+    fireEvent.change(
+      screen.getByLabelText("Does your household include a child under five?"),
+      { target: { value: "false" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText("Is anyone pregnant or recently postpartum?"),
+      { target: { value: "unknown" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
+    await waitFor(() =>
+      expect(fetch.mock.calls.some((call) => call[1]?.method === "POST")).toBe(
+        true,
+      ),
+    );
+    const post = fetch.mock.calls.find((call) => call[1]?.method === "POST")!;
+    expect(JSON.parse(post[1].body)).toMatchObject({
+      action: "correct",
+      intake: { childrenUnderFive: false, pregnantOrPostpartum: null },
+      version: 1,
+    });
+  });
   it("offers wrapping permission choices and requires fresh consent after changing actions", async () => {
     const request = fixture();
-    const fetchMock = vi.fn().mockResolvedValue(response(request));
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async (url: string) =>
+        url.endsWith("/authorization-window")
+          ? {
+              ok: true,
+              json: async () => ({
+                ok: true,
+                authorization: { expiresAt: "2026-11-24T12:00:00.000Z" },
+              }),
+            }
+          : response(request),
+      );
     vi.stubGlobal("fetch", fetchMock);
     render(<SupportDetail requestId={requestId} />);
     fireEvent.click(
@@ -141,7 +211,7 @@ describe("support detail", () => {
       }),
     );
     expect(
-      screen.getByRole("heading", { name: "Permission for the next 30 days" }),
+      screen.getByRole("heading", { name: "Permission for up to 30 days" }),
     ).toBeTruthy();
     expect(document.activeElement?.getAttribute("type")).toBe("checkbox");
     fireEvent.click(screen.getByLabelText(/I authorize these programs/));

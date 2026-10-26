@@ -5,22 +5,53 @@ import { ANSWER_FIELDS, factAnswerSchema } from "@/lib/parent/answers";
 import { parentApi, ParentApiError } from "./api";
 import styles from "./parent.module.css";
 
+function currentAnswer(
+  request: SupportRequest,
+  action: NecessaryAction,
+): string {
+  if (
+    ["income", "incomeAmount", "incomeFrequency"].includes(action.field ?? "")
+  )
+    return request.intake.incomeAmount === null
+      ? ""
+      : String(request.intake.incomeAmount);
+  const fact = request.facts?.find(
+    (item) => item.need === action.need && item.field === action.field,
+  );
+  if (typeof fact?.value === "string" || typeof fact?.value === "number")
+    return String(fact.value);
+  if (action.field === "zip") return request.intake.zip;
+  if (action.field === "householdSize")
+    return request.intake.householdSize === null
+      ? ""
+      : String(request.intake.householdSize);
+  if (
+    action.field === "accountAuthority" &&
+    request.intake.accountAuthority !== "not_sure"
+  )
+    return request.intake.accountAuthority;
+  if (
+    action.field === "shutoffDate" &&
+    request.intake.needs.filter((need) =>
+      ["electricity", "gas", "water"].includes(need),
+    ).length === 1
+  )
+    return request.intake.shutoffDate ?? "";
+  return "";
+}
+
 export function NecessaryAnswer({
   action,
   request,
   onChange,
+  correction = false,
 }: {
   action: NecessaryAction;
   request: SupportRequest;
   onChange: () => void;
+  correction?: boolean;
 }) {
-  const [value, setValue] = useState(() =>
-    ["income", "incomeAmount", "incomeFrequency"].includes(
-      action.field ?? "",
-    ) && request.intake.incomeAmount !== null
-      ? String(request.intake.incomeAmount)
-      : "",
-  );
+  const [value, setValue] = useState(() => currentAnswer(request, action));
   const [frequency, setFrequency] = useState(
     request.intake.incomeFrequency === "unknown"
       ? ""
@@ -95,19 +126,27 @@ export function NecessaryAnswer({
     }
     setPending(true);
     try {
-      await parentApi(`/requests/${request.id}`, {
-        method: "POST",
-        body: JSON.stringify(
-          booking
-            ? {
-                action: "booking_preference",
-                preference: value,
-                version: baseVersion,
-              }
-            : { action: "answer_fact", ...answer },
-        ),
-      });
-      setMessage("Your answer is saved. Permitted work can continue.");
+      const saved = await parentApi<{ request: SupportRequest }>(
+        `/requests/${request.id}`,
+        {
+          method: "POST",
+          body: JSON.stringify(
+            booking
+              ? {
+                  action: "booking_preference",
+                  preference: value,
+                  version: baseVersion,
+                }
+              : { action: "answer_fact", ...answer },
+          ),
+        },
+      );
+      if (correction) setBaseVersion(saved.request.version);
+      setMessage(
+        request.status === "paused"
+          ? "Your answer is saved. This request remains paused."
+          : "Your answer is saved. Permitted work can continue.",
+      );
       onChange();
     } catch (err) {
       setConflict(err instanceof ParentApiError && err.status === 409);
@@ -127,11 +166,7 @@ export function NecessaryAnswer({
         `/requests/${request.id}`,
       );
       setBaseVersion(latest.request.version);
-      setValue(
-        income && latest.request.intake.incomeAmount !== null
-          ? String(latest.request.intake.incomeAmount)
-          : "",
-      );
+      setValue(currentAnswer(latest.request, action));
       setFrequency(
         latest.request.intake.incomeFrequency === "unknown"
           ? ""
@@ -158,13 +193,15 @@ export function NecessaryAnswer({
     <form className={styles.form} onSubmit={submit}>
       <div className={styles.field}>
         <label htmlFor={`answer-${action.id}`}>
-          {booking
-            ? "Preferred appointment window"
-            : income
-              ? "Household income before taxes ($)"
-              : field === "accountAuthority"
-                ? "How are you connected to the account?"
-                : "Your answer"}
+          {correction
+            ? action.title
+            : booking
+              ? "Preferred appointment window"
+              : income
+                ? "Household income before taxes ($)"
+                : field === "accountAuthority"
+                  ? "How are you connected to the account?"
+                  : "Your answer"}
         </label>
         {options ? (
           <select
@@ -235,9 +272,13 @@ export function NecessaryAnswer({
       </div>
       <button
         className={styles.button}
-        disabled={pending || request.status === "paused"}
+        disabled={pending || (!correction && request.status === "paused")}
       >
-        {pending ? "Saving…" : "Save and continue"}
+        {pending
+          ? "Saving…"
+          : correction
+            ? "Save account answer"
+            : "Save and continue"}
       </button>
       {message && (
         <p role="status" className={styles.success}>

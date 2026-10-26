@@ -20,7 +20,7 @@ export function ServiceError({
         </div>
         <h2>Let’s bring you back to your support</h2>
         <p>
-          Sign in with your email code to keep your household’s information
+          Sign in to your CaseLink account to keep your household’s information
           private.
         </p>
         <Link

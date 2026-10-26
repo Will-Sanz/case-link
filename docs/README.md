@@ -15,6 +15,8 @@ The PRD defines intended behavior; source code and exact-release verification es
 
 [Localhost UI/UX review](verification/parent-ui-ux-review.md) records the production-build visual review, fixes and remaining usability checks. [AI evaluation](parent-ai-evaluation.md) distinguishes deterministic orchestration evidence from live model-quality approval.
 
+[Brand options and approval](parent-brand-options.md) records the five imagegen explorations and the owner's explicit Option 2 selection. [Existing accounts](parent-shared-accounts.md) defines safe reuse of the old email/password identities. [Production readiness and continuity](parent-production-readiness.md) maps preserved branding/policies to current research and outstanding release evidence.
+
 [Privacy and regulatory review](parent-privacy-regulatory-review.md) records the October 25 legal applicability research, processor retention distinctions and required launch decisions. It is an engineering assessment for the privacy owner and counsel; it does not certify compliance.
 
 ## Existing school deployment and historical evidence

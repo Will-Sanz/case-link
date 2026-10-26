@@ -31,8 +31,11 @@ async function main() {
     parentProjectIsolationIssues({
       projectUrl,
       schoolUrl: env.CASELINK_SCHOOL_SUPABASE_URL,
-      parentProductionUrl: env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL,
+      parentProductionUrl:
+        env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL ??
+        env.CASELINK_PRODUCTION_SUPABASE_URL,
       environment: env.CASELINK_ENVIRONMENT ?? "production",
+      accountMode: env.CASELINK_PARENT_ACCOUNT_MODE,
     }).length
   )
     throw new Error("The broker requires verified isolated project origins.");
@@ -46,7 +49,15 @@ async function main() {
     loopback(database.hostname) &&
     loopback(project.hostname) &&
     loopback(new URL(origin).hostname);
-  if (local && (database.port !== "55322" || project.port !== "55321"))
+  if (
+    local &&
+    (database.port !== "55322" || project.port !== "55321") &&
+    !(
+      env.CASELINK_PARENT_ACCOUNT_MODE === "existing" &&
+      database.port === "54322" &&
+      project.port === "54321"
+    )
+  )
     throw new Error("The local broker requires isolated parent project ports.");
   if (
     !local &&

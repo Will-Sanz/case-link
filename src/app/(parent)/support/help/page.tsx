@@ -9,6 +9,8 @@ export const metadata: Metadata = {
     "Official food and utility support in Philadelphia, account recovery and answers about CaseLink.",
 };
 export default function HelpPage() {
+  const existingAccounts =
+    process.env.CASELINK_PARENT_ACCOUNT_MODE === "existing";
   return (
     <div className={`${styles.container} ${styles.legal}`}>
       <h1>Help, without another hurdle.</h1>
@@ -81,12 +83,24 @@ export default function HelpPage() {
       </section>
       <section className={styles.section}>
         <h2>Can’t sign in?</h2>
+        {existingAccounts && (
+          <p>
+            For an existing CaseLink school account, use your email and
+            password. If you forgot it,{" "}
+            <Link className={styles.textLink} href="/forgot-password">
+              reset your existing password
+            </Link>
+            . Email-code sign-in is available for supported parent accounts; it
+            does not replace a school account’s password check.
+          </p>
+        )}
         <p>
-          Use the same email address as your existing account. Request a new
-          code, check spam or junk mail, and use the newest code. Never share
-          it. If you no longer have access to that email, CaseLink does not
-          currently provide an automatic account transfer; contact the program
-          directly for time-sensitive support.
+          If you use email-code sign-in, choose “Use an email code instead.” Use
+          the same email address as your account, check spam or junk mail, and
+          use the newest code. Never share your password or codes. If you no
+          longer have access to that email, CaseLink does not currently provide
+          an automatic account transfer; contact the program directly for
+          time-sensitive support.
         </p>
         <Link className={styles.secondary} href="/sign-in">
           Return to sign in

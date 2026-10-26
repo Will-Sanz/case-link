@@ -49,26 +49,34 @@ try {
     const page = await context.newPage();
     await page.route("**/api/parent/**", async (route) => {
       const url = new URL(route.request().url());
-      const body = url.pathname.endsWith("/capabilities")
-        ? { ok: true, capabilities: [] }
-        : url.pathname.endsWith("/operations")
-          ? { ok: true, operations: [] }
-          : url.pathname.endsWith("/account")
-            ? {
-                ok: true,
-                account: {
-                  email: "family@example.test",
-                  preferences: {
-                    contactPreference: "in_app",
-                    language: "en",
-                    quietHoursStart: 19,
-                    quietHoursEnd: 9,
+      const body = url.pathname.endsWith("/authorization-window")
+        ? {
+            ok: true,
+            authorization: {
+              issuedAt: "2026-10-26T12:00:00.000Z",
+              expiresAt: "2026-11-25T12:00:00.000Z",
+            },
+          }
+        : url.pathname.endsWith("/capabilities")
+          ? { ok: true, capabilities: [] }
+          : url.pathname.endsWith("/operations")
+            ? { ok: true, operations: [] }
+            : url.pathname.endsWith("/account")
+              ? {
+                  ok: true,
+                  account: {
+                    email: "family@example.test",
+                    preferences: {
+                      contactPreference: "in_app",
+                      language: "en",
+                      quietHoursStart: 19,
+                      quietHoursEnd: 9,
+                    },
                   },
-                },
-              }
-            : url.pathname.endsWith("/requests")
-              ? { ok: true, requests: [request] }
-              : { ok: true, request };
+                }
+              : url.pathname.endsWith("/requests")
+                ? { ok: true, requests: [request] }
+                : { ok: true, request };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -82,12 +90,56 @@ try {
       ["detail", `/support/${request.id}`],
       ["account", "/account"],
       ["signin", "/sign-in"],
+      ["product", "/product"],
+      ["help", "/support/help"],
+      ["privacy", "/support/privacy"],
+      ["terms", "/support/terms"],
     ]) {
       await page.goto(origin + path, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
+      if (label === "home") {
+        const art = page.getByRole("img", {
+          name: /Illustration of a family unpacking groceries/,
+        });
+        assert.ok(
+          await art.evaluate(
+            (element) => element.complete && element.naturalWidth > 0,
+          ),
+          "The approved panorama must load.",
+        );
+        assert.ok(
+          await page
+            .getByRole("heading", { level: 1 })
+            .evaluate((element) =>
+              getComputedStyle(element).fontFamily.includes("Newsreader"),
+            ),
+          "The original display type must be applied.",
+        );
+      }
+      if (label === "product") {
+        const items = page
+          .getByRole("heading", {
+            name: "We handle the work we’re allowed to handle.",
+          })
+          .locator("..")
+          .getByRole("listitem");
+        for (const item of await items.all()) {
+          const marker = await item.locator("svg").boundingBox();
+          const text = await item.locator("span").boundingBox();
+          assert.ok(
+            marker &&
+              text &&
+              text.x > marker.x &&
+              Math.abs(text.y - marker.y) < 12,
+            "Product checklist text must wrap beside its marker, not below it.",
+          );
+        }
+      }
       await page.screenshot({
         path: `tmp/parent-verification/${name}-${label}.png`,
         fullPage: true,
+        style:
+          'a[href="#main-content"]:not(:focus) { visibility: hidden !important; }',
       });
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,

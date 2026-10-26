@@ -1,0 +1,197 @@
+{
+  "recordedAt": "2026-10-26T04:33:48.527Z",
+  "scope": "real_local_isolated_parser_synthetic_fixtures_only",
+  "image": {
+    "name": "caselink-document-parser:local",
+    "id": "sha256:8d40b107157d4ba9bd60d6633c34b963ae1167187bd6afbf8f04bab5a146f90f",
+    "defaultUser": "65534:65534"
+  },
+  "checks": [
+    {
+      "name": "native-pdf-english-page-order",
+      "passed": true,
+      "durationMs": 624.531041,
+      "pageCount": 2,
+      "characterCounts": [
+        74,
+        72
+      ]
+    },
+    {
+      "name": "native-pdf-spanish",
+      "passed": true,
+      "durationMs": 638.780958,
+      "pageCount": 1,
+      "characterCounts": [
+        101
+      ]
+    },
+    {
+      "name": "png-ocr-english",
+      "passed": true,
+      "durationMs": 1000.162292,
+      "pageCount": 1,
+      "characterCounts": [
+        73
+      ]
+    },
+    {
+      "name": "jpeg-ocr-english",
+      "passed": true,
+      "durationMs": 730.8642500000001,
+      "pageCount": 1,
+      "characterCounts": [
+        73
+      ]
+    },
+    {
+      "name": "scanned-pdf-ocr-english",
+      "passed": true,
+      "durationMs": 890.1347499999997,
+      "pageCount": 1,
+      "characterCounts": [
+        73
+      ]
+    },
+    {
+      "name": "png-ocr-spanish",
+      "passed": false,
+      "durationMs": 748.7179999999998,
+      "failureKind": "assertion_or_test_setup_failed"
+    },
+    {
+      "name": "jpeg-ocr-spanish",
+      "passed": false,
+      "durationMs": 791.3516659999996,
+      "failureKind": "assertion_or_test_setup_failed"
+    },
+    {
+      "name": "scanned-pdf-ocr-spanish",
+      "passed": false,
+      "durationMs": 875.9437090000001,
+      "failureKind": "assertion_or_test_setup_failed"
+    },
+    {
+      "name": "five-page-limit-accepted",
+      "passed": true,
+      "durationMs": 531.6486249999998,
+      "pageCount": 5,
+      "characterCounts": [
+        88,
+        88,
+        88,
+        88,
+        88
+      ]
+    },
+    {
+      "name": "six-page-limit-rejected",
+      "passed": true,
+      "durationMs": 526.2876670000005
+    },
+    {
+      "name": "zero-page-pdf-rejected",
+      "passed": true,
+      "durationMs": 526.0685839999996
+    },
+    {
+      "name": "malformed-pdf-rejected",
+      "passed": true,
+      "durationMs": 506.6902919999993
+    },
+    {
+      "name": "malformed-png-rejected",
+      "passed": true,
+      "durationMs": 528.7012919999997
+    },
+    {
+      "name": "malformed-jpeg-rejected",
+      "passed": true,
+      "durationMs": 564.6543750000001
+    },
+    {
+      "name": "pdf-claimed-as-image-rejected",
+      "passed": true,
+      "durationMs": 568.5959999999995
+    },
+    {
+      "name": "image-claimed-as-pdf-rejected",
+      "passed": true,
+      "durationMs": 1197.27275
+    },
+    {
+      "name": "png-claimed-as-jpeg-rejected",
+      "passed": true,
+      "durationMs": 1334.8263750000006
+    },
+    {
+      "name": "unsupported-media-type-rejected",
+      "passed": true,
+      "durationMs": 0.1981660000001284
+    },
+    {
+      "name": "empty-document-rejected",
+      "passed": true,
+      "durationMs": 0.05591699999968114
+    },
+    {
+      "name": "oversized-document-rejected",
+      "passed": true,
+      "durationMs": 0.09991700000136916
+    },
+    {
+      "name": "oversized-image-pixel-budget-rejected",
+      "passed": true,
+      "durationMs": 1945.950417
+    },
+    {
+      "name": "active-pdf-rejected",
+      "passed": true,
+      "durationMs": 1916.594333000001
+    },
+    {
+      "name": "embedded-file-pdf-rejected",
+      "passed": true,
+      "durationMs": 1835.7077499999978
+    }
+  ],
+  "passed": false,
+  "modelCalls": 0,
+  "realFamilyDocuments": 0,
+  "sourceTextRecorded": false,
+  "fixtureFilesWritten": false,
+  "sourceManifest": [
+    {
+      "path": "scripts/test-parent-document-parser.ts",
+      "sha256": "14396487840650a2fe6a6d5c4c7d5b0e7b2d35280bb6876106ceb9bdc1d1be8a"
+    },
+    {
+      "path": "scripts/parse-parent-document.ts",
+      "sha256": "0a8fbfe6efe0b1bbcfa3761a64ffe2d35a045b5e8baad7240b88459a4c046ee9"
+    },
+    {
+      "path": "src/lib/parent/document-processing.ts",
+      "sha256": "ff61e94abf6e7c6a5c2ae97d1a36351834a416c1d756b0e657c21e6ee338fd3c"
+    },
+    {
+      "path": "src/lib/parent/documents.ts",
+      "sha256": "dca88fefe427b61bc8d1aa1c8e52cd285c4bb7f8e8470b9c21ce0bbd84a2f5b5"
+    },
+    {
+      "path": "src/lib/parent/constants.ts",
+      "sha256": "a913c2b7783301302359f224947cd47e2d65aa257c1d93e7777e0c3971efa2ce"
+    },
+    {
+      "path": "docker/parent-document-worker.Dockerfile",
+      "sha256": "6ac8f2138cf10621c664d125a0b9c4c3b70542d5c5f5562854336dc02ba1f091"
+    },
+    {
+      "path": "docker/parent-document-worker.Dockerfile.dockerignore",
+      "sha256": "394a04885de4c876e8b0ce94dc2f7ff8e1d1ffdf7155ec4f9f1ef98679155f05"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "1696c8d60c5fe9a03a90182ce8e73d24fe24d3c0732ad25770f5335e13de2d17"
+    }
+  ]
+}

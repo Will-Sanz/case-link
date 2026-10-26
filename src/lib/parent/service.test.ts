@@ -152,31 +152,84 @@ describe("parent service orchestration", () => {
     const request = singleUtilityRequest();
     request.mandate.allowedData = ["household", "utility"];
     const input = setup(request);
-    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
-      programId, templateId: "synthetic-income-form", version: "1", validated: true,
-      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
-      missingFields: ["incomeAmount", "incomeFrequency"].filter(field => packet[field] === undefined),
-      personalActs: [],
-      ...(packet.incomeAmount !== undefined && packet.incomeFrequency !== undefined ? { artifactId: "synthetic-artifact", contentSha256: "a".repeat(64) } : {}),
-    }));
+    vi.mocked(input.ports.fillForm).mockImplementation(
+      async (programId, packet) => ({
+        programId,
+        templateId: "synthetic-income-form",
+        version: "1",
+        validated: true,
+        formInputDigest: createHash("sha256")
+          .update(JSON.stringify(packet))
+          .digest("hex"),
+        missingFields: ["incomeAmount", "incomeFrequency"].filter(
+          (field) => packet[field] === undefined,
+        ),
+        personalActs: [],
+        ...(packet.incomeAmount !== undefined &&
+        packet.incomeFrequency !== undefined
+          ? { artifactId: "synthetic-artifact", contentSha256: "a".repeat(64) }
+          : {}),
+      }),
+    );
     const needsPermission = await runSupportService(input);
     expect(request.mandate.allowedData).toEqual(["household", "utility"]);
-    expect(needsPermission.requiredActions.filter(action => action.reason === "expanded_permission")).toEqual([expect.objectContaining({ need: "electricity", field: "allowedData" })]);
-    expect(needsPermission.requiredActions.some(action => action.reason === "missing_fact")).toBe(false);
+    expect(
+      needsPermission.requiredActions.filter(
+        (action) => action.reason === "expanded_permission",
+      ),
+    ).toEqual([
+      expect.objectContaining({ need: "electricity", field: "allowedData" }),
+    ]);
+    expect(
+      needsPermission.requiredActions.some(
+        (action) => action.reason === "missing_fact",
+      ),
+    ).toBe(false);
     expect(input.ports.execute).not.toHaveBeenCalled();
 
     // This change represents a new explicit parent mandate, never automatic expansion by a worker.
-    request.mandate = fixtureMandate({ recipientIds: ["peco-cap"], allowedData: ["household", "utility", "income"] });
+    request.mandate = fixtureMandate({
+      recipientIds: ["peco-cap"],
+      allowedData: ["household", "utility", "income"],
+    });
     request.version++;
     const needsAnswer = await runSupportService(input);
-    expect(needsAnswer.requiredActions.filter(action => action.reason === "missing_fact")).toEqual([expect.objectContaining({ need: "electricity", field: "income" })]);
-    const answer = factAnswerSchema.parse({ need: "electricity", field: "income", value: { amount: 500, frequency: "weekly" }, version: request.version });
-    request.facts = [{ need: answer.need, field: answer.field, value: answer.value, source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" }];
+    expect(
+      needsAnswer.requiredActions.filter(
+        (action) => action.reason === "missing_fact",
+      ),
+    ).toEqual([
+      expect.objectContaining({ need: "electricity", field: "income" }),
+    ]);
+    const answer = factAnswerSchema.parse({
+      need: "electricity",
+      field: "income",
+      value: { amount: 500, frequency: "weekly" },
+      version: request.version,
+    });
+    request.facts = [
+      {
+        need: answer.need,
+        field: answer.field,
+        value: answer.value,
+        source: "parent",
+        confirmedAt: fixtureNow.toISOString(),
+        asOf: "2026-10-25",
+      },
+    ];
     request.version++;
     const resumed = await runSupportService(input);
-    expect(resumed.requiredActions.some(action => action.reason === "missing_fact" || action.reason === "expanded_permission")).toBe(false);
+    expect(
+      resumed.requiredActions.some(
+        (action) =>
+          action.reason === "missing_fact" ||
+          action.reason === "expanded_permission",
+      ),
+    ).toBe(false);
     expect(input.ports.execute).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(input.ports.execute).mock.calls[0][0].packet).toMatchObject({ incomeAmount: 500, incomeFrequency: "weekly" });
+    expect(
+      vi.mocked(input.ports.execute).mock.calls[0][0].packet,
+    ).toMatchObject({ incomeAmount: 500, incomeFrequency: "weekly" });
   });
   it("keeps a provider-matched shutoff notice out of the other utility packet", async () => {
     const request = fixtureRequest({
@@ -267,7 +320,7 @@ describe("parent service orchestration", () => {
     });
     expect(result.requiredActions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ need: "gas", field: "accountAuthority" }),
+        expect.objectContaining({ need: "gas", field: "utilityProvider" }),
       ]),
     );
   });
@@ -406,6 +459,114 @@ describe("parent service orchestration", () => {
     expect(result.events.some((event) => event.kind === "support.sent")).toBe(
       false,
     );
+  });
+  it.each(["support_received", "delivery_unknown"] as const)(
+    "holds a changed provider with prior %s evidence while another utility continues",
+    async (state) => {
+      const request = fixtureRequest({
+        intake: fixtureIntake({
+          needs: ["electricity", "gas"],
+          utilityProviders: ["peco", "pgw"],
+        }),
+        mandate: fixtureMandate({ recipientIds: ["peco-cap", "pgw-crp"] }),
+      });
+      request.facts = [
+        {
+          need: "electricity",
+          field: "utilityProvider",
+          value: "other",
+          source: "parent",
+          confirmedAt: fixtureNow.toISOString(),
+          asOf: "2026-10-25",
+        },
+      ];
+      request.account_changed_at = { electricity: fixtureNow.toISOString() };
+      const input = setup(request);
+      input.documents = [
+        document(request.id, {
+          created_at: "2026-10-24T12:00:00Z",
+          status: "validated",
+          facts,
+          validatedAt: fixtureNow.toISOString(),
+          sourceObservedAt: "2026-10-25",
+        }),
+      ];
+      const oldOperation = acknowledged(request, "support_received");
+      oldOperation.createdAt = "2026-10-24T12:00:00Z";
+      oldOperation.state = state;
+      if (state === "delivery_unknown") {
+        oldOperation.receipt = undefined;
+        vi.mocked(input.ports.reconcile).mockResolvedValue(
+          receipt("support_received"),
+        );
+      }
+      const result = await runSupportService({
+        ...input,
+        operations: [oldOperation],
+      });
+      if (state === "delivery_unknown")
+        expect(input.ports.reconcile).toHaveBeenCalledWith(oldOperation);
+      expect(
+        vi
+          .mocked(input.ports.execute)
+          .mock.calls.map(([operation]) => operation.need),
+      ).toEqual(["gas"]);
+      expect(
+        vi
+          .mocked(input.ports.fillForm)
+          .mock.calls.every(([, , need]) => need !== "electricity"),
+      ).toBe(true);
+      expect(
+        result.plan.routes.find((route) => route.need === "electricity")?.state,
+      ).toBe("unresolved");
+      expect(result.requiredActions).toContainEqual(
+        expect.objectContaining({
+          need: "electricity",
+          reason: "execution_issue",
+          resolver: "operator",
+        }),
+      );
+      expect(
+        vi.mocked(input.ports.execute).mock.calls[0][0].packet.amountDue,
+      ).toBeUndefined();
+    },
+  );
+  it("keeps a saved parent bill correction authoritative after an unrelated ZIP edit", async () => {
+    const request = singleUtilityRequest();
+    request.intake.zip = "19103";
+    request.version++;
+    request.facts = [
+      {
+        need: "electricity",
+        field: "amountDue",
+        value: 80,
+        source: "parent",
+        confirmedAt: fixtureNow.toISOString(),
+        asOf: "2026-10-25",
+      },
+    ];
+    const input = setup(request);
+    input.documents = [
+      document(request.id, {
+        status: "validated",
+        facts: {
+          ...facts,
+          amountDue: 100,
+          fields: facts.fields.map((field) =>
+            field.field === "amountDue"
+              ? { ...field, sourceText: "Amount due $100.00" }
+              : field,
+          ),
+        },
+        validatedAt: fixtureNow.toISOString(),
+        sourceObservedAt: "2026-10-25",
+      }),
+    ];
+    await runSupportService(input);
+    expect(input.ports.extractDocument).not.toHaveBeenCalled();
+    expect(
+      vi.mocked(input.ports.execute).mock.calls[0][0].packet,
+    ).toMatchObject({ zip: "19103", amountDue: 80 });
   });
   it("uses source-validated current document facts automatically without repeating a parent question", async () => {
     const request = singleUtilityRequest();

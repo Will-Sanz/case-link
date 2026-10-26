@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Link as LinkIcon } from "iconoir-react";
+import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
+import { ChatGptFuturesBanner } from "@/components/brand/chatgpt-futures-banner";
 import styles from "./parent.module.css";
 import { ParentNavigation } from "./parent-navigation";
 
@@ -16,18 +17,11 @@ export function ParentShell({
       <a className={styles.skip} href="#main-content">
         Skip to content
       </a>
+      <ChatGptFuturesBanner />
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link className={styles.brand} href="/" aria-label="CaseLink home">
-            <span className={styles.brandMark}>
-              <LinkIcon
-                width={23}
-                height={23}
-                strokeWidth={2}
-                aria-hidden="true"
-              />
-            </span>
-            CaseLink
+            <CaseLinkWordmark />
           </Link>
           <ParentNavigation signedIn={signedIn} />
         </div>
@@ -37,11 +31,19 @@ export function ParentShell({
       </main>
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
-          <span>CaseLink · Support for your family, with you in control.</span>
+          <div className={styles.footerBrand}>
+            <Link href="/" aria-label="CaseLink home">
+              <CaseLinkWordmark />
+            </Link>
+            <p>Support for your family, with you in control.</p>
+            <p>Built in Philadelphia.</p>
+          </div>
           <nav className={styles.footerLinks} aria-label="Footer">
-            <Link href="/support/privacy">Privacy & control</Link>
-            <Link href="/support/terms">Terms</Link>
+            <Link href="/support/privacy#data-policy">Data policy</Link>
+            <Link href="/support/privacy">Privacy policy</Link>
+            <Link href="/support/terms">Terms of service</Link>
             <Link href="/support/help">Get help</Link>
+            <a href="mailto:willsanz23@gmail.com">Contact CaseLink</a>
           </nav>
         </div>
       </footer>

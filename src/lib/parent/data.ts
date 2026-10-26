@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireParentSession } from "./auth";
 import {
   intakeSchema,
@@ -75,17 +76,99 @@ export async function getHousehold(): Promise<{
     preferences: parentPreferencesSchema.parse(account.data!.preferences),
   };
 }
+const requestColumns =
+  "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts,account_changed_at";
+const eventColumns = "id,request_id,kind,actor,summary,created_at,evidence";
+const documentColumns =
+  "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at";
+const pageSize = 100;
+
+async function allParentRows(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    let query = supabase
+      .from(table)
+      .select(columns)
+      .order("id", { ascending: true })
+      .limit(pageSize);
+    if (cursor) query = query.gt("id", cursor);
+    const { data, error } = await query;
+    check(error);
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+    cursor = uuid.parse(page[page.length - 1].id);
+  }
+}
 export async function listSupportRequests(): Promise<SupportRequest[]> {
   const { supabase } = await requireParentSession();
-  const { data, error } = await supabase
-    .from("parent_requests")
-    .select(
-      "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
-  check(error);
-  return data as SupportRequest[];
+  const requests = await allParentRows(
+    supabase,
+    "parent_requests",
+    requestColumns,
+  );
+  return (requests as unknown as SupportRequest[]).sort(
+    (a, b) =>
+      b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id),
+  );
+}
+
+/** Read the complete retained parent-purpose history in sequential, ownership-filtered pages. */
+export async function exportParentInformation() {
+  const { supabase } = await requireParentSession();
+  const exportedAt = new Date().toISOString();
+  const household = await getHousehold();
+  const requests = await allParentRows(
+    supabase,
+    "parent_requests",
+    requestColumns,
+  );
+  const tables = [
+    ["events", "parent_events", eventColumns],
+    [
+      "documents",
+      "parent_documents",
+      `${documentColumns},page_count,consent_version,upload_confirmed_at,facts,source_observed_at,facts_valid_until`,
+    ],
+    [
+      "operations",
+      "parent_operations",
+      "id,request_id,request_version,need,program_id,action,packet,packet_hash,data_categories,document_ids,idempotency_key,permission_version,artifact_id,mandate_hash,authorization_snapshot,state,evidence,created_at,updated_at,executed_at",
+    ],
+    [
+      "receipts",
+      "parent_receipts",
+      "id,request_id,operation_id,state,attribution,evidence,evidence_hash,created_at",
+    ],
+    [
+      "mandates",
+      "parent_mandates",
+      "id,request_id,request_version,mandate,mandate_hash,accepted_at",
+    ],
+    [
+      "forms",
+      "parent_form_artifacts",
+      "id,request_id,request_version,need,program_id,template_id,template_version,template_hash,form_input_digest,content_sha256,status,expires_at,created_at",
+    ],
+  ] as const;
+  for (const [key, table, columns] of tables) {
+    const rows = await allParentRows(supabase, table, columns);
+    const byRequest = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+      const requestId = String(row.request_id);
+      const group = byRequest.get(requestId) ?? [];
+      group.push(row);
+      byRequest.set(requestId, group);
+    }
+    for (const request of requests)
+      request[key] = byRequest.get(String(request.id)) ?? [];
+  }
+  return { exportedAt, household, requests };
 }
 export async function getSupportRequest(
   id: string,
@@ -94,9 +177,7 @@ export async function getSupportRequest(
   const { supabase } = await requireParentSession();
   const request = await supabase
     .from("parent_requests")
-    .select(
-      "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts",
-    )
+    .select(requestColumns)
     .eq("id", id)
     .maybeSingle();
   check(request.error);
@@ -104,10 +185,11 @@ export async function getSupportRequest(
   const [events, documents] = await Promise.all([
     supabase
       .from("parent_events")
-      .select("id,request_id,kind,actor,summary,created_at,evidence")
+      .select(eventColumns)
       .eq("request_id", id)
-      .order("created_at", { ascending: true })
-      .limit(200),
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(201),
     supabase
       .from("parent_documents")
       .select(
@@ -121,7 +203,8 @@ export async function getSupportRequest(
   check(documents.error);
   return {
     ...request.data,
-    events: events.data ?? [],
+    events: (events.data ?? []).slice(0, 200).reverse(),
+    events_truncated: (events.data?.length ?? 0) > 200,
     documents: documents.data ?? [],
   } as SupportRequest;
 }

@@ -34,7 +34,7 @@ export async function createParentSqlFixture(
     grant usage on schema auth to authenticated;
     grant execute on function auth.jwt(),auth.uid() to authenticated;
     create table public.app_users(id uuid primary key references auth.users(id) on delete cascade,email text,role text,is_active boolean);
-    create table public.families(id uuid primary key default gen_random_uuid());
+    create table public.families(id uuid primary key default gen_random_uuid(),name text,created_by_id uuid references public.app_users(id));
     alter table public.families enable row level security;
     grant select on public.families to authenticated;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -47,11 +47,16 @@ export async function createParentSqlFixture(
     alter default privileges for role postgres revoke execute on functions from public;
   `);
   const migrations = [
+    "20261013211053_require_initial_password.sql",
     "20261026012733_parent_support_foundation.sql",
     "20261026014950_parent_scoped_evidence_and_outcomes.sql",
     "20261026015736_parent_verified_form_artifacts.sql",
     "20261026020521_parent_facts_and_mandate_resumption.sql",
     "20261026022658_parent_notifications_and_resume_metadata.sql",
+    "20261026033815_parent_existing_accounts.sql",
+    "20261026040540_parent_preserve_corrected_facts.sql",
+    "20261026044443_parent_storage_upload_preflight.sql",
+    "20261026052446_parent_authoritative_mandate_window.sql",
   ];
   try {
     for (const migration of migrations)

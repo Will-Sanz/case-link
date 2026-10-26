@@ -45,4 +45,36 @@ describe("canonical parent project origins", () => {
       }).join(),
     ).toContain("55321");
   });
+  it("allows intentional existing-account reuse while retaining synthetic environment separation", () => {
+    const shared = {
+      projectUrl: "https://school.supabase.co",
+      schoolUrl: "https://school.supabase.co",
+      parentProductionUrl: "https://school.supabase.co",
+      accountMode: "existing",
+      environment: "production",
+    };
+    expect(parentProjectIsolationIssues(shared)).toEqual([]);
+    expect(
+      parentProjectIsolationIssues({ ...shared, environment: "test" }).join(),
+    ).toContain("synthetic");
+    expect(
+      parentProjectIsolationIssues({
+        ...shared,
+        accountMode: "unexpected",
+      }).join(),
+    ).toContain("account mode");
+    expect(
+      parentProjectIsolationIssues({
+        projectUrl: "http://127.0.0.1:54321",
+        schoolUrl: "http://127.0.0.1:54321",
+        accountMode: "existing",
+      }),
+    ).toEqual([]);
+    expect(
+      parentProjectIsolationIssues({
+        projectUrl: "http://127.0.0.1:54321",
+        accountMode: "existing",
+      }).join(),
+    ).toContain("55321");
+  });
 });

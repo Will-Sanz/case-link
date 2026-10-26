@@ -108,8 +108,21 @@ describe("necessary personal input", () => {
     });
   });
   it("keeps an unsaved permission draft bound to its original version during progress refresh", async () => {
-    const fetch = vi.fn().mockResolvedValue(success),
+    const fetch = vi
+        .fn()
+        .mockImplementation(async (url: string) =>
+          url.endsWith("/authorization-window")
+            ? {
+                ...success,
+                json: async () => ({
+                  ok: true,
+                  authorization: { expiresAt: "2026-11-24T12:00:00.000Z" },
+                }),
+              }
+            : success,
+        ),
       onChange = vi.fn();
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2028-01-01T00:00:00Z"));
     vi.stubGlobal("fetch", fetch);
     const request = fixtureRequest(),
       { rerender } = render(
@@ -132,10 +145,11 @@ describe("necessary personal input", () => {
       screen.getByRole("button", { name: "Save updated permission" }),
     );
     await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
-    const packet = JSON.parse(fetch.mock.calls[0][1].body);
+    const packet = JSON.parse(fetch.mock.calls[1][1].body);
     expect(packet.version).toBe(1);
     expect(packet.mandate.allowedData).not.toContain("documents");
     expect(packet.action).toBe("replace_mandate");
+    expect(packet.mandate.expiresAt).toBe("2026-11-24T12:00:00.000Z");
   });
   it("preserves an existing income period and original answer version during polling", async () => {
     const fetch = vi.fn().mockResolvedValue(success);

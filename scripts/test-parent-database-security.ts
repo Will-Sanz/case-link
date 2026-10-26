@@ -42,7 +42,65 @@ async function main() {
     staff = randomUUID(),
     unverified = randomUUID(),
     trusted = randomUUID();
+  const schoolFamily = randomUUID();
   const users = [ownerA, ownerB, staff, unverified, trusted];
+  const fixtureStoragePaths = new Map<string, string>();
+  const parentGroups = [
+    "parent_worker",
+    "parent_storage_broker",
+    "parent_retention_worker",
+  ];
+  type Membership = {
+    role_name: string;
+    grantor: string;
+    admin_option: boolean;
+    inherit_option: boolean;
+    set_option: boolean;
+  };
+  let originalControls: Record<string, unknown> | undefined;
+  let originalMemberships: Membership[] | undefined;
+  let operatorName = "";
+  const changedMemberships: { name: string; existed: boolean; set: boolean }[] =
+    [];
+  const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  async function memberships(): Promise<Membership[]> {
+    return (
+      await admin.query(
+        "select granted.rolname role_name,grantor.rolname grantor,m.admin_option,m.inherit_option,m.set_option from pg_auth_members m join pg_roles member on member.oid=m.member join pg_roles granted on granted.oid=m.roleid join pg_roles grantor on grantor.oid=m.grantor where member.rolname=current_user and granted.rolname=any($1::text[]) order by granted.rolname,grantor.rolname",
+        [parentGroups],
+      )
+    ).rows;
+  }
+  async function removeFixtureStorageMetadata(bucket: string, path: string) {
+    assert.equal(
+      fixtureStoragePaths.get(path),
+      bucket,
+      "Only metadata created by this fixture may be erased directly.",
+    );
+    await admin.query("begin");
+    try {
+      // These rows have no object bytes; preserve Storage's deletion guard outside this transaction.
+      await admin.query(
+        "select set_config('storage.allow_delete_query','true',true)",
+      );
+      await admin.query(
+        "delete from storage.objects where bucket_id=$1 and name=$2",
+        [bucket, path],
+      );
+      await admin.query("commit");
+    } catch (error) {
+      await admin.query("rollback");
+      throw error;
+    }
+    assert.notEqual(
+      (
+        await admin.query(
+          "select current_setting('storage.allow_delete_query',true) value",
+        )
+      ).rows[0].value,
+      "true",
+    );
+  }
   const sessions = new Map<string, string>(
     users.map((id) => [id, randomUUID()]),
   );
@@ -85,6 +143,7 @@ async function main() {
       | "parent_storage_broker",
     user: string | null,
     run: (db: PoolClient) => Promise<T>,
+    method: "otp" | "password" = "otp",
   ): Promise<T> {
     const db = await pool.connect();
     try {
@@ -96,7 +155,7 @@ async function main() {
           role: name,
           session_id: user ? sessions.get(user) : undefined,
           aal: "aal1",
-          amr: [{ method: "otp" }],
+          amr: [{ method }],
           user_metadata: { role: "parent", is_active: true },
         }),
       ]);
@@ -217,6 +276,50 @@ async function main() {
       ready.rows[0].configured,
       "Apply the parent migration to the isolated local test project first",
     );
+    if (!fixture) {
+      originalControls = (
+        await admin.query(
+          "select to_jsonb(c) value from parent_private.processing_controls c where singleton",
+        )
+      ).rows[0]?.value;
+      assert.ok(
+        originalControls,
+        "The local fixture requires an existing processing-control row.",
+      );
+      operatorName = (await admin.query("select current_user name")).rows[0]
+        .name;
+      originalMemberships = await memberships();
+      for (const name of parentGroups) {
+        const existing = originalMemberships.filter(
+          (membership) => membership.role_name === name,
+        );
+        if (existing.some((membership) => membership.set_option)) continue;
+        assert.ok(
+          existing.some((membership) => membership.admin_option),
+          `The isolated fixture operator needs an existing ADMIN membership for ${name}; no role membership is provisioned by this test.`,
+        );
+        const own = existing.find(
+          (membership) => membership.grantor === operatorName,
+        );
+        changedMemberships.push({
+          name,
+          existed: Boolean(own),
+          set: own?.set_option ?? false,
+        });
+        await admin.query(
+          `grant ${identifier(name)} to ${identifier(operatorName)} with ${own ? "" : "admin false, inherit false, "}set true`,
+        );
+      }
+      assert.notEqual(
+        (
+          await admin.query(
+            "select current_setting('storage.allow_delete_query',true) value",
+          )
+        ).rows[0].value,
+        "true",
+        "The fixture requires Storage's normal direct-deletion guard.",
+      );
+    }
     await admin.query(
       "update parent_private.processing_controls set enabled=true,approval_reference='isolated synthetic security fixture',approved_until=now()+interval '1 day' where singleton",
     );
@@ -290,6 +393,220 @@ async function main() {
     const key = randomUUID(),
       requestA = await start(ownerA, key),
       requestB = await start(ownerB);
+    await denied(() =>
+      role("anon", null, (db) =>
+        db.query("select public.parent_authorization_window()"),
+      ),
+    );
+    await role("authenticated", ownerA, async (db) => {
+      await db.query("savepoint quoted_deadline");
+      const issued = (
+        await db.query(
+          "select public.parent_authorization_window() value,now() checked_at",
+        )
+      ).rows[0];
+      const quote = issued.value;
+      assert.ok(
+        Date.parse(quote.issuedAt) <= new Date(issued.checked_at).getTime(),
+      );
+      assert.ok(
+        Date.parse(quote.expiresAt) > new Date(issued.checked_at).getTime(),
+      );
+      assert.ok(
+        Date.parse(quote.expiresAt) - Date.parse(quote.issuedAt) <=
+          30 * 86400000,
+      );
+      assert.ok(
+        (
+          await db.query("select public.parent_start_request($1,$2,$3) id", [
+            JSON.stringify(intake),
+            JSON.stringify({ ...mandate, expiresAt: quote.expiresAt }),
+            randomUUID(),
+          ])
+        ).rows[0].id,
+      );
+      await db.query("rollback to savepoint quoted_deadline");
+      assertionCount += 4;
+    });
+    // Shared identities get a new, owned parent household, never a school role grant.
+    await admin.query(
+      "update parent_private.processing_controls set existing_accounts_enabled=true where singleton",
+    );
+    await denied(() =>
+      role("authenticated", staff, (db) =>
+        db.query("select public.parent_ensure_account()"),
+      ),
+    );
+    const staffRequest = (
+      await role(
+        "authenticated",
+        staff,
+        (db) =>
+          db.query("select public.parent_start_request($1,$2,$3) id", [
+            JSON.stringify({ ...intake, contactPreference: "email" }),
+            JSON.stringify(mandate),
+            randomUUID(),
+          ]),
+        "password",
+      )
+    ).rows[0].id;
+    await admin.query(
+      "insert into public.families(id,name,created_by_id) values($1,'Synthetic school family',$2)",
+      [schoolFamily, staff],
+    );
+    await admin.query(
+      "update public.parent_accounts set preferences=jsonb_set(preferences,'{contactPreference}','\"email\"') where id=$1",
+      [staff],
+    );
+    assert.equal(
+      (
+        await role(
+          "authenticated",
+          staff,
+          (db) =>
+            db.query(
+              "select count(*)::int n from public.parent_requests where id=$1",
+              [requestA],
+            ),
+          "password",
+        )
+      ).rows[0].n,
+      0,
+    );
+    assertionCount++;
+    assert.equal(
+      (
+        await admin.query(
+          "select parent_private.current_grant($1,1) grant_allowed,parent_private.notification_allowed($1,1) notification_allowed",
+          [staffRequest],
+        )
+      ).rows[0].grant_allowed,
+      true,
+    );
+    assertionCount++;
+    assert.equal(
+      (
+        await admin.query(
+          "select parent_private.notification_allowed($1,1) allowed",
+          [staffRequest],
+        )
+      ).rows[0].allowed,
+      true,
+    );
+    assertionCount++;
+    await admin.query(
+      "update public.app_users set is_active=false where id=$1",
+      [staff],
+    );
+    await denied(() =>
+      role(
+        "authenticated",
+        staff,
+        (db) => db.query("select public.parent_ensure_account()"),
+        "password",
+      ),
+    );
+    const disabledShared = (
+      await admin.query(
+        "select parent_private.current_grant($1,1) grant_allowed,parent_private.notification_allowed($1,1) notification_allowed",
+        [staffRequest],
+      )
+    ).rows[0];
+    assert.deepEqual(disabledShared, {
+      grant_allowed: false,
+      notification_allowed: false,
+    });
+    assertionCount++;
+    await admin.query(
+      "update public.app_users set is_active=true where id=$1",
+      [staff],
+    );
+    const completionEvent = (
+      await admin.query(
+        "insert into public.parent_events(request_id,kind,actor,summary) values($1,'support.support_received','caselink','Synthetic shared-account completion') returning id",
+        [staffRequest],
+      )
+    ).rows[0].id;
+    await admin.query(
+      "insert into parent_private.notification_outbox(event_id,request_id,request_version,kind,completion_notice) values($1,$2,1,'outcome',true)",
+      [completionEvent, staffRequest],
+    );
+    await admin.query(
+      "update public.parent_requests set status='closed',closed_reason='completed' where id=$1",
+      [staffRequest],
+    );
+    assert.equal(
+      (
+        await admin.query(
+          "select parent_private.notification_allowed($1,1) allowed",
+          [staffRequest],
+        )
+      ).rows[0].allowed,
+      true,
+    );
+    assertionCount++;
+    await admin.query(
+      "update public.app_users set is_active=false where id=$1",
+      [staff],
+    );
+    assert.equal(
+      (
+        await admin.query(
+          "select parent_private.notification_allowed($1,1) allowed",
+          [staffRequest],
+        )
+      ).rows[0].allowed,
+      false,
+    );
+    assertionCount++;
+    await admin.query(
+      "update public.app_users set is_active=true where id=$1",
+      [staff],
+    );
+    await role(
+      "authenticated",
+      staff,
+      (db) => db.query("select public.parent_request_deletion()"),
+      "password",
+    );
+    const sharedDeletion = (
+      await role("parent_retention_worker", null, (db) =>
+        db.query("select parent_private.parent_claim_cleanup(100) batch"),
+      )
+    ).rows[0].batch;
+    assert.ok(sharedDeletion.accountIds.includes(staff));
+    assertionCount++;
+    await role("parent_retention_worker", null, (db) =>
+      db.query("select parent_private.parent_finish_cleanup($1,$2,$3,$4,$5)", [
+        sharedDeletion.batchId,
+        sharedDeletion.leaseToken,
+        [],
+        sharedDeletion.accountIds,
+        [],
+      ]),
+    );
+    const preservedIdentity = (
+      await admin.query(
+        "select exists(select 1 from auth.users where id=$1) auth_exists,exists(select 1 from public.app_users where id=$1) staff_exists,exists(select 1 from public.families where id=$2) school_exists,exists(select 1 from public.parent_accounts where id=$1) parent_exists,exists(select 1 from public.parent_requests where id=$3) request_exists",
+        [staff, schoolFamily, staffRequest],
+      )
+    ).rows[0];
+    assert.deepEqual(preservedIdentity, {
+      auth_exists: true,
+      staff_exists: true,
+      school_exists: true,
+      parent_exists: false,
+      request_exists: false,
+    });
+    assertionCount++;
+    await denied(() =>
+      role(
+        "authenticated",
+        staff,
+        (db) => db.query("select public.parent_ensure_account()"),
+        "password",
+      ),
+    );
     await denied(
       () =>
         role("authenticated", ownerA, (db) =>
@@ -300,6 +617,11 @@ async function main() {
     assert.equal(await start(ownerA, key), requestA);
     await admin.query(
       "update parent_private.processing_controls set enabled=false where singleton",
+    );
+    await denied(() =>
+      role("authenticated", ownerA, (db) =>
+        db.query("select public.parent_authorization_window()"),
+      ),
     );
     assert.equal(
       (
@@ -919,6 +1241,7 @@ async function main() {
         ),
       );
       // This is fixture metadata only. Real Storage uploads and PDF bytes require the separate service/rendering checks.
+      fixtureStoragePaths.set(artifact.object_path, "parent-form-artifacts");
       await admin.query(
         "insert into storage.objects(bucket_id,name) values('parent-form-artifacts',$1)",
         [artifact.object_path],
@@ -1184,6 +1507,7 @@ async function main() {
       ),
     );
     assertionCount++;
+    fixtureStoragePaths.set(document.object_path, "parent-documents");
     await role("authenticated", ownerB, (db) =>
       db.query(
         'insert into storage.objects(bucket_id,name,metadata) values(\'parent-documents\',$1,\'{"size":400,"mimetype":"application/pdf"}\')',
@@ -1410,6 +1734,7 @@ async function main() {
       )
     ).rows[0];
     assert.equal(quarantined.page_count, null);
+    fixtureStoragePaths.set(quarantined.object_path, "parent-documents");
     assertionCount++;
     await denied(() =>
       role("parent_worker", null, (db) =>
@@ -1435,24 +1760,83 @@ async function main() {
         ),
       ),
     );
+    await denied(() =>
+      role("authenticated", ownerA, (db) =>
+        db.query(
+          "insert into storage.objects(bucket_id,name) values('parent-documents',$1)",
+          [quarantined.object_path],
+        ),
+      ),
+    );
+    await denied(() =>
+      role("authenticated", ownerB, (db) =>
+        db.query(
+          'insert into storage.objects(bucket_id,name,metadata) values(\'parent-documents\',$1,\'{"size":400,"mimetype":"image/png"}\')',
+          [quarantined.object_path],
+        ),
+      ),
+    );
     await role("authenticated", ownerB, (db) =>
       db.query(
-        'insert into storage.objects(bucket_id,name,metadata) values(\'parent-documents\',$1,\'{"size":400,"mimetype":"application/pdf"}\')',
+        "insert into storage.objects(bucket_id,name) values('parent-documents',$1)",
         [quarantined.object_path],
       ),
     );
     assert.equal(
       (
         await role("authenticated", ownerB, (db) =>
-          db.query(
-            "delete from storage.objects where bucket_id='parent-documents' and name=$1 returning id",
-            [quarantined.object_path],
-          ),
+          db.query("select id from storage.objects where name=$1", [
+            quarantined.object_path,
+          ]),
         )
       ).rows.length,
       0,
     );
     assertionCount++;
+    await denied(() =>
+      role("authenticated", ownerB, (db) =>
+        db.query("select public.parent_confirm_document_upload($1,$2)", [
+          resumeRequest,
+          quarantined.id,
+        ]),
+      ),
+    );
+    await admin.query(
+      'update storage.objects set metadata=\'{"size":401,"mimetype":"application/pdf"}\' where name=$1',
+      [quarantined.object_path],
+    );
+    await denied(() =>
+      role("authenticated", ownerB, (db) =>
+        db.query("select public.parent_confirm_document_upload($1,$2)", [
+          resumeRequest,
+          quarantined.id,
+        ]),
+      ),
+    );
+    await removeFixtureStorageMetadata(
+      "parent-documents",
+      quarantined.object_path,
+    );
+    await role("authenticated", ownerB, (db) =>
+      db.query(
+        'insert into storage.objects(bucket_id,name,metadata) values(\'parent-documents\',$1,\'{"size":400,"mimetype":"application/pdf"}\')',
+        [quarantined.object_path],
+      ),
+    );
+    const directDelete = () =>
+      role("authenticated", ownerB, (db) =>
+        db.query(
+          "delete from storage.objects where bucket_id='parent-documents' and name=$1 returning id",
+          [quarantined.object_path],
+        ),
+      );
+    if (fixture) {
+      assert.equal((await directDelete()).rows.length, 0);
+      assertionCount++;
+    } else {
+      // Actual Storage rejects the statement before row policies can filter it.
+      await denied(directDelete);
+    }
     assert.equal(
       (
         await admin.query(
@@ -1469,6 +1853,17 @@ async function main() {
         quarantined.id,
       ]),
     );
+    assert.equal(
+      (
+        await role("authenticated", ownerB, (db) =>
+          db.query("select id from storage.objects where name=$1", [
+            quarantined.object_path,
+          ]),
+        )
+      ).rows.length,
+      1,
+    );
+    assertionCount++;
     resumeJob = await claim(resumeRequest);
     assert.equal(
       (
@@ -2114,15 +2509,62 @@ async function main() {
     );
   } finally {
     try {
+      for (const [path, bucket] of fixtureStoragePaths)
+        await removeFixtureStorageMetadata(bucket, path);
       await admin.query(
         "delete from parent_private.provider_capabilities where permission_version='synthetic-security-test'",
       );
+      await admin.query("delete from public.families where id=$1", [
+        schoolFamily,
+      ]);
       await admin.query("delete from auth.users where id=any($1::uuid[])", [
         users,
       ]);
     } finally {
-      await pool.end();
-      await admin.end();
+      try {
+        if (!fixture && originalControls) {
+          const errors: unknown[] = [];
+          try {
+            await admin.query(
+              "update parent_private.processing_controls c set (enabled,approval_reference,approved_until,updated_at,existing_accounts_enabled)=(select r.enabled,r.approval_reference,r.approved_until,r.updated_at,r.existing_accounts_enabled from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton",
+              [JSON.stringify(originalControls)],
+            );
+          } catch (error) {
+            errors.push(error);
+          }
+          for (const membership of changedMemberships.reverse()) {
+            try {
+              await admin.query(
+                membership.existed
+                  ? `grant ${identifier(membership.name)} to ${identifier(operatorName)} with set ${membership.set ? "true" : "false"}`
+                  : `revoke ${identifier(membership.name)} from ${identifier(operatorName)} granted by ${identifier(operatorName)}`,
+              );
+            } catch (error) {
+              errors.push(error);
+            }
+          }
+          if (errors.length)
+            throw new AggregateError(
+              errors,
+              "The isolated fixture could not restore its processing controls or role settings.",
+            );
+          assert.deepEqual(
+            (
+              await admin.query(
+                "select to_jsonb(c) value from parent_private.processing_controls c where singleton",
+              )
+            ).rows[0].value,
+            originalControls,
+          );
+          assert.deepEqual(await memberships(), originalMemberships);
+          console.log(
+            "Actual fixture processing controls and role memberships restored exactly.",
+          );
+        }
+      } finally {
+        await pool.end();
+        await admin.end();
+      }
     }
   }
 }

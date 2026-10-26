@@ -1,176 +1,376 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-26T02:41:59.798208+00:00",
-  "title": "Design System: CaseLink parent support",
+  "generatedAt": "2026-10-26T04:02:07.232Z",
+  "title": "Design System: CaseLink",
   "extensions": {
     "colorMeta": {
-      "navy-ink": {
-        "role": "neutral",
-        "displayName": "Navy Ink",
-        "canonical": "#122c37",
-        "tonalRamp": [
-          "oklch(15% 0.0377 228.0)",
-          "oklch(26% 0.0377 228.0)",
-          "oklch(37% 0.0377 228.0)",
-          "oklch(48% 0.0377 228.0)",
-          "oklch(59% 0.0377 228.0)",
-          "oklch(70% 0.0377 228.0)",
-          "oklch(82% 0.0377 228.0)",
-          "oklch(95% 0.0377 228.0)"
-        ]
-      },
-      "body-muted": {
-        "role": "neutral",
-        "displayName": "Body Muted",
-        "canonical": "#4d646b",
-        "tonalRamp": [
-          "oklch(15% 0.0297 218.4)",
-          "oklch(26% 0.0297 218.4)",
-          "oklch(37% 0.0297 218.4)",
-          "oklch(48% 0.0297 218.4)",
-          "oklch(59% 0.0297 218.4)",
-          "oklch(70% 0.0297 218.4)",
-          "oklch(82% 0.0297 218.4)",
-          "oklch(95% 0.0297 218.4)"
-        ]
-      },
       "primary": {
         "role": "primary",
-        "displayName": "Primary",
-        "canonical": "#086a63",
+        "displayName": "CaseLink violet",
         "tonalRamp": [
-          "oklch(15% 0.0807 186.8)",
-          "oklch(26% 0.0807 186.8)",
-          "oklch(37% 0.0807 186.8)",
-          "oklch(48% 0.0807 186.8)",
-          "oklch(59% 0.0807 186.8)",
-          "oklch(70% 0.0807 186.8)",
-          "oklch(82% 0.0807 186.8)",
-          "oklch(95% 0.0807 186.8)"
+          "oklch(15% 0.2146 280.43)",
+          "oklch(26% 0.2146 280.43)",
+          "oklch(38% 0.2146 280.43)",
+          "oklch(50% 0.2146 280.43)",
+          "oklch(62% 0.2146 280.43)",
+          "oklch(74% 0.2146 280.43)",
+          "oklch(85% 0.2146 280.43)",
+          "oklch(95% 0.2146 280.43)"
         ]
       },
       "primary-hover": {
         "role": "primary",
-        "displayName": "Primary Hover",
-        "canonical": "#04544f",
+        "displayName": "Deep action violet",
         "tonalRamp": [
-          "oklch(15% 0.0687 187.8)",
-          "oklch(26% 0.0687 187.8)",
-          "oklch(37% 0.0687 187.8)",
-          "oklch(48% 0.0687 187.8)",
-          "oklch(59% 0.0687 187.8)",
-          "oklch(70% 0.0687 187.8)",
-          "oklch(82% 0.0687 187.8)",
-          "oklch(95% 0.0687 187.8)"
+          "oklch(15% 0.1952 279.25)",
+          "oklch(26% 0.1952 279.25)",
+          "oklch(38% 0.1952 279.25)",
+          "oklch(50% 0.1952 279.25)",
+          "oklch(62% 0.1952 279.25)",
+          "oklch(74% 0.1952 279.25)",
+          "oklch(85% 0.1952 279.25)",
+          "oklch(95% 0.1952 279.25)"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Soft lavender",
+        "tonalRamp": [
+          "oklch(15% 0.0284 294.59)",
+          "oklch(26% 0.0284 294.59)",
+          "oklch(38% 0.0284 294.59)",
+          "oklch(50% 0.0284 294.59)",
+          "oklch(62% 0.0284 294.59)",
+          "oklch(74% 0.0284 294.59)",
+          "oklch(85% 0.0284 294.59)",
+          "oklch(95% 0.0284 294.59)"
+        ]
+      },
+      "primary-rule": {
+        "role": "primary",
+        "displayName": "Violet boundary",
+        "tonalRamp": [
+          "oklch(15% 0.1105 291.16)",
+          "oklch(26% 0.1105 291.16)",
+          "oklch(38% 0.1105 291.16)",
+          "oklch(50% 0.1105 291.16)",
+          "oklch(62% 0.1105 291.16)",
+          "oklch(74% 0.1105 291.16)",
+          "oklch(85% 0.1105 291.16)",
+          "oklch(95% 0.1105 291.16)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus violet",
+        "tonalRamp": [
+          "oklch(15% 0.2133 282.31)",
+          "oklch(26% 0.2133 282.31)",
+          "oklch(38% 0.2133 282.31)",
+          "oklch(50% 0.2133 282.31)",
+          "oklch(62% 0.2133 282.31)",
+          "oklch(74% 0.2133 282.31)",
+          "oklch(85% 0.2133 282.31)",
+          "oklch(95% 0.2133 282.31)"
         ]
       },
       "paper": {
         "role": "neutral",
-        "displayName": "Paper",
-        "canonical": "#f7faf8",
+        "displayName": "Lavender paper",
         "tonalRamp": [
-          "oklch(15% 0.0041 157.2)",
-          "oklch(26% 0.0041 157.2)",
-          "oklch(37% 0.0041 157.2)",
-          "oklch(48% 0.0041 157.2)",
-          "oklch(59% 0.0041 157.2)",
-          "oklch(70% 0.0041 157.2)",
-          "oklch(82% 0.0041 157.2)",
-          "oklch(95% 0.0041 157.2)"
+          "oklch(15% 0.0067 295.45)",
+          "oklch(26% 0.0067 295.45)",
+          "oklch(38% 0.0067 295.45)",
+          "oklch(50% 0.0067 295.45)",
+          "oklch(62% 0.0067 295.45)",
+          "oklch(74% 0.0067 295.45)",
+          "oklch(85% 0.0067 295.45)",
+          "oklch(95% 0.0067 295.45)"
+        ]
+      },
+      "paper-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary lavender paper",
+        "tonalRamp": [
+          "oklch(15% 0.0204 298.2)",
+          "oklch(26% 0.0204 298.2)",
+          "oklch(38% 0.0204 298.2)",
+          "oklch(50% 0.0204 298.2)",
+          "oklch(62% 0.0204 298.2)",
+          "oklch(74% 0.0204 298.2)",
+          "oklch(85% 0.0204 298.2)",
+          "oklch(95% 0.0204 298.2)"
+        ]
+      },
+      "paper-selected": {
+        "role": "neutral",
+        "displayName": "Selected paper",
+        "tonalRamp": [
+          "oklch(15% 0.0286 296.74)",
+          "oklch(26% 0.0286 296.74)",
+          "oklch(38% 0.0286 296.74)",
+          "oklch(50% 0.0286 296.74)",
+          "oklch(62% 0.0286 296.74)",
+          "oklch(74% 0.0286 296.74)",
+          "oklch(85% 0.0286 296.74)",
+          "oklch(95% 0.0286 296.74)"
+        ]
+      },
+      "paper-hero": {
+        "role": "neutral",
+        "displayName": "Panorama paper",
+        "tonalRamp": [
+          "oklch(15% 0.0121 296.36)",
+          "oklch(26% 0.0121 296.36)",
+          "oklch(38% 0.0121 296.36)",
+          "oklch(50% 0.0121 296.36)",
+          "oklch(62% 0.0121 296.36)",
+          "oklch(74% 0.0121 296.36)",
+          "oklch(85% 0.0121 296.36)",
+          "oklch(95% 0.0121 296.36)"
         ]
       },
       "surface": {
         "role": "neutral",
-        "displayName": "Surface",
-        "canonical": "#ffffff",
+        "displayName": "Near-white surface",
         "tonalRamp": [
-          "oklch(15% 0.0000 89.9)",
-          "oklch(26% 0.0000 89.9)",
-          "oklch(37% 0.0000 89.9)",
-          "oklch(48% 0.0000 89.9)",
-          "oklch(59% 0.0000 89.9)",
-          "oklch(70% 0.0000 89.9)",
-          "oklch(82% 0.0000 89.9)",
-          "oklch(95% 0.0000 89.9)"
+          "oklch(15% 0.0011 17.18)",
+          "oklch(26% 0.0011 17.18)",
+          "oklch(38% 0.0011 17.18)",
+          "oklch(50% 0.0011 17.18)",
+          "oklch(62% 0.0011 17.18)",
+          "oklch(74% 0.0011 17.18)",
+          "oklch(85% 0.0011 17.18)",
+          "oklch(95% 0.0011 17.18)"
         ]
       },
-      "soft": {
+      "ink": {
         "role": "neutral",
-        "displayName": "Soft",
-        "canonical": "#eaf4f0",
+        "displayName": "Deep navy ink",
         "tonalRamp": [
-          "oklch(15% 0.0118 170.3)",
-          "oklch(26% 0.0118 170.3)",
-          "oklch(37% 0.0118 170.3)",
-          "oklch(48% 0.0118 170.3)",
-          "oklch(59% 0.0118 170.3)",
-          "oklch(70% 0.0118 170.3)",
-          "oklch(82% 0.0118 170.3)",
-          "oklch(95% 0.0118 170.3)"
+          "oklch(15% 0.0939 266.47)",
+          "oklch(26% 0.0939 266.47)",
+          "oklch(38% 0.0939 266.47)",
+          "oklch(50% 0.0939 266.47)",
+          "oklch(62% 0.0939 266.47)",
+          "oklch(74% 0.0939 266.47)",
+          "oklch(85% 0.0939 266.47)",
+          "oklch(95% 0.0939 266.47)"
         ]
       },
-      "border": {
+      "ink-hover": {
         "role": "neutral",
-        "displayName": "Border",
-        "canonical": "#d6e1dc",
+        "displayName": "Hover navy",
         "tonalRamp": [
-          "oklch(15% 0.0136 167.1)",
-          "oklch(26% 0.0136 167.1)",
-          "oklch(37% 0.0136 167.1)",
-          "oklch(48% 0.0136 167.1)",
-          "oklch(59% 0.0136 167.1)",
-          "oklch(70% 0.0136 167.1)",
-          "oklch(82% 0.0136 167.1)",
-          "oklch(95% 0.0136 167.1)"
+          "oklch(15% 0.1083 266.72)",
+          "oklch(26% 0.1083 266.72)",
+          "oklch(38% 0.1083 266.72)",
+          "oklch(50% 0.1083 266.72)",
+          "oklch(62% 0.1083 266.72)",
+          "oklch(74% 0.1083 266.72)",
+          "oklch(85% 0.1083 266.72)",
+          "oklch(95% 0.1083 266.72)"
         ]
       },
-      "support-lemon": {
+      "ink-strong": {
+        "role": "neutral",
+        "displayName": "Strong supporting ink",
+        "tonalRamp": [
+          "oklch(15% 0.0789 271.66)",
+          "oklch(26% 0.0789 271.66)",
+          "oklch(38% 0.0789 271.66)",
+          "oklch(50% 0.0789 271.66)",
+          "oklch(62% 0.0789 271.66)",
+          "oklch(74% 0.0789 271.66)",
+          "oklch(85% 0.0789 271.66)",
+          "oklch(95% 0.0789 271.66)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Muted navy ink",
+        "tonalRamp": [
+          "oklch(15% 0.0619 272.15)",
+          "oklch(26% 0.0619 272.15)",
+          "oklch(38% 0.0619 272.15)",
+          "oklch(50% 0.0619 272.15)",
+          "oklch(62% 0.0619 272.15)",
+          "oklch(74% 0.0619 272.15)",
+          "oklch(85% 0.0619 272.15)",
+          "oklch(95% 0.0619 272.15)"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Faint navy ink",
+        "tonalRamp": [
+          "oklch(15% 0.0516 272.35)",
+          "oklch(26% 0.0516 272.35)",
+          "oklch(38% 0.0516 272.35)",
+          "oklch(50% 0.0516 272.35)",
+          "oklch(62% 0.0516 272.35)",
+          "oklch(74% 0.0516 272.35)",
+          "oklch(85% 0.0516 272.35)",
+          "oklch(95% 0.0516 272.35)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Lavender rule",
+        "tonalRamp": [
+          "oklch(15% 0.0385 295.43)",
+          "oklch(26% 0.0385 295.43)",
+          "oklch(38% 0.0385 295.43)",
+          "oklch(50% 0.0385 295.43)",
+          "oklch(62% 0.0385 295.43)",
+          "oklch(74% 0.0385 295.43)",
+          "oklch(85% 0.0385 295.43)",
+          "oklch(95% 0.0385 295.43)"
+        ]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong lavender rule",
+        "tonalRamp": [
+          "oklch(15% 0.0606 295.7)",
+          "oklch(26% 0.0606 295.7)",
+          "oklch(38% 0.0606 295.7)",
+          "oklch(50% 0.0606 295.7)",
+          "oklch(62% 0.0606 295.7)",
+          "oklch(74% 0.0606 295.7)",
+          "oklch(85% 0.0606 295.7)",
+          "oklch(95% 0.0606 295.7)"
+        ]
+      },
+      "positive": {
         "role": "secondary",
-        "displayName": "Support Lemon",
-        "canonical": "#eff4b9",
+        "displayName": "Sage status",
         "tonalRamp": [
-          "oklch(15% 0.0762 111.8)",
-          "oklch(26% 0.0762 111.8)",
-          "oklch(37% 0.0762 111.8)",
-          "oklch(48% 0.0762 111.8)",
-          "oklch(59% 0.0762 111.8)",
-          "oklch(70% 0.0762 111.8)",
-          "oklch(82% 0.0762 111.8)",
-          "oklch(95% 0.0762 111.8)"
+          "oklch(15% 0.0686 163.64)",
+          "oklch(26% 0.0686 163.64)",
+          "oklch(38% 0.0686 163.64)",
+          "oklch(50% 0.0686 163.64)",
+          "oklch(62% 0.0686 163.64)",
+          "oklch(74% 0.0686 163.64)",
+          "oklch(85% 0.0686 163.64)",
+          "oklch(95% 0.0686 163.64)"
+        ]
+      },
+      "positive-bg": {
+        "role": "secondary",
+        "displayName": "Sage status field",
+        "tonalRamp": [
+          "oklch(15% 0.0132 159.91)",
+          "oklch(26% 0.0132 159.91)",
+          "oklch(38% 0.0132 159.91)",
+          "oklch(50% 0.0132 159.91)",
+          "oklch(62% 0.0132 159.91)",
+          "oklch(74% 0.0132 159.91)",
+          "oklch(85% 0.0132 159.91)",
+          "oklch(95% 0.0132 159.91)"
+        ]
+      },
+      "attention": {
+        "role": "secondary",
+        "displayName": "Amber attention",
+        "tonalRamp": [
+          "oklch(15% 0.085 81.02)",
+          "oklch(26% 0.085 81.02)",
+          "oklch(38% 0.085 81.02)",
+          "oklch(50% 0.085 81.02)",
+          "oklch(62% 0.085 81.02)",
+          "oklch(74% 0.085 81.02)",
+          "oklch(85% 0.085 81.02)",
+          "oklch(95% 0.085 81.02)"
+        ]
+      },
+      "attention-bg": {
+        "role": "secondary",
+        "displayName": "Amber attention field",
+        "tonalRamp": [
+          "oklch(15% 0.0381 90.65)",
+          "oklch(26% 0.0381 90.65)",
+          "oklch(38% 0.0381 90.65)",
+          "oklch(50% 0.0381 90.65)",
+          "oklch(62% 0.0381 90.65)",
+          "oklch(74% 0.0381 90.65)",
+          "oklch(85% 0.0381 90.65)",
+          "oklch(95% 0.0381 90.65)"
         ]
       },
       "error": {
-        "role": "neutral",
-        "displayName": "Error",
-        "canonical": "#962f29",
+        "role": "secondary",
+        "displayName": "Error red",
         "tonalRamp": [
-          "oklch(15% 0.1390 27.3)",
-          "oklch(26% 0.1390 27.3)",
-          "oklch(37% 0.1390 27.3)",
-          "oklch(48% 0.1390 27.3)",
-          "oklch(59% 0.1390 27.3)",
-          "oklch(70% 0.1390 27.3)",
-          "oklch(82% 0.1390 27.3)",
-          "oklch(95% 0.1390 27.3)"
+          "oklch(15% 0.1586 25.61)",
+          "oklch(26% 0.1586 25.61)",
+          "oklch(38% 0.1586 25.61)",
+          "oklch(50% 0.1586 25.61)",
+          "oklch(62% 0.1586 25.61)",
+          "oklch(74% 0.1586 25.61)",
+          "oklch(85% 0.1586 25.61)",
+          "oklch(95% 0.1586 25.61)"
+        ]
+      },
+      "error-bg": {
+        "role": "secondary",
+        "displayName": "Error field",
+        "tonalRamp": [
+          "oklch(15% 0.0129 17.38)",
+          "oklch(26% 0.0129 17.38)",
+          "oklch(38% 0.0129 17.38)",
+          "oklch(50% 0.0129 17.38)",
+          "oklch(62% 0.0129 17.38)",
+          "oklch(74% 0.0129 17.38)",
+          "oklch(85% 0.0129 17.38)",
+          "oklch(95% 0.0129 17.38)"
         ]
       }
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Entry display",
-        "purpose": "Public entry headline."
+        "displayName": "Shared parent page heading",
+        "purpose": "Newsreader page hierarchy; public panorama has a separate surface scale."
+      },
+      "headline": {
+        "displayName": "Section heading",
+        "purpose": "Newsreader structure across public and operational pages."
+      },
+      "title": {
+        "displayName": "Functional title",
+        "purpose": "Geist subsections, steps and task labels."
       },
       "body": {
-        "displayName": "Readable body",
-        "purpose": "Forms, service explanations and progress."
+        "displayName": "Parent body",
+        "purpose": "Explicit parent shell and input readability; does not inherit the smaller legacy body."
+      },
+      "label": {
+        "displayName": "Field label",
+        "purpose": "Sentence-case functional labels."
       }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "action",
+        "value": "0 8px 22px oklch(30% 0.14 282 / 0.18)",
+        "purpose": "Primary action, resolving the existing shared shadow token."
+      },
+      {
+        "name": "parent-mobile-menu",
+        "value": "0 10px 30px oklch(24% 0.05 275 / 0.08)",
+        "purpose": "The current parent phone menu popover."
+      }
+    ],
     "motion": [
       {
-        "name": "control",
+        "name": "control-color",
         "value": "160ms ease",
-        "purpose": "Control color and boundary transitions; reduced-motion preference is honored."
+        "purpose": "Parent action background and boundary transitions."
+      },
+      {
+        "name": "service-arrow",
+        "value": "220ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Small directional response on the public support route."
       }
     ],
     "breakpoints": [
@@ -188,62 +388,103 @@
     {
       "name": "Primary action",
       "kind": "button",
-      "description": "Primary action from the parent interface.",
+      "refersTo": "button-primary",
+      "description": "The shared violet action with a soft action shadow and clear focus.",
       "html": "<button class=\"ds-primary\">Save and continue</button>",
-      "css": ".ds-primary{background:#086a63;color:#fff;border:1px solid transparent;border-radius:9px;min-height:48px;padding:12px 19px;font:650 15px/1.4 \"Geist Sans\",sans-serif;cursor:pointer}.ds-primary:hover{background:#04544f}.ds-primary:focus-visible{outline:3px solid #087f78;outline-offset:3px}",
-      "refersTo": "button-primary"
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;border-radius:var(--radius-control);padding:.75rem 1.2rem;font:650 .9375rem/1.4 var(--font-body);border:1px solid transparent;cursor:pointer;transition:background 160ms ease,border-color 160ms ease;text-decoration:none;background:var(--color-accent);color:#fff;box-shadow:var(--shadow-action)}.ds-primary:hover{background:var(--color-accent-hover)}.ds-primary:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}.ds-primary:disabled{cursor:wait;opacity:.65}"
     },
     {
       "name": "Secondary action",
       "kind": "button",
-      "description": "Secondary action from the parent interface.",
+      "refersTo": "button-secondary",
+      "description": "A surfaced action with a strong boundary and pale hover.",
       "html": "<button class=\"ds-secondary\">Download summary</button>",
-      "css": ".ds-secondary{background:#fff;color:#122c37;border:1px solid #9cb5ad;border-radius:9px;min-height:48px;padding:12px 19px;font:650 15px/1.4 \"Geist Sans\",sans-serif;cursor:pointer}.ds-secondary:hover{background:#eaf4f0}.ds-secondary:focus-visible{outline:3px solid #087f78;outline-offset:3px}"
+      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;border-radius:var(--radius-control);padding:.75rem 1.2rem;font:650 .9375rem/1.4 var(--font-body);border:1px solid transparent;cursor:pointer;transition:background 160ms ease,border-color 160ms ease;text-decoration:none;background:var(--color-surface);color:var(--color-ink);border-color:var(--color-rule-strong)}.ds-secondary:hover{background:var(--color-accent-soft)}.ds-secondary:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}.ds-secondary:disabled{cursor:wait;opacity:.65}"
+    },
+    {
+      "name": "Quiet action",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Underlined violet action without a filled surface.",
+      "html": "<button class=\"ds-quiet\">Back</button>",
+      "css": ".ds-quiet{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;border-radius:var(--radius-control);padding:.75rem 1.2rem;font:650 .9375rem/1.4 var(--font-body);border:1px solid transparent;cursor:pointer;transition:background 160ms ease,border-color 160ms ease;text-decoration:none;background:transparent;color:var(--color-accent);padding-left:.3rem;padding-right:.3rem;text-decoration:underline;text-underline-offset:4px}.ds-quiet:hover{color:var(--color-accent-hover)}.ds-quiet:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}.ds-quiet:disabled{cursor:wait;opacity:.65}"
+    },
+    {
+      "name": "Destructive action",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Error-colored text and boundary distinguish the destructive choice.",
+      "html": "<button class=\"ds-danger\">Stop future work</button>",
+      "css": ".ds-danger{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;border-radius:var(--radius-control);padding:.75rem 1.2rem;font:650 .9375rem/1.4 var(--font-body);border:1px solid transparent;cursor:pointer;transition:background 160ms ease,border-color 160ms ease;text-decoration:none;color:var(--color-error);border-color:var(--color-error-rule);background:var(--color-surface)}.ds-danger:hover{background:var(--color-error-bg)}.ds-danger:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}.ds-danger:disabled{cursor:wait;opacity:.65}"
     },
     {
       "name": "Factual input",
       "kind": "input",
-      "description": "Factual input from the parent interface.",
+      "refersTo": "input",
+      "description": "Readable body-sized entry with a visible label and strong boundary.",
       "html": "<label class=\"ds-label\" for=\"ds-zip\">Household ZIP code</label><input class=\"ds-input\" id=\"ds-zip\" value=\"19104\" inputmode=\"numeric\">",
-      "css": ".ds-label{display:block;color:#122c37;font:600 16px/1.6 \"Geist Sans\",sans-serif}.ds-input{min-height:48px;border:1px solid #9cb3ac;border-radius:8px;background:#fff;padding:11px 13px;font:16px/1.5 \"Geist Sans\",sans-serif}.ds-input:focus-visible{outline:3px solid #087f78;outline-offset:3px}"
+      "css": ".ds-label{display:block;margin-bottom:.45rem;color:var(--color-ink);font:600 .9375rem/1.6 var(--font-body)}.ds-input{display:block;width:100%;min-height:48px;border:1px solid var(--color-rule-strong);border-radius:var(--radius-control);background:var(--color-surface);padding:.7rem .8rem;color:var(--color-ink);font:1rem/1.5 var(--font-body)}.ds-input::placeholder{color:var(--color-ink-faint)}.ds-input[aria-invalid=\"true\"]{border-color:var(--color-error)}.ds-input:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}"
     },
     {
       "name": "Task surface",
       "kind": "card",
-      "description": "Task surface from the parent interface.",
-      "html": "<section class=\"ds-surface\"><h2>What\u2019s happening</h2><p>Your support paths have separate recorded outcomes.</p></section>",
-      "css": ".ds-surface{background:#fff;border:1px solid #d6e1dc;border-radius:16px;padding:24px;color:#122c37;font:16px/1.6 \"Geist Sans\",sans-serif}.ds-surface h2{font-size:24px;margin:0 0 12px}"
+      "refersTo": "task-surface",
+      "description": "A flat near-white workspace with a lavender boundary and serif heading.",
+      "html": "<section class=\"ds-surface\"><h2>What happens next</h2><p>Your support paths keep their separate recorded outcomes.</p></section>",
+      "css": ".ds-surface{background:var(--color-surface);border:1px solid var(--color-rule);border-radius:var(--radius-feature);padding:2rem;color:var(--color-ink);font:1rem/1.6 var(--font-body)}.ds-surface h2{margin:0 0 1rem;font:560 1.3rem/1.15 var(--font-display);letter-spacing:-.03em}.ds-surface p{margin:0;color:var(--color-ink-muted)}"
     },
     {
       "name": "Outcome badge",
       "kind": "chip",
-      "description": "Outcome badge from the parent interface.",
-      "html": "<span class=\"ds-badge\">Prepared</span>",
-      "css": ".ds-badge{display:inline-flex;background:#eaf4f0;color:#122c37;border-radius:999px;padding:4px 10px;font:650 12px/1.5 \"Geist Sans\",sans-serif}"
+      "refersTo": "outcome-badge",
+      "description": "A text-labeled state, with quiet waiting and semantic attention variants.",
+      "html": "<span class=\"ds-badge\">Prepared</span><span class=\"ds-badge ds-wait\">Waiting for a connection</span>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;gap:.35rem;margin:.25rem;background:var(--color-accent-soft);color:var(--color-accent);border-radius:999px;padding:.3rem .65rem;font:650 .75rem/1.6 var(--font-body);white-space:normal}.ds-badge.ds-wait{background:var(--color-paper-2);color:var(--color-ink-muted)}"
     },
     {
       "name": "Direct navigation",
       "kind": "nav",
-      "description": "Direct navigation from the parent interface.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Parent\"><a href=\"#support\">My support</a><a href=\"#account\">Your account</a></nav>",
-      "css": ".ds-nav{display:flex;gap:24px;font:600 15px/1.6 \"Geist Sans\",sans-serif}.ds-nav a{color:#122c37;text-decoration:none}.ds-nav a:hover{color:#086a63}.ds-nav a:focus-visible{outline:3px solid #087f78;outline-offset:3px}"
+      "description": "Geist task links with an explicit current page and violet interaction.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Parent\"><a href=\"#support\" aria-current=\"page\">My support</a><a href=\"#help\">Help</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:1.8rem;font:600 .9rem/1.6 var(--font-body)}.ds-nav a{color:var(--color-ink-muted);text-decoration:none}.ds-nav a:hover,.ds-nav a[aria-current=\"page\"]{color:var(--color-accent)}.ds-nav a:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}"
+    },
+    {
+      "name": "CaseLink identity",
+      "kind": "custom",
+      "description": "The shared open-link vector and Newsreader wordmark, used in header and footer.",
+      "html": "<span class=\"ds-brand\"><svg viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><g fill=\"none\" stroke=\"currentColor\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m17 15 4-4a6.36 6.36 0 0 1 9 9l-4 4a6.36 6.36 0 0 1-9 0\"/><path d=\"m23 25-4 4a6.36 6.36 0 0 1-9-9l4-4a6.36 6.36 0 0 1 9 0\"/></g></svg><span>CaseLink</span></span>",
+      "css": ".ds-brand{display:inline-flex;align-items:center;gap:.75rem;color:var(--color-ink);font:560 1.75rem/1 var(--font-display);letter-spacing:-.025em}.ds-brand svg{flex:none;color:var(--color-accent)}"
+    },
+    {
+      "name": "Public support entry",
+      "kind": "custom",
+      "description": "Two routes within one shared surface; desktop columns become phone rows.",
+      "html": "<div class=\"ds-services\"><a href=\"#food\"><strong>Food & benefits</strong><span>Food today, SNAP and WIC.</span></a><a href=\"#utilities\"><strong>Help with utility bills</strong><span>Electricity, gas and water.</span></a></div>",
+      "css": ".ds-services{display:grid;grid-template-columns:1fr 1fr;padding:1.6rem 2rem;background:var(--color-surface);border:1px solid var(--color-rule);border-radius:var(--radius-feature);font:1rem/1.6 var(--font-body)}.ds-services a{display:block;padding:.5rem 1.75rem .5rem 0;text-decoration:none;color:var(--color-ink)}.ds-services a+a{padding:.5rem 0 .5rem 1.75rem;border-left:1px solid var(--color-rule)}.ds-services strong{display:block;font-weight:650;font-size:1.125rem;line-height:1.35;letter-spacing:-.02em}.ds-services span{display:block;margin-top:.4rem;font-size:.875rem;color:var(--color-ink-muted)}.ds-services a:hover strong{color:var(--color-accent)}.ds-services a:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}@media(max-width:760px){.ds-services{grid-template-columns:1fr;padding:.25rem 1.25rem}.ds-services a,.ds-services a+a{padding:1.25rem 0;border-left:0}.ds-services a+a{border-top:1px solid var(--color-rule)}}"
     }
   ],
   "narrative": {
-    "northStar": "Clear family service wayfinding",
-    "overview": "The parent may be reading a phone in ordinary daylight while managing household demands. Light, flat surfaces and readable sans-serif type support quick scanning. Dark navy carries structure; teal identifies actions and selections; soft lemon highlights support and necessary choices. Color never supplies the only state cue.\n\nPublic pages explain the service, offer food or utility entry, and expose urgent official help. The application prioritizes the family's task. No generic chat console or analytics dashboard sits between the need and useful action.\n\nUse one primary action per task, progressive detail, clear labels and visible focus. The three intake stages preserve answers and retry identity. Required parent actions precede operator-owned waiting, which stays secondary. Show sources and detailed permission without forcing repetitive approval.",
+    "northStar": "One familiar CaseLink service",
+    "overview": "The original CaseLink identity carries through the parent product: lavender paper, deep navy text, restrained violet actions, Newsreader headings and Geist controls. This refresh follows the owner's request to recover the established brand and the explicit selection of imagegen Option 2, Family Panorama. The palette and shared identity are durable; that public-entry composition is a surface choice.\n\nThe public experience is welcoming and editorial, using original family illustration and generous space to introduce food and utility support. Operational screens use the same identity with calmer, readable task surfaces, direct controls and necessary information. The product should feel composed, welcoming and capable, as recorded in [PRODUCT.md](PRODUCT.md).\n\nThis is an as-built record of [the shared tokens](tokens.css), [parent styles](src/features/parent/parent.module.css), shared CaseLink wordmark/favicon, linked ChatGPT Futures banner and parent entry. It replaces the superseded teal/lemon parent record. The [historical school design](docs/legacy/school-design.md) remains unchanged; its original visual identity is deliberately reused here.",
     "keyCharacteristics": [
-      "One clear task at a time",
-      "Parent action before service waiting",
-      "Honest recorded outcomes"
+      "One CaseLink mark, wordmark, palette and type pairing across public, operational and policy pages.",
+      "Original family imagery on public entry, with readable forms and clear actions inside the service.",
+      "Restrained violet emphasis, explicit state labels and visible keyboard focus.",
+      "Parent-owned actions are prominent; detailed service history and waiting remain secondary."
     ],
     "rules": [],
     "dos": [
-      "Do preserve one clear action, source attribution and honest progress.",
-      "Do keep operator-owned waiting quieter than the family's necessary step."
+      "Do use the original shared lavender, navy and violet tokens across parent pages.",
+      "Do reuse the shared CaseLink mark and Newsreader/Geist pairing.",
+      "Do keep parent body copy and inputs at the readable body role, with visible focus and explicit labels.",
+      "Do use original illustrative imagery where it supports the public story and preserve its alternative text and responsive crop.",
+      "Do keep necessary parent actions ahead of secondary waiting and preserve honest outcome labels."
     ],
     "donts": [
-      "Do not introduce an agent transcript, analytics dashboard or fabricated receipt into the family journey."
+      "Don't reintroduce the superseded standalone teal/lemon parent identity.",
+      "Don't redraw the CaseLink logo differently for individual screens or combine it with OpenAI's marks.",
+      "Don't present generated people as testimonials or proof that a family received assistance.",
+      "Don't use color or a decorative change as the only indication of service status."
     ]
   }
 }

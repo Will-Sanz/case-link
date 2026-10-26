@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureRequest } from "@/lib/parent/test-fixtures";
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
@@ -38,6 +38,7 @@ const request = (consent = "1") => {
   );
 };
 beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.example.test");
   vi.clearAllMocks();
   mocks.session.mockResolvedValue({
     supabase: { storage: { from: () => ({ upload: mocks.upload }) } },
@@ -51,6 +52,7 @@ beforeEach(() => {
   mocks.upload.mockResolvedValue({ error: null });
   mocks.confirm.mockResolvedValue(undefined);
 });
+afterEach(() => vi.unstubAllEnvs());
 describe("consented quarantined upload", () => {
   it("confirms and resumes only after private bytes exist, without exposing their storage path", async () => {
     const result = await POST(request(), context);

@@ -93,7 +93,7 @@ C-01 is mapped with owners and evidence for real completion paths; route limitat
 
 ### Implementation
 
-1. Create isolated parent development/staging and plan parent production; preserve old migrations/history and school settings. Implement trusted adult ownership/acting authority, household/request records and selected identity/recovery flow, with enumeration protection and accessible contact options.
+1. Keep development/staging synthetic and separate from production; reuse existing CaseLink identities in the explicit reviewed shared-account mode for the parent deployment. Preserve old migrations/history, school settings and records. Implement trusted adult ownership/acting authority, household/request records and password/code recovery, with enumeration protection and accessible contact options. Review project-wide Auth enrollment hooks before enabling new parent signup.
 2. Add trusted partner/operator memberships and narrow referral access. Test every reachable legacy route/RPC against parent/partner identities. Operator content access is reasoned, scoped, time-limited and audited.
 3. Add versioned standing mandates and request-scoped worker grants: recipient/program set, data/actions, duration/preferences/limits, suspension/revocation and action-specific approvals. A normal session closing does not kill authorized work; membership/account disable, security holds, expiry or cancellation does.
 4. Implement deterministic per-operation policy checks for exact proposed packets, provider capability/permission, live mandate and household authority. One mandate supports multiple valid operations, each immutable and idempotent. A packet update inside its scope does not demand reapproval; an expansion or required personal act pauses only that action.

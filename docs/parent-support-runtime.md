@@ -14,7 +14,9 @@ The storage broker holds protected Storage access in a separate process. The wor
 
 Documents are quarantined by the web API. Full PDF/image decoding, text extraction and OCR run in the restricted parser container: no network, read-only root, no credentials or host mounts, non-root user, bounded memory/CPU/processes/time. Selected financial/provider/date source lines go to structured AI extraction; independent parser text validates every accepted quote/value. Do not run native file parsers inside the web process.
 
-Retention is a separate isolated process: first remove the exact eligible private objects/Auth identities, then acknowledge eligible database cleanup. Schedule and monitor it; expiry metadata alone is not proof of erasure. Reapply deletion tombstones during a restore before reopening processing.
+Retention is a separate isolated process: first remove exact eligible private objects, then acknowledge eligible parent-purpose database cleanup. It never deletes the reused Auth identity or school records. Schedule and monitor it; expiry metadata alone is not proof of erasure. Reapply parent-purpose deletion tombstones during a restore before reopening processing.
+
+Existing CaseLink email/password identities can be reused with `CASELINK_PARENT_ACCOUNT_MODE=existing`, the additive shared-account migration and reviewed processing controls. See [the exact activation guide](parent-shared-accounts.md); do not substitute the isolated local Auth hook for a shared project's global enrollment policy. The synthetic localhost preview has no live account connection.
 
 ## Local synthetic setup
 
@@ -22,7 +24,7 @@ Retention is a separate isolated process: first remove the exact eligible privat
 2. Set `CASELINK_SUPABASE_CLI` to an installed Supabase executable and run `node scripts/parent-local-stack.mjs start`. Docker must already be available in the background. The isolated profile uses API 55321, database 55322 and test mail 55324. `reset` resets this profile only; inspect it before using that destructive local command.
 3. Apply the repository migrations in the isolated profile. Its `before_user_created` Auth hook points to `public.parent_before_user_created`; the database processing control defaults closed. For synthetic local work only, an operator can set `parent_private.processing_controls.enabled=true`, a synthetic approval reference and a short `approved_until`. Never copy a local enablement into a hosted environment.
 4. Start Next with the explicit parent environment and a separate port, normally 3200. Next also reads local environment files: keep school secrets out of the process. A missing/unsafe parent configuration returns an honest unavailable state; do not relax school guards to bypass it.
-For a production-build visual preview with synthetic environment settings, run `npm run parent:preview`; it listens only on `http://127.0.0.1:3200`. It does not create a working Auth/database service. The headless `parent:test:ux` runner supplies explicit synthetic API fixtures to inspect complete screens without changing the application or sending information externally.
+   For a production-build visual preview with synthetic environment settings, run `npm run parent:preview`; it listens only on `http://127.0.0.1:3200`. The default uses a placeholder public key and does not establish working Auth. For actual isolated local services, set `CASELINK_SUPABASE_CLI`, build with `node scripts/verify-parent.mjs --local-services --build`, then start `node scripts/serve-parent.mjs --local-services`. Both privately read and validate only the local public key; the web runtime receives no operator/model secrets. The headless `parent:test:ux` runner uses explicit API fixtures; `parent:test:auth` uses real local services with no API interception.
 
 5. Build the parser with `docker build -f docker/parent-document-worker.Dockerfile -t caselink-document-parser:local .`. Pin the approved base-image digest when recording a release candidate. The parser script’s default image name must match the built image.
 6. Provision dedicated database LOGIN roles with `NOINHERIT`, no superuser/BYPASSRLS/role-creation powers, and membership in exactly one matching group: `parent_worker`, `parent_storage_broker` or `parent_retention_worker`. The group roles themselves are NOLOGIN. Each process checks the login and uses `SET ROLE`; never give a worker `postgres`, `service_role`, an owner role or a parent session.
@@ -37,7 +39,7 @@ For a production-build visual preview with synthetic environment settings, run `
 
 Remote processes additionally require their explicit `*_APPROVED=1` flag and approved school/parent project origins. These flags do not replace the database processing control, actual permissions, service isolation or release evidence. Protect database connections with verified TLS and platform-managed secrets. Do not put keys in command history, URLs printed to logs, test fixtures or browser bundles.
 
-Email uses fixed generic copy and a sign-in link, with no program, benefit status, financial amount or document in the preview. The outbox rechecks current consent and quiet hours before sending. A provider acceptance reference is transport evidence, not proof a family read or received the email. Unknown sends require reconciliation; never blindly replay them. Provider provisioning and approved sender/domain configuration are still external launch work. Connected Marketplace discovery was unavailable in this session; no provider account was installed and no messages were sent.
+Email uses fixed generic copy and a sign-in link, with no program, benefit status, financial amount or document in the preview. The outbox rechecks current consent and quiet hours before sending. A provider acceptance reference is transport evidence, not proof a family read or received the email. Unknown sends require reconciliation; never blindly replay them. Provider provisioning and approved sender/domain configuration are still external launch work. Connected Marketplace discovery was unavailable in this session; no provider account was installed and no external support notifications were sent. Local Auth test messages use only the isolated test inbox.
 
 ## Verification
 
@@ -46,12 +48,18 @@ Email uses fixed generic copy and a sign-in link, with no program, benefit statu
 | `npm run parent:verify` | Clean synthetic parent environment: existing integrity checks, TypeScript, lint, all unit/component tests and production build |
 | `npm run parent:test` | Parent policy, service, parser boundaries, runtime ports, UI and API regression cases |
 | `npm run parent:test:db` | Isolated real PostgreSQL/Supabase database authorization checks when the local stack exists; inspect the script’s target guard |
+| `CASELINK_SUPABASE_CLI=/absolute/path/to/supabase npm run parent:test:auth` | Actual local browser, Auth, test-email, Data API and private Storage checks; requires the migrated isolated stack, bounded synthetic processing approval and actual-local-services build |
+| `npm run parent:test:parser` | Actual isolated Docker PDF/image/OCR and malformed-file checks; builds no image and makes no model calls |
 | `CASELINK_PARENT_SQL_FIXTURE_MODULE=/absolute/path/to/pglite/dist/index.js npm run parent:test:db` | Embedded PostgreSQL serial migration/RLS/RPC tests; **not** real Auth/Storage or concurrent connections |
 | `npm run parent:test:pdf` | Synthetic summary/packet/form fidelity, page bounds and rendered images; provide `CASELINK_PYTHON_BIN` for Python with bundled `pypdfium2` |
 | `npm run parent:test:ux` | Production localhost intake/permission/document/account/recovery UX captures with synthetic API fixtures; includes keyboard skip-link, axe and responsive checks |
 | `npm run parent:test:visual` | Hidden/headless local browser, responsive layouts and axe AA checks using synthetic API fixtures; not live account/backend integration |
 
-The worker lifecycle integration test uses the same explicitly selected PGlite runtime and actual migrations to catch SQL argument, enum and transaction mismatches. No test sends a live application or uses real family records. See [progress and evidence](parent-support-progress.md) for the exact verified candidate and remaining checks.
+The actual database runner snapshots and restores local processing controls and operator SET-role memberships. It requires existing direct ADMIN membership before temporarily enabling SET; it never provisions a worker login or weakens production roles. Only its own metadata-only Storage fixtures use a transaction-local deletion exception; the normal Storage guard is verified afterward.
+
+The worker lifecycle and correction integration tests require `CASELINK_PARENT_SQL_FIXTURE_MODULE`; without it they are explicitly skipped. Set this variable for the full unit run to include the actual migrations and catch SQL argument, enum, correction and transaction mismatches. Real Supabase and concurrent-connection checks remain separate. Generated local secrets and evidence stay under ignored, access-restricted `tmp/parent-runtime/` and `tmp/parent-verification/`. Do not publish CLI status output or copy credentials into reports.
+
+No test sends a live application or uses real family records. The user approved a capped synthetic live-AI run separately; ordinary tests do not enable paid calls. See [progress and evidence](parent-support-progress.md) for the exact verified candidate and remaining checks.
 
 ## Before a family release
 

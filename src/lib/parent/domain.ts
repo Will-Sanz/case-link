@@ -256,6 +256,8 @@ export type SupportRequest = {
   next_trigger?: string | null;
   next_run_at?: string | null;
   events?: SupportEvent[];
+  events_truncated?: boolean;
+  account_changed_at?: Partial<Record<SupportNeed, string>>;
   documents?: ParentDocument[];
 };
 export type ParentPreferences = {

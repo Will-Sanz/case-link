@@ -68,12 +68,19 @@ describe("parent account controls", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<ParentAccount />);
     fireEvent.click(
-      await screen.findByText("Delete my account & stop future work"),
+      await screen.findByText(
+        "Delete my parent-support data & stop future work",
+      ),
     );
     const button = screen.getByRole("button", {
-      name: "Delete my account & stop work",
+      name: "Delete parent-support data & stop work",
     }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
+    expect(
+      screen.getByText(
+        /keeps your existing CaseLink sign-in and school records/,
+      ),
+    ).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Type DELETE to confirm"), {
       target: { value: "DELETE" },
     });
@@ -82,6 +89,11 @@ describe("parent account controls", () => {
       await screen.findByRole("heading", {
         name: "Your deletion request is recorded",
       }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Your existing CaseLink sign-in and school records are kept separate/,
+      ),
     ).toBeTruthy();
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain(

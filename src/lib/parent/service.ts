@@ -22,6 +22,7 @@ import {
 } from "./documents";
 import {
   hasUtilityAccountAuthority,
+  utilityProviderFor,
   receiptSchema,
   type ProposedOperation,
   type ProviderCapability,
@@ -49,6 +50,7 @@ export type ServiceOperation = {
   idempotencyKey: string;
   packet: Record<string, unknown>;
   updatedAt: string;
+  createdAt?: string;
   receipt?: ServiceReceipt;
 };
 const personalActSchema = z
@@ -169,7 +171,8 @@ const utilityNeeds: SupportNeed[] = ["electricity", "gas", "water"];
 const fieldQuestions: Record<string, { title: string; explanation: string }> = {
   income: {
     title: "What is your household income before taxes?",
-    explanation: "This program requires an income amount and how often you receive it. Zero income is a valid answer.",
+    explanation:
+      "This program requires an income amount and how often you receive it. Zero income is a valid answer.",
   },
   zip: {
     title: "What ZIP code is this household in?",
@@ -222,9 +225,25 @@ const fieldQuestions: Record<string, { title: string; explanation: string }> = {
   },
 };
 const factCategories: Record<string, ServiceMandate["allowedData"][number]> = {
-  zip: "household", householdSize: "household", income: "income", incomeAmount: "income", incomeFrequency: "income", utilityProvider: "utility", accountAuthority: "utility", amountDue: "utility", totalBalance: "utility", dueDate: "utility", shutoffDate: "utility", documentIds: "documents",
+  zip: "household",
+  householdSize: "household",
+  income: "income",
+  incomeAmount: "income",
+  incomeFrequency: "income",
+  utilityProvider: "utility",
+  accountAuthority: "utility",
+  amountDue: "utility",
+  totalBalance: "utility",
+  dueDate: "utility",
+  shutoffDate: "utility",
+  documentIds: "documents",
 };
-const categoryLabels = { household: "household details", income: "income information", utility: "utility details", documents: "supporting documents" };
+const categoryLabels = {
+  household: "household details",
+  income: "income information",
+  utility: "utility details",
+  documents: "supporting documents",
+};
 const dateValue = (value: string | undefined) =>
   value ? Date.parse(value.length === 10 ? `${value}T12:00:00Z` : value) : NaN;
 const digest = (value: unknown) =>
@@ -293,22 +312,60 @@ function packetFor(
     utilityNeeds.includes(route.need) &&
     mandate.allowedData.includes("utility")
   ) {
-    const expected = { electricity: "peco", gas: "pgw", water: "pwd" }[
-      route.need as "electricity" | "gas" | "water"
-    ];
-    packet.utilityProvider = intake.utilityProviders.includes(
-      expected as "peco" | "pgw" | "pwd",
-    )
-      ? expected
-      : intake.utilityProviders.includes("other")
-        ? "other"
-        : "unknown";
+    packet.utilityProvider = utilityProviderFor(request, route.need, now);
     if (intake.accountAuthority !== "not_sure")
       packet.accountAuthority = intake.accountAuthority;
     if (intake.shutoffDate) packet.shutoffDate = intake.shutoffDate;
+  }
+  // A fresh explicit parent answer overrides document evidence only for its named need.
+  for (const fact of [...(request.facts ?? [])].sort(
+    (a, b) => dateValue(a.confirmedAt) - dateValue(b.confirmedAt),
+  )) {
+    const confirmed = dateValue(fact.confirmedAt),
+      asOf = dateValue(fact.asOf);
+    if (
+      fact.need !== route.need ||
+      fact.source !== "parent" ||
+      !Number.isFinite(confirmed) ||
+      confirmed > now.getTime() ||
+      !Number.isFinite(asOf) ||
+      asOf > now.getTime() ||
+      asOf < now.getTime() - 45 * 86400000
+    )
+      continue;
+    const answer = factAnswerSchema.safeParse({
+      need: fact.need,
+      field: fact.field,
+      value: fact.value,
+      version: request.version,
+    });
+    if (!answer.success) continue;
+    const category = ["zip", "householdSize"].includes(fact.field)
+      ? "household"
+      : ["income", "incomeAmount", "incomeFrequency"].includes(fact.field)
+        ? "income"
+        : "utility";
+    if (!mandate.allowedData.includes(category)) continue;
+    if (fact.field === "income") {
+      const value = fact.value as { amount: number; frequency: string };
+      packet.incomeAmount = value.amount;
+      packet.incomeFrequency = value.frequency;
+    } else packet[fact.field] = fact.value;
+  }
+  if (
+    utilityNeeds.includes(route.need) &&
+    mandate.allowedData.includes("utility")
+  ) {
     if (mandate.allowedData.includes("documents")) {
       const relevant = documents
-        .filter(({ facts }) => facts.provider === expected)
+        .filter(
+          ({ facts, document }) =>
+            facts.provider === packet.utilityProvider &&
+            ["peco", "pgw", "pwd"].includes(String(packet.utilityProvider)) &&
+            dateValue(document.created_at) >=
+              (dateValue(request.account_changed_at?.[route.need]) ||
+                -Infinity),
+        )
         .sort(
           (a, b) =>
             dateValue(
@@ -358,41 +415,6 @@ function packetFor(
         }
       }
     }
-  }
-  // A fresh explicit parent answer overrides document evidence only for its named need.
-  for (const fact of [...(request.facts ?? [])].sort(
-    (a, b) => dateValue(a.confirmedAt) - dateValue(b.confirmedAt),
-  )) {
-    const confirmed = dateValue(fact.confirmedAt),
-      asOf = dateValue(fact.asOf);
-    if (
-      fact.need !== route.need ||
-      fact.source !== "parent" ||
-      !Number.isFinite(confirmed) ||
-      confirmed > now.getTime() ||
-      !Number.isFinite(asOf) ||
-      asOf > now.getTime() ||
-      asOf < now.getTime() - 45 * 86400000
-    )
-      continue;
-    const answer = factAnswerSchema.safeParse({
-      need: fact.need,
-      field: fact.field,
-      value: fact.value,
-      version: request.version,
-    });
-    if (!answer.success) continue;
-    const category = ["zip", "householdSize"].includes(fact.field)
-      ? "household"
-      : ["income", "incomeAmount", "incomeFrequency"].includes(fact.field)
-        ? "income"
-        : "utility";
-    if (!mandate.allowedData.includes(category)) continue;
-    if (fact.field === "income") {
-      const value = fact.value as { amount: number; frequency: string };
-      packet.incomeAmount = value.amount;
-      packet.incomeFrequency = value.frequency;
-    } else packet[fact.field] = fact.value;
   }
   return packet;
 }
@@ -447,12 +469,16 @@ export async function runSupportService(input: {
       nextActor: "parent",
       nextTrigger: "authorization_renewed",
     };
+  const currentAccountOperation = (operation: ServiceOperation) =>
+    !request.account_changed_at?.[operation.need] ||
+    dateValue(operation.createdAt ?? operation.updatedAt) >=
+      dateValue(request.account_changed_at[operation.need]);
   const operations = [
     ...(input.operations ?? []),
     ...(input.unknownOperations ?? []),
   ].filter(
-    (operation, i, all) =>
-      all.findIndex((other) => other.id === operation.id) === i,
+    (operation, index, all) =>
+      all.findIndex((other) => other.id === operation.id) === index,
   );
   const validDocuments: { document: ServiceDocument; facts: ExtractedFacts }[] =
     [];
@@ -548,9 +574,25 @@ export async function runSupportService(input: {
     }
   }
   const effectiveIntake = { ...request.intake };
+  const currentAccountDocuments = validDocuments.filter(({ document, facts }) =>
+    request.intake.needs.some(
+      (need) =>
+        utilityNeeds.includes(need) &&
+        facts.provider ===
+          (
+            { electricity: "peco", gas: "pgw", water: "pwd" } as Record<
+              string,
+              string
+            >
+          )[need] &&
+        (!request.account_changed_at?.[need] ||
+          dateValue(document.created_at) >=
+            dateValue(request.account_changed_at[need])),
+    ),
+  );
   const providers = [
     ...new Set(
-      validDocuments
+      currentAccountDocuments
         .map(({ facts }) => facts.provider)
         .filter(
           (provider): provider is "peco" | "pgw" | "pwd" =>
@@ -568,7 +610,7 @@ export async function runSupportService(input: {
     effectiveIntake.utilityProviders = providers;
   const shutoffDates = [
     ...new Set(
-      validDocuments.flatMap(({ facts }) =>
+      currentAccountDocuments.flatMap(({ facts }) =>
         facts.shutoffDate ? [facts.shutoffDate] : [],
       ),
     ),
@@ -590,8 +632,12 @@ export async function runSupportService(input: {
           all.findIndex((other) => other.need === route.need) === index,
       )
       .map((route) => {
-        const previous = request.plan?.routes.find((previous) =>
-          sameNeed(previous, route.need),
+        const previous = request.plan?.routes.find(
+          (previous) =>
+            sameNeed(previous, route.need) &&
+            (!request.account_changed_at?.[route.need] ||
+              dateValue(request.plan?.generatedAt) >=
+                dateValue(request.account_changed_at[route.need])),
         );
         let restored =
           previous &&
@@ -603,6 +649,7 @@ export async function runSupportService(input: {
           .filter(
             (operation) =>
               operation.need === route.need &&
+              currentAccountOperation(operation) &&
               receiptSchema.safeParse(operation.receipt).success &&
               getProgram(operation.programId)?.needs.includes(route.need),
           )
@@ -736,13 +783,16 @@ export async function runSupportService(input: {
           "CaseLink must check the document’s readable evidence and applicable period. Other useful work can continue; no uncertain document values will be sent.",
         );
       const needHistory = operations.filter(
-        (operation) => operation.need === route.need,
+        (operation) =>
+          operation.need === route.need && currentAccountOperation(operation),
       );
       let history = needHistory.filter(
         (operation) => operation.programId === route.programId,
       );
-      const unknown = needHistory.filter(
-        (operation) => operation.state === "delivery_unknown",
+      const unknown = operations.filter(
+        (operation) =>
+          operation.need === route.need &&
+          operation.state === "delivery_unknown",
       );
       let stillUnknown = false;
       for (const operation of unknown) {
@@ -787,6 +837,8 @@ export async function runSupportService(input: {
             stillUnknown = true;
             continue;
           }
+          // A real old-account receipt remains history; it does not complete the changed account.
+          if (!currentAccountOperation(operation)) continue;
           if (route.programId !== operation.programId) {
             const original = getProgram(operation.programId)!;
             route = {
@@ -828,6 +880,49 @@ export async function runSupportService(input: {
       if (route.state === "support_received" || route.state === "withdrawn") {
         plan.routes[index] = route;
         continue;
+      }
+      if (
+        utilityNeeds.includes(route.need) &&
+        request.mandate.allowedData.includes("utility")
+      ) {
+        const accountPacket = packetFor(
+          { ...request, intake: effectiveIntake },
+          route,
+          validDocuments,
+          now,
+        );
+        const expectedProvider = (
+          { electricity: "peco", gas: "pgw", water: "pwd" } as Record<
+            string,
+            string
+          >
+        )[route.need];
+        if (accountPacket.utilityProvider !== expectedProvider) {
+          if ((outcomeOrder[route.state] ?? 0) < 2) route.state = "unresolved";
+          if (accountPacket.utilityProvider === "unknown") {
+            addAction(
+              route,
+              "missing_fact",
+              "Which company is this account with?",
+              "The provider is needed to prepare the right account material. Other support can continue.",
+              "parent",
+              "utilityProvider",
+            );
+            route.nextActor = "parent";
+          } else {
+            addAction(
+              route,
+              "execution_issue",
+              "Find the right provider connection",
+              "The saved provider does not match this route. CaseLink must verify a suitable connection before preparing or sending account material.",
+            );
+            route.nextActor = "caselink";
+          }
+          route.limitation =
+            "This account is waiting for a matching provider connection. Use the contact on your current bill for urgent help.";
+          plan.routes[index] = route;
+          continue;
+        }
       }
       if (route.state === "declined") {
         const exhausted = new Set(
@@ -1028,10 +1123,21 @@ export async function runSupportService(input: {
             )
               throw new Error("form_packet_mismatch");
             if (checked.missingFields.length) {
-              const missingFields = [...new Set(checked.missingFields.map(field => ["incomeAmount", "incomeFrequency"].includes(field) ? "income" : field))];
+              const missingFields = [
+                ...new Set(
+                  checked.missingFields.map((field) =>
+                    ["incomeAmount", "incomeFrequency"].includes(field)
+                      ? "income"
+                      : field,
+                  ),
+                ),
+              ];
               for (const field of missingFields) {
                 const category = factCategories[field];
-                if (category && !request.mandate.allowedData.includes(category)) {
+                if (
+                  category &&
+                  !request.mandate.allowedData.includes(category)
+                ) {
                   addAction(
                     route,
                     "expanded_permission",

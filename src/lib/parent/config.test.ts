@@ -44,6 +44,40 @@ describe("parent purpose and environment boundary", () => {
       }),
     ).toThrow(ParentConfigurationError);
   });
+  it("rejects an unsafe alternate public key even when the preferred key is valid", () => {
+    const serviceRole = `header.${Buffer.from(JSON.stringify({ role: "service_role" })).toString("base64url")}.signature`;
+    for (const environment of [
+      local,
+      hosted,
+      {
+        ...hosted,
+        CASELINK_PARENT_ACCOUNT_MODE: "existing",
+        CASELINK_SCHOOL_SUPABASE_URL: hosted.NEXT_PUBLIC_SUPABASE_URL,
+      },
+    ]) {
+      for (const alternate of ["sb_secret_synthetic_private", serviceRole]) {
+        const issues = parentConfigurationIssues({
+          ...environment,
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: alternate,
+        });
+        expect(issues.join()).toContain("public Supabase");
+        expect(issues.join()).not.toContain(alternate);
+      }
+    }
+  });
+  it("accepts two public key forms without changing the preferred server key", () => {
+    const anonymous = `header.${Buffer.from(JSON.stringify({ role: "anon" })).toString("base64url")}.signature`;
+    expect(
+      getParentConfig({ ...local, NEXT_PUBLIC_SUPABASE_ANON_KEY: anonymous })
+        .supabaseKey,
+    ).toBe(local.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+    expect(
+      parentConfigurationIssues({
+        ...local,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+      }),
+    ).toEqual([]);
+  });
   it("keeps hosted parent, school and synthetic projects separate", () => {
     expect(parentConfigurationIssues(hosted)).toEqual([]);
     expect(
@@ -73,6 +107,41 @@ describe("parent purpose and environment boundary", () => {
         NEXT_PUBLIC_SUPABASE_URL: "https://synthetic.supabase.co",
       }),
     ).toEqual([]);
+  });
+  it("reuses the approved existing identity project only with explicit account mode", () => {
+    const shared = {
+      ...hosted,
+      NEXT_PUBLIC_SUPABASE_URL: "https://school.supabase.co",
+      CASELINK_PARENT_PRODUCTION_SUPABASE_URL: undefined,
+      CASELINK_PRODUCTION_SUPABASE_URL: "https://school.supabase.co",
+      CASELINK_PARENT_ACCOUNT_MODE: "existing",
+    };
+    expect(parentConfigurationIssues(shared)).toEqual([]);
+    expect(
+      parentConfigurationIssues({
+        ...shared,
+        CASELINK_PARENT_ACCOUNT_MODE: undefined,
+      }).join(),
+    ).toContain("separate");
+    expect(
+      parentConfigurationIssues({
+        ...shared,
+        VERCEL_ENV: "preview",
+        CASELINK_ENVIRONMENT: "preview",
+      }).join(),
+    ).toContain("synthetic");
+    expect(
+      parentConfigurationIssues({
+        ...shared,
+        NEXT_PUBLIC_SUPABASE_URL: "https://unexpected.supabase.co",
+      }).join(),
+    ).toContain("existing CaseLink");
+    expect(
+      parentConfigurationIssues({
+        ...shared,
+        CASELINK_PARENT_REAL_DATA_APPROVED: "0",
+      }).join(),
+    ).toContain("release gate");
   });
   it("preserves HTTPS, HSTS and real-data gates on every hosted environment", () => {
     for (const environment of ["production", "preview"]) {

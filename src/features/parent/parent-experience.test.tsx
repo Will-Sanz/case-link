@@ -64,10 +64,123 @@ describe("parent API and navigation", () => {
 });
 
 describe("email sign-in", () => {
+  it("keeps the email form usable when code delivery is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            ok: false,
+            error: "Sign-in is temporarily unavailable. Please try again.",
+          },
+          503,
+        ),
+      ),
+    );
+    render(<ParentSignIn />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use an email code instead" }),
+    );
+    fireEvent.change(screen.getByLabelText("Your email address"), {
+      target: { value: "new-parent@example.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+    await screen.findByRole("alert");
+    expect(screen.queryByLabelText("Email code")).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "See direct support options" })
+        .getAttribute("href"),
+    ).toBe("/support/help");
+    expect(
+      (screen.getByLabelText("Your email address") as HTMLInputElement).value,
+    ).toBe("new-parent@example.test");
+  });
+  it("links shared-account password recovery to the existing flow without treating an email code as a password", () => {
+    const { rerender } = render(<ParentSignIn existingAccountRecovery />);
+    expect(
+      screen
+        .getByRole("link", { name: "Forgot your password?" })
+        .getAttribute("href"),
+    ).toBe("/forgot-password");
+    expect(
+      screen.getByText(/Reset your existing CaseLink password/),
+    ).toBeTruthy();
+    rerender(<ParentSignIn />);
+    expect(
+      screen.queryByRole("link", { name: "Forgot your password?" }),
+    ).toBeNull();
+  });
+  it("shows a safe recovery result without accepting arbitrary provider messages", () => {
+    const { rerender } = render(
+      <ParentSignIn authNotice="password-reset-success" />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Sign in with your new password",
+    );
+    rerender(<ParentSignIn authNotice="auth-link-error" key="error" />);
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Sign-in could not be completed",
+    );
+  });
+  it("uses the existing account password without creating an account or support mandate", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ParentSignIn returnTo="https://attacker.test" />);
+    fireEvent.change(screen.getByLabelText("Your email address"), {
+      target: { value: "existing@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "synthetic-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith("/my-support"),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      action: "sign_in",
+      email: "existing@example.test",
+      password: "synthetic-password",
+    });
+    expect((screen.getByLabelText("Password") as HTMLInputElement).value).toBe(
+      "",
+    );
+  });
+  it("clears the password when choosing email recovery and never sends it with a code", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ParentSignIn />);
+    fireEvent.change(screen.getByLabelText("Your email address"), {
+      target: { value: "existing@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "synthetic-password" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use an email code instead" }),
+    );
+    expect(screen.queryByLabelText("Password")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+    await screen.findByLabelText("Email code");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      action: "send_code",
+      email: "existing@example.test",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use my CaseLink password" }),
+    );
+    expect((screen.getByLabelText("Password") as HTMLInputElement).value).toBe(
+      "",
+    );
+  });
   it("verifies a code and uses a safe return path without authorizing support", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
     render(<ParentSignIn returnTo="/get-support?need=food" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use an email code instead" }),
+    );
     fireEvent.change(screen.getByLabelText("Your email address"), {
       target: { value: "synthetic@example.test" },
     });
@@ -108,6 +221,9 @@ describe("email sign-in", () => {
         ),
     );
     render(<ParentSignIn />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use an email code instead" }),
+    );
     fireEvent.change(screen.getByLabelText("Your email address"), {
       target: { value: "synthetic@example.test" },
     });
@@ -129,13 +245,13 @@ describe("email sign-in", () => {
 
 describe("informed support start", () => {
   it("keeps preparation-only scope, named recipients, consent and concrete limits", () => {
-    const now = new Date("2026-10-25T12:00:00Z");
+    const expiresAt = "2026-11-24T12:00:00.000Z";
     const mandate = buildMandate(
       { ...initialIntake, needs: ["electricity"] },
       ["peco-cap"],
       "prepare_only",
       "ask_me",
-      now,
+      expiresAt,
     );
     expect(mandate.allowedActions).toEqual(["research", "prepare"]);
     expect(mandate.recipientIds).toEqual(["peco-cap"]);
@@ -151,12 +267,20 @@ describe("informed support start", () => {
   });
   it("preserves answers and exact operation identity across a failed start and retry", async () => {
     const attempts: RequestInit[] = [];
+    const windows = vi.fn(() =>
+      jsonResponse({
+        ok: true,
+        authorization: { expiresAt: "2026-11-24T12:00:00.000Z" },
+      }),
+    );
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2028-01-01T00:00:00Z"));
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, options: RequestInit) => {
         if (url.endsWith("/account")) return jsonResponse(account);
         if (url.endsWith("/capabilities"))
           return jsonResponse({ ok: true, capabilities: [] });
+        if (url.endsWith("/authorization-window")) return windows();
         attempts.push(options);
         if (attempts.length === 1)
           throw new Error("The connection was interrupted. Try again.");
@@ -197,6 +321,10 @@ describe("informed support start", () => {
     expect(attempts[0].headers).toEqual(attempts[1].headers);
     expect(attempts[0].body).toBe(attempts[1].body);
     expect(JSON.parse(String(attempts[1].body)).intake.zip).toBe("19104");
+    expect(JSON.parse(String(attempts[1].body)).mandate.expiresAt).toBe(
+      "2026-11-24T12:00:00.000Z",
+    );
+    expect(windows).toHaveBeenCalledOnce();
   });
   it("does not collect intake when secure parent processing is unavailable", async () => {
     vi.stubGlobal(

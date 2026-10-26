@@ -1,6 +1,6 @@
 # Parent support evaluation — deterministic
 
-Corpus: 2026-10-25.1. Recorded: 2026-10-26T03:24:59.690Z. Source fingerprint: `4a6433608fdd219330ceb4f954dd0fcb962e0403641bf02c708c0819177c80b8`.
+Corpus: 2026-10-25.1. Recorded: 2026-10-26T08:48:39.990Z. Source fingerprint: `088b5aa725c404e3dde8aa987c4f4a68d7f83ee21a4f445640e37bfaf1efed08`.
 
 60 synthetic cases, 240 turns, 10 needs, 8 programs; languages en/es. Critical checks failed: 0; quality checks failed: 0. Live model calls: 0. Human-reviewed cases: **0**. Model-quality approval: **not established**.
 

@@ -40,6 +40,21 @@ async function main() {
     intake,
     mandate,
     plan: buildSupportPlan(intake, mandate, fixtureNow),
+    events: [
+      {
+        id: "synthetic-parent-outcome",
+        request_id: fixtureRequest().id,
+        kind: "parent.outcome_reported",
+        actor: "parent",
+        summary: "Parent reported an update.",
+        evidence: {
+          outcome: "support_received",
+          reference: "SYNTHETIC-OUTCOME-456",
+        },
+        created_at: fixtureNow.toISOString(),
+      },
+    ],
+    events_truncated: true,
   });
   writeFileSync(
     resolve(directory, "combined-summary.pdf"),
@@ -52,6 +67,9 @@ async function main() {
       ...NEEDS.map((need) => NEED_LABELS[need]),
       "Preparation only",
       "not an agency application",
+      "Parent reported outcome:",
+      "SYNTHETIC-OUTCOME-456",
+      "Showing the latest 200 updates.",
     ],
     minimumPages: 2,
   });

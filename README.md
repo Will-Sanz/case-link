@@ -4,6 +4,8 @@ CaseLink's current product direction is direct-to-parent food support and utilit
 
 **Implementation status:** the parent app is implemented locally on `main` with verified-email accounts, scoped household data, consented documents, durable service jobs, source-backed AI tools, permission controls and current/exact-packet PDF exports. Local automated and production-build UI/UX checks passed; no hosted deployment or real-family processing has been enabled. Live partner transports and final release evidence remain explicit gates in [implementation progress](docs/parent-support-progress.md).
 
+The original CaseLink identity, linked ChatGPT Futures recognition and published policy/contact substance carry into the parent workflow. The owner approved [Option 2, Family Panorama](docs/parent-brand-options.md). [Existing-account support](docs/parent-shared-accounts.md) reuses the same email/password identities through reviewed configuration and an additive migration; it preserves school sessions and records. The localhost preview remains synthetic. [Production readiness](docs/parent-production-readiness.md) records the exact hosted activation and operational evidence still needed.
+
 ## Current product documents
 
 - [Detailed parent-support MVP PRD](docs/parent-support-mvp-prd.md): scope, end-to-end journeys, agent authority, consent, partner contracts, privacy, states, acceptance criteria and launch gates.
@@ -31,7 +33,7 @@ Preparation, referral sending, partner acceptance, agency submission, assistance
 | Layer | Current foundation | Parent-MVP direction |
 | --- | --- | --- |
 | Application | Next.js App Router, React, TypeScript, Tailwind | Reuse components and create the focused parent journey |
-| Identity/data | Supabase Auth/Postgres with staff roles, password-session checks and family RLS | Add verified parent accounts, household ownership and scoped partner/operator permissions in an isolated environment |
+| Identity/data | Supabase Auth/Postgres with staff roles, password-session checks and family RLS | Reuse existing verified identities in reviewed shared mode; add owned parent households and scoped permissions without inheriting school records |
 | AI | Server-side OpenAI Responses API; local defaults already gpt-6.1-sol; validated text outputs, budgets and privacy checks | Add a judgment/tool-capable coordinator with food/utility playbooks, source-backed facts, standing mandates and permitted execution |
 | Work execution | Persisted stages advanced by browser requests | Add verified durable server execution, recovery, waits and duplicate prevention |
 | Directory | Existing partner resources and import pipeline | Add reviewed program/route contracts, provenance, freshness and explicit unknowns |

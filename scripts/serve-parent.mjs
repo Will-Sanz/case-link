@@ -11,7 +11,10 @@ const child = spawn(
     "--port",
     "3200",
   ],
-  { env: parentTestEnvironment(), stdio: "inherit" },
+  {
+    env: parentTestEnvironment(process.argv.includes("--local-services")),
+    stdio: "inherit",
+  },
 );
 for (const signal of ["SIGINT", "SIGTERM"])
   process.once(signal, () => child.kill(signal));

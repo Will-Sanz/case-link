@@ -4,16 +4,29 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Lock, Mail } from "iconoir-react";
+import { AUTH_LINK_ERROR_MESSAGE } from "@/lib/auth/safe-client-auth-message";
 import { parentApi, safeReturnPath } from "./api";
 import styles from "./parent.module.css";
 
-export function ParentSignIn({ returnTo }: { returnTo?: string }) {
+export function ParentSignIn({
+  returnTo,
+  existingAccountRecovery = false,
+  authNotice,
+}: {
+  returnTo?: string;
+  existingAccountRecovery?: boolean;
+  authNotice?: "password-reset-success" | "auth-link-error";
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [method, setMethod] = useState<"password" | "code">("password");
   const [token, setToken] = useState("");
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    authNotice === "auth-link-error" ? AUTH_LINK_ERROR_MESSAGE : "",
+  );
   const [resent, setResent] = useState(false);
   const codeInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -27,12 +40,15 @@ export function ParentSignIn({ returnTo }: { returnTo?: string }) {
       await parentApi("/auth", {
         method: "POST",
         body: JSON.stringify(
-          sent
-            ? { action: "verify_code", email, token }
-            : { action: "send_code", email },
+          method === "password"
+            ? { action: "sign_in", email, password }
+            : sent
+              ? { action: "verify_code", email, token }
+              : { action: "send_code", email },
         ),
       });
-      if (sent) {
+      if (method === "password" || sent) {
+        setPassword("");
         router.replace(safeReturnPath(returnTo));
         router.refresh();
       } else {
@@ -77,8 +93,8 @@ export function ParentSignIn({ returnTo }: { returnTo?: string }) {
           to find support.
         </h1>
         <p>
-          Use one email address to start, come back, and see what happens next.
-          No password to remember.
+          Your CaseLink account brings your support together. Sign in with the
+          email and password you already use, or get a secure email code.
         </p>
         <div className={styles.trustLine}>
           <Lock width={22} height={22} aria-hidden="true" />
@@ -99,8 +115,10 @@ export function ParentSignIn({ returnTo }: { returnTo?: string }) {
                 Enter the code sent to <strong>{email}</strong>. It may take a
                 moment to arrive.
               </>
+            ) : method === "password" ? (
+              "Use your existing CaseLink email and password."
             ) : (
-              "New here or coming back? We’ll email you a secure sign-in code."
+              "New here or need a code? We’ll email you a secure sign-in code."
             )}
           </p>
         </div>
@@ -112,7 +130,7 @@ export function ParentSignIn({ returnTo }: { returnTo?: string }) {
                 id="parent-email"
                 className={styles.input}
                 type="email"
-                autoComplete="email"
+                autoComplete="username"
                 inputMode="email"
                 required
                 value={email}
@@ -147,10 +165,41 @@ export function ParentSignIn({ returnTo }: { returnTo?: string }) {
               </p>
             </div>
           )}
+          {method === "password" && (
+            <div className={styles.field}>
+              <label htmlFor="parent-password">Password</label>
+              <input
+                id="parent-password"
+                className={styles.input}
+                type="password"
+                autoComplete="current-password"
+                required
+                maxLength={1024}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {existingAccountRecovery && (
+                <p className={styles.hint}>
+                  <Link className={styles.textLink} href="/forgot-password">
+                    Forgot your password?
+                  </Link>{" "}
+                  Reset your existing CaseLink password to sign in with it.
+                </p>
+              )}
+            </div>
+          )}
           {error && (
             <div className={styles.error} role="alert">
-              {error}
+              {error}{" "}
+              <Link className={styles.textLink} href="/support/help">
+                See direct support options
+              </Link>
             </div>
+          )}
+          {authNotice === "password-reset-success" && (
+            <p className={styles.success} role="status">
+              Your password is updated. Sign in with your new password.
+            </p>
           )}
           {resent && (
             <p className={styles.success} role="status">
@@ -163,19 +212,35 @@ export function ParentSignIn({ returnTo }: { returnTo?: string }) {
             type="submit"
           >
             {pending
-              ? sent
+              ? method === "password" || sent
                 ? "Signing you in…"
                 : "Sending your code…"
-              : sent
+              : method === "password" || sent
                 ? "Sign in"
                 : "Email me a code"}{" "}
-            {sent ? (
+            {method === "password" || sent ? (
               <ArrowRight width={19} height={19} aria-hidden="true" />
             ) : (
               <Mail width={19} height={19} aria-hidden="true" />
             )}
           </button>
         </form>
+        <button
+          className={`${styles.quiet} ${styles.space}`}
+          disabled={pending}
+          onClick={() => {
+            setMethod(method === "password" ? "code" : "password");
+            setPassword("");
+            setSent(false);
+            setToken("");
+            setError("");
+            setResent(false);
+          }}
+        >
+          {method === "password"
+            ? "Use an email code instead"
+            : "Use my CaseLink password"}
+        </button>
         {sent && (
           <div className={`${styles.inline} ${styles.space}`}>
             <button

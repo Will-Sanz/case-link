@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { buildSafeErrorPayload } from "../logger/safe-error-payload";
+import { canonicalProjectOrigin } from "./project-origin";
 
 export const uuidSchema = z.uuid();
 export function parentJson(body: unknown, status = 200): Response {
@@ -12,8 +14,12 @@ export function parentJson(body: unknown, status = 200): Response {
 }
 export function requireSameOrigin(request: Request): void {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin)
-    throw new Error("parent_origin_denied");
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  const expected =
+    configured === undefined
+      ? new URL(request.url).origin
+      : canonicalProjectOrigin(configured);
+  if (!origin || origin !== expected) throw new Error("parent_origin_denied");
 }
 export async function readBoundedBody(
   request: Request,
@@ -121,11 +127,18 @@ export function parentError(error: unknown): Response {
       },
       503,
     );
+  console.error(
+    JSON.stringify(
+      buildSafeErrorPayload("parentApi", error, {
+        includeDetails: false,
+      }),
+    ),
+  );
   return parentJson(
     {
       ok: false,
       error:
-        "We couldn't save that change. Your saved work is unchanged. Please try again.",
+        "We couldn't confirm that change. Refresh to check the latest saved information, then try again.",
     },
     500,
   );

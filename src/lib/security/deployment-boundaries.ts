@@ -9,6 +9,7 @@ type DeploymentEnvironment = ProductionPosture & {
   CASELINK_SCHOOL_SUPABASE_URL?: string;
   CASELINK_PARENT_PRODUCTION_SUPABASE_URL?: string;
   CASELINK_PARENT_REAL_DATA_APPROVED?: string;
+  CASELINK_PARENT_ACCOUNT_MODE?: string;
   NODE_ENV?: string;
   VERCEL_ENV?: string;
   CASELINK_ENVIRONMENT?: string;

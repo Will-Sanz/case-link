@@ -16,6 +16,8 @@
 /tmp/ai-evaluation/
 /tmp/legacy-containment/
 /tmp/restore/
+/tmp/parent-runtime/
+/tmp/parent-verification/
 
 # next.js
 /.next/

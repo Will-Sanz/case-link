@@ -102,6 +102,7 @@ const rawOperationSchema = z
     idempotency_key: z.string(),
     packet: z.record(z.string(), z.unknown()),
     updated_at: iso,
+    created_at: iso.optional(),
     evidence: z.record(z.string(), z.unknown()).nullable().optional(),
     personalActsComplete: z.boolean().optional(),
     executed_at: z.string().nullable().optional(),
@@ -208,6 +209,7 @@ export function normalizeWorkerOperation(
     idempotencyKey: operation.idempotency_key,
     packet: operation.packet,
     updatedAt: operation.updated_at,
+    ...(operation.created_at ? { createdAt: operation.created_at } : {}),
     ...(receipt.success ? { receipt: receipt.data } : {}),
   };
 }

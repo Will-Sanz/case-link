@@ -89,7 +89,7 @@ function AccountSettings({
         });
       } catch {
         setError(
-          "Your account is disabled, but we couldn’t confirm sign-out on this device. Close this browser before leaving a shared device.",
+          "Parent-support access is disabled, but we couldn’t confirm sign-out on this device. Close this browser before leaving a shared device.",
         );
       }
       router.refresh();
@@ -108,9 +108,11 @@ function AccountSettings({
       <section className={styles.surface}>
         <h2>Your deletion request is recorded</h2>
         <p className={`${styles.subtle} ${styles.space}`}>
-          Future work is stopped and account access is disabled. Private files
-          and eligible records enter the deletion process. Information already
-          sent to a program may remain under that program’s retention rules.
+          Future parent-support work is stopped and parent access is disabled.
+          Private files and eligible parent records enter the deletion process.
+          Your existing CaseLink sign-in and school records are kept separate.
+          Information already sent to a program may remain under that program’s
+          retention rules.
         </p>
         <p className={`${styles.hint} ${styles.space}`}>
           Deletion does not withdraw an application already held by an agency.
@@ -283,12 +285,13 @@ function AccountSettings({
           open={deleteOpen}
           onToggle={(event) => setDeleteOpen(event.currentTarget.open)}
         >
-          <summary>Delete my account & stop future work</summary>
+          <summary>Delete my parent-support data & stop future work</summary>
           <div>
             <p className={`${styles.small} ${styles.subtle}`}>
-              This stops future work, revokes account access and records a
-              deletion request. Required audit records and information already
-              delivered to a program may have separate retention rules. Download
+              This stops parent-support work, blocks parent access and records a
+              deletion request. It keeps your existing CaseLink sign-in and
+              school records. Minimal service evidence and information already
+              delivered to a program have separate retention rules. Download
               anything you need first.
             </p>
             <form
@@ -316,7 +319,7 @@ function AccountSettings({
               >
                 {pending
                   ? "Recording deletion…"
-                  : "Delete my account & stop work"}
+                  : "Delete parent-support data & stop work"}
               </button>
               <button
                 className={styles.quiet}
@@ -326,7 +329,7 @@ function AccountSettings({
                   setConfirmation("");
                 }}
               >
-                Keep my account
+                Keep my parent-support data
               </button>
             </form>
           </div>

@@ -2,7 +2,7 @@
   "corpusVersion": "2026-10-25.1",
   "evaluationTime": "2026-10-25T16:00:00.000Z",
   "mode": "deterministic",
-  "sourceHash": "4a6433608fdd219330ceb4f954dd0fcb962e0403641bf02c708c0819177c80b8",
+  "sourceHash": "088b5aa725c404e3dde8aa987c4f4a68d7f83ee21a4f445640e37bfaf1efed08",
   "model": "not_called",
   "reasoningEffort": "medium",
   "cases": 60,
@@ -38,7 +38,7 @@
   "parentActionCards": 20,
   "operatorActionCards": 63,
   "syntheticExecutions": 160,
-  "harnessP95Ms": 0.7666659999999865,
+  "harnessP95Ms": 0.7707080000000133,
   "latencyScope": "In-process harness plus optional model calls; excludes hosted jobs, real partners and family waiting time.",
   "liveCalls": 0,
   "inputTokens": 0,
@@ -208,7 +208,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 4.860875000000021,
+      "elapsedMs": 5.013458000000014,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -351,7 +351,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.442875000000015,
+      "elapsedMs": 0.41133300000001327,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -518,7 +518,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.6319579999999974,
+      "elapsedMs": 0.6003749999999854,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -675,7 +675,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.34924999999998363,
+      "elapsedMs": 0.4442500000000109,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -874,7 +874,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 1.653583000000026,
+      "elapsedMs": 1.8393339999999512,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -1047,7 +1047,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.7666659999999865,
+      "elapsedMs": 0.7707080000000133,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -1215,7 +1215,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.27904100000000653,
+      "elapsedMs": 0.28087499999998045,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -1358,7 +1358,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.11679099999997788,
+      "elapsedMs": 0.10854199999999992,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -1525,7 +1525,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.26479100000000244,
+      "elapsedMs": 0.2851660000000038,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -1682,7 +1682,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.1712500000000432,
+      "elapsedMs": 0.16004100000003518,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -1881,7 +1881,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.5197909999999979,
+      "elapsedMs": 0.5845830000000092,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -2054,7 +2054,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.2841659999999706,
+      "elapsedMs": 0.28924999999998136,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -2222,7 +2222,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.37504200000000765,
+      "elapsedMs": 0.2230000000000132,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -2365,7 +2365,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.11150000000003502,
+      "elapsedMs": 0.07720800000004147,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -2532,7 +2532,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.21620799999999463,
+      "elapsedMs": 0.178416000000027,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -2689,7 +2689,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.15629200000000765,
+      "elapsedMs": 0.1346250000000282,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -2888,7 +2888,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 1.4719160000000215,
+      "elapsedMs": 0.3681659999999738,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -3061,7 +3061,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.3228749999999536,
+      "elapsedMs": 0.21249999999997726,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -3234,7 +3234,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.28325000000000955,
+      "elapsedMs": 0.7102500000000305,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -3382,7 +3382,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.10862500000001774,
+      "elapsedMs": 0.1033750000000282,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -3554,7 +3554,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.22145899999998164,
+      "elapsedMs": 0.20395800000000008,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -3716,7 +3716,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.17183299999999235,
+      "elapsedMs": 0.15262500000000045,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -3920,7 +3920,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.3970830000000092,
+      "elapsedMs": 0.3515419999999949,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -4098,7 +4098,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.22674999999998136,
+      "elapsedMs": 0.24695900000000393,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -4271,7 +4271,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.2167919999999981,
+      "elapsedMs": 0.2071669999999699,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -4419,7 +4419,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.08437500000002274,
+      "elapsedMs": 0.08304099999998016,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -4591,7 +4591,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.20758299999999963,
+      "elapsedMs": 0.21779199999997445,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -4753,7 +4753,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.1809170000000222,
+      "elapsedMs": 0.1396670000000313,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -4957,7 +4957,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.35624999999998863,
+      "elapsedMs": 0.30820799999997917,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -5135,7 +5135,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.21429200000000037,
+      "elapsedMs": 0.47170899999997573,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -5303,7 +5303,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.19541700000002038,
+      "elapsedMs": 0.26266600000002427,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -5446,7 +5446,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.10200000000003229,
+      "elapsedMs": 0.1054589999999962,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -5613,7 +5613,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.24512499999997317,
+      "elapsedMs": 0.2400000000000091,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -5770,7 +5770,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.146000000000015,
+      "elapsedMs": 0.15395799999998871,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -5969,7 +5969,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.32854199999997036,
+      "elapsedMs": 0.39274999999997817,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -6142,7 +6142,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.1991249999999809,
+      "elapsedMs": 0.22595899999998892,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -6315,7 +6315,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.20516699999996035,
+      "elapsedMs": 0.22604100000000926,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -6463,7 +6463,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.07625000000001592,
+      "elapsedMs": 0.08358299999997598,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -6635,7 +6635,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.17758399999996755,
+      "elapsedMs": 0.23129199999999628,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -6797,7 +6797,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.14366699999999355,
+      "elapsedMs": 0.12458300000002964,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -7001,7 +7001,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.2805420000000254,
+      "elapsedMs": 0.30133299999999963,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -7179,7 +7179,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.19950000000000045,
+      "elapsedMs": 0.20824999999996407,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -7347,7 +7347,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.19779199999999264,
+      "elapsedMs": 0.20562499999999773,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -7490,7 +7490,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.08533399999998892,
+      "elapsedMs": 0.08279099999998607,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -7657,7 +7657,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.1790830000000483,
+      "elapsedMs": 0.17254199999996445,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -7814,7 +7814,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.16695799999996552,
+      "elapsedMs": 0.1482920000000263,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -8013,7 +8013,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.2928749999999809,
+      "elapsedMs": 0.32833299999998644,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -8183,7 +8183,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.31945899999999483,
+      "elapsedMs": 0.310374999999965,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -8351,7 +8351,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.1995839999999589,
+      "elapsedMs": 0.19683300000002646,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -8494,7 +8494,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.11008299999997462,
+      "elapsedMs": 0.09600000000000364,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -8661,7 +8661,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.19454099999995833,
+      "elapsedMs": 2.100582999999972,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -8818,7 +8818,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.14212500000002137,
+      "elapsedMs": 0.167082999999991,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -9017,7 +9017,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.32783299999999826,
+      "elapsedMs": 0.3985829999999737,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -9187,7 +9187,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.27345900000000256,
+      "elapsedMs": 0.29016699999999673,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -9355,7 +9355,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.196583999999973,
+      "elapsedMs": 0.193916999999999,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -9498,7 +9498,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.0830829999999878,
+      "elapsedMs": 0.08499999999997954,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -9665,7 +9665,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.16929199999998445,
+      "elapsedMs": 0.2630829999999946,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -9822,7 +9822,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.1436249999999859,
+      "elapsedMs": 0.14299999999997226,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -10021,7 +10021,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.35300000000000864,
+      "elapsedMs": 0.369624999999985,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -10191,7 +10191,7 @@
           "outputTokens": 0
         }
       ],
-      "elapsedMs": 0.32229200000000446,
+      "elapsedMs": 0.2618330000000242,
       "humanReview": "pending",
       "reviewCriteria": [
         "Route fits this exact new/renewal/pending/continuing journey; an existing application is not restarted.",
@@ -10201,7 +10201,7 @@
       ]
     }
   ],
-  "recordedAt": "2026-10-26T03:24:59.690Z",
+  "recordedAt": "2026-10-26T08:48:39.990Z",
   "sourceManifest": [
     {
       "path": "tests/fixtures/parent-evaluation.ts",
@@ -10221,11 +10221,11 @@
     },
     {
       "path": "src/lib/parent/service.ts",
-      "sha256": "26693885d0bbacd8d290cc4c7bbb7cdfec75d1c4654d6e356159e3354f66ba50"
+      "sha256": "3b138c14e2c436ca895a2d9f3b7e5920828598434e1963655e997075bd2f265e"
     },
     {
       "path": "src/lib/parent/policy.ts",
-      "sha256": "c9d62e0355e464da173951932770e4215d7766082d3a3fd04e7090ed1c931e2b"
+      "sha256": "c1857ebbef8f06941c76e2b9a08ba08064dda0c9a2cbd0b40e9e0b716ab289d3"
     },
     {
       "path": "src/lib/parent/planning.ts",
@@ -10237,7 +10237,7 @@
     },
     {
       "path": "src/lib/parent/domain.ts",
-      "sha256": "ed936789b33a4ba84b3d724ee3ccacc0bd322239f7379722491d96b3c2c29408"
+      "sha256": "ce620bea3a55a57a18f7ca9b79dd3995a29bfbbc959ad66024717ffda1b1371f"
     },
     {
       "path": "src/lib/parent/answers.ts",

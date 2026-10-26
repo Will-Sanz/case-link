@@ -66,7 +66,7 @@ describe("verified parent session", () => {
     }
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it("rejects revoked interactive sessions, disabled parents and school staff", async () => {
+  it("rejects sessions or accounts denied by the database identity boundary", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
     expect(await getParentSession()).toBeNull();
     await expect(requireParentSession()).rejects.toBeInstanceOf(

@@ -30,7 +30,7 @@ A necessary human step is specific: the agent prepares everything else, explains
 | Partner network | The owner confirmed existing listed resources are partners | Per-program permissions, capacity uncertainty, transport and update contracts; partnership is not integration access |
 | AI | GPT-6.1 Sol, `gpt-6.1-sol`, already the local default; Responses API for tools | Deployed access/settings, evaluations, latency and cost |
 | Geography | Philadelphia first | Exact program/ZIP coverage and honest unsupported-area recovery |
-| Identity | Proposed low-friction default: verified email code; test phone-first access with families | Select and support the actual launch channel(s), including recovery, before changing auth |
+| Identity | Reuse existing CaseLink email/password identities; retain verified email codes where enrollment permits | Apply reviewed shared-account configuration/migration and test actual hosted sign-in, recovery, enrollment and household isolation |
 | Language | Proposed English and reviewed Spanish experience | Test all advertised language content, notices, help and partner coverage |
 | Revenue | Parents are the users; sponsorship/payment model remains open | Pricing is separate from this service scope |
 
@@ -232,7 +232,7 @@ Families can inspect/download a readable progress/preparation summary and releva
 
 Apply the dated [privacy and regulatory review](parent-privacy-regulatory-review.md) and resolve its actual-role and jurisdiction questions before collecting real family data. In particular, WIC/pregnancy and combined-source records require a documented FTC Health Breach Notification Rule assessment; absence of a HIPAA role does not settle that analysis. Agency releases, FERPA roles, adult-account/COPPA boundaries and processor agreements must match actual relationships. Database and Auth controls must enforce the processing gate even for direct API access. Public notices distinguish raw files, derived facts, service records, retained hashes, backups and vendor/recipient copies; never infer zero retention from `store:false` or claim legal compliance from tests.
 
-The parent service has a new purpose and data boundary. Use separate parent production and synthetic staging by default; keep the school deployment/records isolated. Existing school approvals, staff roles and de-identified policy do not supply parent consent or authorize disabling guards.
+The parent service has a new purpose and data boundary. Reuse the existing account provider through the explicit shared-account mode and preserve school sessions/records; synthetic staging must remain separate from production. Existing school approvals, staff roles and de-identified policy do not supply parent consent or authorize disabling guards. Parent-purpose deletion must preserve the shared Auth identity and unrelated school data. See [existing-account activation](parent-shared-accounts.md).
 
 The data inventory permits only fields/documents needed by a supported active action. Keep government identifiers and authentication secrets outside model context and ordinary request records; where a provider requires them, use direct parent entry or a separately reviewed secure delegated channel. Adding such a channel requires specific permission, threat-model/testing and retention controls; no generic credential collection is implied by one click.
 

@@ -26,6 +26,7 @@ import { requestStatus } from "./my-support";
 import { SupportDocuments } from "./support-documents";
 import { SupportActivity } from "./support-activity";
 import { NecessaryAnswer } from "./necessary-answer";
+import { SavedAccountAnswers } from "./saved-account-answers";
 import { ANSWER_FIELDS } from "@/lib/parent/answers";
 import {
   PermissionEditor,
@@ -261,6 +262,65 @@ function CorrectDetails({
               </select>
             </div>
           </div>
+          {intake.needs.some((need) => need.startsWith("wic_")) && (
+            <fieldset className={styles.fieldset}>
+              <legend className={styles.legend}>
+                WIC household information
+              </legend>
+              <div className={styles.field}>
+                <label htmlFor="correct-children">
+                  Does your household include a child under five?
+                </label>
+                <select
+                  id="correct-children"
+                  className={styles.select}
+                  value={
+                    intake.childrenUnderFive === null
+                      ? "unknown"
+                      : String(intake.childrenUnderFive)
+                  }
+                  onChange={(event) =>
+                    change(
+                      "childrenUnderFive",
+                      event.target.value === "unknown"
+                        ? null
+                        : event.target.value === "true",
+                    )
+                  }
+                >
+                  <option value="unknown">Not sure / not provided</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+              <div className={`${styles.field} ${styles.space}`}>
+                <label htmlFor="correct-pregnancy">
+                  Is anyone pregnant or recently postpartum?
+                </label>
+                <select
+                  id="correct-pregnancy"
+                  className={styles.select}
+                  value={
+                    intake.pregnantOrPostpartum === null
+                      ? "unknown"
+                      : String(intake.pregnantOrPostpartum)
+                  }
+                  onChange={(event) =>
+                    change(
+                      "pregnantOrPostpartum",
+                      event.target.value === "unknown"
+                        ? null
+                        : event.target.value === "true",
+                    )
+                  }
+                >
+                  <option value="unknown">Not sure / not provided</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+            </fieldset>
+          )}
           {request.intake.needs.some((need) =>
             ["electricity", "gas", "water"].includes(need),
           ) && (
@@ -580,6 +640,29 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                   <li key={event.id}>
                     <div>
                       <strong>{event.summary}</strong>
+                      {event.kind === "parent.outcome_reported" &&
+                        event.actor === "parent" && (
+                          <>
+                            {typeof event.evidence?.outcome === "string" &&
+                              Object.hasOwn(
+                                OUTCOME_LABELS,
+                                event.evidence.outcome,
+                              ) && (
+                                <p>
+                                  Reported outcome:{" "}
+                                  {
+                                    OUTCOME_LABELS[
+                                      event.evidence
+                                        .outcome as keyof typeof OUTCOME_LABELS
+                                    ]
+                                  }
+                                </p>
+                              )}
+                            {typeof event.evidence?.reference === "string" && (
+                              <p>{event.evidence.reference}</p>
+                            )}
+                          </>
+                        )}
                       <p>
                         {event.actor === "parent"
                           ? "Parent reported"
@@ -601,6 +684,18 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               <p className={`${styles.hint} ${styles.space}`}>
                 No additional activity recorded yet. We won’t mark a request
                 sent or received without evidence.
+              </p>
+            )}
+            {request.events_truncated && (
+              <p className={`${styles.hint} ${styles.space}`}>
+                Showing the latest 200 updates.{" "}
+                <a
+                  className={styles.textLink}
+                  href="/api/parent/account/export"
+                >
+                  Download your information
+                </a>{" "}
+                for retained earlier history.
               </p>
             )}
             <a
@@ -666,6 +761,9 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             </dl>
             {!inactive && (
               <CorrectDetails request={request} onChange={reload} />
+            )}
+            {!inactive && (
+              <SavedAccountAnswers request={request} onChange={reload} />
             )}
           </section>
           <section className={styles.surface}>

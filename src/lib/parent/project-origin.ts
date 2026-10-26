@@ -29,6 +29,7 @@ export function parentProjectIsolationIssues(input: {
   schoolUrl?: string;
   parentProductionUrl?: string;
   environment?: string;
+  accountMode?: string;
 }): string[] {
   const issues: string[] = [];
   const project = canonicalProjectOrigin(input.projectUrl),
@@ -39,12 +40,29 @@ export function parentProjectIsolationIssues(input: {
       "A valid parent Supabase origin without credentials, path, query or fragment is required",
     ];
   const url = new URL(project);
-  if (school && project === school)
+  const existing = input.accountMode === "existing";
+  if (
+    input.accountMode &&
+    !["existing", "isolated"].includes(input.accountMode)
+  )
+    issues.push("Parent account mode must be existing or isolated");
+  if (
+    existing &&
+    (!school || project !== school) &&
+    !["preview", "test"].includes(input.environment ?? "")
+  )
+    issues.push(
+      "Existing-account mode must use the approved existing CaseLink project",
+    );
+  if (!existing && school && project === school)
     issues.push(
       "Parent support must use a project separate from the school environment",
     );
   if (isLoopbackHost(url.hostname)) {
-    if (url.port !== "55321")
+    if (
+      url.port !== "55321" &&
+      !(existing && project === school && url.port === "54321")
+    )
       issues.push(
         "Local parent support must use the isolated parent API on port 55321",
       );
@@ -52,7 +70,7 @@ export function parentProjectIsolationIssues(input: {
   }
   if (!school || !production)
     issues.push(
-      "Remote parent environments must identify valid school and parent production origins",
+      "Remote parent environments must identify the existing CaseLink and approved production origins",
     );
   if (input.environment === "production" && project !== production)
     issues.push("Production must use the approved parent project");

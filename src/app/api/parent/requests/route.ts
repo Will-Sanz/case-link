@@ -13,6 +13,7 @@ import {
 } from "@/lib/parent/http";
 import { validateMandate } from "@/lib/parent/policy";
 import { getProgramsForNeeds } from "@/lib/parent/programs";
+import { getParentAuthorizationWindow } from "@/lib/parent/authorization-window";
 
 export async function GET() {
   try {
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
       .object({ intake: intakeSchema, mandate: mandateSchema })
       .strict()
       .parse(await readParentJson(request));
-    if (validateMandate(value.mandate, new Date()))
+    const authorization = await getParentAuthorizationWindow();
+    if (validateMandate(value.mandate, new Date(authorization.issuedAt)))
       return parentJson(
         {
           ok: false,

@@ -71,6 +71,49 @@ const FIELD_CATEGORY: Record<string, ServiceMandate["allowedData"][number]> = {
   documentIds: "documents",
   statusReference: "household",
 };
+export function utilityProviderFor(
+  request: SupportRequest,
+  need: SupportNeed,
+  now: Date,
+): string {
+  const expected = (
+    { electricity: "peco", gas: "pgw", water: "pwd" } as Partial<
+      Record<SupportNeed, string>
+    >
+  )[need];
+  let provider =
+    expected &&
+    request.intake.utilityProviders.includes(expected as "peco" | "pgw" | "pwd")
+      ? expected
+      : request.intake.utilityProviders.includes("other")
+        ? "other"
+        : "unknown";
+  for (const fact of [...(request.facts ?? [])].sort(
+    (a, b) => Date.parse(a.confirmedAt) - Date.parse(b.confirmedAt),
+  )) {
+    if (
+      fact.need !== need ||
+      fact.field !== "utilityProvider" ||
+      fact.source !== "parent" ||
+      !Number.isFinite(Date.parse(fact.confirmedAt)) ||
+      Date.parse(fact.confirmedAt) > now.getTime() ||
+      !Number.isFinite(Date.parse(fact.asOf)) ||
+      Date.parse(fact.asOf) > now.getTime() ||
+      Date.parse(fact.asOf) < now.getTime() - 45 * 86400000
+    )
+      continue;
+    if (
+      factAnswerSchema.safeParse({
+        need,
+        field: "utilityProvider",
+        value: fact.value,
+        version: request.version,
+      }).success
+    )
+      provider = String(fact.value);
+  }
+  return provider;
+}
 export function hasUtilityAccountAuthority(
   request: SupportRequest,
   need: SupportNeed | undefined,
@@ -202,6 +245,29 @@ export function authorizeOperation(input: {
     operation.dataCategories.some((c) => !capability.dataCategories.includes(c))
   )
     return deny("provider_data_not_permitted");
+  const utilityNeed =
+    operation.need ??
+    getProgram(operation.programId)?.needs.find((need) =>
+      ["electricity", "gas", "water"].includes(need),
+    );
+  if (
+    sideEffect &&
+    utilityNeed &&
+    ["electricity", "gas", "water"].includes(utilityNeed)
+  ) {
+    const expected = (
+      { electricity: "peco", gas: "pgw", water: "pwd" } as Partial<
+        Record<SupportNeed, string>
+      >
+    )[utilityNeed];
+    const provider = utilityProviderFor(request, utilityNeed, now);
+    if (
+      (provider !== "unknown" && provider !== expected) ||
+      (parsedPacket.data.utilityProvider !== undefined &&
+        parsedPacket.data.utilityProvider !== expected)
+    )
+      return deny("provider_account_mismatch");
+  }
   if (sideEffect && !capability.personalActsComplete)
     return deny("required_personal_act");
   if (

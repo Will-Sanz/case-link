@@ -41,6 +41,30 @@ const input = () => ({
   documentsValid: true,
 });
 describe("deterministic parent authority", () => {
+  it("denies an old provider route after a same-need provider correction", () => {
+    const test = input();
+    test.request.facts = [
+      {
+        need: "electricity",
+        field: "utilityProvider",
+        value: "other",
+        source: "parent",
+        confirmedAt: fixtureNow.toISOString(),
+        asOf: "2026-10-25",
+      },
+    ];
+    expect(authorizeOperation(test)).toEqual({
+      allowed: false,
+      reason: "provider_account_mismatch",
+    });
+    const mismatch = input();
+    mismatch.operation.packet = { utilityProvider: "pgw" };
+    expect(authorizeOperation(mismatch)).toEqual({
+      allowed: false,
+      reason: "provider_account_mismatch",
+    });
+  });
+
   it("accepts a fresh exact-need authority fact while keeping another utility unauthorized", () => {
     const request = fixtureRequest({
       intake: fixtureIntake({

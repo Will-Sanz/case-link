@@ -38,8 +38,11 @@ export function parentConfigurationIssues(env: ParentEnvironment): string[] {
     ...parentProjectIsolationIssues({
       projectUrl: env.NEXT_PUBLIC_SUPABASE_URL,
       schoolUrl: env.CASELINK_SCHOOL_SUPABASE_URL,
-      parentProductionUrl: env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL,
+      parentProductionUrl:
+        env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL ??
+        env.CASELINK_PRODUCTION_SUPABASE_URL,
       environment: target,
+      accountMode: env.CASELINK_PARENT_ACCOUNT_MODE,
     }),
   );
   if (
@@ -47,7 +50,11 @@ export function parentConfigurationIssues(env: ParentEnvironment): string[] {
       env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
         env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
         "",
-    )
+    ) ||
+    [
+      env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    ].some((key) => key !== undefined && key !== "" && !publicKeyIsSafe(key))
   )
     issues.push("A public Supabase publishable or anonymous key is required");
   if (!loopback && env.CASELINK_PARENT_REAL_DATA_APPROVED !== "1")

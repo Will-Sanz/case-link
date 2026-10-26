@@ -80,8 +80,34 @@ export function ParentSummaryDocument({
               {event.created_at.slice(0, 10)} · {event.actor}
             </Text>
             <Text>{event.summary}</Text>
+            {event.kind === "parent.outcome_reported" &&
+              event.actor === "parent" && (
+                <>
+                  {typeof event.evidence?.outcome === "string" &&
+                    Object.hasOwn(OUTCOME_LABELS, event.evidence.outcome) && (
+                      <Text>
+                        Parent reported outcome:{" "}
+                        {
+                          OUTCOME_LABELS[
+                            event.evidence
+                              .outcome as keyof typeof OUTCOME_LABELS
+                          ]
+                        }
+                      </Text>
+                    )}
+                  {typeof event.evidence?.reference === "string" && (
+                    <Text>{event.evidence.reference}</Text>
+                  )}
+                </>
+              )}
           </View>
         ))}
+        {request.events_truncated && (
+          <Text style={styles.small}>
+            Showing the latest 200 updates. Download your information from your
+            CaseLink account for retained earlier history.
+          </Text>
+        )}
         <Text style={styles.small}>
           This is a current support summary, not an agency application,
           signature, approval or proof of benefits. Submitted packets and

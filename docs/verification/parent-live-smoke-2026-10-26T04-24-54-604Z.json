@@ -1,0 +1,1903 @@
+{
+  "recordedAt": "2026-10-26T04:24:54.604Z",
+  "scope": "direct_coordinator_routing_smoke_not_four_turn_live_corpus",
+  "model": "gpt-6.1-sol",
+  "reasoningEffort": "medium",
+  "store": false,
+  "maximumCalls": 30,
+  "calls": 28,
+  "inputTokens": 14874,
+  "outputTokens": 620,
+  "tokenUsageComplete": true,
+  "existingKeyExplicitlyApprovedForSyntheticRun": true,
+  "projectIdentityEstablished": false,
+  "dedicatedTestProjectVerified": false,
+  "humanReviewedCases": 0,
+  "modelQualityApproval": "not_established",
+  "failed": false,
+  "results": [
+    {
+      "id": "parent-food_now-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "food_now"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 5152.402417,
+      "selections": [
+        {
+          "need": "food_now",
+          "programId": "philly-food"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "food_now",
+            "programId": "philly-food",
+            "title": "Philadelphia food and meal finder",
+            "summary": "Find city-listed food and meal locations. Confirm hours, pickup requirements and availability before traveling.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.phila.gov/food/",
+            "sourceUrl": "https://www.phila.gov/food/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Confirm a practical pickup or delivery arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "food_now",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-snap_new-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "snap_new"
+      ],
+      "language": "es",
+      "modelCalls": 2,
+      "elapsedMs": 3028.8102500000005,
+      "selections": [
+        {
+          "need": "snap_new",
+          "programId": "snap-pa"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "snap_new",
+            "programId": "snap-pa",
+            "title": "Pennsylvania SNAP",
+            "summary": "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "sourceUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Complete any required personal declaration and interview.",
+              "Use your own account for required authentication.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "snap_new",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-snap_renewal-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "snap_renewal"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 3627.372333000001,
+      "selections": [
+        {
+          "need": "snap_renewal",
+          "programId": "snap-pa"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "snap_renewal",
+            "programId": "snap-pa",
+            "title": "Pennsylvania SNAP",
+            "summary": "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "sourceUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "steps": [
+              "Continue the existing benefit journey; do not start a duplicate application.",
+              "Complete any required personal declaration and interview.",
+              "Use your own account for required authentication.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "snap_renewal",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-snap_pending-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "snap_pending"
+      ],
+      "language": "es",
+      "modelCalls": 2,
+      "elapsedMs": 4636.925416999999,
+      "selections": [
+        {
+          "need": "snap_pending",
+          "programId": "snap-pa"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "snap_pending",
+            "programId": "snap-pa",
+            "title": "Pennsylvania SNAP",
+            "summary": "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "sourceUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "steps": [
+              "Continue the existing benefit journey; do not start a duplicate application.",
+              "Complete any required personal declaration and interview.",
+              "Use your own account for required authentication.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "snap_pending",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-snap_problem-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "snap_problem"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 3481.730540999997,
+      "selections": [
+        {
+          "need": "snap_problem",
+          "programId": "snap-pa"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "snap_problem",
+            "programId": "snap-pa",
+            "title": "Pennsylvania SNAP",
+            "summary": "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "sourceUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "steps": [
+              "Continue the existing benefit journey; do not start a duplicate application.",
+              "Complete any required personal declaration and interview.",
+              "Use your own account for required authentication.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "snap_problem",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-wic_new-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "wic_new"
+      ],
+      "language": "es",
+      "modelCalls": 2,
+      "elapsedMs": 3858.136290999999,
+      "selections": [
+        {
+          "need": "wic_new",
+          "programId": "wic-pa"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "wic_new",
+            "programId": "wic-pa",
+            "title": "Pennsylvania WIC",
+            "summary": "Coordinate WIC enrollment, continuing support, documents and a specialist appointment.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "sourceUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "A WIC specialist completes the program's required assessment.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "wic_new",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-wic_continuing-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "wic_continuing"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 3810.9624159999985,
+      "selections": [
+        {
+          "need": "wic_continuing",
+          "programId": "wic-pa"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "wic_continuing",
+            "programId": "wic-pa",
+            "title": "Pennsylvania WIC",
+            "summary": "Coordinate WIC enrollment, continuing support, documents and a specialist appointment.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "sourceUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "steps": [
+              "Continue the existing benefit journey; do not start a duplicate application.",
+              "A WIC specialist completes the program's required assessment.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "wic_continuing",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-electricity-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "electricity"
+      ],
+      "language": "es",
+      "modelCalls": 2,
+      "elapsedMs": 3353.687582999999,
+      "selections": [
+        {
+          "need": "electricity",
+          "programId": "peco-cap"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "electricity",
+            "programId": "peco-cap",
+            "title": "PECO assistance programs",
+            "summary": "Explore PECO affordability and assistance options for an electric bill or threatened interruption.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "sourceUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with your provider if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "electricity",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-gas-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "gas"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 3473.6068749999977,
+      "selections": [
+        {
+          "need": "gas",
+          "programId": "pgw-crp"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "gas",
+            "programId": "pgw-crp",
+            "title": "PGW financial support",
+            "summary": "Explore PGW financial support, affordability and energy assistance options.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs",
+            "sourceUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with PGW if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "gas",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "parent-water-permitted_lifecycle-routing-smoke",
+      "passed": true,
+      "needs": [
+        "water"
+      ],
+      "language": "es",
+      "modelCalls": 2,
+      "elapsedMs": 3771.148083,
+      "selections": [
+        {
+          "need": "water",
+          "programId": "pwd-tap"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "water",
+            "programId": "pwd-tap",
+            "title": "Philadelphia water assistance",
+            "summary": "Use the City's water assistance application route. The City does not accept application documents by email.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+            "sourceUrl": "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Complete any required account-holder declaration through an accepted City channel.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "water",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "combined-six-needs-en",
+      "passed": true,
+      "needs": [
+        "food_now",
+        "snap_new",
+        "wic_continuing",
+        "electricity",
+        "gas",
+        "water"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 3575.0719580000004,
+      "selections": [
+        {
+          "need": "food_now",
+          "programId": "philly-food"
+        },
+        {
+          "need": "snap_new",
+          "programId": "snap-pa"
+        },
+        {
+          "need": "wic_continuing",
+          "programId": "wic-pa"
+        },
+        {
+          "need": "electricity",
+          "programId": "peco-cap"
+        },
+        {
+          "need": "gas",
+          "programId": "pgw-crp"
+        },
+        {
+          "need": "water",
+          "programId": "pwd-tap"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "food_now",
+            "programId": "philly-food",
+            "title": "Philadelphia food and meal finder",
+            "summary": "Find city-listed food and meal locations. Confirm hours, pickup requirements and availability before traveling.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.phila.gov/food/",
+            "sourceUrl": "https://www.phila.gov/food/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Confirm a practical pickup or delivery arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "snap_new",
+            "programId": "snap-pa",
+            "title": "Pennsylvania SNAP",
+            "summary": "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "sourceUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Complete any required personal declaration and interview.",
+              "Use your own account for required authentication.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "wic_continuing",
+            "programId": "wic-pa",
+            "title": "Pennsylvania WIC",
+            "summary": "Coordinate WIC enrollment, continuing support, documents and a specialist appointment.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "sourceUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "steps": [
+              "Continue the existing benefit journey; do not start a duplicate application.",
+              "A WIC specialist completes the program's required assessment.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "electricity",
+            "programId": "peco-cap",
+            "title": "PECO assistance programs",
+            "summary": "Explore PECO affordability and assistance options for an electric bill or threatened interruption.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "sourceUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with your provider if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "gas",
+            "programId": "pgw-crp",
+            "title": "PGW financial support",
+            "summary": "Explore PGW financial support, affordability and energy assistance options.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs",
+            "sourceUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with PGW if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "water",
+            "programId": "pwd-tap",
+            "title": "Philadelphia water assistance",
+            "summary": "Use the City's water assistance application route. The City does not accept application documents by email.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+            "sourceUrl": "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Complete any required account-holder declaration through an accepted City channel.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "food_now",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "combined-six-needs-es",
+      "passed": true,
+      "needs": [
+        "food_now",
+        "snap_renewal",
+        "wic_new",
+        "electricity",
+        "gas",
+        "water"
+      ],
+      "language": "es",
+      "modelCalls": 2,
+      "elapsedMs": 3741.5420410000006,
+      "selections": [
+        {
+          "need": "food_now",
+          "programId": "philly-food"
+        },
+        {
+          "need": "snap_renewal",
+          "programId": "snap-pa"
+        },
+        {
+          "need": "wic_new",
+          "programId": "wic-pa"
+        },
+        {
+          "need": "electricity",
+          "programId": "peco-cap"
+        },
+        {
+          "need": "gas",
+          "programId": "pgw-crp"
+        },
+        {
+          "need": "water",
+          "programId": "pwd-tap"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "food_now",
+            "programId": "philly-food",
+            "title": "Philadelphia food and meal finder",
+            "summary": "Find city-listed food and meal locations. Confirm hours, pickup requirements and availability before traveling.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.phila.gov/food/",
+            "sourceUrl": "https://www.phila.gov/food/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Confirm a practical pickup or delivery arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "snap_renewal",
+            "programId": "snap-pa",
+            "title": "Pennsylvania SNAP",
+            "summary": "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "sourceUrl": "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
+            "steps": [
+              "Continue the existing benefit journey; do not start a duplicate application.",
+              "Complete any required personal declaration and interview.",
+              "Use your own account for required authentication.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "wic_new",
+            "programId": "wic-pa",
+            "title": "Pennsylvania WIC",
+            "summary": "Coordinate WIC enrollment, continuing support, documents and a specialist appointment.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "sourceUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "A WIC specialist completes the program's required assessment.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "electricity",
+            "programId": "peco-cap",
+            "title": "PECO assistance programs",
+            "summary": "Explore PECO affordability and assistance options for an electric bill or threatened interruption.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "sourceUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with your provider if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "gas",
+            "programId": "pgw-crp",
+            "title": "PGW financial support",
+            "summary": "Explore PGW financial support, affordability and energy assistance options.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs",
+            "sourceUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with PGW if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          },
+          {
+            "need": "water",
+            "programId": "pwd-tap",
+            "title": "Philadelphia water assistance",
+            "summary": "Use the City's water assistance application route. The City does not accept application documents by email.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+            "sourceUrl": "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Complete any required account-holder declaration through an accepted City channel.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "food_now",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "preparation-only-minimized-context",
+      "passed": true,
+      "needs": [
+        "electricity"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 5783.718625000001,
+      "selections": [
+        {
+          "need": "electricity",
+          "programId": "peco-cap"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "electricity",
+            "programId": "peco-cap",
+            "title": "PECO assistance programs",
+            "summary": "Explore PECO affordability and assistance options for an electric bill or threatened interruption.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "sourceUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "Authenticate directly with your provider if required.",
+              "Personally accept any binding payment arrangement.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Your current permission covers preparation. Nothing will be sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": []
+    },
+    {
+      "id": "alternate-authorized-recipient",
+      "passed": true,
+      "needs": [
+        "electricity"
+      ],
+      "language": "en",
+      "modelCalls": 2,
+      "elapsedMs": 4437.780999999995,
+      "selections": [
+        {
+          "need": "electricity",
+          "programId": "uesf-utilities"
+        }
+      ],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "electricity",
+            "programId": "uesf-utilities",
+            "title": "UESF utility assistance",
+            "summary": "Philadelphia utility grant assistance. Funding, account requirements and any required contribution must be confirmed by the program.",
+            "state": "prepared",
+            "nextActor": "caselink",
+            "officialUrl": "https://uesfacts.org/our-programs/utility-grant-program/",
+            "sourceUrl": "https://uesfacts.org/our-programs/utility-grant-program/",
+            "steps": [
+              "Prepare the relevant program information from your household facts.",
+              "A required household contribution or financial commitment needs your decision.",
+              "Check an actual receipt and follow the outcome; opening a link is not submission."
+            ],
+            "limitation": "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": "gpt-6.1-sol"
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "electricity",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "missing-recipient-scope",
+      "passed": true,
+      "needs": [
+        "electricity"
+      ],
+      "language": "en",
+      "modelCalls": 0,
+      "elapsedMs": 0.2505830000009155,
+      "selections": [],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "electricity",
+            "programId": "",
+            "title": "Electric bill",
+            "summary": "No program is authorized for this need yet.",
+            "state": "checking",
+            "nextActor": "parent",
+            "officialUrl": "",
+            "sourceUrl": "",
+            "steps": [
+              "Add a relevant named program to your permission."
+            ],
+            "limitation": "An expanded permission is needed before sharing with a new recipient."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": null
+      },
+      "requiredActions": [
+        {
+          "id": "permission-electricity",
+          "need": "electricity",
+          "reason": "expanded_permission",
+          "title": "Add a program for electric bill",
+          "explanation": "Your permission does not name a relevant program for this need. Other authorized work can continue."
+        },
+        {
+          "id": "provider-connection",
+          "need": "electricity",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    },
+    {
+      "id": "outside-service-region",
+      "passed": true,
+      "needs": [
+        "electricity"
+      ],
+      "language": "en",
+      "modelCalls": 0,
+      "elapsedMs": 0.046833000000333413,
+      "selections": [],
+      "plan": {
+        "version": 1,
+        "summary": "Your needs have separate support paths. Prepared information stays available while each program's next step is checked.",
+        "routes": [
+          {
+            "need": "electricity",
+            "programId": "peco-cap",
+            "title": "PECO assistance programs",
+            "summary": "CaseLink currently coordinates support in Philadelphia. Use local official help while we expand coverage.",
+            "state": "unresolved",
+            "nextActor": "caselink",
+            "officialUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "sourceUrl": "https://www.peco.com/my-account/customer-support/assistance-programs",
+            "steps": [
+              "Check local official help; no application or referral has been sent."
+            ],
+            "limitation": "CaseLink currently coordinates support in Philadelphia. Use local official help while we expand coverage."
+          }
+        ],
+        "generatedAt": "2026-10-25T16:00:00.000Z",
+        "model": null
+      },
+      "requiredActions": [
+        {
+          "id": "provider-connection",
+          "need": "electricity",
+          "reason": "execution_issue",
+          "resolver": "operator",
+          "title": "CaseLink is verifying the service connection",
+          "explanation": "Your preparation is saved. CaseLink must verify the program's permitted delivery and status channel before it can send anything. There is nothing for you to approve again. Official help remains available."
+        }
+      ]
+    }
+  ],
+  "providerCalls": [
+    {
+      "caseId": "parent-food_now-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 443,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 32,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 475
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"food_now\",\"programId\":\"philly-food\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-food_now-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 499,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 503
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_new-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 462,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 31,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 493
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"snap_new\",\"programId\":\"snap-pa\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_new-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 517,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 521
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_renewal-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 464,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 33,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 497
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"snap_renewal\",\"programId\":\"snap-pa\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_renewal-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 523,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 527
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_pending-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 462,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 31,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 493
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"snap_pending\",\"programId\":\"snap-pa\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_pending-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 517,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 521
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_problem-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 462,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 31,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 493
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"snap_problem\",\"programId\":\"snap-pa\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-snap_problem-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 517,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 521
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-wic_new-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 459,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 31,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 490
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"wic_new\",\"programId\":\"wic-pa\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-wic_new-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 514,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 518
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-wic_continuing-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 461,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 33,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 494
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"wic_continuing\",\"programId\":\"wic-pa\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-wic_continuing-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 520,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 524
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-electricity-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 447,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 32,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 479
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"electricity\",\"programId\":\"peco-cap\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-electricity-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 503,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 507
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-gas-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 444,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 32,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 476
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"gas\",\"programId\":\"pgw-crp\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-gas-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 499,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 503
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "parent-water-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 444,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 31,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 475
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"water\",\"programId\":\"pwd-tap\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "parent-water-permitted_lifecycle-routing-smoke",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 498,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 502
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "combined-six-needs-en",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 777,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 91,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 868
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"food_now\",\"programId\":\"philly-food\"},{\"need\":\"snap_new\",\"programId\":\"snap-pa\"},{\"need\":\"wic_continuing\",\"programId\":\"wic-pa\"},{\"need\":\"electricity\",\"programId\":\"peco-cap\"},{\"need\":\"gas\",\"programId\":\"pgw-crp\"},{\"need\":\"water\",\"programId\":\"pwd-tap\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "combined-six-needs-en",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 907,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 911
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "combined-six-needs-es",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 777,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 91,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 868
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"food_now\",\"programId\":\"philly-food\"},{\"need\":\"snap_renewal\",\"programId\":\"snap-pa\"},{\"need\":\"wic_new\",\"programId\":\"wic-pa\"},{\"need\":\"electricity\",\"programId\":\"peco-cap\"},{\"need\":\"gas\",\"programId\":\"pgw-crp\"},{\"need\":\"water\",\"programId\":\"pwd-tap\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "combined-six-needs-es",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 907,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 911
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "preparation-only-minimized-context",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 417,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 32,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 449
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"electricity\",\"programId\":\"peco-cap\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "preparation-only-minimized-context",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 473,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 477
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "alternate-authorized-recipient",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 452,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 33,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 485
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "function_call",
+          "name": "select_programs",
+          "arguments": "{\"selections\":[{\"need\":\"electricity\",\"programId\":\"uesf-utilities\"}]}"
+        }
+      ]
+    },
+    {
+      "caseId": "alternate-authorized-recipient",
+      "status": 200,
+      "model": "gpt-6.1-sol",
+      "responseStatus": "completed",
+      "projectHeaderPresent": true,
+      "usage": {
+        "input_tokens": 509,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 4,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 513
+      },
+      "errorCode": null,
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": ""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sourceManifest": [
+    {
+      "path": "scripts/run-parent-live-smoke.ts",
+      "sha256": "d2c08435d3a7792fc3be43a116b11b6a66d0e4387bb6fe940af1c5f7d86312fd"
+    },
+    {
+      "path": "src/lib/parent/coordinator.ts",
+      "sha256": "0fa7a65d045a8349c1a3446a084ce93ad51066e6e396fadeba0294d0d7893510"
+    },
+    {
+      "path": "src/lib/parent/domain.ts",
+      "sha256": "ce620bea3a55a57a18f7ca9b79dd3995a29bfbbc959ad66024717ffda1b1371f"
+    },
+    {
+      "path": "src/lib/parent/planning.ts",
+      "sha256": "6ffeba7ae99a1d417c2199223dad3a229ae5d999d085ca311be5bbfd91cf8515"
+    },
+    {
+      "path": "src/lib/parent/programs.ts",
+      "sha256": "004ec2768b732eeead42e74e46c8e7a33d4a8f43af301d7c6e6a7f3589bf4fe7"
+    },
+    {
+      "path": "src/lib/parent/test-fixtures.ts",
+      "sha256": "59d546d51a31681e3b6811536f8fdef0104fbf3b0cf0a850ea773bd852907adf"
+    },
+    {
+      "path": "tests/fixtures/parent-evaluation.ts",
+      "sha256": "ad5bdb2f9394e472233858a33e535fd6cc95ace3b976118c177b36c5047a95ba"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "1696c8d60c5fe9a03a90182ce8e73d24fe24d3c0732ad25770f5335e13de2d17"
+    }
+  ]
+}

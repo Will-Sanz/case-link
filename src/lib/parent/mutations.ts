@@ -4,6 +4,7 @@ import { requireParentSession } from "./auth";
 import { factAnswerSchema, type FactAnswer } from "./answers";
 import { mandateSchema, type ServiceMandate } from "./domain";
 import { validateMandate } from "./policy";
+import { getParentAuthorizationWindow } from "./authorization-window";
 
 async function mutate(
   name: string,
@@ -39,7 +40,8 @@ export async function replaceParentMandate(
   version: number,
 ): Promise<void> {
   const parsed = mandateSchema.parse(mandate);
-  if (validateMandate(parsed, new Date()))
+  const authorization = await getParentAuthorizationWindow();
+  if (validateMandate(parsed, new Date(authorization.issuedAt)))
     throw new Error(
       "Check the named programs and permission expiry before saving.",
     );

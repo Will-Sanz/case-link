@@ -30,10 +30,14 @@ const request = (body: unknown, origin = "https://app.example.test") =>
     body: JSON.stringify(body),
   });
 beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.example.test");
   vi.clearAllMocks();
   mocks.get.mockResolvedValue(fixtureRequest());
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
 describe("versioned parent actions", () => {
   it("passes one typed source fact and rejects account secrets or invalid dates before mutation", async () => {
     const body = {

@@ -1,12 +1,6 @@
 import Link from "next/link";
-import {
-  AppleHalf,
-  ArrowRight,
-  Check,
-  Flash,
-  Lock,
-  ShieldCheck,
-} from "iconoir-react";
+import Image from "next/image";
+import { ArrowRight, Lock, ShoppingBag, HomeSimple } from "iconoir-react";
 import styles from "./parent.module.css";
 
 export function UrgentHelp() {
@@ -35,92 +29,81 @@ export function UrgentHelp() {
 export function ParentLanding() {
   return (
     <>
-      <section className={styles.hero}>
-        <div>
-          <h1>
-            A little less paperwork.
-            <br />
-            <em>A lot more support.</em>
-          </h1>
-          <p className={styles.heroCopy}>
-            Food on the table. Help with the bills. Tell us what your family
-            needs, and let CaseLink work through the next steps with you.
-          </p>
+      <section className={styles.heroBand}>
+        <div className={styles.hero}>
+          <div className={styles.heroText}>
+            <h1>
+              Food and utility support,
+              <br />
+              made simpler.
+            </h1>
+            <p className={styles.heroCopy}>
+              Tell us what your family needs. We’ll help with the next steps.
+            </p>
+          </div>
           <div className={styles.heroActions}>
             <Link className={styles.button} href="/get-support">
               Find support for my family{" "}
               <ArrowRight width={19} height={19} aria-hidden="true" />
             </Link>
-            <Link className={styles.quiet} href="/product">
-              How it works
-            </Link>
-          </div>
-          <p className={styles.heroFootnote}>
-            Early access in Philadelphia. Live assistance is preparing to
-            launch.
-          </p>
-          <div
-            className={`${styles.urgentLinks} ${styles.space}`}
-            aria-label="Direct help today"
-          >
-            <a href="https://www.phila.gov/food/">
-              Find food today{" "}
-              <ArrowRight width={16} height={16} aria-hidden="true" />
-            </a>
-            <Link href="/support/help#urgent">
-              Utility shutoff help{" "}
+            <p className={styles.heroFootnote}>
+              Early access in Philadelphia.
+              <br />
+              Live assistance is preparing to launch.
+            </p>
+            <Link className={styles.heroDirectHelp} href="/support/help#urgent">
+              Need help today? Find direct resources{" "}
               <ArrowRight width={16} height={16} aria-hidden="true" />
             </Link>
           </div>
         </div>
-        <div className={styles.servicePanel}>
-          <h2>What would make things easier right now?</h2>
-          <Link className={styles.serviceChoice} href="/get-support?need=food">
-            <AppleHalf width={29} height={29} aria-hidden="true" />
-            <div>
-              <strong>Food & benefits</strong>
-              <span>Food today, SNAP and WIC support</span>
-            </div>
-            <ArrowRight width={21} height={21} aria-hidden="true" />
-          </Link>
-          <Link
-            className={styles.serviceChoice}
-            href="/get-support?need=utilities"
-          >
-            <Flash width={29} height={29} aria-hidden="true" />
-            <div>
-              <strong>Help with utility bills</strong>
-              <span>Electricity, gas and water assistance</span>
-            </div>
-            <ArrowRight width={21} height={21} aria-hidden="true" />
-          </Link>
-          <div className={styles.serviceNote}>
-            <Check width={20} height={20} aria-hidden="true" />
-            <span>Need both? We keep everything together.</span>
-          </div>
+        <div className={styles.heroVisual}>
+          <Image
+            className={styles.heroImage}
+            src="/marketing/caselink-parent-panorama.webp"
+            width={2172}
+            height={724}
+            sizes="100vw"
+            preload
+            alt="Illustration of a family unpacking groceries and a parent checking a bill on his phone at home."
+          />
         </div>
       </section>
-      <div className={styles.earlyAccess}>
-        <div className={`${styles.notice} ${styles.space}`}>
-          <ShieldCheck width={22} height={22} aria-hidden="true" />
-          <p>
-            <strong>We’re getting ready for families.</strong> CaseLink is in
-            early access. Live assistance starts only after the required service
-            and privacy checks. You can use the direct resources below now.
-          </p>
-        </div>
-        <div className={styles.space}>
-          <UrgentHelp />
-        </div>
+      <section className={styles.services} aria-label="Choose your support">
+        <Link className={styles.serviceChoice} href="/get-support?need=food">
+          <span className={styles.serviceIcon}>
+            <ShoppingBag width={31} height={31} aria-hidden="true" />
+          </span>
+          <div>
+            <strong>Food & benefits</strong>
+            <span>Food today, SNAP and WIC. Find a place to start.</span>
+          </div>
+          <ArrowRight width={21} height={21} aria-hidden="true" />
+        </Link>
+        <Link
+          className={styles.serviceChoice}
+          href="/get-support?need=utilities"
+        >
+          <span className={styles.serviceIcon}>
+            <HomeSimple width={31} height={31} aria-hidden="true" />
+          </span>
+          <div>
+            <strong>Help with utility bills</strong>
+            <span>Support with electricity, gas and water bills.</span>
+          </div>
+          <ArrowRight width={21} height={21} aria-hidden="true" />
+        </Link>
+      </section>
+      <div className={styles.landingUrgent}>
+        <Link href="/support/help#urgent">
+          Need immediate help? See urgent resources{" "}
+          <ArrowRight width={18} height={18} aria-hidden="true" />
+        </Link>
       </div>
       <section className={styles.explainSection}>
         <div className={styles.explainInner}>
           <div>
-            <h2>
-              One place to start.
-              <br />
-              Someone on the next steps.
-            </h2>
+            <h2>A clearer path through the paperwork.</h2>
             <p className={styles.lead}>
               You shouldn’t have to become an expert in every form. Our service
               is being built to handle routine preparation and permitted

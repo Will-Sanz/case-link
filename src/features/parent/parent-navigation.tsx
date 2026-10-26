@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useRef } from "react";
 import styles from "./parent.module.css";
 
-const links = [
+const supportLinks = [
   { href: "/get-support", label: "Get support" },
   { href: "/my-support", label: "My support" },
   { href: "/support/help", label: "Help" },
@@ -14,6 +14,12 @@ const links = [
 export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
   const menu = useRef<HTMLDetailsElement>(null);
+  const links = signedIn
+    ? supportLinks
+    : [
+        { href: "/product", label: "How it works" },
+        { href: "/support/help", label: "Get help" },
+      ];
   const active = (href: string) =>
     pathname === href ||
     (href === "/my-support" && /^\/support\/[a-f0-9-]{36}$/i.test(pathname));
@@ -33,7 +39,7 @@ export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
           </Link>
         ))}
         <Link
-          className={styles.secondary}
+          className={styles.navAccount}
           href={accountPath}
           aria-current={pathname === accountPath ? "page" : undefined}
         >

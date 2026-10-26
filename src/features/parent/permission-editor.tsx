@@ -40,6 +40,9 @@ export function PermissionEditor({
     setPending(true);
     setError("");
     try {
+      const { authorization } = await parentApi<{
+        authorization: { expiresAt: string };
+      }>("/authorization-window");
       await parentApi(`/requests/${request.id}`, {
         method: "POST",
         body: JSON.stringify({
@@ -47,7 +50,7 @@ export function PermissionEditor({
           version,
           mandate: {
             ...draft,
-            expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+            expiresAt: authorization.expiresAt,
             maxRecipients: draft.recipientIds.length,
           },
         }),
@@ -104,7 +107,7 @@ export function PermissionEditor({
         </button>
       ) : (
         <form className={styles.form} onSubmit={submit} ref={focusFirstField}>
-          <h3>Permission for the next 30 days</h3>
+          <h3>Permission for up to 30 days</h3>
           <p className={styles.small}>
             Choose exactly who can receive information and what CaseLink can
             use. Removing permission stops new uses; information already
@@ -203,8 +206,8 @@ export function PermissionEditor({
               required
             />
             <span>
-              I authorize these programs, actions and information for 30 days. I
-              can pause or withdraw future work.
+              I authorize these programs, actions and information for up to 30
+              days. I can pause or withdraw future work.
             </span>
           </label>
           <button

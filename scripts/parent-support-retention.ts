@@ -21,8 +21,11 @@ async function main() {
   const isolation = parentProjectIsolationIssues({
     projectUrl,
     schoolUrl: env.CASELINK_SCHOOL_SUPABASE_URL,
-    parentProductionUrl: env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL,
+    parentProductionUrl:
+      env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL ??
+      env.CASELINK_PRODUCTION_SUPABASE_URL,
     environment: env.CASELINK_ENVIRONMENT ?? "production",
+    accountMode: env.CASELINK_PARENT_ACCOUNT_MODE,
   });
   if (isolation.length)
     throw new Error("Parent retention project isolation is not configured.");
@@ -31,7 +34,15 @@ async function main() {
   const local =
     ["localhost", "127.0.0.1", "[::1]"].includes(dbUrl.hostname) &&
     ["localhost", "127.0.0.1", "[::1]"].includes(apiUrl.hostname);
-  if (local && (dbUrl.port !== "55322" || apiUrl.port !== "55321"))
+  if (
+    local &&
+    (dbUrl.port !== "55322" || apiUrl.port !== "55321") &&
+    !(
+      env.CASELINK_PARENT_ACCOUNT_MODE === "existing" &&
+      dbUrl.port === "54322" &&
+      apiUrl.port === "54321"
+    )
+  )
     throw new Error(
       "Local retention must use the isolated parent project ports.",
     );
@@ -115,7 +126,7 @@ async function main() {
       const batch = batchSchema.parse(result.rows[0].batch);
       const documents: string[] = [],
         artifacts: string[] = [],
-        accounts: string[] = [];
+        accounts = batch.accountIds;
       for (const doc of batch.documents) {
         const { data, error } = await supabase.storage
           .from("parent-documents")
@@ -136,14 +147,7 @@ async function main() {
           );
         artifacts.push(artifact.id);
       }
-      for (const account of batch.accountIds) {
-        const { error } = await supabase.auth.admin.deleteUser(account);
-        if (error && error.status !== 404)
-          throw new Error(
-            "An account could not be erased. Its deletion request remains for retry.",
-          );
-        accounts.push(account);
-      }
+      // Parent erasure must not delete a shared Auth identity or cascade school records.
       await db.query(
         "select parent_private.parent_finish_cleanup($1,$2,$3,$4,$5)",
         [batch.batchId, batch.leaseToken, documents, accounts, artifacts],
@@ -152,7 +156,7 @@ async function main() {
       removedAccounts += accounts.length;
     }
     process.stdout.write(
-      `Retention completed: ${removedDocuments} private objects and ${removedAccounts} accounts erased.\n`,
+      `Retention completed: ${removedDocuments} private objects and ${removedAccounts} parent memberships erased.\n`,
     );
   } finally {
     await db.end();

@@ -52,6 +52,14 @@ try {
             },
           },
         };
+      else if (url.pathname.endsWith("/authorization-window"))
+        body = {
+          ok: true,
+          authorization: {
+            issuedAt: "2026-10-26T12:00:00.000Z",
+            expiresAt: "2026-11-25T12:00:00.000Z",
+          },
+        };
       else if (url.pathname.endsWith("/capabilities"))
         body = {
           ok: true,
@@ -251,6 +259,9 @@ try {
     await snapshot("account");
     await page.goto(`${origin}/sign-in`, { waitUntil: "networkidle" });
     await page.getByLabel("Your email address").fill("family@example.test");
+    await page
+      .getByRole("button", { name: "Use an email code instead" })
+      .click();
     await page.getByRole("button", { name: "Email me a code" }).click();
     await page.getByLabel("Email code").fill("123456");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();

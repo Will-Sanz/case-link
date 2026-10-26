@@ -33,8 +33,11 @@ async function main() {
     parentProjectIsolationIssues({
       projectUrl: supabaseOrigin,
       schoolUrl: env.CASELINK_SCHOOL_SUPABASE_URL,
-      parentProductionUrl: env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL,
+      parentProductionUrl:
+        env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL ??
+        env.CASELINK_PRODUCTION_SUPABASE_URL,
       environment: env.CASELINK_ENVIRONMENT ?? "production",
+      accountMode: env.CASELINK_PARENT_ACCOUNT_MODE,
     }).length
   )
     throw new Error("The worker requires a verified isolated parent project.");
@@ -42,7 +45,11 @@ async function main() {
     isLoopbackHost(target.hostname) &&
     isLoopbackHost(new URL(supabaseOrigin).hostname) &&
     isLoopbackHost(new URL(brokerOrigin).hostname);
-  if (local && target.port !== "55322")
+  if (
+    local &&
+    target.port !==
+      (new URL(supabaseOrigin).port === "54321" ? "54322" : "55322")
+  )
     throw new Error("Use the isolated local parent database.");
   if (
     !local &&

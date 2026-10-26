@@ -65,7 +65,7 @@ export function buildMandate(
   recipientIds: string[],
   mode: ServiceMandate["mode"],
   bookingPreference: ServiceMandate["bookingPreference"],
-  now = new Date(),
+  expiresAt: string,
 ): ServiceMandate {
   return {
     version: 1,
@@ -85,7 +85,7 @@ export function buildMandate(
         ? ["utility" as const]
         : []),
     ],
-    expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    expiresAt,
     maxAttempts: 12,
     maxRecipients: recipientIds.length,
     bookingPreference,
@@ -227,18 +227,24 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
     }
     setPending(true);
     try {
-      startAttempt.current ??= {
-        key: crypto.randomUUID(),
-        packet: {
-          intake,
-          mandate: buildMandate(
+      if (!startAttempt.current) {
+        const { authorization } = await parentApi<{
+          authorization: { expiresAt: string };
+        }>("/authorization-window");
+        startAttempt.current = {
+          key: crypto.randomUUID(),
+          packet: {
             intake,
-            recipientIds,
-            fullAvailable ? mode : "prepare_only",
-            booking,
-          ),
-        },
-      };
+            mandate: buildMandate(
+              intake,
+              recipientIds,
+              fullAvailable ? mode : "prepare_only",
+              booking,
+              authorization.expiresAt,
+            ),
+          },
+        };
+      }
       const response = await parentApi<{ request: SupportRequest }>(
         "/requests",
         {
@@ -843,7 +849,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                     <div className={styles.mandateItem}>
                       <Clock width={22} height={22} aria-hidden="true" />
                       <div>
-                        <h3>30 days · up to 12 attempts</h3>
+                        <h3>Up to 30 days · up to 12 attempts</h3>
                         <p>
                           Limited to the {recipientIds.length || "selected"}{" "}
                           named program{recipientIds.length === 1 ? "" : "s"}.

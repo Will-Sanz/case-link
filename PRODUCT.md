@@ -22,7 +22,7 @@ The [parent PRD](docs/parent-support-mvp-prd.md) defines complete scope; the [im
 
 - Public urgent food and utility routes work without an account or AI wait.
 - Get support, My support and Request detail form one coherent family experience.
-- Verified email codes support account access and recovery. Household data, documents and background authority are separate from school staff access.
+- Existing CaseLink email/password identities support sign-in in the reviewed shared-account mode; email codes remain available where enrollment permits. Household data, documents and background authority remain separate from school records and roles.
 - Food now, SNAP new/renewal/pending/problems, relevant WIC, electricity/gas/water and combined requests remain the finished scope.
 - Parents can correct facts, inspect permission and evidence, pause/cancel future work, export information and request deletion.
 - One informed mandate names programs, actions, data, preferences, limits and expiry. AI cannot expand its authority.
@@ -36,8 +36,8 @@ The parent implementation is under verification. Live execution requires current
 
 ## Brand Commitments
 
-CaseLink should feel composed, welcoming and capable. Use clear task language, generous spacing, legible self-hosted type and consistent controls. Avoid technical agent language, unsupported promises, fabricated progress, testimonials or metrics. Let families understand the next useful step quickly.
+CaseLink should feel composed, welcoming and capable. Reuse the original lavender/navy/violet tokens, self-hosted Newsreader and Geist, and one shared CaseLink logo. The owner explicitly selected imagegen Option 2, Family Panorama: editorial heading and action above original family imagery, with a shared food/utility entry surface. Carry the same identity into operational and policy pages, with readable controls and honest states. Preserve the linked ChatGPT Futures recognition and existing policy/contact commitments. Avoid technical agent language, unsupported promises, fabricated progress, testimonials or metrics.
 
 ## Historical Scope
 
-The school product is preserved in [school product context](docs/legacy/school-product.md), [school design](docs/legacy/school-design.md) and the baseline branch. Its staff review model and violet visual system do not govern parent features.
+The school product is preserved in [school product context](docs/legacy/school-product.md), [school design](docs/legacy/school-design.md) and the baseline branch. Its staff review workflow does not govern parent features; the original visual identity and existing accounts are deliberately reused.
