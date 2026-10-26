@@ -1,13 +1,10 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, Check, Clock, Lock, Refresh } from "iconoir-react";
+import { useCallback, useState, type ReactNode } from "react";
+import { ArrowRight, Check, Clock } from "iconoir-react";
 import type { SupportNeed, SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
-import type { ApplicationBrowserResponse } from "@/lib/parent/browser-policy";
-import { getProgram, SNAP_NEW_APPLICATION_URL } from "@/lib/parent/programs";
-import { displayDate, parentApi } from "./api";
-import { useParentResource } from "./use-parent-resource";
 import type { OperationHistory, RecordedOperation } from "./support-activity";
+import { ApplicationBrowser } from "./application-browser";
 import styles from "./parent.module.css";
 import layout from "./application-workspace.module.css";
 
@@ -127,251 +124,6 @@ export function recordedApplicationState(
   };
 }
 
-function safeFrameUrl(value: string | null, requestId: string): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value, window.location.origin);
-    return url.origin === window.location.origin &&
-      url.pathname.startsWith(`/api/parent/requests/${requestId}/browser/`) &&
-      !url.username &&
-      !url.password &&
-      !url.hash
-      ? `${url.pathname}${url.search}`
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function ApplicationBrowser({
-  request,
-  canStart,
-  hasAttempt,
-}: {
-  request: SupportRequest;
-  canStart: boolean;
-  hasAttempt: boolean;
-}) {
-  const { data, error, loading, reload } =
-    useParentResource<ApplicationBrowserResponse>(
-      `/requests/${request.id}/browser`,
-    );
-  const [starting, setStarting] = useState(false);
-  const [stopping, setStopping] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [startError, setStartError] = useState("");
-  const [frameRevision, setFrameRevision] = useState(0);
-  const [frameFailed, setFrameFailed] = useState<string | null>(null);
-  const session = error ? null : data?.session;
-  const active =
-    session && ["starting", "running", "needs_parent"].includes(session.status);
-  useEffect(() => {
-    if (!active) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        reload();
-        setFrameRevision((value) => value + 1);
-      }
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [active, reload]);
-  const frameUrl = session?.frameUrl
-    ? safeFrameUrl(session.frameUrl, request.id)
-    : null;
-  const shownFrame = frameUrl
-    ? `${frameUrl}${frameUrl.includes("?") ? "&" : "?"}view=${frameRevision}`
-    : null;
-  let host = "Pennsylvania COMPASS";
-  try {
-    if (session?.currentUrl) host = new URL(session.currentUrl).hostname;
-  } catch {
-    /* The status still has a safe program label. */
-  }
-  async function start() {
-    setStarting(true);
-    setStartError("");
-    setNotice("");
-    try {
-      await parentApi(`/requests/${request.id}/browser`, {
-        method: "POST",
-        body: JSON.stringify({ programId: "snap-pa" }),
-      });
-      reload();
-    } catch (error) {
-      setStartError(
-        error instanceof Error
-          ? error.message
-          : "The application connection could not start. Try again.",
-      );
-    } finally {
-      setStarting(false);
-    }
-  }
-  async function stop() {
-    setStopping(true);
-    setStartError("");
-    setNotice("");
-    try {
-      await parentApi(`/requests/${request.id}/browser`, { method: "DELETE" });
-      setNotice(
-        "Website viewer stopped. Your support request and its permission have not changed.",
-      );
-      reload();
-    } catch (error) {
-      setStartError(
-        error instanceof Error
-          ? error.message
-          : "We couldn’t stop the website viewer. Try again.",
-      );
-    } finally {
-      setStopping(false);
-    }
-  }
-  return (
-    <section
-      className={layout.browser}
-      aria-labelledby="application-browser-title"
-    >
-      <div className={layout.browserBar}>
-        <span className={layout.browserAddress}>
-          <Lock width={15} height={15} aria-hidden="true" />
-          {host}
-        </span>
-        <span>
-          {session
-            ? "Recorded browser session"
-            : "Official application connection"}
-        </span>
-      </div>
-      <div className={layout.browserBody}>
-        <h3 id="application-browser-title">
-          {session?.status === "running"
-            ? "CaseLink’s application browser"
-            : session?.status === "needs_parent"
-              ? "A personal check needs you"
-              : session?.status === "completed"
-                ? "Browser work finished"
-                : session?.status === "starting"
-                  ? "Opening the official application"
-                  : "Your SNAP application connection"}
-        </h3>
-        <p aria-live="polite">
-          {session?.summary ??
-            (loading
-              ? "Checking the application connection…"
-              : error
-                ? "We couldn’t confirm the application connection. Refresh to check before starting another attempt."
-                : (data?.reason ??
-                  "An automatic application connection is not available for this request. No application is being filled or submitted here."))}
-        </p>
-        {session && (
-          <p className={styles.hint}>
-            Last recorded browser update: {displayDate(session.updatedAt, true)}
-            . A finished browser session does not by itself confirm submission.
-          </p>
-        )}
-        <p className={styles.hint}>
-          This connection currently checks the official start page only. It does
-          not fill personal fields or submit an application. Required provider
-          checks and a protected application connection must be completed first.
-        </p>
-        <div className={layout.browserActions}>
-          {data?.available &&
-            !error &&
-            request.status === "active" &&
-            canStart &&
-            (!session || session.status === "closed") && (
-              <button
-                type="button"
-                className={styles.button}
-                disabled={starting || stopping}
-                onClick={start}
-              >
-                {starting
-                  ? "Opening application view…"
-                  : session?.status === "closed"
-                    ? "Reopen application view"
-                    : "Open application view"}
-                <ArrowRight width={17} height={17} aria-hidden="true" />
-              </button>
-            )}
-          {session && session.status !== "closed" && !error && (
-            <button
-              type="button"
-              className={styles.secondary}
-              disabled={starting || stopping}
-              onClick={stop}
-            >
-              {stopping ? "Stopping website view…" : "Stop website view"}
-            </button>
-          )}
-          <button
-            type="button"
-            className={styles.quiet}
-            onClick={() => {
-              reload();
-              setFrameRevision((value) => value + 1);
-            }}
-          >
-            <Refresh width={16} height={16} aria-hidden="true" /> Refresh
-            application connection
-          </button>
-          <a
-            className={styles.textLink}
-            href={
-              hasAttempt
-                ? getProgram("snap-pa")!.officialUrl
-                : SNAP_NEW_APPLICATION_URL
-            }
-          >
-            {hasAttempt
-              ? "Open the official SNAP service"
-              : "Start a new SNAP application with DHS"}
-          </a>
-        </div>
-        {startError && (
-          <p className={styles.error} role="alert">
-            {startError}
-          </p>
-        )}
-        {notice && (
-          <p className={styles.success} role="status">
-            {notice}
-          </p>
-        )}
-        <p className={styles.hint}>
-          No COMPASS account is needed to begin on the official site; opening it
-          does not file an application. Required identifiers belong in protected
-          program fields, never chat.
-        </p>
-      </div>
-      {shownFrame && frameFailed !== shownFrame && (
-        // The server renders an owned, redacted browser screenshot; never embed a provider page or an arbitrary URL.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          className={layout.frame}
-          src={shownFrame}
-          alt="Current official application page in CaseLink’s secure browser"
-          onError={() => setFrameFailed(shownFrame)}
-        />
-      )}
-      {frameFailed === shownFrame && shownFrame && (
-        <p className={layout.frameNotice} role="status">
-          The browser image could not load. Refresh the application connection;
-          the last recorded status above is still available.
-        </p>
-      )}
-      {shownFrame && (
-        <p className={layout.frameNotice}>
-          Protected browser view. Sensitive fields are masked before this image
-          reaches your device. Use the checklist to review saved work and
-          receipts.
-        </p>
-      )}
-    </section>
-  );
-}
-
 export function ApplicationWorkspace({
   request,
   progress,
@@ -384,6 +136,11 @@ export function ApplicationWorkspace({
   history: OperationHistory;
 }) {
   const [activeSection, setActiveSection] = useState("application-overview");
+  const [verification, setVerification] = useState({ requestId: request.id, needed: false });
+  const onNeedsVerification = useCallback((needed: boolean) => {
+    setVerification({ requestId: request.id, needed });
+  }, [request.id]);
+  const needsVerification = verification.requestId === request.id && verification.needed;
   const { data, error, loading, reload } = history;
   const snap = request.intake.needs.includes("snap_new");
   const operations = data?.operations ?? [];
@@ -419,6 +176,8 @@ export function ApplicationWorkspace({
   );
   const nextActor = inactive
     ? "Work is paused or finished"
+    : needsVerification
+      ? "Next: You — COMPASS verification"
     : actions.length
       ? "Next: You"
       : application.outcome === "support_received"
@@ -434,6 +193,8 @@ export function ApplicationWorkspace({
                 : "Next: CaseLink’s application connection";
   const nextDetail = inactive
     ? "Your recorded information and history stay available below. Your permission controls show whether this request can resume."
+    : needsVerification
+      ? "COMPASS needs a verification step in the website window below. CaseLink will check the result and continue the supported connection steps automatically."
     : actions.length
       ? `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Everything currently known to need you is grouped below.`
       : application.outcome === "support_received"
@@ -460,6 +221,12 @@ export function ApplicationWorkspace({
       detail: "Saved",
       done: true,
     },
+    ...(needsVerification && !inactive ? [{
+      id: "application-browser",
+      label: "COMPASS verification",
+      detail: "Needs you now",
+      done: false,
+    }] : []),
     {
       id: "your-next-steps",
       label: "Your next steps",
@@ -467,8 +234,11 @@ export function ApplicationWorkspace({
         ? "History"
         : actions.length
           ? `${actions.length} need you`
+          : needsVerification
+            ? "COMPASS step above"
           : "Nothing requested",
       done:
+        !needsVerification &&
         request.required_actions.length > 0 &&
         !actions.length &&
         request.required_actions.every((action) => action.resolved),
@@ -595,9 +365,9 @@ export function ApplicationWorkspace({
           <div className={layout.nextAction}>
             <strong>{nextActor}</strong>
             <p>{nextDetail}</p>
-            {!inactive && actions.length > 0 && (
-              <a className={styles.button} href="#your-next-steps">
-                {actions.length === 1 ? "Complete your step" : "See your steps"}{" "}
+            {!inactive && (actions.length > 0 || needsVerification) && (
+              <a className={styles.button} href={needsVerification ? "#application-browser" : "#your-next-steps"}>
+                {needsVerification ? "Complete COMPASS verification" : actions.length === 1 ? "Complete your step" : "See your steps"}{" "}
                 <ArrowRight width={17} height={17} aria-hidden="true" />
               </a>
             )}
@@ -622,6 +392,7 @@ export function ApplicationWorkspace({
         </section>
         {snap && (
           <ApplicationBrowser
+            key={request.id}
             request={request}
             canStart={!loading && !error && !application.hasAttempt}
             hasAttempt={
@@ -631,6 +402,7 @@ export function ApplicationWorkspace({
               application.hasAttempt ||
               relatedSnapAttempt
             }
+            onNeedsVerification={onNeedsVerification}
           />
         )}
         {children}

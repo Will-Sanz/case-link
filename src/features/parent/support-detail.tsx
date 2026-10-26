@@ -563,15 +563,15 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           </h2>
           {acceptingActions && actions.length > 0 && (
             <p className={styles.subtle}>
-              These are all the personal steps currently recorded for this
-              request. Other work follows the current status above.
+              These are the saved household steps for this request. Check the
+              application window above for any website verification.
             </p>
           )}
           {(!actions.length || !acceptingActions) && (
             <p className={styles.subtle}>
               {!acceptingActions
                 ? "No new personal steps are requested while this request is paused or finished."
-                : "Nothing is currently requested from you. Check the application and work status above; this does not mean an application has been submitted."}
+                : "No household updates are requested in this section. Check the application window and work status above for any website verification or other next step."}
             </p>
           )}
           {acceptingActions &&

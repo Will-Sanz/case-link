@@ -12,6 +12,7 @@ import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { useParentResource } from "./use-parent-resource";
 import type { RecordedOperation } from "./support-activity";
+import { COMPASS_CAPTCHA, COMPASS_FAMILY_SAFETY } from "@/lib/parent/browser-policy";
 import {
   ApplicationWorkspace,
   recordedApplicationState,
@@ -97,6 +98,52 @@ function renderWorkspace(request = fixture()) {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+it.each(["challenge", "continue"] as const)("shows only an actual %s handoff as the primary family step", async (kind) => {
+  mockApi({
+    available: true,
+    reason: null,
+    session: {
+      id: "e1671f04-783d-469e-ad76-a426c2a2d832",
+      programId: "snap-pa",
+      status: "needs_parent",
+      currentUrl: kind === "challenge" ? COMPASS_CAPTCHA : COMPASS_FAMILY_SAFETY,
+      title: "Pennsylvania COMPASS",
+      summary: "Public connection check.",
+      updatedAt: new Date().toISOString(),
+      canControl: true,
+      frameUrl: `/api/parent/requests/${requestId}/browser/frame?frameId=13175423-0b23-4292-a9f9-9071c9903178`,
+      handoff: {
+        kind,
+        frameId: "13175423-0b23-4292-a9f9-9071c9903178",
+        width: 1100,
+        height: 720,
+        expiresAt: new Date(Date.now() + 600000).toISOString(),
+      },
+    },
+  });
+  const view = renderWorkspace();
+  const image = await screen.findByRole("img");
+  fireEvent.load(image);
+  if (kind === "challenge") {
+    await screen.findByText("Next: You — COMPASS verification");
+    expect(screen.getByRole("link", { name: /COMPASS verification\s*Needs you now/ }).getAttribute("href")).toBe("#application-browser");
+    expect(screen.queryByText("Nothing requested")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check and continue" })).toBeNull();
+    fireEvent.error(image);
+    await waitFor(() => expect(screen.queryByText("Next: You — COMPASS verification")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Refresh application connection" }));
+    const refreshed = await screen.findByRole("img");
+    fireEvent.load(refreshed);
+    await screen.findByText("Next: You — COMPASS verification");
+  } else {
+    expect(screen.queryByText("Next: You — COMPASS verification")).toBeNull();
+  }
+  mockApi();
+  view.rerender(<WorkspaceFixture request={{ ...fixture(), id: "33333333-3333-4333-8333-333333333333" }} />);
+  await screen.findByText("The provider connection is not operational.");
+  expect(screen.queryByText("Next: You — COMPASS verification")).toBeNull();
 });
 
 describe("actual application evidence", () => {
@@ -441,7 +488,7 @@ describe("application workspace", () => {
     });
     expect(
       screen.getByText(
-        /does not fill personal fields or submit an application/,
+        /no personal information is entered and no application is submitted/,
       ),
     ).toBeTruthy();
   });

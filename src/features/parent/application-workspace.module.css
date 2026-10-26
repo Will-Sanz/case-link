@@ -203,6 +203,40 @@
   font-size: 0.9375rem;
   color: var(--color-ink-muted);
 }
+.frameViewport {
+  overflow: auto;
+  max-block-size: 70vh;
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.frameButton {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: var(--color-paper);
+  cursor: pointer;
+}
+.frameButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+.frameEnlarged {
+  width: 1100px;
+  max-width: none;
+}
+.verificationTools {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--color-rule);
+}
+.verificationTools details > p {
+  margin-block: 0.75rem;
+  color: var(--color-ink-muted);
+  font-size: 0.9375rem;
+  max-width: 65ch;
+}
 @media (max-width: 850px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
