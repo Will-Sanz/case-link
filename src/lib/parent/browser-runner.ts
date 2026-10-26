@@ -51,6 +51,8 @@ const sameBox = (left: Box, right: Box | null) =>
   left.y === right.y &&
   left.width === right.width &&
   left.height === right.height;
+const compassCaptchaHeading =
+  "Since you're applying without an account, we need to confirm that you're a human.";
 type Ports = {
   authorize(token: string, requestId: string): Promise<BrowserGrant>;
   context(): Promise<BrowserContext>;
@@ -236,7 +238,7 @@ export function createApplicationBrowser(ports: Ports) {
   }
 
   async function observe(job: Job): Promise<boolean> {
-    for (let step = 0; step < 4; step++) {
+    for (let step = 0; step < 5; step++) {
       await check(job);
       const page = job.page;
       if (!page) throw new Error("browser_page_unavailable");
@@ -262,6 +264,42 @@ export function createApplicationBrowser(ports: Ports) {
         continue;
       }
       if (url === COMPASS_CAPTCHA) {
+        const component = page.locator("compass-ui-getting-started-captcha");
+        const next = component.getByRole("button", {
+          name: "Next Button",
+          exact: true,
+        });
+        if ((await next.isVisible()) && (await next.isEnabled())) {
+          const title = component.getByRole("heading", {
+            name: compassCaptchaHeading,
+            exact: true,
+          });
+          const button = await next.elementHandle({ timeout: 3000 });
+          if (!button) throw new Error("browser_public_step_changed");
+          clearFrame(job);
+          update(job, {
+            status: "running",
+            summary:
+              "COMPASS enabled its normal Next step. CaseLink is continuing in this same session without entering household information.",
+          });
+          await check(job);
+          if (
+            page.url() !== url ||
+            !(await title.isVisible()) ||
+            !(await button.isVisible()) ||
+            !(await button.isEnabled()) ||
+            (await button.getAttribute("id")) !== "nextButtonID"
+          )
+            throw new Error("browser_public_step_changed");
+          await check(job);
+          if (page.url() !== url) throw new Error("browser_page_changed");
+          await button.click({ timeout: 2000 });
+          await check(job);
+          await page.waitForURL((value) => value.href !== url, {
+            timeout: 5000,
+          });
+          continue;
+        }
         if ((await challengeFrames(page)).length > 0) return true;
         clearFrame(job);
         update(job, {
@@ -270,8 +308,22 @@ export function createApplicationBrowser(ports: Ports) {
             "Waiting for the provider’s verification result in this same session. No household information is being entered or submitted.",
         });
         await page.waitForFunction(
-          (expectedUrl) => {
+          ({ expectedUrl, heading }) => {
             if (location.href !== expectedUrl) return true;
+            const component = document.querySelector(
+              "compass-ui-getting-started-captcha",
+            );
+            const next = component?.querySelector(
+              'button#nextButtonID[aria-label="Next Button"]',
+            );
+            if (
+              component?.querySelector("h1")?.textContent?.trim() === heading &&
+              next instanceof HTMLButtonElement &&
+              !next.disabled &&
+              next.getBoundingClientRect().width > 0 &&
+              next.getBoundingClientRect().height > 0
+            )
+              return true;
             return [...document.querySelectorAll("iframe")].some((element) => {
               try {
                 const src = new URL(element.getAttribute("src") ?? "");
@@ -301,7 +353,7 @@ export function createApplicationBrowser(ports: Ports) {
               }
             });
           },
-          url,
+          { expectedUrl: url, heading: compassCaptchaHeading },
           { timeout: 5000, polling: 100 },
         );
         continue;

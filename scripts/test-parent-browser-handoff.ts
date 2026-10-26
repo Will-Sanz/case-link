@@ -243,6 +243,7 @@ async function main() {
           return browserResponseSchema.parse(await response.json());
         }
         async function open(id: string) {
+          stage = "loading the actual owned support page";
           await page.goto(`${origin}/support/${id}`, {
             waitUntil: "networkidle",
           });
@@ -250,11 +251,14 @@ async function main() {
             name: "Open application view",
             exact: true,
           });
+          stage = "starting the actual private browser through the UI";
           await openButton.click();
+          stage = "waiting for the actual preview handoff metadata";
           await until(async () => {
             const value = await status(id);
             return value.session?.handoff?.kind === "continue";
           }, "replay public handoff not ready");
+          stage = "waiting for the exact preview JPEG and enabled UI control";
           await page
             .getByRole("button", { name: "Continue with COMPASS", exact: true })
             .waitFor();
@@ -272,6 +276,7 @@ async function main() {
         stage =
           "opening one real UI/Next/native-engine context against provider replay";
         await open(id);
+        stage = "checking the initial actual handoff JPEG and isolation";
         check(
           serviceContexts.length === 1,
           "One application view uses one isolated actual Playwright context.",
@@ -333,6 +338,7 @@ async function main() {
           path: resolve(output, "desktop-preview.png"),
           fullPage: true,
         });
+        stage = "continuing Family Safety through the actual UI";
         await page
           .getByRole("button", { name: "Continue with COMPASS", exact: true })
           .click();
@@ -340,6 +346,7 @@ async function main() {
           async () => (await status(id)).session?.handoff?.kind === "challenge",
           "replay challenge not exposed",
         );
+        stage = "confirming the actual challenge next actor and checklist";
         await page
           .getByText("Next: You — COMPASS verification", { exact: true })
           .waitFor();
@@ -355,6 +362,7 @@ async function main() {
           serviceContexts.length === 1,
           "The parent continuation keeps the same browser context and provider session.",
         );
+        stage = "denying replay of the accepted ordinary continuation";
         check(
           (
             await owner.request.post(`${browserPath(id)}/control`, {
@@ -368,6 +376,7 @@ async function main() {
           name: "Refresh application connection",
           exact: true,
         });
+        stage = "refreshing the actual challenge image once";
         await until(
           async () => refreshButton.isEnabled(),
           "Challenge controls must wait for the matching image load",
@@ -378,6 +387,7 @@ async function main() {
           "The optional refresh returns a fresh challenge image",
         );
         await page.getByText("Use keyboard controls", { exact: true }).click();
+        stage = "entering the actual challenge frame with native Tab";
         const nextControl = page.getByRole("button", {
           name: "Next control",
           exact: true,
@@ -392,6 +402,7 @@ async function main() {
           "Keyboard entry returns a fresh image",
         );
         const replayPage = servicePages[0];
+        stage = "locating the actual replay challenge pointer target";
         const challengeFrame = replayPage
           .frames()
           .find((frame) =>
@@ -423,6 +434,7 @@ async function main() {
           imageBox,
           "The branded browser image has a measurable responsive viewport.",
         );
+        stage = "forwarding the actual image pointer into the replay frame";
         await imageControl.click({
           position: {
             x: ((target.x + target.width / 2) / 1100) * imageBox.width,
@@ -436,6 +448,10 @@ async function main() {
         check(
           replays[0].challengeClicks === 1 && replays[0].challengeKeys > 0,
           "Real UI pointer and native keyboard controls reach the same actual replay iframe.",
+        );
+        check(
+          Object.is(replays[0].captchaNext, 0),
+          "The normal CAPTCHA Next remains unused before the fixture's synthetic result enables it.",
         );
         async function captureChallenge(label: string) {
           async function loaded() {
@@ -565,6 +581,10 @@ async function main() {
           "Verified replay completion closes the original isolated context.",
         );
         check(
+          replays[0].captchaNext === 1,
+          "The same-page synthetic result only enables the provider's normal Next, which CaseLink advances exactly once automatically.",
+        );
+        check(
           replays[0].protectedScreenshots === 0 &&
             replays[0].householdInputs === 0,
           "No ending/divider draft reference or household field is captured or entered.",
@@ -682,6 +702,10 @@ async function main() {
         check(
           replays.length === 3,
           "Completion, active cancellation and actual expiry each use their own isolated replay context.",
+        );
+        check(
+          replays.slice(1).every((replay) => replay.captchaNext === 0),
+          "Cancelled and expired replays never advance the normal CAPTCHA Next.",
         );
         const operations = await db.query(
           "select count(*)::int as count from public.parent_operations o join public.parent_requests r on r.id=o.request_id join public.parent_households h on h.id=r.household_id where h.owner_id=any($1::uuid[])",

@@ -8,6 +8,7 @@ export type CompassReplay = {
   publicNext: number;
   challengeClicks: number;
   challengeKeys: number;
+  captchaNext: number;
   householdInputs: number;
   forbiddenRequests: number;
 };
@@ -21,6 +22,7 @@ export async function installCompassReplay(page: Page): Promise<CompassReplay> {
     publicNext: 0,
     challengeClicks: 0,
     challengeKeys: 0,
+    captchaNext: 0,
     householdInputs: 0,
     forbiddenRequests: 0,
   };
@@ -28,6 +30,7 @@ export async function installCompassReplay(page: Page): Promise<CompassReplay> {
     if (kind === "public_next") stats.publicNext++;
     else if (kind === "challenge_click") stats.challengeClicks++;
     else if (kind === "challenge_key") stats.challengeKeys++;
+    else if (kind === "captcha_next") stats.captchaNext++;
     else if (kind === "household_input") stats.householdInputs++;
   });
   const screenshot = page.screenshot.bind(page);
@@ -111,7 +114,10 @@ const scenes={
 function go(path){location.hash='#/'+path}
 function render(){
  const path=location.hash.slice(2),main=document.querySelector('main');
- if(path==='applynow/gettingstarted/captcha'){main.innerHTML='<h1>Verification replay</h1><p>This local fixture tests human controls, not verification success.</p><iframe title="reCAPTCHA replay" src="https://www.google.com/recaptcha/api2/bframe?fixture=local-only" width="360" height="220"></iframe>';return}
+ if(path==='applynow/gettingstarted/captcha'){
+  main.innerHTML='<compass-ui-getting-started-captcha><h1>Since you&#39;re applying without an account, we need to confirm that you&#39;re a human.</h1><p>This local fixture tests human controls, not verification success.</p><iframe title="reCAPTCHA replay" src="https://www.google.com/recaptcha/api2/bframe?fixture=local-only" width="360" height="220"></iframe><button id="nextButtonID" aria-label="Next Button" disabled>Next</button></compass-ui-getting-started-captcha>';
+  main.querySelector('#nextButtonID').onclick=()=>{window.recordReplayEvent('captcha_next');go('applynow/gettingstarted/gettingstartedending')};return
+ }
  if(path==='applynow/household/householdDetails'){
   main.innerHTML='<h1>Let&#39;s start by filling out details for the first person in the household.</h1><label>First Name<input id="firstName" type="text" required maxlength="11"></label><label>Last Name<input id="lastName" type="text" required maxlength="14"></label><label>Date of Birth<input id="dob-datepicker-date" type="text" required></label><input id="gender_male" type="radio" required><input id="gender_female" type="radio" required><input id="provider-session" type="hidden">';
   main.addEventListener('input',()=>window.recordReplayEvent('household_input'));return
@@ -124,6 +130,6 @@ function render(){
  if(path==='applynow/household')main.insertAdjacentHTML('beforeend',"<p>Now, let's enter information about the people in your household. A household is all the people who live in a housing unit together even if they are not related.</p><p>REPLAY-DRAFT-NOT-A-FILING</p>");
  const button=document.createElement('button');button.id='nextButtonID';button.setAttribute('aria-label',scene[1]);button.textContent=scene[1];button.onclick=()=>{window.recordReplayEvent('public_next');go(scene[2])};main.append(button)
 }
-window.addEventListener('message',event=>{if(event.origin!=='https://www.google.com'||!event.data?.replay)return;if(event.data.kind==='complete')go('applynow/gettingstarted/gettingstartedending');else window.recordReplayEvent(event.data.kind)});
+window.addEventListener('message',event=>{if(event.origin!=='https://www.google.com'||!event.data?.replay)return;if(event.data.kind==='complete'){if(location.hash==='#/applynow/gettingstarted/captcha')document.querySelector('compass-ui-getting-started-captcha #nextButtonID').disabled=false}else window.recordReplayEvent(event.data.kind)});
 window.addEventListener('hashchange',render);render();
 </script></body></html>`;

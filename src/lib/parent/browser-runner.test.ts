@@ -51,6 +51,10 @@ function harness(outcome: Outcome = "verification") {
   let currentUrl = prefix + paths[0];
   let errorVisible = false;
   let challengeVisible = false;
+  let captchaReady = false;
+  let captchaTarget:
+    "valid" | "missing" | "heading_changed" | "id_changed" | "foreign" =
+    "valid";
   let nextEnabled = true;
   let topmost = true;
   let focused = true;
@@ -91,7 +95,8 @@ function harness(outcome: Outcome = "verification") {
         challengeVisible = outcome !== "captcha_challenge_late";
         if (outcome !== "challenge") navigate(COMPASS_CAPTCHA);
       } else navigate(prefix + "unsupported");
-    } else if (from === COMPASS_INTRODUCTION_END)
+    } else if (from === COMPASS_CAPTCHA) navigate(COMPASS_INTRODUCTION_END);
+    else if (from === COMPASS_INTRODUCTION_END)
       navigate(COMPASS_HOUSEHOLD_DIVIDER);
     else if (from === COMPASS_HOUSEHOLD_DIVIDER)
       navigate(COMPASS_HOUSEHOLD_ENTRY);
@@ -174,25 +179,34 @@ function harness(outcome: Outcome = "verification") {
       ),
     })),
     getByRole: vi.fn((role: string, options: { name: string }) => {
-      const visible = async () =>
-        role !== "heading" ||
-        (!hydrating &&
-          (options.name === COMPASS_HOUSEHOLD_HEADING
-            ? outcome !== "household_changed"
-            : true));
+      const visible = async (): Promise<boolean> =>
+        (currentUrl !== COMPASS_CAPTCHA ||
+          (role === "button"
+            ? captchaTarget !== "missing"
+            : captchaTarget !== "heading_changed")) &&
+        (role !== "heading" ||
+          (!hydrating &&
+            (options.name === COMPASS_HOUSEHOLD_HEADING
+              ? outcome !== "household_changed"
+              : true)));
+      const enabled = async () =>
+        currentUrl === COMPASS_CAPTCHA ? captchaReady : nextEnabled;
       const locator = {
         click: advance,
         waitFor: vi.fn(async () => {
           hydrating = false;
         }),
         isVisible: visible,
-        isEnabled: async () => nextEnabled,
+        isEnabled: enabled,
         elementHandle: vi.fn(async () => {
           const boundUrl = currentUrl;
           const handle = {
             isVisible: visible,
-            isEnabled: async () => nextEnabled,
-            getAttribute: async () => "nextButtonID",
+            isEnabled: enabled,
+            getAttribute: async () =>
+              currentUrl === COMPASS_CAPTCHA && captchaTarget === "id_changed"
+                ? "unreviewedNextID"
+                : "nextButtonID",
             click: vi.fn(async () => {
               if (currentUrl !== boundUrl)
                 throw new Error("detached public button");
@@ -208,6 +222,13 @@ function harness(outcome: Outcome = "verification") {
       return locator;
     }),
     locator: vi.fn((selector: string) => {
+      if (selector === "compass-ui-getting-started-captcha")
+        return {
+          getByRole: (role: string, options: { name: string }) =>
+            captchaTarget === "foreign"
+              ? { isVisible: async (): Promise<boolean> => false }
+              : page.getByRole(role, options),
+        };
       if (selector.startsWith('main input[id="'))
         return { waitFor: vi.fn(async () => {}) };
       if (selector === "iframe")
@@ -312,6 +333,12 @@ function harness(outcome: Outcome = "verification") {
     navigate,
     setNextEnabled: (value: boolean) => {
       nextEnabled = value;
+    },
+    setCaptchaReady: (value: boolean) => {
+      captchaReady = value;
+    },
+    setCaptchaTarget: (value: typeof captchaTarget) => {
+      captchaTarget = value;
     },
     setTopmost: (value: boolean) => {
       topmost = value;
@@ -483,6 +510,144 @@ it("automatically resumes a verified same-page transition during sweep without a
     ),
   ).toHaveLength(2);
   expect(new Set(h.captureRoutes).size).toBe(9);
+  await h.runner.close();
+});
+
+it("automatically continues the provider's enabled normal Next after a same-page CAPTCHA result", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const waiting = (await h.state()).session;
+  await h.runner.sweep();
+  expect((await h.state()).session.handoff.frameId).toBe(
+    waiting.handoff.frameId,
+  );
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(0);
+  h.setCaptchaReady(true);
+  await h.runner.sweep();
+  expect((await h.state()).session.status).toBe("completed");
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(1);
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
+  expect(
+    h.captureRoutes.some(
+      (url) => url.includes("/household") || url === COMPASS_INTRODUCTION_END,
+    ),
+  ).toBe(false);
+  await h.runner.sweep();
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(1);
+  await h.runner.close();
+});
+
+it.each(["missing", "foreign"] as const)(
+  "does not advance a %s CAPTCHA Next outside the reviewed component contract",
+  async (target) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaTarget(target);
+    h.setCaptchaReady(true);
+    await h.runner.sweep();
+    expect((await h.state()).session.status).toBe("needs_parent");
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    await h.runner.close();
+  },
+);
+
+it.each(["heading_changed", "id_changed"] as const)(
+  "stops before a CAPTCHA Next with %s public metadata",
+  async (target) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaTarget(target);
+    h.setCaptchaReady(true);
+    await h.runner.sweep();
+    const state = (await h.state()).session;
+    expect(state.status).toBe("blocked");
+    expect(state.handoff).toBeNull();
+    expect(state.frameUrl).toBeNull();
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await h.runner.close();
+  },
+);
+
+it.each(["cancelled", "paused", "revoked", "expired", "foreign"] as const)(
+  "cannot automatically continue an enabled CAPTCHA Next after %s authority",
+  async (reason) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaReady(true);
+    if (reason === "expired") vi.setSystemTime(new Date(h.grant.expiresAt + 1));
+    else if (reason === "revoked")
+      h.authorize.mockRejectedValue(new Error("revoked"));
+    else if (reason === "foreign")
+      h.authorize.mockResolvedValueOnce({ ...h.grant, ownerId: "foreign" });
+    else h.grant.authority.status = reason;
+    await h.runner.sweep();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    await h.runner.close();
+  },
+);
+
+it.each(["navigation", "cancellation"] as const)(
+  "rejects a %s race during enabled CAPTCHA Next inspection",
+  async (reason) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaReady(true);
+    h.beforeHandle(() => {
+      if (reason === "navigation") h.navigate(COMPASS_HOUSEHOLD_ENTRY);
+      else h.grant.authority.status = "cancelled";
+    });
+    await h.runner.sweep();
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(
+      h.captureRoutes.some(
+        (url) => url.includes("/household") || url === COMPASS_INTRODUCTION_END,
+      ),
+    ).toBe(false);
+    await h.runner.close();
+  },
+);
+
+it("serializes an enabled CAPTCHA continuation against sweep and retained parent input", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const previous = await h.input({ type: "key", key: "Tab" });
+  h.setCaptchaReady(true);
+  await Promise.allSettled([
+    h.runner.sweep(),
+    h.runner.sweep(),
+    h.runner.control(token, id, previous),
+  ]);
+  expect((await h.state()).session.status).toBe("completed");
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(1);
+  expect(h.keyPress).not.toHaveBeenCalled();
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
   await h.runner.close();
 });
 
