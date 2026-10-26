@@ -55,6 +55,8 @@ function harness(outcome: Outcome = "verification") {
   let topmost = true;
   let focused = true;
   let hydrating = false;
+  let renderedPixels = "initial";
+  const captureRoutes: string[] = [];
   let challengeBox = { x: 100, y: 100, width: 300, height: 200 };
   let challengeUrl =
     "https://www.google.com/recaptcha/api2/bframe?k=public-test-key";
@@ -132,7 +134,8 @@ function harness(outcome: Outcome = "verification") {
       maskColor: string;
     }): Promise<Buffer> => {
       if (!options.maskColor) throw new Error("unmasked frame");
-      return Buffer.from(`actual-test-render:${currentUrl}`);
+      captureRoutes.push(currentUrl);
+      return Buffer.from(`actual-test-render:${currentUrl}:${renderedPixels}`);
     },
   );
   const page = {
@@ -205,6 +208,8 @@ function harness(outcome: Outcome = "verification") {
       return locator;
     }),
     locator: vi.fn((selector: string) => {
+      if (selector.startsWith('main input[id="'))
+        return { waitFor: vi.fn(async () => {}) };
       if (selector === "iframe")
         return { all: async () => [challengeLocator, unknownLocator] };
       if (selector === 'main input:not([type="hidden"])')
@@ -292,6 +297,7 @@ function harness(outcome: Outcome = "verification") {
     grant,
     context,
     screenshot,
+    captureRoutes,
     clicks,
     page,
     challengeLocator,
@@ -315,6 +321,9 @@ function harness(outcome: Outcome = "verification") {
     },
     setHydrating: (value: boolean) => {
       hydrating = value;
+    },
+    changePixels: () => {
+      renderedPixels = "changed";
     },
     moveChallenge: () => {
       challengeBox = { ...challengeBox, x: challengeBox.x + 20 };
@@ -354,7 +363,7 @@ it("pauses one actual context before Family Safety Next and provides only a mask
   expect(value.session.summary).toContain(
     "does not establish that every applicant",
   );
-  expect(h.screenshot).toHaveBeenCalledTimes(9);
+  expect(new Set(h.captureRoutes).size).toBe(9);
   expect(
     h.screenshot.mock.calls.every(
       ([options]) => (options as { maskColor: string }).maskColor === "#dcd8ed",
@@ -406,7 +415,7 @@ it.each(["household", "ending"] as const)(
     expect(value.session.canControl).toBe(false);
     expect(value.session.handoff).toBeNull();
     expect(value.session.frameUrl).toBeNull();
-    expect(h.screenshot).toHaveBeenCalledTimes(9);
+    expect(new Set(h.captureRoutes).size).toBe(9);
     expect(h.context.close).toHaveBeenCalledTimes(1);
     expect(h.forbiddenInput).not.toHaveBeenCalled();
     if (outcome === "ending") {
@@ -438,7 +447,7 @@ it.each([
     expect(value.session.status).toBe("blocked");
     expect(value.session.canControl).toBe(false);
     expect(value.session.frameUrl).toBeNull();
-    expect(h.screenshot).toHaveBeenCalledTimes(9);
+    expect(new Set(h.captureRoutes).size).toBe(9);
     expect(h.forbiddenInput).not.toHaveBeenCalled();
     await h.runner.close();
   },
@@ -473,7 +482,7 @@ it("automatically resumes a verified same-page transition during sweep without a
         url === COMPASS_INTRODUCTION_END || url === COMPASS_HOUSEHOLD_DIVIDER,
     ),
   ).toHaveLength(2);
-  expect(h.screenshot).toHaveBeenCalledTimes(9);
+  expect(new Set(h.captureRoutes).size).toBe(9);
   await h.runner.close();
 });
 
@@ -558,13 +567,93 @@ it("lets a keyboard-only parent enter the actual verified challenge frame with T
   await h.runner.close();
 });
 
+it("automatically updates changed challenge pixels and invalidates only the superseded frame", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const original = await h.input({ type: "key", key: "Tab" });
+  h.changePixels();
+  await h.runner.sweep();
+  const changed = (await h.state()).session;
+  expect(changed.handoff.frameId).not.toBe(original.frameId);
+  await expect(
+    h.runner.read(token, id, "GET", true, original.frameId),
+  ).rejects.toThrow("stale_frame");
+  await expect(h.runner.control(token, id, original)).rejects.toThrow(
+    "stale_frame",
+  );
+  const current = await h.input({ type: "key", key: "Tab" });
+  await h.runner.sweep();
+  expect((await h.state()).session.handoff.frameId).toBe(current.frameId);
+  await h.runner.control(token, id, current);
+  expect(h.keyPress).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
+it("keeps an identical displayed snapshot usable and never recaptures during its exact frame read", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const command = await h.input({ type: "key", key: "Tab" });
+  await h.runner.sweep();
+  expect((await h.state()).session.handoff.frameId).toBe(command.frameId);
+  const captures = h.screenshot.mock.calls.length;
+  h.changePixels();
+  const image = await h.runner.read(token, id, "GET", true, command.frameId);
+  expect(h.screenshot).toHaveBeenCalledTimes(captures);
+  expect(await image.text()).toContain(":initial");
+  const refreshed = (await h.state()).session;
+  expect(refreshed.handoff.frameId).not.toBe(command.frameId);
+  expect(refreshed.handoff.expiresAt).toBe(
+    new Date(h.grant.expiresAt).toISOString(),
+  );
+  await h.runner.close();
+});
+
+it("refuses changed challenge pixels immediately before input and preserves the fresh recoverable handoff", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const command = await h.input({ type: "click", x: 0.2, y: 0.2 });
+  h.changePixels();
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  expect(h.challengeClick).not.toHaveBeenCalled();
+  expect(h.context.close).not.toHaveBeenCalled();
+  const fresh = (await h.state()).session;
+  expect(fresh.status).toBe("needs_parent");
+  expect(fresh.handoff.frameId).not.toBe(command.frameId);
+  await h.runner.control(
+    token,
+    id,
+    await h.input({ type: "click", x: 0.2, y: 0.2 }),
+  );
+  expect(h.challengeClick).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
 it("waits for public SPA metadata before following the reviewed ending and divider controls", async () => {
   const h = harness("ending");
   await h.start();
   h.setHydrating(true);
   await h.runner.control(token, id, await h.input());
   expect((await h.state()).session.status).toBe("completed");
-  expect(h.screenshot).toHaveBeenCalledTimes(9);
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  await h.runner.close();
+});
+
+it("waits for the exact blank household form to hydrate before classifying the connection", async () => {
+  const h = harness("household");
+  await h.start();
+  h.setHydrating(true);
+  await h.runner.control(token, id, await h.input());
+  expect((await h.state()).session.status).toBe("completed");
+  expect(h.page.locator).toHaveBeenCalledWith(
+    'main input[id="firstName"][required]',
+  );
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
   await h.runner.close();
 });
 
@@ -584,7 +673,10 @@ it("rejects a challenge that reflows while current authorization is being checke
     "control_target",
   );
   expect(h.challengeClick).not.toHaveBeenCalled();
-  expect((await h.state()).session.handoff.frameId).toBe(command.frameId);
+  expect((await h.state()).session.handoff.frameId).not.toBe(command.frameId);
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
   await h.runner.close();
 });
 
@@ -636,6 +728,7 @@ it("rejects foreign owners, wrong sessions, arbitrary input and concurrent repla
       action: { type: "type", text: "sensitive" },
     }),
   ).rejects.toThrow();
+  const captures = h.screenshot.mock.calls.length;
   const results = await Promise.allSettled([
     h.runner.control(token, id, command),
     h.runner.control(token, id, command),
@@ -646,7 +739,7 @@ it("rejects foreign owners, wrong sessions, arbitrary input and concurrent repla
   expect(results.filter((result) => result.status === "rejected")).toHaveLength(
     1,
   );
-  expect(h.screenshot).toHaveBeenCalledTimes(10);
+  expect(h.screenshot).toHaveBeenCalledTimes(captures + 2);
   expect((await h.state()).session.handoff.frameId).not.toBe(command.frameId);
   expect(h.forbiddenInput).not.toHaveBeenCalled();
   await h.runner.close();
@@ -666,7 +759,7 @@ it("rejects navigation during target inspection before it can click a different 
         url === COMPASS_FAMILY_SAFETY || url === COMPASS_HOUSEHOLD_ENTRY,
     ),
   ).toHaveLength(0);
-  expect(h.screenshot).toHaveBeenCalledTimes(9);
+  expect(new Set(h.captureRoutes).size).toBe(9);
   expect((await h.state()).session.canControl).toBe(false);
   await h.runner.close();
 });

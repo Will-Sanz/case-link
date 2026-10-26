@@ -6,7 +6,11 @@ import type {
   Locator,
   Page,
 } from "@playwright/test";
-import { compassHouseholdEntryObserved } from "./compass-household-entry";
+import {
+  COMPASS_HOUSEHOLD_ENTRY,
+  COMPASS_HOUSEHOLD_HEADING,
+  compassHouseholdEntryObserved,
+} from "./compass-household-entry";
 import {
   COMPASS_ENTRY,
   COMPASS_FAMILY_SAFETY,
@@ -190,7 +194,27 @@ export function createApplicationBrowser(ports: Ports) {
       (!viewport || viewport.width > 4096 || viewport.height > 4096)
     )
       throw new Error("browser_invalid_viewport");
+    const handoff = job.session.handoff;
+    if (
+      interactive &&
+      viewport &&
+      job.frame &&
+      handoff &&
+      handoff.kind === kind &&
+      job.session.currentUrl === url.href &&
+      handoff.width === viewport.width &&
+      handoff.height === viewport.height &&
+      Buffer.from(job.frame).equals(frame) &&
+      job.challengeBoxes.length === allowed.length &&
+      job.challengeBoxes.every(
+        (displayed, index) =>
+          displayed.frame === allowed[index].frame &&
+          sameBox(displayed.box, allowed[index].box),
+      )
+    )
+      return;
     job.frame = frame;
+    job.deliveredFrameId = null;
     job.challengeBoxes = allowed.map(({ frame, box }) => ({ frame, box }));
     update(job, {
       currentUrl: `https://www.compass.dhs.pa.gov/intake/#/${path}`,
@@ -329,6 +353,30 @@ export function createApplicationBrowser(ports: Ports) {
         await page.waitForURL((next) => next.href !== url, { timeout: 5000 });
         continue;
       }
+      if (url === COMPASS_HOUSEHOLD_ENTRY) {
+        await Promise.all([
+          page
+            .getByRole("heading", {
+              name: COMPASS_HOUSEHOLD_HEADING,
+              exact: true,
+            })
+            .waitFor({ state: "visible", timeout: 3000 }),
+          ...[
+            "firstName",
+            "lastName",
+            "dob-datepicker-date",
+            "gender_male",
+            "gender_female",
+          ].map((id) =>
+            page.locator(`main input[id="${id}"][required]`).waitFor({
+              state: "attached",
+              timeout: 3000,
+            }),
+          ),
+        ]);
+        await check(job);
+        if (page.url() !== url) throw new Error("browser_page_changed");
+      }
       const observed = await compassHouseholdEntryObserved(page);
       await check(job);
       await close(
@@ -397,7 +445,7 @@ export function createApplicationBrowser(ports: Ports) {
     if (!job.parentPhase || job.controlling || closed(job)) return;
     job.controlling = true;
     try {
-      if ((await observe(job)) && !job.frame) await presentHandoff(job);
+      await presentHandoff(job);
     } catch {
       if (!closed(job))
         await close(
@@ -569,7 +617,7 @@ export function createApplicationBrowser(ports: Ports) {
       if (job && !closed(job)) {
         try {
           await check(job);
-          await monitor(job);
+          if (!frame) await monitor(job);
         } catch {
           await close(
             job,
@@ -765,6 +813,15 @@ export function createApplicationBrowser(ports: Ports) {
             )))
         )
           throw new Error("browser_control_target");
+        if (
+          ![COMPASS_FAMILY_SAFETY, COMPASS_CAPTCHA].includes(page.url()) ||
+          job.session.handoff?.frameId !== input.frameId
+        )
+          throw new Error("browser_page_changed");
+        await presentHandoff(job);
+        if (closed(job)) return metadata(job, grant);
+        if (job.session.handoff?.frameId !== input.frameId)
+          throw new Error("browser_stale_frame");
         const viewport = page.viewportSize();
         if (
           ![COMPASS_FAMILY_SAFETY, COMPASS_CAPTCHA].includes(page.url()) ||
@@ -815,9 +872,11 @@ export function createApplicationBrowser(ports: Ports) {
       } catch (error) {
         const rejected =
           error instanceof Error &&
-          ["browser_control_target", "browser_control_rate"].includes(
-            error.message,
-          );
+          [
+            "browser_control_target",
+            "browser_control_rate",
+            "browser_stale_frame",
+          ].includes(error.message);
         if (!closed(job) && (accepted || !rejected))
           await close(
             job,
