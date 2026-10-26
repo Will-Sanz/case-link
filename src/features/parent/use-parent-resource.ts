@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { parentApi } from "./api";
+import { ParentApiError, parentApi } from "./api";
 
 type Result<T> = { path: string; data: T | null; error: Error | null };
 
@@ -16,12 +16,17 @@ export function useParentResource<T>(path: string) {
       })
       .catch((error) => {
         if (!controller.signal.aborted)
-          setResult({
+          setResult((current) => ({
             path,
-            data: null,
+            data:
+              current?.path === path &&
+              error instanceof ParentApiError &&
+              [0, 500, 502, 504].includes(error.status)
+                ? current.data
+                : null,
             error:
               error instanceof Error ? error : new Error("Please try again."),
-          });
+          }));
       });
     return () => controller.abort();
   }, [path, revision]);

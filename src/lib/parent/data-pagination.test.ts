@@ -138,6 +138,7 @@ describe("complete parent data pagination", () => {
       status: index === 101 ? "deletion_pending" : "uploaded",
     }));
     for (const table of [
+      "parent_assistant_messages",
       "parent_operations",
       "parent_receipts",
       "parent_mandates",
@@ -153,6 +154,7 @@ describe("complete parent data pagination", () => {
     expect(last.receipts).toHaveLength(1);
     expect(last.mandates).toHaveLength(1);
     expect(last.forms).toHaveLength(1);
+    expect(last.assistant).toHaveLength(1);
     expect(maxPending).toBeLessThanOrEqual(2); // Only the established household/account pair runs together.
     expect(calls.filter((call) => call.table === "parent_events")).toHaveLength(
       3,

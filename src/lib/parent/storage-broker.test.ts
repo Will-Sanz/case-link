@@ -55,6 +55,25 @@ beforeEach(() => {
   };
 });
 describe("isolated purpose-bound storage broker", () => {
+  it("authenticates health probes and reports an unavailable database honestly", async () => {
+    ports.checkHealth = vi.fn(async () => true);
+    const handle = broker();
+    const probe = (authorized: boolean) =>
+      new Request("http://127.0.0.1:3310/health", {
+        headers: authorized ? { Authorization: `Bearer ${secret}` } : {},
+      });
+    expect((await handle(probe(false))).status).toBe(401);
+    expect(ports.checkHealth).not.toHaveBeenCalled();
+    expect(await (await handle(probe(true))).json()).toEqual({ ready: true });
+    ports.checkHealth = vi.fn(async () => false);
+    expect((await handle(probe(true))).status).toBe(503);
+    ports.checkHealth = vi.fn(async () => {
+      throw new Error("private database details");
+    });
+    const failed = await handle(probe(true));
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ ready: false });
+  });
   it("rejects credentials and URL paths at the broker boundary", () => {
     expect(() =>
       createStorageBroker({

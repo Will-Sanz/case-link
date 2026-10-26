@@ -3,9 +3,11 @@ import Link from "next/link";
 import { ArrowRight, Clock, Folder } from "iconoir-react";
 import { NEED_LABELS } from "@/lib/parent/domain";
 import type { SupportRequest } from "@/lib/parent/domain";
+import type { SupportProgress } from "@/lib/parent/progress";
 import { displayDate } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
+import { ProgressBadge } from "./support-progress";
 import styles from "./parent.module.css";
 
 export function requestStatus(request: SupportRequest): string {
@@ -21,12 +23,13 @@ export function requestStatus(request: SupportRequest): string {
     return "A step needs you";
   if (request.required_actions.some((action) => !action.resolved))
     return "Waiting on a service step";
-  return request.plan ? "Support in progress" : "Getting started";
+  return request.plan ? "Preparation saved" : "Request saved";
 }
 
 export function MySupport() {
   const { data, error, loading, reload } = useParentResource<{
     requests: SupportRequest[];
+    progress?: Record<string, SupportProgress>;
   }>("/requests");
   return (
     <div className={styles.container}>
@@ -61,14 +64,19 @@ export function MySupport() {
                       .map((need) => NEED_LABELS[need])
                       .join(" · ")}
                   </h2>
-                  <span
-                    className={`${styles.badge} ${request.required_actions.some((a) => !a.resolved && (!a.resolver || a.resolver === "parent")) ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
-                  >
-                    {requestStatus(request)}
-                  </span>
+                  {data.progress?.[request.id] ? (
+                    <ProgressBadge progress={data.progress[request.id]} />
+                  ) : (
+                    <span
+                      className={`${styles.badge} ${request.required_actions.some((a) => !a.resolved && (!a.resolver || a.resolver === "parent")) ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
+                    >
+                      {requestStatus(request)}
+                    </span>
+                  )}
                 </div>
                 <p>
-                  {request.plan?.summary ??
+                  {data.progress?.[request.id]?.summary ??
+                    request.plan?.summary ??
                     "Your request is saved. Preparation and any required next steps will appear here."}
                 </p>
                 <div className={styles.requestMeta}>
@@ -109,9 +117,10 @@ export function MySupport() {
       <div className={`${styles.trustLine} ${styles.space}`}>
         <Clock width={22} height={22} aria-hidden="true" />
         <div>
-          <strong>You can leave the page.</strong>Authorized work can continue
-          until its limits expire, or you pause or cancel. Signing out protects
-          this device; it doesn’t cancel your request.
+          <strong>Know what’s happening.</strong>Each request shows whether work
+          is running, waiting or needs you. Signing out protects this device; it
+          doesn’t cancel your permission. A saved request is different from an
+          application sent to a program.
         </div>
       </div>
     </div>

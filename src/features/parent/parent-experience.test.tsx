@@ -317,10 +317,15 @@ describe("informed support start", () => {
     });
     fireEvent.click(screen.getByLabelText(/I’m 18 or older/));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Philadelphia food and meal finder")).toBeTruthy();
     expect(
-      screen.getByText(/external actions are not connected yet/),
+      screen.getByRole("checkbox", {
+        name: /Philadelphia food and meal finder/,
+      }),
     ).toBeTruthy();
+    expect(
+      screen.getByText("About these programs & direct access"),
+    ).toBeTruthy();
+    expect(screen.getByText(/Applications are not connected yet/)).toBeTruthy();
     fireEvent.click(
       screen.getByLabelText(/I authorize research and preparation only/),
     );

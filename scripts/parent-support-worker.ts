@@ -4,8 +4,8 @@ import {
   isLoopbackHost,
   parentProjectIsolationIssues,
 } from "../src/lib/parent/project-origin";
-import { runOneParentJob } from "../src/lib/parent/worker-runtime";
-import { runOneParentNotification } from "../src/lib/parent/notification-runtime";
+import { runParentWorkerService } from "../src/lib/parent/worker-service";
+import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
 
 async function main() {
   const env = process.env;
@@ -45,6 +45,12 @@ async function main() {
     isLoopbackHost(target.hostname) &&
     isLoopbackHost(new URL(supabaseOrigin).hostname) &&
     isLoopbackHost(new URL(brokerOrigin).hostname);
+  const connected = connectedParentServiceAllowed(
+    env,
+    connectionString,
+    supabaseOrigin,
+    brokerOrigin,
+  );
   if (
     local &&
     target.port !==
@@ -54,7 +60,7 @@ async function main() {
   if (
     !local &&
     (env.CASELINK_PARENT_WORKER_APPROVED !== "1" ||
-      !brokerOrigin.startsWith("https:"))
+      (!connected && !brokerOrigin.startsWith("https:")))
   )
     throw new Error(
       "Remote worker execution requires approved isolated HTTPS services.",
@@ -93,35 +99,33 @@ async function main() {
       "parent_worker"
     )
       throw new Error("The restricted worker role is unavailable.");
-    const result = await runOneParentJob({
+    const stop = new AbortController();
+    for (const signal of ["SIGINT", "SIGTERM"] as const)
+      process.once(signal, () => stop.abort());
+    await runParentWorkerService({
       database,
       apiKey: env.OPENAI_API_KEY,
       brokerOrigin,
       brokerSecret,
       supabaseOrigin,
+      watch: process.argv.includes("--watch"),
+      signal: stop.signal,
+      notifications:
+        env.CASELINK_PARENT_NOTIFICATIONS_APPROVED === "1" &&
+        env.RESEND_API_KEY &&
+        env.CASELINK_PARENT_EMAIL_FROM &&
+        env.NEXT_PUBLIC_SITE_URL
+          ? {
+              apiKey: env.RESEND_API_KEY,
+              from: env.CASELINK_PARENT_EMAIL_FROM,
+              siteOrigin: env.NEXT_PUBLIC_SITE_URL,
+              approved: true,
+            }
+          : undefined,
     });
-    if (
-      env.CASELINK_PARENT_NOTIFICATIONS_APPROVED === "1" &&
-      env.RESEND_API_KEY &&
-      env.CASELINK_PARENT_EMAIL_FROM &&
-      env.NEXT_PUBLIC_SITE_URL
-    ) {
-      await runOneParentNotification({
-        database,
-        apiKey: env.RESEND_API_KEY,
-        from: env.CASELINK_PARENT_EMAIL_FROM,
-        siteOrigin: env.NEXT_PUBLIC_SITE_URL,
-        approved: true,
-      });
-    }
     process.stdout.write(
-      result.state === "idle"
-        ? "No authorized support work is due.\n"
-        : result.state === "saved"
-          ? "One authorized support turn was recorded. Delivery requires a verified registered program transport.\n"
-          : "Support work needs an operator check. No unsupported delivery is assumed.\n",
+      "The private support and assistant worker stopped. Only recorded receipts establish external delivery.\n",
     );
-    if (result.state === "failed") process.exitCode = 1;
   } finally {
     await database.end();
   }

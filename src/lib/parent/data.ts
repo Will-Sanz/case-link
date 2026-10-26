@@ -129,6 +129,11 @@ export async function exportParentInformation() {
     requestColumns,
   );
   const tables = [
+    [
+      "assistant",
+      "parent_assistant_messages",
+      "id,request_id,question,status,answer,error,created_at,updated_at",
+    ],
     ["events", "parent_events", eventColumns],
     [
       "documents",

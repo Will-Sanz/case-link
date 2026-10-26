@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
 import {
   canonicalProjectOrigin,
   parentProjectIsolationIssues,
@@ -18,6 +19,13 @@ async function main() {
   const canonicalProject = canonicalProjectOrigin(projectUrl);
   if (!canonicalProject)
     throw new Error("The retention project must be a canonical safe origin.");
+  if (
+    env.CASELINK_ENVIRONMENT === "connected" &&
+    !connectedParentServiceAllowed(env, connectionString, canonicalProject)
+  )
+    throw new Error(
+      "Connected retention requires the approved database with verified TLS.",
+    );
   const isolation = parentProjectIsolationIssues({
     projectUrl,
     schoolUrl: env.CASELINK_SCHOOL_SUPABASE_URL,

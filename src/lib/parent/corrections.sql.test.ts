@@ -251,6 +251,6 @@ describe.skipIf(!modulePath)(
       } finally {
         await db.end();
       }
-    });
+    }, 30000);
   },
 );

@@ -20,6 +20,40 @@ const request = fixtureRequest({
   events: [],
   documents: [],
 });
+const savedProgress = {
+  state: "needs_parent",
+  summary:
+    "Your answer is needed for the electric account. Other recorded work remains separate.",
+  updatedAt: fixtureNow.toISOString(),
+  nextRunAt: null,
+  canContinueAfterClosing: false,
+};
+const answeredConversation = {
+  available: true,
+  unavailableReason: null,
+  historyLimited: false,
+  messages: [
+    {
+      id: "synthetic-question",
+      question: "Has an application been sent?",
+      status: "answered",
+      error: null,
+      created_at: fixtureNow.toISOString(),
+      updated_at: fixtureNow.toISOString(),
+      answer: {
+        intro: "No application has been sent for this request.",
+        paragraphs: [
+          {
+            text: "An answer about your utility account is still needed. Your food options are recorded separately.",
+            sourceLabel: "Your saved request",
+            recordedAt: fixtureNow.toISOString(),
+          },
+        ],
+        actionIds: [],
+      },
+    },
+  ],
+};
 const browser = await chromium.launch({ headless: true }),
   results = [];
 try {
@@ -33,12 +67,13 @@ try {
     });
     const page = await context.newPage();
     let rejectAnswer = false,
-      activeRequest = request;
+      activeRequest = request,
+      assistantConversation = answeredConversation;
     await page.route("**/api/parent/**", async (route) => {
       const url = new URL(route.request().url()),
         method = route.request().method();
       let status = 200,
-        body = { ok: true, request: activeRequest };
+        body = { ok: true, request: activeRequest, progress: savedProgress };
       if (url.pathname.endsWith("/account"))
         body = {
           ok: true,
@@ -68,10 +103,65 @@ try {
             { programId: "peco-cap", enabled: true, actions: ["submit"] },
           ],
         };
-      else if (url.pathname.endsWith("/operations"))
+      else if (url.pathname.endsWith("/food-sites"))
+        body = {
+          ok: true,
+          sites: [],
+          checkedAt: fixtureNow.toISOString(),
+          sourceUrl: "https://www.phila.gov/food/",
+          availability: "city_listed_unconfirmed",
+          moreSitesAvailable: false,
+        };
+      else if (url.pathname.endsWith("/partners"))
+        body = { ok: true, partners: [] };
+      else if (url.pathname.endsWith("/assistant")) {
+        if (method === "POST") {
+          const submitted = route.request().postDataJSON();
+          assert.equal(submitted.consented, true);
+          assistantConversation = {
+            ...assistantConversation,
+            messages: [
+              ...assistantConversation.messages,
+              {
+                id: "synthetic-pending",
+                question: submitted.question,
+                status: "queued",
+                answer: null,
+                error: null,
+                created_at: fixtureNow.toISOString(),
+                updated_at: fixtureNow.toISOString(),
+              },
+            ],
+          };
+          body = { ok: true, id: "synthetic-pending" };
+          status = 202;
+        } else if (method === "DELETE") {
+          assert.equal(
+            route.request().postDataJSON().messageId,
+            "synthetic-pending",
+          );
+          assistantConversation = {
+            ...assistantConversation,
+            messages: assistantConversation.messages.map((message) =>
+              message.id === "synthetic-pending"
+                ? {
+                    ...message,
+                    status: "failed",
+                    error: "You cancelled this question.",
+                  }
+                : message,
+            ),
+          };
+          body = { ok: true };
+        } else body = { ok: true, ...assistantConversation };
+      } else if (url.pathname.endsWith("/operations"))
         body = { ok: true, operations: [] };
       else if (url.pathname.endsWith("/requests") && method === "GET")
-        body = { ok: true, requests: [activeRequest] };
+        body = {
+          ok: true,
+          requests: [activeRequest],
+          progress: { [activeRequest.id]: savedProgress },
+        };
       else if (url.pathname.endsWith("/auth")) {
         body = { ok: true };
         if (
@@ -166,6 +256,126 @@ try {
       waitUntil: "networkidle",
     });
     await snapshot("support-detail");
+    await snapshot(
+      "assistant-answer",
+      page.getByRole("region", { name: "Ask CaseLink" }),
+    );
+    await page
+      .getByLabel("Your question about this request")
+      .fill("What happens next?");
+    await page.getByLabel(/I agree to send my question/).check();
+    await page
+      .getByRole("button", { name: "Ask CaseLink", exact: true })
+      .click();
+    await page
+      .getByText("Question saved. Waiting for the assistant to begin.")
+      .waitFor();
+    await page.waitForFunction(() => {
+      const history = document.querySelector(
+        'ol[aria-label="Conversation about this request"]',
+      );
+      return (
+        history &&
+        history.scrollHeight - history.scrollTop - history.clientHeight < 2
+      );
+    });
+    await snapshot(
+      "assistant-queued",
+      page.getByRole("region", { name: "Ask CaseLink" }),
+    );
+    await page
+      .getByRole("button", { name: "Cancel question", exact: true })
+      .click();
+    await page.getByText("You cancelled this question.").waitFor();
+    await snapshot(
+      "assistant-cancelled",
+      page.getByRole("region", { name: "Ask CaseLink" }),
+    );
+    assistantConversation = {
+      ...answeredConversation,
+      messages: [
+        {
+          ...answeredConversation.messages[0],
+          answer: {
+            ...answeredConversation.messages[0].answer,
+            paragraphs: [
+              {
+                text: "Earlier recorded context remains available for review. ".repeat(
+                  40,
+                ),
+                sourceLabel: "Synthetic request history",
+              },
+            ],
+          },
+        },
+        {
+          ...answeredConversation.messages[0],
+          id: "synthetic-long-history",
+          question: "Latest history question",
+          status: "queued",
+          answer: null,
+        },
+      ],
+    };
+    await page
+      .getByRole("button", { name: "Refresh assistant conversation" })
+      .click();
+    await page.getByText("Latest history question").waitFor();
+    await page.waitForFunction(() => {
+      const history = document.querySelector(
+        'ol[aria-label="Conversation about this request"]',
+      );
+      return (
+        history &&
+        history.scrollHeight > history.clientHeight &&
+        history.scrollHeight - history.scrollTop - history.clientHeight < 2
+      );
+    });
+    const history = page.getByRole("list", {
+      name: "Conversation about this request",
+    });
+    await history.evaluate((element) => {
+      element.scrollTop = 0;
+      element.dispatchEvent(new Event("scroll"));
+    });
+    const historyReload = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/assistant") &&
+        response.request().method() === "GET",
+    );
+    await page
+      .getByRole("button", { name: "Refresh assistant conversation" })
+      .click();
+    await historyReload;
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    assert.equal(
+      await history.evaluate((element) => element.scrollTop),
+      0,
+      "Refreshing must preserve a parent reading earlier answers.",
+    );
+    assistantConversation = {
+      ...answeredConversation,
+      available: false,
+      unavailableReason:
+        "An active assistant connection is unavailable. No new question will be sent.",
+    };
+    await page
+      .getByRole("button", { name: "Refresh assistant conversation" })
+      .click();
+    await page
+      .getByText(
+        "An active assistant connection is unavailable. No new question will be sent.",
+      )
+      .waitFor();
+    await snapshot(
+      "assistant-offline",
+      page.getByRole("region", { name: "Ask CaseLink" }),
+    );
     rejectAnswer = true;
     await page
       .getByLabel("How are you connected to the account?")
@@ -173,7 +383,7 @@ try {
     await page
       .getByRole("button", { name: "Save and continue", exact: true })
       .click();
-    await page.getByRole("alert").waitFor();
+    await page.getByRole("main").getByRole("alert").waitFor();
     await snapshot("answer-error");
     rejectAnswer = false;
     activeRequest = { ...request, version: 2 };
@@ -282,7 +492,7 @@ try {
         .fill("synthetic-wrong-password");
     }
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.getByRole("alert").waitFor();
+    await page.getByRole("main").getByRole("alert").waitFor();
     await snapshot("sign-in-recovery");
     await page.goto(`${origin}/support/help`, { waitUntil: "networkidle" });
     await snapshot("help");

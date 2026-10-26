@@ -14,10 +14,18 @@ import {
 import { validateMandate } from "@/lib/parent/policy";
 import { getProgramsForNeeds } from "@/lib/parent/programs";
 import { getParentAuthorizationWindow } from "@/lib/parent/authorization-window";
+import {
+  getSupportProgress,
+  listSupportProgress,
+} from "@/lib/parent/progress-data";
 
 export async function GET() {
   try {
-    return parentJson({ ok: true, requests: await listSupportRequests() });
+    const [requests, progress] = await Promise.all([
+      listSupportRequests(),
+      listSupportProgress(),
+    ]);
+    return parentJson({ ok: true, requests, progress });
   } catch (error) {
     return parentError(error);
   }
@@ -56,7 +64,11 @@ export async function POST(request: Request) {
       value.mandate,
       idempotencyKey,
     );
-    return parentJson({ ok: true, request: await getSupportRequest(id) }, 201);
+    const [supportRequest, progress] = await Promise.all([
+      getSupportRequest(id),
+      getSupportProgress(id),
+    ]);
+    return parentJson({ ok: true, request: supportRequest, progress }, 201);
   } catch (error) {
     return parentError(error);
   }

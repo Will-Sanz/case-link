@@ -7,6 +7,7 @@ import {
 } from "@/lib/parent/data";
 import { intakeSchema, mandateSchema } from "@/lib/parent/domain";
 import { factAnswerSchema } from "@/lib/parent/answers";
+import { getSupportProgress } from "@/lib/parent/progress-data";
 import {
   answerParentFact,
   replaceParentMandate,
@@ -58,7 +59,11 @@ export async function GET(_: Request, { params }: Context) {
       uuidSchema.parse((await params).id),
     );
     return request
-      ? parentJson({ ok: true, request })
+      ? parentJson({
+          ok: true,
+          request,
+          progress: await getSupportProgress(request.id),
+        })
       : parentJson(
           { ok: false, error: "This support request is unavailable." },
           404,
@@ -85,7 +90,11 @@ export async function POST(request: Request, { params }: Context) {
     else if (value.action === "resolve_action")
       await resolveParentAction(id, value.actionId, value.value);
     else await controlSupportRequest(id, value.action);
-    return parentJson({ ok: true, request: await getSupportRequest(id) });
+    const [supportRequest, progress] = await Promise.all([
+      getSupportRequest(id),
+      getSupportProgress(id),
+    ]);
+    return parentJson({ ok: true, request: supportRequest, progress });
   } catch (error) {
     return parentError(error);
   }

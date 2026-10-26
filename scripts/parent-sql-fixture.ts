@@ -37,6 +37,8 @@ export async function createParentSqlFixture(
     create table public.families(id uuid primary key default gen_random_uuid(),name text,created_by_id uuid references public.app_users(id));
     alter table public.families enable row level security;
     grant select on public.families to authenticated;
+    create table public.resources(id uuid primary key default gen_random_uuid(),slug text not null unique,active boolean not null default true,is_demo boolean not null default false,updated_at timestamptz not null default now(),primary_contact_name text,primary_contact_email text,primary_contact_phone text,description text);
+    alter table public.resources enable row level security;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
     create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,metadata jsonb,unique(bucket_id,name));
     alter table storage.objects enable row level security;
@@ -46,6 +48,15 @@ export async function createParentSqlFixture(
     alter default privileges for role postgres in schema public revoke all on functions from public,anon,authenticated,service_role;
     alter default privileges for role postgres revoke execute on functions from public;
   `);
+  const identifierGuard = readFileSync(
+    "supabase/migrations/20260804173443_production_hardening.sql",
+    "utf8",
+  ).match(
+    /create or replace function public\.contains_direct_identifier\(value text\)[\s\S]*?\$\$;/,
+  )?.[0];
+  if (!identifierGuard)
+    throw new Error("The existing identifier guard was not found.");
+  await db.exec(identifierGuard);
   const migrations = [
     "20261013211053_require_initial_password.sql",
     "20261026012733_parent_support_foundation.sql",
@@ -58,6 +69,9 @@ export async function createParentSqlFixture(
     "20261026044443_parent_storage_upload_preflight.sql",
     "20261026052446_parent_authoritative_mandate_window.sql",
     "20261026155134_parent_existing_identity_cutoff.sql",
+    "20261026162858_parent_runtime_progress.sql",
+    "20261026163009_parent_request_assistant.sql",
+    "20261026163028_parent_partner_directory.sql",
   ];
   try {
     for (const migration of migrations)

@@ -99,7 +99,7 @@ export function SupportDocuments({
         yourself instead.
       </p>
       {documents.length > 0 ? (
-        <ul className={styles.recipientList}>
+        <ul className={styles.documentList}>
           {documents.map((document) => (
             <li className={styles.document} key={document.id}>
               <div className={styles.inline}>
@@ -127,8 +127,7 @@ export function SupportDocuments({
         </ul>
       ) : (
         <p className={`${styles.hint} ${styles.space}`}>
-          No documents added. Your request can continue without optional
-          uploads.
+          No documents added. Optional uploads do not hold up your request.
         </p>
       )}
       {!inactive && (

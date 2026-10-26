@@ -55,6 +55,7 @@
     "parent:preview": "node scripts/serve-parent.mjs",
     "parent:connected:build": "node --import tsx scripts/parent-connected.ts build",
     "parent:connected": "node --import tsx scripts/parent-connected.ts serve",
+    "parent:connected:services": "node --import tsx scripts/parent-connected-services.ts",
     "parent:test:ux": "node --import tsx tests/parent/ux-review.mjs"
   },
   "dependencies": {

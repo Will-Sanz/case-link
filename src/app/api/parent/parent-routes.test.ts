@@ -18,6 +18,10 @@ vi.mock("@/lib/parent/data", () => ({
   getSupportRequest: mocks.get,
   listSupportRequests: mocks.list,
 }));
+vi.mock("@/lib/parent/progress-data", () => ({
+  getSupportProgress: vi.fn().mockResolvedValue({ state: "service_offline" }),
+  listSupportProgress: vi.fn().mockResolvedValue({}),
+}));
 import { GET, POST } from "./requests/route";
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.example");

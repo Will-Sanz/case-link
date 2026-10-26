@@ -13,6 +13,8 @@ The latest revision requires maximum useful AI independence from one informed st
 
 The PRD defines intended behavior; source code and exact-release verification establish what is implemented. Phase status changes only with evidence. Product requirements do not grant runtime permissions or establish partner integration access.
 
+Implementation is paused after the October 26 [background/assistant verification checkpoint](verification/parent-background-assistant.md). It records the current pilot deadline, real service checks, cleanup/preservation, final visual review and remaining execution limits. The next session is a full evaluation and structured next-step decision. [Sensitive identity handling](parent-sensitive-identity.md) records required SSN support and optional Plaid Layer prefill as reviewed requirements; those integrations are not implemented.
+
 [Localhost UI/UX review](verification/parent-ui-ux-review.md) records the production-build visual review, fixes and remaining usability checks. [AI evaluation](parent-ai-evaluation.md) distinguishes deterministic orchestration evidence from live model-quality approval.
 
 [Brand options and approval](parent-brand-options.md) records the five imagegen explorations and the owner's explicit Option 2 selection. [Existing accounts](parent-shared-accounts.md) defines safe reuse of the old email/password identities. [Production readiness and continuity](parent-production-readiness.md) maps preserved branding/policies to current research and outstanding release evidence.

@@ -34,6 +34,14 @@ const request = fixtureRequest({
   ],
   documents: [],
 });
+const progress = {
+  state: "service_offline",
+  summary:
+    "Your request is saved. Background preparation cannot be confirmed and no application is recorded as sent.",
+  updatedAt: fixtureNow.toISOString(),
+  nextRunAt: null,
+  canContinueAfterClosing: false,
+};
 const browser = await chromium.launch({ headless: true });
 const results = [];
 try {
@@ -41,6 +49,7 @@ try {
     ["laptop", 1440, 1000],
     ["phone", 390, 844],
     ["reflow", 320, 820],
+    ["tablet", 768, 1024],
     ["wide", 1920, 934],
   ]) {
     const context = await browser.newContext({
@@ -58,26 +67,83 @@ try {
               expiresAt: "2026-11-25T12:00:00.000Z",
             },
           }
-        : url.pathname.endsWith("/capabilities")
-          ? { ok: true, capabilities: [] }
-          : url.pathname.endsWith("/operations")
-            ? { ok: true, operations: [] }
-            : url.pathname.endsWith("/account")
+        : url.pathname.endsWith("/food-sites")
+          ? {
+              ok: true,
+              sites: [
+                {
+                  id: 1,
+                  name: "Synthetic City-listed site",
+                  address: "100 Example Street",
+                  zip: "19104",
+                  category: "Senior Meal Site",
+                  phoneNumber: "215-555-0123",
+                  website: null,
+                  hours: [
+                    {
+                      day: "mon",
+                      windows: ["09:00–11:00"],
+                      notes: "Call before traveling",
+                    },
+                  ],
+                  serviceAreaNotes: "Confirm eligibility with the location.",
+                },
+              ],
+              checkedAt: fixtureNow.toISOString(),
+              sourceUrl: "https://www.phila.gov/food/",
+              availability: "city_listed_unconfirmed",
+              moreSitesAvailable: false,
+            }
+          : url.pathname.endsWith("/partners")
+            ? {
+                ok: true,
+                partners: [
+                  {
+                    legacyResourceId: "11111111-1111-4111-8111-111111111111",
+                    name: "PECO assistance programs",
+                    officialUrl:
+                      "https://www.peco.com/my-account/customer-support/assistance-programs",
+                    programIds: ["peco-cap"],
+                    directoryUpdatedAt: fixtureNow.toISOString(),
+                    sourceCheckedAt: "2026-10-26",
+                    relationship: "existing_partner",
+                    execution: "not_connected",
+                  },
+                ],
+              }
+            : url.pathname.endsWith("/assistant")
               ? {
                   ok: true,
-                  account: {
-                    email: "family@example.test",
-                    preferences: {
-                      contactPreference: "in_app",
-                      language: "en",
-                      quietHoursStart: 19,
-                      quietHoursEnd: 9,
-                    },
-                  },
+                  messages: [],
+                  available: false,
+                  unavailableReason:
+                    "The assistant is not currently connected. Your recorded progress and direct program options remain available.",
+                  historyLimited: false,
                 }
-              : url.pathname.endsWith("/requests")
-                ? { ok: true, requests: [request] }
-                : { ok: true, request };
+              : url.pathname.endsWith("/capabilities")
+                ? { ok: true, capabilities: [] }
+                : url.pathname.endsWith("/operations")
+                  ? { ok: true, operations: [] }
+                  : url.pathname.endsWith("/account")
+                    ? {
+                        ok: true,
+                        account: {
+                          email: "family@example.test",
+                          preferences: {
+                            contactPreference: "in_app",
+                            language: "en",
+                            quietHoursStart: 19,
+                            quietHoursEnd: 9,
+                          },
+                        },
+                      }
+                    : url.pathname.endsWith("/requests")
+                      ? {
+                          ok: true,
+                          requests: [request],
+                          progress: { [request.id]: progress },
+                        }
+                      : { ok: true, request, progress };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -87,6 +153,7 @@ try {
     for (const [label, path] of [
       ["home", "/"],
       ["intake", "/get-support?need=food"],
+      ["permission", "/get-support?need=food"],
       ["support", "/my-support"],
       ["detail", `/support/${request.id}`],
       ["account", "/account"],
@@ -99,6 +166,37 @@ try {
       if (name === "wide" && label !== "home") continue;
       await page.goto(origin + path, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
+      if (label === "permission") {
+        await page.getByLabel("Apply for SNAP", { exact: true }).check();
+        await page
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
+        await page.getByLabel("Household ZIP code").fill("19104");
+        await page.getByLabel(/18 or older/).check();
+        await page
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
+        assert.ok(
+          await page
+            .getByText("We can prepare. Applications are not connected yet.")
+            .isVisible(),
+        );
+        const programRows = page
+          .getByRole("group", { name: "Named programs for this request" })
+          .getByRole("checkbox");
+        assert.equal(
+          await programRows.count(),
+          3,
+          "Food and SNAP permission must identify all three exact programs.",
+        );
+        for (const row of await programRows.all()) {
+          const box = await row.locator("..").boundingBox();
+          assert.ok(
+            box && box.height <= 110,
+            "Named program choices must remain compact and readable.",
+          );
+        }
+      }
       if (label === "home") {
         const art = page.getByRole("img", {
           name: /Illustration of a family unpacking groceries/,
@@ -180,6 +278,7 @@ try {
         .analyze();
       results.push({
         viewport: name,
+        state: label,
         path,
         overflow,
         violations: axe.violations.map((v) => ({

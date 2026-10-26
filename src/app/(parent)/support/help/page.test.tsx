@@ -52,3 +52,17 @@ it("keeps the email-code path without offering an unrelated school reset", () =>
       .getAttribute("href"),
   ).toBe("/sign-in");
 });
+it("uses the same original recovery site as sign-in in the connected preview", () => {
+  vi.stubEnv("CASELINK_PARENT_ACCOUNT_MODE", "existing");
+  vi.stubEnv("CASELINK_ENVIRONMENT", "connected");
+  vi.stubEnv(
+    "CASELINK_PARENT_RECOVERY_SITE_URL",
+    "https://www.thecaselink.com",
+  );
+  render(<HelpPage />);
+  expect(
+    screen
+      .getByRole("link", { name: "reset your existing password" })
+      .getAttribute("href"),
+  ).toBe("https://www.thecaselink.com/forgot-password");
+});

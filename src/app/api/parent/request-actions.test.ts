@@ -20,6 +20,9 @@ vi.mock("@/lib/parent/mutations", () => ({
   replaceParentMandate: mocks.mandate,
   updateParentBooking: mocks.booking,
 }));
+vi.mock("@/lib/parent/progress-data", () => ({
+  getSupportProgress: vi.fn().mockResolvedValue({ state: "service_offline" }),
+}));
 import { POST } from "./requests/[id]/route";
 const id = fixtureRequest().id,
   context = { params: Promise.resolve({ id }) };

@@ -10,7 +10,6 @@ import {
   Lock,
   Pause,
   Play,
-  Refresh,
   ShieldCheck,
 } from "iconoir-react";
 import { NEED_LABELS, OUTCOME_LABELS, intakeSchema } from "@/lib/parent/domain";
@@ -19,12 +18,19 @@ import type {
   SupportIntake,
   SupportRequest,
 } from "@/lib/parent/domain";
-import { getProgram, PROGRAMS } from "@/lib/parent/programs";
+import {
+  getProgram,
+  PROGRAMS,
+  SNAP_NEW_APPLICATION_URL,
+} from "@/lib/parent/programs";
 import { displayDate, parentApi } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { requestStatus } from "./my-support";
 import { SupportDocuments } from "./support-documents";
 import { SupportActivity } from "./support-activity";
+import { SupportAssistant } from "./support-assistant";
+import { FoodSites } from "./food-sites";
+import { SupportPartners } from "./support-partners";
 import { NecessaryAnswer } from "./necessary-answer";
 import { SavedAccountAnswers } from "./saved-account-answers";
 import { ANSWER_FIELDS } from "@/lib/parent/answers";
@@ -33,6 +39,8 @@ import {
   type PermissionEditorHandle,
 } from "./permission-editor";
 import { useParentResource } from "./use-parent-resource";
+import type { SupportProgress } from "@/lib/parent/progress";
+import { ProgressBadge, SupportProgressPanel } from "./support-progress";
 import { UrgentHelp } from "./landing";
 import styles from "./parent.module.css";
 
@@ -66,7 +74,9 @@ function RequiredStep({
       <p id={`context-${action.id}`} className={styles.small}>
         <strong>{NEED_LABELS[action.need]}</strong>
       </p>
-      <h2 id={`step-${action.id}`}>{action.title}</h2>
+      <h2 id={`step-${action.id}`} tabIndex={-1}>
+        {action.title}
+      </h2>
       <p>{action.explanation}</p>
       {canAnswer ? (
         <NecessaryAnswer
@@ -388,6 +398,7 @@ function CorrectDetails({
 export function SupportDetail({ requestId }: { requestId: string }) {
   const { data, error, loading, reload } = useParentResource<{
     request: SupportRequest;
+    progress?: SupportProgress;
   }>(`/requests/${requestId}`);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<Error | null>(null);
@@ -437,7 +448,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         <ParentLoading />
       </div>
     );
-  if (error || !request)
+  if (!request)
     return (
       <div className={styles.container}>
         <ServiceError
@@ -475,14 +486,18 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           <h1>Your family’s support</h1>
           <p>
             {request.plan?.summary ??
-              "Your request is saved. We’re preparing the next useful steps from the information you shared."}
+              "Your request is saved. Check the status below to see what is happening and what needs you."}
           </p>
         </div>
-        <span
-          className={`${styles.badge} ${actions.length ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
-        >
-          {requestStatus(request)}
-        </span>
+        {data?.progress && !error ? (
+          <ProgressBadge progress={data.progress} />
+        ) : (
+          <span
+            className={`${styles.badge} ${actions.length ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
+          >
+            {requestStatus(request)}
+          </span>
+        )}
       </div>
       {notice && (
         <p className={`${styles.success} ${styles.space}`} role="status">
@@ -490,6 +505,11 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         </p>
       )}
       {actionError && <ServiceError error={actionError} />}
+      {error && <ServiceError error={error} retry={reload} />}
+      <SupportProgressPanel
+        progress={error ? undefined : data?.progress}
+        onRefresh={reload}
+      />
       {request.intake.urgency === "today" && (
         <div className={styles.space}>
           <UrgentHelp />
@@ -538,18 +558,22 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               </div>
             </details>
           )}
+          {request.intake.needs.includes("food_now") && (
+            <FoodSites zip={request.intake.zip} />
+          )}
+          <SupportAssistant key={request.id} request={request} />
           <section className={styles.surface}>
-            <div className={styles.between}>
-              <h2>What’s happening</h2>
-              <button
-                className={`${styles.quiet} ${styles.hidePrint}`}
-                onClick={reload}
-                aria-label="Refresh support progress"
-              >
-                <Refresh width={17} height={17} aria-hidden="true" />
-                Refresh
-              </button>
-            </div>
+            <h2>Program progress</h2>
+            {request.intake.needs.includes("snap_new") && (
+              <p className={`${styles.small} ${styles.space}`}>
+                <a className={styles.textLink} href={SNAP_NEW_APPLICATION_URL}>
+                  Start a new SNAP application with DHS
+                </a>
+                . No COMPASS account is needed to begin. This opens the official
+                site; opening it does not file an application. Enter sensitive
+                identifiers directly with DHS if asked.
+              </p>
+            )}
             {request.plan?.routes.length ? (
               request.plan.routes.map((route, i) => {
                 const program = getProgram(route.programId);
@@ -628,6 +652,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               </div>
             )}
           </section>
+          <SupportPartners request={request} />
           <section className={styles.surface}>
             <h2>Activity & receipts</h2>
             <p className={`${styles.subtle} ${styles.small}`}>
@@ -869,8 +894,9 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         </aside>
       </div>
       <p className={`${styles.hint} ${styles.space}`}>
-        Last recorded update: {displayDate(request.updated_at, true)}. This page
-        refreshes while visible; work does not depend on keeping it open.
+        Last recorded request update: {displayDate(request.updated_at, true)}.
+        This page checks for updates every 30 seconds while visible. The status
+        above shows whether background work is active.
       </p>
     </div>
   );

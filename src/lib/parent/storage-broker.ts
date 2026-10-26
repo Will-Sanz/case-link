@@ -27,6 +27,7 @@ export type StorageAuthorization = StoragePurpose & {
   expectedSha256?: string;
 };
 export type StorageBrokerPorts = {
+  checkHealth?(): Promise<boolean>;
   authorize(
     purpose: StoragePurpose,
   ): Promise<Omit<StorageAuthorization, "jobId" | "leaseToken" | "mode">>;
@@ -140,6 +141,21 @@ export function createStorageBroker(input: {
   }
   return async function handle(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
+    if (path === "/health" && request.method === "GET") {
+      if (
+        !equalSecret(
+          request.headers.get("authorization") ?? "",
+          `Bearer ${input.secret}`,
+        )
+      )
+        return reply({ error: "Authentication required." }, 401);
+      try {
+        const ready = await input.ports.checkHealth?.();
+        return reply({ ready: ready === true }, ready ? 200 : 503);
+      } catch {
+        return reply({ ready: false }, 503);
+      }
+    }
     if (path === "/objects" && request.method === "POST") {
       if (
         !equalSecret(

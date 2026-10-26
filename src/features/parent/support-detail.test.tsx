@@ -12,6 +12,7 @@ import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { SupportDetail } from "./support-detail";
 import { buildSupportPlan } from "@/lib/parent/planning";
+import { getProgram, SNAP_NEW_APPLICATION_URL } from "@/lib/parent/programs";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -48,6 +49,52 @@ afterEach(() => {
 });
 
 describe("support detail", () => {
+  it.each([
+    "snap_new",
+    "snap_renewal",
+    "snap_pending",
+    "snap_problem",
+  ] as const)(
+    "offers a new-application shortcut only for snap_new, preserving %s routing",
+    async (need) => {
+      const request = fixture();
+      request.intake.needs = [need];
+      request.mandate = buildMandate(
+        request.intake,
+        ["snap-pa"],
+        "prepare_only",
+        "ask_me",
+        "2026-11-24T12:00:00.000Z",
+      );
+      request.plan =
+        need === "snap_new"
+          ? null
+          : buildSupportPlan(
+              request.intake,
+              request.mandate,
+              new Date(request.updated_at),
+            );
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
+      render(<SupportDetail requestId={requestId} />);
+      await screen.findByRole("heading", { name: "Program progress" });
+      if (need !== "snap_new")
+        expect(
+          screen
+            .getByRole("link", { name: "Official program & direct access" })
+            .getAttribute("href"),
+        ).toBe(getProgram("snap-pa")!.officialUrl);
+      const shortcut = screen.queryByRole("link", {
+        name: "Start a new SNAP application with DHS",
+      });
+      expect(shortcut?.getAttribute("href") ?? null).toBe(
+        need === "snap_new" ? SNAP_NEW_APPLICATION_URL : null,
+      );
+      if (need === "snap_new")
+        expect(
+          screen.getByText(/opening it does not file an application/),
+        ).toBeTruthy();
+    },
+  );
   it("shows the parent's actual outcome and reference with attribution after reload", async () => {
     const request = fixture();
     request.events = [
@@ -108,19 +155,17 @@ describe("support detail", () => {
   });
   it("offers wrapping permission choices and requires fresh consent after changing actions", async () => {
     const request = fixture();
-    const fetchMock = vi
-      .fn()
-      .mockImplementation(async (url: string) =>
-        url.endsWith("/authorization-window")
-          ? {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+      url.endsWith("/authorization-window")
+        ? {
+            ok: true,
+            json: async () => ({
               ok: true,
-              json: async () => ({
-                ok: true,
-                authorization: { expiresAt: "2026-11-24T12:00:00.000Z" },
-              }),
-            }
-          : response(request),
-      );
+              authorization: { expiresAt: "2026-11-24T12:00:00.000Z" },
+            }),
+          }
+        : response(request),
+    );
     vi.stubGlobal("fetch", fetchMock);
     render(<SupportDetail requestId={requestId} />);
     fireEvent.click(
@@ -246,6 +291,23 @@ describe("support detail", () => {
     const request = fixture();
     let reads = 0;
     const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith("/partners"))
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, partners: [] }),
+        };
+      if (url.endsWith("/assistant"))
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            messages: [],
+            available: false,
+            unavailableReason: "Assistant unavailable.",
+            historyLimited: false,
+          }),
+        };
       if (url.endsWith("/operations"))
         return {
           ok: true,
@@ -307,6 +369,72 @@ describe("support detail", () => {
       (call) => call[1]?.method === "POST",
     );
     expect(JSON.parse(post![1].body)).toEqual({ action: "cancel" });
+  });
+  it("keeps an unsaved correction after a network refresh failure and stops claiming a current running status", async () => {
+    const request = fixture();
+    let disconnected = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/assistant"))
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              messages: [],
+              available: false,
+              unavailableReason: "Unavailable.",
+              historyLimited: false,
+            }),
+          };
+        if (url.endsWith("/partners"))
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ partners: [] }),
+          };
+        if (url.endsWith("/operations"))
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ operations: [] }),
+          };
+        if (disconnected) throw new Error("Disconnected");
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            request,
+            progress: {
+              state: "running",
+              summary: "Recorded worker activity.",
+              updatedAt: request.updated_at,
+              nextRunAt: null,
+              canContinueAfterClosing: true,
+            },
+          }),
+        };
+      }),
+    );
+    render(<SupportDetail requestId={requestId} />);
+    fireEvent.click(
+      await screen.findByText("Correct household or bill information"),
+    );
+    fireEvent.change(screen.getByLabelText("ZIP code"), {
+      target: { value: "19105" },
+    });
+    disconnected = true;
+    fireEvent.click(
+      screen.getByRole("button", { name: "Refresh support progress" }),
+    );
+    await screen.findByRole("alert");
+    expect((screen.getByLabelText("ZIP code") as HTMLInputElement).value).toBe(
+      "19105",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Status unavailable" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Recorded worker activity.")).toBeNull();
   });
   it("attributes evidence and keeps operator-owned connection work away from parent action cards", async () => {
     const request = fixture();

@@ -4,6 +4,7 @@ import { ArrowRight } from "iconoir-react";
 import { PROGRAMS } from "@/lib/parent/programs";
 import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
 import styles from "@/features/parent/parent.module.css";
+import { FoodSites } from "@/features/parent/food-sites";
 export const metadata: Metadata = {
   title: "Help & direct support",
   description:
@@ -13,6 +14,11 @@ export default function HelpPage() {
   const existingAccounts =
     process.env.CASELINK_PARENT_ACCOUNT_MODE === "existing";
   const emailCodeAvailable = parentEmailCodeEnabled(process.env);
+  const recoveryHref =
+    process.env.CASELINK_ENVIRONMENT === "connected" &&
+    process.env.CASELINK_PARENT_RECOVERY_SITE_URL
+      ? `${process.env.CASELINK_PARENT_RECOVERY_SITE_URL}/forgot-password`
+      : "/forgot-password";
   return (
     <div className={`${styles.container} ${styles.legal}`}>
       <h1>Help, without another hurdle.</h1>
@@ -68,6 +74,9 @@ export default function HelpPage() {
           staffed emergency line.
         </p>
       </section>
+      <div className={styles.section}>
+        <FoodSites />
+      </div>
       <section className={styles.section}>
         <h2>Official programs & partner options</h2>
         <ul className={styles.list}>
@@ -89,7 +98,7 @@ export default function HelpPage() {
           <p>
             For an existing CaseLink school account, use your email and
             password. If you forgot it,{" "}
-            <Link className={styles.textLink} href="/forgot-password">
+            <Link className={styles.textLink} href={recoveryHref}>
               reset your existing password
             </Link>
             .

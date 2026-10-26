@@ -8,6 +8,7 @@ import {
   parentProjectIsolationIssues,
 } from "../src/lib/parent/project-origin";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
+import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
 
 async function main() {
   const env = process.env;
@@ -49,6 +50,12 @@ async function main() {
     loopback(database.hostname) &&
     loopback(project.hostname) &&
     loopback(new URL(origin).hostname);
+  const connected = connectedParentServiceAllowed(
+    env,
+    databaseUrl,
+    canonicalProject,
+    origin,
+  );
   if (
     local &&
     (database.port !== "55322" || project.port !== "55321") &&
@@ -63,7 +70,7 @@ async function main() {
     !local &&
     (env.CASELINK_PARENT_STORAGE_BROKER_APPROVED !== "1" ||
       project.protocol !== "https:" ||
-      !canonicalProjectOrigin(origin)?.startsWith("https:"))
+      (!connected && !canonicalProjectOrigin(origin)?.startsWith("https:")))
   )
     throw new Error(
       "The remote broker needs explicit approval and isolated HTTPS origins.",
@@ -103,6 +110,12 @@ async function main() {
     origin,
     supabaseOrigin: canonicalProject,
     ports: {
+      async checkHealth() {
+        return (
+          (await db.query("select current_user as name")).rows[0]?.name ===
+          "parent_storage_broker"
+        );
+      },
       async authorize(purpose) {
         const result = await db.query(
           "select parent_private.parent_authorize_storage($1,$2,$3,$4,$5) permission",

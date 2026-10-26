@@ -328,7 +328,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                 <>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>Food & benefits</legend>
-                    <div className={styles.choices}>
+                    <div className={`${styles.choices} ${styles.needChoices}`}>
                       {foodNeeds.map((need) => (
                         <label className={styles.choice} key={need}>
                           <input
@@ -359,7 +359,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                   </fieldset>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>Utility bills</legend>
-                    <div className={styles.choices}>
+                    <div className={`${styles.choices} ${styles.needChoices}`}>
                       {utilityNeeds.map((need) => (
                         <label className={styles.choice} key={need}>
                           <input
@@ -738,18 +738,20 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       <strong>
                         {fullAvailable
                           ? "Supported work, within your limits."
-                          : "Preparation is available; external actions are not connected yet."}
+                          : "We can prepare. Applications are not connected yet."}
                       </strong>{" "}
                       {fullAvailable
                         ? "Only programs with a verified permitted channel can receive information or carry out applications."
-                        : "This authorization lets us research and prepare. It does not send anything, book appointments or submit applications."}
+                        : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly."}
                     </p>
                   </div>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       Named programs for this request
                     </legend>
-                    <div className={styles.choices}>
+                    <div
+                      className={`${styles.choices} ${styles.programChoices}`}
+                    >
                       {programs.map((program) => (
                         <label className={styles.choice} key={program.id}>
                           <input
@@ -767,17 +769,33 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                           />
                           <span>
                             <strong>{program.name}</strong>
-                            <small>{program.description}</small>
                             <small>
                               {connected(program.id)
-                                ? "Verified execution channel available"
-                                : "Research and preparation only — no external sharing"}
+                                ? "Permitted actions available"
+                                : "Prepare only · nothing sent"}
                             </small>
                           </span>
                         </label>
                       ))}
                     </div>
                   </fieldset>
+                  <details className={styles.programDetails}>
+                    <summary>About these programs & direct access</summary>
+                    <ul className={styles.programDescriptions}>
+                      {programs.map((program) => (
+                        <li key={program.id}>
+                          <strong>{program.name}</strong>
+                          <p>{program.description}</p>
+                          <a
+                            className={styles.textLink}
+                            href={program.officialUrl}
+                          >
+                            Open official program
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                   {fullAvailable && (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
@@ -920,8 +938,9 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                     </span>
                   </label>
                   <p className={styles.hint}>
-                    We continue authorized work when you close the page or sign
-                    out. Your{" "}
+                    Closing the page or signing out does not cancel your
+                    permission. My support shows whether work is running,
+                    waiting or unavailable. Your{" "}
                     <Link className={styles.textLink} href="/support/privacy">
                       privacy and control options
                     </Link>{" "}

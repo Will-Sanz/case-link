@@ -22,7 +22,7 @@ export function requireSameOrigin(request: Request): void {
   if (!origin || origin !== expected) throw new Error("parent_origin_denied");
 }
 export async function readBoundedBody(
-  request: Request,
+  request: Pick<Request, "headers" | "body">,
   limit: number,
 ): Promise<Uint8Array> {
   if (Number(request.headers.get("content-length") ?? 0) > limit)

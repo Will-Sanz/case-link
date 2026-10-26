@@ -150,8 +150,9 @@ function AccountSettings({
         <div className={`${styles.trustLine} ${styles.space}`}>
           <Lock width={21} height={21} aria-hidden="true" />
           <p>
-            Signing out protects this device. Existing support continues within
-            its permission limits. To stop work, pause or cancel it in{" "}
+            Signing out protects this device and keeps your support permission
+            in place. My support shows any running, waiting or unavailable
+            work. To stop future work, pause or cancel it in{" "}
             <Link className={styles.textLink} href="/my-support">
               My support
             </Link>

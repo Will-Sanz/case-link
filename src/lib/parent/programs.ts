@@ -11,6 +11,9 @@ export type SupportProgram = {
   personalSteps: string[];
   execution: "not_configured" | "permitted";
 };
+// This public entry initializes guest intake; a deep application URL can fail without that session.
+export const SNAP_NEW_APPLICATION_URL =
+  "https://www.compass.dhs.pa.gov/intake/#/getstarted";
 const checked = "2026-10-25";
 const program = (
   value: Omit<SupportProgram, "sourceCheckedAt" | "execution" | "sourceUrl">,
@@ -37,12 +40,12 @@ export const PROGRAMS: SupportProgram[] = [
     name: "Pennsylvania SNAP",
     needs: ["snap_new", "snap_renewal", "snap_pending", "snap_problem"],
     description:
-      "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. DHS determines eligibility.",
+      "Apply, renew or follow an existing SNAP application through Pennsylvania's official benefits service. A new application can begin without creating a COMPASS account. DHS determines eligibility.",
     officialUrl:
       "https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap",
     personalSteps: [
-      "Complete any required personal declaration and interview.",
-      "Use your own account for required authentication.",
+      "Complete any required provider verification, personal declaration or interview.",
+      "Enter sensitive identifiers directly with DHS if required; do not share them in CaseLink chat.",
     ],
   }),
   program({

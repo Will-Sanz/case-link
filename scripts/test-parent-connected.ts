@@ -102,7 +102,7 @@ async function main() {
     check(
       await page
         .getByText(
-          "Preparation is available; external actions are not connected yet.",
+          "We can prepare. Applications are not connected yet.",
           { exact: true },
         )
         .isVisible(),

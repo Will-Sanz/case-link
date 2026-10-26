@@ -67,7 +67,7 @@ export function SupportActivity({
             Each download keeps the exact information and evidence recorded for
             that attempt.
           </p>
-          <ul className={styles.recipientList}>
+          <ul className={styles.packetList}>
             {data.operations.map((operation) => (
               <li key={operation.id}>
                 <strong>

@@ -42,3 +42,57 @@ it("never exposes the previous request while loading a new request path", async 
   });
   await waitFor(() => expect(result.current.data?.request.id).toBe("second"));
 });
+it.each([0, 500, 502, 504])(
+  "keeps same-request data after a temporary refresh failure (%s)",
+  async (status) => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ request: { id: "first" } }),
+      });
+    if (status === 0) fetch.mockRejectedValueOnce(new Error("Disconnected"));
+    else
+      fetch.mockResolvedValueOnce({
+        ok: false,
+        status,
+        json: async () => ({ error: "Try again." }),
+      });
+    vi.stubGlobal("fetch", fetch);
+    const { result } = renderHook(() =>
+      useParentResource<{ request: { id: string } }>("/requests/first"),
+    );
+    await waitFor(() => expect(result.current.data?.request.id).toBe("first"));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.data?.request.id).toBe("first");
+  },
+);
+it.each([401, 403, 404, 503])(
+  "discards prior data when access or processing is unavailable (%s)",
+  async (status) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ request: { id: "first" } }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status,
+          json: async () => ({ error: "Unavailable." }),
+        }),
+    );
+    const { result } = renderHook(() =>
+      useParentResource<{ request: { id: string } }>("/requests/first"),
+    );
+    await waitFor(() => expect(result.current.data?.request.id).toBe("first"));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.data).toBeNull();
+  },
+);
