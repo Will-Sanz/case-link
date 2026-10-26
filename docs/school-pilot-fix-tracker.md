@@ -1,5 +1,8 @@
 # CaseLink school-pilot fix tracker
 
+<!-- parent-pivot-notice -->
+> **Historical school-product record — superseded October 25, 2026:** the current product direction is parent-owned food support and utility assistance. Use the [parent MVP PRD](parent-support-mvp-prd.md) and [implementation plan](parent-support-implementation-plan.md) for new work. The dated requirements, findings and Current headings below describe the earlier school application; they do not override the pivot or verify parent-product capabilities. Preserve applicable legacy operating safeguards and release evidence.
+
 **Reviewed:** October 15, 2026 · **Repository baseline:** `e0cb389` · **Status:** narrow engineering/release work complete and live; 30-minute observation passed; school/operating acceptance remains open.
 
 **Intended rollout:** a few staff at one school, working with real family circumstances. This is not yet approval to store identifiable education or family records. Current product policy requires non-identifying labels and de-identified narrative.

@@ -1,5 +1,8 @@
 # CaseLink pilot checkpoint — October 15, 2026
 
+<!-- parent-pivot-notice -->
+> **Historical school-product record — superseded October 25, 2026:** the current product direction is parent-owned food support and utility assistance. Use the [parent MVP PRD](parent-support-mvp-prd.md) and [implementation plan](parent-support-implementation-plan.md) for new work. The dated requirements, findings and Current headings below describe the earlier school application; they do not override the pivot or verify parent-product capabilities. Preserve applicable legacy operating safeguards and release evidence.
+
 ## Current production release: AI preparation upgrade
 
 The user explicitly authorized promotion. Production now serves source `59ef91349f0076c1f3d70a515277915a645facd5` at deployment `dpl_BtUijxvxRbopdJ5Ebr214t36grWU`, with 43 migrations. The exact production candidate, all eight model calls, saved edits, both PDFs and cleanup passed; the public-site workflow also passed with eight real Sol calls and sub-second measured saves. The 30-minute post-promotion observation passed 20:23–20:53 UTC: all 45 probes succeeded, with no warning/error/fatal log entries. The rollout is complete; no further autonomous release work is queued. Follow the current section of [production-release.md](verification/production-release.md), including its conditional rollback boundary. No further product changes or production promotion are needed to update evidence.

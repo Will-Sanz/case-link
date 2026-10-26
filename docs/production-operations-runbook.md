@@ -1,5 +1,8 @@
 # CaseLink production operations runbook
 
+<!-- parent-pivot-notice -->
+> **Legacy school deployment controls — October 25, 2026:** this runbook remains the operating reference for the existing invitation-only school application. The new product direction is parent-owned food support and utility assistance, defined in the [parent MVP PRD](parent-support-mvp-prd.md) and [implementation plan](parent-support-implementation-plan.md). Keep the school environment and its data safeguards intact. Its signup/data assumptions and release evidence do not authorize parent use; parent operations must be implemented and verified separately.
+
 **Applies to:** the invitation-only V1 pilot
 
 **Current deployment:** one managed Vercel application and a dedicated Supabase production project for this school pilot, plus separate synthetic staging. School/operating acceptance remains open; see the [live release record](verification/production-release.md).

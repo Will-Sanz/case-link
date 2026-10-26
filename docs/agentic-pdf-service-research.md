@@ -1,5 +1,8 @@
 # Agentic PDF filling service research
 
+<!-- parent-pivot-notice -->
+> **Historical school-product record — superseded October 25, 2026:** the current product direction is parent-owned food support and utility assistance. Use the [parent MVP PRD](parent-support-mvp-prd.md) and [implementation plan](parent-support-implementation-plan.md) for new work. The dated requirements, findings and Current headings below describe the earlier school application; they do not override the pivot or verify parent-product capabilities. Preserve applicable legacy operating safeguards and release evidence.
+
 **Status:** Execution capabilities deferred; reviewed preparation is the first step
 **Decision date:** October 15, 2026
 
