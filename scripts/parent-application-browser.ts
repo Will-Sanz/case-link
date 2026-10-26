@@ -1,7 +1,7 @@
-import { createServer } from "node:http";
 import { chromium } from "@playwright/test";
 import { createBrowserAuthorizer } from "../src/lib/parent/browser-authority";
 import { createApplicationBrowser } from "../src/lib/parent/browser-runner";
+import { createApplicationBrowserServer } from "../src/lib/parent/browser-server";
 import { APPLICATION_BROWSER_ORIGIN } from "../src/lib/parent/browser-policy";
 import { canonicalProjectOrigin } from "../src/lib/parent/project-origin";
 
@@ -47,58 +47,7 @@ async function main() {
         serviceWorkers: "block",
       }),
   });
-  const server = createServer(async (incoming, outgoing) => {
-    try {
-      if (
-        incoming.headers.host !== "127.0.0.1:3330" ||
-        incoming.headers.origin ||
-        !["127.0.0.1", "::ffff:127.0.0.1"].includes(
-          incoming.socket.remoteAddress ?? "",
-        )
-      )
-        throw new Error("browser_not_authorized");
-      const path =
-        /^\/requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(\/frame)?$/.exec(
-          incoming.url ?? "",
-        );
-      if (
-        !path ||
-        !["GET", "POST", "DELETE"].includes(incoming.method ?? "") ||
-        (path[2] && incoming.method !== "GET")
-      ) {
-        outgoing.writeHead(404, { "Cache-Control": "private, no-store" });
-        outgoing.end();
-        return;
-      }
-      if (
-        incoming.headers["transfer-encoding"] ||
-        (incoming.headers["content-length"] &&
-          incoming.headers["content-length"] !== "0")
-      )
-        throw new Error("browser_invalid_input");
-      const token =
-        /^Bearer ([A-Za-z0-9._-]+)$/.exec(
-          incoming.headers.authorization ?? "",
-        )?.[1] ?? "";
-      const response = await runner.read(
-        token,
-        path[1],
-        incoming.method as "GET" | "POST" | "DELETE",
-        Boolean(path[2]),
-      );
-      outgoing.writeHead(response.status, Object.fromEntries(response.headers));
-      outgoing.end(Buffer.from(await response.arrayBuffer()));
-    } catch {
-      outgoing.writeHead(403, {
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      });
-      outgoing.end();
-    }
-  });
-  server.requestTimeout = 20000;
-  server.headersTimeout = 5000;
-  server.maxRequestsPerSocket = 20;
+  const server = createApplicationBrowserServer(runner);
   server.listen(3330, "127.0.0.1");
   let sweeping = false;
   const sweep = setInterval(async () => {

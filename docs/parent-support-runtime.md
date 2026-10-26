@@ -51,6 +51,8 @@ Email uses fixed generic copy and a sign-in link, with no program, benefit statu
 | `npm run parent:test` | Parent policy, service, parser boundaries, runtime ports, UI and API regression cases |
 | `npm run parent:test:db` | Isolated real PostgreSQL/Supabase database authorization checks when the local stack exists; inspect the script’s target guard |
 | `CASELINK_SUPABASE_CLI=/absolute/path/to/supabase npm run parent:test:auth` | Actual local browser, Auth, test-email, Data API and private Storage checks; requires the migrated isolated stack, bounded synthetic processing approval and actual-local-services build |
+| `CASELINK_SUPABASE_CLI=/absolute/path/to/supabase npm run parent:test:browser` | Actual isolated Auth/RLS/private-browser HTTP checks on an ephemeral loopback port, with exact synthetic fixture cleanup and local-control restoration; does not restart the current preview or launch Chromium |
+| `CASELINK_SUPABASE_CLI=/absolute/path/to/supabase CASELINK_SNAP_READINESS_APPROVED=1 npm run parent:test:browser` | Adds one real public COMPASS navigation through the actual authenticated private service; proves masked frame delivery and a confirmed stop boundary, never applicant entry, CAPTCHA solving or filing |
 | `npm run parent:test:parser` | Actual isolated Docker PDF/image/OCR and malformed-file checks; builds no image and makes no model calls |
 | `CASELINK_PARENT_SQL_FIXTURE_MODULE=/absolute/path/to/pglite/dist/index.js npm run parent:test:db` | Embedded PostgreSQL serial migration/RLS/RPC tests; **not** real Auth/Storage or concurrent connections |
 | `npm run parent:test:pdf` | Synthetic summary/packet/form fidelity, page bounds and rendered images; provide `CASELINK_PYTHON_BIN` for Python with bundled `pypdfium2` |
