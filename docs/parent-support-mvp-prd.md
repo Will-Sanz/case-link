@@ -1,394 +1,384 @@
 # CaseLink parent support MVP PRD
 
-**Decision date:** October 25, 2026 (America/New_York)
-**Status:** Current product requirements; implementation pending
-**Primary user:** An adult parent or caregiver seeking support for their own household
-**Initial service area:** Philadelphia, subject to verified partner coverage
+**Decision/revision date:** October 25, 2026 (America/New_York)
+**Status:** Current requirements; implementation pending; autonomy and family-ready scope revision
+**Primary user:** An adult parent or caregiver seeking food support and utility assistance for their household
+**Initial service area:** Philadelphia, with program-specific coverage verified before launch
 **Companion:** [Phased implementation plan](parent-support-implementation-plan.md)
 
-This PRD supersedes the school case-manager product scope in `intervention-planning-prd.md`, `v1-service-definition.md`, and `product-redesign-plan.md`. Those documents and the school release evidence remain historical references. This document specifies the intended parent product; it does not claim that parent accounts, document uploads, agent tools, referrals, or background follow-up are implemented or approved for live use.
+This PRD supersedes earlier school-product requirements and the earlier preparation-first parent draft. The latest product-owner direction is to maximize useful AI independence from one informed start, involve people only when necessary, and deliver a polished product families can use across both support areas. The earlier one-benefits-path/one-utility-path restriction is an internal delivery slice, not the finished release scope.
 
-The case-manager baseline is preserved on `codex/case-manager-baseline-2026-10-25`, commit `700bb46`. Parent-product work starts from that baseline on `main`. Documentation changes do not deploy the product, change hosted permissions, migrate family records, or authorize contact with a partner.
+These are requirements, not implemented capabilities or provider permissions. The existing code remains the staff-oriented application. Documentation does not enable real parent processing, contact partners, submit applications, or deploy changes. The school baseline remains on `codex/case-manager-baseline-2026-10-25` at `700bb46`; parent work proceeds on `main` without moving school records into parent ownership.
 
-## 1. Product decision and promise
+## 1. Product promise and definition of independence
 
-CaseLink helps parents access **food support and utility assistance** through a short intake, AI preparation, a reviewed handoff, and continued follow-up. The parent is the account owner and decision-maker. Partners help deliver services and complete agency processes.
+> Tell us what your family needs. Let CaseLink find the best available support, handle the work it can, and keep you informed until there is an outcome.
 
-> Tell us what your family needs. We will find the right support, prepare your request, and help you through the next steps.
+After verified account setup and minimum intake, **one informed Start getting support action authorizes a bounded service**, including permitted research, document interpretation, program selection, preparation, sharing, submissions, scheduling, status checks, follow-up and alternative routes. A family can inspect the work and change preferences without having to approve every routine step.
 
-The desired experience is **enter information once → click Find my support → AI prepares → confirm facts and sharing → supported handoff → follow-up → recorded outcome**. Parents should not have to manage agents, write prompts, interpret a resource directory, or supervise routine research.
+The default journey is **describe the need / add available documents → authorize CaseLink → AI chooses and pursues supported routes → receive useful updates → participate only at a real decision or required personal step → record the outcome**. One click is the start of coordinated work, not a promise of instant agency approval or zero required participation.
 
-The system handles the coordination it can reliably execute. Parents still complete required identity checks, signatures, interviews, and appointments. Agencies determine eligibility and awards. CaseLink must describe the exact next action and must not promise benefits, available funding, uninterrupted utilities, or application submission without evidence.
+An agent makes routine judgment calls from evidence and the parent's stated preferences. It can prioritize urgent work, choose among compatible programs, resolve consistent document facts, select an authorized partner, assemble a packet, execute an allowed action, respond with already authorized information, follow up, and change course after a failed route. It must not guess personal facts, conceal uncertainty, make an agency eligibility decision, or promise funding or service restoration.
 
-### Confirmed decisions and remaining assumptions
+A necessary human step is specific: the agent prepares everything else, explains why that person is needed, asks for the minimum action, and resumes automatically afterward. A human partner's legally required service role is distinct from a CaseLink operator manually doing routine work that should have been automated.
 
-| Item | Decision or evidence | Remaining work |
+### Confirmed decisions and planning assumptions
+
+| Item | Current direction | Remaining evidence |
 | --- | --- | --- |
-| Product scope | Food support and utility assistance, directly for parents | Validate the experience with families |
-| Existing resources | The product owner confirmed on October 25 that resources listed in the project are partners | Agree each launch program's intake route, accepted information, coverage, capacity checks, and update process |
-| AI driver | GPT-6.1 Sol, model ID `gpt-6.1-sol`; already the local default | Verify the deployed API project's access, configuration, cost, latency, and task quality |
-| Geography | Philadelphia is the initial planning assumption, consistent with the supplied catalog and existing directory | Confirm supported ZIP codes per program before recruitment |
-| Identity | Proposed MVP default: verified email code with a resumable account | Test email access with parents in Phase 0; if phone-first identity is required, select and verify that method before implementation; do not build two auth systems speculatively |
-| Language | English and professionally reviewed Spanish core journeys are the proposed initial coverage | Confirm partner language support and translation reviewer before advertising either language |
-| Revenue | Parents are the primary users | Pricing, sponsorship, and payer are unvalidated; payment is outside this MVP |
+| Product | Direct-to-parent food support and utility assistance with maximum useful autonomy and a polished family-ready release | Parent usability, service completion and autonomy measurements |
+| Partner network | The owner confirmed existing listed resources are partners | Per-program permissions, capacity uncertainty, transport and update contracts; partnership is not integration access |
+| AI | GPT-6.1 Sol, `gpt-6.1-sol`, already the local default; Responses API for tools | Deployed access/settings, evaluations, latency and cost |
+| Geography | Philadelphia first | Exact program/ZIP coverage and honest unsupported-area recovery |
+| Identity | Proposed low-friction default: verified email code; test phone-first access with families | Select and support the actual launch channel(s), including recovery, before changing auth |
+| Language | Proposed English and reviewed Spanish experience | Test all advertised language content, notices, help and partner coverage |
+| Revenue | Parents are the users; sponsorship/payment model remains open | Pricing is separate from this service scope |
 
-The supplied Parent University catalog is discovery evidence about family needs, rather than proof of product demand or willingness to pay. The [October 15 directory review](verification/2026-10-15-resource-source-review.json) is dated evidence, not a current capacity check. It did not identify a dedicated immediate-food provider from the exported names/descriptions; the launch team must verify that route with the partner network.
+The Parent University catalog and [dated directory review](verification/2026-10-15-resource-source-review.json) inform discovery. Neither proves current capacity, demand or willingness to pay. Verify an actual immediate-food route; that earlier review did not identify a dedicated pantry from the exported names/descriptions.
 
-## 2. Goals, boundaries, and release definition (P-01)
+## 2. Finished scope and release definition (P-01, C-01)
 
-### Product goals
+### Goals
 
-1. Help a parent reach a useful, verified next action with minimal typing and reading.
-2. Reuse confirmed household facts across food and utility requests without asking twice.
-3. Prepare the correct handoff and carry it through acknowledgement, next steps, and an outcome.
-4. Make pending work resumable after closing the page, a network failure, or an agency delay.
-5. Preserve parent choice, factual accuracy, privacy, and clear responsibility throughout the journey.
-6. Measure completed actions and actual access to support, along with the human effort needed.
+1. Move from a family need to actual support or an honestly unresolved outcome with the least necessary family effort.
+2. Reuse supplied facts and documents across relevant programs while honoring purpose, recipient and data permissions.
+3. Let AI own routine coordination and supported execution, including follow-up and recovery; escalate genuine exceptions.
+4. Provide a calm, complete, accessible product with dependable account, document, communication and return-use experiences.
+5. Make autonomy, human intervention, service outcomes, errors and operating cost measurable by journey and route.
 
-### Required for the closed pilot
+### Required coverage of the finished product (C-01)
 
-- One adult account owns one household; a household can have separate food and utility requests.
-- A small, reviewed set of existing partner programs covers both journeys: one agreed food-benefits preparation/handoff path and one utility-assistance path must pass the launch rehearsal, alongside a verified immediate-food contact route. Detect other application/renewal/problem intents, but use a reviewed partner-assisted handoff until each additional automated path is verified.
-- Both journeys support minimum intake, AI preparation, parent review, a working handoff, evidence-based progress, recovery, and a recorded outcome or unresolved closure.
-- Utility bill/notice photos and supported PDFs can reduce typing, with manual entry available for every required field.
-- An operator exception queue and an agreed partner receipt/update process provide the human completion path. Build a minimal authenticated partner referral view only if the selected secure transport requires one; a separate partner portal is not a launch requirement when an approved existing route supplies the same controls and evidence.
-- Email account messages and opt-in support reminders use verified delivery infrastructure. SMS is a later addition unless Phase 0 establishes it as necessary for pilot access.
-- A parent can download a readable preparation summary; PDF is an optional supporting artifact, not the definition of success.
-- The verification and operational gates in Sections 16–18 are satisfied before real parent data or referrals are enabled.
-
-### Outside this MVP
-
-- Job applications, standalone budgeting, meal planning, parenting advice, attendance routines, test preparation, device repair, events, and school operations.
-- Rent assistance, housing search, eviction case management, clinical advice, or legal representation. Existing partners can receive an appropriate human escalation, with consent.
-- District analytics, a general case-management suite, multiple caregiver collaboration, child accounts, payments, or a public partner marketplace.
-- Universal browser automation, arbitrary blank-form detection/filling, autonomous signatures, or automatic government application submission.
-- Bank, EBT, or utility account credential storage; broad mailbox access; autonomous calls; unrestricted agent browsing or code execution.
-- Reusing school records as parent-owned data or giving existing school administrators access to parent households by default.
-
-### Pilot versus broader launch
-
-The closed pilot is a supported service for approximately 15–20 consenting households, with a named operator and controlled partner routes. Each journey must have at least five pilot requests before making a journey-specific adoption claim. External response times may exceed the recruitment period; continue follow-up through a known outcome or explicitly unresolved closure.
-
-Broader self-service launch requires the pilot review, acceptable support burden, dependable partner acknowledgement, approved data handling, and the release evidence. A working prototype or passing build is not that evidence.
-
-## 3. Users, ownership, and access (P-02)
-
-| Actor | Permitted work | Access boundary |
+| Need | Family journeys that must work | Completion contract |
 | --- | --- | --- |
-| Parent/caregiver | Maintain their household; start requests; confirm extracted facts; approve sharing; receive updates; cancel and request deletion | Their household and its requests only |
-| Partner worker | View a consented referral packet; acknowledge receipt; request information; record disposition | Specifically assigned referrals and approved fields; no general household, school, or unrelated partner access |
-| Service operator | Resolve failed work, arrange human handoffs, maintain program records, support parents | Operational metadata by default; documented, time-limited, audited access to necessary content when support requires it |
-| Platform administrator | Manage service configuration and role assignment | Administration does not imply routine access to household documents or narrative |
-| AI coordinator/tools | Prepare or execute permitted work for the request | Server-scoped household/request context; the model cannot select another household or grant itself access |
+| Immediate food | Need food now/soon; practical pickup, travel, language and delivery constraints | Find verified options; arrange supported referral/pickup/contact; follow through to access or a staffed alternative |
+| SNAP | New application, renewal, pending/missing information, routine existing-benefit notices/problems | Understand the intent; prepare and execute permitted steps; track interview/document requirements and outcome; qualified assistance for contested rights/eligibility |
+| WIC | Relevant new enrollment, continuing/renewal support, appointment and document coordination | Prepare/request/book when permitted; support required specialist participation; distinguish appointment request from enrollment and receipt |
+| Electricity | Bill affordability, arrears, assistance applications, threatened shutoff and disconnection | Supported provider/program routes, required evidence, permitted application/status work, urgent provider/partner assistance and verified account outcome |
+| Gas | Bill affordability, arrears, seasonal assistance, threatened shutoff and disconnection | Provider-specific grants/affordability routes and the same complete follow-through contract |
+| Water | Bill affordability, hardship/assistance application, threatened shutoff and disconnection | Correct water programs and submission routes; document/status assistance and account outcome |
+| Combined needs | Food and one or more utility issues | Shared facts, compatible parallel work, separate approvals where required, independent outcomes, one understandable family view |
 
-Use server-controlled membership and role records. Never authorize from user-editable metadata. All reads, mutations, uploads, callbacks, exports, and worker actions enforce the same household/referral boundaries. A worker's privileged infrastructure credential is not blanket authority to read every household.
+Create a capability matrix for the actual programs/providers in this coverage: automated actions, required personal steps, partner role, source/permission evidence, status channel and fallback. Families must have a real completion route for every advertised journey; some steps are legitimately provider- or parent-assisted. Do not call every action autonomous, or treat a link/referral as the finished service. A specialty dispute may need a qualified person while AI continues permitted preparation and coordination.
 
-Single-parent ownership is the initial model. Recovery must not reveal whether an unrelated household exists. Parent accounts cannot use legacy staff invitations, administrator privileges, school assignment RPCs, or password-only session assumptions as shortcuts to authorization. Interactive operations require a current authenticated session. Background work uses a stored, scoped service authorization rather than the parent's browser token, and rechecks account status, ownership, cancellation, and relevant consent before resuming or sharing. Signing out does not cancel saved work; stopping work, revoking consent, account deletion, or disabling the account does.
+Select programs from the existing network by verified fit and practical coverage, rather than an arbitrary count. Complete broad service coverage through reusable tools and supported channels; do not require a bespoke API for every organization. An early vertical slice can cover one route while remaining internal. It cannot be presented as the finished family-ready product.
 
-## 4. Parent experience and intake (P-03)
+### Product boundaries
 
-### Public entry and first use
+Food support and utility assistance remain the two product domains. Employment, standalone budgeting/meal planning, rent/housing search, school operations, clinical diagnosis, legal representation, payment processing, child accounts and district analytics are outside this release. Existing qualified partners can handle an appropriate escalation with permitted sharing.
 
-The public page explains the two supported needs, geography, AI involvement, parent control, and how to reach human help. The dominant action is **Get support**. Parents can view verified urgent contacts without creating an account. Do not store sensitive guest intake in browser persistence.
+Known-form completion, permitted application submission and tested browser assistance are in the product scope where an enabled route supports them. Unrestricted browsing, bypassing provider controls, signing as the parent, impersonation, unsupported claims of representative authority, and financial commitments without specific approval are prohibited. Agencies and authorized specialists retain their own decisions and required roles.
 
-The authenticated product has three primary surfaces:
+### Release versus pilot
 
-1. **Get support:** choose Food, Utilities, or both and complete a short adaptive intake.
-2. **My support:** current requests, honest status, and the next action; no analytics dashboard or caseload list.
-3. **Request detail:** prepared options, review, shared information, activity, documents, and outcome, shown as needed.
+The finished release includes all family-facing essentials and C-01 coverage, not just preparation or handoff. Use a closed 15–20-household supported pilot to learn and verify readiness; it does not shrink the finished scope. Each advertised capability needs relevant synthetic/partner rehearsals and representative pilot evidence. Small samples cannot establish universal outcomes or rare-event safety. Broader launch requires the complete coverage/readiness gates and an explicit release decision.
 
-**My household** is a secondary settings surface for confirmed facts, safe contact preferences, consent, and deletion. A partner receives only the approved referral through its agreed route; when CaseLink hosts a referral view, it is limited to the assigned packet. An operator sees an exception queue with age, urgency, owner, and next follow-up.
+## 3. People, ownership and service authority (P-02)
 
-### Intake requirements
-
-| Information | When requested | Rule |
+| Actor | Responsibility | Access boundary |
 | --- | --- | --- |
-| Need and urgency | First screen | Food today, upcoming need, shutoff notice, already disconnected, or ordinary bill help; missing detail does not hide urgent contacts |
-| ZIP code and language | Common intake | Explain geography use; unsupported areas get an honest handoff |
-| Household size and relevant age bands | When a program needs them | Avoid collecting children's names or full birth dates for initial matching |
-| Approximate income and frequency | When it changes the route | Allow Not sure; separate an estimate from verified application information |
-| Existing benefits or active applications | Food flow | Distinguish new application, renewal, missing information, and existing-benefit problems |
-| Utility provider, bill/notice, and account-holder relationship | Utility flow | A photo can supply suggested values; manual entry and Not in my name remain valid paths |
-| Contact and safe reminder preference | Account/save or handoff | Verify destination; sharing a phone or email requires a safe-message choice |
-| Exact identity/application fields | Only for a selected supported handoff | Explain purpose and recipient; collect the minimum approved fields at that point |
+| Parent/caregiver | State needs/preferences, grant or limit the service mandate, supply indispensable facts and complete required personal acts | Own household, requests, mandate and activity; correct, pause, resume and delete |
+| AI coordinator and tools | Make supported routine judgments, execute within the mandate, verify outcomes, resolve recoverable blockers and coordinate exceptions | Request-scoped server authority; cannot grant its own permissions or use unrelated household data |
+| Partner worker | Deliver or assist with the program; provide genuine receipt/status/decision evidence | Assigned purpose and permitted packet fields through the agreed route |
+| Service operator | Resolve genuine execution exceptions and provide owned support | Metadata by default; necessary content access is scoped, time-limited and audited |
+| Platform administrator | Configure service and trusted memberships | No routine household-content access merely from an administrative title |
 
-Show one small group of questions at a time, save authenticated changes, and preserve work on retry. Reuse previously confirmed facts with a visible edit option. Do not require every potentially useful intake field before showing a route: ask a question only when it changes the recommendation or the next supported action, and collect exact handoff fields after route selection. If both needs are selected, create linked but independently progressing food and utility requests from shared intake.
+Authorize through server-controlled records, not editable metadata. Enforce household/referral boundaries on web actions, storage, exports, worker tools and updates. Parent identities must not inherit school staff/RPC access; school administrators must not inherit parent households. Account ownership alone does not authorize acting for another adult, an unrelated account holder or everyone living at the address. Establish the caregiver/account-holder relationship and any route-required representative permission using the least-friction evidence that route accepts; do not collect or share another person's sensitive information without the required authority.
 
-The primary button **Find my support** starts a saved job. A repeated click returns the existing active job for the same request/revision. Show real stages such as Checking requirements or Preparing your request; do not animate fictitious completion percentages. Closing the page does not cancel saved work. The parent can explicitly stop further work.
+Interactive actions require an authenticated current session. Background work uses a bounded service grant rather than a parent browser/refresh token, and checks active account/membership, purpose, mandate, cancellation and applicable action approval at execution. Closing the page, ordinary sign-out or session expiry does not cancel granted work. Explicit stop, consent withdrawal, account deletion/offboarding, a security hold or grant expiry prevents further affected actions. Stopping one request does not silently stop or authorize unrelated work.
 
-## 5. Food support journeys (F-01, F-02)
+## 4. End-to-end parent experience (P-03)
 
-### F-01: Immediate food access
+### Entry and intake
 
-1. Identify urgency and practical constraints, including travel, pickup times, language, and delivery needs where relevant.
-2. Show a small number of reviewed partner options with their actual service area, contact route, requirements, and verification date.
-3. Clearly distinguish published hours from confirmed current availability. Unknown capacity remains unknown.
-4. Offer the supported next action: call, request a callback, prepare a referral, or arrange a verified pickup through an agreed tool.
-5. Track whether the parent contacted the service, received an acknowledgement, and accessed food. Provide another reviewed route or human assistance after a failed route.
+The public experience accurately explains the service, geography, AI role, control and human help. Verified urgent contacts are available without account creation or waiting for generation. Get support is the primary action. Sensitive guest intake is not persisted in the browser.
 
-Urgent access is independent of benefits preparation. Do not delay showing help while generating a plan, collecting optional documents, or waiting for an AI answer. If no current food provider is confirmed, say so and present the verified human assistance route; do not invent an available pantry, pickup slot, or delivery.
+Account setup and recovery must fit the actual families' access patterns. The minimum intake asks only what changes the next action: need/urgency, ZIP/language, relevant household size/age bands, approximate income/frequency, current assistance/applications and utility provider/account context. Allow Not sure. Optional document capture can replace typing. Exact application fields are collected only for a relevant purpose. Do not require invented goals or parent-selected task dates.
 
-### F-02: Benefits preparation and follow-up
+Reuse parent-supplied and validated facts while they remain applicable. Track source, relevant household/person/account, effective period and last confirmation; stale income, household circumstances or old bill balances cannot silently become current application facts. Ask a missing question only after checking permitted existing information and sources; ask once and reuse the answer within its valid context. For both needs, maintain separate requests/outcomes under one household view. Verified immediate help remains available while jobs run.
 
-Phase 0 selects the first automated benefits path with the launch partner, such as preparation for a new SNAP application. The journey below is the common contract; renewal, pending-information, existing-benefit, and WIC paths may initially use partner-assisted preparation and follow-up. Do not advertise a specialized application connector or automated renewal until that exact path passes its rehearsal and tests.
+### The informed start
 
-1. Determine whether the parent wants to apply, renew, complete a pending request, or resolve an existing-benefit problem.
-2. Identify potentially relevant SNAP/WIC routes using maintained program facts. Explain relevance without deciding eligibility or rejecting a parent based on incomplete answers.
-3. Keep the official apply option available; a preparation checklist must not become a gate that delays starting a SNAP application.
-4. Assemble confirmed information, a source-backed preparation checklist, missing questions, and an understandable next step.
-5. After review, send an agreed partner referral or hand the parent to the official process. Preserve the return path and their preparation summary.
-6. Support required interviews/appointments and additional-information requests with reminders, explanations, and partner assistance.
-7. Record submission evidence, agency decisions, and benefit access separately. If the route fails, explain the known reason and prepare a reviewed alternative or human handoff.
+Before Start getting support, use non-sensitive routing checks to show a short plain-language authorization summary, expandable detail and editable choices: needs pursued, individually named potentially relevant recipients/programs, data/documents allowed, types of actions, timing/preferences, duration and limits. Listing a program does not establish eligibility. Name the proposed recipients without making families choose the technical route or read the entire directory; AI selects among the authorized options. No hidden prechecked permission to share with unknown organizations. A parent may select preparation-only or narrower sharing, with an honest explanation of additional steps; the primary experience is the complete authorized service.
 
-A WIC pre-application/request for an appointment is not an approved WIC enrollment. A referral to a benefits navigator is not a submitted SNAP application. Do not treat an existing SNAP application as a reason to start another one automatically.
+The same start action records the displayed mandate/version and starts saved work; do not add a redundant confirmation screen. Obtain understandable document-processing permission before the first upload/AI extraction, including when it helps fill intake before the service starts. Preparation may precede the service mandate only within that separate processing permission, with no program submission, partner sharing or other service side effect. Test that families understand what the start permits, where information can go, when they will be asked and how to stop it; fix comprehension problems in the explanation rather than adding routine approval clicks. Show actual milestones such as Checking options, Preparing applications, Request sent or Waiting for a response. Do not fabricate percentages or imply an external action completed because a model finished writing. Parents can leave; useful updates and jobs continue within their authorization.
 
-## 6. Utility assistance journeys (U-01, U-02)
+### Returning and exception experience
 
-### U-01: Understand the bill and urgency
+Primary surfaces are **Get support**, **My support**, and **Request detail**. Household settings contain facts, safe contact preferences, authorization, documents and privacy controls. The family sees what AI has done, what is underway, any expected next contact and the next accountable actor. Detailed sources/activity are available without dominating the default screen.
 
-The parent selects a provider or uploads a bill/notice. Extract only the allowed fields: provider, relevant account reference, service address when needed, balance, bill date, due date, shutoff date, and account-holder relationship. Retain where each value came from and whether the parent confirmed it. Display masked account references after confirmation.
+A necessary-action card states the reason, why AI could not complete it, exactly what is needed, any actual deadline and one clear action. The agent pre-fills supported information and resumes afterward. Examples: supply one missing income fact, enter a one-time login code directly, sign an agency declaration, or choose between options with a real financial tradeoff. Do not send a parent into a generic chat to discover what is missing.
 
-The parent must confirm amounts, dates, provider, and any intended identity fields before they enter an external packet. Ask the parent about account-holder relationship when it is not explicit; do not infer a relationship from a name match. Unreadable text, multiple amounts, ambiguous dates, an absent shutoff date, or conflicting pages generate a targeted question; the model must not choose silently. A due date is not a shutoff date. No-income and variable-income cases have explicit paths.
+An unsupported channel still gets owned coordination and a useful recovery path. Human help is available by choice at any point. Lack of response is shown honestly and triggers authorized follow-up; the request does not vanish or auto-complete.
 
-Already disconnected, imminent shutoff, or a safety/medical concern immediately exposes verified provider/human help alongside preparation. An application or referral must never be described as stopping shutoff without applicable provider evidence. Account not in the parent's name, unsupported providers, and disputed bills route to partner review rather than a fabricated application.
+## 5. Food journeys (F-01, F-02)
 
-### U-02: Prepare and pursue assistance
+### F-01: Immediate food
 
-Use provider-specific programs and approved partner routes. Phase 0 selects the first rehearsed utility path, such as UESF utility assistance or the existing water-assistance route. Additional providers/programs remain a reviewed human handoff until their own path is verified. Do not conflate the directory's water Customer Assistance Program with PECO CAP or another similarly named program.
+AI prioritizes urgent need, checks verified hours/access requirements and practical constraints, chooses useful available routes, and arranges permitted contact, referral, pickup or delivery where supported. It may try another authorized option after a closed/unresponsive route without asking the parent to restart. Published hours, current capacity and a confirmed reservation are distinct facts. Missing capacity is Unknown, not available or closed.
 
-Prepare the relevant information and checklist, obtain review/consent, complete the supported partner handoff or official parent-led application, and track acknowledgement and subsequent requests. Check for an existing active application where the program requires one application per household. Avoid accepting payment arrangements, changing service, or making financial commitments on the parent's behalf.
+Show urgent verified contacts immediately. Do not postpone food access behind benefits paperwork, optional uploads or account setup. Track actual contact, acknowledgement, arrangements and food accessed. Where an urgent need cannot be met through reliable tools, alert the owned partner/service exception and keep the family informed; never imply unattended queues are staffed around the clock.
 
-Record whether assistance was granted, an account action was confirmed, service was restored, the request was declined, or the outcome remains unknown. These are distinct outcomes; the model cannot infer them from a sent message or elapsed time.
+### F-02: SNAP/WIC and continuing assistance
 
-## 7. Partner programs and source evidence (R-01)
+AI distinguishes new enrollment, renewal, missing information, pending status and routine existing-benefit problems. It evaluates apparent program fit using current facts, chooses compatible routes within preferences, prepares known forms and documents, executes permitted submissions or partner assistance, tracks required interviews/appointments, answers routine information requests with authorized facts, and follows through to an attributed decision and receipt of support.
 
-An organization can be a confirmed partner while a particular program's live capacity or digital handoff remains unverified. Preserve that distinction. The existing directory is the starting partner network, not an automatic claim that every listed program fits both needs.
+Support SNAP and relevant WIC journeys in the coverage matrix. Maintain program-specific requirements; WIC specialist participation is not replaced by an AI assessment. Do not invent eligibility, reject a parent from incomplete facts, restart an existing application automatically, or describe a WIC appointment request as approved enrollment. Resolve routine problems autonomously when facts and policy permit; disputed eligibility, appeals or legally consequential interpretation goes to qualified assistance with preparation already completed.
 
-Each enabled launch pathway requires a program record with:
+The official application option stays accessible. Preparation/checklists never delay the ability to start an application. When a provider requires a parent signature/attestation, identity step or interview, pause that part, prepare it, and continue independent authorized work. Submission is automatic only when the provider's channel, delegation and required personal acts allow it and server policy verifies the mandate.
 
-- Stable program and organization identity; service type and geography; provider-specific identifiers.
-- Maintained eligibility guidance, required documents, application methods, languages, accessibility, operating hours, and urgency route, including explicit unknown values.
-- Official source URL/document, effective date when available, fact-level last-reviewed date, reviewer, and version.
-- Agreed partner recipient/transport, accepted fields/documents, permitted purpose, acknowledgement method, and update/escalation process.
-- Named internal owner and partner contact stored in a restricted operational location.
-- Capacity/funding status and its evidence, or Unknown; a website being reachable is not capacity evidence.
-- Whether the route is enabled for research, preparation, referral, or application assistance. Disable external execution independently of directory visibility.
+## 6. Utility journeys (U-01, U-02)
 
-Program rules and handoff instructions are reviewed before pilot activation and after a source change or partner report. Proposed operating targets: weekly review of launch instructions and hours; recheck urgent contact/hours within 24 hours before representing them as recently checked. These checks do not assert live stock, funding, or appointments. An unavailable source or overdue review must produce an honest uncertainty state and human route.
+### U-01: Read the bill, understand urgency and reuse facts
 
-AI may research approved official domains and propose record updates. A named resource owner reviews material changes before they alter external-action behavior. Search queries contain only non-identifying routing context. Never send parent names, account numbers, private bill text, or contact details to public search.
+Accept manual input and supported bills/notices. Extract provider, allowed account reference, address where required, amount components, bill/due/shutoff dates and relevant context with field provenance. Match the account to authorized household information; do not infer an account-holder relationship solely from a name match.
 
-## 8. Agent behavior and authority (A-01, A-02)
+The system can use unambiguous source-backed facts that pass semantic/cross-field checks within the mandate; it need not ask the parent to retype or approve each value. A model's self-reported confidence alone is insufficient. Resolve consistent facts using authoritative sources and preserved parent corrections. Calculations use tested deterministic rules with explicit units, income frequency and applicable period; a document total cannot be substituted for a different requested amount. Ask only when consequential facts conflict, evidence is unreadable/unavailable, a personal assertion is indispensable or a route requires confirmation. Show an editable summary of important facts without making routine review a mandatory stop.
 
-### A-01: One coordinator with two playbooks
+A due date is not a shutoff date. Distinguish total balance from amount due and ambiguous date formats. No-income, variable-income, third-party account-holder and shared-household cases require explicit supported handling rather than a silent rejection. Immediate safety/medical concerns or disconnection expose the verified provider/emergency/qualified-human route at once while permitted preparation continues.
 
-Use GPT-6.1 Sol (`gpt-6.1-sol`) through the Responses API as the initial coordinator. Start with medium reasoning effort and evaluate cost, latency, and usefulness on this workload. Preserve the requested model; any later model change requires a recorded evaluation and release decision.
+### U-02: Pursue help across electricity, gas and water
 
-The current app already has model routing, schema validation, usage limits, privacy checks, and source grounding. Reuse those protections while introducing the tool-capable execution path. One coordinator loads the food or utility playbook and calls narrowly defined tools. The MVP does not require independently deployed agents or a general agent platform.
+AI identifies provider-specific affordability, arrears, crisis/grant and seasonal options, checks active applications and compatibility, selects the best supported route(s), prepares known forms, sends allowed applications/referrals, supplies authorized missing documents, monitors available status and adapts after failure. Use the existing partner network and verified PECO/electricity, PGW/gas and Philadelphia water pathways needed by C-01; do not conflate water CAP with PECO CAP.
 
-| Tool capability | Automatic work | Required boundary |
+Parallel work is allowed where compatible and authorized. Prevent duplicate applications per the actual program rules and avoid uncontrolled mass outreach. Parent preferences, attempts and recipient limits constrain route changes. Account disputes, representation requirements or unsafe uncertainty receive a qualified owned exception; ordinary provider lookup, paperwork and follow-up remain AI work.
+
+An application is not proof of a shutoff hold. Confirm account actions, grant decisions, payment application and restored service separately. AI may explain/compare a payment arrangement, but a binding repayment plan, fee, service change or other financial obligation needs specific informed parent approval. No autonomous payment or promise to pay is included in the standing mandate.
+
+## 7. Program capabilities, permissions and fresh evidence (R-01)
+
+Every advertised program has stable organization/program/provider identity, service area, relevant rules/documents/languages/accessibility, official sources/effective dates, verification owner/date/version, and known uncertainty. Partner membership, public website accessibility, eligibility guidance, live capacity and automation permission are separate facts.
+
+Record capabilities at action level: research, preparation, referral, appointment request/booking, application submission, document supplementation, status retrieval, follow-up and outcome evidence. For each capability record the permitted channel, individually approved recipient, accepted fields/documents, authority/delegation evidence, required personal steps, status/receipt channel, limits and failure route. Modes include unattended permitted API/partner work, isolated browser-assisted work, prepared parent-required step and qualified partner action. An unavailable API does not automatically make the whole journey manual.
+
+AI can check official sources, detect changed requirements and propose new routes. It may refresh ordinary factual information under the validated source/change policy. Material changes to provider permissions, destination, mandatory data, personal legal acts or execution rules need service-owner verification before route enablement. A model cannot authorize a new domain or recipient by discovering it. New recipients outside the family's mandate require that family's consent.
+
+Proposed operating targets: review enabled instructions/hours weekly and after a reported/source change; recheck urgent contact details within 24 hours before calling them recently checked. Live funding, food stock and appointments require their own evidence. Overdue review or an unavailable source reduces certainty; AI tries an authorized verified alternative before escalating only the unresolved work.
+
+Public search queries contain routing information only, never private names, contacts, account numbers or raw documents. Private operational agreements and contacts remain outside public Git.
+
+## 8. Agent judgment, delegation and necessary intervention (A-01, A-02)
+
+### A-01: Sol owns routine judgment and follow-through
+
+Use `gpt-6.1-sol` through Responses for tool use. Start with medium reasoning effort and evaluate on complete journeys. Keep the server-side model routing, budgets, validation, safe errors, provenance and test harness. One coordinating agent with food and utility playbooks can call specialized research, document, execution and follow-up workers when that improves quality/latency. Add specialist agents by measured need; families never choose models or supervise delegation.
+
+| Decision or work | Default behavior | Escalation threshold |
 | --- | --- | --- |
-| Read household/request facts | Load the minimum permitted context | Server derives ownership from the live actor/request; ignore model-supplied ownership claims |
-| Search program records and official public sources | Find and explain relevant routes | Approved domains, source provenance, no private search queries |
-| Extract supported documents | Suggest allowed values from a consented upload | Restricted file processing; parent confirmation; missing fields remain unknown |
-| Prepare a packet or summary | Draft structured content and a readable review | Schema and semantic validation; preserve confirmed parent edits |
-| Save progress and arrange reminders | Record validated preparation; schedule consented messages | Scoped writes; version checks; contact consent and quiet hours |
-| Send a partner referral | Execute an already approved packet through an enabled route | Exact approval, current authority, destination verification, duplicate prevention, and durable receipt |
-| Read partner updates | Attach authenticated, scoped evidence and propose next steps | Verify actor/callback, referral scope, event uniqueness, and evidence strength |
-| Escalate | Prepare an exception for a named human | Share only approved information; present urgency immediately to the parent |
+| Prioritize urgent and compatible work | Choose sequence/parallelism from need, verified deadlines, program compatibility and preferences | Conflicting personal priorities or consequences outside the mandate |
+| Select programs and recipients | Rank by verified apparent fit, urgency, practical accessibility and effort; pursue authorized useful routes | Required recipient/purpose outside the mandate, unresolved decisive eligibility facts or competing financial commitments |
+| Interpret documents and reuse facts | Extract, reconcile consistent evidence, calculate validated values and retain provenance | Consequential ambiguity or a personal assertion that cannot be sourced |
+| Prepare forms/requests | Complete supported fields and attachments, validate requirements, preserve corrections | Unsupported required field, prohibited data or required personal attestation |
+| Execute submissions, referrals and scheduling | Use enabled provider-permitted channels within the mandate and stated availability/preferences | Provider-mandated personal act, identity/authentication, specific financial choice or out-of-scope action |
+| Handle notices and missing information | Interpret supported notice types; send already authorized facts/docs; set evidence-based reminders | Legal/clinical judgment, conflicting facts, sensitive new data or an irreversible decision |
+| Follow up and recover | Check real status, reconcile retries, adapt route, arrange permitted callbacks, continue to outcome | Unknown delivery that cannot safely reconcile, exhausted limits or a genuine specialist/safety need |
 
-Use structured outputs and tool schemas, bounded turns, request/tool budgets, and server validation. Calculate dates, parse supported fields, check ownership, and enforce consent using deterministic code. Independent public lookups can use asynchronous tools; the job runner remains responsible for execution and recovery. Never treat asynchronous model calls as a scheduler that survives for days.
+Record consequential decision basis: source/parent facts, options considered, selected action, applicable mandate/rule and result. Expose a plain-language activity summary, not internal chain-of-thought. Agent discretion is evidence-based; it cannot fabricate facts, decide official eligibility, redefine authorization, or interpret provider silence as a decision.
 
-Retrieved pages, uploaded documents, and partner prose are untrusted data. They cannot grant permissions, change recipients, override instructions, request secrets, or authorize additional tools. Tool errors remain visible; a failed AI call must not become a fabricated successful result or an invented generic referral.
+Use schemas and semantic checks at the tool boundary. Ordinary code enforces permission, purpose, destinations, dates, amounts, budgets, duplication and state/evidence rules. Async independent tools reduce waiting; durable execution owns long-term work. An automated policy check can allow an authorized action; no second human or model approval loop is mandatory for every call. Retrieved pages, documents and partner prose are untrusted data and cannot change instructions or tool authority.
 
-### A-02: Parent review and external action
+### A-02: One informed, bounded, revocable service mandate
 
-The first button authorizes research and preparation within the stated data-processing consent. It is not blanket permission to share information with partners.
+The parent's start authorization is a standing mandate, with a narrow preparation-only option if they prefer. Record household/request(s), purpose, individually named recipients/program set, permitted action types, exact data categories and allowed document uses, booking/contact preferences, disclosure/attempt limits, validity/expiry and revocation method. Explain clearly that the service can send permitted information and complete permitted applications; do not disguise sharing consent as a preparation button. Set concrete limits in Phase 0 and show them to the parent. The mandate never includes unknown future recipients, arbitrary new purposes, signatures/impersonation or binding financial decisions.
 
-Before a referral, show the parent the recipient/program, purpose, exact fields and documents, confirmed facts, unknowns, and requested action in plain language. Bind approval to the parent, request, packet version/hash, recipient, purpose, action, and expiry. A material edit, different recipient, expired approval, revoked consent, or changed document invalidates approval. Read-only research and drafting do not need repeated confirmation.
+At each side effect the server evaluates the current mandate and provider permission against the exact operation, recipient, purpose, packet/version, data and available evidence. Within-scope packet changes, supplementation, retries, follow-ups and authorized route changes proceed without a new parent approval. Keep immutable per-operation packets and authorization decisions for audit; one mandate may authorize multiple distinct valid operations, each with its own stable idempotency key. A separate action-specific approval can authorize an exception without silently broadening the entire mandate.
 
-The executor rechecks approval and live authority immediately before a side effect. Atomically bind approval to one logical external operation and its stable idempotency key; safe retries continue that operation rather than consuming another approval or creating another referral. A consumed approval cannot authorize a different operation. If delivery has an unknown outcome, reconcile the original attempt before retrying; if the transport cannot establish a safe retry, create a human exception rather than sending again. Cancellation/revocation stops queued work and future sharing; explain when an in-flight or previously delivered packet cannot be recalled.
+Pause only affected work for an indispensable missing/conflicting fact, expired/insufficient authority, a new recipient/purpose/data use beyond consent, required personal authentication/verification/attestation, or a meaningful financial/personal choice. First try permitted sources/tools and prepare all independent work. Batch related questions where useful. The family can always choose direct control or human assistance.
 
-Government submissions, signatures, required attestations, account authentication, and financial commitments remain parent-led in the MVP. An approved partner may assist through its own authorized process. Adding a specific submission connector later requires separate route verification and testing; the model's computer-use capability does not establish provider permission or integration access.
+Human or qualified-partner review is required for substantive disputed rights/eligibility or clinical assessment, unresolvable safety/identity concerns, or an operation whose permission/reliability cannot be established. Do not route every unfamiliar notice to an operator when its ordinary meaning and permitted next action can be established. A stop records the reason, evidence, intended resolver, prepared next step and resumption event.
 
-## 9. Durable execution, states, and evidence (W-01, W-02)
+Recheck authority immediately before execution, including resumed jobs. Revocation prevents queued/retried future actions; reconcile in-flight actions and explain delivered information cannot always be recalled. Unknown delivery is reconciled before retry; lack of a safe reconciliation path creates an owned exception rather than duplicate submission.
 
-### W-01: Work continues without an open browser
+## 9. Durable execution, events and outcomes (W-01, W-02)
 
-Persist a request before starting work. Use durable execution for research, preparation, waits, updates, bounded retries, and reminders. Save step results and stable identifiers, resume after crashes/deployments, and permit cancellation. Keep sensitive payloads in protected data storage rather than copying them into workflow histories, URLs, or traces.
+### W-01: Continue autonomously over time
 
-Use the existing Next.js/Supabase/Responses stack. Vercel Workflow is the preferred candidate for durable orchestration, subject to a synthetic integration and data-handling spike. Reuse direct Responses calls inside steps; do not add a second AI gateway, agent framework, or queue unless the spike proves it necessary. Record the runtime decision in Phase 0.
+Persist requests and mandates before dispatch. Research, documents, preparation, execution, waits, follow-up, cancellation, limits and recovery run without an open browser. Save bounded step results/opaque references; keep private content out of routine workflow histories and traces. Normal sign-out/session expiry is independent of the active service grant. Provider-required authenticated browser participation has its own explicit pause/handover.
 
-Each external operation has a stable idempotency key, bounded retry policy, timeout, and reconciliation path. Authenticate callbacks and reject replay. Source/packet version changes require replanning affected work, not silently replacing confirmed information. Concurrent parent edits and resumed jobs must detect stale revisions. A successful food request never closes an unrelated utility request.
+Retain Next.js/Supabase/Responses. Vercel Workflow remains the preferred durable-runtime candidate, subject to a synthetic integration/data-handling spike. Keep direct Responses calls where suitable; use an SDK or focused worker when it removes real orchestration/connector complexity. API background generation is not a weeks-long scheduler. Use bounded tool turns, cost/attempt limits, timeouts, per-route kill switches and reconciliation.
 
-Proposed request states: Draft, Working, Needs information, Ready for review, Waiting, Needs human help, Closed, Cancelled, and Recoverable failure. These are product states; final schema names may follow existing project conventions. State transitions require a valid actor and evidence. Pending time does not imply rejection or completion.
+Concurrent edits, source changes, multiple programs, callbacks and resumed jobs enforce version/current-authority rules. A consequential parent correction invalidates queued uses of the superseded fact; reconcile already executed work and prepare a permitted correction instead of silently overwriting submission history. Independent useful work continues when one route pauses. Respect parent corrections and no duplicate applications. Routine recovery tries another permitted strategy before escalating, without infinite retries or mass referrals. Automated status checks use actual supported endpoints/approved browser sessions; there is no invented polling API.
 
-### W-02: Distinguish progress events from service outcomes
+Request states include Draft, Working, Waiting, Action needed from parent, Specialist needed, Closed, Cancelled and Recoverable failure. Ready for review exists only when a specific review is actually required or parent-chosen. Every active/waiting request has a next actor, source-backed deadline or internal follow-up time and a trigger. Internal follow-up times are agent-selected scheduling choices, clearly separate from agency deadlines.
 
-| Event or outcome | Minimum evidence | Parent-facing meaning |
+### W-02: Evidence is the source of progress truth
+
+| Event/outcome | Evidence | Meaning |
 | --- | --- | --- |
-| Prepared | Validated saved packet | Ready to review; nothing has been sent |
-| Referral sent | Transport acknowledgement tied to the approved packet | Sent to the partner; acceptance is still unknown |
-| Partner received | Authenticated receipt acknowledgement or audited operator-confirmed receipt | The partner has received the packet; agreement to assist is still unknown |
-| Partner accepted | Explicit authenticated partner acceptance or audited operator-confirmed acceptance | Partner has agreed to assist; this is not an agency application or an award |
-| Agency application submitted | Agency confirmation or clearly attributed parent/partner report | An application was submitted; decision is pending |
-| More information needed | Attributed partner/agency request | Specific next action and known deadline |
-| Assistance approved | Attributed agency/partner decision or clearly labeled parent report | Assistance was approved; actual payment, food access, or service restoration is still unknown |
-| Support received | Attributed evidence or clearly labeled parent report of food/benefits accessed, payment applied, or service restored | The particular service outcome has occurred; preserve which outcome and when |
-| Declined/unresolved/withdrawn | Attributed reason or explicit parent/operator closure | Preserve the reason and offer an appropriate next route |
+| Prepared | Validated saved packet | Content exists; no external delivery implied |
+| Sent | Transport acknowledgement for exact operation | Channel accepted delivery; partner receipt/acceptance still separate |
+| Partner received | Authenticated receipt or attributed verified report | Packet received, not necessarily accepted for service |
+| Partner accepted | Explicit partner acceptance or attributed report | Agreed to assist; not an agency submission or award |
+| Application submitted | Agency receipt or clearly attributed parent/partner report | Submitted; decision pending |
+| More information/appointment needed | Attributed provider request/booking evidence | Actual next requirement/time, not a guessed deadline or appointment |
+| Assistance approved | Attributed agency/partner decision or labeled report | Approval; funds/food/restoration may still be pending |
+| Support received | Attributed payment, access, benefits use or restoration evidence/report | The particular service outcome occurred; preserve what and when |
+| Declined/unresolved/withdrawn | Attributed reason or explicit closure | Retain reason and pursue permitted alternative when appropriate |
 
-Maintain evidence origin, timestamp, verification status, and the affected request/referral. Display Parent reported when independent verification is absent. Distinguish a message sent from partner receipt, receipt from acceptance, approval from receipt of support, and each from closure. AI can explain or extract an update; it cannot manufacture authoritative evidence or promote a parent's estimate into an agency decision. Each started or waiting request has a named next-action owner and a follow-up date; reaching that date triggers a follow-up or exception, never an inferred decision. Drafts do not require a parent-entered deadline.
+Label Parent reported or Operator confirmed where independent verification is absent. AI can interpret evidence, not manufacture it. Outcome tracking is separate per program and need; one success never silently closes remaining food/utility work. Silence/elapsed time does not mean rejection, award or receipt. Unresolved closure requires recorded exhausted/unsafe routes or limits and an honest notice with an available re-entry/help path; a parent's silence alone does not resolve the need or close independent active programs.
 
-## 10. Documents and optional exports (D-01, E-01)
+## 10. Documents, forms and useful exports (D-01, E-01)
 
-Initial inputs: JPEG/PNG photos and readable PDFs of utility bills, notices, or agency responses. Proposed limits are 10 MB and five pages per document. These are implementation targets, not current capabilities; verify them in the processing spike and expose actual supported limits accurately.
+Support mobile camera/upload and manual input for bills, notices, benefit responses and required supporting documents within the approved data inventory. Initial technical target: JPEG/PNG and readable PDFs, 10 MB/five pages per document; confirm usable limits during implementation. Parent-visible capture quality guidance, rotation/crop support where useful, progress, retry and accessible alternatives are part of the finished product.
 
-Validate actual file type, size, page count, and encryption state on the server. Use private storage, malware/file-processing controls, isolated bounded rendering, and short-lived authorized downloads. Do not execute active content or embedded instructions. Reject unsupported/encrypted/corrupt files with a manual-entry route. Do not cache documents in service workers, localStorage, IndexedDB, analytics, or public URLs.
+Validate actual type/size/pages/encryption; isolate rendering and scan/process files safely. Do not execute embedded content. Reject unsafe/unsupported files without losing the request. Private storage, authorized short-lived download, request-level purpose and expiry apply; no public URL, analytics attachment, service-worker cache, localStorage or IndexedDB vault.
 
-Store extraction suggestions separately from parent-confirmed values. The parent can correct or discard a suggestion without losing their request. Raw files may include identifiers not needed for matching: isolate extraction, redact unnecessary values, and send only the approved minimum to subsequent reasoning tools. A separate consented provider-processing path is required before real uploads are enabled; do not remove the existing outbound identifier guard globally.
+Track original source, page/field reference, extracted value, applicable date/period, validation and parent correction separately. Clear validated facts can be used under the mandate without a mandatory review stop; consequential uncertain fields remain unresolved until sourced or answered. Sensitive fields required only by the agency use a protected direct-entry/provider path where supported, excluding them from model context and ordinary storage/logs. Do not collect passwords, EBT PINs or an indefinite identity-document vault. Document-specific consent/vendor controls must exist before real uploads; preserve legacy outbound identifier guards on school paths.
 
-The parent may preview/download a preparation summary or approved handoff packet. Reuse the current PDF renderer and revision checks after adapting the content. Export only the selected, reviewed information; exclude internal notes, hidden analysis, unrelated requests, and unapproved contacts. Material changes invalidate the previous preview/approval. Preserve readable black-and-white printing, Unicode/language handling, page breaks, and exact confirmed amounts/dates.
+Known forms and provider-supported online forms are in scope for AI completion. Use current versions, evidence-backed mappings and tested field/attachment validation; render/check generated forms before execution. Browser-based discovery can assist a supported route, but new untested form variants require controlled verification before external use. Never invent a signature, attestation, unsupported answer or hidden field value.
 
-No arbitrary uploaded blank-form mapping is required. A future known program template can be added only with a reviewed field map and source-to-field verification.
+Families can inspect/download a readable progress/preparation summary and relevant submitted packet/receipt. Use the same source data and immutable executed version; a separate AI summary must not change amounts, dates, recipient or commitments. Show draft/current/executed states honestly. Verify print, pagination, translated text, special characters and no internal/unrelated household content. A new packet inside the mandate needs fresh validation, not automatically another parent confirmation.
 
-## 11. Privacy, consent, and separation from school data (D-02)
+## 11. Privacy, consent and legacy isolation (D-02)
 
-Parent support requires a new data purpose and trust boundary. De-identified school-pilot permissions and notices are not a parent-data consent mechanism. Use a separate parent-production environment/database and synthetic staging unless a documented isolation design is explicitly selected and tested. Existing school records stay in the legacy environment; parents do not inherit them and school staff do not inherit parent access.
+The parent service has a new purpose and data boundary. Use separate parent production and synthetic staging by default; keep the school deployment/records isolated. Existing school approvals, staff roles and de-identified policy do not supply parent consent or authorize disabling guards.
 
-Collect only information required for an active step. No SSN, EBT PIN, account password, or identity-document vault is part of this MVP. Where an official application requires such information, the parent provides it directly to that approved process. If an uploaded bill/response accidentally contains prohibited values, mask/restrict them and follow the documented handling/deletion procedure rather than persisting them as general request context.
+The data inventory permits only fields/documents needed by a supported active action. Keep government identifiers and authentication secrets outside model context and ordinary request records; where a provider requires them, use direct parent entry or a separately reviewed secure delegated channel. Adding such a channel requires specific permission, threat-model/testing and retention controls; no generic credential collection is implied by one click.
 
-Consent is separate for account/service processing, document extraction by named processing vendors, partner-specific sharing, and optional notifications. Explain how AI is used, how to correct a result, who receives data, how long it is retained, and how to request deletion. Parents can use manual entry and human help if they decline optional extraction. Refusing reminders does not block service access.
+Explain account/service processing, AI/vendor document handling, the standing sharing/action mandate and optional notification permissions. The parent can inspect recipients/action/data limits, narrow or revoke the grant and request correction/deletion. Changes within the existing mandate proceed automatically; expanded scope requires new consent. Optional extraction/reminders can be declined without denying access to information or human help.
 
-### Proposed retention defaults for the parent service
+### Proposed retention defaults, to implement and verify before real data
 
-The privacy owner must approve and engineering must implement this schedule before real data is enabled. These are proposed parent-product defaults, not claims about existing provider settings.
-
-| Data class | Proposed limit | Required control |
+| Data | Proposed limit | Control |
 | --- | --- | --- |
-| Raw bill/notice uploads | Delete within 24 hours after confirmed extraction unless the selected route needs the original; unconfirmed uploads expire after 7 days | Automated cleanup and abandoned-upload cleanup. A needed original is explicitly designated for a parent-approved handoff, with a visible justified expiry; expiry invalidates any packet referencing it and triggers re-upload or manual recovery rather than sending a broken attachment |
-| Confirmed household facts, requests, and shared packets | Active service plus 90 days after closure, or earlier verified deletion request | Parent correction/deletion; specific legal holds only; avoid indefinite household profiles |
-| Consent, delivery, and security evidence | 365 days, minimized to necessary identifiers/hashes | Restricted access; exclude raw document/prose content; approved legal/privacy schedule |
-| Application/usage logs | 30 days | Metadata allowlist, redaction tests, no prompts, documents, authentication tokens, contact values, or complete provider responses; aggregate usage/token counts are permitted |
-| Backups | Expire within 30 days after source deletion | Restricted restore, deletion reapplication after restore, documented backup limits |
-| AI/vendor-held data | Contractually reviewed per feature | `store: false` does not establish zero provider retention; verify actual service retention and regional processing |
+| Raw uploads | Delete within 24 hours after validated extraction unless needed by an authorized active handoff; unprocessed uploads expire after 7 days | Purpose-specific visible expiry; retained original limited to actual handoff; recover an authorized copy or ask for re-upload if expiry blocks required work |
+| Household facts/requests/packets | Active service plus 90 days after closure, or earlier verified deletion | Correction/deletion, justified holds only, no indefinite profile |
+| Mandates/action authorizations/delivery/security evidence | 365 days, minimized identifiers/hashes | Restricted audit access, no raw prose/document copies in security events |
+| Application/usage logs | 30 days | Content-free allowlisted metadata; aggregate token/cost counts allowed; no secrets/private text/full provider responses |
+| Backups | Expire within 30 days of source deletion | Protected restore and reapplication of deletion/revocation |
+| AI/vendor data | Feature-specific contract/retention review | `store: false` does not establish zero retention; verify regions, hosted tools and tracing separately |
 
-Document access uses household/referral authorization on every download and short-lived links. Approval/consent and file lifecycles must be traceable. Account deletion stops jobs/reminders, revokes future partner access, removes eligible data, and explains separately retained minimal evidence or already delivered third-party copies.
+Account deletion stops jobs/messages, revokes future sharing/access and deletes eligible content, while clearly explaining minimal retained evidence and already delivered third-party copies. Expired/deleted attachments cannot be silently omitted or resurrected from unauthorized storage. A safe available copy within the mandate can be reused without unnecessary parent reapproval; changed facts/purpose or an out-of-scope document use requires the appropriate check.
 
-## 12. Partner handoff and human recovery (H-01)
+## 12. Supported execution and qualified help (H-01)
 
-Select one primary secure transport for the first partner routes. Prefer an existing approved API or secure partner workflow when it supports the required consent, recipient restriction, receipt, and updates. Otherwise use a minimal authenticated referral view plus a content-free notification, subject to partner agreement. Choose one implementation for the pilot rather than building alternatives in parallel. Do not invent APIs, assume email attachment acceptance, or build a full partner CRM.
+Prefer provider-permitted APIs, existing secure partner workflows and structured channels for independent execution. Add browser-assisted work for tested allowlisted domains/actions in isolated sessions when APIs do not cover the step. Record capability, permission, identity/attestation requirements, data handling, version limits, receipts and recovery per route; never assume a public portal grants automation permission.
 
-When CaseLink hosts the packet, a partner recipient authenticates and sees only the assigned packet. A notification link alone must not reveal household content. Support receipt acknowledgement, request information, accepted/declined, and outcome updates with reason and attribution through the selected route. Partner staff access must be revocable and updates auditable. A person at the service may record a verified phone response, with actor/time/source; that remains an operator-confirmed event. Automatic status polling is required only where the agreed transport supplies it; the pilot may use operator-confirmed partner updates with a documented follow-up owner and target.
+For browser work, preserve human involvement in authenticated, destructive, purchase or hard-to-reverse flows as required by tool/provider policy. The parent handles login/MFA/identity and personal declarations directly through a secure handover; keep credentials from the model. Supported filling/navigation and non-sensitive work can proceed within tested policy. A standing mandate is not a universal exemption from a required browser confirmation. Provider-authorized unattended API/partner execution is a different capability and can proceed within its verified delegation rules.
 
-Before activation, name an acknowledgement target, staffed hours, escalation owner, and fallback for each route. These are agreed operational targets, not AI-generated promises. If a partner does not respond, the system creates an owned exception and shows a truthful update. Urgent cases present the verified phone/human route immediately; they do not wait for an unstaffed queue or pretend to be monitored around the clock.
+Implement enough supported transports to deliver C-01, rather than arbitrarily forcing every partner into one portal. Reuse transports where possible. A minimal authenticated referral view is built when a partner workflow needs it; otherwise use the agreed secure channel. Content-free notifications alone never disclose household documents. Authenticated callbacks, allowed status retrieval or attributed partner responses provide updates. No fake integration is built to satisfy a hypothetical test.
 
-## 13. Notifications and returning use (N-01)
+AI requests status, asks authorized partners for missing requirements, supplies allowed data, schedules within stated preferences and changes to a compatible authorized route when needed. Legal/clinical/safety decisions and unresolvable execution problems get an owned qualified exception. Record staffed hours, acknowledgement/escalation targets and named resolver; no implied 24/7 human coverage. The parent is interrupted only if their action is required, while operators/partners handle their own responsibilities.
 
-Use a verified destination, explicit opt-in, safe preview preference, quiet hours, and opt-out. Account/security messages are separate from optional support reminders. Proposed reminder window: 9 a.m.–7 p.m. America/New_York; urgent behavior and any override require an explicit parent preference and operational review.
+## 13. Communication, notices and returning use (N-01)
 
-Messages say that a support update is available and link to authenticated content; they do not include benefit status, household income, bill amounts, documents, or account references in a lock-screen preview. Batch redundant reminders, suppress on cancellation/closure/consent withdrawal, and track delivery failures separately from partner or agency progress.
+Deliver complete account/security messages and opt-in support updates in advertised languages using the selected verified email/phone channels. Use safe preview preferences, quiet hours, batching, opt-out and actual delivery tracking. Proposed reminder window is 9 a.m.–7 p.m. America/New_York; any permitted urgent exception is explicit in preferences and operating policy.
 
-Following an official-site handoff, ask for confirmation or the resulting receipt; do not infer completion from opening a link. Returning parents see the next action and preserved progress. A deadline can come from a confirmed document or an explicitly chosen follow-up date; the AI cannot invent an agency deadline.
+AI can send routine permitted follow-ups to named partners, interpret supported responses, request status and respond with existing authorized facts. Family updates emphasize meaningful progress or a real necessary action, with calm waiting expectations. Do not ask for confirmation merely because a message was prepared or a route returned an ordinary answer.
+
+Private amounts, income, benefit status, account references and documents stay out of lock-screen previews. Notification failure is not a service outcome. After a parent-required external step, reconcile a real receipt/status through available allowed tools before asking the family to report completion. Opening a link never proves submission. Suppress affected messages/work after expiry, stop, withdrawal or closure.
 
 ## 14. Data and architecture outline
 
-Use the smallest schema that expresses the required boundaries. The following are logical records, not an instruction to create a separate table for every row. Reuse existing structures only where their ownership, purpose, and lifecycle fit.
+Use logical records with the smallest adequate schema; reuse only where purpose/ownership/lifecycle fit. Do not rename every legacy type or build a general agent platform as a prerequisite.
 
-| Logical record | Essential information |
+| Record | Essential data |
 | --- | --- |
-| Household/membership | Adult owner, confirmed minimal facts, verification/source dates, contact preferences |
-| Support request | Household, Food/Utilities, urgency, intake revision, current state, owner of next action, timestamps |
-| Program/route | Partner identity, verified facts/sources, rules version, accepted fields, enabled capabilities, contact/escalation configuration |
-| Prepared packet | Request, immutable version, confirmed facts, missing fields, selected route, source references, document references |
-| Consent/approval | Actor, purpose, exact recipient/action/packet version, expiry, revocation, bound logical operation |
-| Referral/operation | Approved packet, stable operation/idempotency key, attempts, receipt, acknowledgement, unresolved-delivery state |
-| Document/extraction | Private object reference, validated type, expiry, suggested and confirmed values, processing consent |
-| Job/event/outcome | Request-scoped work state, durable step IDs, attributed progress evidence, outcome and reason |
-| Notification/exception | Consent reference, destination reference, schedule, delivery state, escalation owner and resolution |
+| Household/membership | Adult owner, sourced facts, corrections, safe contact/preferences |
+| Support request | Needs, urgency, intent, state, next actor/trigger, independent program outcomes |
+| Program/capability | Sources/rules/version, provider/recipient, allowed actions/channels, delegation proof, required personal steps, status/fallback |
+| Service mandate | Actor, household/request purpose, named recipient/program set, actions/data/docs, preferences/limits, duration/expiry/revocation |
+| Decision and operation authorization | Proposed action/packet/version, sources, mandate/action approval, policy result and reason, stable operation key |
+| Packet/form/submission | Immutable attempted/executed version, evidence-backed fields/documents, validation, receipt and reconciliation state |
+| Document/fact | Private source reference/expiry, extracted/validated/corrected fields, allowed use and processing permission |
+| Durable job/event/outcome | Work progress, scoped execution grant, retries, waits, source/actor-attributed result |
+| Intervention/notification | Reason category, intended resolver, prepared action, actual human work, delivery and resumption |
 
-Retain Next.js, React, Supabase, server-side Responses, and current PDF libraries. New infrastructure is limited to verified durable execution, private document processing, and transactional support messaging. Credentials stay server-side in the narrow runtime that needs them. Workers use scoped application operations and current authorization; service-role credentials must not appear in the browser or ordinary web deployment.
+Retain Next.js, React, Supabase, server-side Responses and current PDF libraries. Add durable execution, protected document handling, required communication and route adapters. Scoped workers use current authority; private credentials never enter public clients or the ordinary web deployment. Validate any supported delegated provider credentials in an appropriately isolated server runtime.
 
-The existing `CASELINK_INVITE_ONLY`, single-school posture, password-session checks, staff invitations, and deployment-boundary tests need explicit parent-mode replacements in a new environment. Do not disable those safeguards in the school deployment. Read the installed Next.js guidance before framework changes and current vendor documentation before integration work.
+Parent signup and environments need explicit replacements for current invite-only school posture/password guards, with matching CI/configuration/operations changes. Preserve school safeguards. Read installed Next.js guides before framework changes and current official integration docs before using vendor APIs.
 
-## 15. Usability, accessibility, and service targets (X-01, M-01)
+## 15. Family-ready quality and autonomy measures (X-01, X-02, M-01)
 
-Use plain parent language, short screens, one clear primary action, labeled optional fields, and visible recovery. Avoid terms such as intervention plan, caseload, model, prompt, tool call, or agent orchestration in the parent interface. Show why a question matters where it might feel intrusive.
+### X-01: Accessible, low-effort use
 
-Target WCAG 2.2 AA: keyboard operation, labels and associated errors, sensible focus and recovery, live progress announcements, contrast, screen-reader status, 200% zoom, and reflow at 320 CSS pixels. Test the full phone journey, slow connections, interrupted uploads, and shared-device sign-out. Language coverage includes account emails, errors, review/consent, partner limitations, and PDFs, not only marketing copy.
+Use short plain-language screens and purposeful progressive disclosure. Families should not encounter intervention plans, prompts, model selectors, tool logs or orchestration controls. Provide actual examples, safe optionality and understandable source/uncertainty explanations. Human help is discoverable by choice.
 
-The following are initial pilot targets, not measured performance or public guarantees:
+Target WCAG 2.2 AA and test keyboard, screen-reader critical paths, errors/focus, live status, contrast, 200% zoom and reflow at 320 CSS pixels. Complete the advertised language experience across marketing, account/recovery, forms, mandate, notices, partner limits, help and printable artifacts. Use reviewed translations for consequential content.
 
-| Measure | Definition / proposed target |
+### X-02: Polished product acceptance
+
+The release includes truthful public pages, low-friction account/recovery, complete mobile capture/upload/manual paths, consistent navigation/type/spacing, all loading/empty/waiting/error/success states, meaningful progress updates, useful printable packets/receipts, privacy/preferences/history/help, cancellation/deletion and reliable return links. No placeholder controls, demonstration-only outcomes or operator-only workaround is presented as a finished family flow.
+
+Review actual screens on small phones, typical laptops, slow/interrupted networks and shared devices using realistic long/multilingual content. Test interrupted signup/upload/jobs, resumption, corrections, expired grants, provider changes and long agency waits. Polishing happens through implementation, with final family observation and visual/accessibility review. A complete narrow internal slice or synthetic demo is not the family-ready release gate.
+
+### M-01: Measure autonomy alongside outcomes
+
+Initial targets below are proposals to calibrate with Phase 0 fixtures and the first pilot, not measured performance or public guarantees. Never trade accuracy, consent or safety for a lower interruption count.
+
+| Measure | Definition / initial target |
 | --- | --- |
-| Intake usability | At least 80% of observed pilot parents complete minimum intake without operator help in 3 minutes or less, excluding verification delivery time |
-| First useful result | p95 of synthetic representative preparation jobs within 60 seconds under the declared pilot load; urgent contacts are shown independently of AI |
-| Job visibility | Saved work shows a current stage; stalled work is detected and offered recovery within the documented job deadline |
-| Journey progress | Track the share of started requests reaching a completed external action within 7 days, by journey and route; review reasons rather than hiding failures |
-| Service outcomes | Food accessed, application submitted, appointment completed, award/assistance received, declined, withdrawn, and unknown, with evidence origin |
-| Parent effort | Questions asked, repeated information, correction rate, abandonment, and need for operator help |
-| Service cost | Model/tool/messaging cost and operator minutes per request and per successful handoff; exclude private content from measurement |
-| Trust | Zero observed unauthorized sharing, cross-household reads, fabricated program details, or false submission/award claims; any occurrence stops the affected rollout |
+| Intake effort | At least 80% of observed families finish minimum intake without operator help within 3 minutes, excluding verification delivery; document reuse reduces repeated typing |
+| Autonomous completion of controllable work | At least 80% of eligible routine tasks execute without a family prompt or CaseLink operator doing the task; define and freeze tasks/eligibility from the coverage matrix before each evaluation/pilot run. Missing connectors, failed automation and operator-completed routine work count as failures/dependence, not convenient exclusions. Report all tasks and separately identified provider-required personal acts |
+| Unnecessary interruptions | No request to approve an already authorized routine action or reconfirm clear validated facts in the critical evaluation set; report actual prompt counts/reasons per family journey |
+| Required participation | Separately count identity/signature/attestation/interview, genuine missing facts, changed scope and meaningful personal choices; do not disguise these as agent failures or hide them from parent-effort measures |
+| Operator dependence | Operator touches/minutes per task/request and cause; partner-required service delivery is separate from avoidable internal manual work |
+| First useful progress | p95 representative preparation within 60 seconds under declared load; verified urgent help is independent of generation; longer work shows actual status and expected next trigger |
+| Complete service outcomes | Food accessed, submissions, appointments, approvals, payments/benefits applied, restoration, declines and unresolved cases by route, source and waiting time |
+| Coverage | All C-01 journeys and advertised programs/providers have a working completion contract and evidence; disclose actual automated/assisted mode rather than a raw program count |
+| Cost and trust | Per-request/task/outcome model/tool/message/human cost; zero observed unauthorized disclosure, false action/award claims, lost corrections or duplicate submissions |
 
-Count one started authenticated request per support journey; selecting both creates two requests and one household. Report denominators, pending duration, unknown outcomes, and manual support. No growth or outcome claims should be based only on preparation completion or a small pilot without disclosing the sample.
+Measure from the informed start through all attempts, including failed/abandoned tasks. Publish separate total-family-effort and eligible-autonomy measures so exclusion of legal/personal acts cannot inflate a claim of end-to-end automation. One-click completion rate is reported only for cases whose complete provider process supports it; required-personal-step cases remain in total journey reports. Selecting food and utilities produces separate need outcomes under the same household; show all denominators and unknowns.
 
 ## 16. Verification and acceptance (V-01)
 
-Every non-trivial logic change includes a runnable regression test. Extend the existing test harness; do not replace database authorization, accessibility, AI-quality, or PDF checks with compilation. Synthetic data is required for automated tests and provider experiments. Exercise the selected transport and advertised languages; do not build a callback endpoint, partner portal, or extra connector only to satisfy a hypothetical test row.
+Each non-trivial behavior change has a runnable regression. Extend existing unit, real Auth/database/storage, integration, headless end-to-end, accessibility, AI and rendered-document tooling. Test implemented routes and their actual channels, not fictional APIs.
 
-| Layer | Required evidence before the relevant phase ships |
+| Layer | Required evidence |
 | --- | --- |
-| Unit | Intake branches, state/evidence rules, document field confirmation, date/amount handling, approval expiry/invalidation, cancellation, idempotency, notification suppression |
-| Database/Auth | Real parent A/B and selected-route partner/referral isolation, legacy staff denial, admin/operator restrictions, interactive session checks and background revocation, ownership reassignment denial, direct RPC/storage access, concurrent writes, deletion and rollback |
-| Integration | Tool scope and malformed outputs, durable waits/restarts, transport timeouts and reconciliation, signed/replayed callbacks if used, stale packet changes, approval bound to one operation across retries, duplicate external attempts, upload cleanup and expired packet attachments |
-| End to end | Both complete parent journeys from signup to outcome; combined needs; close/reopen and sign-out while saved work continues; interrupted jobs/uploads; expired interactive session; correction/reapproval; partner receipt and acceptance; approval versus received support; failure and human handoff; opt-out and deletion |
-| Accessibility | Automated scans plus keyboard/screen-reader critical paths; phone widths, zoom/reflow, translated labels/errors, status announcements and file alternatives |
-| AI evaluations | At least 40 reviewed synthetic cases (20 per journey), including combined needs, uncertain income, source conflicts, unreadable notices, existing applications, urgent needs, Spanish cases, and unsupported services; require source fidelity, correct question/route, parent-edit preservation, honest unknowns, and no unauthorized action |
-| Adversarial | Injected instructions in files/pages/messages, fake contacts, substituted recipients, private-data search attempts, malicious files, unauthorized IDs, misleading receipt text, callback forgery, replay, budget exhaustion, and cross-household tool calls |
-| PDF/visual | Source-to-export values and rendered pages for long/multilingual content, amounts/dates, selected recipients, revisions, no internal data, and no clipped or stale content |
-| Hosted operations | Exact candidate's Auth/message delivery, real approved partner rehearsal, provider receipts, restore/deletion replay, cancellation, alerts, budgets, and rollback evidence |
+| Unit | Mandate/action policy, source-backed judgment/fact validity and calculations, necessary-intervention reasons, limits/expiry, packet validation, compatibility/duplicate rules, outcomes, cancellation and notification suppression |
+| Auth/data | Parent A/B, partner/referral and legacy isolation; caregiver/third-party acting authority; trusted role assignment; interactive session versus durable grant; current membership/revocation/security holds; storage, exports, deletion and rollback |
+| Integration | In-scope autonomous actions and out-of-scope stops; multi-operation mandates; source/packet updates; execution/submission/booking receipts; reconcile retries; callbacks/status if used; supervised browser handover; expiring documents |
+| End to end | Every C-01 journey and combined needs, complete autonomous eligible cases, required personal acts and resumed work, no gratuitous approval stops, failure/alternative route, sign-out/reopen, notices, operator/partner exceptions and outcomes |
+| Accessibility/visual | Complete phone/laptop and advertised-language journeys, observed mandate comprehension, camera/file/manual alternatives, long text, slow networks, keyboard/screen reader, contrast/zoom/reflow and complete state coverage |
+| AI quality/judgment | At least 60 reviewed synthetic multi-step cases spanning all C-01 rows, providers and advertised languages; each enabled action has representative cases; evaluate route choice, source fidelity, auto-use of reliable facts, independent recovery, necessary versus unnecessary intervention, edits, latency and cost |
+| Adversarial | Prompt injection in files/pages/messages, mandate expansion, new recipient/data/purpose, forged receipts, misleading status, identity/account mismatch, conflicting sources, unsafe files, exfiltration/search payloads, replay and spend/attempt exhaustion |
+| Forms/PDF | Current supported templates/fields/attachments match validated data; actual rendering, no invented attestations/signatures, accessible language/glyphs, exact executed version/receipt and no internal/unrelated content |
+| Hosted operations | Exact candidate model/settings, approved program channels, real permitted rehearsals, communications, job persistence, provider/partner updates, cancellation/revocation, cleanup, restore, alerts and rollback |
 
-Release-blocking failures include any unauthorized disclosure, bypassed approval, invented contact/eligibility/availability, false submitted/approved claim, lost parent correction, duplicate referral under retry, or unowned urgent exception. AI evaluation also requires partner/domain review of usefulness; schema-valid JSON alone is insufficient. Version prompts, playbooks, program facts, model settings, and the evaluation corpus with each release.
+Critical failures block the affected capability: unauthorized action/sharing, false eligibility/capacity/submission/award claim, fabricated personal fact/signature, missing required human participation, duplicate submission, lost parent correction, or unowned urgent exception. Unnecessary approval loops and routine operator dependence also fail the autonomy/readiness criteria, without weakening the critical safety tests. Version model/settings, playbooks/prompts, program contracts, source facts and the evaluation corpus per release.
 
-## 17. Launch and operational gates (O-01)
+## 17. Family-ready release and operating gates (O-01)
 
-The service owner, engineering owner, privacy/security owner, resource owner, and partner contact must be named in a restricted release record. One person can fill multiple internal roles; none can be left implicit. Before real parent intake:
+Name service, engineering, privacy/security, resource and support owners with partner contacts in restricted records.
 
-- Both journey routes have reviewed facts, an agreed transport, accepted fields, staffed acknowledgement/escalation, and a rehearsed fallback.
-- Immediate-food coverage and urgent utility routes have been confirmed; the UI accurately describes staffing hours and availability uncertainty.
-- Parent identity, membership, private documents, consent, scoped partner access, and live revocation have passed real Auth/RLS/storage tests.
-- The proposed retention/deletion schedule, vendor processing, disclosures, and consent are approved and implemented. Legal/privacy review determines applicable duties; do not assume the prior school policy applies or that a generic compliance label proves approval.
-- A separate parent environment, synthetic staging, backups/restore, protected secrets, workflow-data handling, messaging, budgets, failure alerts, and on-call ownership are verified.
-- Both end-to-end journeys and the full relevant verification matrix pass on the exact release candidate; rollback does not expose legacy school records or reverse destructive migrations.
-- Public copy and legal pages describe deployed capabilities truthfully. Support received, partner accepted, agency submitted, and parent reported remain distinct.
-- Pilot recruitment, consent/support script, measurement definitions, and stop conditions are ready. A pilot decision is recorded separately from general launch.
+**Before any real household intake, upload or live external action, including a closed pilot:** approve and implement the relevant data/vendor/consent controls; verify real account, household, storage and legacy isolation; rehearse the enabled routes and required personal acts; prove scoped execution, receipts, cancellation/revocation, deletion and recovery; provide honest capability copy and owned urgent/help coverage. Until that gate is recorded, use synthetic data and authorized partner rehearsals only. A restricted pilot can enable verified capabilities incrementally, with unsupported capabilities clearly unavailable; it does not certify the finished release.
 
-Operational alerts cover stuck jobs, overdue partner acknowledgement, unknown delivery outcomes, notification failure, document cleanup failures, source staleness, unusual authorization denial, and spend. Alert payloads contain opaque IDs and safe metadata. A repeated failure creates an owned exception; it does not silently retry forever.
+The finished product release requires:
 
-## 18. Decisions to close during Phase 0
+- C-01 coverage implemented across immediate food, SNAP/WIC and electricity/gas/water, with actual automated/assisted completion contracts and accurate public capability descriptions.
+- Named recipients, action/data permissions, mandate presentation, required personal acts and per-route receipts/recovery tested. Provider automation restrictions cannot be overridden by a model or general service consent.
+- Real parent/partner/legacy isolation, private document processing, direct secret handling where needed, scoped worker authority and revocation/deletion verified.
+- Approved/implemented data purpose, vendor/retention/disclosure controls and parent consent; no reliance on historical school approvals or compliance labels.
+- Working accounts/recovery, safe messages, actual source/status upkeep, operator exception coverage, backups/restore, budgets/limits, alerts and per-route stop controls.
+- Entire X-01/X-02 product passes phone/laptop visual, accessibility, language and family observation, including failures and lengthy waits; no placeholders or required routine operator completion hidden behind the UI.
+- Exact-candidate verification and the reviewed autonomy/outcome scorecard include denominators, required personal work, manually assisted cases and unresolved outcomes.
+- Closed-pilot feedback incorporated and a recorded decision to launch, continue testing or repair specific gaps. Extend the pilot or targeted rehearsals when its small sample leaves required journeys, languages or operating conditions untested. No old school release or single-route demo certifies this product.
 
-| Decision | Accountable role | Launch consequence |
+AI continuously performs permitted routine monitoring/follow-up within each active grant. Humans own alerts for genuine failures, stalled urgent work, unverifiable sources/receipts, cleanup, unusual denials and spend. Alerts contain safe IDs/metadata. Record staffing hours and response targets truthfully; automated availability does not promise round-the-clock human service.
+
+## 18. Implementation decisions to close in Phase 0
+
+| Decision | Owner | Evidence needed |
 | --- | --- | --- |
-| Exact food/utility routes and immediate-food coverage | Service/resource owner with partner | No route activation without an agreed, verified path |
-| Accepted packet, transport, acknowledgement and escalation target | Partner and engineering owner | No live referral sending until the complete handoff is rehearsed |
-| Parent email access versus phone-first identity | Product/engineering owner | Select the initial verified channel before changing auth policies |
-| Data purpose, vendor handling, retention, deletion and safe contact | Privacy/security owner | Synthetic-only processing until the controls and disclosures are ready |
-| Parent/legacy separation and durable runtime | Engineering owner | Prove isolation, scoped worker authority, restart/retry behavior, and sensitive-data handling |
-| English/Spanish coverage and reviewer | Product/resource owner | Advertise only tested, supported language coverage |
-| Pilot targets, operator coverage and affordable service cost | Service owner | Set the staffing and cost boundary before recruitment |
+| Full coverage matrix and program/provider contracts | Product/resource owner and partners | C-01 completion paths, required acts, verified urgent food/utility coverage, actual execution/status permission |
+| Mandate design and autonomy rules | Product/engineering/privacy owner | Named recipient/program set, allowed actions/data, concrete duration/attempt/booking limits, exceptions and family comprehension |
+| Identity/channel/language access | Product owner with families | Tested signup/recovery/contact availability, translations and real partner coverage |
+| Document/data/direct-entry handling | Privacy/security and engineering | Minimal inventory, model exclusion of secrets, deletion/retention and source validation |
+| Runtime and execution modes | Engineering | Durable tools, API/partner/form/browser feasibility, handover, receipts, isolation and cancellation spikes |
+| Quality, autonomy and operational capacity | Service owner | Family-ready checklist, relevant evals, intervention taxonomy, cost/support capacity and release evidence |
 
-These decisions do not require a new product strategy: the two workflows, parent ownership, Sol 6.1 driver, and existing partner network are already selected. Implementation can proceed on independent synthetic work while external operational details are resolved.
+These decisions refine execution, not the accepted goal. Broad useful automation and a polished family-ready product in the two domains are required. Build internal slices while resolving external permissions; do not silently redefine the finished product to the easiest available handoff.
 
-## 19. Sources and implementation baseline
+## 19. Sources and current implementation
 
-Official sources reviewed for the October 25 planning conversation; recheck program facts when enabling a route. The sources support process boundaries, not a promise of live capacity or account-specific eligibility.
+Official sources reviewed for the October 25 planning/revision; recheck program rules and permissions before enabling an action. Sources describe capabilities/processes, not live availability or a household's eligibility.
 
-- [Pennsylvania SNAP applications and status](https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap): official application/status paths and agency eligibility determination.
-- [Pennsylvania WIC appointment request](https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist): pre-application and specialist process.
-- [UESF benefits access](https://uesfacts.org/i-need-help-with/benefits/) and [utility grants](https://uesfacts.org/our-programs/utility-grant-program/): partner service categories; capacity and individual eligibility need confirmation.
-- [Philadelphia water assistance](https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/): program-specific application routes, document requirements, partner assistance, and no application materials by email.
-- [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol): model/tool capabilities and Responses API requirement for tool calling.
-- [OpenAI asynchronous tools](https://developers.openai.com/api/docs/guides/async-tool-calling), [search controls](https://developers.openai.com/api/docs/guides/tools-web-search#domain-filtering), and [computer-use environment controls](https://developers.openai.com/api/docs/guides/tools-computer-use-integration#restrict-the-environment).
-- [Supabase private storage](https://supabase.com/docs/guides/storage/buckets/fundamentals) and [product security](https://supabase.com/docs/guides/security/product-security): access enforcement and private file handling.
-- [Vercel Workflow concepts](https://vercel.com/docs/workflows/concepts): durable execution candidate; exact integration/version and data handling remain a Phase 0 spike.
+- [Pennsylvania SNAP](https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap) and [WIC](https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist): agency processes and required participation.
+- [UESF benefits](https://uesfacts.org/i-need-help-with/benefits/) and [utility grants](https://uesfacts.org/our-programs/utility-grant-program/): partner service categories.
+- [Philadelphia water assistance](https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/): supported methods and documents; application materials are not accepted by email.
+- [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol): tool/vision capabilities and Responses tool calling.
+- [OpenAI tool guardrails and review](https://developers.openai.com/api/docs/guides/agents/guardrails-approvals): validation at side effects and resumable approval; the application implements its authorization policy.
+- [Async tools](https://developers.openai.com/api/docs/guides/async-tool-calling), [search controls](https://developers.openai.com/api/docs/guides/tools-web-search#domain-filtering), [computer-use environment/human controls](https://developers.openai.com/api/docs/guides/tools-computer-use-integration#restrict-the-environment), and [background mode](https://developers.openai.com/api/docs/guides/background).
+- [Supabase storage](https://supabase.com/docs/guides/storage/buckets/fundamentals), [security](https://supabase.com/docs/guides/security/product-security) and [Vercel Workflow](https://vercel.com/docs/workflows/concepts): implementation foundations requiring route-specific verification.
 
-Local inspection found staff-only signup, staff roles/password-session guards, browser-driven generation advancement, text-only AI request contracts, identifiers blocked before outbound AI, a school-oriented partner directory, and existing reviewed-plan/takeaway PDF infrastructure. These are migration inputs, not evidence that parent capabilities already work. The [implementation plan](parent-support-implementation-plan.md) maps them to phases and acceptance evidence.
+Local inspection found staff-only signup/roles/password guards, browser-driven saved generation, text-only AI requests, outbound identifier checks and reviewed-plan/takeaway PDFs. Parent mandate execution, uploads, forms/submissions, route adapters and polished parent UI remain unimplemented. The [implementation plan](parent-support-implementation-plan.md) separates internal increments from the complete family-ready release.

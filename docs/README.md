@@ -2,10 +2,12 @@
 
 **Current product decision: October 25, 2026.** CaseLink is pivoting to parent-owned food support and utility assistance. The implemented application is still the staff-oriented school baseline; these documents distinguish the intended product from existing behavior.
 
+The latest revision requires maximum useful AI independence from one informed standing authorization and a polished family-ready release across complete food/utility journeys. Earlier preparation-only approval loops and the one-route launch ceiling are superseded. Single-route slices remain useful internal delivery steps; forms, permitted submissions, supported browser work, follow-up and complete product quality belong to the finished scope.
+
 ## Current product authority
 
 1. [Parent support MVP PRD](parent-support-mvp-prd.md): product scope, parent journeys, required behavior, trust boundaries, acceptance and launch gates.
-2. [Parent support implementation plan](parent-support-implementation-plan.md): dependency order, source change map, phase deliverables, proposed effort and test evidence.
+2. [Parent support implementation plan](parent-support-implementation-plan.md): dependencies, source change map, full-coverage phase deliverables, autonomy/quality gates and test evidence; full-product effort is estimated after feasibility work.
 3. [AGENTS.md](../AGENTS.md): working instructions, review/testing discipline and product north star.
 4. [Repository README](../README.md) and [partner data guide](../data/README.md): development/status entry points and directory handling.
 
