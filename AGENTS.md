@@ -8,6 +8,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+# Background work by default
+
+- Work entirely in the background unless the user explicitly asks otherwise.
+- Do not switch the user's active chat, bring apps or windows forward, or open visible browser tabs, previews, files, or review panels unless explicitly requested.
+- Use background tools and hidden or headless browsers for testing. Do not take over the user's active browser tabs.
+- Return links and results in the current chat without opening them automatically.
+- If a step requires taking over the screen or changing focus, ask first and continue independent background work while waiting.
+
 # Coding and review discipline
 
 Ponytail is installed for this project. Use the `ponytail` skill in full mode for every coding, fixing, refactoring, and implementation-design task. Follow its ladder: understand the complete affected flow, reuse existing project patterns, prefer standard-library and native platform behavior, use installed dependencies before adding new ones, and write the smallest correct change.
