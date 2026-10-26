@@ -18,6 +18,8 @@ Retention is a separate isolated process: first remove exact eligible private ob
 
 Existing CaseLink email/password identities can be reused with `CASELINK_PARENT_ACCOUNT_MODE=existing`, the additive shared-account migration and reviewed processing controls. See [the exact activation guide](parent-shared-accounts.md); do not substitute the isolated local Auth hook for a shared project's global enrollment policy. The synthetic localhost preview has no live account connection.
 
+The separately approved existing-account localhost profile uses `npm run parent:connected:build`, then `npm run parent:connected`, with `CASELINK_PARENT_CONNECTED_APPROVED=1`, the exact approved provider in `CASELINK_PARENT_PRODUCTION_SUPABASE_URL`, and its original HTTPS recovery site in `CASELINK_PARENT_RECOVERY_SITE_URL`. It binds only `127.0.0.1:3200`, hashes the approved build/runtime profile, excludes private credentials and disables email-code enrollment. Existing identity cutoff and time-bounded database approval still apply. The October 26 approval expires at **18:08:45 UTC / 2:08 p.m. EDT**; expiry closes parent access independently of the running server. Do not silently renew it. [Actual evidence and remaining limits](verification/parent-connected-accounts.md).
+
 ## Local synthetic setup
 
 1. Install the locked Node 24 dependencies with `npm ci`. Copy `parent.env.example` to a private environment file and supply the **local parent** publishable key. Do not edit or import the school environment file.
@@ -57,7 +59,7 @@ Email uses fixed generic copy and a sign-in link, with no program, benefit statu
 
 The actual database runner snapshots and restores local processing controls and operator SET-role memberships. It requires existing direct ADMIN membership before temporarily enabling SET; it never provisions a worker login or weakens production roles. Only its own metadata-only Storage fixtures use a transaction-local deletion exception; the normal Storage guard is verified afterward.
 
-The worker lifecycle and correction integration tests require `CASELINK_PARENT_SQL_FIXTURE_MODULE`; without it they are explicitly skipped. Set this variable for the full unit run to include the actual migrations and catch SQL argument, enum, correction and transaction mismatches. Real Supabase and concurrent-connection checks remain separate. Generated local secrets and evidence stay under ignored, access-restricted `tmp/parent-runtime/` and `tmp/parent-verification/`. Do not publish CLI status output or copy credentials into reports.
+The worker lifecycle, correction and existing-identity cutoff integration tests require `CASELINK_PARENT_SQL_FIXTURE_MODULE`; without it they are explicitly skipped. Set this variable for the full unit run to include the actual migrations and catch SQL argument, enum, correction and transaction mismatches. Real Supabase and concurrent-connection checks remain separate. Generated local secrets and evidence stay under ignored, access-restricted `tmp/parent-runtime/` and `tmp/parent-verification/`. Do not publish CLI status output or copy credentials into reports.
 
 No test sends a live application or uses real family records. The user approved a capped synthetic live-AI run separately; ordinary tests do not enable paid calls. See [progress and evidence](parent-support-progress.md) for the exact verified candidate and remaining checks.
 

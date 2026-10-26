@@ -36,6 +36,26 @@ afterEach(() => {
 });
 
 describe("parent API and navigation", () => {
+  it("offers only existing passwords and original-site recovery when email-code enrollment is unavailable", () => {
+    render(
+      <ParentSignIn
+        existingAccountRecovery
+        emailCodeAvailable={false}
+        recoveryHref="https://www.old.example.test/forgot-password"
+      />,
+    );
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Use an email code instead" }),
+    ).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "Forgot your password?" })
+        .getAttribute("href"),
+    ).toBe("https://www.old.example.test/forgot-password");
+    expect(screen.getByText(/then return here to sign in/)).toBeTruthy();
+    expect(screen.queryByText(/New here or need a code/)).toBeNull();
+  });
   it("allows only supported local return paths", () => {
     expect(safeReturnPath("https://attacker.test")).toBe("/my-support");
     expect(safeReturnPath("//attacker.test")).toBe("/my-support");

@@ -61,7 +61,9 @@ export async function runSupabaseProxy(request: NextRequest) {
           name: "caselink-parent-auth",
           httpOnly: true,
           sameSite: "lax",
-          secure: process.env.NEXT_PUBLIC_SUPABASE_URL!.startsWith("https://"),
+          secure:
+            process.env.NEXT_PUBLIC_SUPABASE_URL!.startsWith("https://") &&
+            process.env.CASELINK_ENVIRONMENT !== "connected",
           path: "/",
         },
         cookies: {

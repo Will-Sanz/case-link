@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createParentClient } from "@/lib/parent/auth";
+import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
 import {
   parentError,
   parentJson,
@@ -58,6 +59,18 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const value = schema.parse(await readParentJson(request));
+    if (
+      (value.action === "send_code" || value.action === "verify_code") &&
+      !parentEmailCodeEnabled(process.env)
+    )
+      return parentJson(
+        {
+          ok: false,
+          error:
+            "Email-code sign-in is not enabled here. Use your existing CaseLink password or reset it.",
+        },
+        403,
+      );
     const client = await createParentClient();
     if (value.action === "send_code") {
       const result = await client.auth.signInWithOtp({

@@ -22,6 +22,8 @@ Use CaseLink’s own name and mark as primary branding. Preserve text recognitio
 
 API use and ChatGPT Futures recognition are separate facts. The product uses OpenAI Responses where configured; it does not require the parent’s personal ChatGPT account. Do not advertise a live model or transport when the runtime is in deterministic preparation mode or waiting for an enabled connection. Published model claims must match the deployed configuration.
 
+The October 26 [connected-account record](verification/parent-connected-accounts.md) adds actual original-provider password/Storage evidence, an atomic additive schema upgrade and unchanged original account/school/Auth configuration checks. The owner separately approved a two-hour existing-identity localhost cohort, ending at 2:08 p.m. EDT. This explicit connected profile is distinct from synthetic preview/test profiles; public enrollment, AI workers, external transports and family release remain unapproved. Hosted reset-email completion, simultaneous sessions and operational/privacy release evidence still need verification.
+
 ## Data-purpose and deletion decisions
 
 Using old credentials must be a convenience, not implicit consent to the new service. Enrollment creates the parent purpose; the request mandate and document consent separately authorize specific processing and actions. Reuse only source-backed household facts obtained for that parent purpose and permitted route. Existing school context must not silently populate intake, become model input or be disclosed to a partner.

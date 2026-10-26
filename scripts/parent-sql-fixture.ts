@@ -27,7 +27,7 @@ export async function createParentSqlFixture(
   await db.exec(`
     create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin;
     create schema auth; create schema storage;
-    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,is_anonymous boolean default false,banned_until timestamptz);
+    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,is_anonymous boolean default false,banned_until timestamptz,created_at timestamptz default now());
     create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id) on delete cascade,created_at timestamptz,updated_at timestamptz,not_after timestamptz);
     create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
     create function auth.uid() returns uuid language sql stable as $$select nullif(auth.jwt()->>'sub','')::uuid$$;
@@ -57,6 +57,7 @@ export async function createParentSqlFixture(
     "20261026040540_parent_preserve_corrected_facts.sql",
     "20261026044443_parent_storage_upload_preflight.sql",
     "20261026052446_parent_authoritative_mandate_window.sql",
+    "20261026155134_parent_existing_identity_cutoff.sql",
   ];
   try {
     for (const migration of migrations)

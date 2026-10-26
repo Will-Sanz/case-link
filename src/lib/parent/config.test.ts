@@ -23,6 +23,14 @@ const hosted = {
 };
 
 describe("parent purpose and environment boundary", () => {
+  it("permits only explicitly approved loopback connected access to the exact existing provider", () => {
+    const connected = { ...hosted, VERCEL_ENV: "development", CASELINK_ENVIRONMENT: "connected", CASELINK_PARENT_ACCOUNT_MODE: "existing", CASELINK_PARENT_CONNECTED_APPROVED: "1", CASELINK_SCHOOL_SUPABASE_URL: hosted.NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3200", CASELINK_PARENT_RECOVERY_SITE_URL: "https://old.example.test", CASELINK_PARENT_REAL_DATA_APPROVED: undefined };
+    expect(parentConfigurationIssues(connected)).toEqual([]);
+    for (const change of [{ CASELINK_PARENT_CONNECTED_APPROVED: undefined }, { CASELINK_PARENT_ACCOUNT_MODE: "isolated" }, { CASELINK_PARENT_PRODUCTION_SUPABASE_URL: "https://other.supabase.co" }, { CASELINK_SCHOOL_SUPABASE_URL: "https://other.supabase.co" }, { NEXT_PUBLIC_SITE_URL: "http://localhost:3200" }, { NEXT_PUBLIC_SITE_URL: "https://public.example.test" }, { VERCEL_ENV: "preview" }, { VERCEL_ENV: "production" }, { VERCEL: "1" }, { CASELINK_PARENT_RECOVERY_SITE_URL: "https://old.example.test/path" }, { SUPABASE_SERVICE_ROLE_KEY: "private-canary" }])
+      expect(parentConfigurationIssues({ ...connected, ...change }).length).toBeGreaterThan(0);
+    for (const environment of ["test", "preview"])
+      expect(parentConfigurationIssues({ ...connected, VERCEL_ENV: environment === "preview" ? "preview" : "development", CASELINK_ENVIRONMENT: environment }).join()).toContain("synthetic");
+  });
   it("requires explicit product selection and safe public credentials", () => {
     expect(getParentConfig(local).supabaseUrl).toBe(
       local.NEXT_PUBLIC_SUPABASE_URL,

@@ -13,6 +13,7 @@ import { POST } from "./route";
 
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://caselink.example.test");
+  vi.stubEnv("CASELINK_PARENT_ACCOUNT_MODE", "isolated");
   vi.resetAllMocks();
   mocks.create.mockResolvedValue({
     auth: {
@@ -41,6 +42,42 @@ const request = (value: unknown, origin = "https://caselink.example.test") =>
   });
 
 describe("existing parent account sign-in", () => {
+  it("blocks unconfigured existing-project code enrollment before calling Auth and preserves password sign-in", async () => {
+    vi.stubEnv("CASELINK_PARENT_ACCOUNT_MODE", "existing");
+    vi.stubEnv("CASELINK_PARENT_EMAIL_CODE_ENABLED", "0");
+    for (const action of ["send_code", "verify_code"])
+      expect(
+        (
+          await POST(
+            request({
+              action,
+              email: "synthetic@example.test",
+              ...(action === "verify_code" ? { token: "123456" } : {}),
+            }),
+          )
+        ).status,
+      ).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(
+      (
+        await POST(
+          request({
+            action: "sign_in",
+            email: "synthetic@example.test",
+            password: "synthetic-password",
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    vi.stubEnv("CASELINK_PARENT_EMAIL_CODE_ENABLED", "1");
+    expect(
+      (
+        await POST(
+          request({ action: "send_code", email: "synthetic@example.test" }),
+        )
+      ).status,
+    ).toBe(200);
+  });
   it.each(["verify_code", "sign_in"])(
     "keeps %s retryable during an Auth outage without provisioning an account",
     async (action) => {

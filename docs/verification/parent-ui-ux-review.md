@@ -6,11 +6,11 @@ Reviewed October 26, 2026, on the production build at `http://127.0.0.1:3200`. A
 
 The owner selected imagegen **Option 2, Family Panorama**. The implementation restores the original CaseLink lavender/navy/violet tokens and Newsreader/Geist pairing, with a shared connected-link logo, factual linked ChatGPT Futures recognition, original family illustration, one overlapping food/utility entry sheet and consistent policy/contact links. [Design options and the recorded decision](../parent-brand-options.md) preserve all five explorations.
 
-**30 responsive surface captures and 28 interaction-state captures passed with zero detected axe AA violations and zero horizontal overflow.** These are automated findings, not an accessibility certification. The independent reviewer inspected desktop/phone/narrow layouts, approved the selected design and completed normal correctness/security/accessibility and separate Ponytail reviews. Two final findings—checklist wrapping and incomplete account-entry help—were fixed and confirmed in rebuilt desktop and phone captures.
+**31 responsive surface captures and 28 interaction-state captures passed with zero detected axe AA violations and zero horizontal overflow.** These are automated findings, not an accessibility certification. The independent reviewer inspected desktop/phone/narrow/wide layouts, approved the selected design and completed normal correctness/security/accessibility and separate Ponytail reviews. Checklist wrapping and account-entry help were fixed; the latest pass tightens homepage spacing, aligns content edges and caps the panorama so both desktop choices fit in the initial screen. The shared-account profile omits unsupported code instructions in both sign-in and help.
 
 ## Coverage
 
-The responsive batch covers home, intake, My support, request detail, account, sign-in, How it works, help, privacy and terms at 1440, 390 and 320 CSS pixels. It verifies that the actual panorama loads, Newsreader is applied and checklist text stays beside its markers at each width.
+The responsive batch covers home, intake, My support, request detail, account, sign-in, How it works, help, privacy and terms at 1440, 390 and 320 CSS pixels, plus home at 1920×934. It verifies that the actual panorama loads, Newsreader is applied, desktop content edges align, support choices fit and checklist text stays beside its markers at each width.
 
 The interaction batch covers home, need selection, household details, initial permission review, support detail, stale-answer error and recovery, permission editor, document consent, combined utility accounts, permission handoff, account, sign-in recovery and help at desktop and phone sizes. Separate assertions verify working keyboard skip navigation, explicit stale-answer recovery and permission-editor focus handoff.
 
@@ -38,5 +38,7 @@ The runners save generated screenshots and aggregate JSON under ignored `tmp/par
 ## Evidence boundaries
 
 These batches render actual production components with explicit synthetic API responses. They do not establish a real Auth session, model response or partner delivery. The separate [actual-service account rehearsal](parent-actual-auth-stability.json), [live AI review](parent-live-ai-review.md), [parser review](parent-document-parser-review.md) and [progress record](../parent-support-progress.md) carry their own evidence and limitations.
+
+The later [connected-account rehearsal](parent-connected-accounts.md) separately verifies original-provider password/Storage behavior with a disposable synthetic identity. This UI review does not substitute for those integration and preservation checks.
 
 No family observation, full manual screen-reader review, complete Spanish experience, hosted performance or partner completion is established by these screenshots. Production transports remain disabled until verified protocols and authority are configured. No local visual result certifies a family launch.

@@ -14,6 +14,25 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("parent session responses", () => {
+  it("uses the same validated connected loopback cookie policy as the parent server client", async () => {
+    vi.stubEnv("CASELINK_PRODUCT", "parent");
+    vi.stubEnv("CASELINK_ENVIRONMENT", "connected");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://existing.supabase.co");
+    vi.stubEnv(
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "sb_publishable_synthetic",
+    );
+    mocks.issues.mockReturnValue([]);
+    mocks.create.mockReturnValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+    });
+    await runSupabaseProxy(new NextRequest("http://127.0.0.1:3200/sign-in"));
+    expect(mocks.create.mock.lastCall?.[2].cookieOptions).toMatchObject({
+      secure: false,
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  });
   it("keeps rotated session credentials inaccessible to JavaScript and uncached on public routes", async () => {
     vi.stubEnv("CASELINK_PRODUCT", "parent");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://parent.example.test");

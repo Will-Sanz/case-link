@@ -41,6 +41,7 @@ try {
     ["laptop", 1440, 1000],
     ["phone", 390, 844],
     ["reflow", 320, 820],
+    ["wide", 1920, 934],
   ]) {
     const context = await browser.newContext({
       viewport: { width, height },
@@ -95,6 +96,7 @@ try {
       ["privacy", "/support/privacy"],
       ["terms", "/support/terms"],
     ]) {
+      if (name === "wide" && label !== "home") continue;
       await page.goto(origin + path, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
       if (label === "home") {
@@ -115,6 +117,35 @@ try {
             ),
           "The original display type must be applied.",
         );
+        if (width >= 1440) {
+          const heading = await page
+            .getByRole("heading", { level: 1 })
+            .boundingBox();
+          const brand = await page
+            .getByRole("banner")
+            .getByRole("link", { name: "CaseLink home" })
+            .boundingBox();
+          const services = await page
+            .getByRole("region", { name: "Choose your support" })
+            .boundingBox();
+          const panorama = await art.boundingBox();
+          assert.ok(
+            heading &&
+              brand &&
+              services &&
+              Math.abs(heading.x - brand.x) < 2 &&
+              Math.abs(heading.x - services.x) < 2,
+            "Homepage heading, header and support sheet must share their desktop alignment.",
+          );
+          assert.ok(
+            services.y + services.height <= height,
+            "Both support choices must fit in the initial desktop viewport.",
+          );
+          assert.ok(
+            panorama && panorama.height <= 400 && panorama.width <= 1600,
+            "The panorama must remain proportionate on wide screens.",
+          );
+        }
       }
       if (label === "product") {
         const items = page

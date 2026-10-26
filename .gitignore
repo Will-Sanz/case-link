@@ -18,6 +18,7 @@
 /tmp/restore/
 /tmp/parent-runtime/
 /tmp/parent-verification/
+/tmp/parent-connected-build.json
 
 # next.js
 /.next/

@@ -63,7 +63,7 @@ export function ParentLanding() {
             src="/marketing/caselink-parent-panorama.webp"
             width={2172}
             height={724}
-            sizes="100vw"
+            sizes="(max-width: 1600px) 100vw, 1600px"
             preload
             alt="Illustration of a family unpacking groceries and a parent checking a bill on his phone at home."
           />

@@ -4,6 +4,12 @@ import {
   parentProjectIsolationIssues,
 } from "./project-origin";
 export type ParentEnvironment = Record<string, string | undefined>;
+export function parentEmailCodeEnabled(env: ParentEnvironment): boolean {
+  return (
+    env.CASELINK_PARENT_ACCOUNT_MODE !== "existing" ||
+    env.CASELINK_PARENT_EMAIL_CODE_ENABLED === "1"
+  );
+}
 export class ParentConfigurationError extends Error {
   constructor(
     message = "Parent support is not configured for this environment.",
@@ -34,6 +40,34 @@ export function parentConfigurationIssues(env: ParentEnvironment): string[] {
     ? env.VERCEL_ENV
     : env.CASELINK_ENVIRONMENT;
   const hosted = target === "production" || target === "preview";
+  const connected = env.CASELINK_ENVIRONMENT === "connected";
+  if (connected) {
+    if (
+      target !== "connected" ||
+      env.VERCEL ||
+      (env.VERCEL_ENV && env.VERCEL_ENV !== "development")
+    )
+      issues.push(
+        "Connected parent access is restricted to a local owner runtime",
+      );
+    if (env.CASELINK_PARENT_CONNECTED_APPROVED !== "1")
+      issues.push("Connected parent access requires explicit owner approval");
+    if (env.NEXT_PUBLIC_SITE_URL !== "http://127.0.0.1:3200")
+      issues.push(
+        "Connected parent access requires the exact loopback site on port 3200",
+      );
+    const recovery = canonicalProjectOrigin(
+      env.CASELINK_PARENT_RECOVERY_SITE_URL,
+    );
+    if (
+      !recovery?.startsWith("https://") ||
+      isLoopbackHost(new URL(recovery).hostname) ||
+      recovery !== env.CASELINK_PARENT_RECOVERY_SITE_URL
+    )
+      issues.push(
+        "Connected parent recovery requires the existing exact HTTPS site origin",
+      );
+  }
   issues.push(
     ...parentProjectIsolationIssues({
       projectUrl: env.NEXT_PUBLIC_SUPABASE_URL,
@@ -57,7 +91,7 @@ export function parentConfigurationIssues(env: ParentEnvironment): string[] {
     ].some((key) => key !== undefined && key !== "" && !publicKeyIsSafe(key))
   )
     issues.push("A public Supabase publishable or anonymous key is required");
-  if (!loopback && env.CASELINK_PARENT_REAL_DATA_APPROVED !== "1")
+  if (!loopback && !connected && env.CASELINK_PARENT_REAL_DATA_APPROVED !== "1")
     issues.push(
       "Hosted parent processing requires the documented real-data release gate",
     );
@@ -86,7 +120,7 @@ export function parentConfigurationIssues(env: ParentEnvironment): string[] {
       "PLAN_REFINE_DEBUG",
     ])
       if (env[name] === "1") issues.push(`${name} must be disabled`);
-  } else if (!loopback && env.CASELINK_ENVIRONMENT !== "test")
+  } else if (!loopback && !connected && env.CASELINK_ENVIRONMENT !== "test")
     issues.push(
       "Local parent development must use a local project or an explicit synthetic test environment",
     );

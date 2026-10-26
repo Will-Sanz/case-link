@@ -10,8 +10,11 @@ type DeploymentEnvironment = ProductionPosture & {
   CASELINK_PARENT_PRODUCTION_SUPABASE_URL?: string;
   CASELINK_PARENT_REAL_DATA_APPROVED?: string;
   CASELINK_PARENT_ACCOUNT_MODE?: string;
+  CASELINK_PARENT_CONNECTED_APPROVED?: string;
+  CASELINK_PARENT_RECOVERY_SITE_URL?: string;
   NODE_ENV?: string;
   VERCEL_ENV?: string;
+  VERCEL?: string;
   CASELINK_ENVIRONMENT?: string;
   CASELINK_PRODUCTION_SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -27,6 +30,8 @@ export function deploymentBoundaryIssues(env: DeploymentEnvironment): string[] {
     env.VERCEL_ENV === "production" || env.VERCEL_ENV === "preview"
       ? env.VERCEL_ENV
       : env.CASELINK_ENVIRONMENT;
+  if (target === "connected" && env.CASELINK_PRODUCT === "parent")
+    return parentConfigurationIssues({ ...env });
   if (target !== "production" && target !== "preview") return [];
   if (env.CASELINK_PRODUCT === "parent")
     return parentConfigurationIssues({ ...env });

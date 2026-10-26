@@ -333,32 +333,31 @@
   background: var(--color-paper-hero);
 }
 .hero {
-  max-width: 1360px;
+  max-width: 1240px;
   margin: auto;
-  padding: 3rem 2.5rem 1.5rem;
+  padding: 2.5rem 2.5rem 2rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
-  gap: 2.5rem;
-  align-items: end;
+  gap: 3rem;
+  align-items: center;
 }
 .heroText {
   min-width: 0;
 }
 .hero h1 {
-  font-size: clamp(3rem, 5.2vw, 5rem);
+  font-size: clamp(3rem, 4.5vw, 4.5rem);
   line-height: 1.02;
   letter-spacing: -0.035em;
   max-width: 24ch;
 }
 .heroCopy {
-  margin-top: 1.3rem;
+  margin-top: 1rem;
   font-size: 1.125rem;
   color: var(--color-ink-strong);
 }
 .heroActions {
   display: grid;
   gap: 0.8rem;
-  padding-bottom: 0.25rem;
   text-align: center;
 }
 .heroFootnote {
@@ -371,18 +370,21 @@
 }
 .heroVisual {
   width: 100%;
-  height: clamp(320px, 31vw, 500px);
+  max-width: 1600px;
+  height: clamp(280px, 26vw, 400px);
+  margin: auto;
   overflow: hidden;
 }
 .heroImage {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: center 25%;
   mix-blend-mode: multiply;
 }
 .services {
-  max-width: 1200px;
+  width: calc(100% - 5rem);
+  max-width: 1160px;
   margin: -2.5rem auto 0;
   position: relative;
   z-index: 1;
@@ -1100,10 +1102,6 @@
     gap: 1.75rem;
     grid-template-columns: minmax(0, 1fr) 290px;
   }
-  .services {
-    margin-left: 1.25rem;
-    margin-right: 1.25rem;
-  }
   .hero h1 {
     font-size: 3.2rem;
   }
@@ -1204,6 +1202,7 @@
     height: clamp(180px, 56vw, 250px);
   }
   .services {
+    width: auto;
     grid-template-columns: 1fr;
     margin: -0.75rem 1rem 0;
     padding: 0.25rem 1.25rem;

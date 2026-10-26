@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "iconoir-react";
 import { PROGRAMS } from "@/lib/parent/programs";
+import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
 import styles from "@/features/parent/parent.module.css";
 export const metadata: Metadata = {
   title: "Help & direct support",
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 export default function HelpPage() {
   const existingAccounts =
     process.env.CASELINK_PARENT_ACCOUNT_MODE === "existing";
+  const emailCodeAvailable = parentEmailCodeEnabled(process.env);
   return (
     <div className={`${styles.container} ${styles.legal}`}>
       <h1>Help, without another hurdle.</h1>
@@ -90,17 +92,22 @@ export default function HelpPage() {
             <Link className={styles.textLink} href="/forgot-password">
               reset your existing password
             </Link>
-            . Email-code sign-in is available for supported parent accounts; it
-            does not replace a school account’s password check.
+            .
+            {emailCodeAvailable &&
+              " Email-code sign-in is available for supported parent accounts; it does not replace a school account’s password check."}
+          </p>
+        )}
+        {emailCodeAvailable && (
+          <p>
+            If you use email-code sign-in, choose “Use an email code instead.”
+            Use the same email address as your account, check spam or junk mail,
+            and use the newest code.
           </p>
         )}
         <p>
-          If you use email-code sign-in, choose “Use an email code instead.” Use
-          the same email address as your account, check spam or junk mail, and
-          use the newest code. Never share your password or codes. If you no
-          longer have access to that email, CaseLink does not currently provide
-          an automatic account transfer; contact the program directly for
-          time-sensitive support.
+          Never share your password or codes. If you no longer have access to
+          your email, CaseLink does not currently provide an automatic account
+          transfer; contact the program directly for time-sensitive support.
         </p>
         <Link className={styles.secondary} href="/sign-in">
           Return to sign in

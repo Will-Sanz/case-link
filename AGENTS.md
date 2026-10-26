@@ -51,6 +51,7 @@ Use this north star when making product, design, and technical decisions:
 - Preserve the school environment and records. A parent-specific processing path must not globally remove existing identifier, authorization, session or deployment guards.
 - Reuse the original CaseLink lavender/navy/violet design tokens, Newsreader/Geist typography, shared logo, linked ChatGPT Futures recognition and published policy/contact substance across parent surfaces. The owner explicitly approved imagegen Option 2, Family Panorama; do not introduce a competing parent theme. Keep task screens readable and functional within that identity.
 - Existing CaseLink email/password identities may be reused through the explicit reviewed shared-account mode in `docs/parent-shared-accounts.md`. Preserve separate parent ownership, current grants, active-account checks and school sessions; never copy school family records or delete the shared Auth identity during parent-purpose deletion. Hosted activation requires the documented migration/configuration and release evidence.
+- An explicitly approved, time-bounded localhost connection uses `parent:connected:build` / `parent:connected`, never a production provider relabeled as synthetic. Preserve the approved existing-identity cutoff, closed new enrollment, exact original recovery site and secret-free web runtime. Renewing the database approval or expanding the cohort needs the owner's authorization; this preview does not approve a public family launch.
 
 Current product decisions:
 

@@ -10,6 +10,7 @@ it("offers the existing reset route only when explicitly reusing those accounts"
     }),
   });
   expect(shared.props.existingAccountRecovery).toBe(true);
+  expect(shared.props.emailCodeAvailable).toBe(false);
   expect(shared.props.authNotice).toBe("password-reset-success");
   vi.stubEnv("CASELINK_PARENT_ACCOUNT_MODE", "isolated");
   const isolated = await SignInPage({
@@ -19,5 +20,19 @@ it("offers the existing reset route only when explicitly reusing those accounts"
     }),
   });
   expect(isolated.props.existingAccountRecovery).toBe(false);
+  expect(isolated.props.emailCodeAvailable).toBe(true);
   expect(isolated.props.authNotice).toBeUndefined();
+});
+it("uses the original provider recovery site for the connected local account experience", async () => {
+  vi.stubEnv("CASELINK_ENVIRONMENT", "connected");
+  vi.stubEnv("CASELINK_PARENT_ACCOUNT_MODE", "existing");
+  vi.stubEnv(
+    "CASELINK_PARENT_RECOVERY_SITE_URL",
+    "https://www.old.example.test",
+  );
+  const page = await SignInPage({ searchParams: Promise.resolve({}) });
+  expect(page.props.recoveryHref).toBe(
+    "https://www.old.example.test/forgot-password",
+  );
+  expect(page.props.emailCodeAvailable).toBe(false);
 });

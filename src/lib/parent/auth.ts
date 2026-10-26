@@ -24,7 +24,9 @@ export async function createParentClient() {
       name: "caselink-parent-auth",
       sameSite: "lax",
       httpOnly: true,
-      secure: config.supabaseUrl.startsWith("https://"),
+      secure:
+        config.supabaseUrl.startsWith("https://") &&
+        process.env.CASELINK_ENVIRONMENT !== "connected",
       path: "/",
     },
     cookies: {

@@ -1,6 +1,6 @@
 # CaseLink documentation
 
-**Current product decision: October 25, 2026.** CaseLink is pivoting to parent-owned food support and utility assistance. The parent product is implemented locally on `main`; live release gates remain open. The preserved school baseline and its live environment remain separate. See [implementation progress](parent-support-progress.md) for evidence and open gates.
+**Current product decision: October 25, 2026.** CaseLink is pivoting to parent-owned food support and utility assistance. The parent product is implemented locally on `main`; live release gates remain open. The school baseline is preserved. An additive parent schema and an explicitly approved, time-bounded localhost connection reuse its original account provider while preserving school records and Auth settings. See [implementation progress](parent-support-progress.md) and [connected-account verification](verification/parent-connected-accounts.md) for exact evidence, expiry and open gates.
 
 The latest revision requires maximum useful AI independence from one informed standing authorization and a polished family-ready release across complete food/utility journeys. Earlier preparation-only approval loops and the one-route launch ceiling are superseded. Single-route slices remain useful internal delivery steps; forms, permitted submissions, supported browser work, follow-up and complete product quality belong to the finished scope.
 

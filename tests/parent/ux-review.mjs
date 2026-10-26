@@ -74,9 +74,19 @@ try {
         body = { ok: true, requests: [activeRequest] };
       else if (url.pathname.endsWith("/auth")) {
         body = { ok: true };
-        if (route.request().postDataJSON().action === "verify_code") {
+        if (
+          ["verify_code", "sign_in"].includes(
+            route.request().postDataJSON().action,
+          )
+        ) {
           status = 400;
-          body = { ok: false, error: "That code expired. Request a new one." };
+          body = {
+            ok: false,
+            error:
+              route.request().postDataJSON().action === "verify_code"
+                ? "That code expired. Request a new one."
+                : "Check your email and password, then try again.",
+          };
         }
       } else if (method === "POST" && rejectAnswer) {
         status = 409;
@@ -259,11 +269,18 @@ try {
     await snapshot("account");
     await page.goto(`${origin}/sign-in`, { waitUntil: "networkidle" });
     await page.getByLabel("Your email address").fill("family@example.test");
-    await page
-      .getByRole("button", { name: "Use an email code instead" })
-      .click();
-    await page.getByRole("button", { name: "Email me a code" }).click();
-    await page.getByLabel("Email code").fill("123456");
+    const codeOption = page.getByRole("button", {
+      name: "Use an email code instead",
+    });
+    if (await codeOption.count()) {
+      await codeOption.click();
+      await page.getByRole("button", { name: "Email me a code" }).click();
+      await page.getByLabel("Email code").fill("123456");
+    } else {
+      await page
+        .getByLabel("Password", { exact: true })
+        .fill("synthetic-wrong-password");
+    }
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await page.getByRole("alert").waitFor();
     await snapshot("sign-in-recovery");

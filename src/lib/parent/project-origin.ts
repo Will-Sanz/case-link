@@ -42,6 +42,18 @@ export function parentProjectIsolationIssues(input: {
   const url = new URL(project);
   const existing = input.accountMode === "existing";
   if (
+    input.environment === "connected" &&
+    (!existing ||
+      !project.startsWith("https://") ||
+      !school ||
+      !production ||
+      project !== school ||
+      project !== production)
+  )
+    issues.push(
+      "Connected parent access requires the exact approved existing production project",
+    );
+  if (
     input.accountMode &&
     !["existing", "isolated"].includes(input.accountMode)
   )
