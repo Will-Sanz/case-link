@@ -5,7 +5,11 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
 }));
 vi.mock("./auth", () => ({ requireParentSession: mocks.require }));
-import { applicationBrowser } from "./browser-client";
+import {
+  applicationBrowser,
+  applicationBrowserControl,
+} from "./browser-client";
+import { COMPASS_FAMILY_SAFETY } from "./browser-policy";
 const id = "d430cc02-d8d4-46cc-9900-5b397758fb16";
 beforeEach(() => {
   mocks.owned.mockResolvedValue({ data: { id }, error: null });
@@ -81,4 +85,86 @@ it("reissues only bounded real JPEG frames with private cache controls", async (
     ),
   );
   expect((await applicationBrowser(id, "GET", true)).status).toBe(503);
+});
+
+it("forwards minimal validated controls after owned authentication and binds interactive image URLs", async () => {
+  const frameId = "e1671f04-783d-469e-ad76-a426c2a2d832";
+  const input = {
+    sessionId: id,
+    frameId,
+    action: { type: "continue" as const },
+  };
+  const fetcher = vi.fn().mockResolvedValue(
+    Response.json({
+      ok: true,
+      available: true,
+      reason: null,
+      session: {
+        id,
+        programId: "snap-pa",
+        status: "needs_parent",
+        currentUrl: COMPASS_FAMILY_SAFETY,
+        title: "Pennsylvania COMPASS",
+        summary: "Website check",
+        updatedAt: new Date().toISOString(),
+        canControl: true,
+        frameUrl: "https://untrusted.test/frame",
+        handoff: {
+          kind: "continue",
+          frameId,
+          width: 1100,
+          height: 720,
+          expiresAt: new Date(Date.now() + 600000).toISOString(),
+        },
+      },
+    }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const response = await applicationBrowserControl(id, input);
+  expect(fetcher).toHaveBeenCalledExactlyOnceWith(
+    `http://127.0.0.1:3330/requests/${id}/control`,
+    expect.objectContaining({
+      method: "POST",
+      redirect: "error",
+      cache: "no-store",
+      headers: {
+        authorization: "Bearer verified-user-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(input),
+    }),
+  );
+  expect((await response.json()).session.frameUrl).toBe(
+    `/api/parent/requests/${id}/browser/frame?frameId=${frameId}`,
+  );
+  fetcher.mockResolvedValue(
+    new Response("jpeg", { headers: { "content-type": "image/jpeg" } }),
+  );
+  await applicationBrowser(id, "GET", true, frameId);
+  expect(fetcher.mock.calls.at(-1)?.[0]).toBe(
+    `http://127.0.0.1:3330/requests/${id}/frame?frameId=${frameId}`,
+  );
+  fetcher.mockClear();
+  mocks.owned.mockResolvedValue({ data: null, error: null });
+  await expect(applicationBrowserControl(id, input)).rejects.toThrow(
+    "unavailable",
+  );
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it("preserves stale, throttled and unavailable command results without acknowledging an action", async () => {
+  const input = {
+    sessionId: id,
+    frameId: id,
+    action: { type: "refresh" as const },
+  };
+  for (const status of [400, 403, 409, 429]) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status })),
+    );
+    expect((await applicationBrowserControl(id, input)).status).toBe(status);
+  }
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("timeout")));
+  expect((await applicationBrowserControl(id, input)).status).toBe(503);
 });

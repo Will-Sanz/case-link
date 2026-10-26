@@ -9,7 +9,10 @@ import { chromium, type Browser, type BrowserContext } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createBrowserAuthorizer } from "../src/lib/parent/browser-authority";
-import { browserResponseSchema } from "../src/lib/parent/browser-policy";
+import {
+  browserResponseSchema,
+  type BrowserControl,
+} from "../src/lib/parent/browser-policy";
 import { createApplicationBrowser } from "../src/lib/parent/browser-runner";
 import { createApplicationBrowserServer } from "../src/lib/parent/browser-server";
 import { fixtureIntake, fixtureMandate } from "../src/lib/parent/test-fixtures";
@@ -291,6 +294,19 @@ async function main() {
       });
     }
     const path = `/requests/${fixtures[0].requestId}`;
+    function control(value: unknown, token = fixtures[0].token) {
+      const body = JSON.stringify(value);
+      return send(
+        `${path}/control`,
+        token,
+        "POST",
+        {
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(body)),
+        },
+        body,
+      );
+    }
     stage = "testing the actual HTTP trust boundary";
     const initial = await send(path);
     const metadata = browserResponseSchema.parse(
@@ -340,7 +356,7 @@ async function main() {
     );
     check(
       (await send(path, undefined, "POST", { "content-length": "1" }, "x"))
-        .status === 403,
+        .status === 400,
       "Applicant or other request body input is denied.",
     );
     check(
@@ -352,13 +368,121 @@ async function main() {
           { "transfer-encoding": "chunked" },
           "x",
         )
-      ).status === 403,
+      ).status === 400,
       "Chunked input cannot reach browser work.",
     );
     check(
       (await send(`${path}/frame`)).status === 404,
       "No frame is invented before a real browser is started.",
     );
+    const absentCommand: BrowserControl = {
+      sessionId: randomUUID(),
+      frameId: randomUUID(),
+      action: { type: "continue" },
+    };
+    check(
+      (await control(absentCommand)).status === 403,
+      "An owned request without a browser session cannot accept a control command.",
+    );
+    check(
+      (await control(absentCommand, fixtures[1].token)).status === 403,
+      "A foreign real session cannot control the request.",
+    );
+    check(
+      (await control(absentCommand, "invalid-token")).status === 403,
+      "Control commands require a valid Auth session.",
+    );
+    check(
+      (await send(`${path}/control`)).status === 404,
+      "A read cannot issue browser controls.",
+    );
+    check(
+      (await send(`${path}/control?unexpected=1`, undefined, "POST")).status ===
+        404,
+      "Unexpected control query arguments are denied.",
+    );
+    check(
+      (
+        await send(`${path}/control`, undefined, "POST", {
+          "content-type": "application/json",
+        })
+      ).status === 400,
+      "Empty control requests without a usable fixed-length JSON body are denied.",
+    );
+    const absentBody = JSON.stringify(absentCommand);
+    check(
+      (
+        await send(
+          `${path}/control`,
+          undefined,
+          "POST",
+          {
+            "content-length": String(Buffer.byteLength(absentBody)),
+            "content-type": "text/plain",
+          },
+          absentBody,
+        )
+      ).status === 400,
+      "Control bodies require the exact reviewed JSON content type.",
+    );
+    check(
+      (
+        await send(
+          `${path}/control`,
+          undefined,
+          "POST",
+          {
+            "transfer-encoding": "chunked",
+            "content-type": "application/json",
+          },
+          absentBody,
+        )
+      ).status === 400,
+      "Chunked control input is denied.",
+    );
+    check(
+      (
+        await send(
+          `${path}/control`,
+          undefined,
+          "POST",
+          { "content-length": "1", "content-type": "application/json" },
+          "{",
+        )
+      ).status === 400,
+      "Malformed control JSON is denied.",
+    );
+    check(
+      (await control({ ...absentCommand, extra: true })).status === 400,
+      "Unrecognized control fields are denied.",
+    );
+    check(
+      (
+        await control({
+          ...absentCommand,
+          action: { type: "type", text: "not permitted" },
+        })
+      ).status === 400,
+      "Free text cannot become browser input.",
+    );
+    check(
+      (await control({ ...absentCommand, padding: "x".repeat(2048) }))
+        .status === 400,
+      "Control requests exceeding the fixed byte limit are denied.",
+    );
+    check(
+      (await send(`${path}/frame?frameId=${randomUUID()}`)).status === 404,
+      "A syntactically valid frame nonce cannot invent an image.",
+    );
+    for (const query of [
+      "frameId=invalid",
+      `frameId=${randomUUID()}&extra=1`,
+      `frameId=${randomUUID()}&frameId=${randomUUID()}`,
+    ])
+      check(
+        (await send(`${path}/frame?${query}`)).status === 404,
+        "Malformed, extra or duplicate frame query arguments are denied.",
+      );
     check(
       contexts.length === 0,
       "Metadata and denied requests never launch Chromium.",
@@ -371,12 +495,12 @@ async function main() {
         JSON.parse(started.body.toString()),
       );
       check(
-        started.status === 200 &&
-          session.session &&
-          !session.session.canControl,
-        "The real public viewer starts without household input controls.",
+        started.status === 200 && session.session,
+        "The real website-check session starts without applicant input.",
       );
       let sawFrame = false;
+      let sawHandoff = false;
+      let continuationSent = false;
       let terminal = false;
       const deadline = Date.now() + 120000;
       while (Date.now() < deadline) {
@@ -389,11 +513,14 @@ async function main() {
           JSON.parse(response.body.toString()),
         ).session;
         check(
-          state && !state.canControl,
-          "The viewer never offers applicant input or verification bypass controls.",
+          state,
+          "Owned browser metadata identifies the current website-check session.",
         );
+        let handoffFrameServed = false;
         if (state.frameUrl) {
-          const frame = await send(`${path}/frame`);
+          const frame = await send(
+            `${path}/frame${state.handoff ? `?frameId=${state.handoff.frameId}` : ""}`,
+          );
           if (frame.status === 200) {
             check(
               frame.headers["content-type"] === "image/jpeg" &&
@@ -408,36 +535,124 @@ async function main() {
               "The actual Chromium session produces rendered image bytes.",
             );
             sawFrame = true;
+            handoffFrameServed = Boolean(state.handoff);
           } else
             check(
-              frame.status === 404,
+              frame.status === 404 || frame.status === 409,
               "A frame closed during the read is unavailable rather than stale.",
             );
+        }
+        if (state.status === "needs_parent" && state.canControl) {
+          check(
+            state.handoff &&
+              state.frameUrl &&
+              Date.parse(state.handoff.expiresAt) > Date.now(),
+            "Parent control is bound to a real current frame and unexpired handoff.",
+          );
+          check(
+            handoffFrameServed,
+            "The exact handoff image is served before any ordinary continuation is attempted.",
+          );
+          sawHandoff = true;
+          if (!continuationSent) {
+            check(
+              (await send(`${path}/frame`)).status === 409,
+              "An interactive frame cannot be read without its nonce.",
+            );
+            check(
+              (await send(`${path}/frame?frameId=${randomUUID()}`)).status ===
+                409,
+              "A stale image nonce is denied on the actual active session.",
+            );
+            check(
+              (
+                await send(
+                  `${path}/frame?frameId=${state.handoff.frameId}`,
+                  fixtures[1].token,
+                )
+              ).status === 403,
+              "A foreign real session cannot read the active browser image.",
+            );
+            const command: BrowserControl = {
+              sessionId: state.id,
+              frameId: state.handoff.frameId,
+              action: { type: "continue" },
+            };
+            check(
+              (await control({ ...command, frameId: randomUUID() })).status ===
+                409,
+              "A stale control frame cannot change the actual owned browser.",
+            );
+            check(
+              (await control({ ...command, sessionId: randomUUID() }))
+                .status === 409,
+              "A command from another browser session is denied.",
+            );
+            check(
+              (await control(command, fixtures[1].token)).status === 403,
+              "A foreign owner cannot issue the live continuation.",
+            );
+            if (state.handoff.kind === "continue") {
+              const continued = await control(command);
+              check(
+                continued.status === 200,
+                "One automated synthetic Continue reaches the real same-session control handler without solving a challenge.",
+              );
+              browserResponseSchema.parse(
+                JSON.parse(continued.body.toString()),
+              );
+              continuationSent = true;
+              check(
+                (await control(command)).status === 409,
+                "The same accepted control command cannot execute twice.",
+              );
+              continue;
+            }
+          }
+          check(
+            state.handoff.kind === "challenge",
+            "A second active parent step is an actual supported challenge surface.",
+          );
+          liveOutcome =
+            "visible provider challenge awaiting genuine parent interaction; no challenge solved";
+          terminal = true;
+          break;
         }
         if (
           ["blocked", "closed", "failed", "completed"].includes(state.status)
         ) {
           check(
-            state.status === "blocked" && state.frameUrl === null,
-            "The viewer terminates without claiming application completion.",
+            ["blocked", "completed"].includes(state.status) &&
+              state.frameUrl === null &&
+              !state.canControl &&
+              !state.handoff,
+            "The website check stops with no retained input surface or protected image.",
           );
           check(
-            state.summary.includes(
-              "COMPASS blocked this automated page check",
-            ) || state.summary.includes("official household form is reachable"),
-            "The actual terminal result identifies provider verification or the protected household boundary.",
+            state.summary.includes("No application was submitted") ||
+              state.summary.includes("no application was submitted") ||
+              state.summary.includes(
+                "No household information was entered or submitted",
+              ),
+            "The website-check result does not claim a filing or identity-verification result.",
           );
-          liveOutcome = state.summary.includes("COMPASS blocked")
-            ? "provider verification blocked automation"
-            : "protected household boundary reached";
+          liveOutcome =
+            state.status === "completed"
+              ? "same session reached the blank household form; no applicant entry or filing"
+              : "provider connection stopped safely; no applicant entry or filing";
           terminal = true;
           break;
         }
         await delay(300);
       }
       check(
-        terminal && sawFrame,
-        "One public run shows a real frame and reaches a confirmed stop boundary.",
+        terminal && sawFrame && sawHandoff,
+        "One public run shows an actual nonce-bound handoff and records its honest continuation result.",
+      );
+      const stopped = await send(path, undefined, "DELETE");
+      check(
+        stopped.status === 200,
+        "The live website-check session can be explicitly stopped without another provider action.",
       );
       check(
         Number(contexts.length) === 1 && closedContexts === 1,
