@@ -10,7 +10,11 @@ import {
 } from "./test-fixtures";
 const id = fixtureRequest().id;
 function harness(
-  outcome: "verification" | "household" | "unconfirmed" = "verification",
+  outcome:
+    | "verification"
+    | "household"
+    | "household_changed"
+    | "unconfirmed" = "verification",
 ) {
   let path = "getstarted";
   const paths = [
@@ -28,12 +32,29 @@ function harness(
     const index = paths.indexOf(path);
     path =
       paths[index + 1] ??
-      (outcome === "household" ? "applynow/household" : paths.at(-1)!);
+      (outcome.startsWith("household")
+        ? "applynow/household/householdDetails"
+        : paths.at(-1)!);
   });
   const locator = {
     click: vi.fn(async () => {}),
     isVisible: vi.fn(async () => outcome !== "unconfirmed"),
     first: () => ({ waitFor: vi.fn(async () => {}) }),
+    evaluateAll: vi.fn(async () =>
+      outcome === "household_changed"
+        ? []
+        : [
+            "firstName",
+            "lastName",
+            "dob-datepicker-date",
+            "gender_male",
+            "gender_female",
+          ].map((id) => ({
+            id,
+            type: id.startsWith("gender_") ? "radio" : "text",
+            required: true,
+          })),
+    ),
   };
   const screenshot = vi.fn(
     async (options: { maskColor?: string }): Promise<Buffer> => {
@@ -48,7 +69,11 @@ function harness(
     url: () => `https://www.compass.dhs.pa.gov/intake/#/${path}`,
     getByText: vi.fn(() => locator),
     locator: vi.fn(() => locator),
-    getByRole: vi.fn(() => ({ click, last: () => ({ click }) })),
+    getByRole: vi.fn(() => ({
+      click,
+      isVisible: locator.isVisible,
+      last: () => ({ click }),
+    })),
     waitForURL: vi.fn(async () => {}),
     waitForFunction: vi.fn(async () => {}),
     screenshot,
@@ -128,6 +153,19 @@ it("closes before showing a protected household form", async () => {
   expect(value.session.status).toBe("blocked");
   expect(value.session.frameUrl).toBeNull();
   expect(value.session.summary).toContain("protected application connection");
+  await runner.close();
+});
+it("does not confirm household entry when the exact URL has unknown fields", async () => {
+  const { runner, screenshot, context } = harness("household_changed");
+  await runner.read("verified-token", id, "POST");
+  await vi.waitFor(() => expect(context.close).toHaveBeenCalled());
+  const value = await (await runner.read("verified-token", id, "GET")).json();
+  expect(value.session.summary).toContain(
+    "expected fields could not be confirmed",
+  );
+  expect(value.session.status).toBe("blocked");
+  expect(value.session.frameUrl).toBeNull();
+  expect(screenshot).toHaveBeenCalledTimes(9);
   await runner.close();
 });
 it("stops ongoing work and erases frames when authorization is revoked", async () => {

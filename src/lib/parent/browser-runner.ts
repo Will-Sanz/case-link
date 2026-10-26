@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { BrowserContext, Page } from "@playwright/test";
+import { compassHouseholdEntryObserved } from "./compass-household-entry";
 import {
   COMPASS_ENTRY,
   compassResourceAllowed,
@@ -203,9 +204,13 @@ export function createApplicationBrowser(ports: Ports) {
       );
       await check(job);
       if (page.url().includes("/household")) {
+        const observed = await compassHouseholdEntryObserved(page);
+        await check(job);
         await close(
           job,
-          "The official household form is reachable. CaseLink needs its protected application connection before it can enter or submit household information.",
+          observed
+            ? "The official household form is reachable. CaseLink needs its protected application connection before it can enter or submit household information."
+            : "A household page appeared, but its expected fields could not be confirmed. CaseLink stopped without entering or submitting household information.",
           "blocked",
         );
       } else if (

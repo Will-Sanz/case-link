@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
+import { compassHouseholdEntryObserved } from "../src/lib/parent/compass-household-entry.ts";
 
 assert.equal(
   process.env.CASELINK_SNAP_READINESS_APPROVED,
@@ -79,7 +80,7 @@ try {
         "We were unable to verify your information",
       ),
   );
-  // A visible challenge is a personal step. This runner never interacts with it.
+  // An automation block does not establish an available personal handoff.
   const verificationError = page.getByText(
     "We were unable to verify your information at this time. You can try again.",
     { exact: true },
@@ -88,7 +89,7 @@ try {
     report.outcome = "provider_verification_required";
     report.providerVerificationMessage =
       "We were unable to verify your information at this time. You can try again.";
-  } else if (page.url().includes("/household")) {
+  } else if (await compassHouseholdEntryObserved(page)) {
     report.outcome = "household_entry_reached_no_values_entered";
   } else {
     throw new Error("Provider verification result was not confirmed.");
