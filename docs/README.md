@@ -1,6 +1,6 @@
 # CaseLink documentation
 
-**Current product decision: October 25, 2026.** CaseLink is pivoting to parent-owned food support and utility assistance. The implemented application is still the staff-oriented school baseline; these documents distinguish the intended product from existing behavior.
+**Current product decision: October 25, 2026.** CaseLink is pivoting to parent-owned food support and utility assistance. The parent product is implemented locally on `main`; live release gates remain open. The preserved school baseline and its live environment remain separate. See [implementation progress](parent-support-progress.md) for evidence and open gates.
 
 The latest revision requires maximum useful AI independence from one informed standing authorization and a polished family-ready release across complete food/utility journeys. Earlier preparation-only approval loops and the one-route launch ceiling are superseded. Single-route slices remain useful internal delivery steps; forms, permitted submissions, supported browser work, follow-up and complete product quality belong to the finished scope.
 
@@ -11,7 +11,11 @@ The latest revision requires maximum useful AI independence from one informed st
 3. [AGENTS.md](../AGENTS.md): working instructions, review/testing discipline and product north star.
 4. [Repository README](../README.md) and [partner data guide](../data/README.md): development/status entry points and directory handling.
 
-The PRD defines intended behavior; source code and exact-release verification establish what is implemented. Phase status starts at not started. Change those labels only with evidence. Product requirements do not grant runtime permissions or establish partner integration access.
+The PRD defines intended behavior; source code and exact-release verification establish what is implemented. Phase status changes only with evidence. Product requirements do not grant runtime permissions or establish partner integration access.
+
+[Localhost UI/UX review](verification/parent-ui-ux-review.md) records the production-build visual review, fixes and remaining usability checks. [AI evaluation](parent-ai-evaluation.md) distinguishes deterministic orchestration evidence from live model-quality approval.
+
+[Privacy and regulatory review](parent-privacy-regulatory-review.md) records the October 25 legal applicability research, processor retention distinctions and required launch decisions. It is an engineering assessment for the privacy owner and counsel; it does not certify compliance.
 
 ## Existing school deployment and historical evidence
 

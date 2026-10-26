@@ -230,6 +230,8 @@ Families can inspect/download a readable progress/preparation summary and releva
 
 ## 11. Privacy, consent and legacy isolation (D-02)
 
+Apply the dated [privacy and regulatory review](parent-privacy-regulatory-review.md) and resolve its actual-role and jurisdiction questions before collecting real family data. In particular, WIC/pregnancy and combined-source records require a documented FTC Health Breach Notification Rule assessment; absence of a HIPAA role does not settle that analysis. Agency releases, FERPA roles, adult-account/COPPA boundaries and processor agreements must match actual relationships. Database and Auth controls must enforce the processing gate even for direct API access. Public notices distinguish raw files, derived facts, service records, retained hashes, backups and vendor/recipient copies; never infer zero retention from `store:false` or claim legal compliance from tests.
+
 The parent service has a new purpose and data boundary. Use separate parent production and synthetic staging by default; keep the school deployment/records isolated. Existing school approvals, staff roles and de-identified policy do not supply parent consent or authorize disabling guards.
 
 The data inventory permits only fields/documents needed by a supported active action. Keep government identifiers and authentication secrets outside model context and ordinary request records; where a provider requires them, use direct parent entry or a separately reviewed secure delegated channel. Adding such a channel requires specific permission, threat-model/testing and retention controls; no generic credential collection is implied by one click.

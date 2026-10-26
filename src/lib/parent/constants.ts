@@ -1,0 +1,2 @@
+export const DOCUMENT_CONSENT_VERSION = "2026-10-25";
+export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;

@@ -32,7 +32,7 @@ describe("complete serializer to provider privacy boundary",()=>{
     if(field==="resource office")resource.office_or_department=privateText;
     if(field==="resource category")resource.category=privateText;
     if(field==="resource reason")detail.resourceMatches[0].match_reason=privateText;
-    const snapshot=buildPlanningSnapshot(detail,field==="instructions"?privateText:undefined);
+    const snapshot=buildPlanningSnapshot(detail,field==="instructions"?privateText:undefined,new Date("2026-10-15T12:00:00Z"));
     expect(await tryGenerateLeanPlanPhaseOpenAI(snapshot,"30",{priorPhasesSummary:field==="prior phase"?privateText:undefined,retries:1})).toMatchObject({ok:false});
     noTransmission();
   });
@@ -77,7 +77,7 @@ describe("complete serializer to provider privacy boundary",()=>{
     Object.assign(detail.resourceMatches[0].resource!, { description: "Housing stabilization for adults only.", additional_info: privateText });
     successfulResponse(path==="assistant"?{answer:"Confirm intake availability.",resource_ids:[directoryId]}:{steps:[path==="generation"?{...generatedPlanStep,resource_ids:[directoryId]}:{...refinedPlanStep,resource_ids:[directoryId]}]});
     const result=path==="assistant"?await askCaseAssistant(detail,"Help prepare intake"):
-      path==="generation"?await tryGenerateLeanPlanPhaseOpenAI(buildPlanningSnapshot(detail),"30",{retries:1}):
+      path==="generation"?await tryGenerateLeanPlanPhaseOpenAI(buildPlanningSnapshot(detail,undefined,new Date("2026-10-15T12:00:00Z")),"30",{retries:1}):
       await previewRefinePlanStepsWithOpenAI(detail,[draft()],"Clarify",{taskType:path});
     expect(result).toMatchObject({ok:true});
     expect(mocks.fetch).toHaveBeenCalledTimes(1);

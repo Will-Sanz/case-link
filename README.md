@@ -2,7 +2,7 @@
 
 CaseLink's current product direction is direct-to-parent food support and utility assistance with maximum useful AI independence. After minimum intake and one informed authorization, AI chooses and pursues supported programs, handles permitted paperwork/submissions, follows up, and brings in a person only for a real necessary step. The finished release must be a complete, polished product families can use.
 
-**Implementation status:** the repository still contains the staff-oriented case-manager application. The parent experience, signup, private document processing, agent tools, partner execution, and durable follow-up below are requirements to implement, not live capabilities. This documentation update does not change a hosted deployment or authorize real parent data processing.
+**Implementation status:** the parent app is implemented locally on `main` with verified-email accounts, scoped household data, consented documents, durable service jobs, source-backed AI tools, permission controls and current/exact-packet PDF exports. Local automated and production-build UI/UX checks passed; no hosted deployment or real-family processing has been enabled. Live partner transports and final release evidence remain explicit gates in [implementation progress](docs/parent-support-progress.md).
 
 ## Current product documents
 
@@ -38,15 +38,17 @@ Preparation, referral sending, partner acceptance, agency submission, assistance
 | PDF | @react-pdf/renderer and pdf-lib, reviewed-plan and family-takeaway tests | Reuse for supported forms, useful summaries and exact attempted/submitted packets/receipts |
 | Hosting | Managed Vercel and Supabase school deployment; synthetic staging | Separate parent service environment and synthetic staging; retain legacy isolation |
 
-The existing app has invitation-only staff access, de-identified family planning, edited/dated actions, reviewed PDFs and family takeaways. It has no parent accounts or supported upload/referral execution. Read the [legacy operations runbook](docs/production-operations-runbook.md) before operating that deployment; those school settings must not be relaxed to make the parent prototype work.
+The existing app has invitation-only staff access, de-identified family planning, edited/dated actions, reviewed PDFs and family takeaways. Its school routes remain alongside the separate parent implementation; school deployment approvals do not enable parent processing. Read the [legacy operations runbook](docs/production-operations-runbook.md) before operating that deployment; those school settings must not be relaxed to make the parent prototype work.
 
 The current code is preserved on **codex/case-manager-baseline-2026-10-25**, commit **700bb46**. Main was fast-forwarded to this baseline before the parent documentation changes. The original codex/school-pilot-readiness branch remains intact. These are local Git states; remote publication and hosted deployment are separate operations. Existing untracked design assets and temporary outputs remain outside the preservation commit.
 
 ## Development and verification
 
-Use a supported, patched Node 24.x release (.nvmrc), matching CI and hosting, and install locked dependencies with `npm ci`. Use .env.example as the current runtime configuration reference, then `npm run dev`. Read AGENTS.md and installed Next.js guides before framework changes. New parent-mode configuration belongs to the implementation plan; .env.example and current environment validation still encode the school baseline.
+Use a supported, patched Node 24.x release (.nvmrc), matching CI and hosting, and install locked dependencies with `npm ci`. Read AGENTS.md and installed Next.js guides before framework changes. Parent environment examples, isolated background services and test commands are in [the parent runtime guide](docs/parent-support-runtime.md). The older `.env.example` and production runbook describe the preserved school environment.
 
-Existing commands below verify the implemented school application until explicitly extended for parent workflows. A passing existing suite does not certify the proposed parent service.
+Run `npm run parent:verify` for the clean synthetic parent verification path. The focused `parent:test`, `parent:test:db`, `parent:test:pdf` and `parent:test:visual` commands distinguish unit/SQL/PDF/browser evidence. Source tests and a successful build do not certify live provider execution or family readiness.
+
+Legacy commands remain available while school routes are retained:
 
 - `npm run verify`: lockfile/resource/secret checks, typecheck, lint, unit/component tests and production build; the pre-push hook runs it.
 - `npm run test:auth-security`: real local Auth lifecycle, password-session and role-access tests.

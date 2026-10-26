@@ -1,7 +1,7 @@
 # CaseLink parent support implementation plan
 
 **Planning revision:** October 25, 2026 (America/New_York)
-**Status:** Requirements revised; application implementation not started
+**Status:** Local parent implementation and synthetic verification complete; external integration and hosted release gates remain open
 **Product authority:** [Parent support MVP PRD](parent-support-mvp-prd.md)
 **Working branch:** `main`
 **Preserved case-manager baseline:** `codex/case-manager-baseline-2026-10-25` at `700bb46`
@@ -24,7 +24,7 @@ Human identity/signature/attestation/clinical/legal/financial requirements remai
 | --- | --- |
 | School source | Original `codex/school-pilot-readiness` branch remains at `38db6b6`; preserved baseline includes prior background-work instructions at `700bb46` |
 | Main | Fast-forwarded to the baseline, then initial parent documentation committed as `e43ab95`; this is a further requirements revision |
-| Application | Still staff-oriented; no parent mandate/tool/connector/UI implementation is implied by these docs |
+| Application | Parent UI/API, ownership/grants, worker/service, documents/forms, exact operations/receipts and verification now implemented locally; live program transports remain disabled |
 | Local assets | Existing untracked skills, design assets, output and temporary files remain untouched and outside these commits |
 | Hosting/data | Unchanged; separate parent service/staging from the school environment and records |
 
@@ -54,7 +54,7 @@ Read installed Next.js guides before framework code and current official vendor 
 
 ## 4. Phases, dependencies and scope control
 
-All application phases remain **not started**. The old 5–8-week estimate described a narrower product and is superseded. Phase 0 produces an evidence-based estimate for the full coverage/quality target after route feasibility and staffing are known. Time pressure can change delivery order or staffing; it must not silently redefine the completed product.
+Phases 1–3 now have local implementations and synthetic evidence; Phase 4 has the execution/recovery foundation but awaits verified real program transports. Phase 0 still needs external completion contracts and family discovery, and Phase 5 still needs actual infrastructure, release and family-observation evidence. See [implementation progress](parent-support-progress.md) for exact checks and limitations. The old 5–8-week estimate described a narrower product and is superseded. Phase 0 produces an evidence-based estimate for the full coverage/quality target after route feasibility and staffing are known. Time pressure can change delivery order or staffing; it must not silently redefine the completed product.
 
 | Phase | Deliverable | Main dependency | Exit distinction |
 | --- | --- | --- | --- |

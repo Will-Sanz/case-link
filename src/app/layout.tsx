@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s | CaseLink",
   },
   description:
-    "CaseLink helps school case managers turn complex family needs into clear next steps, structured intervention plans, and review-ready PDFs.",
+    "CaseLink helps parents find food support and utility assistance, handle supported next steps, and keep track of progress with control over their information.",
   icons: {
     icon: [{ url: "/favicon.svg?v=3", type: "image/svg+xml" }],
     shortcut: "/favicon.svg?v=3",

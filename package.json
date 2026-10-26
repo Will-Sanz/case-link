@@ -41,7 +41,17 @@
     "prebuild": "node scripts/clear-compiler-cache.mjs",
     "predev": "node scripts/clear-compiler-cache.mjs",
     "test:legacy-containment": "node scripts/test-legacy-containment.mjs",
-    "test:legacy-upgrade": "node scripts/test-legacy-upgrade.mjs"
+    "test:legacy-upgrade": "node scripts/test-legacy-upgrade.mjs",
+    "parent:verify": "node scripts/verify-parent.mjs",
+    "parent:test": "NODE_ENV=test vitest run src/lib/parent src/features/parent src/app/api/parent",
+    "parent:test:db": "node --import tsx scripts/test-parent-database-security.ts",
+    "parent:test:pdf": "node --import tsx scripts/test-parent-pdfs.ts",
+    "parent:test:visual": "node --import tsx tests/parent/visual-check.mjs",
+    "parent:worker": "node --import tsx scripts/parent-support-worker.ts",
+    "parent:retention": "node --import tsx scripts/parent-support-retention.ts",
+    "parent:storage-broker": "node --import tsx scripts/parent-storage-broker.ts",
+    "parent:preview": "node scripts/serve-parent.mjs",
+    "parent:test:ux": "node --import tsx tests/parent/ux-review.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",
@@ -53,10 +63,13 @@
     "iconoir-react": "^7.11.1",
     "next": "16.3.8",
     "pdf-lib": "^1.17.1",
+    "pg": "^8.16.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.71.2",
     "react-markdown": "^10.1.0",
+    "sharp": "0.35.5",
+    "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -76,9 +89,7 @@
     "eslint-config-next": "16.3.8",
     "husky": "^9.1.7",
     "jsdom": "^29.0.2",
-    "pg": "^8.16.3",
     "tailwindcss": "^4",
-    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.11"
   }

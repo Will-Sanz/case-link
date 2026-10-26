@@ -1,259 +1,249 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-03T00:06:37Z",
-  "title": "Design System: CaseLink",
+  "generatedAt": "2026-10-26T02:41:59.798208+00:00",
+  "title": "Design System: CaseLink parent support",
   "extensions": {
     "colorMeta": {
+      "navy-ink": {
+        "role": "neutral",
+        "displayName": "Navy Ink",
+        "canonical": "#122c37",
+        "tonalRamp": [
+          "oklch(15% 0.0377 228.0)",
+          "oklch(26% 0.0377 228.0)",
+          "oklch(37% 0.0377 228.0)",
+          "oklch(48% 0.0377 228.0)",
+          "oklch(59% 0.0377 228.0)",
+          "oklch(70% 0.0377 228.0)",
+          "oklch(82% 0.0377 228.0)",
+          "oklch(95% 0.0377 228.0)"
+        ]
+      },
+      "body-muted": {
+        "role": "neutral",
+        "displayName": "Body Muted",
+        "canonical": "#4d646b",
+        "tonalRamp": [
+          "oklch(15% 0.0297 218.4)",
+          "oklch(26% 0.0297 218.4)",
+          "oklch(37% 0.0297 218.4)",
+          "oklch(48% 0.0297 218.4)",
+          "oklch(59% 0.0297 218.4)",
+          "oklch(70% 0.0297 218.4)",
+          "oklch(82% 0.0297 218.4)",
+          "oklch(95% 0.0297 218.4)"
+        ]
+      },
       "primary": {
         "role": "primary",
-        "displayName": "Forest Action Green",
-        "canonical": "#276221",
-        "tonalRamp": ["oklch(15% 0.115 141.8)", "oklch(26% 0.115 141.8)", "oklch(37% 0.115 141.8)", "oklch(48% 0.115 141.8)", "oklch(59% 0.115 141.8)", "oklch(70% 0.115 141.8)", "oklch(82% 0.115 141.8)", "oklch(95% 0.115 141.8)"]
+        "displayName": "Primary",
+        "canonical": "#086a63",
+        "tonalRamp": [
+          "oklch(15% 0.0807 186.8)",
+          "oklch(26% 0.0807 186.8)",
+          "oklch(37% 0.0807 186.8)",
+          "oklch(48% 0.0807 186.8)",
+          "oklch(59% 0.0807 186.8)",
+          "oklch(70% 0.0807 186.8)",
+          "oklch(82% 0.0807 186.8)",
+          "oklch(95% 0.0807 186.8)"
+        ]
       },
       "primary-hover": {
         "role": "primary",
-        "displayName": "Deep Forest Hover",
-        "canonical": "#1f531b",
-        "tonalRamp": ["oklch(15% 0.103 142.2)", "oklch(26% 0.103 142.2)", "oklch(37% 0.103 142.2)", "oklch(48% 0.103 142.2)", "oklch(59% 0.103 142.2)", "oklch(70% 0.103 142.2)", "oklch(82% 0.103 142.2)", "oklch(95% 0.103 142.2)"]
-      },
-      "focus-green": {
-        "role": "primary",
-        "displayName": "Focused Leaf",
-        "canonical": "#46923c",
-        "tonalRamp": ["oklch(15% 0.143 141.4)", "oklch(26% 0.143 141.4)", "oklch(37% 0.143 141.4)", "oklch(48% 0.143 141.4)", "oklch(59% 0.143 141.4)", "oklch(70% 0.143 141.4)", "oklch(82% 0.143 141.4)", "oklch(95% 0.143 141.4)"]
-      },
-      "forest-ink": {
-        "role": "neutral",
-        "displayName": "Forest Ink",
-        "canonical": "#173a15",
-        "tonalRamp": ["oklch(15% 0.074 142.6)", "oklch(26% 0.074 142.6)", "oklch(37% 0.074 142.6)", "oklch(48% 0.074 142.6)", "oklch(59% 0.074 142.6)", "oklch(70% 0.074 142.6)", "oklch(82% 0.074 142.6)", "oklch(95% 0.074 142.6)"]
-      },
-      "body-ink": {
-        "role": "neutral",
-        "displayName": "Service Ink",
-        "canonical": "#365134",
-        "tonalRamp": ["oklch(15% 0.058 142.8)", "oklch(26% 0.058 142.8)", "oklch(37% 0.058 142.8)", "oklch(48% 0.058 142.8)", "oklch(59% 0.058 142.8)", "oklch(70% 0.058 142.8)", "oklch(82% 0.058 142.8)", "oklch(95% 0.058 142.8)"]
-      },
-      "muted-ink": {
-        "role": "neutral",
-        "displayName": "Muted Moss",
-        "canonical": "#5d705a",
-        "tonalRamp": ["oklch(15% 0.041 141.3)", "oklch(26% 0.041 141.3)", "oklch(37% 0.041 141.3)", "oklch(48% 0.041 141.3)", "oklch(59% 0.041 141.3)", "oklch(70% 0.041 141.3)", "oklch(82% 0.041 141.3)", "oklch(95% 0.041 141.3)"]
-      },
-      "soft-ink": {
-        "role": "neutral",
-        "displayName": "Soft Moss",
-        "canonical": "#778874",
-        "tonalRamp": ["oklch(15% 0.036 140.9)", "oklch(26% 0.036 140.9)", "oklch(37% 0.036 140.9)", "oklch(48% 0.036 140.9)", "oklch(59% 0.036 140.9)", "oklch(70% 0.036 140.9)", "oklch(82% 0.036 140.9)", "oklch(95% 0.036 140.9)"]
+        "displayName": "Primary Hover",
+        "canonical": "#04544f",
+        "tonalRamp": [
+          "oklch(15% 0.0687 187.8)",
+          "oklch(26% 0.0687 187.8)",
+          "oklch(37% 0.0687 187.8)",
+          "oklch(48% 0.0687 187.8)",
+          "oklch(59% 0.0687 187.8)",
+          "oklch(70% 0.0687 187.8)",
+          "oklch(82% 0.0687 187.8)",
+          "oklch(95% 0.0687 187.8)"
+        ]
       },
       "paper": {
         "role": "neutral",
-        "displayName": "Warm Paper",
-        "canonical": "#f6f8f4",
-        "tonalRamp": ["oklch(15% 0.006 128.5)", "oklch(26% 0.006 128.5)", "oklch(37% 0.006 128.5)", "oklch(48% 0.006 128.5)", "oklch(59% 0.006 128.5)", "oklch(70% 0.006 128.5)", "oklch(82% 0.006 128.5)", "oklch(95% 0.006 128.5)"]
+        "displayName": "Paper",
+        "canonical": "#f7faf8",
+        "tonalRamp": [
+          "oklch(15% 0.0041 157.2)",
+          "oklch(26% 0.0041 157.2)",
+          "oklch(37% 0.0041 157.2)",
+          "oklch(48% 0.0041 157.2)",
+          "oklch(59% 0.0041 157.2)",
+          "oklch(70% 0.0041 157.2)",
+          "oklch(82% 0.0041 157.2)",
+          "oklch(95% 0.0041 157.2)"
+        ]
       },
       "surface": {
         "role": "neutral",
-        "displayName": "Clean Sheet",
+        "displayName": "Surface",
         "canonical": "#ffffff",
-        "tonalRamp": ["oklch(15% 0.000 89.9)", "oklch(26% 0.000 89.9)", "oklch(37% 0.000 89.9)", "oklch(48% 0.000 89.9)", "oklch(59% 0.000 89.9)", "oklch(70% 0.000 89.9)", "oklch(82% 0.000 89.9)", "oklch(95% 0.000 89.9)"]
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.9)",
+          "oklch(26% 0.0000 89.9)",
+          "oklch(37% 0.0000 89.9)",
+          "oklch(48% 0.0000 89.9)",
+          "oklch(59% 0.0000 89.9)",
+          "oklch(70% 0.0000 89.9)",
+          "oklch(82% 0.0000 89.9)",
+          "oklch(95% 0.0000 89.9)"
+        ]
       },
-      "green-wash": {
+      "soft": {
         "role": "neutral",
-        "displayName": "Quiet Green Wash",
-        "canonical": "#edf4eb",
-        "tonalRamp": ["oklch(15% 0.014 138.7)", "oklch(26% 0.014 138.7)", "oklch(37% 0.014 138.7)", "oklch(48% 0.014 138.7)", "oklch(59% 0.014 138.7)", "oklch(70% 0.014 138.7)", "oklch(82% 0.014 138.7)", "oklch(95% 0.014 138.7)"]
-      },
-      "green-mist": {
-        "role": "neutral",
-        "displayName": "Open Green Mist",
-        "canonical": "#e7f1e4",
-        "tonalRamp": ["oklch(15% 0.020 138.4)", "oklch(26% 0.020 138.4)", "oklch(37% 0.020 138.4)", "oklch(48% 0.020 138.4)", "oklch(59% 0.020 138.4)", "oklch(70% 0.020 138.4)", "oklch(82% 0.020 138.4)", "oklch(95% 0.020 138.4)"]
+        "displayName": "Soft",
+        "canonical": "#eaf4f0",
+        "tonalRamp": [
+          "oklch(15% 0.0118 170.3)",
+          "oklch(26% 0.0118 170.3)",
+          "oklch(37% 0.0118 170.3)",
+          "oklch(48% 0.0118 170.3)",
+          "oklch(59% 0.0118 170.3)",
+          "oklch(70% 0.0118 170.3)",
+          "oklch(82% 0.0118 170.3)",
+          "oklch(95% 0.0118 170.3)"
+        ]
       },
       "border": {
         "role": "neutral",
-        "displayName": "Quiet Rule",
-        "canonical": "#dce6d9",
-        "tonalRamp": ["oklch(15% 0.020 138.4)", "oklch(26% 0.020 138.4)", "oklch(37% 0.020 138.4)", "oklch(48% 0.020 138.4)", "oklch(59% 0.020 138.4)", "oklch(70% 0.020 138.4)", "oklch(82% 0.020 138.4)", "oklch(95% 0.020 138.4)"]
+        "displayName": "Border",
+        "canonical": "#d6e1dc",
+        "tonalRamp": [
+          "oklch(15% 0.0136 167.1)",
+          "oklch(26% 0.0136 167.1)",
+          "oklch(37% 0.0136 167.1)",
+          "oklch(48% 0.0136 167.1)",
+          "oklch(59% 0.0136 167.1)",
+          "oklch(70% 0.0136 167.1)",
+          "oklch(82% 0.0136 167.1)",
+          "oklch(95% 0.0136 167.1)"
+        ]
       },
-      "control-border": {
+      "support-lemon": {
+        "role": "secondary",
+        "displayName": "Support Lemon",
+        "canonical": "#eff4b9",
+        "tonalRamp": [
+          "oklch(15% 0.0762 111.8)",
+          "oklch(26% 0.0762 111.8)",
+          "oklch(37% 0.0762 111.8)",
+          "oklch(48% 0.0762 111.8)",
+          "oklch(59% 0.0762 111.8)",
+          "oklch(70% 0.0762 111.8)",
+          "oklch(82% 0.0762 111.8)",
+          "oklch(95% 0.0762 111.8)"
+        ]
+      },
+      "error": {
         "role": "neutral",
-        "displayName": "Control Rule",
-        "canonical": "#cfdccc",
-        "tonalRamp": ["oklch(15% 0.026 139.8)", "oklch(26% 0.026 139.8)", "oklch(37% 0.026 139.8)", "oklch(48% 0.026 139.8)", "oklch(59% 0.026 139.8)", "oklch(70% 0.026 139.8)", "oklch(82% 0.026 139.8)", "oklch(95% 0.026 139.8)"]
-      },
-      "soft-leaf": {
-        "role": "neutral",
-        "displayName": "Soft Leaf",
-        "canonical": "#cce7c9",
-        "tonalRamp": ["oklch(15% 0.049 142.4)", "oklch(26% 0.049 142.4)", "oklch(37% 0.049 142.4)", "oklch(48% 0.049 142.4)", "oklch(59% 0.049 142.4)", "oklch(70% 0.049 142.4)", "oklch(82% 0.049 142.4)", "oklch(95% 0.049 142.4)"]
-      },
-      "review-bg": {
-        "role": "tertiary",
-        "displayName": "Review Amber Background",
-        "canonical": "#fff5da",
-        "tonalRamp": ["oklch(15% 0.037 90.1)", "oklch(26% 0.037 90.1)", "oklch(37% 0.037 90.1)", "oklch(48% 0.037 90.1)", "oklch(59% 0.037 90.1)", "oklch(70% 0.037 90.1)", "oklch(82% 0.037 90.1)", "oklch(95% 0.037 90.1)"]
-      },
-      "review-ink": {
-        "role": "tertiary",
-        "displayName": "Review Amber Ink",
-        "canonical": "#765a16",
-        "tonalRamp": ["oklch(15% 0.090 84.8)", "oklch(26% 0.090 84.8)", "oklch(37% 0.090 84.8)", "oklch(48% 0.090 84.8)", "oklch(59% 0.090 84.8)", "oklch(70% 0.090 84.8)", "oklch(82% 0.090 84.8)", "oklch(95% 0.090 84.8)"]
-      },
-      "error-bg": {
-        "role": "tertiary",
-        "displayName": "Plain Error Background",
-        "canonical": "#fef2f2",
-        "tonalRamp": ["oklch(15% 0.013 17.4)", "oklch(26% 0.013 17.4)", "oklch(37% 0.013 17.4)", "oklch(48% 0.013 17.4)", "oklch(59% 0.013 17.4)", "oklch(70% 0.013 17.4)", "oklch(82% 0.013 17.4)", "oklch(95% 0.013 17.4)"]
-      },
-      "error-ink": {
-        "role": "tertiary",
-        "displayName": "Plain Error Ink",
-        "canonical": "#a32929",
-        "tonalRamp": ["oklch(15% 0.159 25.6)", "oklch(26% 0.159 25.6)", "oklch(37% 0.159 25.6)", "oklch(48% 0.159 25.6)", "oklch(59% 0.159 25.6)", "oklch(70% 0.159 25.6)", "oklch(82% 0.159 25.6)", "oklch(95% 0.159 25.6)"]
-      },
-      "print-ink": {
-        "role": "neutral",
-        "displayName": "Print Ink",
-        "canonical": "#000000",
-        "tonalRamp": ["#000000"]
-      },
-      "print-muted": {
-        "role": "neutral",
-        "displayName": "Print Muted",
-        "canonical": "#333333",
-        "tonalRamp": ["#333333"]
+        "displayName": "Error",
+        "canonical": "#962f29",
+        "tonalRamp": [
+          "oklch(15% 0.1390 27.3)",
+          "oklch(26% 0.1390 27.3)",
+          "oklch(37% 0.1390 27.3)",
+          "oklch(48% 0.1390 27.3)",
+          "oklch(59% 0.1390 27.3)",
+          "oklch(70% 0.1390 27.3)",
+          "oklch(82% 0.1390 27.3)",
+          "oklch(95% 0.1390 27.3)"
+        ]
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Public Display", "purpose": "Short public hero statements that establish confidence and the product promise." },
-      "headline": { "displayName": "Section Headline", "purpose": "Major public section statements at wide breakpoints." },
-      "title": { "displayName": "Workspace Title", "purpose": "Page titles, family names, and completion states." },
-      "body": { "displayName": "Operational Body", "purpose": "Default workspace copy and control text." },
-      "label": { "displayName": "Wayfinding Label", "purpose": "Sparse uppercase navigation-group labels; not ordinary form labels." },
-      "micro": { "displayName": "Micro Indicator", "purpose": "Tiny checkmarks and compact data indicators." },
-      "caption": { "displayName": "Caption", "purpose": "Provenance, timestamps, and secondary labels." },
-      "compact": { "displayName": "Compact UI", "purpose": "Dense operational metadata and controls." },
-      "reading": { "displayName": "Reading UI", "purpose": "Editable plan text and focused legal copy." },
-      "brand": { "displayName": "Wordmark", "purpose": "CaseLink brand text only." },
-      "legal": { "displayName": "Legal Reading", "purpose": "Long-form legal content." },
-      "legal-compact": { "displayName": "Legal Metadata", "purpose": "Legal document metadata and supporting labels." },
-      "print": { "displayName": "PDF Print", "purpose": "Reliable monochrome PDF output using Helvetica." }
+      "display": {
+        "displayName": "Entry display",
+        "purpose": "Public entry headline."
+      },
+      "body": {
+        "displayName": "Readable body",
+        "purpose": "Forms, service explanations and progress."
+      }
     },
-    "shadows": [
-      { "name": "action-lift", "value": "0 5px 14px rgba(39,98,33,0.14)", "purpose": "Default primary button elevation." },
-      { "name": "working-surface", "value": "0 10px 30px rgba(30,70,27,0.06)", "purpose": "Low ambient depth for primary paperwork panels." },
-      { "name": "decision-surface", "value": "0 24px 60px rgba(30,70,27,0.12)", "purpose": "Demo forms and completion states that need focused attention." },
-      { "name": "product-proof", "value": "0 30px 80px rgba(30,70,27,0.16)", "purpose": "Large public product-preview compositions only." }
-    ],
+    "shadows": [],
     "motion": [
-      { "name": "fast", "value": "150ms ease", "purpose": "Control hover, focus, and pressed-state feedback." },
-      { "name": "normal", "value": "200ms ease", "purpose": "Standard surface and navigation transitions." },
-      { "name": "hero-reveal", "value": "700ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "One-time public hero reveal when reduced motion is not requested." }
+      {
+        "name": "control",
+        "value": "160ms ease",
+        "purpose": "Control color and boundary transitions; reduced-motion preference is honored."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "40rem" },
-      { "name": "md", "value": "48rem" },
-      { "name": "lg", "value": "64rem" }
+      {
+        "name": "tablet",
+        "value": "900px"
+      },
+      {
+        "name": "phone",
+        "value": "760px"
+      }
     ]
   },
   "components": [
     {
-      "name": "Primary Button",
+      "name": "Primary action",
       "kind": "button",
-      "refersTo": "button-primary",
-      "description": "The single strongest action in a task area, with quiet lift and an explicit focus ring.",
-      "html": "<button class=\"ds-btn-primary\">Continue to review<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
-      "css": ".ds-btn-primary { display:inline-flex; min-height:44px; align-items:center; justify-content:center; gap:8px; border:0; border-radius:8px; background:var(--primary, #276221); color:#fff; padding:8px 16px; font-family:var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size:14px; font-weight:600; box-shadow:0 5px 14px rgba(39,98,33,.14); cursor:pointer; transition:background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease; } .ds-btn-primary svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; } .ds-btn-primary:hover { background:var(--primary-hover, #1f531b); transform:translateY(-1px); box-shadow:0 7px 18px rgba(39,98,33,.18); } .ds-btn-primary:active { transform:translateY(0); } .ds-btn-primary:focus-visible { outline:2px solid rgba(70,146,60,.35); outline-offset:2px; }"
+      "description": "Primary action from the parent interface.",
+      "html": "<button class=\"ds-primary\">Save and continue</button>",
+      "css": ".ds-primary{background:#086a63;color:#fff;border:1px solid transparent;border-radius:9px;min-height:48px;padding:12px 19px;font:650 15px/1.4 \"Geist Sans\",sans-serif;cursor:pointer}.ds-primary:hover{background:#04544f}.ds-primary:focus-visible{outline:3px solid #087f78;outline-offset:3px}",
+      "refersTo": "button-primary"
     },
     {
-      "name": "Secondary Button",
+      "name": "Secondary action",
       "kind": "button",
-      "refersTo": "button-secondary",
-      "description": "A supportive action that stays visually inside the green paper system.",
-      "html": "<button class=\"ds-btn-secondary\">Save draft</button>",
-      "css": ".ds-btn-secondary { display:inline-flex; min-height:40px; align-items:center; justify-content:center; border:0; border-radius:8px; background:var(--muted-bg, #edf4eb); color:var(--primary, #276221); padding:8px 16px; font-family:var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size:14px; font-weight:600; cursor:pointer; transition:background-color 150ms ease; } .ds-btn-secondary:hover { background:#dfeedd; } .ds-btn-secondary:active { background:#d8ead5; } .ds-btn-secondary:focus-visible { outline:2px solid rgba(70,146,60,.3); outline-offset:2px; }"
+      "description": "Secondary action from the parent interface.",
+      "html": "<button class=\"ds-secondary\">Download summary</button>",
+      "css": ".ds-secondary{background:#fff;color:#122c37;border:1px solid #9cb5ad;border-radius:9px;min-height:48px;padding:12px 19px;font:650 15px/1.4 \"Geist Sans\",sans-serif;cursor:pointer}.ds-secondary:hover{background:#eaf4f0}.ds-secondary:focus-visible{outline:3px solid #087f78;outline-offset:3px}"
     },
     {
-      "name": "Outline Button",
-      "kind": "button",
-      "refersTo": "button-outline",
-      "description": "A contained low-emphasis action for pairing with a primary button.",
-      "html": "<button class=\"ds-btn-outline\">Start over</button>",
-      "css": ".ds-btn-outline { display:inline-flex; min-height:40px; align-items:center; justify-content:center; border:1px solid #cfdccc; border-radius:8px; background:#fff; color:#365134; padding:8px 16px; font-family:var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size:14px; font-weight:600; cursor:pointer; transition:background-color 150ms ease, border-color 150ms ease; } .ds-btn-outline:hover { background:#f3f7f1; border-color:#bdd2b9; } .ds-btn-outline:active { background:#edf4eb; } .ds-btn-outline:focus-visible { outline:2px solid rgba(70,146,60,.3); outline-offset:2px; }"
-    },
-    {
-      "name": "Text Field",
+      "name": "Factual input",
       "kind": "input",
-      "refersTo": "input",
-      "description": "A plain-language field with a strong, broad focus treatment.",
-      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Family label</span><input class=\"ds-field-input\" placeholder=\"Example: Family A-104\" /></label>",
-      "css": ".ds-field { display:block; color:#365134; font-family:var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size:14px; font-weight:600; } .ds-field-label { display:block; margin-bottom:8px; } .ds-field-input { display:block; width:100%; min-height:44px; border:1px solid #cfdccc; border-radius:8px; background:#fff; color:#253f23; padding:10px 12px; font:400 14px/1.5 var(--font-sans, ui-sans-serif, system-ui, sans-serif); transition:border-color 150ms ease, box-shadow 150ms ease; } .ds-field-input::placeholder { color:#778874; } .ds-field-input:hover { border-color:#bdd2b9; } .ds-field-input:focus { border-color:#46923c; outline:0; box-shadow:0 0 0 4px rgba(70,146,60,.1); }"
+      "description": "Factual input from the parent interface.",
+      "html": "<label class=\"ds-label\" for=\"ds-zip\">Household ZIP code</label><input class=\"ds-input\" id=\"ds-zip\" value=\"19104\" inputmode=\"numeric\">",
+      "css": ".ds-label{display:block;color:#122c37;font:600 16px/1.6 \"Geist Sans\",sans-serif}.ds-input{min-height:48px;border:1px solid #9cb3ac;border-radius:8px;background:#fff;padding:11px 13px;font:16px/1.5 \"Geist Sans\",sans-serif}.ds-input:focus-visible{outline:3px solid #087f78;outline-offset:3px}"
     },
     {
-      "name": "Workspace Navigation Item",
-      "kind": "nav",
-      "description": "The active rail item pairs a restrained icon with a green-tinted location cue.",
-      "html": "<a class=\"ds-nav-item ds-nav-item-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/></svg><span>Families</span></a>",
-      "css": ".ds-nav-item { display:flex; min-height:40px; align-items:center; gap:12px; border-radius:8px; padding:0 12px; color:#5d705a; font:500 14px/1.4 var(--font-sans, ui-sans-serif, system-ui, sans-serif); text-decoration:none; transition:background-color 150ms ease, color 150ms ease; } .ds-nav-item svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; } .ds-nav-item:hover { background:#f1f6ef; color:#173a15; } .ds-nav-item-active { background:#e2efe0; color:#276221; } .ds-nav-item:focus-visible { outline:2px solid rgba(70,146,60,.3); outline-offset:1px; }"
-    },
-    {
-      "name": "Review Status Chip",
-      "kind": "chip",
-      "refersTo": "chip-review",
-      "description": "A human-attention state that combines amber, an icon, and direct wording.",
-      "html": "<span class=\"ds-chip-review\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 8v5M12 16h.01\"/></svg>2 to review</span>",
-      "css": ".ds-chip-review { display:inline-flex; align-items:center; gap:6px; border-radius:9999px; background:#fff5da; color:#765a16; padding:4px 12px; font:600 12px/1.5 var(--font-sans, ui-sans-serif, system-ui, sans-serif); } .ds-chip-review svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; } .ds-chip-review:hover { background:#fff0c2; } .ds-chip-review:focus-visible { outline:2px solid rgba(118,90,22,.35); outline-offset:2px; }"
-    },
-    {
-      "name": "Working Card",
+      "name": "Task surface",
       "kind": "card",
-      "refersTo": "card",
-      "description": "A flat working surface whose hierarchy comes from paper contrast and a thin border.",
-      "html": "<article class=\"ds-card\"><div class=\"ds-card-kicker\">Reviewed plan</div><h3 class=\"ds-card-title\">Housing stability</h3><p class=\"ds-card-copy\">Connect the family with intake support and prepare the required documentation.</p></article>",
-      "css": ".ds-card { border:1px solid #dce6d9; border-radius:12px; background:#fff; color:#173a15; padding:20px; font-family:var(--font-sans, ui-sans-serif, system-ui, sans-serif); transition:border-color 150ms ease, background-color 150ms ease; } .ds-card:hover { border-color:#cfdccc; } .ds-card:focus-within { border-color:#46923c; box-shadow:0 0 0 4px rgba(70,146,60,.1); } .ds-card-kicker { color:#5d705a; font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; } .ds-card-title { margin:16px 0 0; color:#173a15; font-size:14px; font-weight:600; } .ds-card-copy { margin:6px 0 0; color:#5d705a; font-size:12px; line-height:1.65; }"
+      "description": "Task surface from the parent interface.",
+      "html": "<section class=\"ds-surface\"><h2>What\u2019s happening</h2><p>Your support paths have separate recorded outcomes.</p></section>",
+      "css": ".ds-surface{background:#fff;border:1px solid #d6e1dc;border-radius:16px;padding:24px;color:#122c37;font:16px/1.6 \"Geist Sans\",sans-serif}.ds-surface h2{font-size:24px;margin:0 0 12px}"
     },
     {
-      "name": "Paperwork Upload Panel",
-      "kind": "custom",
-      "description": "The signature entry point to the paperwork handoff: a calm, bounded drop area with explicit file guidance.",
-      "html": "<section class=\"ds-upload\"><span class=\"ds-upload-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 16V4M7 9l5-5 5 5M5 14v5h14v-5\"/></svg></span><h3 class=\"ds-upload-title\">Choose a blank fillable PDF</h3><p class=\"ds-upload-copy\">PDF forms up to 15 MB are supported. Scanned documents do not contain fields CaseLink can complete.</p><button class=\"ds-upload-action\">Select PDF</button></section>",
-      "css": ".ds-upload { border:1px dashed #a9c7a5; border-radius:12px; background:#edf4eb; padding:40px 32px; text-align:center; font-family:var(--font-sans, ui-sans-serif, system-ui, sans-serif); transition:border-color 150ms ease, background-color 150ms ease; } .ds-upload:hover { border-color:#8fb58a; background:#e8f1e6; } .ds-upload:focus-within { border-color:#46923c; box-shadow:0 0 0 4px rgba(70,146,60,.1); } .ds-upload-icon { display:grid; width:56px; height:56px; margin:0 auto; place-items:center; border-radius:16px; background:#fff; color:#276221; box-shadow:0 8px 24px rgba(39,98,33,.1); } .ds-upload-icon svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; } .ds-upload-title { margin:20px 0 0; color:#173a15; font-size:20px; font-weight:600; } .ds-upload-copy { max-width:448px; margin:8px auto 0; color:#5d705a; font-size:14px; line-height:1.7; } .ds-upload-action { min-height:44px; margin-top:24px; border:0; border-radius:8px; background:#276221; color:#fff; padding:8px 16px; font-size:14px; font-weight:600; cursor:pointer; box-shadow:0 6px 18px rgba(39,98,33,.16); transition:background-color 150ms ease, transform 150ms ease; } .ds-upload-action:hover { background:#1f531b; transform:translateY(-1px); } .ds-upload-action:active { transform:translateY(0); } .ds-upload-action:focus-visible { outline:2px solid rgba(70,146,60,.35); outline-offset:2px; }"
+      "name": "Outcome badge",
+      "kind": "chip",
+      "description": "Outcome badge from the parent interface.",
+      "html": "<span class=\"ds-badge\">Prepared</span>",
+      "css": ".ds-badge{display:inline-flex;background:#eaf4f0;color:#122c37;border-radius:999px;padding:4px 10px;font:650 12px/1.5 \"Geist Sans\",sans-serif}"
+    },
+    {
+      "name": "Direct navigation",
+      "kind": "nav",
+      "description": "Direct navigation from the parent interface.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Parent\"><a href=\"#support\">My support</a><a href=\"#account\">Your account</a></nav>",
+      "css": ".ds-nav{display:flex;gap:24px;font:600 15px/1.6 \"Geist Sans\",sans-serif}.ds-nav a{color:#122c37;text-decoration:none}.ds-nav a:hover{color:#086a63}.ds-nav a:focus-visible{outline:3px solid #087f78;outline-offset:3px}"
     }
   ],
   "narrative": {
-    "northStar": "The Calm Handoff",
-    "overview": "CaseLink should feel like a well-prepared folder passed between trusted colleagues: ordered, legible, and ready for the next responsible action. The interface uses warm paper fields, crisp white working surfaces, quiet green structure, and concise language so a school case manager can move from family intake to reviewed plan to paperwork without needing software expertise.\n\nPolish comes from proportion, steady alignment, and visible review boundaries—not visual spectacle. Public surfaces are spacious and reassuring; the authenticated workspace is denser and more operational. Both share the same restrained green palette, Geist Sans, gently curved geometry, and explicit human-control cues.",
+    "northStar": "Clear family service wayfinding",
+    "overview": "The parent may be reading a phone in ordinary daylight while managing household demands. Light, flat surfaces and readable sans-serif type support quick scanning. Dark navy carries structure; teal identifies actions and selections; soft lemon highlights support and necessary choices. Color never supplies the only state cue.\n\nPublic pages explain the service, offer food or utility entry, and expose urgent official help. The application prioritizes the family's task. No generic chat console or analytics dashboard sits between the need and useful action.\n\nUse one primary action per task, progressive detail, clear labels and visible focus. The three intake stages preserve answers and retry identity. Required parent actions precede operator-owned waiting, which stays secondary. Show sources and detailed permission without forcing repetitive approval.",
     "keyCharacteristics": [
-      "Calm, credible, and institutionally polished",
-      "Warm paper surroundings with white working surfaces",
-      "Deep green reserved for action, location, and completion",
-      "Compact controls inside generous page-level spacing",
-      "Clear provenance, review state, and manual handoff language",
-      "Motion that confirms interaction without turning AI into spectacle"
+      "One clear task at a time",
+      "Parent action before service waiting",
+      "Honest recorded outcomes"
     ],
-    "rules": [
-      { "name": "The Verdant Restraint Rule", "body": "Forest Action Green marks the next action, current location, or a purposeful public emphasis; it does not flood routine working surfaces.", "section": "colors" },
-      { "name": "The Written State Rule", "body": "Review, success, and error colors always travel with plain-language labels or icons; color is never the only signal.", "section": "colors" },
-      { "name": "The Plainspoken Hierarchy Rule", "body": "Type communicates order without jargon: one decisive heading, direct supporting copy, and labels written for school staff rather than software specialists.", "section": "typography" },
-      { "name": "The Room Around the Work Rule", "body": "Give the page generous breathing room, then make controls and review rows compact enough for daily operations; do not solve density by stacking decorative cards.", "section": "layout" },
-      { "name": "The Lift With Purpose Rule", "body": "A shadow must explain hierarchy or response; routine cards rely on paper contrast and a one-pixel border.", "section": "elevation" },
-      { "name": "The Quiet Curve Rule", "body": "Corners soften institutional workflows without making them playful; preserve the control, card, feature, and pill hierarchy instead of rounding every element to the maximum.", "section": "shapes" },
-      { "name": "The Visible Handoff Rule", "body": "AI-prepared values remain editable and traceable, attention states remain visible, and no completion treatment implies automatic submission.", "section": "components" }
-    ],
+    "rules": [],
     "dos": [
-      "Do reserve Forest Action Green for primary actions, active location, and meaningful completion.",
-      "Do place white working surfaces on Warm Paper or green-tinted page fields.",
-      "Do keep provenance, review status, and the next human action visible in paperwork flows.",
-      "Do use plain labels, readable focus rings, and words or icons alongside semantic color.",
-      "Do pair generous page spacing with compact operational controls."
+      "Do preserve one clear action, source attribution and honest progress.",
+      "Do keep operator-owned waiting quieter than the family's necessary step."
     ],
     "donts": [
-      "Don't reintroduce blue or slate as a competing primary visual system; migrate remaining legacy primitives into the green palette when touched.",
-      "Don't use gradients, decorative AI glow, or excessive floating cards to imply sophistication.",
-      "Don't turn the Families workspace into an analytics dashboard or add charts without a decision-making need.",
-      "Don't imply direct CitySpan integration, automatic submission, or AI authority over case-manager judgment.",
-      "Don't use identifiable family details in public previews or demonstration fixtures."
+      "Do not introduce an agent transcript, analytics dashboard or fabricated receipt into the family journey."
     ]
   }
 }

@@ -15,6 +15,7 @@ const env = {
     .filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])),
   TZ: "UTC", NODE_ENV: "production", NEXT_TELEMETRY_DISABLED: "1", VERCEL_ENV: "development",
   CASELINK_ENVIRONMENT: "test", CASELINK_TENANCY_MODE: "single-tenant", CASELINK_INVITE_ONLY: "1", CASELINK_HSTS: "1",
+  CASELINK_PRODUCT: "school",
   NEXT_PUBLIC_SITE_URL: TEST_ORIGIN, NEXT_PUBLIC_APP_URL: TEST_ORIGIN,
   NEXT_PUBLIC_SUPABASE_URL: local.API_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY: local.ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: "unavailable-to-the-browser-test-app", DATABASE_URL: "unavailable-to-the-browser-test-app",

@@ -3,11 +3,18 @@ import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/dist/server/web/spec-extension/request";
 import { NextResponse } from "next/dist/server/web/spec-extension/response";
 import { applyRuntimeHsts } from "@/lib/security/response-headers";
+import { parentConfigurationIssues } from "@/lib/parent/configuration";
 
 // Import NextRequest/NextResponse from spec-extension paths, not `next/server`, so we do not load
 // user-agent / ua-parser-js (uses `__dirname`, which is undefined in some proxy bundles).
 
-const PROTECTED_PREFIXES = ["/dashboard", "/families", "/resources", "/admin", "/profile"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/families",
+  "/resources",
+  "/admin",
+  "/profile",
+];
 
 /**
  * Continue to the App Router without overriding request headers.
@@ -23,10 +30,12 @@ function continueToApp() {
 }
 
 function finalizeResponse(response: NextResponse): NextResponse {
+  if (process.env.CASELINK_PRODUCT === "parent")
+    response.headers.set("Cache-Control", "private, no-store");
   applyRuntimeHsts(response.headers, {
     productionDeployment:
-      process.env.VERCEL_ENV === "production"
-      || process.env.CASELINK_ENVIRONMENT === "production",
+      process.env.VERCEL_ENV === "production" ||
+      process.env.CASELINK_ENVIRONMENT === "production",
     enableHsts: process.env.CASELINK_HSTS === "1",
   });
   return response;
@@ -38,6 +47,39 @@ function finalizeResponse(response: NextResponse): NextResponse {
  */
 export async function runSupabaseProxy(request: NextRequest) {
   let supabaseResponse = continueToApp();
+
+  if (process.env.CASELINK_PRODUCT === "parent") {
+    if (parentConfigurationIssues(process.env).length)
+      return finalizeResponse(supabaseResponse);
+    const parent = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+      {
+        global: { fetch: fetchWithTimeout },
+        cookieOptions: {
+          name: "caselink-parent-auth",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NEXT_PUBLIC_SUPABASE_URL!.startsWith("https://"),
+          path: "/",
+        },
+        cookies: {
+          getAll: () => request.cookies.getAll(),
+          setAll(values) {
+            for (const { name, value } of values)
+              request.cookies.set(name, value);
+            supabaseResponse = continueToApp();
+            for (const { name, value, options } of values)
+              supabaseResponse.cookies.set(name, value, options);
+          },
+        },
+      },
+    );
+    // Authoritative live-session and household checks remain in each parent server entry point.
+    await parent.auth.getUser().catch(() => null);
+    return finalizeResponse(supabaseResponse);
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

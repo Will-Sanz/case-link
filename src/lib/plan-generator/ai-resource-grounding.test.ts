@@ -21,7 +21,7 @@ type Path = typeof paths[number];
 async function run(path: Path, detail: FamilyDetail) {
   if (path === "assistant") return askCaseAssistant(detail,"Help plan the intake");
   if (path === "generation") {
-    const snapshot = buildPlanningSnapshot(detail);
+    const snapshot = buildPlanningSnapshot(detail,undefined,new Date("2026-10-15T12:00:00Z"));
     const result = await tryGenerateLeanPlanPhaseOpenAI(snapshot,"30",{retries:1});
     return result.ok ? {ok:true,contacts:sparseDetailsForPersistence(result.steps[0],snapshot.resource_catalog).contacts} : result;
   }
