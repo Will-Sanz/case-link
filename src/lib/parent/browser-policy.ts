@@ -4,6 +4,49 @@ import { mandateSchema } from "./domain";
 export const APPLICATION_BROWSER_ORIGIN = "http://127.0.0.1:3330";
 export const COMPASS_ENTRY =
   "https://www.compass.dhs.pa.gov/intake/#/getstarted";
+export const COMPASS_FAMILY_SAFETY =
+  "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/familysafety";
+export const COMPASS_CAPTCHA =
+  "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/captcha";
+export const COMPASS_INTRODUCTION_END =
+  "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/gettingstartedending";
+export const COMPASS_HOUSEHOLD_DIVIDER =
+  "https://www.compass.dhs.pa.gov/intake/#/applynow/household";
+export const browserControlSchema = z
+  .object({
+    sessionId: z.uuid(),
+    frameId: z.uuid(),
+    action: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("continue") }).strict(),
+      z.object({ type: z.literal("refresh") }).strict(),
+      z.object({ type: z.literal("resume") }).strict(),
+      z
+        .object({
+          type: z.literal("click"),
+          x: z.number().finite().min(0).max(1),
+          y: z.number().finite().min(0).max(1),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("key"),
+          key: z.enum([
+            "Tab",
+            "Shift+Tab",
+            "Enter",
+            "Space",
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "Escape",
+          ]),
+        })
+        .strict(),
+    ]),
+  })
+  .strict();
+export type BrowserControl = z.infer<typeof browserControlSchema>;
 export const browserSessionSchema = z
   .object({
     id: z.uuid(),
@@ -21,10 +64,37 @@ export const browserSessionSchema = z
     title: z.string().nullable(),
     summary: z.string(),
     updatedAt: z.iso.datetime(),
-    canControl: z.literal(false),
+    canControl: z.boolean(),
     frameUrl: z.string().nullable(),
+    handoff: z
+      .object({
+        kind: z.enum(["continue", "challenge"]),
+        frameId: z.uuid(),
+        width: z.number().int().positive().max(4096),
+        height: z.number().int().positive().max(4096),
+        expiresAt: z.iso.datetime(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.canControl !== Boolean(value.handoff) ||
+      (value.canControl &&
+        (value.status !== "needs_parent" ||
+          !value.frameUrl ||
+          ![COMPASS_FAMILY_SAFETY, COMPASS_CAPTCHA].includes(
+            value.currentUrl ?? "",
+          )))
+    )
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Parent control requires the current public verification frame.",
+      });
+  });
 export type ApplicationBrowserSession = z.infer<typeof browserSessionSchema>;
 export const browserResponseSchema = z
   .object({
@@ -79,6 +149,27 @@ export function compassResourceAllowed(
             url.origin,
           ) &&
           url.pathname.startsWith("/recaptcha/")))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Only reviewed public challenge frames may receive parent input or appear unmasked. */
+export function recaptchaFrameAllowed(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      !url.username &&
+      !url.password &&
+      url.origin === "https://www.google.com" &&
+      ["/recaptcha/api2/anchor", "/recaptcha/api2/bframe"].includes(
+        url.pathname,
+      ) &&
+      !(
+        url.pathname.endsWith("/anchor") &&
+        url.searchParams.get("size") === "invisible"
+      )
     );
   } catch {
     return false;
