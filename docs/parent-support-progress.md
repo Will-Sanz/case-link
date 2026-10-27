@@ -30,6 +30,8 @@ A registered production transport is still required for each external route. `PA
 
 ## Verification
 
+- **L1 exact-need origin capture (3b):** a narrow server-owned restriction now survives need/fact removal and unchanged edits/renewal, while genuine household changes restore only the changed field. **1,672 tests / 189 files** passed; independent normal/Ponytail review passed 69 focused tests. These are captured rules; model/packet/execution enforcement is the next piece, with no new route or intake activation. [Evidence](verification/parent-shared-data-authority.md).
+
 - **L1 source-date capture (3a):** server-owned metadata now records original/changed intake dates without refreshing them on reads, renewal or unrelated edits. Seven provenance cases and 27 affected SQL regressions passed; independent normal/Ponytail review passed 78 focused tests. This is capture only; source-age enforcement and exact-need mirror origin remain the next pieces. The [owner-needs list](parent-owner-needs.md) tracks partner/release inputs while engineering continues. [Evidence](verification/parent-shared-data-authority.md).
 
 - **L1 shared-authority piece 2:** model history now stays within the current request version after permission changes/corrections; owner-visible history and eligible saved facts remain. **1,656 tests / 187 files** passed; independent normal and separate Ponytail reviews cleared the change. Both reviewed migrations were applied only to the isolated local test database, whose **159 security assertions plus budget/concurrency checks** passed with exact fixture cleanup. [Evidence and autonomy checkpoint](verification/parent-shared-data-authority.md).
