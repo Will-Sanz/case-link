@@ -31,12 +31,11 @@ const values = {
   shutoffDate: date,
 } as const;
 export const ANSWER_FIELDS = Object.keys(values) as (keyof typeof values)[];
-export const factAnswerSchema = z
+export const factValueSchema = z
   .object({
     need: needSchema,
     field: z.enum(ANSWER_FIELDS),
     value: z.unknown(),
-    version: z.number().int().positive(),
   })
   .strict()
   .superRefine((answer, context) => {
@@ -63,4 +62,24 @@ export const factAnswerSchema = z
         message: "This fact must identify its utility account.",
       });
   });
+export const factAnswerSchema = factValueSchema.safeExtend({
+  version: z.number().int().positive(),
+});
+export const factAnswerBundleSchema = z.object({
+  answers: z.array(factValueSchema.safeExtend({
+    field: z.enum(ANSWER_FIELDS).exclude(["incomeAmount", "incomeFrequency"]),
+  })).min(1).max(30),
+  version: z.number().int().positive(),
+}).strict().superRefine(({ answers }, context) => {
+  const seen = new Set<string>();
+  answers.forEach((answer, index) => {
+    const key = `${answer.need}:${answer.field}`;
+    if (seen.has(key)) context.addIssue({
+      code: "custom", path: ["answers", index, "field"],
+      message: "Answer each question once, with income and its frequency together.",
+    });
+    seen.add(key);
+  });
+});
 export type FactAnswer = z.infer<typeof factAnswerSchema>;
+export type FactAnswerBundle = z.infer<typeof factAnswerBundleSchema>;

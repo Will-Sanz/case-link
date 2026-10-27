@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { requireParentSession } from "./auth";
-import { factAnswerSchema, type FactAnswer } from "./answers";
+import { factAnswerSchema, factAnswerBundleSchema, type FactAnswer, type FactAnswerBundle } from "./answers";
 import { mandateSchema, type ServiceMandate } from "./domain";
 import { validateMandate } from "./policy";
 import { getParentAuthorizationWindow } from "./authorization-window";
@@ -31,6 +31,14 @@ export async function answerParentFact(
     p_need: value.need,
     p_field: value.field,
     p_value: value.value,
+    p_expected_version: value.version,
+  });
+}
+export async function answerParentFacts(id: string, input: FactAnswerBundle): Promise<void> {
+  const value = factAnswerBundleSchema.parse(input);
+  await mutate("parent_answer_facts", {
+    p_request_id: z.uuid().parse(id),
+    p_answers: value.answers,
     p_expected_version: value.version,
   });
 }

@@ -6,10 +6,11 @@ import {
   resolveParentAction,
 } from "@/lib/parent/data";
 import { intakeSchema, mandateSchema } from "@/lib/parent/domain";
-import { factAnswerSchema } from "@/lib/parent/answers";
+import { factAnswerSchema, factAnswerBundleSchema } from "@/lib/parent/answers";
 import { getSupportProgress } from "@/lib/parent/progress-data";
 import {
   answerParentFact,
+  answerParentFacts,
   replaceParentMandate,
   updateParentBooking,
 } from "@/lib/parent/mutations";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/parent/http";
 const actionSchema = z.discriminatedUnion("action", [
   factAnswerSchema.safeExtend({ action: z.literal("answer_fact") }),
+  factAnswerBundleSchema.safeExtend({ action: z.literal("answer_facts") }),
   z
     .object({
       action: z.literal("replace_mandate"),
@@ -83,6 +85,10 @@ export async function POST(request: Request, { params }: Context) {
       const { action: _, ...answer } = value;
       void _;
       await answerParentFact(id, answer);
+    } else if (value.action === "answer_facts") {
+      const { action: _, ...answers } = value;
+      void _;
+      await answerParentFacts(id, answers);
     } else if (value.action === "replace_mandate")
       await replaceParentMandate(id, value.mandate, value.version);
     else if (value.action === "booking_preference")
