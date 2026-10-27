@@ -47,7 +47,7 @@
     "parent:test:db": "node --import tsx scripts/test-parent-database-security.ts",
     "parent:test:auth": "node --import tsx scripts/test-parent-auth.ts",
     "parent:test:browser": "node --import tsx scripts/test-parent-browser-connection.ts",
-    "parent:test:pdf": "node --import tsx scripts/test-parent-pdfs.ts",
+    "parent:test:pdf": "node --import tsx scripts/test-parent-pdfs.ts && node --import tsx scripts/test-parent-peco-cap.ts",
     "parent:test:parser": "CASELINK_PARENT_TEST_REAL_PARSER=1 node --import tsx scripts/test-parent-document-parser.ts",
     "parent:test:visual": "node --import tsx tests/parent/visual-check.mjs",
     "parent:worker": "node --import tsx scripts/parent-support-worker.ts",

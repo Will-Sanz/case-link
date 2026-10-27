@@ -32,7 +32,7 @@ A necessary human step is specific: the agent prepares everything else, explains
 | Geography | Philadelphia first | Exact program/ZIP coverage and honest unsupported-area recovery |
 | Identity | Reuse existing CaseLink email/password identities; retain verified email codes where enrollment permits | Apply reviewed shared-account configuration/migration and test actual hosted sign-in, recovery, enrollment and household isolation |
 | Language | Proposed English and reviewed Spanish experience | Test all advertised language content, notices, help and partner coverage |
-| Delivery order | Compare SNAP signed-form/fax and PECO CAP across the full lifecycle, independently review the selection, then finish one route before broadening implementation | PECO is a leading candidate, not an enabled connection; exact fields/personal acts, secure delivery, genuine receipt, status and outcome evidence determine the choice |
+| Delivery order | Compare SNAP signed-form/fax and PECO CAP across the full lifecycle, independently review the selection, then finish one route before broadening implementation | PECO is selected for the first internal preparation piece; accepted personal acts, secure delivery, genuine receipt, status and outcome evidence remain open before route activation |
 | Revenue | Parents are the users; sponsorship/payment model remains open | Pricing is separate from this service scope |
 
 The Parent University catalog and [dated directory review](verification/2026-10-15-resource-source-review.json) inform discovery. Neither proves current capacity, demand or willingness to pay. Verify an actual immediate-food route; that earlier review did not identify a dedicated pantry from the exported names/descriptions.
