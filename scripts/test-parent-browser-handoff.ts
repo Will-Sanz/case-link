@@ -9,6 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { createBrowserAuthorizer } from "../src/lib/parent/browser-authority";
 import {
   browserResponseSchema,
+  COMPASS_CAPTCHA,
   type ApplicationBrowserResponse,
   type BrowserControl,
 } from "../src/lib/parent/browser-policy";
@@ -105,7 +106,12 @@ async function main() {
           const newPage = context.newPage.bind(context);
           context.newPage = async () => {
             const page = await newPage();
-            replays.push(await installCompassReplay(page));
+            replays.push(
+              await installCompassReplay(
+                page,
+                serviceContexts.length === 1 ? "challenge" : null,
+              ),
+            );
             servicePages.push(page);
             return page;
           };
@@ -342,6 +348,26 @@ async function main() {
         await page
           .getByRole("button", { name: "Continue with COMPASS", exact: true })
           .click();
+        stage =
+          "confirming a pending provider result preserves the actual owned session";
+        await until(async () => {
+          const pending = (await status(id)).session;
+          return (
+            pending?.status === "running" &&
+            pending.currentUrl === COMPASS_CAPTCHA
+          );
+        }, "The delayed provider result must become a visible pending state");
+        const pending = (await status(id)).session;
+        check(
+          pending?.status === "running" &&
+            pending.currentUrl === COMPASS_CAPTCHA &&
+            !pending.canControl &&
+            !pending.frameUrl &&
+            !pending.handoff &&
+            serviceContexts.length === 1 &&
+            Object.is(closedServiceContexts, 0),
+          "A delayed provider result remains running in the same actual Auth-owned session without stale input.",
+        );
         await until(
           async () => (await status(id)).session?.handoff?.kind === "challenge",
           "replay challenge not exposed",
@@ -773,6 +799,7 @@ async function main() {
         completedChecks: 1,
         cancelledContexts: 1,
         expiredContexts: 1,
+        initialProviderDelayMilliseconds: 6000,
         protectedScreenshots: 0,
         householdInputs: 0,
         modelCalls: 0,

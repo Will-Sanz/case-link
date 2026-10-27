@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { BrowserContext } from "@playwright/test";
+import { errors, type BrowserContext } from "@playwright/test";
 import { createApplicationBrowser } from "./browser-runner";
 import {
   COMPASS_HOUSEHOLD_ENTRY,
@@ -52,6 +52,7 @@ function harness(outcome: Outcome = "verification") {
   let errorVisible = false;
   let challengeVisible = false;
   let captchaReady = false;
+  let captchaComponentCount = 1;
   let captchaTarget:
     "valid" | "missing" | "heading_changed" | "id_changed" | "foreign" =
     "valid";
@@ -65,6 +66,7 @@ function harness(outcome: Outcome = "verification") {
   let challengeUrl =
     "https://www.google.com/recaptcha/api2/bframe?k=public-test-key";
   let beforeHandle: (() => void) | undefined;
+  let beforeCaptchaCount: (() => void) | undefined;
   const listeners = new Map<string, (value: unknown) => void>();
   const mainFrame = {};
   const clicks = vi.fn<(url: string) => void>();
@@ -224,6 +226,11 @@ function harness(outcome: Outcome = "verification") {
     locator: vi.fn((selector: string) => {
       if (selector === "compass-ui-getting-started-captcha")
         return {
+          count: async () => {
+            beforeCaptchaCount?.();
+            beforeCaptchaCount = undefined;
+            return captchaComponentCount;
+          },
           getByRole: (role: string, options: { name: string }) =>
             captchaTarget === "foreign"
               ? { isVisible: async (): Promise<boolean> => false }
@@ -337,6 +344,12 @@ function harness(outcome: Outcome = "verification") {
     setCaptchaReady: (value: boolean) => {
       captchaReady = value;
     },
+    setCaptchaComponentCount: (value: number) => {
+      captchaComponentCount = value;
+    },
+    setChallengeVisible: (value: boolean) => {
+      challengeVisible = value;
+    },
     setCaptchaTarget: (value: typeof captchaTarget) => {
       captchaTarget = value;
     },
@@ -360,6 +373,9 @@ function harness(outcome: Outcome = "verification") {
     },
     beforeHandle: (callback: () => void) => {
       beforeHandle = callback;
+    },
+    beforeCaptchaCount: (callback: () => void) => {
+      beforeCaptchaCount = callback;
     },
   };
 }
@@ -512,6 +528,201 @@ it("automatically resumes a verified same-page transition during sweep without a
   expect(new Set(h.captureRoutes).size).toBe(9);
   await h.runner.close();
 });
+
+it("retains an exact authorized CAPTCHA session after a native pending timeout and later resumes", async () => {
+  const h = harness("ending");
+  await h.start();
+  const command = await h.input();
+  const expiresAt = h.grant.expiresAt;
+  h.page.waitForFunction.mockRejectedValue(
+    new errors.TimeoutError("pending public result"),
+  );
+  const response = await h.runner.control(token, id, command);
+  expect(response.status).toBe(200);
+  expect((await response.json()).session).toMatchObject({
+    status: "running",
+    currentUrl: COMPASS_CAPTCHA,
+    frameUrl: null,
+    handoff: null,
+    canControl: false,
+  });
+  expect((await h.state()).session.status).toBe("running");
+  expect(h.grant.expiresAt).toBe(expiresAt);
+  expect(h.context.close).not.toHaveBeenCalled();
+  expect((await h.runner.read(token, id, "GET", true)).status).toBe(404);
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  h.navigate(COMPASS_INTRODUCTION_END);
+  await h.runner.sweep();
+  expect((await h.state()).session.status).toBe("completed");
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(1);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
+  expect(h.captureRoutes).not.toContain(COMPASS_CAPTCHA);
+  await h.runner.close();
+});
+
+it("offers a later real challenge in the same pending context without repeating the ordinary continuation", async () => {
+  const h = harness("ending");
+  await h.start();
+  h.page.waitForFunction.mockRejectedValue(new errors.TimeoutError("pending"));
+  await h.runner.control(token, id, await h.input());
+  h.setChallengeVisible(true);
+  await h.runner.sweep();
+  expect((await h.state()).session).toMatchObject({
+    status: "needs_parent",
+    currentUrl: COMPASS_CAPTCHA,
+    canControl: true,
+    handoff: { kind: "challenge" },
+  });
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(1);
+  await h.runner.close();
+});
+
+it.each([0, 2])(
+  "blocks a timed-out CAPTCHA with %s reviewed components",
+  async (count) => {
+    const h = harness("ending");
+    await h.start();
+    h.setCaptchaComponentCount(count);
+    h.page.waitForFunction.mockRejectedValue(
+      new errors.TimeoutError("pending"),
+    );
+    await expect(h.runner.control(token, id, await h.input())).rejects.toThrow(
+      "public_step_changed",
+    );
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect((await h.state()).session).toMatchObject({
+      status: "blocked",
+      frameUrl: null,
+      handoff: null,
+      canControl: false,
+    });
+    await h.runner.close();
+  },
+);
+
+it.each(["ordinary", "fake_timeout"])(
+  "does not hide a %s error as pending verification",
+  async (kind) => {
+    const h = harness("ending");
+    await h.start();
+    const error = new Error("public page failure");
+    if (kind === "fake_timeout") error.name = "TimeoutError";
+    h.page.waitForFunction.mockRejectedValue(error);
+    await expect(h.runner.control(token, id, await h.input())).rejects.toThrow(
+      "public page failure",
+    );
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect((await h.state()).session.status).toBe("blocked");
+    await h.runner.close();
+  },
+);
+
+it.each([
+  "cancelled",
+  "paused",
+  "revoked",
+  "expired",
+  "foreign",
+  "stop",
+] as const)(
+  "ends pending verification when %s happens during its bounded wait",
+  async (reason) => {
+    const h = harness("ending");
+    await h.start();
+    const command = await h.input();
+    h.page.waitForFunction.mockImplementation(async () => {
+      if (reason === "expired")
+        vi.setSystemTime(new Date(h.grant.expiresAt + 1));
+      else if (reason === "revoked")
+        h.authorize.mockRejectedValue(new Error("revoked"));
+      else if (reason === "foreign")
+        h.authorize.mockResolvedValue({ ...h.grant, ownerId: "foreign" });
+      else if (reason === "stop") await h.runner.read(token, id, "DELETE");
+      else h.grant.authority.status = reason;
+      throw new errors.TimeoutError("pending");
+    });
+    await expect(h.runner.control(token, id, command)).rejects.toThrow();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    expect(h.captureRoutes).not.toContain(COMPASS_CAPTCHA);
+    await h.runner.close();
+  },
+);
+
+it.each(["unknown", "household"] as const)(
+  "reclassifies a %s navigation during a pending timeout without capturing it",
+  async (target) => {
+    const h = harness("ending");
+    await h.start();
+    h.page.waitForFunction.mockImplementation(async () => {
+      h.navigate(
+        target === "household"
+          ? COMPASS_HOUSEHOLD_ENTRY
+          : "https://unreviewed.example.test/",
+      );
+      throw new errors.TimeoutError("pending");
+    });
+    const response = await h.runner.control(token, id, await h.input());
+    expect((await response.json()).session).toMatchObject({
+      status: target === "household" ? "completed" : "blocked",
+      canControl: false,
+      handoff: null,
+      frameUrl: null,
+    });
+    expect(
+      h.captureRoutes.every(
+        (url) => !url.includes("household") && !url.includes("unreviewed"),
+      ),
+    ).toBe(true);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await h.runner.close();
+  },
+);
+
+it.each(["ending", "household", "unknown"] as const)(
+  "rechecks a %s navigation during pending component inspection before treating it as missing",
+  async (target) => {
+    const h = harness("ending");
+    await h.start();
+    h.page.waitForFunction.mockRejectedValue(
+      new errors.TimeoutError("pending"),
+    );
+    h.setCaptchaComponentCount(0);
+    h.beforeCaptchaCount(() =>
+      h.navigate(
+        target === "ending"
+          ? COMPASS_INTRODUCTION_END
+          : target === "household"
+            ? COMPASS_HOUSEHOLD_ENTRY
+            : "https://unreviewed.example.test/",
+      ),
+    );
+    const response = await h.runner.control(token, id, await h.input());
+    expect((await response.json()).session.status).toBe(
+      target === "unknown" ? "blocked" : "completed",
+    );
+    expect(
+      h.captureRoutes.every(
+        (url) =>
+          !url.includes("household") &&
+          !url.includes("unreviewed") &&
+          url !== COMPASS_INTRODUCTION_END,
+      ),
+    ).toBe(true);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await h.runner.close();
+  },
+);
 
 it("automatically continues the provider's enabled normal Next after a same-page CAPTCHA result", async () => {
   const h = harness("captcha_challenge");

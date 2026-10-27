@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type {
-  BrowserContext,
-  ElementHandle,
-  Frame,
-  Locator,
-  Page,
+import {
+  errors,
+  type BrowserContext,
+  type ElementHandle,
+  type Frame,
+  type Locator,
+  type Page,
 } from "@playwright/test";
 import {
   COMPASS_HOUSEHOLD_ENTRY,
@@ -304,58 +305,81 @@ export function createApplicationBrowser(ports: Ports) {
         clearFrame(job);
         update(job, {
           status: "running",
+          currentUrl: COMPASS_CAPTCHA,
           summary:
             "Waiting for the provider’s verification result in this same session. No household information is being entered or submitted.",
         });
-        await page.waitForFunction(
-          ({ expectedUrl, heading }) => {
-            if (location.href !== expectedUrl) return true;
-            const component = document.querySelector(
-              "compass-ui-getting-started-captcha",
-            );
-            const next = component?.querySelector(
-              'button#nextButtonID[aria-label="Next Button"]',
-            );
-            if (
-              component?.querySelector("h1")?.textContent?.trim() === heading &&
-              next instanceof HTMLButtonElement &&
-              !next.disabled &&
-              next.getBoundingClientRect().width > 0 &&
-              next.getBoundingClientRect().height > 0
-            )
-              return true;
-            return [...document.querySelectorAll("iframe")].some((element) => {
-              try {
-                const src = new URL(element.getAttribute("src") ?? "");
-                const box = element.getBoundingClientRect();
-                const style = getComputedStyle(element);
-                return (
-                  src.origin === "https://www.google.com" &&
-                  ["/recaptcha/api2/anchor", "/recaptcha/api2/bframe"].includes(
-                    src.pathname,
-                  ) &&
-                  !(
-                    src.pathname.endsWith("/anchor") &&
-                    src.searchParams.get("size") === "invisible"
-                  ) &&
-                  element.contentDocument === null &&
-                  box.width >= 40 &&
-                  box.height >= 40 &&
-                  box.x >= 0 &&
-                  box.y >= 0 &&
-                  box.right <= innerWidth &&
-                  box.bottom <= innerHeight &&
-                  style.display !== "none" &&
-                  style.visibility !== "hidden"
-                );
-              } catch {
-                return false;
-              }
-            });
-          },
-          { expectedUrl: url, heading: compassCaptchaHeading },
-          { timeout: 5000, polling: 100 },
-        );
+        const observed = await page
+          .waitForFunction(
+            ({ expectedUrl, heading }) => {
+              if (location.href !== expectedUrl) return true;
+              const component = document.querySelector(
+                "compass-ui-getting-started-captcha",
+              );
+              const next = component?.querySelector(
+                'button#nextButtonID[aria-label="Next Button"]',
+              );
+              if (
+                component?.querySelector("h1")?.textContent?.trim() ===
+                  heading &&
+                next instanceof HTMLButtonElement &&
+                !next.disabled &&
+                next.getBoundingClientRect().width > 0 &&
+                next.getBoundingClientRect().height > 0
+              )
+                return true;
+              return [...document.querySelectorAll("iframe")].some(
+                (element) => {
+                  try {
+                    const src = new URL(element.getAttribute("src") ?? "");
+                    const box = element.getBoundingClientRect();
+                    const style = getComputedStyle(element);
+                    return (
+                      src.origin === "https://www.google.com" &&
+                      [
+                        "/recaptcha/api2/anchor",
+                        "/recaptcha/api2/bframe",
+                      ].includes(src.pathname) &&
+                      !(
+                        src.pathname.endsWith("/anchor") &&
+                        src.searchParams.get("size") === "invisible"
+                      ) &&
+                      element.contentDocument === null &&
+                      box.width >= 40 &&
+                      box.height >= 40 &&
+                      box.x >= 0 &&
+                      box.y >= 0 &&
+                      box.right <= innerWidth &&
+                      box.bottom <= innerHeight &&
+                      style.display !== "none" &&
+                      style.visibility !== "hidden"
+                    );
+                  } catch {
+                    return false;
+                  }
+                },
+              );
+            },
+            { expectedUrl: url, heading: compassCaptchaHeading },
+            { timeout: 5000, polling: 100 },
+          )
+          .then(
+            () => true,
+            (error: unknown) => {
+              if (error instanceof errors.TimeoutError) return false;
+              throw error;
+            },
+          );
+        await check(job);
+        if (page.url() !== url) continue;
+        if (!observed) {
+          const componentCount = await component.count();
+          await check(job);
+          if (page.url() !== url) continue;
+          if (componentCount !== 1)
+            throw new Error("browser_public_step_changed");
+          return false;
+        }
         continue;
       }
       clearFrame(job);
