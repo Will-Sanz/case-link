@@ -30,6 +30,8 @@ A registered production transport is still required for each external route. `PA
 
 ## Verification
 
+- **Partner-independent recovery:** genuine newer personal-act verification now resumes the same current prepared operation; retries preserve expiry/history and do not wake work. **28 targeted cases**, independent normal/Ponytail review, **170 embedded / 165 native security assertions plus budget checks**, and native concurrency passed. Only the isolated database was migrated. [Continuation evidence](verification/parent-independent-continuation.md).
+
 - **L1 current routing/case recovery (3d2):** each need uses its own permitted current ZIP for new work; genuine linked-case follow-up continues without unrelated routing prompts. Known routing/form/booking requirements are grouped before pausing. **1,792 tests / 192 files**, 18 PDF pages and **160 native database assertions plus budget/concurrency checks** passed. Independent normal/Ponytail review cleared the piece. The owner preview approval has ended without renewal; hosted accounts/public enrollment/transports remain unchanged. [Current checkpoint](verification/parent-shared-data-authority.md).
 
 - **L1 submission-time source enforcement (3d1):** application/database preparation, form registration and dispatch reject stale or mismatched mirrored values; receipt-only follow-up remains independent of them. **1,748 tests / 191 files** passed. Reviewed migrations were applied only to the isolated local database; **160 native security assertions plus budget/concurrency checks** passed with exact cleanup. Per-need ZIP recovery is next; hosted accounts/preview/transports remain unchanged. [Evidence](verification/parent-shared-data-authority.md).

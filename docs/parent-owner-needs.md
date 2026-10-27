@@ -16,9 +16,14 @@ The October 30 route checkpoint is a progress/evidence checkpoint, not a deadlin
 
 ## Engineering completed independently
 
+- Fixed genuine personal-step verification renewal for an unchanged current packet, with retained private provenance and replay protection. Native security/concurrency and independent review passed; no signing channel was activated. [Continuation evidence](verification/parent-independent-continuation.md).
 - The reviewed four-field source/routing gap is closed: reads, permission renewal and unrelated edits do not make old values current. Carry this boundary into the selected real route's minimum fields; other fields still require their applicable evidence assessment.
 - Preserved tested household/purpose isolation, corrections, revocation, retention, operation evidence and the school environment.
 - Kept exact new route fields, identity collection and external transports closed pending the actual operating/policy evidence.
 - Delivered focused pieces with tests and independent normal/Ponytail review before dependent work. Results are recorded in the [shared-data checkpoint](verification/parent-shared-data-authority.md).
 
 Completed shared pieces: exact requested-purpose binding, current-permission assistant context, original intake source dates, persistent exact-need restrictions, current-source model/packet projection, submission-time source enforcement and per-need routing/case recovery. Actual route-specific fields/execution now require the accepted partner instructions above. The existing-account localhost approval has expired; this list does not renew it or enable public signup.
+
+## Continuing without partner access
+
+Current engineering targets are source-safe answer defaults/food lookup and visible-page progress refresh. A separate review is also checking grouped-answer recovery. These use existing purposes and fields, need no new owner input, and will be tested and independently reviewed before dependent work. Actual partner allocation/booking, new private-field collection and family launch still require the items in the table.

@@ -68,6 +68,8 @@ Until an accepted personal-act channel is established, the blocker is **CaseLink
 
 ### Personal-act lifecycle gate
 
+**October 27 resolution:** the recorder's exact-packet renewal defect described below is now independently reviewed and verified in isolated SQL and native database tests; see [partner-independent continuation](parent-independent-continuation.md). The earlier test results remain historical. Accepted signing, protected inputs and real delivery/status remain open; this fix does not activate them.
+
 The existing trusted-verifier recorder uses an insert-on-conflict/no-op for the same operation, act and packet hash. After its evidence expires, a genuinely later verification cannot currently renew that identical prepared operation. Independent review confirmed this from the recorder and primary key. This is an explicit release blocker before enabling signature capture/resumption, not a new family requirement or reason to extend evidence when a worker reads it. The following isolated regression must prove genuinely newer verification for the same current packet/grant can resume, stale replay cannot, and prior verification provenance is retained without broadening verifier authority. No PECO signing channel is enabled by this checkpoint.
 
 The unmodified isolated local database suite passed 159 recorded assertions plus bounded budget and concurrent cancellation/dispatch checks during this work. It exercised packet-bound personal acts, scoped verifier/parent denial, immutable artifacts, cancellation, expired attachments and retention; it does not yet prove the renewal case above. The fixture restored its processing controls and role memberships exactly. No hosted database or family records were changed.

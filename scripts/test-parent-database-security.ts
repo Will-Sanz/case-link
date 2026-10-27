@@ -839,6 +839,57 @@ async function main() {
       "queued",
     );
     assertionCount++;
+    const firstAct = (
+      await admin.query(
+        "select verified_at::text observed_at from parent_private.personal_act_evidence where operation_id=$1 and reference='fixture-act'",
+        [evidenceOperation],
+      )
+    ).rows[0];
+    await admin.query(
+      "update parent_private.personal_act_evidence set expires_at=now()-interval '1 second' where operation_id=$1",
+      [evidenceOperation],
+    );
+    await admin.query(
+      "update public.parent_jobs set state='waiting',run_at='infinity' where id=$1",
+      [evidenceJob.jobId],
+    );
+    await role("authenticated", trusted, (db) =>
+      db.query(
+        "select public.parent_record_personal_act($1,'identity','fixture-act',$2)",
+        [evidenceOperation, firstAct.observed_at],
+      ),
+    );
+    assert.equal(
+      (await admin.query("select state from public.parent_jobs where id=$1", [evidenceJob.jobId])).rows[0].state,
+      "waiting",
+    );
+    assertionCount++;
+    assert.equal(
+      (await admin.query("select expires_at<now() expired from parent_private.personal_act_evidence where operation_id=$1", [evidenceOperation])).rows[0].expired,
+      true,
+    );
+    assertionCount++;
+    await role("authenticated", trusted, (db) =>
+      db.query(
+        "select public.parent_record_personal_act($1,'identity','fixture-act-renewed',now())",
+        [evidenceOperation],
+      ),
+    );
+    assert.equal(
+      (await admin.query("select count(*)::integer count from parent_private.personal_act_evidence where operation_id=$1", [evidenceOperation])).rows[0].count,
+      2,
+    );
+    assertionCount++;
+    assert.equal(
+      (await admin.query("select state from public.parent_jobs where id=$1", [evidenceJob.jobId])).rows[0].state,
+      "queued",
+    );
+    assertionCount++;
+    assert.equal(
+      (await admin.query("select count(*)::integer count from public.parent_events where request_id=$1 and kind='personal_act.verified'", [evidenceRequest])).rows[0].count,
+      2,
+    );
+    assertionCount++;
     await admin.query(
       "update public.parent_jobs set state='leased' where id=$1",
       [evidenceJob.jobId],
