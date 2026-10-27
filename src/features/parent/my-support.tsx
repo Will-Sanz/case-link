@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight, Clock, Folder } from "iconoir-react";
+import { useEffect } from "react";
+import { ArrowRight, Clock, Folder, Refresh } from "iconoir-react";
 import { NEED_LABELS } from "@/lib/parent/domain";
 import type { SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
@@ -27,10 +28,25 @@ export function requestStatus(request: SupportRequest): string {
 }
 
 export function MySupport() {
-  const { data, error, loading, reload } = useParentResource<{
+  const { data, error, loading, reload, reloadIfIdle } = useParentResource<{
     requests: SupportRequest[];
     progress?: Record<string, SupportProgress>;
   }>("/requests");
+  const hasOpenRequests = data?.requests.some((request) =>
+    request.status === "active" || request.status === "paused",
+  ) ?? false;
+  useEffect(() => {
+    if (!hasOpenRequests) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") reloadIfIdle();
+    };
+    const interval = setInterval(refresh, 30000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [hasOpenRequests, reloadIfIdle]);
   return (
     <div className={styles.container}>
       <div className={styles.pageTop}>
@@ -41,10 +57,16 @@ export function MySupport() {
             needs you.
           </p>
         </div>
-        <Link className={styles.button} href="/get-support">
-          Get more support{" "}
-          <ArrowRight width={18} height={18} aria-hidden="true" />
-        </Link>
+        <div className={styles.inline}>
+          <button className={styles.quiet} onClick={reload} aria-label="Refresh support status">
+            <Refresh width={17} height={17} aria-hidden="true" />
+            Refresh status
+          </button>
+          <Link className={styles.button} href="/get-support">
+            Get more support{" "}
+            <ArrowRight width={18} height={18} aria-hidden="true" />
+          </Link>
+        </div>
       </div>
       {loading ? (
         <ParentLoading />

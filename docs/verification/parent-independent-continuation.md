@@ -22,7 +22,16 @@ The test writer reproduced **12 failures across 34 UI cases** before the fix. Ro
 
 Autonomy: lawful current answers stay reusable without presenting another program's or expired information as current. Only an actually missing required answer needs input; urgent public food search remains accessible. This closes UI consumers of the four-field source boundary, not a food reservation or new private profile.
 
+## Piece 3 — current progress on My support
+
+The list checks recorded status every 30 seconds while active/paused requests are visible and once on returning to the tab. A manual refresh also works for empty/finished lists. Refresh only reads status; it does not create, retry or submit service work. Terminal lists do not keep polling. Authentication loss and processing closure retain the existing record-clearing boundary; transient failures hide old progress claims and allow recovery. Refresh does not move focus or announce the whole list.
+
+Independent review found that an automatic timer could abort every slow outstanding GET before it completed. The existing resource hook now exposes a small `reloadIfIdle` callback backed by its pending request; automatic checks defer until completion, while explicit mutation/manual refresh keeps its existing behavior. Aborted older requests cannot clear a newer pending flag. Timers, listeners and fetches clean up on unmount.
+
+The first baseline reproduced **seven failures across eight cases**. After aligning new error assertions with the existing 401 sign-in and 503 processing-closure behavior, the completed suite has **10 list cases**, including a deferred response surviving multiple timer/visibility events. Root passed **38 list/resource/experience cases**; independent normal/Ponytail/React/Impeccable review passed **60 cases across four suites**. TypeScript and scoped lint passed. The existing access/privacy rules were not relaxed to make retry tests pass. A hidden responsive/browser pass follows these UI changes.
+
+Autonomy: families can see background progress and necessary steps without manually reloading or losing work on a slow connection. No new family prompt, operator task, provider action or progress claim was added. This verifies display of recorded state, not receipt from an unconnected partner.
+
 ## Next independent pieces
 
-- Keep My support progress current while the page is visible, with manual refresh and truthful failure recovery.
 - Investigate grouped-answer saving and preserve unrelated exact-need answers before adding any atomic bundle path. Keep optimistic concurrency and existing strict fields; do not collect speculative route data.
