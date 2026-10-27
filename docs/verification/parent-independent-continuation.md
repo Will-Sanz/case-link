@@ -12,8 +12,17 @@ Verification: the 22-case baseline had **11 meaningful failures**; the completed
 
 Autonomy: a genuine necessary personal act can now resume unchanged prepared work rather than strand the family. No routine final review, parent checkbox, new signing channel or operator task was introduced. This is preserved PECO/R2 recovery work, required for R1 only if its actual selected route requires such evidence. Accepted signing, protected inputs and provider delivery/status remain external gates.
 
+## Piece 2 — source-safe saved answers and immediate-food lookup
+
+Necessary-answer defaults now use the existing current-source projection for ZIP, household size and the paired income amount/frequency. Initial render and explicit conflict recovery each take one consistent snapshot; zero remains valid. Another need's mirror, expired source or excluded permission cannot prefill these fields. Typed drafts and their original optimistic version survive background refresh. Other existing field behavior is unchanged.
+
+The request's food directory uses only the current permitted `food_now` ZIP. When none is usable, its existing manual search remains available; a directory query neither persists a new household fact nor claims food is allocated. Four old planner calls in the visual/UX runners were updated to the provenance-bearing request signature; the UX runner now supports a loopback-only test origin so it can run against an isolated copy without replacing the owner's preview.
+
+The test writer reproduced **12 failures across 34 UI cases** before the fix. Root's affected UI run passed **40 cases** and independent normal/Ponytail/React/Impeccable review passed **106 UI/projection cases**. A final hidden responsive/browser pass follows the remaining UI piece. No new category, field, policy purpose, model call or provider action was introduced.
+
+Autonomy: lawful current answers stay reusable without presenting another program's or expired information as current. Only an actually missing required answer needs input; urgent public food search remains accessible. This closes UI consumers of the four-field source boundary, not a food reservation or new private profile.
+
 ## Next independent pieces
 
-- Use the existing current-source projection for necessary-answer defaults and immediate-food lookup, including conflict recovery, without overwriting typed drafts.
 - Keep My support progress current while the page is visible, with manual refresh and truthful failure recovery.
 - Investigate grouped-answer saving and preserve unrelated exact-need answers before adding any atomic bundle path. Keep optimistic concurrency and existing strict fields; do not collect speculative route data.

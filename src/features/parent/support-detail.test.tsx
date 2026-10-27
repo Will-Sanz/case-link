@@ -7,12 +7,13 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { SupportDetail } from "./support-detail";
 import { buildSupportPlan } from "@/lib/parent/planning";
 import { getProgram, SNAP_NEW_APPLICATION_URL } from "@/lib/parent/programs";
+import { fixtureNow } from "@/lib/parent/test-fixtures";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -48,12 +49,56 @@ const response = (request: SupportRequest) => ({
     historyLimited: false,
   }),
 });
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(fixtureNow);
+});
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("support detail", () => {
+  it("looks up immediate food using its exact current ZIP rather than a utility mirror", async () => {
+    const request = fixture();
+    request.intake.needs = ["food_now", "electricity"];
+    request.intake.zip = "19103";
+    request.intake_need_scoped_fields = ["zip"];
+    request.facts = [
+      { need: "food_now", field: "zip", value: "19104", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" },
+      { need: "electricity", field: "zip", value: "19103", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" },
+    ];
+    const fetch = vi.fn(async (url: string) => url.includes("/food-sites?")
+      ? { ok: true, status: 200, json: async () => ({ sites: [], checkedAt: fixtureNow.toISOString(), moreSitesAvailable: false }) }
+      : response(request));
+    vi.stubGlobal("fetch", fetch);
+    render(<SupportDetail requestId={requestId} />);
+    await screen.findByRole("heading", { name: "Food locations near your ZIP" });
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.includes("/food-sites?"))).toBe(true));
+    expect(fetch.mock.calls.filter(([url]) => url.includes("/food-sites?")).map(([url]) => url))
+      .toEqual(["/api/parent/food-sites?zip=19104"]);
+  });
+  it.each(["other_need", "expired", "excluded"])("keeps manual food lookup available without querying a %s saved ZIP", async (source) => {
+    const request = fixture();
+    request.intake.needs = ["food_now", "electricity"];
+    request.intake.zip = "19103";
+    request.intake_need_scoped_fields = source === "other_need" ? ["zip"] : [];
+    if (source === "other_need") request.facts = [{ need: "electricity", field: "zip", value: "19103", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" }];
+    if (source === "expired") request.intake_confirmed_at = { zip: "2026-01-01T00:00:00Z" };
+    if (source === "excluded") request.mandate.allowedData = ["utility"];
+    const fetch = vi.fn(async (url: string) => url.includes("/food-sites?")
+      ? { ok: true, status: 200, json: async () => ({ sites: [], checkedAt: fixtureNow.toISOString(), moreSitesAvailable: false }) }
+      : response(request));
+    vi.stubGlobal("fetch", fetch);
+    render(<SupportDetail requestId={requestId} />);
+    const zip = await screen.findByLabelText("Philadelphia ZIP code");
+    expect(fetch.mock.calls.some(([url]) => url.includes("/food-sites?"))).toBe(false);
+    fireEvent.change(zip, { target: { value: "19105" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find food locations" }));
+    await waitFor(() => expect(fetch.mock.calls.filter(([url]) => url.includes("/food-sites?")).map(([url]) => url))
+      .toEqual(["/api/parent/food-sites?zip=19105"]));
+  });
   it("does not ask for completion while paused and keeps resume and permission controls", async () => {
     const request = fixture();
     request.status = "paused";

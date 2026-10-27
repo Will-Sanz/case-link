@@ -20,7 +20,7 @@ const intake = fixtureIntake({ accountAuthority: "not_sure" }),
 const request = fixtureRequest({
   intake,
   mandate,
-  plan: buildSupportPlan(intake, mandate, fixtureNow),
+  plan: buildSupportPlan(fixtureRequest({ intake, mandate }), fixtureNow),
   required_actions: requiredActions(intake, mandate),
   events: [
     {
@@ -41,7 +41,7 @@ const snapMandate = fixtureMandate({
 const snapRequest = fixtureRequest({
   intake: snapIntake,
   mandate: snapMandate,
-  plan: buildSupportPlan(snapIntake, snapMandate, fixtureNow),
+  plan: buildSupportPlan(fixtureRequest({ intake: snapIntake, mandate: snapMandate }), fixtureNow),
   required_actions: requiredActions(snapIntake, snapMandate),
   events: [],
   documents: [],

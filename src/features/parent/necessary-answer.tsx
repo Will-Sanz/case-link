@@ -2,42 +2,37 @@
 import { useState, type FormEvent } from "react";
 import type { NecessaryAction, SupportRequest } from "@/lib/parent/domain";
 import { ANSWER_FIELDS, factAnswerSchema } from "@/lib/parent/answers";
+import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
 import { parentApi, ParentApiError } from "./api";
 import styles from "./parent.module.css";
 
 function currentAnswer(
   request: SupportRequest,
   action: NecessaryAction,
-): string {
+): { value: string; frequency: string } {
+  const current = currentIntakeFields(request, new Date(), action.need);
+  let value = "";
   if (
     ["income", "incomeAmount", "incomeFrequency"].includes(action.field ?? "")
-  )
-    return request.intake.incomeAmount === null
-      ? ""
-      : String(request.intake.incomeAmount);
-  const fact = request.facts?.find(
-    (item) => item.need === action.need && item.field === action.field,
-  );
-  if (typeof fact?.value === "string" || typeof fact?.value === "number")
-    return String(fact.value);
-  if (action.field === "zip") return request.intake.zip;
-  if (action.field === "householdSize")
-    return request.intake.householdSize === null
-      ? ""
-      : String(request.intake.householdSize);
-  if (
-    action.field === "accountAuthority" &&
-    request.intake.accountAuthority !== "not_sure"
-  )
-    return request.intake.accountAuthority;
-  if (
-    action.field === "shutoffDate" &&
-    request.intake.needs.filter((need) =>
-      ["electricity", "gas", "water"].includes(need),
-    ).length === 1
-  )
-    return request.intake.shutoffDate ?? "";
-  return "";
+  ) {
+    value = current.incomeAmount === undefined ? "" : String(current.incomeAmount);
+  } else if (action.field === "zip") value = current.zip ?? "";
+  else if (action.field === "householdSize")
+    value = current.householdSize === undefined ? "" : String(current.householdSize);
+  else {
+    const fact = request.facts?.find(
+      (item) => item.need === action.need && item.field === action.field,
+    );
+    if (typeof fact?.value === "string" || typeof fact?.value === "number")
+      value = String(fact.value);
+    else if (action.field === "accountAuthority" && request.intake.accountAuthority !== "not_sure")
+      value = request.intake.accountAuthority;
+    else if (action.field === "shutoffDate" && request.intake.needs.filter(
+      (need) => ["electricity", "gas", "water"].includes(need),
+    ).length === 1)
+      value = request.intake.shutoffDate ?? "";
+  }
+  return { value, frequency: current.incomeFrequency ?? "" };
 }
 
 export function NecessaryAnswer({
@@ -51,12 +46,7 @@ export function NecessaryAnswer({
   onChange: () => void;
   correction?: boolean;
 }) {
-  const [value, setValue] = useState(() => currentAnswer(request, action));
-  const [frequency, setFrequency] = useState(
-    request.intake.incomeFrequency === "unknown"
-      ? ""
-      : request.intake.incomeFrequency,
-  );
+  const [{ value, frequency }, setAnswer] = useState(() => currentAnswer(request, action));
   const [baseVersion, setBaseVersion] = useState(request.version);
   const [conflict, setConflict] = useState(false);
   const [pending, setPending] = useState(false);
@@ -166,12 +156,7 @@ export function NecessaryAnswer({
         `/requests/${request.id}`,
       );
       setBaseVersion(latest.request.version);
-      setValue(currentAnswer(latest.request, action));
-      setFrequency(
-        latest.request.intake.incomeFrequency === "unknown"
-          ? ""
-          : latest.request.intake.incomeFrequency,
-      );
+      setAnswer(currentAnswer(latest.request, action));
       setError("");
       setConflict(false);
       setMessage(
@@ -209,7 +194,7 @@ export function NecessaryAnswer({
             className={styles.select}
             value={value}
             required
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => setAnswer({ value: event.target.value, frequency })}
           >
             <option value="">Choose your answer</option>
             {options.map(([key, label]) => (
@@ -232,7 +217,7 @@ export function NecessaryAnswer({
             maxLength={field === "zip" ? 5 : 100}
             required
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => setAnswer({ value: event.target.value, frequency })}
           />
         )}
         {income && (
@@ -244,9 +229,7 @@ export function NecessaryAnswer({
               id={`frequency-${action.id}`}
               className={styles.select}
               value={frequency}
-              onChange={(event) =>
-                setFrequency(event.target.value as typeof frequency)
-              }
+              onChange={(event) => setAnswer({ value, frequency: event.target.value })}
               required
             >
               <option value="">Choose frequency</option>

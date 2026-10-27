@@ -19,6 +19,7 @@ import type {
   SupportRequest,
 } from "@/lib/parent/domain";
 import { getProgram, PROGRAMS } from "@/lib/parent/programs";
+import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
 import { displayDate, parentApi } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { requestStatus } from "./my-support";
@@ -607,7 +608,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           )}
         </section>
         {request.intake.needs.includes("food_now") && (
-          <FoodSites zip={request.intake.zip} />
+          <FoodSites zip={currentIntakeFields(request, new Date(), "food_now").zip} />
         )}
         <section
           id="application-programs"

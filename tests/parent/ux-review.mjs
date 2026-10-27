@@ -7,15 +7,16 @@ import * as planning from "../../src/lib/parent/planning.ts";
 const { fixtureRequest, fixtureIntake, fixtureMandate, fixtureNow } =
   fixtures.default ?? fixtures;
 const { buildSupportPlan, requiredActions } = planning.default ?? planning;
-const origin = "http://127.0.0.1:3200",
+const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200",
   directory = "tmp/parent-verification/production-ux";
+assert.ok(["127.0.0.1", "localhost"].includes(new URL(origin).hostname), "UX verification is local and synthetic only.");
 mkdirSync(directory, { recursive: true });
 const intake = fixtureIntake({ accountAuthority: "not_sure" }),
   mandate = fixtureMandate();
 const request = fixtureRequest({
   intake,
   mandate,
-  plan: buildSupportPlan(intake, mandate, fixtureNow),
+  plan: buildSupportPlan(fixtureRequest({ intake, mandate }), fixtureNow),
   required_actions: requiredActions(intake, mandate),
   events: [],
   documents: [],
@@ -521,7 +522,7 @@ try {
     activeRequest = fixtureRequest({
       intake: combinedIntake,
       mandate: combinedMandate,
-      plan: buildSupportPlan(combinedIntake, combinedMandate, fixtureNow),
+      plan: buildSupportPlan(fixtureRequest({ intake: combinedIntake, mandate: combinedMandate }), fixtureNow),
       required_actions: [
         ...combinedIntake.needs.map((need) => ({
           id: `authority-${need}`,

@@ -6,19 +6,26 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NecessaryAnswer } from "./necessary-answer";
 import { PermissionEditor } from "./permission-editor";
-import { fixtureRequest } from "@/lib/parent/test-fixtures";
+import { fixtureNow, fixtureRequest } from "@/lib/parent/test-fixtures";
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(fixtureNow);
+});
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 const success = { ok: true, status: 200, json: async () => ({ ok: true }) };
 describe("necessary personal input", () => {
   it("keeps a conflicting draft until explicit review, then uses the latest saved version", async () => {
     const request = fixtureRequest();
+    request.intake.incomeAmount = 300;
     request.intake.incomeFrequency = "weekly";
     const fetch = vi
       .fn()
@@ -62,7 +69,7 @@ describe("necessary personal input", () => {
       screen.getByRole("button", { name: "Review latest question" }),
     );
     await screen.findByText(/latest saved information is loaded/);
-    expect(input.value).toBe("");
+    expect(input.value).toBe("300");
     fireEvent.change(input, { target: { value: "450" } });
     fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
@@ -155,6 +162,7 @@ describe("necessary personal input", () => {
     const fetch = vi.fn().mockResolvedValue(success);
     vi.stubGlobal("fetch", fetch);
     const request = fixtureRequest();
+    request.intake.incomeAmount = 300;
     request.intake.incomeFrequency = "weekly";
     const action = {
       id: "missing-income",
@@ -191,5 +199,76 @@ describe("necessary personal input", () => {
       version: 1,
       value: { amount: 400, frequency: "weekly" },
     });
+  });
+  it("prefills the exact need's paired income instead of another need's latest mirror", () => {
+    const request = fixtureRequest();
+    request.intake.needs = ["snap_new", "electricity"];
+    request.intake.incomeAmount = 900;
+    request.intake.incomeFrequency = "monthly";
+    request.intake_need_scoped_fields = ["incomeAmount", "incomeFrequency"];
+    request.facts = [
+      { need: "snap_new", field: "income", value: { amount: 0, frequency: "weekly" }, source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" },
+      { need: "electricity", field: "income", value: { amount: 900, frequency: "monthly" }, source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" },
+    ];
+    render(<NecessaryAnswer request={request} action={{ id: "snap-income", need: "snap_new", field: "income", reason: "missing_fact", title: "Income", explanation: "Required" }} onChange={() => {}} />);
+    expect((screen.getByLabelText("Household income before taxes ($)") as HTMLInputElement).value).toBe("0");
+    expect((screen.getByLabelText("How often is this income received?") as HTMLSelectElement).value).toBe("weekly");
+  });
+  it.each([
+    ["zip", "stale"], ["householdSize", "stale"],
+    ["zip", "excluded"], ["householdSize", "excluded"],
+  ] as const)("leaves %s blank when saved household facts are %s", (field, source) => {
+    const request = fixtureRequest();
+    const at = source === "stale" ? "2026-01-01T00:00:00Z" : fixtureNow.toISOString();
+    request.intake_confirmed_at = { [field]: at };
+    if (source === "excluded") request.mandate.allowedData = ["utility"];
+    request.facts = [{ need: "electricity", field, value: field === "zip" ? "19103" : 8, source: "parent", confirmedAt: at, asOf: at.slice(0, 10) }];
+    render(<NecessaryAnswer request={request} action={{ id: `current-${field}`, need: "electricity", field, reason: "missing_fact", title: "Current fact", explanation: "Required" }} onChange={() => {}} />);
+    expect((screen.getByLabelText("Your answer") as HTMLInputElement).value).toBe("");
+  });
+  it.each(["stale", "excluded"])("does not combine or prefill an %s income pair", (source) => {
+    const request = fixtureRequest();
+    request.intake.incomeAmount = 900;
+    request.intake.incomeFrequency = "monthly";
+    const at = source === "stale" ? "2026-01-01T00:00:00Z" : fixtureNow.toISOString();
+    request.intake_confirmed_at = { incomeAmount: at, incomeFrequency: at };
+    if (source === "excluded") request.mandate.allowedData = ["household"];
+    request.facts = [{ need: "electricity", field: "income", value: { amount: 700, frequency: "weekly" }, source: "parent", confirmedAt: at, asOf: at.slice(0, 10) }];
+    render(<NecessaryAnswer request={request} action={{ id: "current-income", need: "electricity", field: "income", reason: "missing_fact", title: "Current income", explanation: "Required" }} onChange={() => {}} />);
+    expect((screen.getByLabelText("Household income before taxes ($)") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("How often is this income received?") as HTMLSelectElement).value).toBe("");
+  });
+  it("loads scoped paired values only after explicit latest review and submits the reviewed version", async () => {
+    const request = fixtureRequest();
+    request.intake.needs = ["snap_new", "electricity"];
+    request.intake.incomeAmount = 100;
+    request.intake.incomeFrequency = "monthly";
+    const latest = structuredClone(request);
+    latest.version = 2;
+    latest.intake.incomeAmount = 900;
+    latest.intake.incomeFrequency = "yearly";
+    latest.intake_need_scoped_fields = ["incomeAmount", "incomeFrequency"];
+    latest.facts = [{ need: "snap_new", field: "income", value: { amount: 250, frequency: "weekly" }, source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" }];
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ error: "Request changed." }) })
+      .mockResolvedValueOnce({ ...success, json: async () => ({ request: latest }) })
+      .mockResolvedValue(success);
+    vi.stubGlobal("fetch", fetch);
+    render(<NecessaryAnswer request={request} action={{ id: "review-snap-income", need: "snap_new", field: "income", reason: "missing_fact", title: "Income", explanation: "Required" }} onChange={() => {}} />);
+    const amount = screen.getByLabelText("Household income before taxes ($)") as HTMLInputElement;
+    const frequency = screen.getByLabelText("How often is this income received?") as HTMLSelectElement;
+    fireEvent.change(amount, { target: { value: "444" } });
+    fireEvent.change(frequency, { target: { value: "yearly" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await screen.findByRole("alert");
+    expect(amount.value).toBe("444");
+    expect(frequency.value).toBe("yearly");
+    fireEvent.click(screen.getByRole("button", { name: "Review latest question" }));
+    await screen.findByText(/latest saved information is loaded/);
+    expect(amount.value).toBe("250");
+    expect(frequency.value).toBe("weekly");
+    fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(fetch.mock.calls[2][1].body)).toMatchObject({ version: 2, value: { amount: 250, frequency: "weekly" } });
   });
 });
