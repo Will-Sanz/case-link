@@ -1,14 +1,15 @@
-# CaseLink: parent food support and utility assistance
+# CaseLink: parent-owned family support
 
-CaseLink's current product direction is direct-to-parent food support and utility assistance with maximum useful AI independence. After minimum intake and one informed authorization, AI chooses and pursues supported programs, handles permitted paperwork/submissions, follows up, and brings in a person only for a real necessary step. The finished release must be a complete, polished product families can use.
+CaseLink's October 27 direction is one parent-owned service with maximum useful AI independence. The bounded R1 MVP delivers confirmed food access and one adult career-support booking lifecycle; R2 preserves complete food/utility coverage, then R3 expands across the original catalog. After minimum intake and one informed authorization, AI pursues supported work and follows up, involving a person only for a genuine necessary step. Each released workflow must be complete and polished. Preserve the current engineering; a provider failure changes a route dependency, not the product or stack.
 
 **Implementation status:** the parent app is implemented locally on `main` with verified-email accounts, scoped household data, consented documents, durable service jobs, source-backed AI tools, permission controls and current/exact-packet PDF exports. Local automated and production-build UI/UX checks passed; no hosted deployment or real-family processing has been enabled. Live partner transports and final release evidence remain explicit gates in [implementation progress](docs/parent-support-progress.md).
 
-The original CaseLink identity, linked ChatGPT Futures recognition and published policy/contact substance carry into the parent workflow. The owner approved [Option 2, Family Panorama](docs/parent-brand-options.md). [Existing-account support](docs/parent-shared-accounts.md) reuses the same email/password identities while preserving school records and separate parent sessions. The additive hosted schema and an explicitly approved two-hour localhost connection passed a disposable synthetic rehearsal; the October 26 connection expires at **2:08 p.m. EDT**. Default preview/test profiles remain synthetic. [Connected-account evidence](docs/verification/parent-connected-accounts.md) and [production readiness](docs/parent-production-readiness.md) record the exact scope and remaining release work.
+The original CaseLink identity, linked ChatGPT Futures recognition and published policy/contact substance carry into the parent workflow. The owner approved [Option 2, Family Panorama](docs/parent-brand-options.md). [Existing-account support](docs/parent-shared-accounts.md) reuses email/password identities while preserving school records and separate parent sessions. The later capped localhost planning/assistant pilot expires **October 27, 2026, 12:54:27 p.m. EDT**; the new plan does not renew it or activate food reservations/adult bookings. Default preview/test profiles remain synthetic. [Background/assistant evidence](docs/verification/parent-background-assistant.md), [connected-account evidence](docs/verification/parent-connected-accounts.md) and [production readiness](docs/parent-production-readiness.md) record exact scope and remaining gates.
 
 ## Current product documents
 
 - [Detailed parent-support MVP PRD](docs/parent-support-mvp-prd.md): scope, end-to-end journeys, agent authority, consent, partner contracts, privacy, states, acceptance criteria and launch gates.
+- [Launch and expansion plan](docs/parent-launch-and-expansion-plan.md): researched first routes, L0–L6 delivery backlog, owner dependencies, conditional MVP estimate and full workflow expansion order.
 - [Phased implementation plan](docs/parent-support-implementation-plan.md): current-app change map, dependencies, complete-coverage milestones, autonomy/quality gates and verification. The earlier narrow-product time estimate is superseded; full-product estimates follow feasibility work.
 - [AGENTS.md](AGENTS.md): project instructions and product north star.
 - [Documentation index and precedence](docs/README.md): current requirements versus legacy runtime instructions and historical evidence.
@@ -17,14 +18,14 @@ The parent PRD and implementation plan supersede the school case-manager product
 
 ## Intended MVP experience
 
-1. Choose food, utilities, or both; receive verified urgent help immediately when needed.
+1. Choose an enabled service: R1 food access or adult career support, then food/utility C-01 in R2. Verified urgent official help remains accessible independently.
 2. Complete minimum adaptive intake or provide supported documents with processing consent. Reuse reliable current facts; allow Not sure and manual entry.
 3. Review a short understandable mandate naming permitted programs/recipients, actions, data, limits and preferences. Click **Start getting support** once to authorize the bounded service.
 4. GPT-6.1 Sol chooses useful compatible routes, prepares/completes supported forms, executes permitted submissions/referrals/scheduling, checks status and follows up. In-scope routine work proceeds without another approval click.
 5. Participate only for genuinely necessary facts, new permissions, required personal authentication/signature/attestation, consequential choices or qualified assistance. The agent prepares that step and resumes afterward.
 6. Return to **My support** for meaningful progress, control of the mandate, useful notices/receipts and attributed outcomes. Durable authorized work continues without an open browser.
 
-Finished scope covers immediate food, SNAP new/renewal/pending/routine issues, relevant WIC journeys, electricity/gas/water affordability/arrears/shutoff/disconnection and combined needs within verified geography. Early single-route slices are internal milestones. Every advertised journey needs a real completion contract, with honest autonomous/assisted capabilities; the completed product cannot end at links or referrals. Existing listed resources are partners; program fit, capacity, automation/delegation permission, transport and updates still need verification.
+R1 requires both complete food-access and adult career-support booking workflows. R2 retains immediate food, SNAP new/renewal/pending/routine issues, relevant WIC journeys, electricity/gas/water affordability/arrears/shutoff/disconnection and combined needs; R3 maps the remaining catalog. The staged decision supersedes all-C-01-before-first-family-release, not its eventual coverage or any privacy/quality gate. Internal slices remain tests. Every advertised journey needs a real completion contract; existing partnership alone does not prove current capacity, booking authority or status access. The new R1 routes are planned, not enabled.
 
 Preparation, referral sending, partner acceptance, agency submission, assistance approval and actual support received are different events. A model response or opened link does not prove any external action succeeded. PDFs support preparation and handoff; completion of a document is not the service outcome.
 

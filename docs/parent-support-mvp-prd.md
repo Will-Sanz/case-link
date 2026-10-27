@@ -1,12 +1,12 @@
 # CaseLink parent support MVP PRD
 
-**Decision/revision date:** October 26, 2026 (America/New_York)
-**Status:** Current requirements; parent foundations implemented locally; external completion routes and family release gates remain open
-**Primary user:** An adult parent or caregiver seeking food support and utility assistance for their household
+**Decision/revision date:** October 27, 2026 (America/New_York)
+**Status:** Current requirements; staged MVP and expansion plan; external completion routes and family release gates remain open
+**Primary user:** An adult parent or caregiver seeking practical support for their household
 **Initial service area:** Philadelphia, with program-specific coverage verified before launch
 **Companion:** [Phased implementation plan](parent-support-implementation-plan.md)
 
-This PRD supersedes earlier school-product requirements and the earlier preparation-first parent draft. The latest product-owner direction is to maximize useful AI independence from one informed start, involve people only when necessary, and deliver a polished product families can use across both support areas. The earlier one-benefits-path/one-utility-path restriction is an internal delivery slice, not the finished release scope.
+This PRD supersedes earlier school-product requirements and the earlier preparation-first parent draft. The latest owner direction is a stable, researched MVP launch followed by expansion without restarting engineering. Release R1 is confirmed food access and one adult career-support booking lifecycle; R2 preserves the complete food/utility C-01 scope; R3 expands across the original catalog. This explicitly replaces the earlier all-C-01-before-first-release rule, while preserving maximum useful independence, necessary participation only and all applicable privacy, quality and operating gates. See the [launch and expansion plan](parent-launch-and-expansion-plan.md) for route evidence, milestones L0–L6, owners and estimate assumptions. No route or data processing is enabled by this revision.
 
 These are requirements, not a certification of implemented capabilities or provider permissions. Parent accounts/ownership, requests, scoped work, documents/packet foundations, recorded progress, contextual assistance and an inspectable workspace have local implementation and bounded verification evidence; external application transports remain disabled. The [implementation plan](parent-support-implementation-plan.md) and [progress record](parent-support-progress.md) distinguish tested local behavior from unproved provider completion and release readiness. Documentation does not enable real parent processing, contact partners, submit applications, or deploy changes. The school baseline remains on `codex/case-manager-baseline-2026-10-25` at `700bb46`; parent work proceeds on `main` without moving school records into parent ownership.
 
@@ -26,13 +26,13 @@ A necessary human step is specific: the agent prepares everything else, explains
 
 | Item | Current direction | Remaining evidence |
 | --- | --- | --- |
-| Product | Direct-to-parent food support and utility assistance with maximum useful autonomy and a polished family-ready release | Parent usability, service completion and autonomy measurements |
+| Product | One parent-owned service; R1 confirmed food access and adult career-support booking, then full food/utility coverage and the wider catalog | Per-release parent usability, real service completion and autonomy measurements |
 | Partner network | The owner confirmed existing listed resources are partners | Per-program permissions, capacity uncertainty, transport and update contracts; partnership is not integration access |
 | AI | GPT-6.1 Sol, `gpt-6.1-sol`, already the local default; Responses API for tools | Deployed access/settings, evaluations, latency and cost |
 | Geography | Philadelphia first | Exact program/ZIP coverage and honest unsupported-area recovery |
 | Identity | Reuse existing CaseLink email/password identities; retain verified email codes where enrollment permits | Apply reviewed shared-account configuration/migration and test actual hosted sign-in, recovery, enrollment and household isolation |
 | Language | Proposed English and reviewed Spanish experience | Test all advertised language content, notices, help and partner coverage |
-| Delivery order | Compare SNAP signed-form/fax and PECO CAP across the full lifecycle, independently review the selection, then finish one route before broadening implementation | PECO is selected for the first internal preparation piece; accepted personal acts, secure delivery, genuine receipt, status and outcome evidence remain open before route activation |
+| Delivery order | Follow L0–L6 for two complete MVP workflows, then R2 C-01 and R3 catalog expansions; one tested, independently reviewed piece at a time | First candidates are Locke school produce distribution and a minimal one-to-one career appointment; actual allocation/host authority and receipt access remain unverified. Preserve PECO/SNAP work for R2 |
 | Revenue | Parents are the users; sponsorship/payment model remains open | Pricing is separate from this service scope |
 
 The Parent University catalog and [dated directory review](verification/2026-10-15-resource-source-review.json) inform discovery. Neither proves current capacity, demand or willingness to pay. Verify an actual immediate-food route; that earlier review did not identify a dedicated pantry from the exported names/descriptions.
@@ -47,7 +47,13 @@ The Parent University catalog and [dated directory review](verification/2026-10-
 4. Provide a calm, complete, accessible product with dependable account, document, communication and return-use experiences.
 5. Make autonomy, human intervention, service outcomes, errors and operating cost measurable by journey and route.
 
-### Required coverage of the finished product (C-01)
+### Staged release scope (L-01)
+
+R1 is a polished family MVP with **both** confirmed school/community food access and one adult employment-support appointment route, including preparation, necessary personal steps, real receipts, changes/cancellation, follow-up and attributed outcomes. Food allocation is not collection; a booking is not attendance, training admission or employment. The first route candidates and remaining access/capacity dependencies are recorded in the [launch plan](parent-launch-and-expansion-plan.md). A public link, callback inquiry, generated resume or hidden operator cannot replace either promised workflow. Test stock/slot races, unknown acceptance, corrections, revocation, page-close recovery and accessible return use before launch.
+
+R2 delivers every C-01 journey below; R3 covers the remaining catalog in ordered waves. Freeze scope and evaluation denominators per release before testing. All advertised journeys must pass their completion and family-readiness contracts; unsupported capabilities remain unavailable honestly. A route failure changes the provider/channel within that workflow or its dated dependency, not the service promise. Do not rebuild the app, discard earlier provider work or silently substitute an easier artifact to meet a launch date.
+
+### Required coverage of the complete food/utility release (C-01, R2)
 
 | Need | Family journeys that must work | Completion contract |
 | --- | --- | --- |
@@ -61,13 +67,13 @@ The Parent University catalog and [dated directory review](verification/2026-10-
 
 Create a capability matrix for the actual programs/providers in this coverage: automated actions, required personal steps, partner role, source/permission evidence, status channel and fallback. Families must have a real completion route for every advertised journey; some steps are legitimately provider- or parent-assisted. Do not call every action autonomous, or treat a link/referral as the finished service. A specialty dispute may need a qualified person while AI continues permitted preparation and coordination.
 
-Select programs from the existing network by verified fit and practical coverage, rather than an arbitrary count. Complete broad service coverage through reusable tools and supported channels; do not require a bespoke API for every organization. An early vertical slice can cover one route while remaining internal. It cannot be presented as the finished family-ready product.
+Select programs by verified fit and practical coverage, rather than an arbitrary count. Complete broad service coverage through proven tools and supported channels; do not require a bespoke API for every organization. An internal slice is not a release. The explicitly bounded R1 may launch after both of its complete workflows and all applicable gates pass; it cannot be presented as complete C-01 or the full catalog.
 
 ### One family service, program-specific completion
 
 The reusable product is the household's low-effort experience and its tested service machinery: purpose-scoped reusable facts/documents, one coordinating AI, current program instructions, exact authorized operations, attributed progress and continued follow-up. Each program retains its own fields, personal acts, permitted recipients, accepted channels and outcome contract. Use a small set of supported web, official-form/packet, partner and appointment channels as actual routes require them; a universal browser agent, fax gateway or speculative connector platform is not a prerequisite.
 
-Choose the first complete service route by comparing SNAP and PECO CAP from required information through certification, delivery, agency/program receipt, status, missing-information handling and attributed outcome. Assess necessary family effort, avoidable operator work, security and reuse as well as submission feasibility. The [route selection record](verification/parent-snap-peco-route-selection.md) must distinguish published process, observed behavior, synthetic proof and unverified assumptions. A sendable PDF or transport acknowledgement alone cannot win the comparison as a complete service. SNAP remains required even if a utility route is selected first; urgent food access remains independent of application work.
+Choose actual routes through the launch plan's complete transaction/return contract and dated evidence. The [earlier SNAP/PECO selection](verification/parent-snap-peco-route-selection.md) remains historical evidence for PECO's internal preparation proof; R1 delivery order now follows L0–L6. Reuse PECO income/packet and COMPASS work for R2. A sendable PDF, public calendar or transport acknowledgement alone cannot establish a complete service. SNAP remains required in C-01; urgent access remains independent of application work.
 
 Finish and independently review the selected route in small tested slices, including its return/follow-up journey, before broadening provider implementation. Then use a second meaningfully different route to establish which components are truly shared. Extract common behavior from these demonstrated needs; do not prebuild infrastructure for unrelated catalog domains. Safe feasibility research can continue independently when one provider has an external blocker.
 
@@ -75,15 +81,15 @@ The work view follows the channel actually used: an owned live browser session f
 
 ### Product boundaries
 
-Food support and utility assistance remain the two product domains. Employment, standalone budgeting/meal planning, rent/housing search, school operations, clinical diagnosis, legal representation, payment processing, child accounts and district analytics are outside this release. Existing qualified partners can handle an appropriate escalation with permitted sharing.
+R1 enables only its verified food and adult career-support routes. R2 adds full food/utility C-01. R3 adds employment applications/adult education, financial-confidence services, housing/tenant and family support, school routines/academics/transport/technology, and childcare/camp/community participation as mapped in the launch plan. Booking a service does not complete that entire need area. Each added purpose, recipient and sensitive field requires its actual policy, consent, authority and implementation before collection; a roadmap does not approve broader data use.
 
-The Parent University catalog also suggests later housing, employment, financial-confidence, parenting/family-support, school, technology and community-activity services. These are future discovery and prioritization opportunities, not additions to C-01, approved data purposes or justification for collecting more household information now. Reuse proven service components if a later separately approved domain needs them.
+Standalone artifacts can support these services, but are not substitutes for confirmed assistance. Clinical diagnosis, legal representation, unrestricted financial commitments, child-owned accounts and district analytics remain outside autonomous CaseLink execution. Qualified providers retain substantive professional decisions and genuinely required service roles. Do not turn the catalog's draft dates/prices into verified operating facts.
 
 Known-form completion, permitted application submission and tested browser assistance are in the product scope where an enabled route supports them. Unrestricted browsing, bypassing provider controls, signing as the parent, impersonation, unsupported claims of representative authority, and financial commitments without specific approval are prohibited. Agencies and authorized specialists retain their own decisions and required roles.
 
 ### Release versus pilot
 
-The finished release includes all family-facing essentials and C-01 coverage, not just preparation or handoff. Use a closed 15–20-household supported pilot to learn and verify readiness; it does not shrink the finished scope. Each advertised capability needs relevant synthetic/partner rehearsals and representative pilot evidence. Small samples cannot establish universal outcomes or rare-event safety. Broader launch requires the complete coverage/readiness gates and an explicit release decision.
+Each release includes all family-facing essentials for its declared scope, not just preparation or handoff. R1 uses the launch plan's staged 5 then approximately 15–20-household pilot after real-data gates, with both workflows and actual service cycles represented. R2 independently requires complete C-01 coverage. Each advertised capability needs relevant synthetic/partner rehearsals and representative family evidence. Small samples cannot establish universal outcomes or rare-event safety. A bounded R1 launch and later expansions each require the exact release's coverage/readiness gates and explicit release decision.
 
 ## 3. People, ownership and service authority (P-02)
 
@@ -105,9 +111,9 @@ Interactive actions require an authenticated current session. Background work us
 
 The public experience accurately explains the service, geography, AI role, control and human help. Verified urgent contacts are available without account creation or waiting for generation. Get support is the primary action. Sensitive guest intake is not persisted in the browser.
 
-Account setup and recovery must fit the actual families' access patterns. The minimum intake asks only what changes the next action: need/urgency, ZIP/language, relevant household size/age bands, approximate income/frequency, current assistance/applications and utility provider/account context. Allow Not sure. Optional document capture can replace typing. Exact application fields are collected only for a relevant purpose. Do not require invented goals or parent-selected task dates.
+Account setup and recovery must fit the actual families' access patterns. Intake asks only what changes an enabled route's next action. R1 food/booking must not inherit irrelevant benefit income, pregnancy, child-identity or utility questions. Collect minimal verified contact/quantity/availability and actual provider questions, with protected execution fields and route-scoped permission. R2 adds relevant household/income/program/account facts only for its supported purposes. Allow Not sure where meaningful; exact required facts cannot be invented. Optional document capture can replace typing. Scheduling availability is a real preference; invented goals or arbitrary task dates are not required.
 
-The food entry asks explicitly whether the family wants food now, a new SNAP application, renewal, or help with an existing application/benefit; a general food click must not silently choose a different journey. Gather known applicable questions in one coherent bundle before the mandate, preserve answers on Back, reuse current validated information and avoid repeatedly asking for facts already available. Required identifiers use the separate protected program field/provider flow; ordinary intake is not that channel. Do not delay minimum filing or urgent food access for optional preparation.
+The food entry distinguishes food now from SNAP new/renewal/existing-benefit journeys when those service capabilities are enabled; a general food click must not silently choose a different journey. Before R2 activation, preserve clearly labeled official application access without persisting an unsupported benefit intake. Gather known applicable questions together before the mandate, preserve answers on Back, reuse current validated information and avoid repeated questions. Required identifiers use the separate protected program field/provider flow; ordinary intake is not that channel. Do not delay minimum filing or urgent access for optional preparation.
 
 Reuse parent-supplied and validated facts while they remain applicable. Track source, relevant household/person/account, effective period and last confirmation; stale income, household circumstances or old bill balances cannot silently become current application facts. Ask a missing question only after checking permitted existing information and sources; ask once and reuse the answer within its valid context. For both needs, maintain separate requests/outcomes under one household view. Verified immediate help remains available while jobs run.
 
@@ -142,6 +148,10 @@ AI distinguishes new enrollment, renewal, missing information, pending status an
 Support SNAP and relevant WIC journeys in the coverage matrix. Maintain program-specific requirements; WIC specialist participation is not replaced by an AI assessment. Do not invent eligibility, reject a parent from incomplete facts, restart an existing application automatically, or describe a WIC appointment request as approved enrollment. Resolve routine problems autonomously when facts and policy permit; disputed eligibility, appeals or legally consequential interpretation goes to qualified assistance with preparation already completed.
 
 The official application option stays accessible. Preparation/checklists never delay the ability to start an application. When a provider requires a parent signature/attestation, identity step or interview, pause that part, prepare it, and continue independent authorized work. Submission is automatic only when the provider's channel, delegation and required personal acts allow it and server policy verifies the mandate.
+
+### B-01: Adult career-support booking (R1)
+
+Select a verified minimal one-to-one career-support appointment within the adult's confirmed service, location/time preferences and named host permission. Reuse eligible saved facts, collect actual required fields together, prepare useful truthful materials and perform routine permitted booking from the mandate. Display the real accepted booking reference, local time/location, requirements and next trigger. Handle unavailability, changed slots, cancellation, unknown acceptance and actual supported changes without duplicates or hidden operator booking. Separate the booking, host/family-reported attendance and later employment outcome. No collection of SSNs, child/health or financial records merely because a host has an optional field. Actual custom questions and minimal accepted alternatives must be verified before enabling the route. The [launch plan](parent-launch-and-expansion-plan.md) defines provider-specific controls and acceptance; the current food/utility schemas do not implement this new route.
 
 ## 6. Utility journeys (U-01, U-02)
 
@@ -339,7 +349,7 @@ Initial targets below are proposals to calibrate with Phase 0 fixtures and the f
 | Operator dependence | Operator touches/minutes per task/request and cause; partner-required service delivery is separate from avoidable internal manual work |
 | First useful progress | p95 representative preparation within 60 seconds under declared load; verified urgent help is independent of generation; longer work shows actual status and expected next trigger |
 | Complete service outcomes | Food accessed, submissions, appointments, approvals, payments/benefits applied, restoration, declines and unresolved cases by route, source and waiting time |
-| Coverage | All C-01 journeys and advertised programs/providers have a working completion contract and evidence; disclose actual automated/assisted mode rather than a raw program count |
+| Coverage | Both L-01/B-01 MVP workflows for R1, all C-01 journeys for R2, and each declared R3 expansion have working completion contracts and evidence; disclose actual automated/assisted mode rather than a raw program count |
 | Cost and trust | Per-request/task/outcome model/tool/message/human cost; zero observed unauthorized disclosure, false action/award claims, lost corrections or duplicate submissions |
 
 Measure from the informed start through all attempts, including failed/abandoned tasks. Publish separate total-family-effort and eligible-autonomy measures so exclusion of legal/personal acts cannot inflate a claim of end-to-end automation. One-click completion rate is reported only for cases whose complete provider process supports it; required-personal-step cases remain in total journey reports. Selecting food and utilities produces separate need outcomes under the same household; show all denominators and unknowns.
@@ -353,9 +363,9 @@ Each non-trivial behavior change has a runnable regression. Extend existing unit
 | Unit | Mandate/action policy, source-backed judgment/fact validity and calculations, necessary-intervention reasons, limits/expiry, packet validation, compatibility/duplicate rules, outcomes, cancellation and notification suppression |
 | Auth/data | Parent A/B, partner/referral and legacy isolation; caregiver/third-party acting authority; trusted role assignment; interactive session versus durable grant; current membership/revocation/security holds; storage, exports, deletion and rollback |
 | Integration | In-scope autonomous actions and out-of-scope stops; multi-operation mandates; source/packet updates; execution/submission/booking receipts; reconcile retries; callbacks/status if used; supervised browser handover; expiring documents |
-| End to end | Every C-01 journey and combined needs, complete autonomous eligible cases, required personal acts and resumed work, no gratuitous approval stops, failure/alternative route, sign-out/reopen, notices, operator/partner exceptions and outcomes |
+| End to end | Both R1 workflows and their combined/return journeys, then every C-01 journey for R2 and each declared R3 route; complete autonomous eligible cases, required personal acts/resumption, no gratuitous approval stops, failures, sign-out/reopen, notices, exceptions and outcomes |
 | Accessibility/visual | Complete phone/laptop and advertised-language journeys, observed mandate comprehension, camera/file/manual alternatives, long text, slow networks, keyboard/screen reader, contrast/zoom/reflow and complete state coverage |
-| AI quality/judgment | At least 60 reviewed synthetic multi-step cases spanning all C-01 rows, providers and advertised languages; each enabled action has representative cases; evaluate route choice, source fidelity, auto-use of reliable facts, independent recovery, necessary versus unnecessary intervention, edits, latency and cost |
+| AI quality/judgment | At least 60 reviewed synthetic multi-step cases spanning both R1 routes and advertised languages; expand to a complete C-01 corpus for R2 and applicable R3 routes. Each enabled action has representative cases; evaluate route choice, source fidelity, auto-use of reliable facts, recovery, necessary intervention, edits, latency and cost |
 | Adversarial | Prompt injection in files/pages/messages, mandate expansion, new recipient/data/purpose, forged receipts, misleading status, identity/account mismatch, conflicting sources, unsafe files, exfiltration/search payloads, replay and spend/attempt exhaustion |
 | Forms/PDF | Current supported templates/fields/attachments match validated data; actual rendering, no invented attestations/signatures, accessible language/glyphs, exact executed version/receipt and no internal/unrelated content |
 | Hosted operations | Exact candidate model/settings, approved program channels, real permitted rehearsals, communications, job persistence, provider/partner updates, cancellation/revocation, cleanup, restore, alerts and rollback |
@@ -368,9 +378,9 @@ Name service, engineering, privacy/security, resource and support owners with pa
 
 **Before any real household intake, upload or live external action, including a closed pilot:** approve and implement the relevant data/vendor/consent controls; verify real account, household, storage and legacy isolation; rehearse the enabled routes and required personal acts; prove scoped execution, receipts, cancellation/revocation, deletion and recovery; provide honest capability copy and owned urgent/help coverage. Until that gate is recorded, use synthetic data and authorized partner rehearsals only. A restricted pilot can enable verified capabilities incrementally, with unsupported capabilities clearly unavailable; it does not certify the finished release.
 
-The finished product release requires:
+Every family release requires the following; scope is frozen per the staged L-01 contract:
 
-- C-01 coverage implemented across immediate food, SNAP/WIC and electricity/gas/water, with actual automated/assisted completion contracts and accurate public capability descriptions.
+- R1: both complete food-access and adult career-support booking workflows; R2: every C-01 food/SNAP/WIC/electricity/gas/water/combined journey; R3: the declared catalog expansion. Each has actual completion contracts and accurate public capability descriptions, not an internal slice presented as broader coverage.
 - Named recipients, action/data permissions, mandate presentation, required personal acts and per-route receipts/recovery tested. Provider automation restrictions cannot be overridden by a model or general service consent.
 - Real parent/partner/legacy isolation, private document processing, direct secret handling where needed, scoped worker authority and revocation/deletion verified.
 - Approved/implemented data purpose, vendor/retention/disclosure controls and parent consent; no reliance on historical school approvals or compliance labels.
@@ -385,15 +395,15 @@ AI continuously performs permitted routine monitoring/follow-up within each acti
 
 | Decision | Owner | Evidence needed |
 | --- | --- | --- |
-| Full coverage matrix and program/provider contracts | Product/resource owner and partners | C-01 completion paths, required acts, verified urgent food/utility coverage, actual execution/status permission |
-| First complete service route | Product/engineering/privacy owner, independently reviewed | SNAP signed-form/fax versus PECO CAP lifecycle comparison, remaining gates, family/operator effort and a bounded selected-route acceptance checklist |
+| Release coverage and program/provider contracts | Product/resource owner and partners | R1 food allocation and adult host connection first; then C-01 and declared catalog paths, required acts, urgent coverage and actual execution/status permission |
+| First MVP routes | Product/engineering/privacy owner, independently reviewed | L0 operating contracts and controlled tests for Locke distribution and the named career-service candidate, or a verified equivalent within the same workflow; actual access remains pending |
 | Mandate design and autonomy rules | Product/engineering/privacy owner | Named recipient/program set, allowed actions/data, concrete duration/attempt/booking limits, exceptions and family comprehension |
 | Identity/channel/language access | Product owner with families | Tested signup/recovery/contact availability, translations and real partner coverage |
 | Document/data/direct-entry handling | Privacy/security and engineering | Minimal inventory, model exclusion of secrets, deletion/retention and source validation |
 | Runtime and execution modes | Engineering | Durable tools, API/partner/form/browser feasibility, handover, receipts, isolation and cancellation spikes |
 | Quality, autonomy and operational capacity | Service owner | Family-ready checklist, relevant evals, intervention taxonomy, cost/support capacity and release evidence |
 
-These decisions refine execution, not the accepted goal. Broad useful automation and a polished family-ready product in the two domains are required. Build internal slices while resolving external permissions; do not silently redefine the finished product to the easiest available handoff.
+These decisions refine execution, not the accepted goal. The October 27 staged release contract replaces the earlier all-C-01 first-launch requirement; it does not erase the broader product. Build reviewed internal pieces while resolving external permissions, preserve existing engineering and do not silently replace a committed workflow with the easiest handoff.
 
 ## 19. Sources and current implementation
 
