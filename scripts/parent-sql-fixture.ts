@@ -77,6 +77,7 @@ export async function createParentSqlFixture(
     "20261027141312_parent_intake_source_dates.sql",
     "20261027142357_parent_intake_need_scope.sql",
     "20261027144122_parent_intake_projection.sql",
+    "20261027150144_parent_packet_source_guard.sql",
   ];
   try {
     for (const migration of migrations)

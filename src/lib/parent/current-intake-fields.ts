@@ -7,9 +7,9 @@ type CurrentIntakeFields = Partial<{
   incomeAmount: number;
   incomeFrequency: Exclude<SupportIntake["incomeFrequency"], "unknown">;
 }>;
-const mirroredFields = [
+export const CURRENT_INTAKE_FIELDS = [
   "zip", "householdSize", "incomeAmount", "incomeFrequency",
-];
+] as const;
 
 /** The existing 45-day ceiling is not proof of a provider's evidence requirements. */
 export function currentIntakeFields(
@@ -37,7 +37,7 @@ export function currentIntakeFields(
   const reusable = (field: keyof SupportIntake) => {
     if (
       !Array.isArray(restrictions) ||
-      restrictions.some((key) => !mirroredFields.includes(key)) ||
+      restrictions.some((key) => !CURRENT_INTAKE_FIELDS.some((field) => field === key)) ||
       restrictions.includes(field)
     )
       return false;
@@ -72,11 +72,11 @@ export function currentIntakeFields(
   }
   if (!need) return result;
   for (const fact of (request.facts ?? [])
-    .filter((fact) => fact !== null && typeof fact === "object")
+    .filter((fact) => fact !== null && typeof fact === "object" && current(fact.confirmedAt))
     .sort((a, b) => Date.parse(a.confirmedAt) - Date.parse(b.confirmedAt))) {
     if (
       fact.need !== need || fact.source !== "parent" ||
-      !current(fact.confirmedAt) || !current(fact.asOf) ||
+      !current(fact.asOf) ||
       Date.parse(fact.asOf) > Date.parse(fact.confirmedAt) ||
       !valid(fact.field, fact.value)
     )

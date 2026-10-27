@@ -53,6 +53,16 @@ function setup() {
   };
 }
 describe("execution side effect and receipts", () => {
+  it("blocks an expired packet source before storage or transport", async () => {
+    const input = setup();
+    input.request.created_at = new Date(fixtureNow.getTime() - 46 * 86400000).toISOString();
+    input.operation = { ...input.operation, dataCategories: ["household"], packet: { zip: "19104" } };
+    input.capability.dataCategories = ["household"];
+    expect(await executeSupportOperation(input)).toEqual({ state: "blocked", reason: "packet_source_not_current" });
+    expect(input.store.prepare).not.toHaveBeenCalled();
+    expect(input.store.begin).not.toHaveBeenCalled();
+    expect(input.transport.execute).not.toHaveBeenCalled();
+  });
   it("cannot prepare or dispatch a named recipient's operation for a different requested purpose", async () => {
     const input = setup();
     input.request.intake = fixtureIntake({ needs: ["food_now"] });

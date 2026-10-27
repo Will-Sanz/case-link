@@ -30,6 +30,8 @@ A registered production transport is still required for each external route. `PA
 
 ## Verification
 
+- **L1 submission-time source enforcement (3d1):** application/database preparation, form registration and dispatch reject stale or mismatched mirrored values; receipt-only follow-up remains independent of them. **1,748 tests / 191 files** passed. Reviewed migrations were applied only to the isolated local database; **160 native security assertions plus budget/concurrency checks** passed with exact cleanup. Per-need ZIP recovery is next; hosted accounts/preview/transports remain unchanged. [Evidence](verification/parent-shared-data-authority.md).
+
 - **L1 current-source projection (3c):** planner/chat/prepared packets now share permission, source-age and exact-need checks for the four mirrored fields. Same-version chat history cannot revive expired values; current household facts survive unrelated utility-account changes. **1,723 tests / 190 files** passed; independent normal/Ponytail review passed 145 focused tests. Final source checks at submission and per-need ZIP recovery remain next. [Evidence](verification/parent-shared-data-authority.md).
 
 - **L1 exact-need origin capture (3b):** a narrow server-owned restriction now survives need/fact removal and unchanged edits/renewal, while genuine household changes restore only the changed field. **1,672 tests / 189 files** passed; independent normal/Ponytail review passed 69 focused tests. These are captured rules; model/packet/execution enforcement is the next piece, with no new route or intake activation. [Evidence](verification/parent-shared-data-authority.md).

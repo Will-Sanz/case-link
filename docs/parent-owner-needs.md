@@ -20,4 +20,4 @@ The October 30 route checkpoint is a progress/evidence checkpoint, not a deadlin
 - Keep exact new route fields, identity collection and external transports closed until the actual operating/policy evidence exists.
 - Continue one focused implementation piece, tests and independent normal/Ponytail review at a time. Record results in the [shared-data checkpoint](verification/parent-shared-data-authority.md).
 
-Completed shared pieces: exact requested-purpose binding, current-permission assistant context, original intake source dates, persistent exact-need restriction capture and current-source model/packet projection. Final submission-time source checks and per-need ZIP recovery are in progress. This list does not renew the existing-account localhost pilot or enable public signup.
+Completed shared pieces: exact requested-purpose binding, current-permission assistant context, original intake source dates, persistent exact-need restrictions, current-source model/packet projection and submission-time source enforcement. Per-need ZIP routing/recovery is next. This list does not renew the existing-account localhost pilot or enable public signup.

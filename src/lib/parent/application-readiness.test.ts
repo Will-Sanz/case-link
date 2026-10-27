@@ -56,6 +56,14 @@ function ready(): Parameters<typeof applicationReadiness>[0] {
   };
 }
 describe("automatic application handling", () => {
+  it("keeps an operation with an expired packet source with the service", () => {
+    const input = ready();
+    input.authority.request.created_at = new Date(fixtureNow.getTime() - 46 * 86400000).toISOString();
+    const result = applicationReadiness(input);
+    expect(result.automaticHandlingAllowed).toBe(false);
+    expect(result.authorityDeniedReason).toBe("packet_source_not_current");
+    expect(result.parentActionRequired).toBe(false);
+  });
   it("keeps a program-purpose mismatch with the service instead of asking the family again", () => {
     const input = ready();
     input.authority.operation.need = "food_now";

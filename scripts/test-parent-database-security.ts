@@ -735,16 +735,17 @@ async function main() {
     assertionCount++;
     await denied(() => prepare(job)); // Partnership never automatically enables sharing.
     await admin.query(
-      "insert into parent_private.provider_capabilities(program_id,action,enabled,transport_verified,permission_version,permission_reference,verified_until,allowed_fields,field_categories,required_acts) values('peco-cap','share',true,true,'synthetic-security-test','isolated synthetic fixture',now()+interval '1 hour',array['householdSize'],'{\"householdSize\":\"household\"}',array[]::text[])",
+      "insert into parent_private.provider_capabilities(program_id,action,enabled,transport_verified,permission_version,permission_reference,verified_until,allowed_fields,field_categories,required_acts) values('peco-cap','share',true,true,'synthetic-security-test','isolated synthetic fixture',now()+interval '1 hour',array['householdSize','zip'],'{\"householdSize\":\"household\",\"zip\":\"household\"}',array[]::text[])",
     );
     const operationKey = randomUUID(),
       operation = await prepare(job, "share", operationKey);
     assert.equal(await prepare(job, "share", operationKey), operation);
     assertionCount++;
     await denied(
-      () => prepare(job, "share", operationKey, { householdSize: 4 }),
+      () => prepare(job, "share", operationKey, { householdSize: 3, zip: "19104" }),
       "23514",
     );
+    await denied(() => prepare(job, "share", randomUUID(), { householdSize: 4 }));
     const dispatched = await begin(job, operation);
     assert.equal(dispatched.idempotencyKey, operationKey);
     assertionCount++;

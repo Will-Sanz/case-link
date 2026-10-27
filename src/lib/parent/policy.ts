@@ -8,6 +8,7 @@ import {
 } from "./domain";
 import { getProgram } from "./programs";
 import { factAnswerSchema } from "./answers";
+import { CURRENT_INTAKE_FIELDS, currentIntakeFields } from "./current-intake-fields";
 
 export type ProviderCapability = {
   programId: string;
@@ -235,6 +236,12 @@ export function authorizeOperation(input: {
       !input.documentsValid)
   )
     return deny("document_not_authorized");
+  const current = currentIntakeFields(request, now, need);
+  if (CURRENT_INTAKE_FIELDS.some((field) =>
+    Object.hasOwn(parsedPacket.data, field) &&
+    (current[field] === undefined || parsedPacket.data[field] !== current[field]),
+  ))
+    return deny("packet_source_not_current");
   if (!/^[a-zA-Z0-9:_-]{8,200}$/.test(operation.idempotencyKey))
     return deny("invalid_operation_key");
   if (input.attempts >= request.mandate.maxAttempts)

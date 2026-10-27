@@ -210,4 +210,18 @@ describe("current intake fields from exact-need parent answers", () => {
       facts: [fact("incomeAmount", 4000), fact("incomeFrequency", "weekly")],
     }), now, "electricity")).toEqual({ zip: "19104", householdSize: 3 });
   });
+  it("orders usable facts before an interleaved invalid timestamp can affect the latest answer", () => {
+    const newer = fact("income", { amount: 3125, frequency: "monthly" }, {
+      confirmedAt: "2026-10-24T16:00:00Z", asOf: "2026-10-24",
+    });
+    const invalid = fact("amountDue", 10, { confirmedAt: "invalid" });
+    const older = fact("incomeAmount", 4000, {
+      confirmedAt: "2026-10-23T16:00:00Z", asOf: "2026-10-23",
+    });
+    const saved = request({
+      intake_need_scoped_fields: ["incomeAmount", "incomeFrequency"],
+      facts: [newer, invalid, older],
+    });
+    expect(currentIntakeFields(saved, now, "electricity")).toEqual(expected);
+  });
 });

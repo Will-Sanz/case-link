@@ -41,6 +41,32 @@ const input = () => ({
   documentsValid: true,
 });
 describe("deterministic parent authority", () => {
+  it.each(["zip", "householdSize", "incomeAmount", "incomeFrequency"] as const)(
+    "requires a matching current owned source for packet %s",
+    (field) => {
+      const test = input();
+      test.request.intake = fixtureIntake({ incomeAmount: 0, incomeFrequency: "monthly" });
+      test.operation = { ...operation, need: "electricity", dataCategories: ["household", "income"], packet: { [field]: test.request.intake[field] } };
+      test.capability.dataCategories = ["household", "income"];
+      expect(authorizeOperation(test).allowed).toBe(true);
+      test.request.intake_confirmed_at = { [field]: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString() };
+      expect(authorizeOperation(test)).toEqual({ allowed: false, reason: "packet_source_not_current" });
+      test.request.intake_confirmed_at = { [field]: fixtureNow.toISOString() };
+      test.request.intake_need_scoped_fields = [field];
+      expect(authorizeOperation(test).allowed).toBe(false);
+      const income = field === "incomeAmount" || field === "incomeFrequency";
+      test.request.facts = [{
+        need: "food_now", field: income ? "income" : field,
+        value: income ? { amount: 0, frequency: "monthly" } : test.request.intake[field],
+        source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25",
+      }];
+      expect(authorizeOperation(test).allowed).toBe(false);
+      test.request.facts[0].need = "electricity";
+      expect(authorizeOperation(test).allowed).toBe(true);
+      test.operation.packet = { [field]: field === "zip" ? "19103" : field === "incomeFrequency" ? "weekly" : 10 };
+      expect(authorizeOperation(test).allowed).toBe(false);
+    },
+  );
   it.each(["research", "prepare", "share", "submit", "schedule", "follow_up"] as const)(
     "rejects a mismatched or unrequested need before %s even when the recipient is named",
     (action) => {
