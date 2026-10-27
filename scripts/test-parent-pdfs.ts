@@ -39,7 +39,7 @@ async function main() {
   const request = fixtureRequest({
     intake,
     mandate,
-    plan: buildSupportPlan(intake, mandate, fixtureNow),
+    plan: buildSupportPlan(fixtureRequest({ intake: intake, mandate: mandate }), fixtureNow),
     events: [
       {
         id: "synthetic-parent-outcome",

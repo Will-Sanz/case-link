@@ -108,11 +108,7 @@ describe("support detail", () => {
     "only shows a form prepared for the exact current need ($need, version $version)",
     async ({ need, version, label }) => {
       const request = fixture();
-      request.plan = buildSupportPlan(
-        request.intake,
-        request.mandate,
-        new Date(request.created_at),
-      );
+      request.plan = buildSupportPlan(request, new Date(request.created_at));
       request.plan.routes[0].state = "prepared";
       vi.stubGlobal(
         "fetch",
@@ -176,11 +172,7 @@ describe("support detail", () => {
       request.plan =
         need === "snap_new"
           ? null
-          : buildSupportPlan(
-              request.intake,
-              request.mandate,
-              new Date(request.updated_at),
-            );
+          : buildSupportPlan(request, new Date(request.updated_at));
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
       render(<SupportDetail requestId={requestId} />);
       await screen.findByRole("heading", { name: "Program progress" });
@@ -330,11 +322,7 @@ describe("support detail", () => {
   it("shows the actual named recipient count and avoids repeating a route’s program name", async () => {
     const request = fixture();
     request.mandate.maxRecipients = 8;
-    request.plan = buildSupportPlan(
-      request.intake,
-      request.mandate,
-      new Date(request.created_at),
-    );
+    request.plan = buildSupportPlan(request, new Date(request.created_at));
     request.plan.routes[0].title = "PECO assistance programs";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
     render(<SupportDetail requestId={requestId} />);

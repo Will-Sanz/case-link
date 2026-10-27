@@ -193,7 +193,7 @@ function setup() {
     coordinate: async (input) => {
       await input.beforeCall?.();
       return {
-        plan: buildSupportPlan(input.request.intake, input.request.mandate, fixtureNow),
+        plan: buildSupportPlan(input.request, fixtureNow),
         requiredActions: requiredActions(input.request.intake, input.request.mandate),
         modelCalls: 1,
         inputTokens: 10,

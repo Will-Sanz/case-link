@@ -230,7 +230,13 @@ export function buildAssistantFacts(
   for (const program of getProgramsForNeeds(intake.needs).filter((p) =>
     mandate.recipientIds.includes(p.id),
   )) {
-    const issue = programRoutingIssue(program, intake.zip, now);
+    const issues = program.needs.filter((need) => intake.needs.includes(need)).map((need) => {
+      const zip = currentIntakeFields(request, now, need).zip;
+      return programRoutingIssue(program, zip, now) ?? (zip === undefined
+        ? `Coverage for new ${NEED_LABELS[need].toLowerCase()} work is not confirmed. Current routing details are checked before starting it.`
+        : null);
+    });
+    const issue = [...new Set(issues.filter((issue): issue is string => issue !== null))].join(" ");
     add(
       `program-${program.id}`,
       `${program.name}: ${program.description}${issue ? ` ${issue}` : " Program eligibility, capacity and approval are determined by the program."}`,

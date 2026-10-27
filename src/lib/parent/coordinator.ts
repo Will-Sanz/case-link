@@ -70,15 +70,16 @@ export async function coordinateSupport(input: {
 }): Promise<CoordinatorResult> {
   const { now } = input;
   const { intake, mandate } = input.request;
-  const selections: Parameters<typeof buildSupportPlan>[3] = {};
+  const selections: NonNullable<Parameters<typeof buildSupportPlan>[2]> = {};
   const programs = getProgramsForNeeds(intake.needs).filter(
     (p) =>
       mandate.recipientIds.includes(p.id) &&
-      !programRoutingIssue(p, intake.zip, now),
+      p.needs.some((need) => intake.needs.includes(need) &&
+        !programRoutingIssue(p, currentIntakeFields(input.request, now, need).zip, now)),
   );
   if (!programs.length)
     return {
-      plan: buildSupportPlan(intake, mandate, now),
+      plan: buildSupportPlan(input.request, now),
       requiredActions: requiredActions(intake, mandate),
       modelCalls: 0,
       inputTokens: 0,
@@ -203,7 +204,7 @@ export async function coordinateSupport(input: {
       });
     }
   }
-  const plan = buildSupportPlan(intake, mandate, now, selections);
+  const plan = buildSupportPlan(input.request, now, selections);
   plan.model = "gpt-6.1-sol";
   return {
     plan,

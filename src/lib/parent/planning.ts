@@ -5,7 +5,9 @@ import {
   type SupportNeed,
   type SupportPlan,
   type ServiceMandate,
+  type SupportRequest,
 } from "./domain";
+import { currentIntakeFields } from "./current-intake-fields";
 import {
   getProgramsForNeeds,
   getProgram,
@@ -13,11 +15,11 @@ import {
 } from "./programs";
 
 export function buildSupportPlan(
-  intake: SupportIntake,
-  mandate: ServiceMandate,
+  request: SupportRequest,
   now: Date,
   selections: Partial<Record<SupportNeed, string>> = {},
 ): SupportPlan {
+  const { intake, mandate } = request;
   const routes = intake.needs.map((need) => {
     const candidates = getProgramsForNeeds([need]).filter((p) =>
       mandate.recipientIds.includes(p.id),
@@ -44,7 +46,8 @@ export function buildSupportPlan(
       "snap_problem",
       "wic_continuing",
     ].includes(need);
-    const routingIssue = programRoutingIssue(selected, intake.zip, now);
+    const zip = currentIntakeFields(request, now, need).zip;
+    const routingIssue = programRoutingIssue(selected, zip, now);
     if (routingIssue)
       return {
         need,
@@ -77,9 +80,9 @@ export function buildSupportPlan(
         "Check an actual receipt and follow the outcome; opening a link is not submission.",
       ],
       limitation:
-        mandate.mode === "prepare_only"
+        (zip === undefined ? "Service-area coverage is not confirmed. Current routing details must be checked before a new service action. " : "") + (mandate.mode === "prepare_only"
           ? "Your current permission covers preparation. Nothing will be sent."
-          : "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent.",
+          : "Independent sharing and submission are waiting for this program's verified service connection. Nothing has been sent."),
     };
   });
   return {

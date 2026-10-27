@@ -41,6 +41,34 @@ const input = () => ({
   documentsValid: true,
 });
 describe("deterministic parent authority", () => {
+  it.each(["stale", "excluded", "other_need", "outside"])(
+    "requires current permitted routing for new work even when ZIP is unsent: %s",
+    (source) => {
+      const test = input();
+      test.operation.dataCategories = ["utility"];
+      if (source === "stale") test.request.intake_confirmed_at = { zip: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString() };
+      if (source === "excluded") test.request.mandate.allowedData = ["utility"];
+      if (source === "outside") test.request.intake.zip = "10001";
+      if (source === "other_need") {
+        test.request.intake_need_scoped_fields = ["zip"];
+        test.request.facts = [{ need: "food_now", field: "zip", value: "19104", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" }];
+      }
+      expect(authorizeOperation(test)).toEqual({ allowed: false, reason: "routing_source_not_current" });
+    },
+  );
+  it("exempts only verified linked follow-up from new-work routing", () => {
+    const test = input();
+    test.request.intake.zip = "10001";
+    test.operation.action = "follow_up";
+    test.capability.actions = ["follow_up"];
+    expect(authorizeOperation(test).allowed).toBe(false);
+    test.operation.packet = { statusReference: "known-receipt" };
+    test.operation.dataCategories = ["household"];
+    expect(authorizeOperation(test)).toEqual({ allowed: false, reason: "unverified_status_reference" });
+    expect(authorizeOperation({ ...test, statusReferences: ["known-receipt"] }).allowed).toBe(true);
+    test.operation.packet = { statusReference: "known-receipt", householdSize: 10 };
+    expect(authorizeOperation({ ...test, statusReferences: ["known-receipt"] }).allowed).toBe(false);
+  });
   it.each(["zip", "householdSize", "incomeAmount", "incomeFrequency"] as const)(
     "requires a matching current owned source for packet %s",
     (field) => {

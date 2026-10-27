@@ -180,11 +180,7 @@ describe("automatic application handling", () => {
 });
 
 describe("honest application labels", () => {
-  const route = buildSupportPlan(
-    fixtureIntake({ needs: ["snap_new"] }),
-    fixtureMandate({ recipientIds: ["snap-pa"] }),
-    fixtureNow,
-  ).routes[0];
+  const route = buildSupportPlan(fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }), mandate: fixtureMandate({ recipientIds: ["snap-pa"] }) }), fixtureNow).routes[0];
   it("distinguishes saved guidance, recorded information and an actual prepared form", () => {
     expect(supportRouteLabel(route)).toBe("Guidance ready");
     const operation = {

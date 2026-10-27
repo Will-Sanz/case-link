@@ -46,7 +46,7 @@ function capability(programId: string): ServiceCapability {
 function setup(request = fixtureRequest()) {
   const ports: ServicePorts = {
     coordinate: vi.fn(async (request) => ({
-      plan: buildSupportPlan(request.intake, request.mandate, fixtureNow),
+      plan: buildSupportPlan(request, fixtureNow),
       requiredActions: requiredActions(request.intake, request.mandate),
       modelCalls: 1,
       inputTokens: 100,
@@ -148,6 +148,119 @@ function singleUtilityRequest(): SupportRequest {
 }
 
 describe("parent service orchestration", () => {
+  it("routes each need by its current ZIP instead of another need's mirror", async () => {
+    const request = fixtureRequest({
+      intake: fixtureIntake({ zip: "10001" }),
+      intake_need_scoped_fields: ["zip"],
+      facts: [
+        { need: "food_now", field: "zip", value: "19104", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" },
+        { need: "electricity", field: "zip", value: "10001", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" },
+      ],
+    });
+    const input = setup(request);
+    const result = await runSupportService(input);
+    expect(input.ports.execute).toHaveBeenCalledWith(expect.objectContaining({ need: "food_now", packet: expect.objectContaining({ zip: "19104" }) }));
+    expect(vi.mocked(input.ports.execute).mock.calls.some(([operation]) => operation.need === "electricity")).toBe(false);
+    expect(result.plan.routes.find((route) => route.need === "food_now")?.state).toBe("sent");
+  });
+
+  it("reconciles an existing receipt before checking new-work geographic coverage", async () => {
+    const request = singleUtilityRequest();
+    request.intake.zip = "10001";
+    request.created_at = new Date(fixtureNow.getTime() - 46 * 86400000).toISOString();
+    const input = setup(request);
+    const pending: ServiceOperation = { ...acknowledged(request), state: "delivery_unknown", receipt: undefined };
+    input.ports.reconcile = vi.fn(async () => receipt("partner_received"));
+    const result = await runSupportService({ ...input, operations: [pending] });
+    expect(input.ports.reconcile).toHaveBeenCalledWith(pending);
+    expect(result.plan.routes[0].state).toBe("partner_received");
+    expect(result.requiredActions.some((action) => action.field === "zip")).toBe(false);
+  });
+
+  it("gathers CaseLink routing and actual form facts together before a new service action", async () => {
+    const request = fixtureRequest({
+      intake: fixtureIntake({ needs: ["food_now"], zip: "10001" }),
+      mandate: fixtureMandate({ recipientIds: ["philly-food"] }),
+      created_at: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString(),
+    });
+    const input = setup(request);
+    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+      programId, templateId: "synthetic-household-form", version: "1", validated: true,
+      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
+      missingFields: ["householdSize"], personalActs: [],
+    }));
+    const result = await runSupportService(input);
+    expect(result.requiredActions.filter((action) => action.reason === "missing_fact").map((action) => action.field).sort()).toEqual(["householdSize", "zip"]);
+    expect(result.requiredActions.find((action) => action.field === "zip")?.explanation).toContain("CaseLink");
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
+
+  it("checks a known case after a move without requesting a fresh ZIP", async () => {
+    const request = singleUtilityRequest();
+    request.intake.zip = "10001";
+    request.created_at = new Date(fixtureNow.getTime() - 46 * 86400000).toISOString();
+    const input = setup(request);
+    const result = await runSupportService({
+      ...input, operations: [acknowledged(request, "sent", "2026-10-20T16:00:00Z")],
+    });
+    expect(input.ports.execute).toHaveBeenCalledWith(expect.objectContaining({
+      action: "follow_up", packet: { statusReference: "synthetic-provider-reference" },
+    }));
+    expect(result.requiredActions.some((action) => action.field === "zip")).toBe(false);
+  });
+  it("gathers routing, booking choice and known form facts in one appointment response", async () => {
+    const request = fixtureRequest({
+      intake: fixtureIntake({ needs: ["food_now"], zip: "10001" }),
+      mandate: fixtureMandate({ recipientIds: ["philly-food"], bookingPreference: "ask_me" }),
+      created_at: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString(),
+    });
+    const input = setup(request);
+    vi.mocked(input.ports.capability).mockImplementation(async (programId) => ({ ...capability(programId), actions: ["schedule"] }));
+    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+      programId, templateId: "synthetic-appointment-form", version: "1", validated: true,
+      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
+      missingFields: ["householdSize"], personalActs: [],
+    }));
+    const result = await runSupportService(input);
+    expect(result.requiredActions.filter((action) => action.resolver !== "operator").map((action) => action.field).sort()).toEqual(["bookingPreference", "householdSize", "zip"]);
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    expect(input.ports.preparePersonalStep).not.toHaveBeenCalled();
+  });
+
+  it("requests routing permission before collecting a ZIP and keeps internal routing out of a utility-only packet", async () => {
+    const request = singleUtilityRequest();
+    request.mandate.allowedData = ["utility"];
+    const input = setup(request);
+    vi.mocked(input.ports.capability).mockImplementation(async (programId) => ({
+      ...capability(programId), dataCategories: ["utility"], allowedFields: ["utilityProvider", "accountAuthority"],
+    }));
+    const waiting = await runSupportService(input);
+    expect(waiting.requiredActions).toContainEqual(expect.objectContaining({ reason: "expanded_permission", field: "allowedData" }));
+    expect(waiting.requiredActions.some((action) => action.reason === "missing_fact" && action.field === "zip")).toBe(false);
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    request.mandate.allowedData = ["household", "utility"];
+    request.version++;
+    await runSupportService(input);
+    const operation = vi.mocked(input.ports.execute).mock.calls[0][0];
+    expect(operation.dataCategories).toEqual(["utility"]);
+    expect(operation.packet).not.toHaveProperty("zip");
+    expect(operation.packet).not.toHaveProperty("householdSize");
+  });
+
+  it("keeps an authorized alternative available while waiting for current routing evidence", async () => {
+    const request = fixtureRequest({
+      intake: fixtureIntake({ needs: ["snap_new"], zip: "10001" }),
+      mandate: fixtureMandate({ recipientIds: ["snap-pa", "uesf-benefits"] }),
+      created_at: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString(),
+    });
+    const input = setup(request);
+    const declined: ServiceOperation = { ...acknowledged(request, "declined"), need: "snap_new", programId: "snap-pa" };
+    const result = await runSupportService({ ...input, operations: [declined] });
+    expect(result.plan.routes[0].programId).toBe("uesf-benefits");
+    expect(result.requiredActions).toContainEqual(expect.objectContaining({ field: "zip", reason: "missing_fact" }));
+    expect(result.plan.routes[0].limitation ?? "").not.toContain("exhausted");
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
   it.each(["stale", "scoped"])(
     "does not execute with %s generic household data and resumes from a current exact-need answer",
     async (source) => {
@@ -879,11 +992,7 @@ describe("parent service orchestration", () => {
   });
   it("runs due follow-up against the exact recorded reference and advances to received support", async () => {
     const request = singleUtilityRequest();
-    request.plan = buildSupportPlan(
-      request.intake,
-      request.mandate,
-      fixtureNow,
-    );
+    request.plan = buildSupportPlan(request, fixtureNow);
     request.plan.routes[0].state = "sent";
     const input = setup(request);
     vi.mocked(input.ports.execute).mockImplementation(async (operation) => {
@@ -917,11 +1026,7 @@ describe("parent service orchestration", () => {
   });
   it("schedules a future internal follow-up instead of polling before its due time", async () => {
     const request = singleUtilityRequest();
-    request.plan = buildSupportPlan(
-      request.intake,
-      request.mandate,
-      fixtureNow,
-    );
+    request.plan = buildSupportPlan(request, fixtureNow);
     request.plan.routes[0].state = "agency_submitted";
     const input = setup(request);
     const result = await runSupportService({
@@ -935,11 +1040,7 @@ describe("parent service orchestration", () => {
   });
   it("does not regress an approval when a later channel acknowledgement is less specific", async () => {
     const request = singleUtilityRequest();
-    request.plan = buildSupportPlan(
-      request.intake,
-      request.mandate,
-      fixtureNow,
-    );
+    request.plan = buildSupportPlan(request, fixtureNow);
     request.plan.routes[0].state = "assistance_approved";
     const input = setup(request);
     vi.mocked(input.ports.execute).mockResolvedValue({
@@ -1031,7 +1132,7 @@ describe("operation identity and correction recovery", () => {
     request.mandate.recipientIds.push("uesf-utilities");
     const first = setup(request);
     vi.mocked(first.ports.coordinate).mockResolvedValue({
-      plan: buildSupportPlan(request.intake, request.mandate, fixtureNow, {
+      plan: buildSupportPlan(request, fixtureNow, {
         electricity: "peco-cap",
       }),
       requiredActions: [],
@@ -1054,11 +1155,7 @@ describe("operation identity and correction recovery", () => {
   });
   it("gives a new due follow-up a new identity while retries of one cycle stay stable", async () => {
     const request = singleUtilityRequest();
-    request.plan = buildSupportPlan(
-      request.intake,
-      request.mandate,
-      fixtureNow,
-    );
+    request.plan = buildSupportPlan(request, fixtureNow);
     request.plan.routes[0].state = "sent";
     const first = setup(request);
     await runSupportService({ ...first, operations: [acknowledged(request)] });

@@ -262,6 +262,9 @@ export function authorizeOperation(input: {
     operation.dataCategories.some((c) => !capability.dataCategories.includes(c))
   )
     return deny("provider_data_not_permitted");
+  const knownCase = operation.action === "follow_up" && parsedPacket.data.statusReference !== undefined;
+  if (sideEffect && !knownCase && (current.zip === undefined || !/^191\d{2}$/.test(current.zip)))
+    return deny("routing_source_not_current");
   if (sideEffect && ["electricity", "gas", "water"].includes(need)) {
     const expected = (
       { electricity: "peco", gas: "pgw", water: "pwd" } as Partial<

@@ -727,7 +727,7 @@ export async function runSupportService(input: {
   for (let index = 0; index < plan.routes.length; index++) {
     let route = plan.routes[index];
     try {
-      const program = getProgram(route.programId);
+      let program = getProgram(route.programId);
       if (!program || !program.needs.includes(route.need)) continue;
       if (!request.mandate.recipientIds.includes(program.id)) {
         addAction(
@@ -736,17 +736,6 @@ export async function runSupportService(input: {
           "Review permission for an existing program",
           "There is a recorded attempt with this program, but the current permission does not include it. Its status must be reconciled before a new application is started.",
           "parent",
-        );
-        plan.routes[index] = route;
-        continue;
-      }
-      if (programRoutingIssue(program, request.intake.zip, now)) {
-        if ((outcomeOrder[route.state] ?? 0) < 2) route.state = "unresolved";
-        addAction(
-          route,
-          "execution_issue",
-          "Check this program’s current coverage",
-          "Program coverage or source freshness must be verified before this route continues.",
         );
         plan.routes[index] = route;
         continue;
@@ -911,7 +900,7 @@ export async function runSupportService(input: {
           (candidate) =>
             !exhausted.has(candidate.id) &&
             request.mandate.recipientIds.includes(candidate.id) &&
-            !programRoutingIssue(candidate, request.intake.zip, now),
+            !programRoutingIssue(candidate, currentIntakeFields(request, now, route.need).zip, now),
         );
         if (!alternative) {
           routesExhausted = true;
@@ -928,6 +917,7 @@ export async function runSupportService(input: {
           await record(route);
           continue;
         }
+        program = alternative;
         route = {
           ...route,
           programId: alternative.id,
@@ -1025,10 +1015,28 @@ export async function runSupportService(input: {
         await record(route);
         continue;
       }
-      if (
-        action === "schedule" &&
-        request.mandate.bookingPreference === "ask_me"
-      ) {
+      const knownCase = action === "follow_up" && history.some((operation) => operation.receipt);
+      const zip = currentIntakeFields(request, now, route.need).zip;
+      if (!knownCase && programRoutingIssue(program, zip, now)) {
+        route.state = "unresolved";
+        addAction(route, "execution_issue", "Check this program’s current coverage",
+          "CaseLink must verify its supported service area or refresh this program's source information before starting new work.");
+        plan.routes[index] = route;
+        continue;
+      }
+      const needsRouting = !knownCase && zip === undefined;
+      if (needsRouting) {
+        if (!request.mandate.allowedData.includes("household"))
+          addAction(route, "expanded_permission", "Review permission for routing details",
+            "CaseLink needs permission to use current household routing details to check its Philadelphia service area before a new service action. Your existing permission stays unchanged until you choose.",
+            "parent", "allowedData", "data-household");
+        else
+          addAction(route, "missing_fact", "What is your current household ZIP code?",
+            "CaseLink currently coordinates new support in Philadelphia. A current ZIP lets us check the service area for this need; this is a CaseLink routing check, not an extra program form requirement.",
+            "parent", "zip", "zip");
+      }
+      const needsBookingChoice = action === "schedule" && request.mandate.bookingPreference === "ask_me";
+      if (needsBookingChoice) {
         addAction(
           route,
           "meaningful_choice",
@@ -1037,9 +1045,6 @@ export async function runSupportService(input: {
           "parent",
           "bookingPreference",
         );
-        route.nextActor = "parent";
-        plan.routes[index] = route;
-        continue;
       }
       let followUpCycle: string | null = null;
       let preparedForm: ServiceForm | undefined;
@@ -1169,6 +1174,11 @@ export async function runSupportService(input: {
           plan.routes[index] = route;
           continue;
         }
+      }
+      if (needsRouting || needsBookingChoice) {
+        route.nextActor = "parent";
+        plan.routes[index] = route;
+        continue;
       }
       const operation: ServiceProposedOperation = {
         need: route.need,

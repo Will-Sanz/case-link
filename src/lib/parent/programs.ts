@@ -139,10 +139,11 @@ export function getProgram(id: string): SupportProgram | undefined {
 }
 export function programRoutingIssue(
   program: SupportProgram,
-  zip: string,
+  zip: string | undefined,
   now: Date,
 ): string | null {
-  if (!/^191\d{2}$/.test(zip))
+  // Missing routing evidence permits preparation, never confirms coverage for execution.
+  if (zip !== undefined && !/^191\d{2}$/.test(zip))
     return "CaseLink currently coordinates support in Philadelphia. Use local official help while we expand coverage.";
   const checkedAt = Date.parse(program.sourceCheckedAt + "T00:00:00Z");
   if (!Number.isFinite(checkedAt) || now.getTime() - checkedAt > 30 * 86400000)
