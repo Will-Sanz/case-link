@@ -169,8 +169,8 @@ describe.skipIf(!modulePath)(
           coordinate: async (input) => {
             await input.beforeCall?.();
             return {
-              plan: buildSupportPlan(input.intake, input.mandate, input.now),
-              requiredActions: requiredActions(input.intake, input.mandate),
+              plan: buildSupportPlan(input.request.intake, input.request.mandate, input.now),
+              requiredActions: requiredActions(input.request.intake, input.request.mandate),
               modelCalls: 1,
               inputTokens: 0,
               outputTokens: 0,

@@ -9,6 +9,7 @@ import {
   fixtureIntake,
   fixtureMandate,
   fixtureNow,
+  fixtureRequest,
 } from "../src/lib/parent/test-fixtures";
 import { PARENT_EVAL_CASES } from "../tests/fixtures/parent-evaluation";
 
@@ -130,7 +131,7 @@ export async function runParentLiveSmoke(
       firstObservation = providerCalls.length;
     try {
       const result = await coordinateSupport({
-        ...test,
+        request: fixtureRequest({ intake: test.intake, mandate: test.mandate }),
         now: fixtureNow,
         apiKey,
         beforeCall: async () => {

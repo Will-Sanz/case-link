@@ -142,6 +142,8 @@ describe("request-grounded parent assistant", () => {
     request.intake.incomeAmount = 3125;
     request.intake.incomeFrequency = "monthly";
     request.mandate.allowedData = ["household"];
+    const statusText = buildAssistantFacts(snapshot({ request }), fixtureNow)
+      .facts.find((fact) => fact.id === "request-status")!.text;
     const previous = {
       question: "What income did I provide?",
       answer: {
@@ -159,6 +161,10 @@ describe("request-grounded parent assistant", () => {
       snapshot: snapshot({
         request,
         history: [
+          {
+            ...previous, request_version: 1,
+            answer: { ...previous.answer, paragraphs: [{ text: statusText, sourceLabel: "Saved request" }] },
+          },
           { ...previous, request_version: 1 },
           { ...previous, request_version: 3 },
           { ...previous, request_version: "2" },
@@ -170,7 +176,7 @@ describe("request-grounded parent assistant", () => {
             answer: {
               ...previous.answer,
               paragraphs: [
-                { text: "Your request is open.", sourceLabel: "Saved request" },
+                { text: statusText, sourceLabel: "Saved request" },
               ],
             },
           },
@@ -185,13 +191,22 @@ describe("request-grounded parent assistant", () => {
     const body = JSON.parse(String(vi.mocked(fetcher).mock.calls[0][1]?.body));
     const context = JSON.parse(body.input[0].content);
     expect(context.history).toEqual([
-      { question: "Is my request open?", answer: "Your request is open." },
+      { facts: [statusText] },
     ]);
     expect(JSON.stringify(body)).not.toContain("3125");
   });
   it("uses fresh typed parent corrections without reviving facts for an earlier utility account", () => {
     const request = fixtureRequest({
+      intake_need_scoped_fields: ["zip", "incomeAmount", "incomeFrequency"],
       facts: [
+        {
+          need: "electricity", field: "zip", value: "19103", source: "parent",
+          confirmedAt: "2026-10-20T16:00:00Z", asOf: "2026-10-20",
+        },
+        {
+          need: "electricity", field: "income", value: { amount: 3125, frequency: "monthly" },
+          source: "parent", confirmedAt: "2026-10-20T16:00:00Z", asOf: "2026-10-20",
+        },
         {
           need: "electricity",
           field: "utilityProvider",
@@ -219,6 +234,41 @@ describe("request-grounded parent assistant", () => {
     expect(facts.some((f) => f.id === "fact-electricity-amountDue")).toBe(
       false,
     );
+    expect(facts.find((f) => f.id === "fact-electricity-zip")?.text).toContain("19103");
+    expect(facts.find((f) => f.id === "fact-electricity-income")?.text).toContain("3125");
+  });
+  it("does not replay expired intake income through current-version conversation history", async () => {
+    const request = fixtureRequest({
+      created_at: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString(),
+      updated_at: fixtureNow.toISOString(),
+    });
+    request.intake.incomeAmount = 3125;
+    request.intake.incomeFrequency = "monthly";
+    const oldIncome = "Your saved income is $3125 (monthly). This is information you provided, not an agency eligibility decision.";
+    let body = "";
+    await answerParentQuestion({
+      snapshot: snapshot({
+        request,
+        history: [{
+          request_version: request.version,
+          question: "My income was 3125. What happens next?",
+          answer: {
+            intro: "Saved information",
+            paragraphs: [{ text: oldIncome, sourceLabel: "Your intake" }],
+            actionIds: [],
+          },
+        }],
+      }),
+      question: "What happens next?",
+      apiKey: "synthetic-key",
+      now: fixtureNow,
+      fetcher: vi.fn(async (_: unknown, options?: RequestInit) => {
+        body = String(options?.body);
+        return response({ intro: "status", factIds: ["request-status"], actionIds: [] });
+      }) as typeof fetch,
+      beforeCall: async () => {},
+    });
+    expect(body).not.toContain("3125");
   });
   it("attributes verified receipts and parent reports and never upgrades preparation into submission", () => {
     const { facts } = buildAssistantFacts(

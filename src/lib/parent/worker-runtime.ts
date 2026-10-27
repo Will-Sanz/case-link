@@ -16,8 +16,6 @@ import {
   mandateSchema,
   needSchema,
   type SupportAction,
-  type SupportIntake,
-  type ServiceMandate,
   type SupportRequest,
 } from "./domain";
 import { executeSupportOperation, type ExecutablePacket } from "./execution";
@@ -529,12 +527,11 @@ export async function runOneParentJob(
     );
   };
   const ports: ServicePorts = {
-    coordinate: async (intake: SupportIntake, mandate: ServiceMandate) => {
+    coordinate: async (request) => {
       if (!options.apiKey)
         throw new DocumentProcessingError("configuration_unavailable");
       return (options.coordinate ?? coordinateSupport)({
-        intake,
-        mandate,
+        request,
         now: now(),
         apiKey: options.apiKey,
         fetcher,

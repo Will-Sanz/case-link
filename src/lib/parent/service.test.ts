@@ -45,9 +45,9 @@ function capability(programId: string): ServiceCapability {
 }
 function setup(request = fixtureRequest()) {
   const ports: ServicePorts = {
-    coordinate: vi.fn(async (intake, mandate) => ({
-      plan: buildSupportPlan(intake, mandate, fixtureNow),
-      requiredActions: requiredActions(intake, mandate),
+    coordinate: vi.fn(async (request) => ({
+      plan: buildSupportPlan(request.intake, request.mandate, fixtureNow),
+      requiredActions: requiredActions(request.intake, request.mandate),
       modelCalls: 1,
       inputTokens: 100,
       outputTokens: 100,
@@ -148,6 +148,51 @@ function singleUtilityRequest(): SupportRequest {
 }
 
 describe("parent service orchestration", () => {
+  it.each(["stale", "scoped"])(
+    "does not execute with %s generic household data and resumes from a current exact-need answer",
+    async (source) => {
+      const request = fixtureRequest({
+        intake: fixtureIntake({ needs: ["food_now"] }),
+        mandate: fixtureMandate({ recipientIds: ["philly-food"] }),
+        created_at: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString(),
+        updated_at: fixtureNow.toISOString(),
+        intake_confirmed_at: {
+          zip: fixtureNow.toISOString(),
+          ...(source === "scoped" ? { householdSize: fixtureNow.toISOString() } : {}),
+        },
+        intake_need_scoped_fields: source === "scoped" ? ["householdSize"] : [],
+      });
+      const input = setup(request);
+      vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+        programId, templateId: "synthetic-household-form", version: "1", validated: true,
+        formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
+        missingFields: packet.householdSize === undefined ? ["householdSize"] : [],
+        personalActs: [],
+        ...(packet.householdSize === undefined ? {} : {
+          artifactId: "synthetic-artifact", contentSha256: "a".repeat(64),
+        }),
+      }));
+      const waiting = await runSupportService(input);
+      expect(input.ports.execute).not.toHaveBeenCalled();
+      expect(waiting.requiredActions).toContainEqual(
+        expect.objectContaining({ need: "food_now", field: "householdSize", reason: "missing_fact" }),
+      );
+      request.facts = [{
+        need: "food_now",
+        field: "householdSize",
+        value: 5,
+        source: "parent",
+        confirmedAt: fixtureNow.toISOString(),
+        asOf: "2026-10-25",
+      }];
+      request.version++;
+      const resumed = await runSupportService(input);
+      expect(resumed.requiredActions.some((action) => action.field === "householdSize")).toBe(false);
+      expect(input.ports.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ need: "food_now", packet: expect.objectContaining({ householdSize: 5 }) }),
+      );
+    },
+  );
   it("recovers a narrow existing grant with explicit income permission and one paired answer", async () => {
     const request = singleUtilityRequest();
     request.mandate.allowedData = ["household", "utility"];

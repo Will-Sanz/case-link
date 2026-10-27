@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { coordinateSupport } from "./coordinator";
-import { fixtureIntake, fixtureMandate, fixtureNow } from "./test-fixtures";
+import { fixtureIntake, fixtureMandate, fixtureNow, fixtureRequest } from "./test-fixtures";
 describe("Responses support coordinator", () => {
   it("executes bounded validated program selection without inventing execution", async () => {
     const beforeCall = vi.fn(async () => {});
@@ -34,8 +34,7 @@ describe("Responses support coordinator", () => {
       });
     }) as typeof fetch;
     const result = await coordinateSupport({
-      intake: fixtureIntake(),
-      mandate: fixtureMandate(),
+      request: fixtureRequest(),
       now: fixtureNow,
       apiKey: "synthetic-key",
       fetcher,
@@ -71,8 +70,7 @@ describe("Responses support coordinator", () => {
       }),
     ) as typeof fetch;
     const result = await coordinateSupport({
-      intake: fixtureIntake(),
-      mandate: fixtureMandate(),
+      request: fixtureRequest(),
       now: fixtureNow,
       apiKey: "synthetic-key",
       fetcher,
@@ -83,8 +81,7 @@ describe("Responses support coordinator", () => {
     });
     await expect(
       coordinateSupport({
-        intake: fixtureIntake(),
-        mandate: fixtureMandate(),
+        request: fixtureRequest(),
         now: fixtureNow,
         apiKey: "synthetic-key",
         fetcher,
@@ -100,12 +97,14 @@ describe("Responses support coordinator", () => {
       return Response.json({ status: "completed", output: [] });
     }) as typeof fetch;
     await coordinateSupport({
-      intake: fixtureIntake({
-        incomeAmount: 2500,
-        incomeFrequency: "monthly",
-        shutoffDate: "2026-11-20",
+      request: fixtureRequest({
+        intake: fixtureIntake({
+          incomeAmount: 2500,
+          incomeFrequency: "monthly",
+          shutoffDate: "2026-11-20",
+        }),
+        mandate: fixtureMandate({ allowedData: ["household"] }),
       }),
-      mandate: fixtureMandate({ allowedData: ["household"] }),
       now: fixtureNow,
       apiKey: "synthetic-key",
       fetcher,
@@ -115,5 +114,34 @@ describe("Responses support coordinator", () => {
     expect(content.facts).not.toHaveProperty("incomeAmount");
     expect(content.facts).not.toHaveProperty("shutoffDate");
     expect(body).not.toContain("2500");
+  });
+  it("sends only current shared and exact-need facts without exposing provenance metadata", async () => {
+    let body = "";
+    const request = fixtureRequest({
+      created_at: new Date(fixtureNow.getTime() - 46 * 86400000).toISOString(),
+      updated_at: fixtureNow.toISOString(),
+      intake: fixtureIntake({ incomeAmount: 3125, incomeFrequency: "monthly" }),
+      intake_confirmed_at: { zip: fixtureNow.toISOString() },
+      intake_need_scoped_fields: ["incomeAmount", "incomeFrequency"],
+      facts: [{
+        need: "electricity", field: "income", value: { amount: 2200, frequency: "monthly" },
+        source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25",
+      }],
+    });
+    await coordinateSupport({
+      request, now: fixtureNow, apiKey: "synthetic-key",
+      fetcher: vi.fn(async (_: unknown, options?: RequestInit) => {
+        body = String(options?.body);
+        return Response.json({ status: "completed", output: [] });
+      }) as typeof fetch,
+    });
+    const content = JSON.parse(JSON.parse(body).input[0].content);
+    expect(content.facts).toHaveProperty("zip", "19104");
+    expect(content.facts).not.toHaveProperty("householdSize");
+    expect(content.facts).not.toHaveProperty("incomeAmount");
+    expect(content.needFacts).toEqual([{ need: "electricity", incomeAmount: 2200, incomeFrequency: "monthly" }]);
+    expect(body).not.toContain("3125");
+    expect(body).not.toContain("intake_confirmed_at");
+    expect(body).not.toContain(request.household_id);
   });
 });

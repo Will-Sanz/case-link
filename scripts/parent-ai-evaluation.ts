@@ -85,19 +85,19 @@ const existingJourney = (need: SupportNeed) =>
   ["snap_pending", "snap_problem", "wic_continuing"].includes(need);
 export const deterministicParentCoordinator: Coordinate = async (input) => ({
   plan: buildSupportPlan(
-    input.intake,
-    input.mandate,
+    input.request.intake,
+    input.request.mandate,
     input.now,
     Object.fromEntries(
-      input.intake.needs.map((need) => [
+      input.request.intake.needs.map((need) => [
         need,
-        input.mandate.recipientIds.find((id) =>
+        input.request.mandate.recipientIds.find((id) =>
           getProgram(id)?.needs.includes(need),
         )!,
       ]),
     ),
   ),
-  requiredActions: requiredActions(input.intake, input.mandate),
+  requiredActions: requiredActions(input.request.intake, input.request.mandate),
   modelCalls: 0,
   inputTokens: 0,
   outputTokens: 0,
@@ -198,8 +198,8 @@ export async function runParentEvalCase(
         ? "schedule"
         : "submit";
   const ports: ServicePorts = {
-    coordinate: (intake, mandate) =>
-      coordinate({ intake, mandate, now, apiKey }),
+    coordinate: (request) =>
+      coordinate({ request, now, apiKey }),
     extractDocument: async () => {
       const provider = expectedProvider(utilityNeed ?? need),
         label = sourceFor(utilityNeed ?? need);

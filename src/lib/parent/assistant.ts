@@ -19,6 +19,7 @@ import {
   programRoutingIssue,
 } from "./programs";
 import type { WorkerDatabase } from "./worker-runtime";
+import { currentIntakeFields } from "./current-intake-fields";
 
 export type AssistantFact = ParentAssistantAnswer["paragraphs"][number] & {
   id: string;
@@ -141,20 +142,30 @@ export function buildAssistantFacts(
       "Saved follow-up schedule",
       request.updated_at,
     );
-  if (mandate.allowedData.includes("household")) {
+  const shared = currentIntakeFields(request, now);
+  if (shared.zip !== undefined)
     add(
-      "household",
-      `Your saved household size is ${intake.householdSize ?? "not provided"}; your ZIP code is ${intake.zip}.`,
+      "household-zip",
+      `Your saved household ZIP code is ${shared.zip}.`,
       "Your intake",
-      request.updated_at,
+      request.intake_confirmed_at?.zip ?? request.created_at,
     );
-  }
-  if (mandate.allowedData.includes("income") && intake.incomeAmount !== null)
+  if (shared.householdSize !== undefined)
+    add(
+      "household-size",
+      `Your saved household size is ${shared.householdSize}.`,
+      "Your intake",
+      request.intake_confirmed_at?.householdSize ?? request.created_at,
+    );
+  if (shared.incomeAmount !== undefined && shared.incomeFrequency !== undefined)
     add(
       "income",
-      `Your saved income is $${intake.incomeAmount} (${intake.incomeFrequency.replaceAll("_", " ")}). This is information you provided, not an agency eligibility decision.`,
+      `Your saved income is $${shared.incomeAmount} (${shared.incomeFrequency.replaceAll("_", " ")}). This is information you provided, not an agency eligibility decision.`,
       "Your intake",
-      request.updated_at,
+      new Date(Math.min(
+        Date.parse(request.intake_confirmed_at?.incomeAmount ?? request.created_at),
+        Date.parse(request.intake_confirmed_at?.incomeFrequency ?? request.created_at),
+      )).toISOString(),
     );
   if (mandate.allowedData.includes("utility")) {
     add(
@@ -172,7 +183,7 @@ export function buildAssistantFacts(
       request.updated_at,
     );
   }
-  for (const fact of request.facts ?? []) {
+  for (const fact of (request.facts ?? []).filter((fact) => fact && typeof fact === "object")) {
     const category = ["zip", "householdSize"].includes(fact.field)
       ? "household"
       : ["income", "incomeAmount", "incomeFrequency"].includes(fact.field)
@@ -192,7 +203,7 @@ export function buildAssistantFacts(
       !Number.isFinite(asOf) ||
       asOf > now.getTime() ||
       asOf < now.getTime() - 45 * 86400000 ||
-      (Number.isFinite(accountChangedAt) && confirmedAt < accountChangedAt)
+      (category === "utility" && Number.isFinite(accountChangedAt) && confirmedAt < accountChangedAt)
     )
       continue;
     const checked = factAnswerSchema.safeParse({
@@ -202,6 +213,13 @@ export function buildAssistantFacts(
       version: request.version,
     });
     if (!checked.success) continue;
+    if (["zip", "householdSize", "income", "incomeAmount", "incomeFrequency"].includes(fact.field)) {
+      const current = currentIntakeFields(request, now, fact.need);
+      if (fact.field === "income") {
+        const value = fact.value as { amount: number; frequency: string };
+        if (current.incomeAmount !== value.amount || current.incomeFrequency !== value.frequency) continue;
+      } else if (current[fact.field as keyof typeof current] !== fact.value) continue;
+    }
     add(
       `fact-${fact.need}-${fact.field}`,
       `${NEED_LABELS[fact.need]} — your current ${fact.field.replace(/([A-Z])/g, " $1").toLowerCase()} answer is ${typeof fact.value === "object" ? JSON.stringify(fact.value) : String(fact.value)}. This is information you supplied for this need, as of ${fact.asOf}.`,
@@ -364,22 +382,19 @@ export async function answerParentQuestion(input: {
   if (hasExcludedAssistantInformation(input.question))
     throw new Error("assistant_private_input");
   const context = buildAssistantFacts(input.snapshot, input.now);
+  const currentTexts = new Set(context.facts.map((fact) => fact.text));
   const history = input.snapshot.history
     .filter(
       (item) =>
         Number.isSafeInteger(item.request_version) &&
-        item.request_version === input.snapshot.request.version &&
-        safeText(item.question),
+        item.request_version === input.snapshot.request.version,
     )
     .slice(0, 4)
     .reverse()
     .map((item) => ({
-      question: item.question,
-      answer: item.answer.paragraphs
-        .map((p) => p.text)
-        .filter(safeText)
-        .join("\n"),
-    }));
+      facts: item.answer.paragraphs.map((p) => p.text).filter((text) => currentTexts.has(text)),
+    }))
+    .filter((item) => item.facts.length > 0);
   await input.beforeCall();
   const response = await (input.fetcher ?? fetch)(
     "https://api.openai.com/v1/responses",

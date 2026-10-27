@@ -123,6 +123,19 @@ describe.skipIf(!modulePath)("assistant context purpose against PostgreSQL migra
     expect(JSON.stringify(work.history)).toContain("Current request context remains available.");
     await finish(work, "The saved status is unchanged.");
   });
+  it("passes actual source dates and exact-need restrictions through the assistant snapshot", async () => {
+    const request = await start();
+    await query("authenticated", "select public.parent_answer_fact($1,'electricity','income',$2,1)", [
+      request.id, JSON.stringify({ amount: 2200, frequency: "monthly" }),
+    ]);
+    await ask(request.id);
+    const work = (await claim())!;
+    const owned = await query("authenticated",
+      "select intake_confirmed_at,intake_need_scoped_fields from public.parent_requests where id=$1", [request.id]);
+    expect(owned.rows[0].intake_need_scoped_fields).toEqual(["incomeAmount"]);
+    expect(work.request).toMatchObject(owned.rows[0]);
+    await finish(work, "Current source information is available.");
+  });
 
   it("excludes prior income context after real permission narrowing without erasing owner-visible history", async () => {
     const request = await start();

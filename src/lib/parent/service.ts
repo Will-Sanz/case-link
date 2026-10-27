@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { DOCUMENT_CONSENT_VERSION } from "./constants";
 import { factAnswerSchema } from "./answers";
+import { currentIntakeFields } from "./current-intake-fields";
 import type { CoordinatorResult } from "./coordinator";
 import {
   type NecessaryAction,
@@ -9,7 +10,6 @@ import {
   type ParentDocument,
   type ServiceMandate,
   type SupportAction,
-  type SupportIntake,
   type SupportNeed,
   type SupportPlan,
   type SupportRequest,
@@ -107,10 +107,7 @@ export type ServiceEvent = {
   receipt?: ServiceReceipt;
 };
 export type ServicePorts = {
-  coordinate(
-    intake: SupportIntake,
-    mandate: ServiceMandate,
-  ): Promise<CoordinatorResult>;
+  coordinate(request: SupportRequest): Promise<CoordinatorResult>;
   extractDocument(document: ServiceDocument): Promise<{
     facts: unknown;
     sourcePages: string[];
@@ -294,20 +291,7 @@ function packetFor(
   now: Date,
 ): Record<string, unknown> {
   const { intake, mandate } = request;
-  const packet: Record<string, unknown> = {};
-  if (mandate.allowedData.includes("household")) {
-    packet.zip = intake.zip;
-    if (intake.householdSize !== null)
-      packet.householdSize = intake.householdSize;
-  }
-  if (
-    mandate.allowedData.includes("income") &&
-    intake.incomeAmount !== null &&
-    intake.incomeFrequency !== "unknown"
-  ) {
-    packet.incomeAmount = intake.incomeAmount;
-    packet.incomeFrequency = intake.incomeFrequency;
-  }
+  const packet: Record<string, unknown> = { ...currentIntakeFields(request, now, route.need) };
   if (
     utilityNeeds.includes(route.need) &&
     mandate.allowedData.includes("utility")
@@ -318,7 +302,9 @@ function packetFor(
     if (intake.shutoffDate) packet.shutoffDate = intake.shutoffDate;
   }
   // A fresh explicit parent answer overrides document evidence only for its named need.
-  for (const fact of [...(request.facts ?? [])].sort(
+  for (const fact of (request.facts ?? []).filter((fact) =>
+    fact && !["zip", "householdSize", "income", "incomeAmount", "incomeFrequency"].includes(fact.field),
+  ).sort(
     (a, b) => dateValue(a.confirmedAt) - dateValue(b.confirmedAt),
   )) {
     const confirmed = dateValue(fact.confirmedAt),
@@ -340,17 +326,7 @@ function packetFor(
       version: request.version,
     });
     if (!answer.success) continue;
-    const category = ["zip", "householdSize"].includes(fact.field)
-      ? "household"
-      : ["income", "incomeAmount", "incomeFrequency"].includes(fact.field)
-        ? "income"
-        : "utility";
-    if (!mandate.allowedData.includes(category)) continue;
-    if (fact.field === "income") {
-      const value = fact.value as { amount: number; frequency: string };
-      packet.incomeAmount = value.amount;
-      packet.incomeFrequency = value.frequency;
-    } else packet[fact.field] = fact.value;
+    if (mandate.allowedData.includes("utility")) packet[fact.field] = fact.value;
   }
   if (
     utilityNeeds.includes(route.need) &&
@@ -622,7 +598,7 @@ export async function runSupportService(input: {
       .length === 1
   )
     effectiveIntake.shutoffDate = shutoffDates[0];
-  const coordinated = await ports.coordinate(effectiveIntake, request.mandate);
+  const coordinated = await ports.coordinate({ ...request, intake: effectiveIntake });
   const plan = {
     ...coordinated.plan,
     routes: coordinated.plan.routes

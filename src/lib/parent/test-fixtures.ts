@@ -59,6 +59,7 @@ export function fixtureRequest(
     version: 1,
     created_at: fixtureNow.toISOString(),
     updated_at: fixtureNow.toISOString(),
+    intake_need_scoped_fields: [],
     ...overrides,
   };
 }

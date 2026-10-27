@@ -258,6 +258,8 @@ export type SupportRequest = {
   events?: SupportEvent[];
   events_truncated?: boolean;
   account_changed_at?: Partial<Record<SupportNeed, string>>;
+  intake_confirmed_at?: Partial<Record<keyof SupportIntake, string>>;
+  intake_need_scoped_fields?: string[];
   documents?: ParentDocument[];
 };
 export type ParentPreferences = {
