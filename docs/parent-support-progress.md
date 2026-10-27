@@ -46,6 +46,8 @@ Generated local secrets and captures stay in ignored, access-restricted `tmp/par
 
 ## External readiness ledger
 
+October 26 SNAP research: the accepted public fax channel, official forms and separate blank application tracker offer a promising completion route beyond the rejected COMPASS session. The [independently critiqued recommendation](verification/parent-snap-alternative-routes.md) records the next small packet proof and remaining signature, exact-recipient, processor, delivery and agency-status gates. No filing/status connector, enrollment or pilot expansion was enabled; no DHS inquiry was sent, following the owner's preference.
+
 | Gate | Evidence still needed | Owner | Effect |
 | --- | --- | --- | --- |
 | Program execution | Accepted fields/forms, automation/delegation authority, secure transport/status protocol, receipt meaning, escalation and completion rehearsal per route | Product/resource owner + partners | Real autonomous transports remain disabled; local preparation and development continue |

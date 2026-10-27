@@ -12,6 +12,8 @@ The actual rehearsal used real browser → API → Auth/Data API/Storage → pri
 
 Runtime connections query their real source or report unavailability with an official alternative. Synthetic receipts, food sites and partner records belong only in explicitly identified tests; a missing runtime connection cannot be replaced by a fixture or treated as successful delivery.
 
+The [October 26 SNAP alternative-route research](verification/parent-snap-alternative-routes.md) recommends proving a signed official application and verified county fax transport, with separate agency registration/status reconciliation, as an alternative to the rejected COMPASS browser session. Official forms and the blank no-account tracker were inspected; no delivery, signature method, successful lookup or new transport is enabled. The owner prefers no DHS outreach. The proposed next step is a non-sending synthetic packet proof, not a launch claim or change to the pilot's authority.
+
 ## Existing CaseLink resources
 
 The original provider contains 54 active, non-demo directory records. The relevant existing records include UESF, PECO, two Philadelphia Water Department entries, and Community Legal Services of Philadelphia. They contain staff contact fields and descriptive material, not API credentials or an application/status integration protocol. Their shared March 21 import timestamp is not evidence of current capacity, permission or eligibility rules.

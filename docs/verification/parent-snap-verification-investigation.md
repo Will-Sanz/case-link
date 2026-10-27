@@ -70,6 +70,8 @@ The official Community Partner page links the [2026 registration presentation](h
 
 ### Prepared inquiry, not sent
 
+**Owner preference:** do not send this inquiry. The owner prefers to investigate alternatives without DHS outreach; sending it later requires new explicit authorization. See the [researched alternative routes](parent-snap-alternative-routes.md). An offline prototype does not require this email.
+
 To: `RA-PWCOMPASSCP@pa.gov`  
 Subject: Supported COMPASS route for parent-authorized SNAP assistance
 
