@@ -14,6 +14,8 @@ The latest revision freezes a staged launch direction without restarting enginee
 
 The PRD defines intended behavior; source code and exact-release verification establish what is implemented. Phase status changes only with evidence. Product requirements do not grant runtime permissions or establish partner integration access.
 
+[Owner needs](parent-owner-needs.md) keeps the running list of partner access and release decisions while independent engineering continues. [Shared-data milestones](verification/parent-shared-data-authority.md) records the current L1 implementation and its exact verification limits.
+
 The original [background/assistant checkpoint](verification/parent-background-assistant.md) retains its October 27, 12:54:27 p.m. EDT pilot deadline and processing limits. The [SNAP/PECO comparison](verification/parent-snap-peco-route-selection.md) and [unsigned preparation piece](verification/parent-peco-cap-preparation.md) are preserved R2 evidence, with the [income/certification checkpoint](verification/parent-peco-income-certification.md) recording reviewed readiness logic and remaining data/signing/delivery gates. Current MVP work follows L0–L6; no restart or new processing approval is inferred. [Sensitive identity handling](parent-sensitive-identity.md) records required SSN support and optional Plaid Layer prefill as requirements; those integrations are not implemented.
 
 [Localhost UI/UX review](verification/parent-ui-ux-review.md) records the production-build visual review, fixes and remaining usability checks. [AI evaluation](parent-ai-evaluation.md) distinguishes deterministic orchestration evidence from live model-quality approval.
