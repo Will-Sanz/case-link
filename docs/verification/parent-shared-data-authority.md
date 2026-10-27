@@ -41,4 +41,37 @@ The module is an independently installed local test runtime, not a product depen
 
 ### Autonomy checkpoint
 
-No family work or routine operator task is added. Valid, uniquely inferable authorized operations still proceed automatically; a service scope error is resolved by the service rather than asking the parent to reapprove it. This piece proves an authority boundary, not food allocation or a career booking. The next smallest shared piece is permission/data parity at request mutation and execution boundaries. New provider-specific fields and real side effects still depend on L0's accepted food allocation and adult-host contracts.
+No family work or routine operator task is added. Valid, uniquely inferable authorized operations still proceed automatically; a service scope error is resolved by the service rather than asking the parent to reapprove it. This piece proves an authority boundary, not food allocation or a career booking. The next shared piece checked permission changes against saved assistant context, below. New provider-specific fields and real side effects still depend on L0's accepted food allocation and adult-host contracts.
+
+## Piece 2 — permission and correction boundaries for assistant context
+
+Current request facts already respected the mandate's data categories, but the assistant's history did not. The database returned previous answers from every version of the request, and the model input included their text. After permission was narrowed, an old income answer could be transmitted again; after a correction, old location text could reappear.
+
+Forward migration `20261027140357_parent_assistant_context_authority.sql` limits claimed conversation context to the current request version and returns that version with each history item. The application independently drops old, future, missing or malformed version metadata before selecting its four history turns. Current-version conversation still works. The owner-visible conversation, exports and retention are unchanged; this is not erasure or an extension of retention. Saved facts are rebuilt through the current-permission projection and existing per-fact freshness checks, so this does not ask the family to re-enter them.
+
+The existing integration sends bounded context explicitly with `store: false`; no persistent provider conversation or new API/dependency was introduced. [OpenAI's conversation-state documentation](https://developers.openai.com/api/docs/guides/conversation-state) distinguishes explicit input history from provider-managed conversation state. This patch changes only the application's choice of eligible history, not processor retention or contract settings.
+
+### Verification and independent review
+
+- The new application test first reproduced income text leaving through a captured synthetic Responses request. Two database cases also failed before the fix after real permission-narrowing and correction RPCs.
+- **1,656 tests across 187 files passed**, including the new five-case database suite and all previous migration-backed suites. The focused assistant/worker/UI/API/export regression passed **81 tests across 11 files** without live model calls.
+- Independent normal and separate Ponytail reviews cleared the complete affected flow; the reviewer independently reran **40 focused tests**, including piece 1's SQL guards. The SQL replacement mechanically changes only the history projection and version filter.
+- Both reviewed forward migrations were dry-run checked and applied **only to the isolated local PostgreSQL 17.11 database on port 55322**. Its existing security regression then passed **159 assertions plus bounded-budget checks and concurrent cancellation/dispatch**. The fixture verified exact restoration of processing controls and role memberships.
+- TypeScript, scoped lint, whitespace and secret checks passed. Neither the hosted account provider nor the running connected preview was migrated or restarted.
+
+The new purpose/history regressions use embedded PostgreSQL role/RPC execution. The separate local-server regression establishes existing concurrent security behavior after applying both migrations; it is not a claim that each new history case was run through real Auth/Storage or that hosted deployment is verified. No real family record, provider transaction, model call or expansion of family-processing authority was involved.
+
+### Autonomy checkpoint
+
+Family prompts added: **zero**. Routine operator tasks added: **zero**. The family keeps its conversation and validated saved facts. The service stops reusing historical text after its authority or facts change, rather than requiring another routine consent click. This is a shared privacy prerequisite for reliable autonomous service; it still proves no food allocation or appointment. Next: finish the scoped data/permission inventory and implement only additional demonstrated shared gaps while L0's actual route contracts are obtained.
+
+## Remaining L1 dependencies and bounded review findings
+
+The additional shared-path review found no further demonstrated normal-path disclosure or execution bypass in its bounded scope. Exact provider-field restrictions remain enforced by SQL; the application's broader category-only policy remains a fail-late limitation, not evidence of a tested transport bypass. This is not a complete security audit or compliance certification.
+
+- **Actual route contracts:** the original resources establish intended food/Resume Lab support and the owner's partnership decision, but not reservation stock, organizer calendar access, exact required questions or accepted confirmation/change/fulfillment evidence. Obtain the actual food-allocation owner and adult booking host's instructions before new route fields or side effects. Preserve direct walk-in food access; do not invent reservable stock. The owner does not yet have these instructions and asked to keep a running needs list while independent engineering continues; no outreach was sent.
+- **Source-age readiness:** original intake income and household values lack per-field confirmation timestamps. A renewed mandate must not make those old values current. Before an enabled route uses such a field, implement and test source-age handling across packet, coordinator and assistant projection, preserving unrelated corrections and without refreshing on a read or renewal. Later typed facts/documents already have dated checks. Do not add irrelevant income questions to a minimal adult/food route merely to exercise this R2 dependency.
+- **Exact new data and retention:** adult routing and protected execution fields remain closed until the selected route establishes required fields, purpose, subject/household, recipient, personal acts, policy coverage and retention. The two fixes neither authorize a new schema purpose nor complete L1.
+- **Deployment:** hosted migration and exact release-candidate Auth/Storage/end-to-end checks are still required before operational activation. The existing localhost approval is not renewed; no public enrollment or live provider transport was enabled.
+
+Continue independently with the demonstrated source-age gap for existing fields; new route-specific fields follow an actual contract. Do not add irrelevant R1 income prompts or new private-data collection. Test and independently review each piece before dependent execution. No app, theme, identity or provider-platform restart is needed.

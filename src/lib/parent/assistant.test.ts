@@ -137,6 +137,58 @@ describe("request-grounded parent assistant", () => {
     expect(JSON.stringify(facts)).not.toContain("2026-11-20");
     expect(facts.find((f) => f.id === "needs")?.text).toContain("Food");
   });
+  it("keeps model conversation context within the current request version after permission or facts change", async () => {
+    const request = fixtureRequest({ version: 2 });
+    request.intake.incomeAmount = 3125;
+    request.intake.incomeFrequency = "monthly";
+    request.mandate.allowedData = ["household"];
+    const previous = {
+      question: "What income did I provide?",
+      answer: {
+        intro: "Here is your saved information.",
+        paragraphs: [
+          { text: "Your monthly income is 3125.", sourceLabel: "Saved request" },
+        ],
+        actionIds: [],
+      },
+    };
+    const fetcher = vi.fn(async () =>
+      response({ intro: "status", factIds: ["request-status"], actionIds: [] }),
+    ) as typeof fetch;
+    await answerParentQuestion({
+      snapshot: snapshot({
+        request,
+        history: [
+          { ...previous, request_version: 1 },
+          { ...previous, request_version: 3 },
+          { ...previous, request_version: "2" },
+          previous,
+          {
+            ...previous,
+            request_version: 2,
+            question: "Is my request open?",
+            answer: {
+              ...previous.answer,
+              paragraphs: [
+                { text: "Your request is open.", sourceLabel: "Saved request" },
+              ],
+            },
+          },
+        ] as unknown as AssistantSnapshot["history"],
+      }),
+      question: "What happens next?",
+      apiKey: "synthetic-key",
+      now: fixtureNow,
+      fetcher,
+      beforeCall: async () => {},
+    });
+    const body = JSON.parse(String(vi.mocked(fetcher).mock.calls[0][1]?.body));
+    const context = JSON.parse(body.input[0].content);
+    expect(context.history).toEqual([
+      { question: "Is my request open?", answer: "Your request is open." },
+    ]);
+    expect(JSON.stringify(body)).not.toContain("3125");
+  });
   it("uses fresh typed parent corrections without reviving facts for an earlier utility account", () => {
     const request = fixtureRequest({
       facts: [

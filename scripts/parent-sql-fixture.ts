@@ -73,6 +73,7 @@ export async function createParentSqlFixture(
     "20261026163009_parent_request_assistant.sql",
     "20261026163028_parent_partner_directory.sql",
     "20261027135314_parent_operation_purpose_binding.sql",
+    "20261027140357_parent_assistant_context_authority.sql",
   ];
   try {
     for (const migration of migrations)

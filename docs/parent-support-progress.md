@@ -30,6 +30,8 @@ A registered production transport is still required for each external route. `PA
 
 ## Verification
 
+- **L1 shared-authority piece 2:** model history now stays within the current request version after permission changes/corrections; owner-visible history and eligible saved facts remain. **1,656 tests / 187 files** passed; independent normal and separate Ponytail reviews cleared the change. Both reviewed migrations were applied only to the isolated local test database, whose **159 security assertions plus budget/concurrency checks** passed with exact fixture cleanup. [Evidence and autonomy checkpoint](verification/parent-shared-data-authority.md).
+
 - **L1 shared-authority piece 1:** exact requested-purpose checks now guard application preparation/readiness and database preparation, form registration and dispatch. **1,650 tests / 186 files**, including migration-backed SQL suites, and **164 embedded database-security assertions plus budget checks** passed. Independent normal and separate Ponytail reviews cleared the fix. No new purpose, hosted migration, provider action or preview change was activated. [Scope, regression evidence and autonomy checkpoint](verification/parent-shared-data-authority.md).
 
 - Latest actual-service checkpoint: **24 background/assistant checks + 21 account/control checks passed**, eight standalone live assistant cases passed, real City/partner discovery worked, exact synthetic bill facts were validated, and parent-purpose deletion erased three private objects while preserving the shared identity. Subsequent fixture cleanup and original 16/14/2 fingerprints passed. Required SSN/Plaid support is documented but not implemented. [Current evidence and limitations](verification/parent-background-assistant.md).

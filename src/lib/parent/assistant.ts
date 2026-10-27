@@ -37,7 +37,11 @@ export type AssistantSnapshot = {
   }[];
   reports: { need: string; outcome: string; created_at: string }[];
   documents: { status: string; total: number }[];
-  history: { question: string; answer: ParentAssistantAnswer }[];
+  history: {
+    request_version: number;
+    question: string;
+    answer: ParentAssistantAnswer;
+  }[];
 };
 const safeText = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -361,7 +365,12 @@ export async function answerParentQuestion(input: {
     throw new Error("assistant_private_input");
   const context = buildAssistantFacts(input.snapshot, input.now);
   const history = input.snapshot.history
-    .filter((item) => safeText(item.question))
+    .filter(
+      (item) =>
+        Number.isSafeInteger(item.request_version) &&
+        item.request_version === input.snapshot.request.version &&
+        safeText(item.question),
+    )
     .slice(0, 4)
     .reverse()
     .map((item) => ({
