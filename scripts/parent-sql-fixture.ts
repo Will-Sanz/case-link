@@ -81,6 +81,7 @@ export async function createParentSqlFixture(
     "20261027163941_parent_current_route_authority.sql",
     "20261027170820_parent_personal_act_renewal.sql",
     "20261027172429_parent_preserve_exact_need_answers.sql",
+    "20261027174125_parent_atomic_factual_answers.sql",
   ];
   try {
     for (const migration of migrations)

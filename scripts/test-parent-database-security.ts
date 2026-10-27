@@ -2577,6 +2577,55 @@ async function main() {
     assertionCount++;
     assert.deepEqual(scoped.electric, { zip: "19102", householdSize: 3, incomeAmount: 400, incomeFrequency: "weekly" });
     assertionCount++;
+    const bundledRequest = await start();
+    const bundle = [
+      { need: "food_now", field: "zip", value: "19103" },
+      { need: "electricity", field: "householdSize", value: 4 },
+    ];
+    await role("authenticated", ownerA, (db) => db.query(
+      "select public.parent_answer_facts($1,$2,1)", [bundledRequest, JSON.stringify(bundle)],
+    ));
+    const bundleSnapshot = async () => (await admin.query(
+      "select to_jsonb(r) value from public.parent_requests r where id=$1", [bundledRequest],
+    )).rows[0].value;
+    const bundled = await bundleSnapshot();
+    assert.equal(bundled.version, 3);
+    assertionCount++;
+    assert.equal(bundled.facts.length, 2);
+    assertionCount++;
+    await denied(() => role("authenticated", ownerA, (db) => db.query(
+      "select public.parent_answer_facts($1,$2,1)", [bundledRequest, JSON.stringify(bundle)],
+    )), "40001");
+    await denied(() => role("authenticated", ownerA, (db) => db.query(
+      "select public.parent_answer_facts($1,$2,3)", [bundledRequest, JSON.stringify([
+        { need: "food_now", field: "zip", value: "19102" },
+        { need: "electricity", field: "amountDue", value: -1 },
+      ])],
+    )), "23514");
+    assert.deepEqual(await bundleSnapshot(), bundled);
+    assertionCount++;
+    if (!fixture) {
+      const concurrentRequest = await start();
+      const attempts = await Promise.allSettled([2, 4].map((size) =>
+        role("authenticated", ownerA, (db) => db.query(
+          "select public.parent_answer_facts($1,$2,1)", [concurrentRequest, JSON.stringify([
+            { need: "food_now", field: "householdSize", value: size },
+            { need: "electricity", field: "amountDue", value: size * 10 },
+          ])],
+        )),
+      ));
+      assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
+      assertionCount++;
+      const rejected = attempts.find((attempt) => attempt.status === "rejected");
+      assert.equal(rejected?.status === "rejected" ? rejected.reason.code : null, "40001");
+      assertionCount++;
+      const saved = (await admin.query("select facts,version from public.parent_requests where id=$1", [concurrentRequest])).rows[0];
+      assert.equal(saved.version, 3);
+      assertionCount++;
+      assert.equal(saved.facts.find((fact: { field: string }) => fact.field === "amountDue").value,
+        saved.facts.find((fact: { field: string }) => fact.field === "householdSize").value * 10);
+      assertionCount++;
+    }
     console.log(
       `Parent database security passed (${assertionCount} recorded assertions, plus bounded budget checks; concurrency ${fixture ? "not run" : "passed"}).`,
     );
