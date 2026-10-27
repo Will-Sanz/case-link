@@ -80,6 +80,7 @@ export async function createParentSqlFixture(
     "20261027150144_parent_packet_source_guard.sql",
     "20261027163941_parent_current_route_authority.sql",
     "20261027170820_parent_personal_act_renewal.sql",
+    "20261027172429_parent_preserve_exact_need_answers.sql",
   ];
   try {
     for (const migration of migrations)

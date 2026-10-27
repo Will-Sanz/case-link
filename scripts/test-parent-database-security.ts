@@ -2556,6 +2556,27 @@ async function main() {
     console.log(
       "Document consent/provenance, expired attachment denial, raw retention, atomic factual answers, deletion and restore tombstones passed.",
     );
+    const scopedRequest = await start();
+    for (const [need, field, value, version] of [
+      ["food_now", "zip", "19103", 1],
+      ["food_now", "income", { amount: 1000, frequency: "monthly" }, 2],
+      ["electricity", "zip", "19102", 3],
+      ["electricity", "income", { amount: 400, frequency: "weekly" }, 4],
+    ] as const)
+      await role("authenticated", ownerA, (db) => db.query(
+        "select public.parent_answer_fact($1,$2,$3,$4,$5)",
+        [scopedRequest, need, field, JSON.stringify(value), version],
+      ));
+    const scoped = (await admin.query(
+      "select facts,parent_private.current_intake_fields(id,'food_now') food,parent_private.current_intake_fields(id,'electricity') electric from public.parent_requests where id=$1",
+      [scopedRequest],
+    )).rows[0];
+    assert.equal(scoped.facts.length, 4);
+    assertionCount++;
+    assert.deepEqual(scoped.food, { zip: "19103", householdSize: 3, incomeAmount: 1000, incomeFrequency: "monthly" });
+    assertionCount++;
+    assert.deepEqual(scoped.electric, { zip: "19102", householdSize: 3, incomeAmount: 400, incomeFrequency: "weekly" });
+    assertionCount++;
     console.log(
       `Parent database security passed (${assertionCount} recorded assertions, plus bounded budget checks; concurrency ${fixture ? "not run" : "passed"}).`,
     );

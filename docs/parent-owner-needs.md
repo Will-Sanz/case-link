@@ -19,6 +19,7 @@ The October 30 route checkpoint is a progress/evidence checkpoint, not a deadlin
 - Fixed genuine personal-step verification renewal for an unchanged current packet, with retained private provenance and replay protection. Native security/concurrency and independent review passed; no signing channel was activated. [Continuation evidence](verification/parent-independent-continuation.md).
 - Necessary-answer defaults and immediate-food lookup now use current information permitted for that exact need, including conflict recovery. Typed drafts remain protected; independent UI/projection review passed.
 - My support now refreshes recorded progress while visible and on return, with manual refresh, slow-connection protection and existing account/processing closure behavior. Independent review passed; no provider action is started by refreshing.
+- Answering one need no longer erases another need's saved ZIP, household size or income evidence. Explicit shared-household corrections still invalidate matching information. Independent SQL review and native security/concurrency checks passed.
 - The reviewed four-field source/routing gap is closed: reads, permission renewal and unrelated edits do not make old values current. Carry this boundary into the selected real route's minimum fields; other fields still require their applicable evidence assessment.
 - Preserved tested household/purpose isolation, corrections, revocation, retention, operation evidence and the school environment.
 - Kept exact new route fields, identity collection and external transports closed pending the actual operating/policy evidence.
@@ -28,4 +29,4 @@ Completed shared pieces: exact requested-purpose binding, current-permission ass
 
 ## Continuing without partner access
 
-Current engineering targets are preserving unrelated exact-need answers and grouped-answer recovery. These use existing purposes and fields, need no new owner input, and will be tested and independently reviewed before dependent work. Actual partner allocation/booking, new private-field collection and family launch still require the items in the table.
+The next independent engineering piece is one atomic save for already-known factual questions, avoiding sibling-question version conflicts while preserving typed drafts, genuine concurrency protection and existing strict fields. Its exact-need-preservation prerequisite is complete. It needs no new owner input and must be tested and independently reviewed before dependent work. Actual partner allocation/booking, new private-field collection and family launch still require the items in the table. No additional partner or account approval was inferred from these background changes.
