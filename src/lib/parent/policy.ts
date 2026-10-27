@@ -188,6 +188,16 @@ export function authorizeOperation(input: {
     return deny("superseded_facts");
   if (!request.mandate.recipientIds.includes(operation.programId))
     return deny("recipient_not_authorized");
+  const compatibleNeeds =
+    getProgram(operation.programId)?.needs.filter((need) =>
+      request.intake.needs.includes(need),
+    ) ?? [];
+  const need =
+    operation.need === undefined && compatibleNeeds.length === 1
+      ? compatibleNeeds[0]
+      : operation.need;
+  if (!need || !compatibleNeeds.includes(need))
+    return deny("need_not_authorized");
   if (!request.mandate.allowedActions.includes(operation.action))
     return deny("action_not_authorized");
   const sideEffect = !["research", "prepare"].includes(operation.action);
@@ -245,22 +255,13 @@ export function authorizeOperation(input: {
     operation.dataCategories.some((c) => !capability.dataCategories.includes(c))
   )
     return deny("provider_data_not_permitted");
-  const utilityNeed =
-    operation.need ??
-    getProgram(operation.programId)?.needs.find((need) =>
-      ["electricity", "gas", "water"].includes(need),
-    );
-  if (
-    sideEffect &&
-    utilityNeed &&
-    ["electricity", "gas", "water"].includes(utilityNeed)
-  ) {
+  if (sideEffect && ["electricity", "gas", "water"].includes(need)) {
     const expected = (
       { electricity: "peco", gas: "pgw", water: "pwd" } as Partial<
         Record<SupportNeed, string>
       >
-    )[utilityNeed];
-    const provider = utilityProviderFor(request, utilityNeed, now);
+    )[need];
+    const provider = utilityProviderFor(request, need, now);
     if (
       (provider !== "unknown" && provider !== expected) ||
       (parsedPacket.data.utilityProvider !== undefined &&
@@ -275,7 +276,7 @@ export function authorizeOperation(input: {
     operation.dataCategories.includes("utility") &&
     !hasUtilityAccountAuthority(
       request,
-      operation.need,
+      need,
       parsedPacket.data.accountAuthority,
       now,
     )

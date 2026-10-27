@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { executeSupportOperation } from "./execution";
-import { fixtureNow, fixtureRequest } from "./test-fixtures";
+import { fixtureIntake, fixtureNow, fixtureRequest } from "./test-fixtures";
 import type { ProposedOperation, ProviderCapability } from "./policy";
 function setup() {
   const operation: ProposedOperation = {
@@ -53,6 +53,25 @@ function setup() {
   };
 }
 describe("execution side effect and receipts", () => {
+  it("cannot prepare or dispatch a named recipient's operation for a different requested purpose", async () => {
+    const input = setup();
+    input.request.intake = fixtureIntake({ needs: ["food_now"] });
+    input.operation = {
+      ...input.operation,
+      need: "food_now",
+      dataCategories: ["household"],
+      packet: { householdSize: 3 },
+    };
+    input.capability.dataCategories = ["household"];
+    expect(await executeSupportOperation(input)).toEqual({
+      state: "blocked",
+      reason: "need_not_authorized",
+    });
+    expect(input.store.prepare).not.toHaveBeenCalled();
+    expect(input.store.begin).not.toHaveBeenCalled();
+    expect(input.transport.execute).not.toHaveBeenCalled();
+  });
+
   it("blocks actual dispatch until required application evidence is current and the form is verified", async () => {
     const input = setup();
     const incomplete = {

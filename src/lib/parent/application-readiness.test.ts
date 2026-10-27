@@ -56,6 +56,15 @@ function ready(): Parameters<typeof applicationReadiness>[0] {
   };
 }
 describe("automatic application handling", () => {
+  it("keeps a program-purpose mismatch with the service instead of asking the family again", () => {
+    const input = ready();
+    input.authority.operation.need = "food_now";
+    const result = applicationReadiness(input);
+    expect(result.automaticHandlingAllowed).toBe(false);
+    expect(result.authorityDeniedReason).toBe("need_not_authorized");
+    expect(result.parentActionRequired).toBe(false);
+  });
+
   it("does not request routine human review when the exact operation and all evidence are ready", () => {
     const result = applicationReadiness(ready());
     expect(result.automaticHandlingAllowed).toBe(true);

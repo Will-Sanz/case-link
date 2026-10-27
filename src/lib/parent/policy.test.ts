@@ -41,6 +41,83 @@ const input = () => ({
   documentsValid: true,
 });
 describe("deterministic parent authority", () => {
+  it.each(["research", "prepare", "share", "submit", "schedule", "follow_up"] as const)(
+    "rejects a mismatched or unrequested need before %s even when the recipient is named",
+    (action) => {
+      for (const need of ["food_now", "electricity", undefined] as const) {
+        const test = input();
+        test.request.intake = fixtureIntake({ needs: ["food_now"] });
+        test.operation = {
+          ...operation,
+          need,
+          action,
+          dataCategories: ["household"],
+          packet: { zip: "19104" },
+        };
+        test.capability = {
+          ...capability,
+          actions: [action],
+          dataCategories: ["household"],
+        };
+        expect(authorizeOperation(test)).toEqual({
+          allowed: false,
+          reason: "need_not_authorized",
+        });
+      }
+    },
+  );
+
+  it("does not infer a purpose when one recipient serves multiple requested journeys", () => {
+    const test = input();
+    test.request = fixtureRequest({
+      intake: fixtureIntake({ needs: ["snap_new", "snap_renewal"] }),
+      mandate: fixtureMandate({ recipientIds: ["uesf-benefits"] }),
+    });
+    test.operation = {
+      ...operation,
+      programId: "uesf-benefits",
+      dataCategories: ["household"],
+      packet: { householdSize: 3 },
+    };
+    test.capability = { ...capability, programId: "uesf-benefits" };
+    expect(authorizeOperation(test)).toEqual({
+      allowed: false,
+      reason: "need_not_authorized",
+    });
+    for (const need of ["snap_new", "snap_renewal"] as const)
+      expect(
+        authorizeOperation({
+          ...test,
+          operation: { ...test.operation, need },
+        }),
+      ).toEqual({ allowed: true });
+    test.request.intake = fixtureIntake({ needs: ["snap_new"] });
+    expect(authorizeOperation(test)).toEqual({ allowed: true });
+  });
+
+  it.each([null, "", "career_support", "water", { need: "electricity" }])(
+    "rejects a foreign or malformed purpose at the runtime boundary: %j",
+    (need) => {
+      const test = input();
+      test.operation = { ...operation, need } as ProposedOperation;
+      expect(authorizeOperation(test)).toEqual({
+        allowed: false,
+        reason: "need_not_authorized",
+      });
+    },
+  );
+
+  it("does not make an unknown program executable by naming it in both permission records", () => {
+    const test = input();
+    test.request.mandate.recipientIds = ["unknown-program"];
+    test.operation.programId = "unknown-program";
+    test.capability.programId = "unknown-program";
+    expect(authorizeOperation(test)).toEqual({
+      allowed: false,
+      reason: "need_not_authorized",
+    });
+  });
+
   it("denies an old provider route after a same-need provider correction", () => {
     const test = input();
     test.request.facts = [
