@@ -32,11 +32,17 @@ const diagnosticOrigins = new Set([
   "https://recaptcha.google.com",
   "https://fonts.googleapis.com",
   "https://fonts.gstatic.com",
+  "https://www.googletagmanager.com",
 ]);
+const verificationUrl =
+  "https://www.compass.dhs.pa.gov/api/intake/v1/recaptcha/verifyrecaptcha";
 const diagnosticPaths = new Set([
   "/intake/",
   "/home/",
   "/mca/",
+  "/api/intake/v1/recaptcha/verifyrecaptcha",
+  "/gtm.js",
+  "/gtag/js",
   "/recaptcha/api.js",
   "/recaptcha/enterprise.js",
   ...["anchor", "bframe", "reload", "userverify", "clr", "pat"].flatMap(
@@ -95,11 +101,36 @@ function diagnosticLocation(value: string) {
   }
 }
 
+type DiagnosticPhase = "before_continue" | "after_continue" | "closing";
+function verificationResult(status: number, body?: Buffer) {
+  if (status !== 200) return "http_failure";
+  if (!body) return "unavailable_body";
+  if (body.length > 65536) return "oversized_body";
+  try {
+    const value: unknown = JSON.parse(body.toString("utf8"));
+    const code =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as { statusCode?: unknown }).statusCode
+        : undefined;
+    return code === 1052 || code === "1052"
+      ? "passed"
+      : code === 1053 || code === "1053"
+        ? "rejected"
+        : code === 1054 || code === "1054"
+          ? "verification_required"
+          : "other_result";
+  } catch {
+    return "invalid_json";
+  }
+}
+
 function createPublicDiagnostic() {
   type Row = ReturnType<typeof diagnosticLocation> & {
+    phase: DiagnosticPhase;
     policy: "allow" | "deny" | "unconfirmed";
     requests: number;
     failures: number;
+    finished: number;
     statuses: Record<string, number>;
   };
   const rows = new Map<string, Row>();
@@ -107,9 +138,46 @@ function createPublicDiagnostic() {
   let truncated = false;
   let lastPublicRoute: string | null = null;
   let terminal: { status: string; summary: string } | null = null;
+  let phase: DiagnosticPhase = "before_continue";
+  let verificationStarted = 0;
+  const verification: {
+    phase: DiagnosticPhase;
+    result: ReturnType<typeof verificationResult>;
+  }[] = [];
+  const continuationStatuses: (number | "unexpected_status")[] = [];
   return {
+    continuationStatus(status: number) {
+      if (continuationStatuses.length >= 9) {
+        truncated = true;
+        return;
+      }
+      continuationStatuses.push(
+        Number.isInteger(status) && status >= 100 && status <= 599
+          ? status
+          : "unexpected_status",
+      );
+    },
+    phase(next?: DiagnosticPhase) {
+      if (next) phase = next;
+      return phase;
+    },
+    beginVerification() {
+      if (verificationStarted >= 8) {
+        truncated = true;
+        return null;
+      }
+      verificationStarted++;
+      return phase;
+    },
+    verification(
+      at: DiagnosticPhase,
+      result: ReturnType<typeof verificationResult>,
+    ) {
+      if (verification.length < 8) verification.push({ phase: at, result });
+      else truncated = true;
+    },
     network(
-      kind: "request" | "response" | "failure",
+      kind: "request" | "response" | "failure" | "finished",
       value: string,
       main: boolean | null,
       status?: number,
@@ -126,23 +194,26 @@ function createPublicDiagnostic() {
           : compassResourceAllowed(value, main)
             ? "allow"
             : "deny";
-      const key = `${location.origin}${location.path}:${policy}`;
+      const key = `${phase}:${location.origin}${location.path}:${policy}`;
       if (!rows.has(key)) {
-        if (rows.size >= 40) {
+        if (rows.size >= 120) {
           truncated = true;
           return;
         }
         rows.set(key, {
           ...location,
+          phase,
           policy,
           requests: 0,
           failures: 0,
+          finished: 0,
           statuses: {},
         });
       }
       const row = rows.get(key)!;
       if (kind === "request") row.requests++;
       else if (kind === "failure") row.failures++;
+      else if (kind === "finished") row.finished++;
       else if (Number.isInteger(status) && status! >= 100 && status! <= 599)
         row.statuses[String(status)] = (row.statuses[String(status)] ?? 0) + 1;
     },
@@ -167,13 +238,67 @@ function createPublicDiagnostic() {
         truncated,
         lastPublicRoute,
         terminal,
+        verification,
+        continuationStatuses,
         resources: [...rows.values()],
       };
     },
   };
 }
 
-function diagnosticSelfCheck() {
+async function connectionOutcome(
+  runWithCleanup: Promise<void>,
+  getFailureStage: () => string | null,
+) {
+  await runWithCleanup;
+  const failureStage = getFailureStage();
+  return {
+    outcome: failureStage === null ? "checks_passed" : "checks_failed",
+    checksPassed: checks,
+    failureStage,
+    cleanupPassed: true,
+  } as const;
+}
+
+function createPublicResampling() {
+  let count = 0;
+  const rejectedFrames = new Set<string>();
+  function observeAgain(frameId?: string) {
+    assert.ok(++count <= 8, "public_probe_resampling_exhausted");
+    if (frameId) rejectedFrames.add(frameId);
+  }
+  return {
+    imageCurrent(status: number, frameId?: string) {
+      if (status === 404 || status === 409) {
+        observeAgain();
+        return false;
+      }
+      check(
+        status === 200,
+        "Only a successful current public image can precede input.",
+      );
+      if (frameId && rejectedFrames.has(frameId)) {
+        observeAgain();
+        return false;
+      }
+      return true;
+    },
+    continuationAccepted(status: number, frameId: string) {
+      if (status === 409) {
+        observeAgain(frameId);
+        return false;
+      }
+      check(
+        status === 200,
+        "One ordinary synthetic continuation reaches the real same-session handler without solving a challenge.",
+      );
+      return true;
+    },
+    observeAgain,
+  };
+}
+
+async function diagnosticSelfCheck() {
   const secret = "sensitive-value-never-record";
   assert.deepEqual(
     diagnosticLocation(
@@ -212,6 +337,11 @@ function diagnosticSelfCheck() {
     false,
   );
   diagnostic.network(
+    "finished",
+    "https://www.google.com/recaptcha/api2/anchor",
+    false,
+  );
+  diagnostic.network(
     "request",
     "https://www.recaptcha.net/recaptcha/api2/anchor",
     false,
@@ -228,9 +358,11 @@ function diagnosticSelfCheck() {
   assert.deepEqual(snapshot.resources[0], {
     origin: "https://www.google.com",
     path: "/recaptcha/api2/anchor",
+    phase: "before_continue",
     policy: "allow",
     requests: 1,
     failures: 1,
+    finished: 1,
     statuses: { "200": 1 },
   });
   assert.equal(snapshot.resources[1].policy, "deny");
@@ -248,13 +380,13 @@ function diagnosticSelfCheck() {
   const bounded = diagnostic.snapshot();
   assert.equal(bounded.events, 2000);
   assert.equal(bounded.truncated, true);
-  assert.ok(bounded.resources.length <= 40);
+  assert.ok(bounded.resources.length <= 120);
   assert.ok(!JSON.stringify(bounded).includes(secret));
   const rowBound = createPublicDiagnostic();
   for (const origin of diagnosticOrigins)
     for (const path of diagnosticPaths)
       rowBound.network("request", `${origin}${path}`, false);
-  assert.equal(rowBound.snapshot().resources.length, 40);
+  assert.equal(rowBound.snapshot().resources.length, 120);
   assert.equal(rowBound.snapshot().truncated, true);
   const trustedSummary = [...diagnosticSummaries][0];
   rowBound.state({
@@ -269,6 +401,182 @@ function diagnosticSelfCheck() {
     null,
   );
   assert.equal(unknown.snapshot().resources[0].policy, "unconfirmed");
+  unknown.phase("after_continue");
+  unknown.network("request", `${verificationUrl}?token=${secret}`, false);
+  unknown.phase("closing");
+  unknown.network("failure", `${verificationUrl}?token=${secret}`, false);
+  assert.equal(
+    unknown.snapshot().resources[1].path,
+    new URL(verificationUrl).pathname,
+  );
+  assert.equal(unknown.snapshot().resources[1].phase, "after_continue");
+  assert.equal(unknown.snapshot().resources[2].phase, "closing");
+  for (const [code, result] of [
+    [1052, "passed"],
+    [1053, "rejected"],
+    [1054, "verification_required"],
+    ["1052", "passed"],
+    ["1053", "rejected"],
+    ["1054", "verification_required"],
+    [9999, "other_result"],
+    [" 1053", "other_result"],
+    ["1053.0", "other_result"],
+    [true, "other_result"],
+  ] as const) {
+    const body = Buffer.from(
+      JSON.stringify({ statusCode: code, message: secret, token: secret }),
+    );
+    assert.equal(verificationResult(200, body), result);
+    unknown.verification("after_continue", verificationResult(200, body));
+  }
+  assert.equal(verificationResult(500, Buffer.from(secret)), "http_failure");
+  assert.equal(verificationResult(200), "unavailable_body");
+  assert.equal(verificationResult(200, Buffer.from(secret)), "invalid_json");
+  assert.equal(verificationResult(200, Buffer.alloc(65537)), "oversized_body");
+  assert.equal(
+    verificationResult(200, Buffer.from('[{"statusCode":1052}]')),
+    "other_result",
+  );
+  for (let index = 0; index < 20; index++)
+    unknown.verification("closing", "unavailable_body");
+  assert.equal(unknown.snapshot().verification.length, 8);
+  assert.equal(unknown.snapshot().truncated, true);
+  assert.ok(!JSON.stringify(unknown.snapshot()).includes(secret));
+  const pending = createPublicDiagnostic();
+  const reserved = Array.from({ length: 8 }, () => pending.beginVerification());
+  assert.equal(pending.beginVerification(), null);
+  assert.equal(pending.snapshot().verification.length, 0);
+  for (const phase of reserved) {
+    assert.equal(phase, "before_continue");
+    pending.verification(phase!, "verification_required");
+  }
+  assert.equal(pending.snapshot().verification.length, 8);
+  assert.ok(
+    pending
+      .snapshot()
+      .verification.every(({ result }) => result === "verification_required"),
+  );
+  assert.equal(pending.snapshot().truncated, true);
+  const transport = createPublicDiagnostic();
+  for (const status of [
+    200,
+    409,
+    403,
+    429,
+    400,
+    0,
+    600,
+    200.5,
+    secret as unknown as number,
+  ])
+    transport.continuationStatus(status);
+  assert.deepEqual(transport.snapshot().continuationStatuses, [
+    200,
+    409,
+    403,
+    429,
+    400,
+    "unexpected_status",
+    "unexpected_status",
+    "unexpected_status",
+    "unexpected_status",
+  ]);
+  assert.equal(transport.snapshot().truncated, false);
+  for (let index = 0; index < 20; index++) transport.continuationStatus(200);
+  assert.equal(transport.snapshot().continuationStatuses.length, 9);
+  assert.equal(transport.snapshot().truncated, true);
+  assert.ok(!JSON.stringify(transport.snapshot()).includes(secret));
+
+  const order: string[] = [];
+  let failureStage: string | null = null;
+  const failed = await connectionOutcome(
+    (async () => {
+      try {
+        try {
+          throw new Error(secret);
+        } catch {
+          failureStage = "deliberate no-provider check failure";
+        } finally {
+          order.push("resources closed");
+        }
+      } finally {
+        order.push("exact fixture controls restored");
+      }
+    })(),
+    () => failureStage,
+  );
+  order.push("outcome available");
+  assert.deepEqual(order, [
+    "resources closed",
+    "exact fixture controls restored",
+    "outcome available",
+  ]);
+  assert.deepEqual(failed, {
+    outcome: "checks_failed",
+    checksPassed: checks,
+    failureStage: "deliberate no-provider check failure",
+    cleanupPassed: true,
+  });
+  assert.ok(!JSON.stringify(failed).includes(secret));
+  for (const cleanup of ["resource", "fixture"]) {
+    let reportable = false;
+    await assert.rejects(async () => {
+      await connectionOutcome(
+        (async () => {
+          try {
+            try {
+              throw new Error(secret);
+            } catch {
+              // A body failure must not conceal either cleanup failure.
+            } finally {
+              if (cleanup === "resource") throw new Error(secret);
+            }
+          } finally {
+            if (cleanup === "fixture") throw new Error(secret);
+          }
+        })(),
+        () => "deliberate no-provider check failure",
+      );
+      reportable = true;
+    });
+    assert.equal(reportable, false);
+  }
+  assert.deepEqual(await connectionOutcome(Promise.resolve(), () => null), {
+    outcome: "checks_passed",
+    checksPassed: checks,
+    failureStage: null,
+    cleanupPassed: true,
+  });
+
+  const resampling = createPublicResampling();
+  const attempted: string[] = [];
+  let accepted = 0;
+  for (const [imageStatus, frameId, controlStatus] of [
+    [404, "closed-image", 200],
+    [409, "stale-image", 200],
+    [200, "first-current-image", 409],
+    [200, "first-current-image", 200],
+    [200, "fresh-current-image", 200],
+  ] as const) {
+    if (!resampling.imageCurrent(imageStatus, frameId)) continue;
+    attempted.push(frameId);
+    if (!resampling.continuationAccepted(controlStatus, frameId)) continue;
+    accepted++;
+    break;
+  }
+  assert.deepEqual(attempted, ["first-current-image", "fresh-current-image"]);
+  assert.equal(accepted, 1);
+  assert.throws(() => createPublicResampling().imageCurrent(403));
+  assert.throws(() => resampling.imageCurrent(403, "first-current-image"));
+  assert.throws(() =>
+    createPublicResampling().continuationAccepted(403, "denied"),
+  );
+  const exhausted = createPublicResampling();
+  for (let index = 0; index < 8; index++) exhausted.observeAgain();
+  assert.throws(
+    () => exhausted.observeAgain(),
+    /public_probe_resampling_exhausted/,
+  );
 }
 
 async function main() {
@@ -278,7 +586,8 @@ async function main() {
     process.env.CASELINK_SNAP_READINESS_APPROVED === "1"
       ? createPublicDiagnostic()
       : null;
-  await withParentBrowserFixtures(
+  let failureStage: string | null = null;
+  const fixtureRun = withParentBrowserFixtures(
     check,
     (value) => {
       stage = value;
@@ -288,6 +597,7 @@ async function main() {
       let runner: ReturnType<typeof createApplicationBrowser> | undefined;
       let server: ReturnType<typeof createApplicationBrowserServer> | undefined;
       const contexts: BrowserContext[] = [];
+      const verificationReads: Promise<void>[] = [];
       let closedContexts = 0;
       const live = process.env.CASELINK_SNAP_READINESS_APPROVED === "1";
       try {
@@ -342,6 +652,11 @@ async function main() {
               closedContexts++;
             });
             if (diagnostic) {
+              const close = context.close.bind(context);
+              context.close = async (...args) => {
+                diagnostic.phase("closing");
+                await close(...args);
+              };
               const main = (request: import("@playwright/test").Request) => {
                 try {
                   return (
@@ -355,13 +670,42 @@ async function main() {
               context.on("request", (request) =>
                 diagnostic.network("request", request.url(), main(request)),
               );
-              context.on("response", (response) =>
+              context.on("response", (response) => {
                 diagnostic.network(
                   "response",
                   response.url(),
                   main(response.request()),
                   response.status(),
-                ),
+                );
+                if (
+                  response.url() === verificationUrl &&
+                  response.request().method() === "POST"
+                ) {
+                  const phase = diagnostic.beginVerification();
+                  if (!phase) return;
+                  const body =
+                    response.status() === 200
+                      ? response.body()
+                      : Promise.resolve(undefined);
+                  verificationReads.push(
+                    body
+                      .then((body) =>
+                        diagnostic.verification(
+                          phase,
+                          verificationResult(response.status(), body),
+                        ),
+                      )
+                      .catch(() =>
+                        diagnostic.verification(
+                          phase,
+                          verificationResult(response.status()),
+                        ),
+                      ),
+                  );
+                }
+              });
+              context.on("requestfinished", (request) =>
+                diagnostic.network("finished", request.url(), main(request)),
               );
               context.on("requestfailed", (request) =>
                 diagnostic.network("failure", request.url(), main(request)),
@@ -628,9 +972,9 @@ async function main() {
         );
 
         if (live) {
-          stage =
-            "one actual public COMPASS navigation without applicant input";
+          stage = "starting the one public COMPASS website-check session";
           const started = await send(path, undefined, "POST");
+          stage = "validating the public COMPASS session start response";
           const session = browserResponseSchema.parse(
             JSON.parse(started.body.toString()),
           );
@@ -642,9 +986,12 @@ async function main() {
           let sawHandoff = false;
           let continuationSent = false;
           let terminal = false;
+          const resampling = createPublicResampling();
           const deadline = Date.now() + 120000;
           while (Date.now() < deadline) {
+            stage = "reading current public COMPASS session metadata";
             const response = await send(path);
+            stage = "validating current public COMPASS session metadata";
             check(
               response.status === 200,
               "Owned session metadata remains authorized during the real check.",
@@ -659,52 +1006,73 @@ async function main() {
             diagnostic?.state(state);
             let handoffFrameServed = false;
             if (state.frameUrl) {
+              stage = "reading the exact current public COMPASS frame";
               const frame = await send(
                 `${path}/frame${state.handoff ? `?frameId=${state.handoff.frameId}` : ""}`,
               );
-              if (frame.status === 200) {
-                check(
-                  frame.headers["content-type"] === "image/jpeg" &&
-                    frame.headers["cache-control"] === "private, no-store" &&
-                    frame.headers["x-content-type-options"] === "nosniff",
-                  "Actual frame delivery is a private non-sniffable JPEG.",
-                );
-                check(
-                  frame.body[0] === 0xff &&
-                    frame.body[1] === 0xd8 &&
-                    frame.body.length > 1000,
-                  "The actual Chromium session produces rendered image bytes.",
-                );
-                sawFrame = true;
-                handoffFrameServed = Boolean(state.handoff);
-              } else
-                check(
-                  frame.status === 404 || frame.status === 409,
-                  "A frame closed during the read is unavailable rather than stale.",
-                );
+              stage = "validating the current public COMPASS frame response";
+              if (
+                !resampling.imageCurrent(frame.status, state.handoff?.frameId)
+              ) {
+                await delay(300);
+                continue;
+              }
+              check(
+                frame.headers["content-type"] === "image/jpeg" &&
+                  frame.headers["cache-control"] === "private, no-store" &&
+                  frame.headers["x-content-type-options"] === "nosniff",
+                "Actual frame delivery is a private non-sniffable JPEG.",
+              );
+              check(
+                frame.body[0] === 0xff &&
+                  frame.body[1] === 0xd8 &&
+                  frame.body.length > 1000,
+                "The actual Chromium session produces rendered image bytes.",
+              );
+              sawFrame = true;
+              handoffFrameServed = Boolean(state.handoff);
             }
             if (state.status === "needs_parent" && state.canControl) {
+              stage = "validating current public COMPASS handoff authority";
               check(
                 state.handoff &&
                   state.frameUrl &&
                   Date.parse(state.handoff.expiresAt) > Date.now(),
                 "Parent control is bound to a real current frame and unexpired handoff.",
               );
+              stage =
+                "requiring exact public COMPASS image delivery before continuation";
               check(
                 handoffFrameServed,
                 "The exact handoff image is served before any ordinary continuation is attempted.",
               );
               sawHandoff = true;
               if (!continuationSent) {
+                stage = "denying a missing public COMPASS frame nonce";
+                const missingNonce = await send(`${path}/frame`);
                 check(
-                  (await send(`${path}/frame`)).status === 409,
+                  missingNonce.status === 409 || missingNonce.status === 404,
                   "An interactive frame cannot be read without its nonce.",
                 );
+                if (missingNonce.status === 404) {
+                  resampling.observeAgain();
+                  await delay(300);
+                  continue;
+                }
+                stage = "denying a stale public COMPASS frame nonce";
+                const staleNonce = await send(
+                  `${path}/frame?frameId=${randomUUID()}`,
+                );
                 check(
-                  (await send(`${path}/frame?frameId=${randomUUID()}`))
-                    .status === 409,
+                  staleNonce.status === 409 || staleNonce.status === 404,
                   "A stale image nonce is denied on the actual active session.",
                 );
+                if (staleNonce.status === 404) {
+                  resampling.observeAgain();
+                  await delay(300);
+                  continue;
+                }
+                stage = "denying a foreign public COMPASS image read";
                 check(
                   (
                     await send(
@@ -719,30 +1087,47 @@ async function main() {
                   frameId: state.handoff.frameId,
                   action: { type: "continue" },
                 };
+                stage = "denying a stale public COMPASS control nonce";
                 check(
                   (await control({ ...command, frameId: randomUUID() }))
                     .status === 409,
                   "A stale control frame cannot change the actual owned browser.",
                 );
+                stage = "denying a different public COMPASS control session";
                 check(
                   (await control({ ...command, sessionId: randomUUID() }))
                     .status === 409,
                   "A command from another browser session is denied.",
                 );
+                stage = "denying a foreign public COMPASS continuation";
                 check(
                   (await control(command, fixtures[1].token)).status === 403,
                   "A foreign owner cannot issue the live continuation.",
                 );
                 if (state.handoff.kind === "continue") {
+                  stage =
+                    "sending the single ordinary public COMPASS continuation";
+                  diagnostic?.phase("after_continue");
                   const continued = await control(command);
-                  check(
-                    continued.status === 200,
-                    "One automated synthetic Continue reaches the real same-session control handler without solving a challenge.",
-                  );
+                  diagnostic?.continuationStatus(continued.status);
+                  stage =
+                    "validating the ordinary public COMPASS continuation response";
+                  if (
+                    !resampling.continuationAccepted(
+                      continued.status,
+                      command.frameId,
+                    )
+                  ) {
+                    diagnostic?.phase("before_continue");
+                    await delay(300);
+                    continue;
+                  }
                   browserResponseSchema.parse(
                     JSON.parse(continued.body.toString()),
                   );
                   continuationSent = true;
+                  stage =
+                    "denying replay of the accepted public COMPASS control";
                   check(
                     (await control(command)).status === 409,
                     "The same accepted control command cannot execute twice.",
@@ -750,6 +1135,7 @@ async function main() {
                   continue;
                 }
               }
+              stage = "recording a genuine pending public COMPASS challenge";
               check(
                 state.handoff.kind === "challenge",
                 "A second active parent step is an actual supported challenge surface.",
@@ -764,6 +1150,8 @@ async function main() {
                 state.status,
               )
             ) {
+              stage =
+                "validating the terminal public COMPASS website-check result";
               check(
                 ["blocked", "completed"].includes(state.status) &&
                   state.frameUrl === null &&
@@ -788,11 +1176,15 @@ async function main() {
             }
             await delay(300);
           }
+          stage = "requiring a bounded public COMPASS handoff outcome";
           check(
             terminal && sawFrame && sawHandoff,
             "One public run shows an actual nonce-bound handoff and records its honest continuation result.",
           );
+          stage = "stopping the one public COMPASS website-check session";
           const stopped = await send(path, undefined, "DELETE");
+          stage =
+            "verifying the stopped public COMPASS context and frame closure";
           check(
             stopped.status === 200,
             "The live website-check session can be explicitly stopped without another provider action.",
@@ -873,12 +1265,15 @@ async function main() {
             ).status === 403,
           "A retained token from a revoked real Auth session cannot read browser metadata.",
         );
+      } catch {
+        failureStage = stage;
       } finally {
         try {
           await runner?.close();
         } finally {
           try {
             await browser?.close();
+            await Promise.all(verificationReads);
           } finally {
             if (server?.listening)
               await new Promise<void>((resolve, reject) =>
@@ -889,9 +1284,10 @@ async function main() {
       }
     },
   );
+  const outcome = await connectionOutcome(fixtureRun, () => failureStage);
   if (diagnostic) {
     const path = `tmp/parent-verification/snap-connection-diagnostic-${randomUUID()}.json`;
-    const result = diagnostic.snapshot();
+    const result = { ...diagnostic.snapshot(), ...outcome };
     mkdirSync("tmp/parent-verification", { recursive: true, mode: 0o700 });
     writeFileSync(path, `${JSON.stringify(result, null, 2)}\n`, {
       mode: 0o600,
@@ -905,20 +1301,25 @@ async function main() {
       `Public connection diagnostic: ${JSON.stringify({ ...result, resources: undefined, deniedRequests: count("deny", "requests"), allowedFailures: count("allow", "failures") })}; resource counts saved to ${path}. Exact local fixture cleanup passed.\n`,
     );
   }
+  if (outcome.failureStage !== null) {
+    stage = outcome.failureStage;
+    throw new Error("browser_connection_checks_failed");
+  }
   process.stdout.write(
     `Parent browser connection: ${checks} assertions passed; actual COMPASS: ${liveOutcome}. No applicant data was entered or submitted.\n`,
   );
 }
 
-if (process.env.CASELINK_SNAP_DIAGNOSTIC_SELF_CHECK === "1") {
-  diagnosticSelfCheck();
-  process.stdout.write(
-    "Public connection diagnostic redaction and bounds self-check passed; no service or browser used.\n",
-  );
-} else
-  void main().catch(() => {
-    process.stderr.write(
-      `Parent browser connection verification failed during ${stage}. Credentials and household information are not logged.\n`,
+void (async () => {
+  if (process.env.CASELINK_SNAP_DIAGNOSTIC_SELF_CHECK === "1") {
+    await diagnosticSelfCheck();
+    process.stdout.write(
+      "Public connection diagnostic redaction, bounds and failure-cleanup self-check passed; no service or browser used.\n",
     );
-    process.exitCode = 1;
-  });
+  } else await main();
+})().catch(() => {
+  process.stderr.write(
+    `Parent browser connection verification failed during ${stage}. Credentials and household information are not logged.\n`,
+  );
+  process.exitCode = 1;
+});
