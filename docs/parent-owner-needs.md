@@ -16,6 +16,7 @@ The October 30 route checkpoint is a progress/evidence checkpoint, not a deadlin
 
 ## Engineering completed independently
 
+- Families can save all provided factual answers in one action. The database commits the complete validated bundle together; unanswered questions stay open, drafts survive conflicts and uncertain save responses require a current-status check before retry. Each database/API/form piece received tests and independent review. [Bundle evidence](verification/parent-answer-bundle.md).
 - Fixed genuine personal-step verification renewal for an unchanged current packet, with retained private provenance and replay protection. Native security/concurrency and independent review passed; no signing channel was activated. [Continuation evidence](verification/parent-independent-continuation.md).
 - Necessary-answer defaults and immediate-food lookup now use current information permitted for that exact need, including conflict recovery. Typed drafts remain protected; independent UI/projection review passed.
 - My support now refreshes recorded progress while visible and on return, with manual refresh, slow-connection protection and existing account/processing closure behavior. Independent review passed; no provider action is started by refreshing.
@@ -29,4 +30,4 @@ Completed shared pieces: exact requested-purpose binding, current-permission ass
 
 ## Continuing without partner access
 
-One atomic save for already-known factual questions is in progress. Its database transaction and strict one-RPC API are independently reviewed; the isolated native security/concurrency checks pass. The family-facing form is next, preserving typed drafts, genuine conflicts, scoped defaults and account-change handling. [Bundle evidence](verification/parent-answer-bundle.md) records each piece. This work needs no new owner input. Actual partner allocation/booking, new private-field collection and family launch still require the items in the table; no partner or account approval was inferred from these changes.
+One-action factual saving is implemented and independently reviewed through the database, API and family form. It preserves drafts, genuine conflicts, scoped defaults and account-change handling. Families can save provided answers together while unanswered questions remain open. [Bundle evidence](verification/parent-answer-bundle.md) records each piece and the isolated tests. This work needs no new owner input. Actual partner allocation/booking, new private-field collection and family launch still require the items in the table; no partner or account approval was inferred from these changes.

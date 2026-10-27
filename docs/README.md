@@ -18,6 +18,8 @@ The PRD defines intended behavior; source code and exact-release verification es
 
 [Partner-independent continuation](verification/parent-independent-continuation.md) records subsequent recovery and family-experience pieces, starting with genuine exact-packet personal-act renewal. It does not enable a signing channel or provider execution.
 
+[One-action factual answers](verification/parent-answer-bundle.md) records the reviewed database/API/form milestone: provided answers save together, unanswered questions remain open, and conflicts preserve drafts. Its isolated account/browser and responsive checks do not activate hosted processing or partner execution.
+
 The original [background/assistant checkpoint](verification/parent-background-assistant.md) retains its October 27, 12:54:27 p.m. EDT pilot deadline and processing limits. The [SNAP/PECO comparison](verification/parent-snap-peco-route-selection.md) and [unsigned preparation piece](verification/parent-peco-cap-preparation.md) are preserved R2 evidence, with the [income/certification checkpoint](verification/parent-peco-income-certification.md) recording reviewed readiness logic and remaining data/signing/delivery gates. Current MVP work follows L0–L6; no restart or new processing approval is inferred. [Sensitive identity handling](parent-sensitive-identity.md) records required SSN support and optional Plaid Layer prefill as requirements; those integrations are not implemented.
 
 [Localhost UI/UX review](verification/parent-ui-ux-review.md) records the production-build visual review, fixes and remaining usability checks. [AI evaluation](parent-ai-evaluation.md) distinguishes deterministic orchestration evidence from live model-quality approval.

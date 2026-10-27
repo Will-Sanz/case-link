@@ -1175,7 +1175,8 @@
   padding: 1.6rem;
   border-radius: var(--radius-card);
 }
-.actionBox h2 {
+.actionBox h2,
+.actionBox h3 {
   font-size: 1.2rem;
   margin-bottom: 0.65rem;
 }
@@ -1184,6 +1185,9 @@
   color: var(--color-attention);
 }
 .actionBox form {
+  margin-top: 1.2rem;
+}
+.actionBox > .field {
   margin-top: 1.2rem;
 }
 .factList {

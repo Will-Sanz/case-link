@@ -28,6 +28,7 @@ import { SupportActivity, type RecordedOperation } from "./support-activity";
 import { FoodSites } from "./food-sites";
 import { SupportPartners } from "./support-partners";
 import { NecessaryAnswer } from "./necessary-answer";
+import { NecessaryAnswers, isFactualQuestion } from "./necessary-answers";
 import { SavedAccountAnswers } from "./saved-account-answers";
 import { ANSWER_FIELDS } from "@/lib/parent/answers";
 import { supportRouteLabel } from "@/lib/parent/application-readiness";
@@ -575,8 +576,11 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                 : "No household updates are requested in this section. Check the application window and work status above for any website verification or other next step."}
             </p>
           )}
+          {acceptingActions && (
+            <NecessaryAnswers key={request.id} request={request} onChange={reload} />
+          )}
           {acceptingActions &&
-            actions.map((action) => (
+            actions.filter((action) => !isFactualQuestion(action)).map((action) => (
               <RequiredStep
                 key={action.id}
                 action={action}

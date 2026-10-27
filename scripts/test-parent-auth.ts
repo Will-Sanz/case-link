@@ -5,13 +5,13 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type BrowserContext, type Page, type Request as BrowserRequest } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { PDFDocument } from "pdf-lib";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 
-const origin = "http://127.0.0.1:3200";
+const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200";
 const checks: string[] = [];
 let stage = "local service configuration";
 function check(condition: unknown, label: string): asserts condition {
@@ -20,6 +20,13 @@ function check(condition: unknown, label: string): asserts condition {
 }
 
 async function main() {
+  const target = new URL(origin);
+  check(
+    target.protocol === "http:" &&
+      ["127.0.0.1", "localhost"].includes(target.hostname) &&
+      target.origin === origin && !target.username && !target.password,
+    "The actual Auth browser origin is a canonical loopback HTTP origin.",
+  );
   const cli = process.env.CASELINK_SUPABASE_CLI;
   check(cli, "An explicit installed Supabase CLI is required.");
   const local = JSON.parse(
@@ -362,6 +369,119 @@ async function main() {
         `The actual ${status} control updates durable permission in the database.`,
       );
     }
+    stage = "actual browser save of synthetic grouped factual questions";
+    const questions = [
+      { id: "actual-bundle-zip", need: "food_now", field: "zip", reason: "missing_fact", title: "Current ZIP code", explanation: "Synthetic rehearsal question; this fixture is not an AI worker decision.", resolved: false },
+      { id: "actual-bundle-size", need: "food_now", field: "householdSize", reason: "missing_fact", title: "Household size for this request", explanation: "Synthetic rehearsal question; no partner action is connected.", resolved: false },
+    ];
+    const seeded = await db.query(
+      "update public.parent_requests r set required_actions=$2 where r.id=$1 and exists(select 1 from public.parent_households h where h.id=r.household_id and h.owner_id=$3) returning version",
+      [requestId, JSON.stringify(questions), first.id],
+    );
+    check(seeded.rowCount === 1, "Only this run's owned synthetic request receives the factual-question fixture.");
+    const originalVersion = seeded.rows[0].version as number;
+    await first.page.reload({ waitUntil: "networkidle" });
+    const form = first.page.getByRole("form", { name: "Household questions" });
+    await form.getByRole("region", { name: /Current ZIP code/ }).getByLabel("Your answer").fill("19103");
+    await form.getByRole("region", { name: /Household size for this request/ }).getByLabel("Your answer").fill("4");
+    const expectedAnswers = [
+      { need: "food_now", field: "zip", value: "19103" },
+      { need: "food_now", field: "householdSize", value: 4 },
+    ];
+    const requestUrl = `${origin}/api/parent/requests/${requestId}`;
+    let bundlePosts = 0;
+    const observeBundle = (request: BrowserRequest) => {
+      if (request.url() === requestUrl && request.method() === "POST" && request.postDataJSON()?.action === "answer_facts") bundlePosts++;
+    };
+    first.page.on("request", observeBundle);
+    const savingAnswers = first.page.waitForResponse((response) =>
+      response.url() === requestUrl && response.request().method() === "POST" && response.request().postDataJSON()?.action === "answer_facts",
+    );
+    let bundleBody: { action: string; version: number; answers: unknown[] };
+    try {
+      await form.getByRole("button", { name: "Save all answers and continue", exact: true }).click();
+      const response = await savingAnswers;
+      check(response.status() === 200, "The actual browser saves both known factual questions through one successful web API request.");
+      bundleBody = response.request().postDataJSON();
+      await first.page.getByText("All your answers are saved. Permitted work can continue.", { exact: true }).waitFor();
+      check(
+        bundlePosts === 1 && bundleBody.action === "answer_facts" && bundleBody.version === originalVersion &&
+          JSON.stringify(bundleBody.answers) === JSON.stringify(expectedAnswers) && Object.keys(bundleBody).length === 3,
+        "One actual POST carries the original shared version and two typed answers without per-answer versions or extra fields.",
+      );
+    } finally {
+      first.page.off("request", observeBundle);
+    }
+    const storedBundle = (
+      await db.query(
+        "select r.version,r.facts,r.required_actions,j.request_version,j.state job_state,(select count(*)::int from public.parent_operations o where o.request_id=r.id) operations from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1",
+        [requestId],
+      )
+    ).rows[0];
+    check(
+      storedBundle.facts.length === 2 && storedBundle.facts.some((fact: Record<string, unknown>) => fact.need === "food_now" && fact.field === "zip" && fact.value === "19103" && fact.source === "parent") &&
+        storedBundle.facts.some((fact: Record<string, unknown>) => fact.need === "food_now" && fact.field === "householdSize" && fact.value === 4 && fact.source === "parent"),
+      "The actual database stores both typed parent facts from the one browser save.",
+    );
+    check(
+      storedBundle.required_actions.length === 2 && storedBundle.required_actions.every((action: Record<string, unknown>) => questions.some((question) => question.id === action.id) && action.resolved === true) &&
+        storedBundle.version > originalVersion && storedBundle.request_version === storedBundle.version && storedBundle.job_state === "queued" && storedBundle.operations === 0,
+      "Both fixture questions resolve with the matching current queued job version and no provider operation.",
+    );
+    check(
+      (await first.page.request.post(requestUrl, { headers: { origin }, data: bundleBody! })).status() === 409,
+      "Replaying the completed browser bundle's old version is rejected by the actual web API.",
+    );
+    const snapshotSql = "select to_jsonb(r) request,to_jsonb(j) job,(select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from public.parent_events e where e.request_id=r.id) events from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1";
+    const beforeInvalid = (await db.query(snapshotSql, [requestId])).rows[0];
+    const invalidBundle = await first.page.request.post(requestUrl, {
+      headers: { origin },
+      data: { action: "answer_facts", version: storedBundle.version, answers: [
+        { ...expectedAnswers[0], value: "19102" },
+        { ...expectedAnswers[1], value: -1 },
+      ] },
+    });
+    check(invalidBundle.status() === 400, "The actual web API refuses a bundle with an invalid later fact.");
+    assert.deepEqual((await db.query(snapshotSql, [requestId])).rows[0], beforeInvalid);
+    check(true, "Invalid bundle input leaves the actual request, source facts, questions, job and event history unchanged.");
+    stage = "actual browser partial save of synthetic factual questions";
+    const partialSeeded = await db.query(
+      "update public.parent_requests r set required_actions=$2 where r.id=$1 and exists(select 1 from public.parent_households h where h.id=r.household_id and h.owner_id=$3) returning version",
+      [requestId, JSON.stringify(questions.map((question) => ({ ...question, id: `${question.id}-partial` }))), first.id],
+    );
+    check(partialSeeded.rowCount === 1, "Only this run's synthetic request receives the partial-answer question fixture.");
+    await first.page.reload({ waitUntil: "networkidle" });
+    await form.getByRole("region", { name: /Current ZIP code/ }).getByLabel("Your answer").fill("19102");
+    await form.getByRole("region", { name: /Household size for this request/ }).getByLabel("Your answer").fill("");
+    bundlePosts = 0;
+    first.page.on("request", observeBundle);
+    const savingPartial = first.page.waitForResponse((response) =>
+      response.url() === requestUrl && response.request().method() === "POST" && response.request().postDataJSON()?.action === "answer_facts",
+    );
+    try {
+      await form.getByRole("button", { name: "Save all answers and continue", exact: true }).click();
+      const response = await savingPartial;
+      const body = response.request().postDataJSON();
+      await first.page.getByText("Your provided answers are saved. Unanswered questions stay open; other permitted work can continue.", { exact: true }).waitFor();
+      check(await first.page.getByRole("form", { name: "Household questions" }).getByRole("region", { name: /Household size for this request/ }).getByLabel("Your answer").inputValue() === "",
+        "The actual partial-save UI keeps the explicitly deferred answer blank instead of refilling it from the retained source.");
+      check(response.status() === 200 && bundlePosts === 1 && body.action === "answer_facts" && body.version === partialSeeded.rows[0].version &&
+        JSON.stringify(body.answers) === JSON.stringify([{ ...expectedAnswers[0], value: "19102" }]) && Object.keys(body).length === 3,
+      "One actual partial-save POST includes only the provided ZIP and current shared version; the blank size is omitted.");
+    } finally {
+      first.page.off("request", observeBundle);
+    }
+    const partialStored = (await db.query(
+      "select r.version,r.intake,r.facts,r.required_actions,j.request_version,j.state job_state,(select count(*)::int from public.parent_operations o where o.request_id=r.id) operations from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1",
+      [requestId],
+    )).rows[0];
+    assert.deepEqual(partialStored.facts.find((fact: Record<string, unknown>) => fact.field === "householdSize"), storedBundle.facts.find((fact: Record<string, unknown>) => fact.field === "householdSize"));
+    check(partialStored.intake.householdSize === 4 && partialStored.facts.length === 2,
+      "Leaving size blank preserves its existing typed value and exact confirmation time rather than saving zero or refreshing its source.");
+    check(partialStored.required_actions.find((action: Record<string, unknown>) => action.field === "zip")?.resolved === true &&
+      partialStored.required_actions.find((action: Record<string, unknown>) => action.field === "householdSize")?.resolved === false &&
+      partialStored.request_version === partialStored.version && partialStored.job_state === "queued" && partialStored.operations === 0,
+    "The provided ZIP resolves while the blank size question stays open and other permitted work remains queued without provider operations.");
     stage = "actual consented private PDF upload and immutable confirmation";
     const pdf = await PDFDocument.create();
     pdf
@@ -981,6 +1101,7 @@ async function main() {
       "Loopback HTTP cannot establish hosted Secure-cookie, domain, SMTP or redirect-allowlist behavior.",
       "Hosted shared-account migration, recovery/session coexistence and scheduled retention erasure require separate checks; the password case uses a synthetic school role only on the isolated parent service.",
       "Document parsing/extraction is not established by private PDF upload and Storage authorization.",
+      "Grouped factual questions are explicitly seeded synthetic fixtures; the test does not establish AI question selection or partner execution.",
       "No external application or model provider was called.",
     ],
   };

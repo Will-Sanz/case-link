@@ -60,6 +60,44 @@ afterEach(() => {
 });
 
 describe("support detail", () => {
+  it("offers one save for all known factual questions while personal steps stay separate", async () => {
+    const request = fixture();
+    request.intake.needs = ["electricity", "water"];
+    request.required_actions = [
+      { id: "electric-amount", need: "electricity", field: "amountDue", reason: "missing_fact", resolver: "parent", title: "What is due on this account?", explanation: "Enter the current bill amount." },
+      { id: "water-amount", need: "water", field: "amountDue", reason: "missing_fact", resolver: "parent", title: "What is due on this account?", explanation: "Enter the current bill amount." },
+      { id: "declaration", need: "electricity", reason: "personal_step", resolver: "parent", title: "Complete the program declaration", explanation: "This separate personal step requires the program's accepted process." },
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
+    render(<SupportDetail requestId={requestId} />);
+    await screen.findByRole("heading", { name: "Your next steps" });
+    expect(screen.getAllByRole("button", { name: "Save all answers and continue" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Save and continue" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Complete the program declaration" })).toBeTruthy();
+  });
+  it("keeps both unsaved factual answers when a connected newer-version refresh clears the question list", async () => {
+    const current = fixture();
+    current.required_actions = [
+      { id: "bill-amount", need: "electricity", field: "amountDue", reason: "missing_fact", resolver: "parent", title: "Bill amount", explanation: "Enter the current amount due." },
+      { id: "household-count", need: "electricity", field: "householdSize", reason: "missing_fact", resolver: "parent", title: "Household count", explanation: "Enter the current household size." },
+    ];
+    const latest = { ...current, version: 2, required_actions: [] };
+    let refreshed = false;
+    const fetch = vi.fn<(url: string, options?: RequestInit) => Promise<ReturnType<typeof response>>>(
+      async () => response(refreshed ? latest : current),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(<SupportDetail requestId={requestId} />);
+    const amountRegion = await screen.findByRole("region", { name: "Electric bill Bill amount" });
+    fireEvent.change(within(amountRegion).getByLabelText("Your answer"), { target: { value: "15" } });
+    fireEvent.change(within(screen.getByRole("region", { name: "Electric bill Household count" })).getByLabelText("Your answer"), { target: { value: "4" } });
+    refreshed = true;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh support progress" }));
+    await screen.findByRole("button", { name: "Review latest questions" });
+    expect((within(screen.getByRole("region", { name: "Electric bill Bill amount" })).getByLabelText("Your answer") as HTMLInputElement).value).toBe("15");
+    expect((within(screen.getByRole("region", { name: "Electric bill Household count" })).getByLabelText("Your answer") as HTMLInputElement).value).toBe("4");
+    expect(fetch.mock.calls.some((call) => call[1]?.method === "POST")).toBe(false);
+  });
   it("looks up immediate food using its exact current ZIP rather than a utility mirror", async () => {
     const request = fixture();
     request.intake.needs = ["food_now", "electricity"];

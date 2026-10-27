@@ -21,7 +21,11 @@ const request = fixtureRequest({
   intake,
   mandate,
   plan: buildSupportPlan(fixtureRequest({ intake, mandate }), fixtureNow),
-  required_actions: requiredActions(intake, mandate),
+  required_actions: [...requiredActions(intake, mandate), {
+    id: "synthetic-amount", need: "electricity", reason: "missing_fact", resolver: "parent",
+    field: "amountDue", title: "Electric bill amount due",
+    explanation: "Synthetic factual question for layout review, not a live provider requirement.",
+  }],
   events: [
     {
       id: "synthetic-event",

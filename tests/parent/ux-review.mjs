@@ -17,7 +17,11 @@ const request = fixtureRequest({
   intake,
   mandate,
   plan: buildSupportPlan(fixtureRequest({ intake, mandate }), fixtureNow),
-  required_actions: requiredActions(intake, mandate),
+  required_actions: [...requiredActions(intake, mandate), {
+    id: "synthetic-amount", need: "electricity", reason: "missing_fact", resolver: "parent",
+    field: "amountDue", title: "Electric bill amount due",
+    explanation: "Synthetic factual question for this interaction check, not a live provider requirement.",
+  }],
   events: [],
   documents: [],
 });
@@ -186,6 +190,23 @@ try {
                 ? "That code expired. Request a new one."
                 : "Check your email and password, then try again.",
           };
+        }
+      } else if (method === "POST" && route.request().postDataJSON().action === "answer_facts") {
+        const payload = route.request().postDataJSON();
+        assert.equal(payload.version, activeRequest.version);
+        assert.equal(payload.answers.length, 2);
+        assert.ok(payload.answers.some((answer) => answer.field === "accountAuthority" && answer.value === "self"));
+        assert.ok(payload.answers.some((answer) => answer.field === "amountDue" && answer.value === 45));
+        if (rejectAnswer) {
+          status = 409;
+          body = { ok: false, error: "This request changed. Refresh it before saving your answer." };
+        } else {
+          activeRequest = { ...activeRequest, version: activeRequest.version + 2,
+            required_actions: activeRequest.required_actions.map((action) =>
+              payload.answers.some((answer) => answer.need === action.need && answer.field === action.field)
+                ? { ...action, resolved: true } : action),
+          };
+          body = { ok: true, request: activeRequest, progress: savedProgress };
         }
       } else if (method === "POST" && rejectAnswer) {
         status = 409;
@@ -486,16 +507,23 @@ try {
     await page
       .getByLabel("How are you connected to the account?")
       .selectOption("self");
+    await page.locator("#answer-synthetic-amount").fill("45");
     await page
-      .getByRole("button", { name: "Save and continue", exact: true })
+      .getByRole("button", { name: "Save all answers and continue", exact: true })
       .click();
     await page.getByRole("main").getByRole("alert").waitFor();
     await snapshot("answer-error");
     rejectAnswer = false;
     activeRequest = { ...request, version: 2 };
-    await page.getByRole("button", { name: "Review latest question" }).click();
-    await page.getByText(/latest saved information is loaded/).waitFor();
+    await page.getByRole("button", { name: "Review latest questions" }).click();
+    await page.getByText(/latest saved answers and questions are loaded/).waitFor();
     await snapshot("answer-recovered");
+    await page.getByLabel("How are you connected to the account?").selectOption("self");
+    await page.locator("#answer-synthetic-amount").fill("45");
+    await page.getByRole("button", { name: "Save all answers and continue", exact: true }).click();
+    await page.getByText("All your answers are saved. Permitted work can continue.").waitFor();
+    assert.equal(await page.getByRole("button", { name: "Save all answers and continue", exact: true }).count(), 0);
+    await snapshot("answers-saved");
     await page
       .getByRole("button", { name: "Change or renew permission" })
       .click();

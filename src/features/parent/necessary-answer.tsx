@@ -6,11 +6,14 @@ import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
 import { parentApi, ParentApiError } from "./api";
 import styles from "./parent.module.css";
 
-function currentAnswer(
+export type AnswerDraft = { value: string; frequency: string };
+
+export function currentAnswer(
   request: SupportRequest,
   action: NecessaryAction,
-): { value: string; frequency: string } {
-  const current = currentIntakeFields(request, new Date(), action.need);
+  now = new Date(),
+): AnswerDraft {
+  const current = currentIntakeFields(request, now, action.need);
   let value = "";
   if (
     ["income", "incomeAmount", "incomeFrequency"].includes(action.field ?? "")
@@ -35,23 +38,33 @@ function currentAnswer(
   return { value, frequency: current.incomeFrequency ?? "" };
 }
 
-export function NecessaryAnswer({
-  action,
-  request,
-  onChange,
-  correction = false,
+export function canonicalFactField(field?: string) {
+  return field === "incomeAmount" || field === "incomeFrequency" ? "income" : field;
+}
+
+export function factualAnswer(action: NecessaryAction, draft: AnswerDraft) {
+  const field = canonicalFactField(action.field);
+  return {
+    need: action.need,
+    field,
+    value: field === "income"
+      ? { amount: Number(draft.value), frequency: draft.frequency }
+      : ["householdSize", "amountDue", "totalBalance"].includes(field ?? "")
+        ? Number(draft.value) : draft.value,
+  };
+}
+
+export function NecessaryAnswerFields({
+  action, draft, onChange, correction = false, disabled = false, required = true,
 }: {
   action: NecessaryAction;
-  request: SupportRequest;
-  onChange: () => void;
+  draft: AnswerDraft;
+  onChange: (draft: AnswerDraft) => void;
   correction?: boolean;
+  disabled?: boolean;
+  required?: boolean;
 }) {
-  const [{ value, frequency }, setAnswer] = useState(() => currentAnswer(request, action));
-  const [baseVersion, setBaseVersion] = useState(request.version);
-  const [conflict, setConflict] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const { value, frequency } = draft;
   const field = action.field;
   const booking = field === "bookingPreference";
   if (
@@ -89,6 +102,110 @@ export function NecessaryAnswer({
             ["other", "Another provider"],
           ]
         : null;
+  return (
+      <div className={styles.field}>
+        <label htmlFor={`answer-${action.id}`}>
+          {correction
+            ? action.title
+            : booking
+              ? "Preferred appointment window"
+              : income
+                ? "Household income before taxes ($)"
+                : field === "accountAuthority"
+                  ? "How are you connected to the account?"
+                  : "Your answer"}
+        </label>
+        {options ? (
+          <select
+            id={`answer-${action.id}`}
+            className={styles.select}
+            value={value}
+            required={required}
+            disabled={disabled}
+            onChange={(event) => onChange({ value: event.target.value, frequency })}
+          >
+            <option value="">Choose your answer</option>
+            {options.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            id={`answer-${action.id}`}
+            className={styles.input}
+            type={date ? "date" : numeric ? "number" : "text"}
+            inputMode={
+              numeric ? "decimal" : field === "zip" ? "numeric" : undefined
+            }
+            step={field === "householdSize" ? 1 : "0.01"}
+            min={field === "householdSize" ? 1 : numeric ? 0 : undefined}
+            max={field === "householdSize" ? 30 : numeric ? 1000000 : undefined}
+            maxLength={field === "zip" ? 5 : 100}
+            required={required}
+            disabled={disabled}
+            value={value}
+            onChange={(event) => onChange({ value: event.target.value, frequency })}
+          />
+        )}
+        {income && (
+          <>
+            <label htmlFor={`frequency-${action.id}`}>
+              How often is this income received?
+            </label>
+            <select
+              id={`frequency-${action.id}`}
+              className={styles.select}
+              value={frequency}
+              onChange={(event) => onChange({ value, frequency: event.target.value })}
+              required={required}
+              disabled={disabled}
+            >
+              <option value="">Choose frequency</option>
+              {[
+                ["weekly", "Weekly"],
+                ["biweekly", "Every two weeks"],
+                ["twice_monthly", "Twice a month"],
+                ["monthly", "Monthly"],
+                ["yearly", "Yearly"],
+              ].map(([key, label]) => (
+                <option value={key} key={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        <p className={styles.hint}>
+          {booking
+            ? "This permits a routine booking in this window. A binding payment or other meaningful commitment still needs your choice."
+            : "Enter a current fact you know. This does not sign a form or certify an agency declaration."}
+        </p>
+      </div>
+  );
+}
+
+export function NecessaryAnswer({
+  action,
+  request,
+  onChange,
+  correction = false,
+}: {
+  action: NecessaryAction;
+  request: SupportRequest;
+  onChange: () => void;
+  correction?: boolean;
+}) {
+  const [{ value, frequency }, setAnswer] = useState(() => currentAnswer(request, action));
+  const [baseVersion, setBaseVersion] = useState(request.version);
+  const [conflict, setConflict] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const field = action.field;
+  const booking = field === "bookingPreference";
+  if (!booking && !ANSWER_FIELDS.includes(field as (typeof ANSWER_FIELDS)[number])) return null;
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -97,16 +214,7 @@ export function NecessaryAnswer({
       setError("Enter an answer. Zero is a valid amount.");
       return;
     }
-    const answer = {
-      need: action.need,
-      field: income ? "income" : field,
-      value: income
-        ? { amount: Number(value), frequency }
-        : numeric
-          ? Number(value)
-          : value,
-      version: baseVersion,
-    };
+    const answer = { ...factualAnswer(action, { value, frequency }), version: baseVersion };
     if (!booking) {
       const parsed = factAnswerSchema.safeParse(answer);
       if (!parsed.success) {
@@ -176,83 +284,8 @@ export function NecessaryAnswer({
   }
   return (
     <form className={styles.form} onSubmit={submit}>
-      <div className={styles.field}>
-        <label htmlFor={`answer-${action.id}`}>
-          {correction
-            ? action.title
-            : booking
-              ? "Preferred appointment window"
-              : income
-                ? "Household income before taxes ($)"
-                : field === "accountAuthority"
-                  ? "How are you connected to the account?"
-                  : "Your answer"}
-        </label>
-        {options ? (
-          <select
-            id={`answer-${action.id}`}
-            className={styles.select}
-            value={value}
-            required
-            onChange={(event) => setAnswer({ value: event.target.value, frequency })}
-          >
-            <option value="">Choose your answer</option>
-            {options.map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            id={`answer-${action.id}`}
-            className={styles.input}
-            type={date ? "date" : numeric ? "number" : "text"}
-            inputMode={
-              numeric ? "decimal" : field === "zip" ? "numeric" : undefined
-            }
-            step={field === "householdSize" ? 1 : "0.01"}
-            min={field === "householdSize" ? 1 : numeric ? 0 : undefined}
-            max={field === "householdSize" ? 30 : numeric ? 1000000 : undefined}
-            maxLength={field === "zip" ? 5 : 100}
-            required
-            value={value}
-            onChange={(event) => setAnswer({ value: event.target.value, frequency })}
-          />
-        )}
-        {income && (
-          <>
-            <label htmlFor={`frequency-${action.id}`}>
-              How often is this income received?
-            </label>
-            <select
-              id={`frequency-${action.id}`}
-              className={styles.select}
-              value={frequency}
-              onChange={(event) => setAnswer({ value, frequency: event.target.value })}
-              required
-            >
-              <option value="">Choose frequency</option>
-              {[
-                ["weekly", "Weekly"],
-                ["biweekly", "Every two weeks"],
-                ["twice_monthly", "Twice a month"],
-                ["monthly", "Monthly"],
-                ["yearly", "Yearly"],
-              ].map(([key, label]) => (
-                <option value={key} key={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-        <p className={styles.hint}>
-          {booking
-            ? "This permits a routine booking in this window. A binding payment or other meaningful commitment still needs your choice."
-            : "Enter a current fact you know. This does not sign a form or certify an agency declaration."}
-        </p>
-      </div>
+      <NecessaryAnswerFields action={action} draft={{ value, frequency }} onChange={setAnswer}
+        correction={correction} disabled={pending} />
       <button
         className={styles.button}
         disabled={pending || (!correction && request.status === "paused")}
