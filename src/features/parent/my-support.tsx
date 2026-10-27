@@ -111,7 +111,7 @@ export function MySupport() {
                       ? "Preparation only"
                       : "Permitted steps authorized"}
                   </span>
-                  <span className={styles.textLink}>
+                  <span className={`${styles.textLink} ${styles.inline}`}>
                     View support{" "}
                     <ArrowRight width={15} height={15} aria-hidden="true" />
                   </span>

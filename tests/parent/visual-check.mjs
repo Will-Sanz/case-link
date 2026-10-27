@@ -223,6 +223,15 @@ try {
           );
         }
       }
+      if (label === "support") {
+        const action = page.getByText("View support", { exact: true });
+        const text = await action.boundingBox();
+        const icon = await action.locator("svg").boundingBox();
+        assert.ok(
+          text && icon && Math.abs(text.y + text.height / 2 - icon.y - icon.height / 2) < 3,
+          "The support action arrow must stay aligned beside its label.",
+        );
+      }
       if (label === "home") {
         const art = page.getByRole("img", {
           name: /Illustration of a family unpacking groceries/,
