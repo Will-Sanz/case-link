@@ -1,14 +1,14 @@
 # CaseLink parent support MVP PRD
 
-**Decision/revision date:** October 25, 2026 (America/New_York)
-**Status:** Current requirements; implementation pending; autonomy and family-ready scope revision
+**Decision/revision date:** October 26, 2026 (America/New_York)
+**Status:** Current requirements; parent foundations implemented locally; external completion routes and family release gates remain open
 **Primary user:** An adult parent or caregiver seeking food support and utility assistance for their household
 **Initial service area:** Philadelphia, with program-specific coverage verified before launch
 **Companion:** [Phased implementation plan](parent-support-implementation-plan.md)
 
 This PRD supersedes earlier school-product requirements and the earlier preparation-first parent draft. The latest product-owner direction is to maximize useful AI independence from one informed start, involve people only when necessary, and deliver a polished product families can use across both support areas. The earlier one-benefits-path/one-utility-path restriction is an internal delivery slice, not the finished release scope.
 
-These are requirements, not implemented capabilities or provider permissions. The existing code remains the staff-oriented application. Documentation does not enable real parent processing, contact partners, submit applications, or deploy changes. The school baseline remains on `codex/case-manager-baseline-2026-10-25` at `700bb46`; parent work proceeds on `main` without moving school records into parent ownership.
+These are requirements, not a certification of implemented capabilities or provider permissions. Parent accounts/ownership, requests, scoped work, documents/packet foundations, recorded progress, contextual assistance and an inspectable workspace have local implementation and bounded verification evidence; external application transports remain disabled. The [implementation plan](parent-support-implementation-plan.md) and [progress record](parent-support-progress.md) distinguish tested local behavior from unproved provider completion and release readiness. Documentation does not enable real parent processing, contact partners, submit applications, or deploy changes. The school baseline remains on `codex/case-manager-baseline-2026-10-25` at `700bb46`; parent work proceeds on `main` without moving school records into parent ownership.
 
 ## 1. Product promise and definition of independence
 
@@ -32,6 +32,7 @@ A necessary human step is specific: the agent prepares everything else, explains
 | Geography | Philadelphia first | Exact program/ZIP coverage and honest unsupported-area recovery |
 | Identity | Reuse existing CaseLink email/password identities; retain verified email codes where enrollment permits | Apply reviewed shared-account configuration/migration and test actual hosted sign-in, recovery, enrollment and household isolation |
 | Language | Proposed English and reviewed Spanish experience | Test all advertised language content, notices, help and partner coverage |
+| Delivery order | Compare SNAP signed-form/fax and PECO CAP across the full lifecycle, independently review the selection, then finish one route before broadening implementation | PECO is a leading candidate, not an enabled connection; exact fields/personal acts, secure delivery, genuine receipt, status and outcome evidence determine the choice |
 | Revenue | Parents are the users; sponsorship/payment model remains open | Pricing is separate from this service scope |
 
 The Parent University catalog and [dated directory review](verification/2026-10-15-resource-source-review.json) inform discovery. Neither proves current capacity, demand or willingness to pay. Verify an actual immediate-food route; that earlier review did not identify a dedicated pantry from the exported names/descriptions.
@@ -62,9 +63,21 @@ Create a capability matrix for the actual programs/providers in this coverage: a
 
 Select programs from the existing network by verified fit and practical coverage, rather than an arbitrary count. Complete broad service coverage through reusable tools and supported channels; do not require a bespoke API for every organization. An early vertical slice can cover one route while remaining internal. It cannot be presented as the finished family-ready product.
 
+### One family service, program-specific completion
+
+The reusable product is the household's low-effort experience and its tested service machinery: purpose-scoped reusable facts/documents, one coordinating AI, current program instructions, exact authorized operations, attributed progress and continued follow-up. Each program retains its own fields, personal acts, permitted recipients, accepted channels and outcome contract. Use a small set of supported web, official-form/packet, partner and appointment channels as actual routes require them; a universal browser agent, fax gateway or speculative connector platform is not a prerequisite.
+
+Choose the first complete service route by comparing SNAP and PECO CAP from required information through certification, delivery, agency/program receipt, status, missing-information handling and attributed outcome. Assess necessary family effort, avoidable operator work, security and reuse as well as submission feasibility. The [route selection record](verification/parent-snap-peco-route-selection.md) must distinguish published process, observed behavior, synthetic proof and unverified assumptions. A sendable PDF or transport acknowledgement alone cannot win the comparison as a complete service. SNAP remains required even if a utility route is selected first; urgent food access remains independent of application work.
+
+Finish and independently review the selected route in small tested slices, including its return/follow-up journey, before broadening provider implementation. Then use a second meaningfully different route to establish which components are truly shared. Extract common behavior from these demonstrated needs; do not prebuild infrastructure for unrelated catalog domains. Safe feasibility research can continue independently when one provider has an external blocker.
+
+The work view follows the channel actually used: an owned live browser session for web activity, the exact prepared/submitted official packet for document channels, and attributable receipts, appointment or status evidence for other work. Do not simulate a website being filled when a packet is being prepared or imply delivery, registration, approval or support receipt without the corresponding evidence.
+
 ### Product boundaries
 
 Food support and utility assistance remain the two product domains. Employment, standalone budgeting/meal planning, rent/housing search, school operations, clinical diagnosis, legal representation, payment processing, child accounts and district analytics are outside this release. Existing qualified partners can handle an appropriate escalation with permitted sharing.
+
+The Parent University catalog also suggests later housing, employment, financial-confidence, parenting/family-support, school, technology and community-activity services. These are future discovery and prioritization opportunities, not additions to C-01, approved data purposes or justification for collecting more household information now. Reuse proven service components if a later separately approved domain needs them.
 
 Known-form completion, permitted application submission and tested browser assistance are in the product scope where an enabled route supports them. Unrestricted browsing, bypassing provider controls, signing as the parent, impersonation, unsupported claims of representative authority, and financial commitments without specific approval are prohibited. Agencies and authorized specialists retain their own decisions and required roles.
 
@@ -373,6 +386,7 @@ AI continuously performs permitted routine monitoring/follow-up within each acti
 | Decision | Owner | Evidence needed |
 | --- | --- | --- |
 | Full coverage matrix and program/provider contracts | Product/resource owner and partners | C-01 completion paths, required acts, verified urgent food/utility coverage, actual execution/status permission |
+| First complete service route | Product/engineering/privacy owner, independently reviewed | SNAP signed-form/fax versus PECO CAP lifecycle comparison, remaining gates, family/operator effort and a bounded selected-route acceptance checklist |
 | Mandate design and autonomy rules | Product/engineering/privacy owner | Named recipient/program set, allowed actions/data, concrete duration/attempt/booking limits, exceptions and family comprehension |
 | Identity/channel/language access | Product owner with families | Tested signup/recovery/contact availability, translations and real partner coverage |
 | Document/data/direct-entry handling | Privacy/security and engineering | Minimal inventory, model exclusion of secrets, deletion/retention and source validation |
@@ -383,7 +397,7 @@ These decisions refine execution, not the accepted goal. Broad useful automation
 
 ## 19. Sources and current implementation
 
-Official sources reviewed for the October 25 planning/revision; recheck program rules and permissions before enabling an action. Sources describe capabilities/processes, not live availability or a household's eligibility.
+Official sources reviewed for the October 25 planning/revision, with dated October 26 connection and alternative-route evidence below; recheck program rules and permissions before enabling an action. Sources describe capabilities/processes, not live availability or a household's eligibility.
 
 - [Pennsylvania SNAP](https://www.pa.gov/services/dhs/apply-for-the-supplemental-nutrition-assistance-program-snap) and [WIC](https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist): agency processes and required participation.
 - [UESF benefits](https://uesfacts.org/i-need-help-with/benefits/) and [utility grants](https://uesfacts.org/our-programs/utility-grant-program/): partner service categories.
@@ -393,4 +407,4 @@ Official sources reviewed for the October 25 planning/revision; recheck program 
 - [Async tools](https://developers.openai.com/api/docs/guides/async-tool-calling), [search controls](https://developers.openai.com/api/docs/guides/tools-web-search#domain-filtering), [computer-use environment/human controls](https://developers.openai.com/api/docs/guides/tools-computer-use-integration#restrict-the-environment), and [background mode](https://developers.openai.com/api/docs/guides/background).
 - [Supabase storage](https://supabase.com/docs/guides/storage/buckets/fundamentals), [security](https://supabase.com/docs/guides/security/product-security) and [Vercel Workflow](https://vercel.com/docs/workflows/concepts): implementation foundations requiring route-specific verification.
 
-Local inspection found staff-only signup/roles/password guards, browser-driven saved generation, text-only AI requests, outbound identifier checks and reviewed-plan/takeaway PDFs. Parent mandate execution, uploads, forms/submissions, route adapters and polished parent UI remain unimplemented. The [implementation plan](parent-support-implementation-plan.md) separates internal increments from the complete family-ready release.
+Current local evidence includes parent ownership/mandates, scoped jobs, upload/document and packet foundations, background planning/status, request-scoped assistance, real public-resource lookup and the inspectable Option 2 family workspace. The legacy school routes and their protections remain. These foundations do not establish real application filling, submission, agency status or support received. The [COMPASS investigation](verification/parent-snap-verification-investigation.md) confirmed rejection code 1053 during the automated verification attempt; its cause remains unknown and accepted same-session live resumption is unproved. The [alternative-route assessment](verification/parent-snap-alternative-routes.md) and [SNAP/PECO selection record](verification/parent-snap-peco-route-selection.md) inform the next bounded work. The [implementation plan](parent-support-implementation-plan.md) separates local evidence, disabled external capabilities, internal increments and the complete family-ready release; no new route is enabled by this PRD.
