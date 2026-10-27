@@ -2,6 +2,8 @@
 
 Checked October 26, 2026 (America/New_York). This is a restricted connection rehearsal, not a family release or an application-filing milestone. The source implementation supports a parent-controlled public COMPASS verification surface and automatic recognition of the next screen in the same owned browser context. Actual provider acceptance remains an independent evidence gate.
 
+Follow-up: the [current public-contract investigation](parent-snap-verification-investigation.md) found and corrected a missing normal Next after genuine verification completion. This record's original toy replay navigated directly after its synthetic interaction and did not prove that extra transition. The corrected replay explicitly enables Next, requires CaseLink to click it, and records its separate results and reliability limits.
+
 ## What changed
 
 The private runner exposes only bounded public actions: the reviewed introductory Next button, a pointer inside a visible reviewed Google verification frame, a short native-key allowlist and a refresh/check. It accepts no arbitrary URL, script, text, applicant value, file, cookie or browser-control credential. The actual current parent/request/mandate authority, original deadline, session, delivered image nonce and current public target are checked before every input. A changed view is a recoverable stale response rather than a repeated action.

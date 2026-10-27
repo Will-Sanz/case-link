@@ -1,0 +1,28 @@
+{
+  "recordedAt": "2026-10-27T00:06:12.288Z",
+  "providerReplay": true,
+  "liveCompass": false,
+  "authService": false,
+  "delayMilliseconds": 6000,
+  "results": [
+    {
+      "outcome": "challenge",
+      "pendingMilliseconds": 5073,
+      "finalStatus": "needs_parent"
+    },
+    {
+      "outcome": "ending",
+      "pendingMilliseconds": 5068,
+      "finalStatus": "completed"
+    },
+    {
+      "outcome": "provider_error",
+      "pendingMilliseconds": 5065,
+      "finalStatus": "blocked"
+    }
+  ],
+  "protectedScreenshots": 0,
+  "householdInputs": 0,
+  "providerRequests": 0,
+  "cleanupPassed": true
+}
