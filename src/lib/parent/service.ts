@@ -1213,7 +1213,10 @@ export async function runSupportService(input: {
       ) {
         await ports.preparePersonalStep(operation);
         const acts = preparedForm?.personalActs.length
-          ? preparedForm.personalActs
+          ? [
+              ...preparedForm.personalActs,
+              ...(capability.requiredPersonalActs ?? []),
+            ]
           : (capability.requiredPersonalActs ?? [
               {
                 id: "required-personal-step",
@@ -1223,7 +1226,10 @@ export async function runSupportService(input: {
                 ),
               },
             ]);
-        for (const act of acts)
+        const distinctActs = acts.filter(
+          (act, index) => acts.findIndex((other) => other.id === act.id) === index,
+        );
+        for (const act of distinctActs)
           addAction(
             route,
             "personal_step",

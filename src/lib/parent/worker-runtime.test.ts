@@ -412,7 +412,7 @@ describe("isolated parent worker runtime", () => {
       ]),
     );
   });
-  it("does not borrow completed personal acts from another packet for the same recipient and version", async () => {
+  it.each(["facts", "artifact", "request version", "attachments"])("does not borrow completed personal acts after %s changes", async (change) => {
     const test = setup();
     test.state.requiredActs = ["identity"];
     await runOneParentJob(test.options);
@@ -425,18 +425,50 @@ describe("isolated parent worker runtime", () => {
         program_id: "peco-cap",
         action: "submit",
         state: "prepared",
-        packet: { ...JSON.parse(String(original[5])), householdSize: 9 },
+        packet: JSON.parse(String(original[5])),
         idempotency_key: original[8],
         updated_at: fixtureNow.toISOString(),
         personalActsComplete: true,
       },
     ];
+    if (change === "facts")
+      test.state.operations[0].packet = {
+        ...JSON.parse(String(original[5])), householdSize: 9,
+      };
+    if (change === "artifact") test.state.operations[0].artifact_id = artifactId;
+    if (change === "request version") test.state.operations[0].request_version = 2;
+    if (change === "attachments")
+      test.state.operations[0].packet = {
+        ...JSON.parse(String(original[5])), documentIds: [documentId],
+      };
     await runOneParentJob(test.options);
     expect(test.execute).not.toHaveBeenCalled();
+    expect(test.database.query.mock.calls.some(
+      ([sql]) => sql.includes("parent_begin_operation"),
+    )).toBe(false);
     expect(test.state.prepared).toHaveLength(2);
     test.state.operations[0].packet = JSON.parse(String(original[5]));
+    test.state.operations[0].request_version = 1;
+    delete test.state.operations[0].artifact_id;
     await runOneParentJob(test.options);
     expect(test.execute).toHaveBeenCalledTimes(1);
+  });
+  it("rechecks authority after freezing a ready operation and before transport", async () => {
+    const test = setup();
+    const query = test.database.query.getMockImplementation()!;
+    test.database.query.mockImplementation(async (sql, values) => {
+      const result = await query(sql, values);
+      if (sql.includes("parent_begin_operation")) test.state.revoked = true;
+      return result;
+    });
+    await runOneParentJob(test.options);
+    expect(test.state.revoked).toBe(true);
+    expect(test.execute).not.toHaveBeenCalled();
+    const calls = test.database.query.mock.calls.map(([sql]) => sql);
+    const begin = calls.findIndex((sql) => sql.includes("parent_begin_operation"));
+    expect(calls.slice(begin + 1).some(
+      (sql) => sql.includes("parent_renew_job_lease"),
+    )).toBe(true);
   });
   it("fills a verified template, stores its exact hash, confirms it, and sends those frozen bytes", async () => {
     const test = setup();

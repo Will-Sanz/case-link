@@ -767,6 +767,71 @@ describe("parent service orchestration", () => {
     const second = await runSupportService(resumed);
     expect(second.plan.routes[0].state).toBe("sent");
   });
+  it("shows every required personal act once with form-specific wording, then resumes the exact prepared work", async () => {
+    const input = setup();
+    vi.mocked(input.ports.capability).mockImplementation(async (programId) => ({
+      ...capability(programId),
+      personalActsComplete: programId !== "peco-cap",
+      requiresForm: programId === "peco-cap",
+      requiredPersonalActs: [
+        {
+          id: "declaration",
+          title: "Generic declaration",
+          explanation: "Generic declaration instructions.",
+        },
+        {
+          id: "identity",
+          title: "Required provider identity step",
+          explanation: "This synthetic verified route requires an identity step.",
+        },
+      ],
+    }));
+    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) =>
+      programId === "peco-cap" ? {
+        programId,
+        templateId: "synthetic-template",
+        version: "1",
+        artifactId: "synthetic-artifact",
+        contentSha256: "a".repeat(64),
+        formInputDigest: createHash("sha256")
+          .update(JSON.stringify(packet))
+          .digest("hex"),
+        validated: true,
+        missingFields: [],
+        personalActs: [{
+          id: "declaration",
+          title: "Required form declaration",
+          explanation: "The exact form's declaration and disclosure scope.",
+        }],
+      } : null,
+    );
+    const first = await runSupportService(input);
+    const acts = first.requiredActions.filter(
+      (action) => action.reason === "personal_step",
+    );
+    expect(acts.map((action) => action.title)).toEqual([
+      "Required form declaration",
+      "Required provider identity step",
+    ]);
+    expect(acts[0].explanation).toBe("The exact form's declaration and disclosure scope.");
+    expect(acts.every((action) => action.resolver === "parent")).toBe(true);
+    expect(first.plan.routes.find((route) => route.need === "food_now")?.state).toBe("sent");
+    expect(vi.mocked(input.ports.execute).mock.calls.some(
+      ([operation]) => operation.programId === "peco-cap",
+    )).toBe(false);
+    const prepared = vi.mocked(input.ports.preparePersonalStep).mock.calls[0][0];
+    vi.mocked(input.ports.personalActsComplete).mockImplementation(async (operation) =>
+      JSON.stringify(operation) === JSON.stringify(prepared),
+    );
+    const resumed = await runSupportService(input);
+    const sent = vi.mocked(input.ports.execute).mock.calls.find(
+      ([operation]) => operation.programId === "peco-cap",
+    )?.[0];
+    expect(sent).toEqual(prepared);
+    expect(resumed.requiredActions.filter(
+      (action) => action.reason === "personal_step",
+    )).toEqual([]);
+  });
   it("runs due follow-up against the exact recorded reference and advances to received support", async () => {
     const request = singleUtilityRequest();
     request.plan = buildSupportPlan(

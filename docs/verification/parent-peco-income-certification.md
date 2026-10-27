@@ -58,6 +58,12 @@ The existing trusted-verifier recorder uses an insert-on-conflict/no-op for the 
 
 The unmodified isolated local database suite passed 159 recorded assertions plus bounded budget and concurrent cancellation/dispatch checks during this work. It exercised packet-bound personal acts, scoped verifier/parent denial, immutable artifacts, cancellation, expired attachments and retention; it does not yet prove the renewal case above. The fixture restored its processing controls and role memberships exactly. No hosted database or family records were changed.
 
+### Piece 2 result: complete personal-step list
+
+The existing service replaced provider-required personal steps whenever a form supplied its own steps. A declaration-only form could therefore hide a separate required identity step, while the database correctly kept execution blocked. The regression first failed against that behavior. The service now combines the two lists, shows each act ID once and retains the form's specific declaration wording. It does not invent a new act or verification method.
+
+The passing regression also proves independent food work continues, utility work is frozen without delivery, and the exact prepared operation resumes after the existing verified-completion check. Worker regressions separately deny borrowed completion when facts, artifact, request version or attachment IDs differ, and stop transport when authority is revoked after operation begin. Independent normal and separate Ponytail reviews cleared the change; 65 service/worker/execution/policy tests passed. This is orchestration evidence using synthetic capabilities, not a PECO identity requirement, completed signature, live button/browser test or submission.
+
 ## Goal-alignment checkpoint
 
 Target family work removed: repeated income typing, duplicate document requests, manual choice between equivalent permitted evidence and assembling multi-person proof. Keep known required questions together and reuse lawful fresh answers. Preserve necessary missing facts, actual affidavits/signatures and meaningful program decisions. Internal rehearsal stops are not product steps. No real-family effort or program outcome is measured by these synthetic milestones; complete receipt/status/follow-up and family-release gates remain open.
