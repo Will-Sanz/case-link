@@ -1,5 +1,17 @@
 # Items to resolve with the product owner
 
+## Current decisions — November 7, 2026
+
+William Sanz confirmed that he is CaseLink's individual operator and accountable privacy/incident contact at `willsanz23@gmail.com`; there is no registered entity. The intended pilot geography is Philadelphia. The owner approved a fixed maximum of 30 days from original protected acquisition consent for the encrypted application PDF and per-packet key, with every earlier applicable limit taking precedence and no extension on reading, replay or follow-up. Ordinary application revisions, metadata, processor copies and backups require their own treatment.
+
+For this bounded Philadelphia SNAP pilot, the owner expressly waived a separate qualified privacy reviewer, conditional on engineering security readiness. Do not ask again for the operator, geography, contact, protected cap or separate reviewer. Engineering must complete the actual data/processor assessment, accurate notices and consent, rights/incident procedure, deletion/restore evidence and deployed security checks. The decision does not establish that these checks pass or supply vendor terms, agency permission, a live cohort or an operating deadline. See the [privacy decision record](parent-privacy-regulatory-review.md#decision-for-the-current-release).
+
+The proposed DigitalOcean purchase was declined. No alternative provider purchase, budget or DNS change is approved. Initial expected use is 10–50 users over the first weeks, not a concurrency forecast: retain one host and one bounded worker, measure the actual workload and expand only if justified. Engineering owns the concrete provider/account/region/cost and backup-retention comparison before any purchase decision; see the [hosting decision and prepared package](../deploy/parent-vm/README.md).
+
+The dated entries below preserve what was known and authorized at each checkpoint. Earlier statements that the protected cap was only proposed, operator details were missing or a separate reviewer was required are superseded by this decision record. Historical local test windows, provider observations and unresolved outcomes are not renewed or converted into current release approval.
+
+## Dated engineering and owner evidence
+
 Updated October 27, 2026. Keep this running list alongside the [launch plan](parent-launch-and-expansion-plan.md). The owner is working on partner access while engineering continues independently. These items gate the affected real-world action or release, not all development. No outside message, provider transaction or new family processing is authorized by this list.
 
 Names, existing instructions and ordinary partner links are enough to start. Do not paste passwords, tokens, private family information or identity documents into chat. Engineering will map the accepted process, minimize fields, implement it, test it and obtain independent review.
