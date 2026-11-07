@@ -12,7 +12,8 @@ const scope = globalThis as typeof globalThis & {
   onmessage?: ((event: MessageEvent<unknown>) => void) | null;
   close?: () => void;
 };
-if (typeof window === "undefined" && typeof scope.postMessage === "function") {
+// Next folds typeof window during client builds, including worker entries.
+if (!Reflect.has(scope, "document") && typeof scope.postMessage === "function") {
   // This worker has one private task; suppress parser diagnostics before importing the rendering core.
   let diagnostic = false;
   for (const name of ["log", "warn", "error", "info", "debug"] as const) console[name] = () => { diagnostic = true; };

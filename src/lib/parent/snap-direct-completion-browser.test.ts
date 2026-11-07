@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Worker as NodeWorker } from "node:worker_threads";
+import { runInNewContext } from "node:vm";
 import { buildSync } from "esbuild";
+import { transformSync } from "next/dist/build/swc";
 import { PDFDocument, PDFName, PDFNumber } from "pdf-lib";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { completeSnapDirectCompletionInBrowser, SNAP_DIRECT_COMPLETION_ERROR } from "./snap-direct-completion-browser";
@@ -15,6 +17,11 @@ const template = readFileSync("data/verified-forms/snap-pa600fs-2019.pdf"), now 
 const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const workerBundle = buildSync({ entryPoints: ["src/lib/parent/snap-direct-completion-worker.ts"], bundle: true, platform: "browser", format: "iife", write: false, metafile: true });
 const workerCode = workerBundle.outputFiles[0].text;
+// Next's client compiler folds typeof window even for a worker entry.
+const browserCompiledWorkerCode = transformSync(workerCode, {
+  jsc: { parser: { syntax: "ecmascript" }, target: "es2022", transform: { optimizer: { globals: { typeofs: { window: "object" } } } } },
+}).code;
+let currentWorkerCode = workerCode;
 const workers: FixtureWorker[] = [];
 class FixtureWorker {
   onmessage: ((event: MessageEvent) => void) | null = null;
@@ -23,7 +30,7 @@ class FixtureWorker {
   thread: NodeWorker; logs = ""; closed: Promise<void>; terminated = false;
   constructor() {
     // Exercise the actual browser bundle; only the transport is adapted to a credential-free test thread.
-    this.thread = new NodeWorker(`const {parentPort}=require('node:worker_threads');globalThis.postMessage=(value,transfer)=>parentPort.postMessage(value,transfer);globalThis.close=()=>parentPort.close();${workerCode};parentPort.on('message',data=>globalThis.onmessage?.({data}));`,
+    this.thread = new NodeWorker(`const {parentPort}=require('node:worker_threads');globalThis.postMessage=(value,transfer)=>parentPort.postMessage(value,transfer);globalThis.close=()=>parentPort.close();${currentWorkerCode};parentPort.on('message',data=>globalThis.onmessage?.({data}));`,
       { eval: true, stdout: true, stderr: true, env: {}, resourceLimits: { maxOldGenerationSizeMb: 128 } });
     this.closed = new Promise(resolve => this.thread.once("exit", () => resolve())); workers.push(this);
     this.thread.stdout.on("data", bytes => { this.logs += bytes.toString(); }); this.thread.stderr.on("data", bytes => { this.logs += bytes.toString(); });
@@ -51,7 +58,7 @@ beforeAll(async () => {
   fixture = { unsigned, trusted, completion }; baseline = await renderSnapDirectCompletion(template, trusted, completion, now);
   expect(baseline.bytes).not.toBeNull();
 });
-beforeEach(() => { workers.length = 0; vi.stubGlobal("Worker", FixtureWorker); });
+beforeEach(() => { workers.length = 0; currentWorkerCode = workerCode; vi.stubGlobal("Worker", FixtureWorker); });
 afterEach(async () => {
   for (const worker of workers) worker.terminate();
   await Promise.all(workers.map(worker => worker.closed));
@@ -62,6 +69,19 @@ const input = () => structuredClone(fixture);
 const run = (value = input(), signal?: AbortSignal) => completeSnapDirectCompletionInBrowser(value.unsigned, value.trusted, value.completion, new Date(now), { signal });
 
 describe("closed direct completion browser worker", () => {
+  it("retains the real worker handler after Next's browser typeof-window optimization", async () => {
+    currentWorkerCode = browserCompiledWorkerCode;
+    expect(await run()).toEqual(baseline);
+  }, 15000);
+  it("does not install a handler or suppress diagnostics in the main browser context", () => {
+    const postMessage = vi.fn(), originalHandler = vi.fn();
+    const console = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
+    const originalConsole = { ...console }, context = { document: {}, postMessage, onmessage: originalHandler, console };
+    runInNewContext(browserCompiledWorkerCode, context);
+    expect(context.onmessage).toBe(originalHandler);
+    expect(console).toEqual(originalConsole);
+    expect(postMessage).not.toHaveBeenCalled();
+  });
   it("bundles the wrapper and actual worker for browsers without Node or server rendering imports", () => {
     const wrapper = buildSync({ entryPoints: ["src/lib/parent/snap-direct-completion-browser.ts"], bundle: true, platform: "browser", format: "esm", write: false, metafile: true });
     for (const bundle of [wrapper, workerBundle]) {
