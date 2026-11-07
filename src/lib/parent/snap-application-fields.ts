@@ -2,6 +2,7 @@ import { z } from "zod";
 import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
 
 const text = (max = 160) => z.string().trim().min(1).max(max).refine((value) =>
+  value.length <= max &&
   !/[\u0000-\u001f\u007f-\u009f]/.test(value) &&
   !/\b\d{3}[-.\s]*\d{2}[-.\s]*\d{4}\b/.test(value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")));
 const amount = z.number().finite().min(0).max(1000000);

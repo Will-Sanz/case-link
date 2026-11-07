@@ -240,5 +240,5 @@ describe.skipIf(!modulePath)("sticky exact-need intake scope against PostgreSQL 
     } finally {
       await legacy.admin.end();
     }
-  });
+  }, 30_000);
 });

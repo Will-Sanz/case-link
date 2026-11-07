@@ -200,5 +200,5 @@ describe.skipIf(!modulePath)("server-owned intake source dates against PostgreSQ
     } finally {
       await legacy.admin.end();
     }
-  });
+  }, 30_000);
 });

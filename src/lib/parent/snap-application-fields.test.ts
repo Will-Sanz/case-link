@@ -22,6 +22,11 @@ function complete(): SnapApplicationFields {
 const valid = (value: unknown) => snapApplicationFieldsSchema(now).safeParse(value).success;
 
 describe("complete SNAP application values", () => {
+  it("preserves the database's UTF-16 text bounds for supplementary characters", () => {
+    expect(snapApplicationFieldsValueSchema.safeParse({ applicant: { firstName: "😀".repeat(40) } }).success).toBe(true);
+    expect(snapApplicationFieldsValueSchema.safeParse({ applicant: { firstName: "😀".repeat(41) } }).success).toBe(false);
+    expect(snapApplicationFieldsValueSchema.safeParse({ applicant: { firstName: "A".repeat(81) } }).success).toBe(false);
+  });
   it("binds the immutable reviewed source inventory without becoming a submission or identity contract", () => {
     const raw = readFileSync("data/verified-forms/snap-pa600fs-2019.fields.json");
     const inventory = JSON.parse(raw.toString());
