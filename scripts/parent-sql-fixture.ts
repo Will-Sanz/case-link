@@ -40,7 +40,10 @@ export async function createParentSqlFixture(
     create table public.resources(id uuid primary key default gen_random_uuid(),slug text not null unique,active boolean not null default true,is_demo boolean not null default false,updated_at timestamptz not null default now(),primary_contact_name text,primary_contact_email text,primary_contact_phone text,description text);
     alter table public.resources enable row level security;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-    create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,metadata jsonb,unique(bucket_id,name));
+    create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,metadata jsonb,
+      owner uuid,created_at timestamptz default now(),updated_at timestamptz default now(),last_accessed_at timestamptz default now(),version text,owner_id text,
+      user_metadata jsonb,archived_at timestamptz,is_delete_marker boolean default false,is_versioned boolean default false,
+      path_tokens text[] generated always as (string_to_array(name,'/')) stored,unique(bucket_id,name));
     alter table storage.objects enable row level security;
     grant usage on schema storage to authenticated;
     grant select,insert,delete on storage.objects to authenticated;
@@ -82,6 +85,32 @@ export async function createParentSqlFixture(
     "20261027170820_parent_personal_act_renewal.sql",
     "20261027172429_parent_preserve_exact_need_answers.sql",
     "20261027174125_parent_atomic_factual_answers.sql",
+    "20261103220623_parent_preparation_only_forms.sql",
+    "20261103224633_parent_preparation_mandate_guard.sql",
+    "20261104012940_parent_snap_application_details.sql",
+    "20261104021316_parent_snap_application_previews.sql",
+    "20261104173842_parent_snap_submission_authorization.sql",
+    "20261104190911_parent_snap_encrypted_packets.sql",
+    "20261104201514_parent_storage_artifact_immutability.sql",
+    "20261104212630_parent_snap_protected_capture_authority.sql",
+    "20261105011520_parent_snap_capture_context.sql",
+    "20261105012309_parent_snap_protected_operation_binding.sql",
+    "20261105013703_parent_snap_protected_submission.sql",
+    "20261105020641_parent_snap_protected_operation_projection.sql",
+    "20261105021926_parent_snap_pending_capture.sql",
+  "20261105025504_parent_snap_owned_review.sql",
+  "20261105195436_parent_snap_direct_construction.sql",
+  "20261105203600_parent_snap_direct_acquisition.sql",
+  "20261105211010_parent_snap_direct_construction_acquisition.sql",
+  "20261105211853_parent_snap_linked_packet_authority.sql",
+  "20261105212440_parent_snap_direct_intent_recovery.sql",
+  "20261105220209_parent_snap_verified_completion_route.sql",
+  "20261105220445_parent_snap_linked_retention_cleanup.sql",
+  "20261106051250_parent_food_journey_boundaries.sql",
+  "20261106051804_parent_snap_deterministic_continuation.sql",
+  "20261107024524_parent_snap_acquisition_expiry.sql",
+  "20261107181301_parent_snap_direct_completion_continuation.sql",
+  "20261107181433_parent_snap_delivery_intent.sql",
   ];
   try {
     for (const migration of migrations)

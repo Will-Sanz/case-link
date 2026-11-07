@@ -60,6 +60,8 @@
     "parent:test:ux": "node --import tsx tests/parent/ux-review.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1161.0",
+    "@aws-sdk/s3-request-presigner": "3.1161.0",
     "@fontsource-variable/newsreader": "^5.3.0",
     "@hookform/resolvers": "^5.2.2",
     "@react-pdf/renderer": "^4.3.2",

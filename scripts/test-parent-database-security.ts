@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Client, Pool, type PoolClient } from "pg";
 import { createParentSqlFixture } from "./parent-sql-fixture";
 import type { ServiceMandate, SupportIntake } from "../src/lib/parent/domain";
+import { SNAP_APPLICATION_NOTICE_VERSION } from "../src/lib/parent/constants";
+import { SNAP_APPLICATION_SOURCE } from "../src/lib/parent/snap-application-fields";
 
 async function main() {
   const connectionString =
@@ -270,12 +272,14 @@ async function main() {
   await admin.connect();
   try {
     const ready = await admin.query(
-      "select to_regclass('public.parent_requests') configured",
+      "select to_regclass('public.parent_requests') configured,to_regclass('public.parent_snap_application_details') snap_configured,to_regprocedure('public.parent_reaffirm_snap_application_details(uuid,integer,jsonb,text,uuid,text[])') snap_preview_configured",
     );
     assert.ok(
       ready.rows[0].configured,
       "Apply the parent migration to the isolated local test project first",
     );
+    assert.ok(ready.rows[0].snap_configured && ready.rows[0].snap_preview_configured,
+      "Apply the reviewed private SNAP details and preview migrations to the isolated test project first");
     if (!fixture) {
       originalControls = (
         await admin.query(
@@ -428,6 +432,122 @@ async function main() {
       await db.query("rollback to savepoint quoted_deadline");
       assertionCount += 4;
     });
+
+    // Native roles and real session rows only; this does not test GoTrue-issued tokens or PostgREST.
+    const snapControls = (await admin.query(
+      "select to_jsonb(c) value from parent_private.processing_controls c where singleton",
+    )).rows[0].value;
+    const snapKey = randomUUID();
+    const snapDetails = {
+      zip: "19104", language: "en",
+      applicant: { firstName: "SNAP-PRIVATE-CANARY", lastName: "Synthetic" },
+      address: { street: "100 Fixture Street", city: "Philadelphia", state: "PA" },
+    };
+    const snapArgs = [
+      JSON.stringify({ ...intake, needs: ["snap_new"], utilityProviders: [] }),
+      JSON.stringify({ ...mandate, mode: "prepare_only", recipientIds: ["snap-pa"], allowedActions: ["research", "prepare"], allowedData: ["household", "income"] }),
+      JSON.stringify(snapDetails), SNAP_APPLICATION_NOTICE_VERSION, snapKey,
+    ];
+    const startSnap = () => role("authenticated", ownerA, (db) => db.query(
+      "select public.parent_start_snap_application($1,$2,$3,$4,$5) id", snapArgs,
+    ));
+    let snapRequest: string | undefined;
+    try {
+      await admin.query("update parent_private.processing_controls set snap_details_enabled=false where singleton");
+      await denied(startSnap);
+      assert.equal((await admin.query("select count(*)::int n from public.parent_requests where start_key=$1", [snapKey])).rows[0].n, 0);
+      assert.deepEqual((await role("authenticated", ownerA, (db) => db.query("select public.parent_snap_application_collection() value"))).rows[0].value,
+        { collectionEnabled: false, noticeVersion: null });
+      assertionCount += 2;
+      await admin.query(`update parent_private.processing_controls set snap_details_enabled=true,
+        snap_details_approval_reference='isolated synthetic SNAP security fixture',snap_details_approved_until=now()+interval '1 hour',snap_details_notice_version=$1 where singleton`,
+        [SNAP_APPLICATION_NOTICE_VERSION]);
+      snapRequest = (await startSnap()).rows[0].id;
+      const original = (await role("authenticated", ownerA, (db) => db.query(
+        "select * from public.parent_snap_application_details where request_id=$1", [snapRequest],
+      ))).rows[0];
+      assert.equal(original.request_version, 2);
+      assert.deepEqual(original.details, snapDetails);
+      assert.deepEqual(original.source, SNAP_APPLICATION_SOURCE);
+      assert.equal((await admin.query("select request_version from public.parent_jobs where request_id=$1", [snapRequest])).rows[0].request_version, 2);
+      for (const user of [ownerB, staff]) {
+        assert.equal((await role("authenticated", user, (db) => db.query(
+          "select count(*)::int n from public.parent_snap_application_details where request_id=$1", [snapRequest],
+        ))).rows[0].n, 0);
+        assertionCount++;
+      }
+      for (const deniedRole of ["anon", "service_role", "parent_worker"] as const)
+        await denied(() => role(deniedRole, null, (db) => db.query("select * from public.parent_snap_application_details")));
+      await denied(() => role("authenticated", ownerB, (db) => db.query(
+        "select public.parent_save_snap_application_details($1,2,$2,$3,$4)", [snapRequest, JSON.stringify(snapDetails), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()],
+      )));
+      await denied(() => role("authenticated", ownerA, (db) => db.query(
+        "insert into public.parent_snap_application_details select * from public.parent_snap_application_details where id=$1", [original.id],
+      )));
+      await denied(() => role("authenticated", ownerA, (db) => db.query("delete from public.parent_snap_application_details where id=$1", [original.id])));
+      await denied(() => admin.query("update public.parent_snap_application_details set details='{}' where id=$1", [original.id]), "23514");
+      const snapState = async () => (await admin.query(`select to_jsonb(r) request,
+        (select to_jsonb(j) from public.parent_jobs j where j.request_id=r.id) job,
+        (select count(*)::int from public.parent_events e where e.request_id=r.id) events
+        from public.parent_requests r where r.id=$1`, [snapRequest])).rows[0];
+      const beforeRetry = await snapState();
+      assert.equal((await startSnap()).rows[0].id, snapRequest);
+      assert.deepEqual(await snapState(), beforeRetry);
+      assert.deepEqual((await role("authenticated", ownerA, (db) => db.query(
+        "select * from public.parent_snap_application_details where id=$1", [original.id],
+      ))).rows[0], original);
+      assert.ok(!JSON.stringify(beforeRetry).includes("SNAP-PRIVATE-CANARY"));
+      const correctionKey = randomUUID(), corrected = { ...snapDetails, address: { ...snapDetails.address, street: "101 Fixture Street" } };
+      const correctSnap = () => role("authenticated", ownerA, (db) => db.query(
+        "select public.parent_save_snap_application_details($1,2,$2,$3,$4) id", [snapRequest, JSON.stringify(corrected), SNAP_APPLICATION_NOTICE_VERSION, correctionKey],
+      ));
+      const correctedId = (await correctSnap()).rows[0].id;
+      const current = (await role("authenticated", ownerA, (db) => db.query(
+        "select * from public.parent_snap_application_details where id=$1", [correctedId],
+      ))).rows[0];
+      assert.equal(current.revision, 2); assert.equal(current.request_version, 3);
+      assert.deepEqual(current.details, corrected);
+      assert.deepEqual({ ...current.provenance, "address.street": original.provenance["address.street"] }, original.provenance);
+      assert.equal((await correctSnap()).rows[0].id, correctedId);
+      await denied(startSnap, "40001");
+      await denied(() => role("authenticated", ownerA, (db) => db.query(
+        "select public.parent_save_snap_application_details($1,2,$2,$3,$4)", [snapRequest, JSON.stringify(corrected), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()],
+      )), "40001");
+      assert.ok(!JSON.stringify(await snapState()).includes("SNAP-PRIVATE-CANARY"));
+      assertionCount += 14;
+      const stale = { ...current.provenance, "address.street": { source: "parent", confirmedAt: "2026-01-01T12:00:00Z", asOf: "2026-01-01" } };
+      await admin.query(`insert into public.parent_snap_application_details(id,request_id,revision,base_version,request_version,details,provenance,source,notice_version,idempotency_key)
+        select $1,request_id,revision+1,base_version,request_version,details,$2,source,notice_version,$3 from public.parent_snap_application_details where id=$4`,
+        [randomUUID(), JSON.stringify(stale), randomUUID(), correctedId]);
+      const reaffirmArgs = [snapRequest, JSON.stringify(corrected), SNAP_APPLICATION_NOTICE_VERSION, randomUUID(), ["address.street"]];
+      const reaffirm = () => role("authenticated", ownerA, (db) => db.query(
+        "select public.parent_reaffirm_snap_application_details($1,3,$2,$3,$4,$5) id", reaffirmArgs));
+      const reaffirmId = (await reaffirm()).rows[0].id;
+      const reaffirmed = (await role("authenticated", ownerA, (db) => db.query(
+        "select * from public.parent_snap_application_details where id=$1", [reaffirmId]))).rows[0];
+      assert.deepEqual(reaffirmed.confirmed_paths, ["address.street"]);
+      assert.deepEqual({ ...reaffirmed.provenance, "address.street": stale["address.street"] }, stale);
+      assert.equal(reaffirmed.request_version, 4); assert.equal((await reaffirm()).rows[0].id, reaffirmId);
+      assertionCount += 4;
+    } finally {
+      try {
+        if (snapRequest) {
+          await admin.query("delete from public.parent_requests where id=$1 and household_id=(select id from public.parent_households where owner_id=$2)", [snapRequest, ownerA]);
+          assert.equal((await admin.query("select count(*)::int n from public.parent_snap_application_details where request_id=$1", [snapRequest])).rows[0].n, 0);
+          assert.equal((await admin.query("select count(*)::int n from auth.users where id=$1", [ownerA])).rows[0].n, 1);
+          assertionCount += 2;
+        }
+      } finally {
+        await admin.query(`update parent_private.processing_controls c set
+          (snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version)=
+          (select r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version
+          from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(snapControls)]);
+        assert.deepEqual((await admin.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, snapControls);
+        assertionCount++;
+      }
+    }
+    console.log("Private SNAP native-role gate, atomic start, owned immutable revisions, replay, correction and cascade cleanup passed; purpose controls restored exactly.");
+
     // Shared identities get a new, owned parent household, never a school role grant.
     await admin.query(
       "update parent_private.processing_controls set existing_accounts_enabled=true where singleton",
@@ -1420,30 +1540,56 @@ async function main() {
       "40001",
     );
     const currentJob = await claim(correctionRequest);
-    for (let i = 0; i < 12; i++)
-      assert.equal(
-        (
-          await role("parent_worker", null, (db) =>
-            db.query(
+    await admin.query("begin");
+    try {
+      // Hold capacity stable and roll back every probe reservation, including on failure.
+      await admin.query("select pg_advisory_xact_lock(627281901)");
+      await admin.query(
+        "select 1 from parent_private.processing_controls where singleton for update",
+      );
+      const budgetSnapshotSql = `select
+        (select count(*) from parent_private.model_call_reservations) reservations,
+        (select count(*) from parent_private.ai_calls) execution_calls,
+        (select count(*) from parent_private.assistant_calls) assistant_calls,
+        case when c.model_budget_started_at>now() then 0
+          when c.model_call_limit is null then 12
+          else least(12,greatest(0,c.model_call_limit-greatest(
+            (select count(*) from parent_private.model_call_reservations where created_at>=c.model_budget_started_at),
+            (select count(*) from parent_private.ai_calls where created_at>=c.model_budget_started_at)
+              +(select count(*) from parent_private.assistant_calls where created_at>=c.model_budget_started_at)
+          ))) end::integer allowed_calls
+        from parent_private.processing_controls c where singleton`;
+      const before = (await admin.query(budgetSnapshotSql)).rows[0];
+      await admin.query("savepoint ai_budget_probe");
+      await admin.query("set local role parent_worker");
+      for (let i = 0; i < before.allowed_calls; i++)
+        assert.equal(
+          (
+            await admin.query(
               "select parent_private.parent_reserve_ai_call($1,$2) allowed",
               [currentJob.jobId, currentJob.leaseToken],
-            ),
-          )
-        ).rows[0].allowed,
-        true,
-      );
-    assert.equal(
-      (
-        await role("parent_worker", null, (db) =>
-          db.query(
+            )
+          ).rows[0].allowed,
+          true,
+        );
+      assert.equal(
+        (
+          await admin.query(
             "select parent_private.parent_reserve_ai_call($1,$2) allowed",
             [currentJob.jobId, currentJob.leaseToken],
-          ),
-        )
-      ).rows[0].allowed,
-      false,
-    );
-    assertionCount++;
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      await admin.query("rollback to savepoint ai_budget_probe");
+      assert.deepEqual((await admin.query(budgetSnapshotSql)).rows[0], before);
+      assertionCount += 2;
+      console.log(
+        `AI budget probe passed (${before.allowed_calls} available calls, then denial); all probe reservations rolled back.`,
+      );
+    } finally {
+      await admin.query("rollback");
+    }
     await admin.query("delete from auth.sessions where user_id=$1", [ownerA]);
     assert.equal(
       (
@@ -2648,7 +2794,7 @@ async function main() {
           const errors: unknown[] = [];
           try {
             await admin.query(
-              "update parent_private.processing_controls c set (enabled,approval_reference,approved_until,updated_at,existing_accounts_enabled)=(select r.enabled,r.approval_reference,r.approved_until,r.updated_at,r.existing_accounts_enabled from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton",
+              "update parent_private.processing_controls c set (enabled,approval_reference,approved_until,updated_at,existing_accounts_enabled,snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version)=(select r.enabled,r.approval_reference,r.approved_until,r.updated_at,r.existing_accounts_enabled,r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton",
               [JSON.stringify(originalControls)],
             );
           } catch (error) {
