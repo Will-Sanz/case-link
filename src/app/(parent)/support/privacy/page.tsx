@@ -11,7 +11,7 @@ export default function ParentPrivacyPage() {
     <article className={`${styles.container} ${styles.legal}`}>
       <p>Privacy & data policy</p>
       <h1>Your information. Your control.</h1>
-      <p>Last updated November 3, 2026 · Parent service</p>
+      <p>Last updated November 7, 2026 · Parent service</p>
       <div className={styles.notice}>
         Live personal-data processing is not open by default. Provider
         agreements, approved retention terms and operational privacy checks are
@@ -54,8 +54,9 @@ export default function ParentPrivacyPage() {
       <p>
         Do not put passwords, email codes, EBT PINs or unrequested identity
         documents in support requests or uploads. Enter your CaseLink password
-        only in its sign-in form. Agency-only sensitive information belongs in
-        the program’s protected direct-entry process.
+        only in its sign-in form. Use only the protected personal-entry step
+        offered for the named program for required identifiers and signatures;
+        never put them in chat or ordinary support fields.
       </p>
       <h2 id="snap-application">Private SNAP application details</h2>
       <p>
@@ -80,9 +81,9 @@ export default function ParentPrivacyPage() {
         A future AI or delivery use must pass its actual purpose, information,
         processor and recipient controls. Required Social Security numbers,
         credentials and signature values are not accepted in these fields;
-        genuine identifiers and certifications need the protected official-program
-        process. The accepted submission route must establish its own personal
-        act and receipt evidence.
+        genuine identifiers and certifications need a separately permitted
+        protected process. The accepted submission route must establish its own
+        personal act and receipt evidence.
       </p>
       <p>
         CaseLink keeps these application revisions while the support request is
@@ -95,6 +96,29 @@ export default function ParentPrivacyPage() {
         existing storage, access, deletion and backup limitations below apply.
         Real-family processing remains closed until its recorded privacy and
         operational checks are complete.
+      </p>
+      <h3>Protected SNAP personal steps</h3>
+      <p>
+        When enabled, a separate permission names the people applying, the
+        Pennsylvania SNAP application and the expiry before protected entry
+        opens. Required Social Security numbers and your own signature drawings
+        and dates are used to complete the private application. These entries
+        stay out of AI, chat and ordinary household records. You can choose to
+        provide an applicant’s Social Security number to the agency later;
+        CaseLink does not invent one. Permission to collect these entries does
+        not sign or send the application, or establish agency acceptance.
+      </p>
+      <p>
+        The approved CaseLink limit for the encrypted final SNAP PDF and its
+        individual encryption key is at most 30 days from your original consent
+        to this protected collection. Earlier permission or service-processing
+        deadlines, withdrawal and deletion limits take precedence. Reading,
+        recovering or following up on the application does not extend that
+        deadline. This limit is separate from the ordinary application revisions
+        above. An expiry date is not proof of completed deletion: scheduled PDF
+        and key cleanup must be verified before live use. Processor copies,
+        backups and records already delivered to a program have separate terms
+        that must be resolved and explained before intake opens.
       </p>
       <h2>What you authorize</h2>
       <p>
@@ -112,7 +136,8 @@ export default function ParentPrivacyPage() {
       <h2 id="data-policy">Data policy: storage, access & security</h2>
       <p>
         CaseLink uses Supabase for account authentication, database and private
-        file storage, and Vercel for application hosting. Access controls limit
+        file storage, and Vercel for the existing site. Hosting for the protected
+        SNAP service has not been selected or activated. Access controls limit
         parent records to their household owner and specifically authorized
         service work. A school role or administrator role does not grant access
         to other parents’ household records. Any program access must be limited
@@ -227,8 +252,10 @@ export default function ParentPrivacyPage() {
         through the deletion process. It does not delete a reused CaseLink
         sign-in identity or school records held for a separate purpose. Contact
         us for a broader account or privacy request. The proposed CaseLink
-        schedule keeps service records and exact packets during active service
-        and for 90 days after closure, subject to earlier eligible deletion.
+        schedule keeps ordinary service records and nonprotected packets during
+        active service and for 90 days after closure, subject to earlier eligible
+        deletion. The protected SNAP PDF and key instead have the shorter limit
+        described above.
         Selected minimal evidence hashes and deletion tombstones have a proposed
         365-day expiry. These periods require an approved purpose; they are not
         a claim that a law requires them. Backups, processor copies and
@@ -254,7 +281,9 @@ export default function ParentPrivacyPage() {
       </p>
       <h2>Questions, requests & policy changes</h2>
       <p>
-        The contact published on our original site remains{" "}
+        William Sanz operates CaseLink as an individual, without a registered
+        entity, and is responsible for privacy and incident requests. Contact him
+        at{" "}
         <a className={styles.textLink} href="mailto:willsanz23@gmail.com">
           willsanz23@gmail.com
         </a>
@@ -270,8 +299,8 @@ export default function ParentPrivacyPage() {
         </Link>{" "}
         for their privacy practices and alternatives to CaseLink. We date
         changes to this notice and seek new permission when a change expands
-        your authorization. The service operator, monitored privacy response
-        process and final processor and retention terms must be confirmed before
+        your authorization. The monitored privacy response process and final
+        processor and retention terms must be confirmed before
         real-family intake opens.
       </p>
     </article>

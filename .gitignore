@@ -17,6 +17,8 @@
 /tmp/legacy-containment/
 /tmp/restore/
 /tmp/parent-runtime/
+/tmp/parent-sql-runtime/
+/tmp/parent-pdf-runtime/
 /tmp/parent-verification/
 /tmp/parent-connected-build.json
 
