@@ -35,7 +35,7 @@ function harness(db: Client) {
       return { id, email, password };
     },
     async emailLink(email: string, type: "invite" | "recovery") {
-      const subject = type === "invite" ? "You're invited to CaseLink" : "Reset your password — CaseLink";
+      const subject = type === "invite" ? "You've been invited to CaseLink" : "Reset your password — CaseLink";
       for (let attempt = 0; attempt < 30; attempt++) {
         const response = await fetch(`${local.MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
         const { messages } = await response.json() as { messages: { ID: string }[] };

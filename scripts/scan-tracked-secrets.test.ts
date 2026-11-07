@@ -5,8 +5,11 @@ import { resolve } from "node:path";
 import { expect, it } from "vitest";
 
 // Hook repository settings must never reach commands operating on disposable repositories.
-const fixtureEnvironment = (inherited: NodeJS.ProcessEnv) =>
-  Object.fromEntries(Object.entries(inherited).filter(([name]) => !name.startsWith("GIT_")));
+const fixtureEnvironment = (inherited: NodeJS.ProcessEnv) => {
+  const env = { ...inherited };
+  for (const name of Object.keys(env)) if (name.startsWith("GIT_")) delete env[name];
+  return env;
+};
 
 function checkScanner(inherited = process.env) {
   const env = fixtureEnvironment(inherited);
