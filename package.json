@@ -51,12 +51,14 @@
     "parent:test:parser": "CASELINK_PARENT_TEST_REAL_PARSER=1 node --import tsx scripts/test-parent-document-parser.ts",
     "parent:test:visual": "node --import tsx tests/parent/visual-check.mjs",
     "parent:worker": "node --import tsx scripts/parent-support-worker.ts",
+    "parent:snap:template": "node --import tsx scripts/parent-snap-template.ts",
     "parent:retention": "node --import tsx scripts/parent-support-retention.ts",
     "parent:storage-broker": "node --import tsx scripts/parent-storage-broker.ts",
     "parent:preview": "node scripts/serve-parent.mjs",
     "parent:connected:build": "node --import tsx scripts/parent-connected.ts build",
     "parent:connected": "node --import tsx scripts/parent-connected.ts serve",
     "parent:connected:services": "node --import tsx scripts/parent-connected-services.ts",
+    "parent:local:services": "node --import tsx scripts/parent-local-services.ts",
     "parent:test:ux": "node --import tsx tests/parent/ux-review.mjs"
   },
   "dependencies": {

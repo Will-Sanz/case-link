@@ -9,10 +9,20 @@ import {
 
 async function main() {
   const env = process.env;
+  const mode = z.enum(["all", "snap-packets"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
+  const packetsOnly = mode === "snap-packets";
   const connectionString = env.CASELINK_PARENT_RETENTION_DATABASE_URL;
   const projectUrl = env.CASELINK_PARENT_RETENTION_SUPABASE_URL;
   const storageKey = env.CASELINK_PARENT_RETENTION_STORAGE_KEY;
-  if (!connectionString || !projectUrl || !storageKey)
+  let maintenanceUntil: number | undefined;
+  if (packetsOnly) {
+    z.literal("1").parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED);
+    z.string().trim().min(1).max(500).parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE);
+    maintenanceUntil = Date.parse(z.iso.datetime({ offset: true }).parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL));
+    if (maintenanceUntil <= Date.now() || storageKey !== undefined)
+      throw new Error("Protected packet cleanup needs current maintenance approval and no Storage credential.");
+  }
+  if (!connectionString || !projectUrl || (!packetsOnly && !storageKey))
     throw new Error(
       "Set the isolated retention database, parent project URL and protected storage/Auth credential.",
     );
@@ -62,6 +72,16 @@ async function main() {
     throw new Error(
       "Remote retention requires approval and an isolated parent project.",
     );
+  if (packetsOnly) {
+    const ref = /^https:\/\/([a-z0-9]+)\.supabase\.co$/.exec(canonicalProject)?.[1];
+    if (!["postgres:", "postgresql:"].includes(dbUrl.protocol) || !dbUrl.username || !dbUrl.password
+      || dbUrl.pathname !== "/postgres" || dbUrl.hash
+      || (local ? dbUrl.search !== "" && dbUrl.search !== "?sslmode=disable"
+        : !ref || dbUrl.hostname !== `db.${ref}.supabase.co` || !["", "5432"].includes(dbUrl.port)
+          || dbUrl.searchParams.getAll("sslmode").length !== 1 || dbUrl.searchParams.get("sslmode") !== "verify-full"
+          || [...dbUrl.searchParams.keys()].some(key => !["sslmode", "sslrootcert"].includes(key) || dbUrl.searchParams.getAll(key).length !== 1)))
+      throw new Error("Protected packet cleanup requires the exact approved database with verified TLS.");
+  }
   const batchSchema = z.object({
     batchId: z.uuid(),
     leaseToken: z.uuid(),
@@ -90,44 +110,83 @@ async function main() {
   const db = new Client({
     connectionString,
     application_name: "caselink-parent-retention",
+    connectionTimeoutMillis: 3000,
+    query_timeout: 18000,
     statement_timeout: 15000,
   });
-  const supabase = createClient(canonicalProject, storageKey, {
+  const supabase = !packetsOnly && storageKey ? createClient(canonicalProject, storageKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
-  await db.connect();
+  }) : null;
+  let closed = false, rejectStop!: (error: Error) => void;
+  const close = () => {
+    if (closed) return; closed = true;
+    db.connection.stream.destroy();
+    try { void db.end().catch(() => {}); } catch {}
+  };
+  const stop = new Promise<never>((_, reject) => { rejectStop = reject; });
+  void stop.catch(() => {});
+  const abort = () => { rejectStop(new Error("Parent retention stopped.")); close(); };
+  const run = async <T>(action: () => Promise<T>) => {
+    if (closed || (maintenanceUntil !== undefined && Date.now() >= maintenanceUntil)) throw new Error("Parent retention stopped.");
+    const result = await Promise.race([action(), stop]);
+    if (closed || (maintenanceUntil !== undefined && Date.now() >= maintenanceUntil)) throw new Error("Parent retention stopped.");
+    return result;
+  };
+  const query = (text: string, values?: unknown[]) => run(() => db.query(text, values));
+  const timer = maintenanceUntil === undefined ? undefined : setTimeout(abort, Math.min(60000, maintenanceUntil - Date.now()));
+  db.on("error", abort);
   try {
+    await run(() => db.connect());
     const principal = (
-      await db.query(`select r.rolname,r.rolinherit,r.rolsuper,r.rolbypassrls,r.rolcreaterole,
-    pg_has_role(session_user,'parent_retention_worker','MEMBER') member,
-    exists(select 1 from pg_auth_members m join pg_roles g on g.oid=m.roleid where m.member=r.oid and g.rolname<>'parent_retention_worker') broader_membership
-    from pg_roles r where r.rolname=session_user`)
+      await query(`select r.rolname,r.rolcanlogin,r.rolinherit,r.rolsuper,r.rolbypassrls,r.rolcreaterole,r.rolcreatedb,r.rolreplication,
+    pg_has_role(session_user,g.oid,'MEMBER') member,pg_has_role(session_user,g.oid,'SET') can_set,
+    exists(select 1 from pg_auth_members m where m.member=r.oid and m.roleid=g.oid and m.admin_option) admin_option,
+    exists(select 1 from pg_auth_members m where m.member=r.oid and m.roleid<>g.oid) broader_membership,
+    exists(select 1 from pg_auth_members m where m.member=g.oid) group_membership,
+    g.rolcanlogin group_login,g.rolinherit group_inherit,g.rolsuper group_super,g.rolbypassrls group_bypassrls,
+    g.rolcreaterole group_createrole,g.rolcreatedb group_createdb,g.rolreplication group_replication
+    from pg_roles r cross join pg_roles g where r.rolname=session_user and g.rolname='parent_retention_worker'`)
     ).rows[0];
+    const role = z.object({
+      rolname: z.string(), rolcanlogin: z.literal(true), rolinherit: z.literal(false), rolsuper: z.literal(false), rolbypassrls: z.literal(false),
+      rolcreaterole: z.literal(false), rolcreatedb: z.literal(false), rolreplication: z.literal(false), member: z.literal(true), can_set: z.literal(true),
+      admin_option: z.literal(false), broader_membership: z.literal(false), group_membership: z.literal(false), group_login: z.literal(false),
+      group_inherit: z.literal(false), group_super: z.literal(false), group_bypassrls: z.literal(false), group_createrole: z.literal(false),
+      group_createdb: z.literal(false), group_replication: z.literal(false),
+    }).strict().safeParse(principal);
     if (
-      !principal ||
-      !principal.member ||
-      principal.rolinherit ||
-      principal.rolsuper ||
-      principal.rolbypassrls ||
-      principal.rolcreaterole ||
-      principal.broader_membership ||
+      !role.success ||
       ["postgres", "service_role", "supabase_admin", "authenticator"].includes(
-        principal.rolname,
-      )
+        role.data.rolname,
+      ) || (dbUrl.username && role.data.rolname !== decodeURIComponent(dbUrl.username))
     )
       throw new Error(
         "Use a dedicated NOINHERIT login granted only the parent_retention_worker role.",
       );
-    await db.query("set role parent_retention_worker");
+    await query("set role parent_retention_worker");
     if (
-      (await db.query("select current_user as name")).rows[0].name !==
+      (await query("select current_user as name")).rows[0].name !==
       "parent_retention_worker"
     )
       throw new Error("Could not enter the restricted retention role.");
     let removedDocuments = 0,
-      removedAccounts = 0;
+      removedAccounts = 0,
+      removedPackets = 0;
     for (let count = 0; count < 10; count++) {
-      const result = await db.query(
+      const result = await query(
+        "select parent_private.parent_purge_snap_final_packets(100) removed",
+      );
+      const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed);
+      removedPackets += removed;
+      if (removed < 100) break;
+    }
+    if (packetsOnly) {
+      process.stdout.write(`Retention completed: ${removedPackets} protected packets erased.\n`);
+      return;
+    }
+    if (!supabase) throw new Error("Ordinary retention requires its Storage credential.");
+    for (let count = 0; count < 10; count++) {
+      const result = await query(
         "select parent_private.parent_claim_cleanup(100) batch",
       );
       if (!result.rows[0]?.batch) break;
@@ -156,7 +215,7 @@ async function main() {
         artifacts.push(artifact.id);
       }
       // Parent erasure must not delete a shared Auth identity or cascade school records.
-      await db.query(
+      await query(
         "select parent_private.parent_finish_cleanup($1,$2,$3,$4,$5)",
         [batch.batchId, batch.leaseToken, documents, accounts, artifacts],
       );
@@ -164,10 +223,10 @@ async function main() {
       removedAccounts += accounts.length;
     }
     process.stdout.write(
-      `Retention completed: ${removedDocuments} private objects and ${removedAccounts} parent memberships erased.\n`,
+      `Retention completed: ${removedPackets} protected packets, ${removedDocuments} private objects and ${removedAccounts} parent memberships erased.\n`,
     );
   } finally {
-    await db.end();
+    clearTimeout(timer); close();
   }
 }
 void main().catch(() => {

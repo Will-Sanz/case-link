@@ -39,8 +39,8 @@ export function parentLiveSmokeCases(): SmokeCase[] {
     intake: fixtureIntake({
       needs: [test.need],
       language: test.language,
-      childrenUnderFive: test.need.startsWith("wic_") ? true : null,
-      pregnantOrPostpartum: test.need === "wic_new" ? true : null,
+      childrenUnderFive: null,
+      pregnantOrPostpartum: null,
       incomeAmount: 120,
       incomeFrequency: "weekly",
       utilityProviders:
@@ -66,8 +66,8 @@ export function parentLiveSmokeCases(): SmokeCase[] {
       intake: fixtureIntake({
         needs,
         language,
-        childrenUnderFive: true,
-        pregnantOrPostpartum: true,
+        childrenUnderFive: null,
+        pregnantOrPostpartum: null,
         utilityProviders: ["peco", "pgw", "pwd"],
       }),
       mandate: fixtureMandate({
@@ -260,6 +260,7 @@ export async function runParentLiveSmoke(
   return {
     recordedAt: new Date().toISOString(),
     scope: "direct_coordinator_routing_smoke_not_four_turn_live_corpus",
+    limitations: "Routing selections do not establish preparation, delivery or outcomes. Unverified initial benefit journeys remain closed, including WIC; private WIC questions are not collected in these fixtures.",
     model: "gpt-6.1-sol",
     reasoningEffort: "medium",
     store: false,

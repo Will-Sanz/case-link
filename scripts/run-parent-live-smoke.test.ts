@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { NEEDS } from "../src/lib/parent/domain";
+import { NEEDS, intakeSchema } from "../src/lib/parent/domain";
 import {
   parentLiveSmokeCases,
   parentLiveSmokeConfig,
@@ -59,6 +59,7 @@ describe("explicitly approved direct live parent smoke", () => {
     ).toBe("synthetic-key");
   });
   it("covers all needs, records actual tool selections and stays distinct from the full live corpus", async () => {
+    for (const test of parentLiveSmokeCases()) expect(intakeSchema.safeParse(test.intake).success).toBe(true);
     expect(
       new Set(parentLiveSmokeCases().flatMap((test) => test.intake.needs)),
     ).toEqual(new Set(NEEDS));
@@ -73,6 +74,7 @@ describe("explicitly approved direct live parent smoke", () => {
     expect(result.tokenUsageComplete).toBe(true);
     expect(result.projectIdentityEstablished).toBe(false);
     expect(result.modelQualityApproval).toBe("not_established");
+    expect(result.limitations).toContain("Unverified initial benefit journeys remain closed");
     expect(JSON.stringify(result)).not.toContain("synthetic-key");
     expect(
       new Headers(fetcher.mock.calls[0][1]?.headers).has("OpenAI-Project"),

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
+import { s3StorageCredentialsSchema } from "../src/lib/parent/storage-s3";
 
 export const connectedServicesSchema = z
   .object({
@@ -10,6 +11,7 @@ export const connectedServicesSchema = z
     retentionDatabaseUrl: z.string().min(1),
     openaiApiKey: z.string().min(20),
     storageKey: z.string().min(20),
+    ...s3StorageCredentialsSchema.shape,
     brokerSecret: z.string().min(32),
   })
   .strict();
@@ -78,7 +80,9 @@ export function connectedServiceEnvironment(
       CASELINK_PARENT_STORAGE_BROKER_APPROVED: "1",
       CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL: databaseUrl,
       CASELINK_PARENT_STORAGE_BROKER_SUPABASE_URL: config.projectUrl,
-      CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY: config.storageKey,
+      CASELINK_PARENT_STORAGE_BROKER_S3_ACCESS_KEY_ID: config.s3AccessKeyId,
+      CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY: config.s3SecretAccessKey,
+      CASELINK_PARENT_STORAGE_BROKER_S3_REGION: config.s3Region,
       CASELINK_PARENT_STORAGE_BROKER_ORIGIN: brokerOrigin,
       CASELINK_PARENT_STORAGE_BROKER_SECRET: config.brokerSecret,
     });

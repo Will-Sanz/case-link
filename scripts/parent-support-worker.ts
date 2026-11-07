@@ -6,6 +6,8 @@ import {
 } from "../src/lib/parent/project-origin";
 import { runParentWorkerService } from "../src/lib/parent/worker-service";
 import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
+import { hostedParentServiceAllowed } from "../src/lib/parent/hosted-service";
+import { createSnapProtectedSubmissionClient } from "../src/lib/parent/snap-sender-worker-client";
 
 async function main() {
   const env = process.env;
@@ -51,6 +53,7 @@ async function main() {
     supabaseOrigin,
     brokerOrigin,
   );
+  const hosted = hostedParentServiceAllowed(env, connectionString, supabaseOrigin, brokerOrigin);
   if (
     local &&
     target.port !==
@@ -60,7 +63,7 @@ async function main() {
   if (
     !local &&
     (env.CASELINK_PARENT_WORKER_APPROVED !== "1" ||
-      (!connected && !brokerOrigin.startsWith("https:")))
+      (!connected && !hosted && !brokerOrigin.startsWith("https:")))
   )
     throw new Error(
       "Remote worker execution requires approved isolated HTTPS services.",
@@ -110,6 +113,8 @@ async function main() {
       supabaseOrigin,
       watch: process.argv.includes("--watch"),
       signal: stop.signal,
+      protectedSnapSubmission: env.CASELINK_PARENT_SNAP_SENDER_ORIGIN || env.CASELINK_PARENT_SNAP_SENDER_SECRET
+        ? createSnapProtectedSubmissionClient({ origin: env.CASELINK_PARENT_SNAP_SENDER_ORIGIN ?? "", secret: env.CASELINK_PARENT_SNAP_SENDER_SECRET ?? "" }) : undefined,
       notifications:
         env.CASELINK_PARENT_NOTIFICATIONS_APPROVED === "1" &&
         env.RESEND_API_KEY &&

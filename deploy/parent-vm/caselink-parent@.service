@@ -1,0 +1,47 @@
+[Unit]
+Description=CaseLink isolated parent %i
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=caselink-%i
+Group=caselink-%i
+WorkingDirectory=/opt/caselink/current
+ExecStart=/usr/bin/node --import tsx scripts/parent-hosted-services.ts /etc/caselink/%i/profile.json
+Environment=NODE_ENV=production
+Environment=PATH=/usr/bin:/bin
+Environment=HOME=/var/lib/caselink-%i
+Environment=TMPDIR=/tmp
+StateDirectory=caselink-%i
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=10
+RestartPreventExitStatus=78
+TimeoutStopSec=10
+KillMode=control-group
+SendSIGKILL=yes
+Slice=caselink-parent.slice
+MemoryMax=1G
+TasksMax=128
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

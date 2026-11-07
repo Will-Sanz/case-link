@@ -16,6 +16,7 @@ it("separates each private principal and credential and never inherits the opera
       "postgresql://retention:synthetic@db.approved.supabase.co:5432/postgres?sslmode=verify-full",
     openaiApiKey: "synthetic-private-model-key",
     storageKey: "synthetic-private-storage-key",
+    s3AccessKeyId: "synthetic-s3-access-id", s3SecretAccessKey: "synthetic-s3-secret-at-least-20", s3Region: "us-east-1",
     brokerSecret: "separate-synthetic-broker-secret-32characters",
   });
   const approval = {
@@ -65,6 +66,9 @@ it("separates each private principal and credential and never inherits the opera
     "CASELINK_PARENT_WORKER_DATABASE_URL",
     "CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL",
     "CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY",
+    "CASELINK_PARENT_STORAGE_BROKER_S3_ACCESS_KEY_ID",
+    "CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY",
+    "CASELINK_PARENT_STORAGE_BROKER_S3_REGION",
     "CASELINK_PARENT_RETENTION_DATABASE_URL",
   ])
     expect(browser[key]).toBeUndefined();
@@ -72,6 +76,14 @@ it("separates each private principal and credential and never inherits the opera
   expect(worker.CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY).toBeUndefined();
   expect(worker.CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL).toBeUndefined();
   expect(broker.OPENAI_API_KEY).toBeUndefined();
+  expect(broker.CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY).toBeUndefined();
+  expect(broker.CASELINK_PARENT_RETENTION_STORAGE_KEY).toBeUndefined();
+  expect(broker.CASELINK_PARENT_STORAGE_BROKER_S3_ACCESS_KEY_ID).toBe(config.s3AccessKeyId);
+  expect(broker.CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY).toBe(config.s3SecretAccessKey);
+  expect(broker.CASELINK_PARENT_STORAGE_BROKER_S3_REGION).toBe(config.s3Region);
+  expect(retention.CASELINK_PARENT_RETENTION_STORAGE_KEY).toBe(config.storageKey);
+  expect(retention.CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY).toBeUndefined();
+  expect(worker.CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY).toBeUndefined();
   expect(retention.OPENAI_API_KEY).toBeUndefined();
   expect(broker.CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL).toBe(
     config.brokerDatabaseUrl,

@@ -1,30 +1,41 @@
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "pg";
-import { createClient } from "@supabase/supabase-js";
 import { createStorageBroker } from "../src/lib/parent/storage-broker";
+import { createS3Storage, s3StorageCredentialsSchema, storageArtifactGuardReady } from "../src/lib/parent/storage-s3";
 import {
   canonicalProjectOrigin,
   parentProjectIsolationIssues,
 } from "../src/lib/parent/project-origin";
-import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
+import { hostedParentServiceAllowed } from "../src/lib/parent/hosted-service";
+
+export function brokerS3Credentials(env: Record<string, string | undefined>) {
+  if ([env.CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY, env.SUPABASE_SERVICE_ROLE_KEY, env.SUPABASE_SECRET_KEY].some(Boolean))
+    throw new Error("Project API credentials do not belong in the Storage-only broker.");
+  return s3StorageCredentialsSchema.parse({
+    s3AccessKeyId: env.CASELINK_PARENT_STORAGE_BROKER_S3_ACCESS_KEY_ID,
+    s3SecretAccessKey: env.CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY,
+    s3Region: env.CASELINK_PARENT_STORAGE_BROKER_S3_REGION,
+  });
+}
 
 async function main() {
   const env = process.env;
   const databaseUrl = env.CASELINK_PARENT_STORAGE_BROKER_DATABASE_URL,
     projectUrl = env.CASELINK_PARENT_STORAGE_BROKER_SUPABASE_URL,
-    storageKey = env.CASELINK_PARENT_STORAGE_BROKER_STORAGE_KEY,
     secret = env.CASELINK_PARENT_STORAGE_BROKER_SECRET;
+  const credentials = brokerS3Credentials(env);
   if (
     !databaseUrl ||
     !projectUrl ||
-    !storageKey ||
     !secret ||
     secret.length < 32
   )
     throw new Error(
-      "An isolated broker database, parent storage credential and separate 32-character secret are required.",
+      "An isolated broker database, Storage-only S3 credentials and separate 32-character secret are required.",
     );
   const canonicalProject = canonicalProjectOrigin(projectUrl);
   if (
@@ -56,6 +67,7 @@ async function main() {
     canonicalProject,
     origin,
   );
+  const hosted = hostedParentServiceAllowed(env, databaseUrl, canonicalProject, origin);
   if (
     local &&
     (database.port !== "55322" || project.port !== "55321") &&
@@ -70,7 +82,7 @@ async function main() {
     !local &&
     (env.CASELINK_PARENT_STORAGE_BROKER_APPROVED !== "1" ||
       project.protocol !== "https:" ||
-      (!connected && !canonicalProjectOrigin(origin)?.startsWith("https:")))
+      (!connected && !hosted && !canonicalProjectOrigin(origin)?.startsWith("https:")))
   )
     throw new Error(
       "The remote broker needs explicit approval and isolated HTTPS origins.",
@@ -101,20 +113,14 @@ async function main() {
     );
   }
   await db.query("set role parent_storage_broker");
-  const supabase = createClient(canonicalProject, storageKey, {
-    global: { fetch: fetchWithTimeout },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const storage = createS3Storage({ projectUrl: canonicalProject, ...credentials });
   const handler = createStorageBroker({
     secret,
     origin,
     supabaseOrigin: canonicalProject,
     ports: {
       async checkHealth() {
-        return (
-          (await db.query("select current_user as name")).rows[0]?.name ===
-          "parent_storage_broker"
-        );
+        return await storageArtifactGuardReady(db) && await storage.checkHealth();
       },
       async authorize(purpose) {
         const result = await db.query(
@@ -130,17 +136,11 @@ async function main() {
         return result.rows[0].permission;
       },
       async signDownload(bucket, path, seconds) {
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(path, seconds);
-        if (error || !data) throw new Error("download_unavailable");
-        return data.signedUrl;
+        return storage.signDownload(bucket, path, seconds);
       },
       async upload(bucket, path, bytes, mediaType) {
-        const { error } = await supabase.storage
-          .from(bucket)
-          .upload(path, bytes, { upsert: false, contentType: mediaType });
-        if (error) throw new Error("upload_unconfirmed");
+        if (!await storageArtifactGuardReady(db)) throw new Error("storage_immutability_unavailable");
+        await storage.upload(bucket, path, bytes, mediaType);
       },
     },
   });
@@ -177,6 +177,7 @@ async function main() {
   server.listen(port, "127.0.0.1");
   const stop = () =>
     server.close(() => {
+      storage.destroy();
       void db.end();
     });
   process.once("SIGINT", stop);
@@ -185,7 +186,7 @@ async function main() {
     "Private parent storage broker is listening on loopback.\n",
   );
 }
-void main().catch(() => {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) void main().catch(() => {
   process.stderr.write(
     "The isolated parent storage broker could not start. Check the protected runtime configuration.\n",
   );
