@@ -1,15 +1,27 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Client } from "pg";
 
-// No remote override: only disposable databases inside CaseLink's local/CI test container.
-const container = "supabase_db_caselink";
-const address = name => `postgresql://postgres:postgres@127.0.0.1:54322/${name}`;
+// A separate cluster preserves existing global roles while replaying their original CREATE ROLE migrations.
+const project = `caselink-upgrade-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+const platformDirectory = mkdtempSync(join(tmpdir(), "caselink-upgrade-platform-"));
+const container = `supabase_db_${project}`;
+const address = name => `postgresql://postgres:postgres@127.0.0.1:57422/${name}`;
 const database = `caselink_upgrade_${randomUUID().replaceAll("-", "")}`;
 const admin = new Client({ connectionString: address("postgres") });
 const client = new Client({ connectionString: address(database) });
+const freshInstall = new Client({ connectionString: "postgresql://postgres:postgres@127.0.0.1:54322/postgres" });
+function platform(args) {
+  try {
+    return execFileSync("npx", ["--yes", "supabase@2.111.0", ...args, "--workdir", platformDirectory],
+      { encoding: "utf8", timeout: 240_000, maxBuffer: 5_000_000, stdio: ["ignore", "pipe", "pipe"],
+        env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, SUPABASE_TELEMETRY_DISABLED: "1" } });
+  } catch { throw new Error("The isolated upgrade platform command failed; local credentials are not logged."); }
+}
 const docker = (args, input) => execFileSync("docker", ["exec", "-i", container, ...args], { input, maxBuffer: 30_000_000, stdio: ["pipe", "pipe", "pipe"] });
 const sql = input => docker(["psql", "-X", "-U", "supabase_admin", "-d", database, "-v", "ON_ERROR_STOP=1"], input);
 const hash = value => createHash("sha256").update(value).digest("hex");
@@ -37,13 +49,28 @@ const migrationNames = readdirSync("supabase/migrations").filter(name => name.en
 // These two earlier objects are absent in the observed schema; the case-progress migration is present.
 const missingEarlier = ["20260802120000_demo_requests.sql", "20260802143000_replace_family_barriers_rpc.sql"];
 const upgradeNames = migrationNames.filter(name => missingEarlier.includes(name) || name >= "20260804173443");
-const migrationSource = name => readFileSync(`supabase/migrations/${name}`, "utf8");
+const migrationSources = new Map(upgradeNames.map(name => [name, readFileSync(`supabase/migrations/${name}`, "utf8")]));
+const migrationSource = name => migrationSources.get(name);
+function transactionalSource(name) {
+  const source = migrationSource(name);
+  const boundaries = [...source.matchAll(/^(begin|commit|rollback);[ \t]*$/gm)].map(match => match[1]);
+  if (name === "20261106051250_parent_food_journey_boundaries.sql") {
+    assert.deepEqual(boundaries, ["begin", "commit"]);
+    assert.match(source, /^--[^\n]*\nbegin;\n/);
+    assert.match(source, /\ncommit;\s*$/);
+    // The upgrade owns the transaction; this migration's outer wrapper would commit it early.
+    return source.replace(/^begin;\n/m, "").replace(/\ncommit;\s*$/, "\n");
+  }
+  assert.deepEqual(boundaries, [], `${name} must not change the upgrade transaction`);
+  return source;
+}
 const bundle = upgradeNames.map(name => `-- ${name}\n${migrationSource(name)}`).join("\n");
+const executedBundle = upgradeNames.map(name => `-- ${name}\n${transactionalSource(name)}`).join("\n");
 const staff = randomUUID(), other = randomUUID(), operator = randomUUID();
 const session = randomUUID(), otherSession = randomUUID(), operatorSession = randomUUID();
 const family = randomUUID(), otherFamily = randomUUID(), plan = randomUUID(), step = randomUUID();
 const action = randomUUID(), resource = randomUUID(), demoResource = randomUUID();
-let created = false, evidence;
+let created = false, platformStarted = false, evidence;
 const startedAt = new Date();
 async function asUser(id, sid, run, aal = "aal1") {
   await client.query("begin");
@@ -58,7 +85,7 @@ async function upgrade() {
   await client.query("begin");
   try {
     await client.query("set local lock_timeout='5s'; set local statement_timeout='60s'");
-    for (const name of upgradeNames) await client.query(migrationSource(name));
+    for (const name of upgradeNames) await client.query(transactionalSource(name));
     // Replacing an immutable validation function does not recheck existing CHECK constraints.
     const checks = (await client.query(`select c.relname as table_name, con.conname,
       pg_get_expr(con.conbin,con.conrelid) as expression from pg_constraint con
@@ -85,8 +112,23 @@ async function oldRows(baseline) {
 }
 
 try {
+  mkdirSync(join(platformDirectory, "supabase"));
+  cpSync("supabase/email-templates", join(platformDirectory, "supabase/email-templates"), { recursive: true });
+  const config = readFileSync("supabase/config.toml", "utf8")
+    .replace(/^project_id = .*$/m, `project_id = "${project}"`)
+    .replace(/\b5432([0-9])\b/g, "5742$1")
+    .replace("[db.seed]\n# If enabled, seeds the database after migrations during a db reset.\nenabled = true", "[db.seed]\nenabled = false")
+    .replace("[functions.invite-staff]\nenabled = true", "[functions.invite-staff]\nenabled = false")
+    .replace("[edge_runtime]\nenabled = true", "[edge_runtime]\nenabled = false");
+  writeFileSync(join(platformDirectory, "supabase/config.toml"), config, { mode: 0o600 });
+  platformStarted = true;
+  platform(["start"]);
+  const status = JSON.parse(platform(["status", "--output", "json"]));
+  assert.equal(status.DB_URL, address("postgres"), "upgrade fixture uses only its separate local cluster");
+  await freshInstall.connect();
   await admin.connect();
-  const authSchema = docker(["pg_dump", "-U", "supabase_admin", "-d", "postgres", "--schema-only", "--schema=auth", "--schema=extensions", "--no-publications", "--no-subscriptions"]);
+  assert.equal((await admin.query("select count(*)::int n from pg_roles where rolname in ('parent_snap_finalizer','parent_snap_sender')")).rows[0].n, 0);
+  const authSchema = docker(["pg_dump", "-U", "supabase_admin", "-d", "postgres", "--schema-only", "--schema=auth", "--schema=extensions", "--schema=storage", "--no-publications", "--no-subscriptions"]);
   await admin.query(`create database ${quote(database)} template template0`); created = true;
   sql(authSchema);
   sql('create extension if not exists pgcrypto with schema extensions; create extension if not exists "uuid-ossp" with schema extensions;');
@@ -158,7 +200,7 @@ try {
   await client.query("delete from auth.mfa_factors where id=$1", [oldFactor]);
   await upgrade();
   assert.deepEqual(await oldRows(baseline), before, "successful upgrade preserves legacy columns, relationships and history");
-  const target = await inventory(client), fresh = await inventory(admin);
+  const target = await inventory(client), fresh = await inventory(freshInstall);
   const targetSections = sections(target), freshSections = sections(fresh);
   for (const key of Object.keys(targetSections)) assert.deepEqual(targetSections[key], freshSections[key], `upgraded ${key} must match a fresh install`);
   assert.equal((await client.query("select count(*)::int n from public.app_users where is_active")).rows[0].n, 3);
@@ -181,14 +223,25 @@ try {
   assert.match(regression, /Database security integration checks passed/);
   evidence = { startedAt, completedAt: new Date(), syntheticOnly: true, localOnly: true, fixtureMatchesHostedDefinitions: true,
     legacyTableCounts: Object.fromEntries(Object.entries(before).map(([name, rows]) => [name, rows.length])),
-    appliedMigrations: upgradeNames.map(name => ({ name, sha256: hash(migrationSource(name)) })), bundleSha256: hash(bundle),
+    appliedMigrations: upgradeNames.map(name => ({ name, sha256: hash(migrationSource(name)),
+      executedSha256: hash(transactionalSource(name)), outerTransactionRemoved: migrationSource(name) !== transactionalSource(name) })),
+    bundleSha256: hash(bundle), executedBundleSha256: hash(executedBundle),
     aggregateDataPreflightPassed: true, incompatibleDataRollbackPassed: true, oldColumnsAndRelationshipsPreserved: true, schemaMatchesFreshInstall: true,
     legacyReviewRequiresApproval: true, administratorPasswordAccessVerified: true, retainedSessionDenied: true, fullDatabaseRegressionPassed: true,
     limits: "No production rows, live upgrade, migration-history repair, backup verification, hosted Auth tokens or operator approval. Live preflight must be repeated against the unchanged definitions and approved backup." };
 } finally {
   await client.end();
-  if (created) await admin.query(`drop database ${quote(database)} with (force)`);
-  await admin.end();
+  try {
+    if (created) await admin.query(`drop database ${quote(database)} with (force)`);
+  } finally {
+    await admin.end();
+    await freshInstall.end();
+    if (platformStarted) {
+      platform(["stop", "--project-id", project, "--no-backup"]);
+      assert.equal(execFileSync("docker", ["ps", "-aq", "--filter", `label=com.supabase.cli.project=${project}`], { encoding: "utf8" }).trim(), "", "disposable cluster containers are removed");
+    }
+    rmSync(platformDirectory, { recursive: true, force: true });
+  }
 }
 mkdirSync("tmp/legacy-upgrade", { recursive: true });
 writeFileSync("tmp/legacy-upgrade/latest.json", JSON.stringify({ ...evidence, cleanupPassed: true }, null, 2) + "\n");
