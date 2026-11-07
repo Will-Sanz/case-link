@@ -14,6 +14,8 @@ The latest revision freezes a staged launch direction without restarting enginee
 
 The PRD defines intended behavior; source code and exact-release verification establish what is implemented. Phase status changes only with evidence. Product requirements do not grant runtime permissions or establish partner integration access.
 
+[Approved system architecture](parent-system-architecture.md) records the owner's November 7 direction and system diagram: one CaseLink app, a shared service engine, durable jobs, a bounded background worker pool, isolated tools/data and verified program connections. It includes the GitHub release process, test/live separation, capacity requirements for thousands of families and implementation order. It supplements the product authority above; target architecture is not deployed-capacity or launch evidence. `AGENTS.md` points future work to this plan.
+
 [Owner needs](parent-owner-needs.md) keeps the running list of partner access and release decisions while independent engineering continues. [Shared-data milestones](verification/parent-shared-data-authority.md) records the current L1 implementation and its exact verification limits.
 
 [Partner-independent continuation](verification/parent-independent-continuation.md) records subsequent recovery and family-experience pieces, starting with genuine exact-packet personal-act renewal. It does not enable a signing channel or provider execution.

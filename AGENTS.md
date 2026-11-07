@@ -33,6 +33,10 @@ Deliver the parent service in focused, independently reviewed milestones, follow
 
 At major checkpoints, separately compare the direction with the goal of maximum useful family-service autonomy. Record family work removed, remaining or new prompts and their actual reasons, routine work still done by people, the outcome proved and the next smallest change toward autonomous completion. Internal rehearsal pauses must not become product requirements or count as provider-required family participation. Routine reviewed steps should proceed automatically; opening the viewer should eventually inspect work triggered by the service mandate.
 
+# Approved system architecture
+
+The owner approved the November 7, 2026 system direction in `docs/parent-system-architecture.md`. Read it before architecture, worker/queue, hosting, provider-integration or scale changes. Preserve one CaseLink app, one shared service engine and durable jobs consumed by a bounded worker pool; add verified program-specific requirements and connections. Use frontier models with controlled PDF/API/fax/browser tools and keep protected identifiers/application bytes in isolated services. Target thousands of families through measured concurrency, fleet health, resource/cost limits and load tests. Capture implementation in focused reviewed GitHub changes before releases. The plan supplements the PRD and launch/implementation plans; it does not expand processing permissions, activate providers or establish production capacity.
+
 # Product north star
 
 CaseLink is a direct-to-parent **family-support service** designed for maximum useful AI independence. The October 27 staged plan launches R1 with confirmed food access and one adult career-support booking lifecycle, expands R2 to complete food/utility C-01, then R3 to the original catalog. After minimum intake and one informed, bounded authorization, AI makes routine judgment calls and pursues supported work through an outcome. Parents own their accounts and control the mandate. Every released workflow must be polished and ready for families, with human participation only where actually necessary or chosen by the family.
