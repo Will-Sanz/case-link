@@ -54,7 +54,8 @@ export async function loadSnapSigningCopyFile(input: unknown, signal: AbortSigna
       return response;
     }), aborted]);
     body = response.body;
-    const length = response.headers.get("content-length"), hash = response.headers.get("x-caselink-snap-unsigned-sha256");
+    // Next strips transport Content-Length; this descriptor counts the decoded PDF bytes.
+    const length = response.headers.get("x-caselink-snap-unsigned-byte-length"), hash = response.headers.get("x-caselink-snap-unsigned-sha256");
     if (response.status !== 200 || response.redirected || response.headers.get("content-type") !== "application/pdf" || !body
       || !length || !/^[1-9][0-9]{0,7}$/.test(length) || Number(length) > MAX_SNAP_PACKET_BYTES
       || !hash || !/^[a-f0-9]{64}$/.test(hash) || response.headers.get("x-caselink-snap-prepared-at") !== preparedAt) throw new Error();

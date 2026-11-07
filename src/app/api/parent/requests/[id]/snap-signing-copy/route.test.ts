@@ -34,7 +34,8 @@ describe("current official SNAP signing-copy download", () => {
     const bytes = new Uint8Array(await response.arrayBuffer()), pdf = await PDFDocument.load(bytes);
     expect(response.headers.get("x-caselink-snap-prepared-at")).toBe(now.toISOString());
     expect(response.headers.get("x-caselink-snap-unsigned-sha256")).toBe(createHash("sha256").update(bytes).digest("hex"));
-    expect(Number(response.headers.get("content-length"))).toBe(bytes.length); expect(pdf.getPageCount()).toBe(12);
+    expect(Number(response.headers.get("content-length"))).toBe(bytes.length);
+    expect(response.headers.get("x-caselink-snap-unsigned-byte-length")).toBe(String(bytes.length)); expect(pdf.getPageCount()).toBe(12);
     for (const page of pdf.getPages()) expect(page.getSize()).toEqual({ width: 612, height: 792 });
     expect(pdf.getTitle()).toContain("protected fields blank - not submission-ready - not sent");
     expect(mocks.details).toHaveBeenCalledExactlyOnceWith(requestId, saved.id);
@@ -60,7 +61,7 @@ describe("current official SNAP signing-copy download", () => {
     mocks.details.mockResolvedValue({ ...structuredClone(saved), created_at: kind === "invalid" ? "PRIVATE-CANARY" : new Date(now.getTime() + 1).toISOString() });
     const response = await GET(request(), params);
     expect(response.status).toBe(409); expect(response.headers.get("x-caselink-snap-prepared-at")).toBeNull();
-    expect(response.headers.get("x-caselink-snap-unsigned-sha256")).toBeNull(); expect(response.headers.get("content-type")).not.toBe("application/pdf");
+    expect(response.headers.get("x-caselink-snap-unsigned-sha256")).toBeNull(); expect(response.headers.get("x-caselink-snap-unsigned-byte-length")).toBeNull(); expect(response.headers.get("content-type")).not.toBe("application/pdf");
     expect(await response.text()).not.toContain("PRIVATE-CANARY");
   });
   it("checks freshness at the current time rather than letting the old preparation date revive stale answers", async () => {

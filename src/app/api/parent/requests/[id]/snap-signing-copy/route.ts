@@ -38,6 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new Response(Uint8Array.from(bytes), { headers: {
       "Content-Type": "application/pdf", "Content-Length": String(bytes.length), "Content-Disposition": 'attachment; filename="caselink-snap-signing-copy.pdf"',
       "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+      "X-CaseLink-SNAP-Unsigned-Byte-Length": String(bytes.length),
       "X-CaseLink-SNAP-Prepared-At": preparedAt.toISOString(), "X-CaseLink-SNAP-Unsigned-SHA256": createHash("sha256").update(bytes).digest("hex"),
     } });
   } catch (error) { return parentError(error instanceof z.ZodError ? new Error("parent_invalid_input") : error); }

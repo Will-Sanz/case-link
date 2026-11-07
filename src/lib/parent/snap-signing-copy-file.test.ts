@@ -18,7 +18,7 @@ function input(): SnapSigningCopyFileInput {
       applyingSubjectIds: snapshot.details.household!.filter(person => person.requestingSnap).map(person => person.id) } };
 }
 function headers(extra: Record<string, string> = {}) {
-  return { "Content-Type": "application/pdf", "Content-Length": String(paper.length), "X-CaseLink-SNAP-Prepared-At": savedAt.toISOString(),
+  return { "Content-Type": "application/pdf", "Content-Length": String(paper.length), "X-CaseLink-SNAP-Unsigned-Byte-Length": String(paper.length), "X-CaseLink-SNAP-Prepared-At": savedAt.toISOString(),
     "X-CaseLink-SNAP-Unsigned-SHA256": sha(paper), ...extra };
 }
 const response = (bytes = Uint8Array.from(paper), extra: Record<string, string> = {}) => new Response(bytes, { headers: headers(extra) });
@@ -37,6 +37,18 @@ describe("current unsigned signing-copy browser descriptor", () => {
       expect.objectContaining({ credentials: "same-origin", mode: "same-origin", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
         headers: { Accept: "application/pdf" }, signal: expect.any(AbortSignal) }));
     result.bytes.fill(0); expect(paper.some(byte => byte !== 0)).toBe(true); expect(value).toEqual(before);
+  });
+  it("verifies the decoded bytes when Next omits transport Content-Length", async () => {
+    const reply = response(); reply.headers.delete("Content-Length"); fetcher.mockResolvedValue(reply);
+    const result = await load(); expect(result.bytes).toEqual(paper); result.bytes.fill(0);
+  });
+  it("does not use compressed transport framing as the decoded PDF length", async () => {
+    fetcher.mockResolvedValue(response(undefined, { "Content-Encoding": "gzip", "Content-Length": "12" }));
+    const result = await load(); expect(result.bytes).toEqual(paper); result.bytes.fill(0);
+  });
+  it("requires the application byte count even when transport framing is present", async () => {
+    const reply = response(); reply.headers.delete("X-CaseLink-SNAP-Unsigned-Byte-Length"); fetcher.mockResolvedValue(reply);
+    await expect(load()).rejects.toThrow(SNAP_SIGNING_COPY_FILE_ERROR);
   });
   it("copies all input scope and facts before the first await", async () => {
     const value = input(), expected = structuredClone(value);
@@ -110,9 +122,9 @@ describe("current unsigned signing-copy browser descriptor", () => {
   });
 
   it.each([
-    ["wrong media", { "Content-Type": "text/html" }], ["missing size", { "Content-Length": "" }],
-    ["zero size", { "Content-Length": "0" }], ["noncanonical size", { "Content-Length": "01" }],
-    ["oversize", { "Content-Length": String(MAX_SNAP_PACKET_BYTES + 1) }],
+    ["wrong media", { "Content-Type": "text/html" }], ["missing size", { "X-CaseLink-SNAP-Unsigned-Byte-Length": "" }],
+    ["zero size", { "X-CaseLink-SNAP-Unsigned-Byte-Length": "0" }], ["noncanonical size", { "X-CaseLink-SNAP-Unsigned-Byte-Length": "01" }],
+    ["oversize", { "X-CaseLink-SNAP-Unsigned-Byte-Length": String(MAX_SNAP_PACKET_BYTES + 1) }],
     ["missing digest", { "X-CaseLink-SNAP-Unsigned-SHA256": "" }], ["malformed digest", { "X-CaseLink-SNAP-Unsigned-SHA256": "PRIVATE-CANARY" }],
     ["uppercase digest", { "X-CaseLink-SNAP-Unsigned-SHA256": sha(paper).toUpperCase() }], ["different digest", { "X-CaseLink-SNAP-Unsigned-SHA256": "f".repeat(64) }],
     ["missing preparation time", { "X-CaseLink-SNAP-Prepared-At": "" }], ["different preparation time", { "X-CaseLink-SNAP-Prepared-At": now.toISOString() }],
@@ -132,7 +144,8 @@ describe("current unsigned signing-copy browser descriptor", () => {
   it.each(["short", "long", "changed"])("rejects %s bytes and clears every delivered chunk", async kind => {
     const chunk = kind === "short" ? paper.slice(0, -1) : kind === "long" ? new Uint8Array(paper.length + 1).fill(1) : Uint8Array.from(paper);
     if (kind === "changed") chunk[8] ^= 1;
-    fetcher.mockResolvedValue(new Response(new ReadableStream({ start(controller) { controller.enqueue(chunk); controller.close(); } }), { headers: headers() }));
+    const descriptor = new Headers(headers()); descriptor.delete("Content-Length");
+    fetcher.mockResolvedValue(new Response(new ReadableStream({ start(controller) { controller.enqueue(chunk); controller.close(); } }), { headers: descriptor }));
     await expect(load()).rejects.toThrow(SNAP_SIGNING_COPY_FILE_ERROR); expect([...chunk]).toEqual(Array(chunk.length).fill(0));
   });
   it("clears stream chunks after success while returning a separate owned copy", async () => {
