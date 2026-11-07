@@ -1,15 +1,17 @@
 import { spawn } from "node:child_process";
 import { parentTestEnvironment } from "./parent-test-environment.mjs";
+import { parentAppBind } from "./parent-app-bind.mjs";
 
+const bind = parentAppBind();
 const child = spawn(
   process.execPath,
   [
     "node_modules/next/dist/bin/next",
     "start",
     "--hostname",
-    "127.0.0.1",
+    bind.hostname,
     "--port",
-    "3200",
+    bind.port,
   ],
   {
     env: parentTestEnvironment(process.argv.includes("--local-services")),

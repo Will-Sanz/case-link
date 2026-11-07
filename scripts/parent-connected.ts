@@ -3,10 +3,12 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { parentConnectedEnvironment } from "./parent-connected-environment";
+import { parentAppBind } from "./parent-app-bind.mjs";
 
 const command = process.argv[2];
 if (command !== "build" && command !== "serve")
   throw new Error("Choose the connected parent build or serve command.");
+const bind = command === "serve" ? parentAppBind() : null;
 
 const source: Record<string, string> = {};
 for (const file of [
@@ -45,7 +47,7 @@ if (command === "serve") {
 process.stdout.write(
   command === "build"
     ? "Building the approved existing-account parent connection.\n"
-    : "Starting the approved existing-account parent connection on http://127.0.0.1:3200.\n",
+    : `Starting the approved existing-account parent connection on ${bind!.origin}.\n`,
 );
 const child = spawn(
   command === "build" ? "npm" : process.execPath,
@@ -55,9 +57,9 @@ const child = spawn(
         "node_modules/next/dist/bin/next",
         "start",
         "--hostname",
-        "127.0.0.1",
+        bind!.hostname,
         "--port",
-        "3200",
+        bind!.port,
       ],
   { env, stdio: "inherit" },
 );
