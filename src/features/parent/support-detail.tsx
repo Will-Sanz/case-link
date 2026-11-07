@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowLeft,
@@ -20,18 +21,19 @@ import type {
 } from "@/lib/parent/domain";
 import { getProgram, PROGRAMS } from "@/lib/parent/programs";
 import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
-import { displayDate, parentApi } from "./api";
+import { boundedParentApi, displayDate, parentApi, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { requestStatus } from "./my-support";
 import { SupportDocuments } from "./support-documents";
-import { SupportActivity, type RecordedOperation } from "./support-activity";
+import { SupportActivity, currentProtectedSnapAttempt, currentSnapReview, isSnapFinalReviewAction, recordedReceipt, type RecordedOperation } from "./support-activity";
+import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { FoodSites } from "./food-sites";
 import { SupportPartners } from "./support-partners";
 import { NecessaryAnswer } from "./necessary-answer";
 import { NecessaryAnswers, isFactualQuestion } from "./necessary-answers";
 import { SavedAccountAnswers } from "./saved-account-answers";
 import { ANSWER_FIELDS } from "@/lib/parent/answers";
-import { supportRouteLabel } from "@/lib/parent/application-readiness";
+import { supportRouteLabel, supportRouteReceipt } from "@/lib/parent/application-readiness";
 import {
   PermissionEditor,
   type PermissionEditorHandle,
@@ -49,18 +51,30 @@ function officialLink(value?: string): string | null {
     ? value
     : null;
 }
+function receiptNextStep(state: string): string {
+  return state === "agency_submitted" ? "Agency response"
+    : state === "assistance_approved" ? "Program follow-up"
+      : state === "support_received" ? "No further step recorded"
+        : state === "declined" ? "Review the recorded decision and follow-up"
+          : "Program response";
+}
 
 function RequiredStep({
   action,
   request,
   onChange,
   onReviewPermission,
+  onSnapDetails,
 }: {
   action: NecessaryAction;
   request: SupportRequest;
   onChange: () => void;
   onReviewPermission: () => void;
+  onSnapDetails: () => void;
 }) {
+  const snapDetails = action.need === "snap_new" && request.intake.needs.includes("snap_new") &&
+    action.reason === "missing_fact" && action.field === "snap_application_details";
+  const snapSubmit = action.need === "snap_new" && request.intake.needs.includes("snap_new") && action.reason === "submission_review" && action.field === "snap_final_submit";
   const url = officialLink(action.url);
   const canAnswer =
     (action.reason === "missing_fact" &&
@@ -69,16 +83,16 @@ function RequiredStep({
   return (
     <section
       className={styles.actionBox}
-      aria-labelledby={`context-${action.id} step-${action.id}`}
+      aria-labelledby={snapSubmit ? `step-${action.id}` : `context-${action.id} step-${action.id}`}
     >
-      <p id={`context-${action.id}`} className={styles.small}>
+      {!snapSubmit && <p id={`context-${action.id}`} className={styles.small}>
         <strong>{NEED_LABELS[action.need]}</strong>
-      </p>
+      </p>}
       <h2 id={`step-${action.id}`} tabIndex={-1}>
         {action.title}
       </h2>
       <p>{action.explanation}</p>
-      {canAnswer ? (
+      {snapSubmit ? <a className={styles.button} href="#snap-final-review">Review application and Submit</a> : snapDetails ? <button className={styles.button} onClick={onSnapDetails}>Answer SNAP application questions</button> : canAnswer ? (
         <NecessaryAnswer
           action={action}
           request={request}
@@ -130,13 +144,21 @@ function CorrectDetails({
   const [intake, setIntake] = useState(request.intake);
   const [baseVersion, setBaseVersion] = useState(request.version);
   const [editing, setEditing] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const legacyPrivate = request.intake.childrenUnderFive !== null || request.intake.pregnantOrPostpartum !== null;
+  const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
+  const scope=JSON.stringify({id:request.id,version:request.version,status:request.status,mandate:request.mandate,legacyPrivate});
+  const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
+  useLayoutEffect(()=>{
+    const controller=new AbortController();work.current=controller;
+    return()=>{controller.abort();if(work.current===controller)work.current=null;};
+  },[scope]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (legacyPrivate) return;
+    const controller=work.current;
+    if(legacyPrivate||pending||!controller||controller.signal.aborted||running.current===controller)return;
     setError("");
     setSaved(false);
     const parsed = intakeSchema.safeParse(intake);
@@ -144,9 +166,9 @@ function CorrectDetails({
       setError(parsed.error.issues[0]?.message ?? "Check your information.");
       return;
     }
-    setPending(true);
+    running.current=controller;setPendingWork({ scope, controller });
     try {
-      const response = await parentApi<{ request: SupportRequest }>(
+      const response = await boundedParentApi(
         `/requests/${request.id}`,
         {
           method: "POST",
@@ -155,26 +177,29 @@ function CorrectDetails({
             intake: parsed.data,
             version: baseVersion,
           }),
-        },
+        },controller.signal,new Date(Date.now()+30000).toISOString(),
       );
-      setIntake(response.request.intake);
-      setBaseVersion(response.request.version);
+      if(controller.signal.aborted||work.current!==controller)return;
+      const result=z.object({request:z.object({id:z.uuid(),intake:intakeSchema,version:z.number().int().positive()})}).safeParse(response);
+      if(!result.success||result.data.request.id!==request.id||result.data.request.version<=baseVersion)throw new Error();
+      setIntake(result.data.request.intake);
+      setBaseVersion(result.data.request.version);
       setSaved(true);
       onChange();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "We couldn’t save the correction. Please try again.",
-      );
+      if(controller.signal.aborted||work.current!==controller)return;
+      setError(err instanceof ParentApiError&&err.status>=400&&err.status<500?err.message:
+        "The correction result is not confirmed. Your draft is still on this page. Check the current request before another save.");
     } finally {
-      setPending(false);
+      if(running.current===controller)running.current=null;
+      if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);
     }
   }
   function change<K extends keyof SupportIntake>(
     field: K,
     value: SupportIntake[K],
   ) {
+    if(pending||running.current===work.current)return;
     setIntake((current) => ({ ...current, [field]: value }));
     setSaved(false);
   }
@@ -188,6 +213,7 @@ function CorrectDetails({
       <summary
         onClick={(event) => {
           event.preventDefault();
+          if(pending||running.current===work.current)return;
           if (!editing) {
             setIntake(request.intake);
             setBaseVersion(request.version);
@@ -206,6 +232,7 @@ function CorrectDetails({
           intact.
         </p>
         <form className={`${styles.form} ${styles.space}`} onSubmit={submit}>
+          <fieldset className={`${styles.fieldset} ${styles.form}`} aria-label="Household and bill corrections" disabled={pending}>
           <div className={styles.row}>
             <div className={styles.field}>
               <label htmlFor="correct-zip">ZIP code</label>
@@ -279,7 +306,7 @@ function CorrectDetails({
               </select>
             </div>
           </div>
-          {intake.needs.some(need => need.startsWith("wic_")) && <p className={styles.hint}>Private WIC questions are not available here yet. Ordinary routing changes do not collect those answers.</p>}
+          {intake.needs.some(need=>need.startsWith('wic_')) && <p className={styles.hint}>Private WIC questions are not available here yet. Ordinary routing changes do not collect those answers.</p>}
           {request.intake.needs.some((need) =>
             ["electricity", "gas", "water"].includes(need),
           ) && (
@@ -338,6 +365,7 @@ function CorrectDetails({
           <button className={styles.button} disabled={pending} type="submit">
             {pending ? "Saving correction…" : "Save correction"}
           </button>
+          </fieldset>
         </form>
       </div>
     </details>
@@ -345,7 +373,7 @@ function CorrectDetails({
 }
 
 export function SupportDetail({ requestId }: { requestId: string }) {
-  const { data, error, loading, reload } = useParentResource<{
+  const { data, error, loading, reload, reloadIfIdle } = useParentResource<{
     request: SupportRequest;
     progress?: SupportProgress;
   }>(`/requests/${requestId}`);
@@ -354,15 +382,28 @@ export function SupportDetail({ requestId }: { requestId: string }) {
     historyLimited: boolean;
   }>(`/requests/${requestId}/operations`);
   const reloadHistory = history.reload;
+  const reloadHistoryIfIdle = history.reloadIfIdle;
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<Error | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [notice, setNotice] = useState("");
+  const [snapAnswerRequest, setSnapAnswerRequest] = useState(0);
+  const [snapReview, setSnapReview] = useState<SnapProtectedOperation | null>(null);
+  const [snapSubmissionDecision, setSnapSubmissionDecision] = useState<SnapProtectedOperation | null>(null);
   const permissionEditor = useRef<PermissionEditorHandle>(null);
   const request = data?.request;
   const requestState = request?.status;
+  const pollEvery = !error && (data?.progress?.state === "queued" || data?.progress?.state === "running") ? 5000 : 30000;
   const requestVersion = request?.version;
   const requestUpdated = request?.updated_at;
+  const snapRequested = request?.intake.needs.includes("snap_new") === true;
+  const onSnapReviewChange = useCallback((input: SnapProtectedOperation | null) => {
+    if (!snapRequested) return;
+    const next = currentSnapReview({ id: requestId, version: requestVersion ?? 0 }, input);
+    setSnapReview(next);
+    // Preserve the decision separately so a newer delivery state is never hidden by its cache.
+    if (next?.snapSubmissionAuthorized) setSnapSubmissionDecision(next);
+  }, [requestId, requestVersion, snapRequested]);
   useEffect(() => {
     if (requestVersion !== undefined) reloadHistory();
   }, [requestVersion, requestUpdated, reloadHistory]);
@@ -370,12 +411,12 @@ export function SupportDetail({ requestId }: { requestId: string }) {
     if (requestState !== "active") return;
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        reload();
-        reloadHistory();
+        reloadIfIdle();
+        reloadHistoryIfIdle();
       }
-    }, 30000);
+    }, pollEvery);
     return () => clearInterval(interval);
-  }, [requestState, reload, reloadHistory]);
+  }, [requestState, pollEvery, reloadIfIdle, reloadHistoryIfIdle]);
   async function changeState(action: "pause" | "resume" | "cancel") {
     setPending(true);
     setActionError(null);
@@ -436,11 +477,34 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           need: operation.need ?? undefined,
           state: operation.state,
           artifactId: operation.artifact_id,
+          preparationOnly: operation.form?.preparation_only,
+          action: operation.action,
+          protectedPacket: operation.protected_packet,
+          receipt: recordedReceipt(operation),
         }));
+  const submittedNeeds = request.intake.needs.filter((need) =>
+    currentOperations.some(
+      (operation) =>
+        operation.need === need &&
+        operation.state === "agency_submitted" &&
+        operation.receipt?.state === "agency_submitted" &&
+        getProgram(operation.programId)?.needs.includes(need),
+    ),
+  );
+  const ownedReview = snapRequested ? currentSnapReview(request, snapReview) : null;
+  const knownDecision = snapRequested ? currentSnapReview(request, snapSubmissionDecision) : null;
+  const decisionRecorded = ownedReview?.snapSubmissionAuthorized === true || (knownDecision?.snapSubmissionAuthorized === true && (!ownedReview || sameSnapProtectedOperationBinding(ownedReview, knownDecision)));
+  const attemptRecorded = !!ownedReview && snapProtectedDeliveryAttempt(ownedReview.state) || !history.error && !history.loading && currentProtectedSnapAttempt(request, history.data?.operations ?? []);
+  const reviewFinished = decisionRecorded || attemptRecorded;
+  const currentSnapReceipt = snapRequested ? supportRouteReceipt({ need: "snap_new", programId: "snap-pa", state: "checking" }, currentOperations) : null;
+  const preparedSnapReview = ownedReview?.state === "prepared" && ownedReview.protectedPacketCurrent ? ownedReview : null;
+  const snapReviewRequired = acceptingActions && preparedSnapReview?.protectedParentSubmitReady === true && request.required_actions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent") && isSnapFinalReviewAction(action));
+  const showSnapProgress = !!currentSnapReceipt || reviewFinished || !!preparedSnapReview || !acceptingActions && snapRequested;
   const actions = request.required_actions.filter(
     (action) =>
-      !action.resolved && (!action.resolver || action.resolver === "parent"),
+      !action.resolved && (!action.resolver || action.resolver === "parent") && !(reviewFinished && isSnapFinalReviewAction(action)),
   );
+  const outdatedParentWait = request.status === "active" && reviewFinished && !actions.length && data?.progress?.state === "needs_parent";
   const serviceActions = request.required_actions.filter(
     (action) =>
       !action.resolved && action.resolver && action.resolver !== "parent",
@@ -462,7 +526,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             step are together here.
           </p>
         </div>
-        {data?.progress && !error ? (
+        {outdatedParentWait ? <span className={styles.badge}>{submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded"}</span> : data?.progress && !error ? (
           <ProgressBadge progress={data.progress} />
         ) : (
           <span
@@ -480,14 +544,19 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       {actionError && <ServiceError error={actionError} />}
       {error && <ServiceError error={error} retry={reload} />}
       <ApplicationWorkspace
+        snapAnswerRequest={snapAnswerRequest}
         request={request}
         progress={error ? undefined : data?.progress}
         history={history}
+        snapReview={snapReview}
+        snapSubmissionDecision={snapSubmissionDecision}
+        onReviewChange={onSnapReviewChange}
+        onChange={()=>{reload();reloadHistory();}}
       >
-        <SupportProgressPanel
+        {!outdatedParentWait && <SupportProgressPanel
           progress={error ? undefined : data?.progress}
           onRefresh={reload}
-        />
+        />}
         {request.intake.urgency === "today" && (
           <div className={styles.space}>
             <UrgentHelp />
@@ -522,6 +591,12 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             <p className={styles.subtle}>
               {!acceptingActions
                 ? "No new personal steps are requested while this request is paused or finished."
+                : reviewFinished && !submittedNeeds.includes("snap_new")
+                  ? attemptRecorded
+                    ? "CaseLink must confirm the recorded delivery attempt before any retry. No repeated review is requested."
+                    : "Your Submit decision is saved. CaseLink owns the delivery check; you do not need to repeat the review."
+                : submittedNeeds.length === request.intake.needs.length
+                  ? "Use the recorded submission and any official notices above for your next step. No household update is currently requested."
                 : "No household updates are requested in this section. Check the application window and work status above for any website verification or other next step."}
             </p>
           )}
@@ -536,6 +611,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                 request={request}
                 onChange={reload}
                 onReviewPermission={() => permissionEditor.current?.open()}
+                onSnapDetails={() => setSnapAnswerRequest(current => current + 1)}
               />
             ))}
           {!inactive && serviceActions.length > 0 && (
@@ -572,6 +648,9 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           {request.plan?.routes.length ? (
             request.plan.routes.map((route, i) => {
               const program = getProgram(route.programId);
+              const receipt = supportRouteReceipt(route, currentOperations);
+              const snapDeliveryCheck = !receipt && reviewFinished && route.need === "snap_new" && route.programId === "snap-pa";
+              const state = receipt?.state ?? route.state;
               return (
                 <article
                   className={styles.needRow}
@@ -580,9 +659,9 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                   <div className={styles.between}>
                     <h3>{NEED_LABELS[route.need]}</h3>
                     <span
-                      className={`${styles.badge} ${["checking", "unresolved"].includes(route.state) ? styles.badgeWait : ""}`}
+                      className={`${styles.badge} ${["checking", "unresolved"].includes(state) ? styles.badgeWait : ""}`}
                     >
-                      {supportRouteLabel(route, currentOperations)}
+                      {receipt ? OUTCOME_LABELS[receipt.state] : snapDeliveryCheck ? attemptRecorded ? "Delivery result not confirmed" : "Submit decision recorded" : supportRouteLabel(route, currentOperations)}
                     </span>
                   </div>
                   <p>
@@ -591,11 +670,17 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                       <> · {program.name}</>
                     )}
                   </p>
-                  <p>{route.summary}</p>
-                  {route.limitation && <p>{route.limitation}</p>}
+                  <p>{receipt
+                    ? `${OUTCOME_LABELS[receipt.state]} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`
+                    : snapDeliveryCheck
+                      ? attemptRecorded ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry." : "Your decision to send the exact SNAP application is recorded. CaseLink must check delivery and any agency confirmation."
+                      : route.summary}</p>
+                  {!receipt && !snapDeliveryCheck && route.limitation && <p>{route.limitation}</p>}
                   <p>
                     <strong>Next:</strong>{" "}
-                    {route.nextActor === "caselink"
+                    {receipt
+                      ? receiptNextStep(state)
+                      : snapDeliveryCheck || route.nextActor === "caselink"
                       ? "CaseLink"
                       : route.nextActor === "parent"
                         ? "Your personal step"
@@ -603,7 +688,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                           ? "Agency response"
                           : "Program response"}
                   </p>
-                  {route.steps.length > 0 && (
+                  {!receipt && !snapDeliveryCheck && route.steps.length > 0 && (
                     <details className={styles.disclosure}>
                       <summary>See the planned steps</summary>
                       <div>
@@ -633,17 +718,37 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               <p className={styles.subtle}>Your selected needs are saved:</p>
               <ul>
                 {request.intake.needs.map((need) => (
-                  <li key={need}>{NEED_LABELS[need]}</li>
+                  <li key={need}>
+                    {NEED_LABELS[need]}
+                    {need === "snap_new" && currentSnapReceipt ? ` · ${OUTCOME_LABELS[currentSnapReceipt.state]}` : submittedNeeds.includes(need) ? " · Application submitted" : need === "snap_new" && reviewFinished ? attemptRecorded ? " · Delivery result not confirmed" : " · Submit decision recorded" : need === "snap_new" && preparedSnapReview ? " · Application prepared" : ""}
+                  </li>
                 ))}
               </ul>
-              <div className={styles.trustLine}>
+              {showSnapProgress && <div className={styles.trustLine}>
+                <Clock width={21} height={21} aria-hidden="true" />
+                <div>
+                  <p>{currentSnapReceipt
+                    ? `${OUTCOME_LABELS[currentSnapReceipt.state]} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`
+                    : !acceptingActions
+                      ? "Future SNAP application work is stopped. Open Activity & receipts for anything already attempted or confirmed."
+                      : attemptRecorded ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry."
+                        : decisionRecorded ? "Your decision to send the exact SNAP application is recorded. CaseLink must check delivery and any agency confirmation."
+                          : snapReviewRequired ? "The exact SNAP application is prepared. Review it above before choosing Submit."
+                            : "The exact SNAP application is prepared. CaseLink must resolve its remaining submission requirements before Submit can be offered."}</p>
+                  {currentSnapReceipt?.state === "agency_submitted" && <p>A submission is separate from approval or receiving support.</p>}
+                  <p><strong>Next:</strong>{" "}{currentSnapReceipt ? receiptNextStep(currentSnapReceipt.state) : !acceptingActions ? <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> : !reviewFinished && snapReviewRequired ? <a className={styles.textLink} href="#snap-final-review">Your application review</a> : "CaseLink"}</p>
+                </div>
+              </div>}
+              {(!showSnapProgress || request.intake.needs.some(need => need !== "snap_new")) && <div className={styles.trustLine}>
                 <Clock width={21} height={21} aria-hidden="true" />
                 <p>
-                  Preparation is pending. A saved request is not an application
-                  or a confirmed appointment. You can use official programs
-                  directly while you wait.
+                  {submittedNeeds.some(need => need !== "snap_new" || !showSnapProgress)
+                    ? "An agency submission is recorded for the support marked above. Open Activity & receipts for the exact application and any follow-up requirements. A submission is separate from approval or receiving support."
+                    : showSnapProgress
+                      ? "Preparation is pending for your other selected support. A saved request is not an application or a confirmed appointment. You can use official programs directly while you wait."
+                    : "Preparation is pending. A saved request is not an application or a confirmed appointment. You can use official programs directly while you wait."}
                 </p>
-              </div>
+              </div>}
             </div>
           )}
         </section>

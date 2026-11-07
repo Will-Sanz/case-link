@@ -11,7 +11,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { useParentResource } from "./use-parent-resource";
-import type { RecordedOperation } from "./support-activity";
+import { SupportActivity, type RecordedOperation } from "./support-activity";
+import { fixtureProtectedSnapOperation } from "@/lib/parent/test-fixtures";
+import type { SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { COMPASS_CAPTCHA, COMPASS_FAMILY_SAFETY } from "@/lib/parent/browser-policy";
 import {
   ApplicationWorkspace,
@@ -20,6 +22,7 @@ import {
 } from "./application-workspace";
 
 const requestId = "11111111-1111-4111-8111-111111111111";
+const receiptEvidence = { source: "agency_receipt", reference: "SNAP receipt for this test", recordedAt: "2026-10-25T12:00:00Z" };
 function fixture(): SupportRequest {
   const intake = {
     ...initialIntake,
@@ -67,13 +70,13 @@ function mockApi(
   vi.stubGlobal("fetch", fetch);
   return fetch;
 }
-function WorkspaceFixture({ request }: { request: SupportRequest }) {
+function WorkspaceFixture({ request, review, decision }: { request: SupportRequest; review?: SnapProtectedOperation | null; decision?: SnapProtectedOperation | null }) {
   const history = useParentResource<{
     operations: RecordedOperation[];
     historyLimited: boolean;
   }>(`/requests/${request.id}/operations`);
   return (
-    <ApplicationWorkspace request={request} history={history}>
+    <ApplicationWorkspace request={request} history={history} snapReview={review} snapSubmissionDecision={decision}>
       <section id="your-next-steps" tabIndex={-1}>
         <input aria-label="Unsaved answer" />
       </section>
@@ -95,6 +98,77 @@ function WorkspaceFixture({ request }: { request: SupportRequest }) {
 function renderWorkspace(request = fixture()) {
   return render(<WorkspaceFixture request={request} />);
 }
+const finalReviewAction = { id: "snap-final-review", need: "snap_new" as const, reason: "submission_review" as const, field: "snap_final_submit", resolver: "parent" as const, title: "Review the exact SNAP application", explanation: "Review before choosing Submit." };
+describe("canonical application continuity", () => {
+  it("places one current prepared draft directly after the overview and before all answer details", async () => {
+    const request = fixture(), operation: RecordedOperation = { id: "draft", request_id: request.id, request_version: request.version, need: "snap_new", program_id: "snap-pa", action: "prepare", state: "prepared", artifact_id: "exact-form", form: { preparation_only: true }, created_at: request.created_at };
+    mockApi(); const history = { data: { operations: [operation], historyLimited: false }, loading: false, error: null, reload: vi.fn() };
+    render(<ApplicationWorkspace request={request} history={history}><section id="application-receipts"><SupportActivity request={request} history={history} onChange={vi.fn()}/></section></ApplicationWorkspace>);
+    const overview = screen.getByRole("heading", { name: "Where your application stands" }), draft = screen.getByRole("region", { name: "Your prepared SNAP draft" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
+    expect(overview.compareDocumentPosition(draft) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(draft.compareDocumentPosition(answers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "View prepared draft" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Download incomplete unsigned draft" }).getAttribute("href")).toBe(`/api/parent/requests/${request.id}/forms/exact-form`);
+    await screen.findByRole("link", { name: "Start a new SNAP application with DHS" });
+  });
+  it("opens exact review before the answer recap and suppresses a duplicate COMPASS start", async () => {
+    const request = fixture(); request.required_actions = [finalReviewAction];
+    mockApi({ available: true, reason: null, session: null }, [{ id: "canonical", request_id: request.id, program_id: "snap-pa", need: "snap_new", action: "submit", request_version: request.version, state: "prepared", artifact_id: null, protected_packet: fixtureProtectedSnapOperation().packet.protectedSnapPacket },
+      { id: "earlier-draft", request_id: request.id, program_id: "snap-pa", need: "snap_new", action: "prepare", request_version: request.version, state: "prepared", artifact_id: "unsigned-form", form: { preparation_only: true } }]);
+    renderWorkspace(request); await screen.findByText("SNAP application prepared");
+    expect(screen.getByRole("link", { name: "Review application and Submit" }).getAttribute("href")).toBe("#snap-final-review");
+    const review = screen.getByRole("heading", { name: "Review your SNAP application" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
+    expect(review.compareDocumentPosition(answers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open application view" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Open the official SNAP service" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "View prepared draft" })).toBeNull();
+  });
+  it.each([undefined, { snapSubmissionAuthorized: false }, { requestVersion: 2 }, { requestId: "33333333-3333-4333-8333-333333333333" }])("keeps review requested without a matching confirmed decision: %j", async change => {
+    const request = fixture(); request.required_actions = [finalReviewAction]; mockApi();
+    const review = change ? fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true, ...change }) : undefined;
+    render(<WorkspaceFixture request={request} review={review}/>); await screen.findByText("Next: You");
+    expect(screen.getByRole("link", { name: "Review application and Submit" }).getAttribute("href")).toBe("#snap-final-review");
+  });
+  it("gives a matching recorded Submit to CaseLink without inventing an agency receipt", async () => {
+    const request = fixture(); request.required_actions = [finalReviewAction]; mockApi();
+    render(<WorkspaceFixture request={request} review={fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true })}/>);
+    await screen.findByText("Next: CaseLink"); expect(screen.getByText("Submit decision recorded")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Review application and Submit" })).toBeNull();
+    expect(screen.queryByText("SNAP application complete")).toBeNull();
+  });
+  it("preserves another necessary personal step after the exact Submit is recorded", async () => {
+    const request = fixture(); request.required_actions = [finalReviewAction, { id: "interview", need: "snap_new", reason: "personal_step", resolver: "parent", title: "Complete the scheduled interview", explanation: "An independently required personal step." }]; mockApi();
+    render(<WorkspaceFixture request={request} review={fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true })}/>);
+    await screen.findByText("Next: You"); expect(screen.getByText(/One personal step needs/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Complete your step" }).getAttribute("href")).toBe("#your-next-steps");
+  });
+  it("retains an exact recorded decision during refresh without hiding a newer delivery state or another version", async () => {
+    const request = fixture(); request.required_actions = [finalReviewAction]; mockApi();
+    const decision = fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true });
+    const view = render(<WorkspaceFixture request={request} decision={decision}/>); await screen.findByText("Next: CaseLink");
+    view.rerender(<WorkspaceFixture request={request} decision={decision} review={{ ...decision, state: "delivery_unknown", snapSubmissionAuthorized: false }}/>);
+    expect(screen.getByText(/must confirm its result before any retry/)).toBeTruthy();
+    view.rerender(<WorkspaceFixture request={{ ...request, version: request.version + 1 }} decision={decision}/>);
+    await screen.findByText("Next: You"); expect(screen.getByRole("link", { name: "Review application and Submit" })).toBeTruthy();
+  });
+  it.each(["executing", "delivery_unknown", "sent"] as const)("keeps a fresh tab's exact %s attempt with CaseLink even when the prepared-only Submit flag is false", async state => {
+    const request = fixture(); request.required_actions = [finalReviewAction];
+    const canonical = fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: false });
+    const review = { ...canonical, state };
+    mockApi(undefined, [{ id: canonical.operationId, request_id: request.id, request_version: request.version, program_id: "snap-pa", need: "snap_new", action: "submit", state, artifact_id: null, protected_packet: canonical.packet.protectedSnapPacket }]);
+    render(<WorkspaceFixture request={request} review={review}/>); await screen.findByText("Next: CaseLink");
+    expect(screen.queryByRole("link", { name: "Review application and Submit" })).toBeNull();
+    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(screen.getByText(/must confirm its result before any retry/)).toBeTruthy();
+  });
+  it.each([{ request_id: "33333333-3333-4333-8333-333333333333" }, { request_version: 0 }, { need: "snap_renewal" }, { action: "follow_up" }, { protected_packet: { raw: "PRIVATE-CANARY" } }, { state: "prepared" }])("does not retire review from unrelated, stale or unattempted metadata: %j", async change => {
+    const request = fixture(); request.required_actions = [finalReviewAction];
+    mockApi(undefined, [{ id: "attempt", request_id: request.id, request_version: request.version, program_id: "snap-pa", need: "snap_new", action: "submit", state: "delivery_unknown", artifact_id: null, protected_packet: fixtureProtectedSnapOperation().packet.protectedSnapPacket, ...change }]);
+    renderWorkspace(request); await screen.findByText("Next: You");
+    expect(screen.getByRole("link", { name: "Review application and Submit" })).toBeTruthy();
+  });
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -147,6 +221,12 @@ it.each(["challenge", "continue"] as const)("shows only an actual %s handoff as 
 });
 
 describe("actual application evidence", () => {
+  it("distinguishes a current canonical application from plans, stale metadata and other journeys", () => {
+    const operation = { id: "canonical", program_id: "snap-pa", need: "snap_new" as const, action: "submit", request_version: 1, state: "prepared", artifact_id: null, protected_packet: fixtureProtectedSnapOperation().packet.protectedSnapPacket };
+    expect(recordedApplicationState([operation], "snap-pa", 1, "snap_new")).toMatchObject({ label: "SNAP application prepared", submitted: false, hasAttempt: false });
+    for (const change of [{ request_version: 0 }, { need: "snap_renewal" as const }, { action: "follow_up" }, { protected_packet: { raw: "PRIVATE-CANARY" } }])
+      expect(recordedApplicationState([{ ...operation, ...change }], "snap-pa", 1, "snap_new").label).not.toBe("SNAP application prepared");
+  });
   it("does not turn a support plan or a prepared packet into a submitted application", () => {
     expect(recordedApplicationState([])).toMatchObject({
       label: "No application submission recorded",
@@ -194,7 +274,7 @@ describe("actual application evidence", () => {
     ).toBe(false);
     expect(
       recordedApplicationState(
-        [{ id: "snap", program_id: "snap-pa", state: "agency_submitted" }],
+        [{ id: "snap", program_id: "snap-pa", state: "agency_submitted", evidence: receiptEvidence }],
         "snap-pa",
       ).submitted,
     ).toBe(true);
@@ -222,6 +302,7 @@ describe("actual application evidence", () => {
             program_id: "snap-pa",
             state: "agency_submitted",
             request_version: 1,
+            evidence: receiptEvidence,
           },
         ],
         "snap-pa",
@@ -279,6 +360,161 @@ describe("actual application evidence", () => {
 });
 
 describe("application workspace", () => {
+  it("names an incomplete unsigned draft without calling it an application or submission", async () => {
+    mockApi(undefined, [{
+      id: "snap-draft", program_id: "snap-pa", need: "snap_new",
+      request_version: 1, state: "prepared", action: "prepare",
+      artifact_id: "draft-artifact", form: { preparation_only: true },
+    }]);
+    renderWorkspace();
+    await screen.findByText("An incomplete unsigned draft is saved. It is not a complete application and has not been submitted.");
+    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(screen.queryByRole("link", { name: "View application receipt" })).toBeNull();
+  });
+  it("does not call an ordinary prepared form incomplete because an earlier draft exists", async () => {
+    mockApi(undefined, [
+      { id: "form", program_id: "snap-pa", need: "snap_new", state: "prepared", artifact_id: "complete-form", form: { preparation_only: false } },
+      { id: "draft", program_id: "snap-pa", need: "snap_new", state: "prepared", artifact_id: "draft-form", form: { preparation_only: true } },
+    ]);
+    renderWorkspace();
+    await screen.findByText("A prepared form is saved. Preparation is separate from sending an application.");
+    expect(screen.queryByText(/An incomplete unsigned draft is saved/)).toBeNull();
+  });
+  it("shows completion only for the current exact SNAP submission and opens its receipt section", async () => {
+    mockApi(undefined, [{
+      id: "snap-submitted", program_id: "snap-pa", need: "snap_new",
+      request_version: 1, state: "agency_submitted", action: "submit",
+      evidence: receiptEvidence,
+    }]);
+    renderWorkspace();
+    await screen.findByText("SNAP application complete");
+    expect(screen.getByText(/Submission confirmed · benefits decision pending/)).toBeTruthy();
+    const receipt = screen.getByRole("link", { name: "View application receipt" });
+    expect(receipt.getAttribute("href")).toBe("#application-receipts");
+    fireEvent.click(receipt);
+    expect(document.activeElement?.id).toBe("application-receipts");
+    expect(screen.getByRole("link", { name: /Activity & receipts/ }).getAttribute("aria-current")).toBe("location");
+  });
+  it.each([
+    { program_id: "snap-pa", need: "snap_new", request_version: 1, state: "prepared" },
+    { program_id: "snap-pa", need: "snap_new", request_version: 1, state: "sent" },
+    { program_id: "snap-pa", need: "snap_renewal", request_version: 1, state: "agency_submitted" },
+    { program_id: "peco-cap", need: "electricity", request_version: 1, state: "agency_submitted" },
+    { program_id: "snap-pa", need: "snap_new", request_version: 0, state: "agency_submitted" },
+    { program_id: "snap-pa", need: "snap_new", state: "agency_submitted" },
+  ])("does not label mismatched or unconfirmed evidence as current SNAP completion: %j", async (operation) => {
+    mockApi(undefined, [{ id: "other-operation", evidence: receiptEvidence, ...operation }]);
+    renderWorkspace();
+    await screen.findByRole("navigation", { name: "Your application checklist" });
+    await waitFor(() => expect(screen.queryByText("Checking application records…")).toBeNull());
+    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(screen.queryByRole("link", { name: "View application receipt" })).toBeNull();
+  });
+  it.each(["assistance_approved", "support_received", "declined"])("does not call a recorded %s decision pending after submission", async (state) => {
+    mockApi(undefined, [
+      { id: "outcome", program_id: "snap-pa", need: "snap_new", request_version: 1, state, evidence: receiptEvidence },
+      { id: "snap-submitted", program_id: "snap-pa", need: "snap_new", request_version: 1, state: "agency_submitted", evidence: receiptEvidence },
+    ]);
+    renderWorkspace();
+    await screen.findByText("SNAP application complete");
+    expect(screen.queryByText(/benefits decision pending/)).toBeNull();
+    expect(screen.queryByText(/Watch for the official DHS notice/)).toBeNull();
+    expect(screen.getByText(/recorded decision or support outcome/)).toBeTruthy();
+  });
+  it("keeps an older decision separate from the current version’s submission", async () => {
+    mockApi(undefined, [
+      { id: "old-approved", program_id: "snap-pa", need: "snap_new", request_version: 0, state: "assistance_approved", evidence: receiptEvidence },
+      { id: "submitted", program_id: "snap-pa", need: "snap_new", request_version: 1, state: "agency_submitted", evidence: receiptEvidence },
+    ]);
+    renderWorkspace();
+    await screen.findByText("SNAP application complete");
+    expect(screen.getByText(/Submission confirmed · benefits decision pending/)).toBeTruthy();
+  });
+  it("uses evidence time when an older-created operation receives the latest decision", async () => {
+    mockApi(undefined, [
+      { id: "newer-operation", created_at: "2026-11-02T12:00:00Z", program_id: "snap-pa", need: "snap_new", request_version: 1,
+        state: "agency_submitted", evidence: { ...receiptEvidence, recordedAt: "2026-11-02T12:00:00Z" } },
+      { id: "older-operation", created_at: "2026-10-25T12:00:00Z", program_id: "snap-pa", need: "snap_new", request_version: 1,
+        state: "assistance_approved", evidence: { source: "authenticated_partner", reference: "Later decision", observedAt: "2026-11-03T17:30:00+05:30" } },
+    ]);
+    renderWorkspace();
+    await screen.findByText("SNAP application complete");
+    expect(screen.getByText("Next: Program follow-up")).toBeTruthy();
+    expect(screen.queryByText(/benefits decision pending/)).toBeNull();
+  });
+  it("shows the latest valid notice by evidence time, regardless of operation response order", async () => {
+    mockApi(undefined, [
+      { id: "old-status", created_at: "2026-11-02T12:00:00Z", program_id: "snap-pa", need: "snap_new", request_version: 1,
+        state: "agency_submitted", evidence: { ...receiptEvidence, recordedAt: "2026-11-02T12:00:00Z", agencyStatus: {
+          reference: "Old synthetic status", observedAt: "2026-11-02T12:00:00Z", documents: [{ name: "Old requested document" }],
+        } } },
+      { id: "latest-status", created_at: "2026-10-25T12:00:00Z", program_id: "snap-pa", need: "snap_new", request_version: 1,
+        state: "agency_submitted", evidence: { ...receiptEvidence, reference: "Latest synthetic receipt", recordedAt: "2026-11-03T17:30:00+05:30", agencyStatus: {
+          reference: "Latest synthetic notice", observedAt: "2026-11-03T12:00:00Z", interview: { channel: "phone" },
+        } } },
+    ]);
+    renderWorkspace();
+    await screen.findByText("SNAP application complete");
+    expect(screen.getByText(/Status reference: Latest synthetic notice/)).toBeTruthy();
+    expect(screen.getByText(/Complete the required SNAP interview by phone/)).toBeTruthy();
+    expect(screen.queryByText("Old requested document")).toBeNull();
+    expect(screen.getByRole("link", { name: "Download this exact submission record" }).getAttribute("href"))
+      .toBe(`/api/parent/requests/${requestId}/operations/latest-status/export`);
+  });
+  it.each([false, true])("does not let a late-imported older notice replace a newer observed status or decision (decision=%s)", async decision => {
+    mockApi(undefined, [
+      { id: "late-import", program_id: "snap-pa", need: "snap_new", request_version: 1, state: "agency_submitted",
+        evidence: { ...receiptEvidence, recordedAt: "2026-11-03T12:00:00Z", agencyStatus: {
+          reference: "Late import of an older notice", observedAt: "2026-11-03T10:00:00Z", documents: [{ name: "Superseded requested document" }],
+        } } },
+      { id: "newer-observation", program_id: "snap-pa", need: "snap_new", request_version: 1, state: decision ? "assistance_approved" : "agency_submitted",
+        evidence: { ...receiptEvidence, reference: "Newer recorded observation", recordedAt: "2026-11-03T11:01:00Z", agencyStatus: {
+          reference: "Newer observed notice", observedAt: "2026-11-03T11:00:00Z", interview: { channel: "phone" },
+        } } },
+    ]);
+    renderWorkspace(); await screen.findByText("SNAP application complete");
+    expect(screen.queryByText("Superseded requested document")).toBeNull();
+    if (decision) {
+      expect(screen.queryByText(/benefits decision pending/)).toBeNull();
+      expect(screen.getByText(/recorded decision or support outcome/)).toBeTruthy();
+    } else {
+      expect(screen.getByText(/Status reference: Newer observed notice/)).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Download this exact submission record" }).getAttribute("href"))
+        .toBe(`/api/parent/requests/${requestId}/operations/newer-observation/export`);
+    }
+  });
+  it("does not infer a pending decision when earlier history is outside the response", () => {
+    mockApi();
+    render(<ApplicationWorkspace request={fixture()} history={{
+      data: { operations: [{ id: "submitted", program_id: "snap-pa", need: "snap_new", request_version: 1,
+        state: "agency_submitted", evidence: receiptEvidence, created_at: fixture().created_at }], historyLimited: true },
+      loading: false, error: null, reload: vi.fn(),
+    }}>Saved work</ApplicationWorkspace>);
+    expect(screen.getByText("SNAP application complete")).toBeTruthy();
+    expect(screen.queryByText(/benefits decision pending/)).toBeNull();
+  });
+  it.each(["sent", "partner_received", "partner_accepted", "agency_submitted", "assistance_approved", "support_received", "declined"])("keeps %s without receipt evidence unconfirmed and prevents a fresh application", async (state) => {
+    mockApi({ available: true, reason: null, session: null }, [{
+      id: "unverified", program_id: "snap-pa", need: "snap_new", request_version: 1, state,
+    }]);
+    renderWorkspace();
+    await screen.findByText("Agency submission not confirmed");
+    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Your SNAP submission record" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open application view" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
+    expect(screen.queryByText("No application submission recorded")).toBeNull();
+  });
+  it.each(["loading", "error"])("hides retained confirmation data while history is %s", (state) => {
+    mockApi();
+    render(<ApplicationWorkspace request={fixture()} history={{
+      data: { operations: [{ id: "submitted", program_id: "snap-pa", need: "snap_new", request_version: 1,
+        state: "agency_submitted", evidence: receiptEvidence, created_at: fixture().created_at }], historyLimited: false },
+      loading: state === "loading", error: state === "error" ? new Error("Unavailable") : null, reload: vi.fn(),
+    }}>Saved work</ApplicationWorkspace>);
+    expect(screen.queryByRole("region", { name: "Your SNAP submission record" })).toBeNull();
+    expect(screen.queryByText("SNAP application complete")).toBeNull();
+  });
   it("keeps all work states reachable and retains unsaved input when navigating the checklist", async () => {
     mockApi();
     renderWorkspace();
@@ -386,6 +622,7 @@ describe("application workspace", () => {
           need: "snap_new",
           request_version: 1,
           state,
+          evidence: receiptEvidence,
         },
       ]);
       renderWorkspace();
@@ -619,6 +856,7 @@ describe("application workspace", () => {
         need: "snap_new",
         request_version: 1,
         state: "assistance_approved",
+        evidence: receiptEvidence,
       },
     ]);
     const request = fixture();

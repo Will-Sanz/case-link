@@ -45,7 +45,7 @@ async function show() {
 }
 
 describe("current support-list progress", () => {
-  it("does not restart a slow outstanding refresh on another timer or visibility event", async () => {
+  it("does not restart a slow outstanding refresh on a visibility event before its deadline", async () => {
     let finish!: (value: ReturnType<typeof response>) => void;
     const fetch = vi.fn().mockResolvedValueOnce(response("queued")).mockImplementationOnce(
       () => new Promise((resolve) => { finish = resolve; }),
@@ -54,7 +54,7 @@ describe("current support-list progress", () => {
     await open();
     await tick();
     const signal = fetch.mock.calls[1][1].signal as AbortSignal;
-    await tick();
+    await act(async () => { await vi.advanceTimersByTimeAsync(29_999); });
     await show();
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(signal.aborted).toBe(false);

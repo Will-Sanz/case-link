@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -17,14 +18,18 @@ import type {
   ParentPreferences,
   SupportIntake,
   SupportNeed,
-  SupportRequest,
   SupportAction,
 } from "@/lib/parent/domain";
-import { getProgramsForNeeds } from "@/lib/parent/programs";
-import { parentApi } from "./api";
+import { getProgramsForNeeds, SNAP_NEW_APPLICATION_URL, supportsInitialServiceDelivery } from "@/lib/parent/programs";
+import { boundedParentApi, canCollectSnapApplication, ParentApiError, type ParentAuthorizationWindow } from "./api";
+import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
+import { assessSnapApplicationFields, snapApplicationFieldsSchema, type SnapApplicationFields } from "@/lib/parent/snap-application-fields";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { UrgentHelp } from "./landing";
+import { FoodServices } from "./food-services";
+import { SnapApplicationFormFields } from "./snap-application-form";
+import { SnapApplicationNotice } from "./snap-application-review";
 import styles from "./parent.module.css";
 
 const foodNeeds: SupportNeed[] = [
@@ -53,6 +58,14 @@ export const initialIntake: SupportIntake = {
   contactPreference: "in_app",
   adultConfirmed: true,
 };
+const authorizationReply=z.object({authorization:z.object({issuedAt:z.iso.datetime({offset:true}),expiresAt:z.iso.datetime({offset:true}),snapApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable()}).optional()})});
+
+async function readAuthorizationWindow(signal: AbortSignal) {
+  const result = authorizationReply.parse(await boundedParentApi("/authorization-window", {}, signal, new Date(Date.now() + 30_000).toISOString()));
+  if (Date.parse(result.authorization.expiresAt) <= Date.now()) throw new Error("Authorization timing is unavailable. Try again before starting.");
+  return result;
+}
+
 export function buildMandate(
   intake: SupportIntake,
   recipientIds: string[],
@@ -87,6 +100,14 @@ export function buildMandate(
 }
 
 export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
+  return initialNeed === "food" ? (
+    <FoodServices />
+  ) : (
+    <ParentIntakeForm key={initialNeed ?? "all"} initialNeed={initialNeed} />
+  );
+}
+
+function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const session = useParentResource<{
     account: { email: string; preferences?: ParentPreferences };
   }>("/account");
@@ -98,28 +119,45 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
       actions: SupportAction[];
     }[];
   }>("/capabilities");
+  const authorization = useParentResource<ParentAuthorizationWindow>("/authorization-window");
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
     needs: [...foodNeeds, ...utilityNeeds].includes(initialNeed as SupportNeed)
       ? [initialNeed as SupportNeed]
       : [],
   }));
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => intake.needs.length ? 1 : 0);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [mode, setMode] = useState<ServiceMandate["mode"]>("full");
   const [booking, setBooking] =
     useState<ServiceMandate["bookingPreference"]>("ask_me");
   const [adult, setAdult] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [snapDetails, setSnapDetails] = useState<SnapApplicationFields>({});
+  const [detailsReady, setDetailsReady] = useState(false);
+  const [startUncertain, setStartUncertain] = useState(false);
+  const [collectionBlocked, setCollectionBlocked] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application"; details?: SnapApplicationFields; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION };
   } | null>(null);
+  const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
+  const scope=JSON.stringify({intake,snapDetails,detailsReady,recipientIds,mode,booking,accepted});
+  const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
+  useLayoutEffect(()=>{
+    const controller=new AbortController();work.current=controller;
+    return()=>{controller.abort();if(work.current===controller)work.current=null;};
+  },[scope]);
   const router = useRouter();
-  const programs = getProgramsForNeeds(intake.needs);
+  const snapSelected = intake.needs.includes("snap_new");
+  const directSnap = initialNeed === "snap_new" && step > 0 && snapSelected && intake.needs.length === 1;
+  const fullSnap = snapSelected && canCollectSnapApplication(authorization.data) && !authorization.error && !collectionBlocked;
+  const snapValues={...(intake.zip?{zip:intake.zip}:{}),...snapDetails};
+  const programs = getProgramsForNeeds(intake.needs).filter(program=>!fullSnap||program.id==='snap-pa'||
+    program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need)));
   const hasUtility = intake.needs.some((n) => utilityNeeds.includes(n));
   const hasBenefits = intake.needs.some((need) =>
     [
@@ -137,7 +175,8 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
         connection.programId === id &&
         connection.enabled &&
         connection.actions.some((action) =>
-          ["share", "submit", "schedule", "follow_up"].includes(action),
+          ["share", "submit", "schedule"].includes(action) && programs.some(program=>program.id===id &&
+            program.needs.some(need=>intake.needs.includes(need)&&supportsInitialServiceDelivery(need,action))),
         ),
     ) ?? false;
   const fullAvailable = programs.some(
@@ -177,10 +216,45 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
         : {}),
     }));
     setError(null);
+    if (!needs.includes("snap_new")) { setSnapDetails({}); setDetailsReady(false); }
     startAttempt.current = null;
+  }
+  function changeSnapDetails(details: SnapApplicationFields) {
+    setSnapDetails(details);setDetailsReady(false);setAccepted(false);setError(null);startAttempt.current=null;
+    setIntake(current=>({...current,zip:details.zip??"",householdSize:details.household?.length??null,
+      ...(details.language==='en'||details.language==='es'?{language:details.language}:{}),
+      incomeAmount:null,incomeFrequency:"unknown",
+    }));
+  }
+  async function refreshSnapCollection() {
+    const controller=work.current;
+    if(!controller||controller.signal.aborted||running.current===controller)return;
+    running.current=controller;
+    setPendingWork({ scope, controller });setError(null);
+    try {
+      const latest=await readAuthorizationWindow(controller.signal);
+      if(controller.signal.aborted||work.current!==controller)return;
+      setCollectionBlocked(!canCollectSnapApplication(latest));authorization.reload();
+    } catch(err) {if(!controller.signal.aborted&&work.current===controller){setCollectionBlocked(true);setError(err instanceof Error?err:new Error("Application availability could not be checked."));}}
+    finally {if(running.current===controller)running.current=null;if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);}
+  }
+  function validatedSnapDetails() {
+    const parsed=snapApplicationFieldsSchema(new Date()).safeParse(snapValues);
+    if (!parsed.success) throw new Error("Check your SNAP application answers. Use only the requested information; identifiers, credentials and signatures belong in the protected official-program step.");
+    const assessment=assessSnapApplicationFields(parsed.data,new Date());
+    if (!assessment.nonProtectedDataReadyForReview) {
+      const group=assessment.missingFields[0]?.split('.')[0];
+      const label=({applicant:"your name",county:"your county",language:"language preferences",otherLanguage:"language preferences",interpreter:"interpreter preferences",interpreterLanguage:"interpreter preferences",household:"everyone in your home",income:"this month’s income",screening:"the expedited-service questions",history:"the application history questions",expenses:"applicable expenses",expenseClaims:"expense deductions",authorizedRepresentative:"your chosen representative"} as Record<string,string>)[group??""];
+      throw new Error(assessment.serviceQuestions.includes("address_or_provider_accepted_alternative")
+        ? "Add a usable postal address for this application. If you do not have a permanent address, CaseLink needs to verify an accepted mailing alternative; official application help remains available without completing these fields."
+        : label ? `Complete the applicable answers for ${label}. Unknown answers stay blank; they are not treated as No or zero.`
+        : "The application’s date-sensitive answers or form source need checking before complete preparation. Your answers remain on this page and official program access stays available.");
+    }
+    return parsed.data;
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if(pending)return;
     setError(null);
     if (step === 0) {
       if (!intake.needs.length) {
@@ -195,6 +269,10 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
       return;
     }
     if (step === 1) {
+      if (snapSelected && authorization.loading) return;
+      if (fullSnap) {
+        try {validatedSnapDetails();} catch (err) {setError(err instanceof Error?err:new Error("Check your SNAP application answers."));heading.current?.focus();return;}
+      }
       const parsed = intakeSchema.safeParse(intake);
       if (!parsed.success) {
         setError(
@@ -214,6 +292,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
         return;
       }
       setRecipientIds(programs.map((p) => p.id));
+      setDetailsReady(fullSnap);
       setStep(2);
       return;
     }
@@ -225,12 +304,30 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
       );
       return;
     }
-    setPending(true);
+    if (fullSnap && !detailsReady && !startAttempt.current) {
+      setStep(1);setAccepted(false);
+      setError(new Error("Private SNAP application preparation is now available. Complete its applicable questions before authorizing this application."));
+      return;
+    }
+    const controller=work.current;
+    if(!controller||controller.signal.aborted||running.current===controller)return;
+    running.current=controller;setPendingWork({ scope, controller });
     try {
       if (!startAttempt.current) {
-        const { authorization } = await parentApi<{
-          authorization: { expiresAt: string };
-        }>("/authorization-window");
+        const window = await readAuthorizationWindow(controller.signal);
+        if(controller.signal.aborted||work.current!==controller)return;
+        if (snapSelected && !detailsReady && canCollectSnapApplication(window)) {
+          setCollectionBlocked(false);authorization.reload();setStep(1);setAccepted(false);
+          setError(new Error("Private SNAP application preparation is now available. Complete its applicable questions before authorizing this application."));
+          return;
+        }
+        if (detailsReady && (!fullSnap || !canCollectSnapApplication(window))) {
+          setCollectionBlocked(true);
+          authorization.reload();
+          throw new Error("Private SNAP application collection is currently unavailable. Your answers remain on this page; nothing new has been saved. Official program help remains available.");
+        }
+        const details=detailsReady?validatedSnapDetails():undefined;
+        if (details && !recipientIds.includes("snap-pa")) throw new Error("SNAP application answers can be saved only for the named Pennsylvania SNAP program. Choose that program or return to change your support needs.");
         startAttempt.current = {
           key: crypto.randomUUID(),
           packet: {
@@ -240,42 +337,54 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
               recipientIds,
               fullAvailable ? mode : "prepare_only",
               booking,
-              authorization.expiresAt,
+              window.authorization.expiresAt,
             ),
+            ...(details?{kind:"snap_application" as const,details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}:{}),
           },
         };
       }
-      const response = await parentApi<{ request: SupportRequest }>(
+      const response = await boundedParentApi(
         "/requests",
         {
           method: "POST",
           headers: { "Idempotency-Key": startAttempt.current.key },
           body: JSON.stringify(startAttempt.current.packet),
-        },
+        },controller.signal,startAttempt.current.packet.mandate.expiresAt,
       );
-      router.push(`/support/${response.request.id}`);
+      if(controller.signal.aborted||work.current!==controller)return;
+      const saved=z.object({request:z.object({id:z.uuid()})}).safeParse(response);
+      if (!saved.success) throw new ParentApiError("The saved request could not be confirmed. Retry the same request before making changes.",0);
+      router.push(`/support/${saved.data.request.id}`);
       router.refresh();
     } catch (err) {
+      if(controller.signal.aborted||work.current!==controller)return;
+      const status=err instanceof ParentApiError?err.status:0;
+      setStartUncertain(!!startAttempt.current && (status<400||status>=500||status===409));
+      if(snapSelected && (status===401||status===403)){setCollectionBlocked(true);authorization.reload();}
       setError(
         err instanceof Error
           ? err
           : new Error("We couldn’t save your request. Please try again."),
       );
     } finally {
-      setPending(false);
+      if(running.current===controller)running.current=null;
+      if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);
     }
   }
   return (
     <div className={`${styles.container} ${styles.narrow}`}>
       <div className={styles.pageTop}>
         <div>
-          <h1>Let’s make the next steps easier.</h1>
+          <h1>{directSnap ? "Apply for SNAP" : "Let’s make the next steps easier."}</h1>
           <p>
             Share what your family needs. You choose what we can handle, and you
             can change your mind.
           </p>
         </div>
       </div>
+      {snapSelected && <p className={`${styles.hint} ${styles.space}`}>
+        You can <a className={styles.textLink} href={SNAP_NEW_APPLICATION_URL} target="_blank" rel="noreferrer">apply directly with Pennsylvania SNAP</a> at any time, including before completing these questions. The official application opens in a new tab.
+      </p>}
       {session.loading ? (
         <ParentLoading label="Checking secure access" />
       ) : session.error ? (
@@ -287,19 +396,22 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
       ) : (
         <>
           <ol className={styles.progress} aria-label="Support request steps">
-            {["Your needs", "Household details", "Your permission"].map(
-              (label, i) => (
+            {(directSnap ? ["Application details", "Your permission"] : ["Your needs", "Household details", "Your permission"]).map(
+              (label, index) => {
+                const i = directSnap ? index + 1 : index;
+                return (
                 <li key={label} aria-current={i === step ? "step" : undefined}>
                   <span>
                     {i < step ? (
                       <Check width={14} height={14} aria-hidden="true" />
                     ) : (
-                      i + 1
+                      index + 1
                     )}
                   </span>
                   {label}
                 </li>
-              ),
+                );
+              },
             )}
           </ol>
           <section className={styles.surface}>
@@ -309,7 +421,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                   {
                     [
                       "What would help your household?",
-                      "Your household details, in one place",
+                      fullSnap ? "Tell us about your household" : "Your household details, in one place",
                       "You’re in control of what happens next",
                     ][step]
                   }
@@ -318,7 +430,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                   {
                     [
                       "Choose everything that applies. Food and utility support can move forward together.",
-                      "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
+                      fullSnap ? "Answer the questions that apply to you. CaseLink will use these answers to prepare your application; you can review and correct it afterward. Leave optional or uncertain answers blank." : "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
                       "These are the specific programs and limits for this request. No unknown recipients or open-ended permission.",
                     ][step]
                   }
@@ -424,6 +536,15 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
               )}
               {step === 1 && (
                 <>
+                  {snapSelected && authorization.loading ? <ParentLoading label="Checking SNAP application availability"/> : fullSnap ? <>
+                    <SnapApplicationNotice />
+                    <SnapApplicationFormFields value={snapValues} onChange={changeSnapDetails} disabled={pending}/>
+                  </> : <>
+                  {snapSelected && <div className={styles.notice}>
+                    <p>{authorization.loading ? "Checking whether private SNAP application fields are available…" : "Full private SNAP application fields are not available here yet. You can still save minimum routing details and use the official program directly; this does not complete or submit an application."}</p>
+                    {(authorization.error || collectionBlocked) && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshSnapCollection}>Check application availability again</button>}
+                    <a className={styles.textLink} href={getProgramsForNeeds(["snap_new"])[0].officialUrl}>Open official SNAP help</a>
+                  </div>}
                   <div className={styles.row}>
                     <div className={styles.field}>
                       <label htmlFor="support-zip">Household ZIP code</label>
@@ -467,6 +588,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       )}
                     </div>
                   </div>
+                  </>}
                   {hasUtility && (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
@@ -505,7 +627,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       </div>
                     </fieldset>
                   )}
-                  {hasBenefits || hasUtility ? (
+                  {(hasBenefits || hasUtility) && !(snapSelected&&authorization.loading) && (!fullSnap || intake.needs.some(need=>need==='wic_new'||need==='wic_continuing')) ? (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
                         Household & income
@@ -516,7 +638,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                         help without them.
                       </p>
                       <div className={styles.stack}>
-                        <div className={styles.field}>
+                        {!fullSnap && <div className={styles.field}>
                           <label htmlFor="household-size">
                             People in your household
                           </label>
@@ -540,14 +662,14 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                             Leave blank if you’re not sure who a program will
                             count.
                           </p>
-                        </div>
+                        </div>}
                         {intake.needs.some(
                           (need) =>
                             need === "wic_new" || need === "wic_continuing",
                         ) && (
                           <p className={styles.hint}>Private WIC questions are not available here yet. You can use the official WIC service without sharing those details with CaseLink.</p>
                         )}
-                        <div className={styles.row}>
+                        {!fullSnap && <div className={styles.row}>
                           <div className={styles.field}>
                             <label htmlFor="income-amount">
                               Household income before taxes ($)
@@ -600,11 +722,11 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                               <option value="yearly">Yearly</option>
                             </select>
                           </div>
-                        </div>
+                        </div>}
                       </div>
                     </fieldset>
                   ) : null}
-                  {hasBenefits && (
+                  {hasBenefits && !fullSnap && (
                     <div className={styles.notice}>
                       <Lock width={22} height={22} aria-hidden="true" />
                       <p>
@@ -732,7 +854,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                 </>
               )}
               {step === 2 && (
-                <>
+                <fieldset className={`${styles.fieldset} ${styles.form}`} disabled={pending || startUncertain}>
                   <div className={styles.notice}>
                     <ShieldCheck width={23} height={23} aria-hidden="true" />
                     <p>
@@ -746,7 +868,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                         : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly."}
                     </p>
                   </div>
-                  <fieldset className={styles.fieldset}>
+                  {fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' ? <p><strong>Pennsylvania SNAP</strong> is the named program for your application.</p> : <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       Named programs for this request
                     </legend>
@@ -779,7 +901,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                         </label>
                       ))}
                     </div>
-                  </fieldset>
+                  </fieldset>}
                   <details className={styles.programDetails}>
                     <summary>About these programs & direct access</summary>
                     <ul className={styles.programDescriptions}>
@@ -853,7 +975,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       <div>
                         <h3>The information we can use</h3>
                         <p>
-                          Your needs, household details
+                          {detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
                           {intake.needs.some((need) => need !== "food_now")
                             ? ", income information when a named program requires it"
                             : ""}
@@ -890,7 +1012,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       </div>
                     </div>
                   </div>
-                  {mode === "full" && fullAvailable && (
+                  {mode === "full" && fullAvailable && (!fullSnap || intake.needs.some(need=>need!=='snap_new')) && (
                     <div className={styles.field}>
                       <label htmlFor="booking-preference">
                         Appointment preference
@@ -936,6 +1058,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                         : "research and preparation only"}{" "}
                       for this request within these limits. I can stop future
                       work in My support.
+                      {detailsReady && " I also agree to save and use my private SNAP application answers for this named program under the SNAP data notice."}
                     </span>
                   </label>
                   <p className={styles.hint}>
@@ -947,9 +1070,10 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                     </Link>{" "}
                     are always available.
                   </p>
-                </>
+                </fieldset>
               )}
               {error && <ServiceError error={error} />}
+              {startUncertain && <p className={styles.notice}>The save result has not been confirmed. Retry the same request before changing answers or starting another request. <Link className={styles.textLink} href="/my-support">Check My support for the saved request</Link>.</p>}
               <div className={styles.formFooter}>
                 {step > 0 ? (
                   <button
@@ -961,7 +1085,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                       setAccepted(false);
                       startAttempt.current = null;
                     }}
-                    disabled={pending}
+                    disabled={pending || startUncertain}
                   >
                     <ArrowLeft width={17} height={17} aria-hidden="true" />
                     Back
@@ -974,7 +1098,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                 <button
                   className={styles.button}
                   type="submit"
-                  disabled={pending}
+                  disabled={pending || (step===1 && snapSelected && authorization.loading)}
                 >
                   {pending
                     ? "Saving your request…"

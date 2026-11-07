@@ -6,13 +6,18 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type BrowserContext, type Page, type Request as BrowserRequest } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { PDFDocument } from "pdf-lib";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
+import { SNAP_APPLICATION_NOTICE_VERSION } from "../src/lib/parent/constants";
+import { assessSnapApplicationFields, SNAP_APPLICATION_SOURCE } from "../src/lib/parent/snap-application-fields";
+import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema, type SnapApplicationSnapshot } from "../src/lib/parent/snap-application-snapshot";
 
 const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200";
 const checks: string[] = [];
+const snapAccessibility: { state: string; width: number; height: number; screenshot: string; overflow: boolean; violations: string[] }[] = [];
 let stage = "local service configuration";
 function check(condition: unknown, label: string): asserts condition {
   assert.ok(condition, label);
@@ -217,8 +222,7 @@ async function main() {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
-    await page.getByRole("checkbox", { name: /Food for now/ }).check();
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -871,6 +875,243 @@ async function main() {
       "The actual confirmation button cancels a request and stops its durable mandate.",
     );
 
+    stage = "actual full SNAP intake, owned revisions and token authorization";
+    const snapControls = (await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+    const snapBudgetBefore = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    let snapDiagnosticRequestId: string | undefined;
+    try {
+      await db.query(`update parent_private.processing_controls set snap_details_enabled=true,
+        snap_details_approval_reference='isolated synthetic Auth SNAP fixture',snap_details_approved_until=now()+interval '1 hour',snap_details_notice_version=$1 where singleton`,
+      [SNAP_APPLICATION_NOTICE_VERSION]);
+      const checkSnapPage = async (state: string) => {
+        const viewport = first.page.viewportSize();
+        const directory = "tmp/parent-verification/actual-auth";
+        mkdirSync(directory, { recursive: true });
+        try {
+          for (const [name, width, height] of [["phone", 320, 820], ["laptop", 1280, 900]] as const) {
+            await first.page.setViewportSize({ width, height });
+            await first.page.evaluate(() => document.fonts.ready.then(() => undefined));
+            const overflow = await first.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+            if (state === "intake" || state === "correction") {
+              const flow = await first.page.getByRole("link", { name: "SNAP data notice", exact: true }).evaluate(link => {
+                const paragraph = link.closest("p"), notice = paragraph?.parentElement;
+                if (!paragraph || !notice) return null;
+                const style = getComputedStyle(notice);
+                return { display: getComputedStyle(paragraph).display, width: paragraph.getBoundingClientRect().width,
+                  available: notice.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) };
+              });
+              check(flow?.display === "block" && Math.abs(flow.width - flow.available) <= 2,
+                `The actual SNAP ${state} notice keeps all prose and links in normal paragraph flow across the available content width at ${width}px.`);
+            }
+            const axe = await new AxeBuilder({ page: first.page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+            const screenshot = `${directory}/snap-${state}-${name}.png`;
+            await first.page.screenshot({ path: screenshot, fullPage: true });
+            snapAccessibility.push({ state, width, height, screenshot, overflow, violations: axe.violations.map(item => item.id) });
+            check(!overflow, `The actual SNAP ${state} has no horizontal page overflow at ${width}px.`);
+            check(axe.violations.length === 0, `The actual SNAP ${state} has no automated WCAG A/AA violations at ${width}px (${axe.violations.map(item => item.id).join(", ") || "none"}).`);
+          }
+        } finally {
+          if (viewport) await first.page.setViewportSize(viewport);
+        }
+      };
+      await first.page.clock.setSystemTime(new Date());
+      const snapClockStarted = await first.page.evaluate(() => Date.now());
+      await first.page.goto(`${origin}/get-support?need=snap_new`, { waitUntil: "networkidle" });
+      await first.page.getByLabel("Your first name").fill("AuthSnapCanary");
+      await first.page.getByLabel("Your last name").fill("Parent");
+      for (const [path, value] of Object.entries({ "address.street": "123 Synthetic Lane", "address.city": "Philadelphia", "address.state": "PA", zip: "19104", county: "Philadelphia" }))
+        await first.page.locator(`[data-snap-path="${path}"]`).fill(value);
+      for (const [path, value] of Object.entries({ language: "en", interpreter: "no", "income.hasIncome": "no",
+        "screening.lowCashAndIncome": "no", "screening.migrantOrSeasonal": "no", "screening.belowShelterCosts": "no",
+        "history.fleeingOrProbation.answer": "no", "history.welfareFraud.answer": "no", "history.otherStateDisqualification.answer": "no",
+        "expenseClaims.household": "do_not_claim", "expenseClaims.medical": "not_applicable" }))
+        await first.page.locator(`[data-snap-path="${path}"]`).selectOption(value);
+      await first.page.getByLabel("Your date of birth").fill("1988-04-15");
+      for (const [label, value] of [["Your sex, as requested on the form", "female"], ["Are you a student?", "no"], ["Are you applying for SNAP?", "yes"], ["Are you a U.S. citizen?", "yes"]])
+        await first.page.getByLabel(label).selectOption(value);
+      check(await first.page.getByLabel("Your first name").count() === 1 && await first.page.getByLabel("People in your household").count() === 0 &&
+        await first.page.getByLabel("Household income before taxes ($)").count() === 0,
+      "The actual full SNAP form asks supplied names once and derives the roster without duplicate count or aggregate-income questions.");
+      await first.page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+      await checkSnapPage("intake");
+      check(await first.page.evaluate(() => Date.now()) > snapClockStarted, "The actual SNAP browser clock advances so subsequently saved evidence is not misclassified as future-dated.");
+      await first.page.getByRole("button", { name: "Continue", exact: true }).click();
+      check(await first.page.getByRole("checkbox").count() === 1, "The actual full SNAP start uses one bounded authorization without a separate review-approval click.");
+      await first.page.getByRole("checkbox", { name: /I authorize/ }).check();
+      const snapStarting = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+      await first.page.getByRole("button", { name: "Start getting support" }).click();
+      const snapStarted = await snapStarting;
+      check(snapStarted.status() === 201, "The actual full SNAP form and authorization atomically start the request with its private answers.");
+      const snapRequestId = (await snapStarted.json()).request.id as string;
+      snapDiagnosticRequestId = snapRequestId;
+      const snapStartBody = snapStarted.request().postDataJSON();
+      const snapStartHeaders = { origin, "Idempotency-Key": snapStarted.request().headers()["idempotency-key"] };
+      check(snapStartBody.kind === "snap_application" && snapStartBody.noticeVersion === SNAP_APPLICATION_NOTICE_VERSION && !!snapStartHeaders["Idempotency-Key"],
+        "The browser sends the explicit reviewed SNAP payload and a stable idempotency key.");
+      await first.page.waitForURL(`${origin}/support/${snapRequestId}`);
+      stage = "actual SNAP saved review and editable owned snapshot";
+      await first.page.getByRole("button", { name: "Correct application answers" }).waitFor();
+      await checkSnapPage("review");
+      const snapUrl = `${origin}/api/parent/requests/${snapRequestId}/snap-application`;
+      const readSnap = async (revision?: string) => {
+        const response = await first.page.request.get(`${snapUrl}${revision ? `?revision=${revision}` : ""}`);
+        check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "Owned SNAP revision reads succeed privately through the real web API.");
+        return (await response.json()).snapshot as SnapApplicationSnapshot;
+      };
+      const originalSnap = await readSnap();
+      check(originalSnap.revision === 1 && originalSnap.request_version === 2 && originalSnap.idempotency_key === snapStartHeaders["Idempotency-Key"] &&
+        assessSnapApplicationFields(originalSnap.details, new Date()).nonProtectedDataReadyForReview,
+      "The committed original revision includes all applicable nonprotected form answers before queued work can use it.");
+      assert.deepEqual(originalSnap.details, snapStartBody.details);
+      assert.deepEqual(originalSnap.source, SNAP_APPLICATION_SOURCE);
+      const ownerSnap = await rest(token, `parent_snap_application_details?request_id=eq.${snapRequestId}`);
+      check(ownerSnap.status === 200, "The issued owner Auth token reads its own private SNAP snapshot through actual PostgREST.");
+      assert.deepEqual(await ownerSnap.json(), [originalSnap]);
+      const snapState = async () => (await db.query(`select to_jsonb(r) request,to_jsonb(j) job,
+        (select jsonb_agg(to_jsonb(d) order by d.revision) from public.parent_snap_application_details d where d.request_id=r.id) snapshots,
+        (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]') from public.parent_events e where e.request_id=r.id) events,
+        (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
+        (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls
+        from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [snapRequestId])).rows[0];
+      const snapBeforeRetry = await snapState();
+      check(snapBeforeRetry.job.request_version === originalSnap.request_version && snapBeforeRetry.job.state === "queued" &&
+        !JSON.stringify([snapBeforeRetry.request, snapBeforeRetry.job, snapBeforeRetry.events]).includes("AuthSnapCanary"),
+      "Private answers remain outside ordinary request/job/event data while the queued job matches the committed snapshot version.");
+      const startReplay = await first.page.request.post(`${origin}/api/parent/requests`, { headers: snapStartHeaders, data: snapStartBody });
+      check(startReplay.status() === 201 && (await startReplay.json()).request.id === snapRequestId, "An exact real web start retry returns the same SNAP request.");
+      const rpcStart = await rest(token, "rpc/parent_start_snap_application", { p_intake: snapStartBody.intake, p_mandate: snapStartBody.mandate,
+        p_details: snapStartBody.details, p_notice_version: snapStartBody.noticeVersion, p_idempotency_key: snapStartHeaders["Idempotency-Key"] });
+      check(rpcStart.status === 200 && await rpcStart.json() === snapRequestId, "The issued owner token can replay the exact atomic start through PostgREST without duplicating work.");
+      assert.deepEqual(await snapState(), snapBeforeRetry);
+      const hiddenSnap = await rest(secondToken, `parent_snap_application_details?request_id=eq.${snapRequestId}`);
+      check(hiddenSnap.status === 200 && (await hiddenSnap.json()).length === 0 && (await second.page.request.get(snapUrl)).status() === 404,
+        "Another authenticated household cannot read the private SNAP revision through PostgREST or the web API.");
+      const foreignSave = await rest(secondToken, "rpc/parent_save_snap_application_details", { p_request_id: snapRequestId, p_expected_version: originalSnap.request_version,
+        p_details: originalSnap.details, p_notice_version: SNAP_APPLICATION_NOTICE_VERSION, p_idempotency_key: randomUUID() });
+      check(foreignSave.status === 403, "Another issued Auth token cannot save a correction to this household's SNAP application.");
+
+      stage = "actual SNAP correction, immutable history and exact retry";
+      await first.page.getByRole("button", { name: "Correct application answers" }).click();
+      const snapForm = first.page.getByRole("form", { name: "Correct SNAP application answers" });
+      await snapForm.locator('[data-snap-path="address.street"]').fill("124 Synthetic Lane");
+      await checkSnapPage("correction");
+      const snapSaving = first.page.waitForResponse(response => response.url() === snapUrl && response.request().method() === "POST");
+      await snapForm.getByRole("button", { name: "Save application changes" }).click();
+      const snapSaved = await snapSaving;
+      check(snapSaved.status() === 201, "The real grouped application editor saves a private correction without asking for review approval.");
+      const snapSaveBody = snapSaved.request().postDataJSON();
+      const snapSaveHeaders = { origin, "Idempotency-Key": snapSaved.request().headers()["idempotency-key"] };
+      const correctedSnap = await readSnap();
+      check(correctedSnap.id === (await snapSaved.json()).snapshotId && correctedSnap.revision === 2 && correctedSnap.request_version === originalSnap.request_version + 1 &&
+        correctedSnap.details.address?.street === "124 Synthetic Lane" && snapSaveBody.expectedVersion === originalSnap.request_version,
+      "The correction creates a new immutable exact revision and invalidates the earlier request version.");
+      assert.deepEqual({ ...correctedSnap.provenance, "address.street": originalSnap.provenance["address.street"] }, originalSnap.provenance);
+      assert.deepEqual(await readSnap(originalSnap.id), originalSnap);
+      const correctedState = await snapState();
+      const correctionReplay = await first.page.request.post(snapUrl, { headers: snapSaveHeaders, data: snapSaveBody });
+      check(correctionReplay.status() === 201 && (await correctionReplay.json()).snapshotId === correctedSnap.id,
+        "An exact correction retry through the real web API returns the same saved revision.");
+      const rpcCorrection = await rest(token, "rpc/parent_save_snap_application_details", { p_request_id: snapRequestId, p_expected_version: snapSaveBody.expectedVersion,
+        p_details: snapSaveBody.details, p_notice_version: snapSaveBody.noticeVersion, p_idempotency_key: snapSaveHeaders["Idempotency-Key"] });
+      check(rpcCorrection.status === 200 && await rpcCorrection.json() === correctedSnap.id, "The issued owner token replays the exact correction through PostgREST.");
+      const oldVersion = await first.page.request.post(snapUrl, { headers: { origin, "Idempotency-Key": randomUUID() }, data: snapSaveBody });
+      const oldStart = await first.page.request.post(`${origin}/api/parent/requests`, { headers: snapStartHeaders, data: snapStartBody });
+      check(oldVersion.status() === 409 && oldStart.status() === 409, "Old-version corrections and a superseded initial-start retry are rejected instead of overwriting current private answers.");
+      assert.deepEqual(await snapState(), correctedState);
+      check(correctedState.operations === 0 && correctedState.model_calls === 0, "This actual intake/revision check creates no provider operation and calls no model.");
+      const snapExport = await first.page.request.get(`${origin}/api/parent/account/export`);
+      check(snapExport.status() === 200 && snapExport.headers()["cache-control"] === "private, no-store", "The actual owned information export includes private SNAP revisions without public caching.");
+      const exportedSnap = (await snapExport.json()).requests.find((row: { id: string }) => row.id === snapRequestId);
+      const exportedRevisions = exportedSnap?.snapApplicationDetails as SnapApplicationSnapshot[];
+      check(exportedRevisions?.length === 2, "The actual owned export retains both original and corrected private application revisions.");
+      assert.deepEqual(exportedRevisions.find(row => row.id === originalSnap.id), originalSnap);
+      assert.deepEqual(exportedRevisions.find(row => row.id === correctedSnap.id), correctedSnap);
+      const foreignExport = await second.page.request.get(`${origin}/api/parent/account/export`);
+      check(foreignExport.status() === 200 && !(await foreignExport.text()).includes(snapRequestId), "Another household's actual export contains no private SNAP request or revision from this owner.");
+
+      stage = "actual focused SNAP stale-answer reaffirmation from an explicit synthetic fixture";
+      const staleProvenance = { ...correctedSnap.provenance, "address.street": { source: "parent", confirmedAt: "2026-01-01T12:00:00Z", asOf: "2026-01-01" } };
+      const staleId = randomUUID();
+      const staleSeed = await db.query(`insert into public.parent_snap_application_details(id,request_id,revision,base_version,request_version,details,provenance,source,notice_version,idempotency_key)
+        select $1,d.request_id,d.revision+1,d.request_version,d.request_version,d.details,$2,d.source,d.notice_version,$3
+        from public.parent_snap_application_details d join public.parent_requests r on r.id=d.request_id join public.parent_households h on h.id=r.household_id
+        where d.id=$4 and h.owner_id=$5`, [staleId, JSON.stringify(staleProvenance), randomUUID(), correctedSnap.id, first.id]);
+      const staleQuestion = [{ id: "actual-snap-stale-address", need: "snap_new", field: "snap_application_details", reason: "missing_fact", resolver: "parent", resolved: false,
+        title: "Check an outdated SNAP application answer", explanation: "Explicit synthetic stale-answer fixture; this question is not an AI worker decision." }];
+      const questionSeed = await db.query(`update public.parent_requests r set required_actions=$2 where r.id=$1
+        and exists(select 1 from public.parent_households h where h.id=r.household_id and h.owner_id=$3)`, [snapRequestId, JSON.stringify(staleQuestion), first.id]);
+      check(staleSeed.rowCount === 1 && questionSeed.rowCount === 1, "Only this run's owned synthetic SNAP request receives an immutable stale-address revision and an explicitly labeled fixture question.");
+      const staleSnap = await readSnap();
+      check(staleSnap.id === staleId && staleSnap.revision === 3, "The owned API reads the explicit immutable synthetic stale revision.");
+      assert.deepEqual(staleSnap.details, correctedSnap.details);
+      assert.deepEqual(staleSnap.provenance, staleProvenance);
+      await first.page.reload({ waitUntil: "networkidle" });
+      await first.page.getByRole("button", { name: "Answer SNAP application questions" }).click();
+      const focusedForm = first.page.getByRole("form", { name: "Correct SNAP application answers" });
+      await focusedForm.getByLabel("Your address", { exact: true }).waitFor();
+      check(await focusedForm.locator("input,select").count() === 1 && await focusedForm.getByLabel("Your address", { exact: true }).inputValue() === staleSnap.details.address?.street &&
+        await first.page.getByRole("form", { name: "Household questions" }).count() === 0,
+      "The actual focused editor asks only for the stale street answer and never opens generic answer_facts.");
+      await focusedForm.getByRole("button", { name: "Still correct: Your address", exact: true }).click();
+      const reaffirming = first.page.waitForResponse(response => response.url() === snapUrl && response.request().method() === "POST");
+      await focusedForm.getByRole("button", { name: "Save application changes" }).click();
+      const reaffirmed = await reaffirming;
+      check(reaffirmed.status() === 201, "The actual focused Still correct answer saves through the owned application API.");
+      const reaffirmBody = reaffirmed.request().postDataJSON(), reaffirmKey = reaffirmed.request().headers()["idempotency-key"];
+      const latestSnap = await readSnap();
+      check(latestSnap.id === (await reaffirmed.json()).snapshotId && latestSnap.revision === 4 && latestSnap.request_version === staleSnap.request_version + 1 && reaffirmBody.expectedVersion === staleSnap.request_version,
+        "The current-version stale answer creates a new immutable revision and request version.");
+      assert.deepEqual(reaffirmBody.confirmedPaths, ["address.street"]);
+      assert.deepEqual(latestSnap.confirmed_paths, ["address.street"]);
+      assert.deepEqual(latestSnap.details, staleSnap.details);
+      assert.deepEqual({ ...latestSnap.provenance, "address.street": staleSnap.provenance["address.street"] }, staleSnap.provenance);
+      check(Date.parse(latestSnap.provenance["address.street"].confirmedAt) > Date.parse(staleSnap.provenance["address.street"].confirmedAt), "Only the explicitly reaffirmed stale street evidence gains a current confirmation time.");
+      const reaffirmedState = await snapState();
+      check(reaffirmedState.request.version === latestSnap.request_version && reaffirmedState.job.request_version === latestSnap.request_version && reaffirmedState.job.state === "queued" &&
+        reaffirmedState.operations === 0 && reaffirmedState.model_calls === 0, "The actual reaffirmation requeues only current-version permitted work without a model call or provider operation.");
+      const tokenReaffirm = await rest(token, "rpc/parent_reaffirm_snap_application_details", { p_request_id: snapRequestId, p_expected_version: reaffirmBody.expectedVersion,
+        p_details: reaffirmBody.details, p_notice_version: reaffirmBody.noticeVersion, p_idempotency_key: reaffirmKey, p_confirmed_paths: reaffirmBody.confirmedPaths });
+      check(tokenReaffirm.status === 200 && await tokenReaffirm.json() === latestSnap.id, "The issued owner Auth token replays the exact reaffirmation through the real PostgREST RPC.");
+      assert.deepEqual(await snapState(), reaffirmedState);
+      assert.deepEqual(await readSnap(originalSnap.id), originalSnap);
+      assert.deepEqual(await readSnap(correctedSnap.id), correctedSnap);
+      assert.deepEqual(await readSnap(staleSnap.id), staleSnap);
+      await db.query("update parent_private.processing_controls set snap_details_enabled=false where singleton");
+      assert.deepEqual(await readSnap(), latestSnap);
+      check((await first.page.request.post(snapUrl, { headers: { origin, "Idempotency-Key": reaffirmKey }, data: reaffirmBody })).status() === 403,
+        "Closing the SNAP purpose stops further private writes while the owner can still read their retained exact revision.");
+    } catch (error) {
+      try {
+        const fieldName = (path: string) => path.replace(/[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}/gi, "record");
+        const response = snapDiagnosticRequestId ? await first.page.request.get(`${origin}/api/parent/requests/${snapDiagnosticRequestId}/snap-application`) : null;
+        const body = response?.ok() ? await response.json() : null;
+        const parsed = snapApplicationSnapshotSchema.safeParse(body?.snapshot);
+        const browserNow = await first.page.evaluate(() => Date.now());
+        const assessmentCode = (now: number) => {
+          if (!parsed.success) return "snap_snapshot_invalid";
+          try { assessSnapApplicationSnapshot(parsed.data, new Date(now));return null; }
+          catch (failure) { return failure instanceof Error && ["snap_snapshot_invalid", "snap_provenance_invalid"].includes(failure.message) ? failure.message : "assessment_failed"; }
+        };
+        mkdirSync("tmp/parent-verification/actual-auth", { recursive: true });
+        writeFileSync("tmp/parent-verification/actual-auth/snap-failure.json", `${JSON.stringify({
+          stage, status: response?.status() ?? null, snapshotParsed: parsed.success,
+          parseIssues: parsed.success ? [] : parsed.error.issues.map(issue => ({ code: issue.code, field: fieldName(issue.path.map(String).join(".")) })),
+          browserAssessmentCode: assessmentCode(browserNow), systemAssessmentCode: assessmentCode(Date.now()),
+          futureProvenanceFields: parsed.success ? Object.entries(parsed.data.provenance).filter(([, evidence]) => Date.parse(evidence.confirmedAt) > browserNow).map(([path]) => fieldName(path)) : [],
+          snapAccessibility,
+        }, null, 2)}\n`);
+      } catch { /* Diagnostics must not mask the original failure or stop fixture cleanup. */ }
+      throw error;
+    } finally {
+      await db.query(`update parent_private.processing_controls c set
+        (snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version)=
+        (select r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version
+        from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(snapControls)]);
+      assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, snapControls);
+      check((await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n === snapBudgetBefore,
+        "All four SNAP-purpose controls are restored exactly and model-budget reservations are unchanged.");
+    }
+
     stage = "actual browser sign-out and retained-token denial";
     await first.page.goto(`${origin}/account`, { waitUntil: "networkidle" });
     await first.page
@@ -1097,11 +1338,13 @@ async function main() {
     services: { auth: "55321", database: "55322", email: "55324" },
     assertions: [...new Set(checks)],
     rateLimitObserved,
+    snapAccessibility,
     limitations: [
       "Loopback HTTP cannot establish hosted Secure-cookie, domain, SMTP or redirect-allowlist behavior.",
       "Hosted shared-account migration, recovery/session coexistence and scheduled retention erasure require separate checks; the password case uses a synthetic school role only on the isolated parent service.",
       "Document parsing/extraction is not established by private PDF upload and Storage authorization.",
       "Grouped factual questions are explicitly seeded synthetic fixtures; the test does not establish AI question selection or partner execution.",
+      "The full SNAP form check establishes owned nonprotected intake, atomic start, revision correction and export, not protected identifiers/signatures, worker preparation or a genuine provider submission.",
       "No external application or model provider was called.",
     ],
   };

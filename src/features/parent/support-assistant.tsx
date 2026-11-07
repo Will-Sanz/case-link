@@ -31,7 +31,7 @@ export function SupportAssistant({
   onRefresh?: () => void;
 }) {
   const path = `/requests/${request.id}/assistant`;
-  const { data, error, loading, reload } =
+  const { data, error, loading, reload, reloadIfIdle } =
     useParentResource<ParentAssistantConversation>(path);
   const [question, setQuestion] = useState("");
   const [consented, setConsented] = useState(false);
@@ -64,10 +64,10 @@ export function SupportAssistant({
   useEffect(() => {
     if (!waiting) return;
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") reload();
+      if (document.visibilityState === "visible") reloadIfIdle();
     }, 5000);
     return () => clearInterval(interval);
-  }, [waiting, reload]);
+  }, [waiting, reloadIfIdle]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice("");

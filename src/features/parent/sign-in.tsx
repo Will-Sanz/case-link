@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -7,6 +7,8 @@ import { ArrowRight, Lock, Mail } from "iconoir-react";
 import { AUTH_LINK_ERROR_MESSAGE } from "@/lib/auth/safe-client-auth-message";
 import { parentApi, safeReturnPath } from "./api";
 import styles from "./parent.module.css";
+
+const subscribeReady = () => () => {};
 
 export function ParentSignIn({
   returnTo,
@@ -22,6 +24,7 @@ export function ParentSignIn({
   authNotice?: "password-reset-success" | "auth-link-error";
 }) {
   const router = useRouter();
+  const ready = useSyncExternalStore(subscribeReady, () => true, () => false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [method, setMethod] = useState<"password" | "code">("password");
@@ -38,6 +41,7 @@ export function ParentSignIn({
   }, [sent]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!ready) return;
     setPending(true);
     setError("");
     try {
@@ -69,6 +73,7 @@ export function ParentSignIn({
     }
   }
   async function resend() {
+    if (!ready) return;
     setPending(true);
     setError("");
     setResent(false);
@@ -138,6 +143,7 @@ export function ParentSignIn({
                 autoComplete="username"
                 inputMode="email"
                 required
+                disabled={!ready}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 maxLength={254}
@@ -160,6 +166,7 @@ export function ParentSignIn({
                 pattern="[0-9]{6,10}"
                 autoComplete="one-time-code"
                 required
+                disabled={!ready}
                 maxLength={10}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
@@ -179,6 +186,7 @@ export function ParentSignIn({
                 type="password"
                 autoComplete="current-password"
                 required
+                disabled={!ready}
                 maxLength={1024}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -215,7 +223,7 @@ export function ParentSignIn({
           )}
           <button
             className={`${styles.button} ${styles.full}`}
-            disabled={pending}
+            disabled={!ready || pending}
             type="submit"
           >
             {pending
@@ -235,7 +243,7 @@ export function ParentSignIn({
         {emailCodeAvailable && (
           <button
             className={`${styles.quiet} ${styles.space}`}
-            disabled={pending}
+            disabled={!ready || pending}
             onClick={() => {
               setMethod(method === "password" ? "code" : "password");
               setPassword("");
@@ -254,14 +262,14 @@ export function ParentSignIn({
           <div className={`${styles.inline} ${styles.space}`}>
             <button
               className={styles.quiet}
-              disabled={pending}
+              disabled={!ready || pending}
               onClick={resend}
             >
               Send a new code
             </button>
             <button
               className={styles.quiet}
-              disabled={pending}
+              disabled={!ready || pending}
               onClick={() => {
                 setSent(false);
                 setToken("");

@@ -14,6 +14,7 @@ import {
   type ApplicationBrowserResponse,
 } from "@/lib/parent/browser-policy";
 import { fixtureRequest } from "@/lib/parent/test-fixtures";
+import { getProgram } from "@/lib/parent/programs";
 
 const request = fixtureRequest();
 const sessionId = "e1671f04-783d-469e-ad76-a426c2a2d832";
@@ -53,6 +54,7 @@ function setup(
     signal: AbortSignal,
   ) => Promise<{ status: number }>,
   onNeedsVerification?: (needed: boolean) => void,
+  preparedApplicationAvailable = false,
 ) {
   let state = initial;
   let metadataStatus = 200;
@@ -77,7 +79,7 @@ function setup(
   });
   vi.stubGlobal("fetch", fetch);
   const view = render(
-    <ApplicationBrowser request={request} canStart hasAttempt={false} onNeedsVerification={onNeedsVerification} />,
+    <ApplicationBrowser request={request} canStart hasAttempt={false} preparedApplicationAvailable={preparedApplicationAvailable} onNeedsVerification={onNeedsVerification} />,
   );
   return {
     fetch,
@@ -101,6 +103,31 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+it.each(["none", "closed"] as const)("keeps the official service secondary with a prepared application and %s session", async state => {
+  const initial = record();
+  initial.session = state === "none" ? null : { ...initial.session!, status: "closed", canControl: false, handoff: null, frameUrl: null };
+  const { fetch } = setup(initial, undefined, undefined, true);
+  await screen.findByText("Your prepared SNAP application is above.");
+  expect(screen.getByRole("link", { name: "Open the official SNAP service" }).getAttribute("href")).toBe(getProgram("snap-pa")!.officialUrl);
+  expect(screen.queryByRole("button", { name: /application view|Refresh application connection/ })).toBeNull();
+  expect(screen.queryByText(/Connection check only/)).toBeNull();
+  expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("keeps an active owned verification and Stop fully usable when the prepared application is above", async () => {
+  const verification = vi.fn(), { fetch } = setup(record("challenge"), undefined, verification, true);
+  await loadFrame();
+  expect(screen.queryByText("Your prepared SNAP application is above.")).toBeNull();
+  expect(screen.getByRole("heading", { name: "Complete the COMPASS verification" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Interact with COMPASS verification image" }).hasAttribute("disabled")).toBe(false);
+  expect(screen.getByRole("button", { name: "Stop website view" }).hasAttribute("disabled")).toBe(false);
+  expect(verification).toHaveBeenCalledWith(true);
+  fireEvent.click(screen.getByRole("button", { name: "Interact with COMPASS verification image" }), { detail: 0 });
+  await waitFor(() => expect(commandCalls(fetch)).toHaveLength(1));
+  expect(JSON.parse(String(commandCalls(fetch)[0][1].body)).action).toEqual({ type: "key", key: "Tab" });
 });
 
 it("enables the preview continuation only after its exact image loads, without calling it a required personal act", async () => {

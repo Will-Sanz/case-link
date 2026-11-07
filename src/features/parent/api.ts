@@ -1,3 +1,19 @@
+import { NEEDS } from "@/lib/parent/domain";
+import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
+
+export type ParentAuthorizationWindow = {
+  authorization?: {
+    issuedAt: string;
+    expiresAt: string;
+    snapApplication?: { collectionEnabled: boolean; noticeVersion: string | null };
+  };
+};
+
+export function canCollectSnapApplication(value: ParentAuthorizationWindow | null): boolean {
+  return value?.authorization?.snapApplication?.collectionEnabled === true &&
+    value.authorization.snapApplication.noticeVersion === SNAP_APPLICATION_NOTICE_VERSION;
+}
+
 export class ParentApiError extends Error {
   constructor(
     message: string,
@@ -49,13 +65,30 @@ export async function parentApi<T>(
   return body;
 }
 
+export async function boundedParentApi(path: string, init: RequestInit, owner: AbortSignal, expiry: string): Promise<unknown> {
+  const remaining = Math.min(30_000, Date.parse(expiry) - Date.now());
+  if (!Number.isFinite(remaining) || remaining <= 0 || owner.aborted) throw new Error();
+  const deadline = new AbortController(), signal = AbortSignal.any([owner, deadline.signal]);
+  let rejectAbort!: (error: Error) => void;
+  const stopped = new Promise<never>((_, reject) => { rejectAbort = reject; });
+  const stop = () => rejectAbort(new ParentApiError("We couldn’t finish checking this information. Check your connection and try again.", 0));
+  signal.addEventListener("abort", stop, { once: true });
+  const timer = setTimeout(() => deadline.abort(), remaining);
+  try { return await Promise.race([parentApi<unknown>(path, { ...init, signal }), stopped]); }
+  finally { clearTimeout(timer); signal.removeEventListener("abort", stop); }
+}
+
+
 export function safeReturnPath(value: string | undefined): string {
-  return value &&
-    /^\/(?:get-support|my-support|account|support\/[a-zA-Z0-9-]+)(?:\?need=(?:food|utilities))?$/.test(
-      value,
-    )
-    ? value
-    : "/my-support";
+  if (!value || value.trim() !== value) return "/my-support";
+  const [path, need, ...extra] = value.split("?need=");
+  return (
+    /^\/(?:get-support|my-support|account|support\/[a-zA-Z0-9-]+)$/.test(path) &&
+    extra.length === 0 &&
+    (need === undefined ||
+      (path === "/get-support" &&
+        (["food", "utilities", ...NEEDS] as readonly string[]).includes(need)))
+  ) ? value : "/my-support";
 }
 
 export function displayDate(value: string, includeTime = false): string {

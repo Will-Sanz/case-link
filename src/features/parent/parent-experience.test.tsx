@@ -7,7 +7,9 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToString } from "react-dom/server";
 import { ParentApiError, parentApi, safeReturnPath, displayDate } from "./api";
+import { NEEDS } from "@/lib/parent/domain";
 import { ParentSignIn } from "./sign-in";
 import { buildMandate, initialIntake, ParentIntake } from "./intake";
 import { SupportDocuments } from "./support-documents";
@@ -68,6 +70,20 @@ describe("parent API and navigation", () => {
     expect(displayDate("2026-10-25")).toBe("Oct 25, 2026");
     expect(displayDate("unreadable")).toBe("Date unavailable");
   });
+  it.each(NEEDS)("returns to the exact %s service after sign-in", (need) => {
+    expect(safeReturnPath(`/get-support?need=${need}`)).toBe(`/get-support?need=${need}`);
+  });
+  it.each([
+    "/get-support?need=snap_new&next=https://attacker.test",
+    "/get-support?need=snap_new?need=food_now",
+    "/my-support?need=snap_new",
+    "/get-support?need=not-a-service",
+    "/get-support?need=",
+    "/my-support\n",
+    " /get-support?need=snap_new",
+  ])("rejects an unrecognized return path %s", (path) => {
+    expect(safeReturnPath(path)).toBe("/my-support");
+  });
   it("preserves authentication and configuration failure status", async () => {
     vi.stubGlobal(
       "fetch",
@@ -84,6 +100,51 @@ describe("parent API and navigation", () => {
 });
 
 describe("email sign-in", () => {
+  it("keeps server-rendered sign-in controls natively disabled until hydration", () => {
+    const document = new DOMParser().parseFromString(
+      renderToString(<ParentSignIn existingAccountRecovery />),
+      "text/html",
+    );
+    const inputs = document.querySelectorAll("input");
+    const buttons = document.querySelectorAll("button");
+    expect(inputs.length).toBe(2);
+    expect(buttons.length).toBe(2);
+    for (const control of [...inputs, ...buttons]) expect(control.disabled).toBe(true);
+    expect(document.querySelector('a[href="/forgot-password"]')).toBeTruthy();
+  });
+  it("automatically enables the hydrated form and preserves typed values for the exact sign-in request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const container = document.createElement("div");
+    const form = <ParentSignIn returnTo="/my-support" />;
+    container.innerHTML = renderToString(form);
+    document.body.append(container);
+    expect(container.querySelector<HTMLInputElement>("#parent-email")?.disabled).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const { rerender } = render(form, { container, hydrate: true });
+    const email = screen.getByLabelText<HTMLInputElement>("Your email address");
+    const password = screen.getByLabelText<HTMLInputElement>("Password");
+    const submit = screen.getByRole<HTMLButtonElement>("button", { name: "Sign in" });
+    expect(email.disabled).toBe(false);
+    expect(password.disabled).toBe(false);
+    expect(submit.disabled).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.change(email, { target: { value: "existing@example.test" } });
+    fireEvent.change(password, { target: { value: "synthetic-password" } });
+    rerender(<ParentSignIn returnTo="/my-support" />);
+    expect(email.value).toBe("existing@example.test");
+    expect(password.value).toBe("synthetic-password");
+    fireEvent.click(submit);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/my-support"));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      action: "sign_in",
+      email: "existing@example.test",
+      password: "synthetic-password",
+    });
+  });
   it("keeps the email form usable when code delivery is unavailable", async () => {
     vi.stubGlobal(
       "fetch",
@@ -206,7 +267,7 @@ describe("email sign-in", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
     const codeInput = await screen.findByLabelText("Email code");
-    expect(document.activeElement).toBe(codeInput);
+    await waitFor(() => expect(document.activeElement).toBe(codeInput));
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
       action: "send_code",
       email: "synthetic@example.test",
@@ -290,10 +351,10 @@ describe("informed support start", () => {
     const windows = vi.fn(() =>
       jsonResponse({
         ok: true,
-        authorization: { expiresAt: "2026-11-24T12:00:00.000Z" },
+        authorization: { issuedAt: "2026-11-03T12:00:00.000Z", expiresAt: "2026-11-24T12:00:00.000Z" },
       }),
     );
-    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2028-01-01T00:00:00Z"));
+    const clock=vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-06T00:00:00Z"));
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, options: RequestInit) => {
@@ -310,7 +371,7 @@ describe("informed support start", () => {
         });
       }),
     );
-    render(<ParentIntake initialNeed="food" />);
+    render(<ParentIntake />);
     fireEvent.click(
       await screen.findByRole("checkbox", { name: /Food for now/ }),
     );
@@ -337,6 +398,7 @@ describe("informed support start", () => {
     );
     await screen.findByRole("alert");
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+    clock.mockReturnValue(Date.parse("2026-11-06T00:05:00Z"));
     fireEvent.click(
       screen.getByRole("button", { name: "Start getting support" }),
     );
@@ -352,7 +414,8 @@ describe("informed support start", () => {
     expect(JSON.parse(String(attempts[1].body)).mandate.expiresAt).toBe(
       "2026-11-24T12:00:00.000Z",
     );
-    expect(windows).toHaveBeenCalledOnce();
+    // Collection availability is read before fields; retry reuses the one start window.
+    expect(windows).toHaveBeenCalledTimes(2);
   });
   it("does not collect intake when secure parent processing is unavailable", async () => {
     vi.stubGlobal(

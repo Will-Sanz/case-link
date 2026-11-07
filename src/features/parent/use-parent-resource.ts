@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ParentApiError, parentApi } from "./api";
+import { ParentApiError, boundedParentApi } from "./api";
 
 type Result<T> = { path: string; data: T | null; error: Error | null };
 
@@ -17,9 +17,9 @@ export function useParentResource<T>(path: string) {
   useEffect(() => {
     const controller = new AbortController();
     pending.current = true;
-    parentApi<T>(path, { signal: controller.signal })
+    boundedParentApi(path, {}, controller.signal, new Date(Date.now() + 30_000).toISOString())
       .then((data) => {
-        if (!controller.signal.aborted) setResult({ path, data, error: null });
+        if (!controller.signal.aborted) setResult({ path, data: data as T, error: null });
       })
       .catch((error) => {
         if (!controller.signal.aborted)

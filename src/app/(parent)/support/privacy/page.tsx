@@ -11,7 +11,7 @@ export default function ParentPrivacyPage() {
     <article className={`${styles.container} ${styles.legal}`}>
       <p>Privacy & data policy</p>
       <h1>Your information. Your control.</h1>
-      <p>Last updated October 25, 2026 · Parent service</p>
+      <p>Last updated November 3, 2026 · Parent service</p>
       <div className={styles.notice}>
         Live personal-data processing is not open by default. Provider
         agreements, approved retention terms and operational privacy checks are
@@ -56,6 +56,45 @@ export default function ParentPrivacyPage() {
         documents in support requests or uploads. Enter your CaseLink password
         only in its sign-in form. Agency-only sensitive information belongs in
         the program’s protected direct-entry process.
+      </p>
+      <h2 id="snap-application">Private SNAP application details</h2>
+      <p>
+        When this collection purpose is enabled, the separate SNAP application
+        fields request the ordinary answers needed for the reviewed Pennsylvania
+        application: applicant name and postal address, optional phone contacts,
+        language preferences, household members’ names and birth dates,
+        relationship and student information, which people are applying and
+        their citizenship answers, current-month income received or expected,
+        applicable medical and other expense deductions and the form’s
+        criminal-history and benefit-disqualification questions.
+        Representative contact details are optional and do not designate
+        CaseLink or an AI as an authorized representative. Optional race and
+        voter-registration answers are not collected here.
+      </p>
+      <p>
+        Before these details are saved, the start authorization names
+        Pennsylvania SNAP and explains the application purpose and information
+        use. The answers are held in private, owned application revisions,
+        separate from chat and ordinary support facts. Saving these answers does
+        not send all of them to an AI service or submit an agency application.
+        A future AI or delivery use must pass its actual purpose, information,
+        processor and recipient controls. Required Social Security numbers,
+        credentials and signature values are not accepted in these fields;
+        genuine identifiers and certifications need the protected official-program
+        process. The accepted submission route must establish its own personal
+        act and receipt evidence.
+      </p>
+      <p>
+        CaseLink keeps these application revisions while the support request is
+        active and for up to 90 days after closure, subject to eligible earlier
+        deletion. Unchanged answers keep their original recorded dates; reading
+        them, starting another request or changing an unrelated answer does not
+        refresh them. Corrections create a new revision and stop queued uses of
+        superseded information. Earlier delivered records remain attributed
+        history. These are sensitive household and eligibility details; the
+        existing storage, access, deletion and backup limitations below apply.
+        Real-family processing remains closed until its recorded privacy and
+        operational checks are complete.
       </p>
       <h2>What you authorize</h2>
       <p>

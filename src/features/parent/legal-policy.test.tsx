@@ -48,4 +48,12 @@ describe("parent policy commitments", () => {
       screen.getByText(/Mandatory consumer rights remain in place/),
     ).toBeTruthy();
   });
+  it("explains the narrow private SNAP purpose and retention without enabling real-family processing or treating save as submission",()=>{
+    render(<ParentPrivacyPage/>);
+    expect(document.getElementById("snap-application")?.textContent).toBe("Private SNAP application details");
+    expect(screen.getByText(/current-month income received or expected/)).toBeTruthy();
+    expect(screen.getByText(/Saving these answers does not send all of them to an AI service or submit an agency application/)).toBeTruthy();
+    expect(screen.getByText(/up to 90 days after closure/)).toBeTruthy();
+    expect(screen.getByText(/Real-family processing remains closed/)).toBeTruthy();
+  });
 });

@@ -3,8 +3,12 @@ import { useCallback, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Clock } from "iconoir-react";
 import type { SupportNeed, SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
-import type { OperationHistory, RecordedOperation } from "./support-activity";
+import { currentProtectedSnapAttempt, currentSnapReview, currentSnapDraft, SnapDraftReview, isSnapFinalReviewAction, protectedRecordedSnapPacket, recordedReceipt, type OperationHistory, type RecordedOperation } from "./support-activity";
+import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
+import { SnapSubmissionConfirmation } from "./snap-submission-confirmation";
 import { ApplicationBrowser } from "./application-browser";
+import { SnapApplicationReview } from "./snap-application-review";
+import { SnapFinalReview } from "./snap-final-review";
 import styles from "./parent.module.css";
 import layout from "./application-workspace.module.css";
 
@@ -26,8 +30,11 @@ export function recordedApplicationState(
     | "state"
     | "request_version"
     | "artifact_id"
+    | "protected_packet"
+    | "form"
     | "need"
     | "action"
+    | "evidence"
   >[],
   programId?: string,
   currentVersion?: number,
@@ -37,6 +44,7 @@ export function recordedApplicationState(
   detail: string;
   submitted: boolean;
   hasAttempt: boolean;
+  currentVersionSubmitted?: boolean;
   outcome?: "assistance_approved" | "support_received" | "declined";
 } {
   const relevant = operations.filter(
@@ -44,14 +52,12 @@ export function recordedApplicationState(
       (!programId || operation.program_id === programId) &&
       (!need || operation.need === need),
   );
-  const latestDecision = relevant.find((operation) =>
-    [
-      "agency_submitted",
-      "assistance_approved",
-      "support_received",
-      "declined",
-    ].includes(operation.state),
-  )?.state;
+  const latestDecision = relevant.flatMap((operation) => {
+    const receipt = recordedReceipt(operation);
+    return receipt && ["agency_submitted", "assistance_approved", "support_received", "declined"].includes(receipt.state) &&
+      (currentVersion === undefined || operation.request_version === currentVersion)
+      ? [receipt] : [];
+  }).sort((a, b) => Date.parse(b.agencyStatus?.observedAt ?? b.recordedAt) - Date.parse(a.agencyStatus?.observedAt ?? a.recordedAt))[0]?.state;
   const outcome =
     latestDecision === "assistance_approved" ||
     latestDecision === "support_received" ||
@@ -59,7 +65,7 @@ export function recordedApplicationState(
       ? latestDecision
       : undefined;
   const submitted = relevant.filter(
-    (operation) => operation.state === "agency_submitted",
+    (operation) => operation.state === "agency_submitted" && recordedReceipt(operation),
   );
   if (submitted.length) {
     const earlierVersion =
@@ -76,6 +82,7 @@ export function recordedApplicationState(
         : "An agency submission is recorded. Open Activity & receipts for the exact evidence and who confirmed it.",
       submitted: true,
       hasAttempt: true,
+      currentVersionSubmitted: currentVersion !== undefined && !earlierVersion,
       outcome,
     };
   }
@@ -102,6 +109,10 @@ export function recordedApplicationState(
           "partner_received",
           "partner_accepted",
           "unresolved",
+          "agency_submitted",
+          "assistance_approved",
+          "support_received",
+          "declined",
         ].includes(operation.state) &&
         (operation.state !== "executing" ||
           !["research", "prepare"].includes(operation.action ?? "")),
@@ -114,10 +125,15 @@ export function recordedApplicationState(
       submitted: false,
       hasAttempt: true,
     };
+  if (relevant.some(operation => operation.state === "prepared" && (currentVersion === undefined || operation.request_version === currentVersion) && protectedRecordedSnapPacket(operation)))
+    return { label: "SNAP application prepared", detail: "The exact application is prepared for your review. No application submission is recorded.", submitted: false, hasAttempt: false };
+  const forms = relevant.filter((operation) => operation.artifact_id);
   return {
     label: "No application submission recorded",
-    detail: relevant.some((operation) => operation.artifact_id)
-      ? "A prepared form is saved. Preparation is separate from sending an application."
+    detail: forms.length
+      ? forms.every((operation) => operation.form?.preparation_only)
+        ? "An incomplete unsigned draft is saved. It is not a complete application and has not been submitted."
+        : "A prepared form is saved. Preparation is separate from sending an application."
       : "Your support request is saved. Guidance and a support plan are separate from filling or sending an application.",
     submitted: false,
     hasAttempt: false,
@@ -129,11 +145,21 @@ export function ApplicationWorkspace({
   progress,
   children,
   history,
+  onChange,
+  snapAnswerRequest,
+  snapReview,
+  snapSubmissionDecision,
+  onReviewChange,
 }: {
   request: SupportRequest;
   progress?: SupportProgress;
   children: ReactNode;
   history: OperationHistory;
+  onChange?: () => void;
+  snapAnswerRequest?: number;
+  snapReview?: SnapProtectedOperation | null;
+  snapSubmissionDecision?: SnapProtectedOperation | null;
+  onReviewChange?: (review: SnapProtectedOperation | null) => void;
 }) {
   const [activeSection, setActiveSection] = useState("application-overview");
   const [verification, setVerification] = useState({ requestId: request.id, needed: false });
@@ -145,6 +171,13 @@ export function ApplicationWorkspace({
   const snap = request.intake.needs.includes("snap_new");
   const operations = data?.operations ?? [];
   const historyLimited = data?.historyLimited !== false;
+  const ownedReview = snap ? currentSnapReview(request, snapReview) : null;
+  const knownDecision = snap ? currentSnapReview(request, snapSubmissionDecision) : null;
+  const decisionRecorded = ownedReview?.snapSubmissionAuthorized === true || (knownDecision?.snapSubmissionAuthorized === true && (!ownedReview || sameSnapProtectedOperationBinding(ownedReview, knownDecision)));
+  const attemptRecorded = !!ownedReview && snapProtectedDeliveryAttempt(ownedReview.state) || !error && !loading && currentProtectedSnapAttempt(request, operations);
+  const reviewFinished = decisionRecorded || attemptRecorded;
+  const reviewRequested = snap && request.required_actions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent") && isSnapFinalReviewAction(action));
+  const protectedPrepared = snap && !error && !loading && operations.some(operation => operation.request_id === request.id && operation.request_version === request.version && operation.state === "prepared" && protectedRecordedSnapPacket(operation));
   const application = recordedApplicationState(
     operations,
     snap ? "snap-pa" : undefined,
@@ -155,6 +188,18 @@ export function ApplicationWorkspace({
         ? request.intake.needs[0]
         : undefined,
   );
+  const snapSubmissionComplete = snap && application.currentVersionSubmitted;
+  const draft = !loading && !error && !reviewRequested && !protectedPrepared && !reviewFinished && !application.submitted ? currentSnapDraft(request, operations) : null;
+  const snapSubmission = snapSubmissionComplete
+    ? operations.filter((operation) => operation.program_id === "snap-pa" &&
+        operation.need === "snap_new" && operation.request_version === request.version &&
+        operation.state === "agency_submitted" && recordedReceipt(operation))
+      .sort((a, b) => {
+        const left = recordedReceipt(a)!, right = recordedReceipt(b)!;
+        return Date.parse(right.agencyStatus?.observedAt ?? right.recordedAt) - Date.parse(left.agencyStatus?.observedAt ?? left.recordedAt);
+      })[0]
+    : undefined;
+  const snapReceipt = snapSubmission ? recordedReceipt(snapSubmission) : null;
   const relatedSnapAttempt =
     snap &&
     !error &&
@@ -167,7 +212,7 @@ export function ApplicationWorkspace({
     );
   const actions = request.required_actions.filter(
     (action) =>
-      !action.resolved && (!action.resolver || action.resolver === "parent"),
+      !action.resolved && (!action.resolver || action.resolver === "parent") && !(reviewFinished && isSnapFinalReviewAction(action)),
   );
   const inactive = request.status !== "active";
   const needsService = request.required_actions.some(
@@ -186,6 +231,8 @@ export function ApplicationWorkspace({
           ? "Next: Program follow-up"
           : application.outcome === "declined"
             ? "Next: Decision & follow-up"
+            : reviewFinished && !application.submitted
+              ? "Next: CaseLink"
             : progress?.state === "running" || progress?.state === "queued"
               ? "Next: CaseLink"
               : application.submitted
@@ -203,6 +250,10 @@ export function ApplicationWorkspace({
           ? "Approval is recorded. Actual receipt of support is a separate step. Check Activity & receipts for the decision, delivery and follow-up evidence."
           : application.outcome === "declined"
             ? "A decline is recorded. Check Activity & receipts for the decision and Program progress for any recorded appeal or alternative. The decision does not start a new application."
+            : reviewFinished && !application.submitted
+              ? attemptRecorded
+                ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry. No repeat Submit decision is requested."
+                : "Your Submit decision is saved. CaseLink must check delivery and record any agency confirmation. You do not need to choose Submit again."
             : progress?.state === "running"
               ? `${progress.summary} The browser below shows the official site connection and any recorded blocker.`
               : progress?.state === "queued"
@@ -333,7 +384,11 @@ export function ApplicationWorkspace({
                     ? "Checking application records…"
                     : historyLimited && !application.hasAttempt
                       ? "Earlier application history needs checking"
-                      : application.label}
+                      : decisionRecorded && !application.hasAttempt
+                        ? "Submit decision recorded"
+                      : snapSubmissionComplete
+                        ? "SNAP application complete"
+                        : application.label}
               </strong>
               <p>
                 {error
@@ -342,10 +397,34 @@ export function ApplicationWorkspace({
                     ? "We use recorded operations and receipts to confirm what actually happened."
                     : historyLimited && !application.hasAttempt
                       ? "Only the latest 100 operation records are available here. An earlier submission or uncertain delivery may be outside this view. We cannot treat this as a fresh application until earlier history is checked."
-                      : application.detail}
+                      : decisionRecorded && !application.hasAttempt
+                        ? "The decision to send your exact application is saved. Delivery and an agency confirmation are separate records."
+                      : snapSubmissionComplete && !application.outcome && !historyLimited
+                        ? "Submission confirmed · benefits decision pending. Open your recorded receipt for the exact application and who confirmed it."
+                        : application.detail}
               </p>
             </div>
           </div>
+          {!loading && !error && snapSubmissionComplete && (
+            <a
+              className={styles.button}
+              href="#application-receipts"
+              onClick={() => {
+                setActiveSection("application-receipts");
+                document.getElementById("application-receipts")?.focus({ preventScroll: true });
+              }}
+            >
+              View application receipt <ArrowRight width={17} height={17} aria-hidden="true" />
+            </a>
+          )}
+          {!loading && !error && snapSubmission && snapReceipt && (
+            <SnapSubmissionConfirmation
+              requestId={request.id}
+              operationId={snapSubmission.id}
+              receipt={snapReceipt}
+              outcome={application.outcome}
+            />
+          )}
           {error && (
             <button type="button" className={styles.quiet} onClick={reload}>
               Check application records again
@@ -366,8 +445,8 @@ export function ApplicationWorkspace({
             <strong>{nextActor}</strong>
             <p>{nextDetail}</p>
             {!inactive && (actions.length > 0 || needsVerification) && (
-              <a className={styles.button} href={needsVerification ? "#application-browser" : "#your-next-steps"}>
-                {needsVerification ? "Complete COMPASS verification" : actions.length === 1 ? "Complete your step" : "See your steps"}{" "}
+              <a className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
+                {needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps"}{" "}
                 <ArrowRight width={17} height={17} aria-hidden="true" />
               </a>
             )}
@@ -390,16 +469,21 @@ export function ApplicationWorkspace({
             </li>
           </ul>
         </section>
+        {draft && <SnapDraftReview key={`${request.id}:${request.version}:${draft.artifact_id}`} request={request} operation={draft}/>}
+        {reviewRequested && <SnapFinalReview key={`${request.id}:${request.version}`} request={request} onChange={onChange} onReviewChange={onReviewChange}/>}
+        {snap && <SnapApplicationReview key={`snap-answers:${request.id}`} request={request} onChange={onChange} answerRequest={snapAnswerRequest}/>}
         {snap && (
           <ApplicationBrowser
-            key={request.id}
+            key={`compass-browser:${request.id}`}
             request={request}
-            canStart={!loading && !error && !application.hasAttempt}
+            preparedApplicationAvailable={protectedPrepared || attemptRecorded || ownedReview?.protectedPacketCurrent === true}
+            canStart={!loading && !error && !application.hasAttempt && !protectedPrepared}
             hasAttempt={
               loading ||
               !!error ||
               historyLimited ||
               application.hasAttempt ||
+              protectedPrepared ||
               relatedSnapAttempt
             }
             onNeedsVerification={onNeedsVerification}

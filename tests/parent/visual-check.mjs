@@ -50,6 +50,20 @@ const snapRequest = fixtureRequest({
   events: [],
   documents: [],
 });
+const snapConfirmation = {
+  id: "synthetic-snap-submission",
+  program_id: "snap-pa",
+  need: "snap_new",
+  request_version: snapRequest.version,
+  action: "submit",
+  state: "agency_submitted",
+  created_at: fixtureNow.toISOString(),
+  evidence: {
+    source: "agency_receipt",
+    reference: "SYNTHETIC-LAYOUT-ONLY-NOT-A-FILING",
+    recordedAt: "2026-10-25T16:00:00+00:00",
+  },
+};
 const progress = {
   state: "service_offline",
   summary:
@@ -74,6 +88,8 @@ try {
     });
     const page = await context.newPage();
     let currentRequest = request;
+    let currentOperations = [];
+    let currentProgress = progress;
     await page.route("**/api/parent/**", async (route) => {
       const url = new URL(route.request().url());
       const body = url.pathname.endsWith("/authorization-window")
@@ -148,7 +164,7 @@ try {
                 : url.pathname.endsWith("/capabilities")
                   ? { ok: true, capabilities: [] }
                   : url.pathname.endsWith("/operations")
-                    ? { ok: true, operations: [], historyLimited: false }
+                    ? { ok: true, operations: currentOperations, historyLimited: false }
                     : url.pathname.endsWith("/account")
                       ? {
                           ok: true,
@@ -166,9 +182,9 @@ try {
                         ? {
                             ok: true,
                             requests: [currentRequest],
-                            progress: { [request.id]: progress },
+                            progress: { [currentRequest.id]: currentProgress },
                           }
-                        : { ok: true, request: currentRequest, progress };
+                        : { ok: true, request: currentRequest, progress: currentProgress };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -177,11 +193,14 @@ try {
     });
     for (const [label, path] of [
       ["home", "/"],
-      ["intake", "/get-support?need=food"],
-      ["permission", "/get-support?need=food"],
+      ["food-services", "/get-support?need=food"],
+      ["intake", "/get-support"],
+      ["snap-intake", "/get-support?need=snap_new"],
+      ["permission", "/get-support"],
       ["support", "/my-support"],
       ["detail", `/support/${request.id}`],
       ["snap-detail", `/support/${request.id}`],
+      ["snap-confirmation", `/support/${request.id}`],
       ["account", "/account"],
       ["signin", "/sign-in"],
       ["product", "/product"],
@@ -190,11 +209,30 @@ try {
       ["terms", "/support/terms"],
     ]) {
       if (name === "wide" && label !== "home") continue;
-      if (process.argv.includes("--snap-only") && label !== "snap-detail")
+      if (process.argv.includes("--snap-only") && !["snap-detail", "snap-confirmation"].includes(label))
         continue;
-      currentRequest = label === "snap-detail" ? snapRequest : request;
+      currentRequest = label.startsWith("snap-") ? snapRequest : request;
+      currentOperations = label === "snap-confirmation" ? [snapConfirmation] : [];
+      currentProgress = label === "snap-confirmation"
+        ? { ...progress, state: "waiting", summary: "Synthetic layout fixture: application submission recorded; waiting for the agency decision." }
+        : progress;
       await page.goto(origin + path, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
+      if (label === "snap-confirmation") {
+        await page.getByText("SNAP application complete", { exact: true }).waitFor();
+        const record = page.getByRole("region", { name: "Your SNAP submission record" });
+        assert.ok(await record.getByText(snapConfirmation.evidence.reference, { exact: false }).isVisible());
+        assert.equal(await record.getByRole("link", { name: "Download this exact submission record" }).getAttribute("href"),
+          `/api/parent/requests/${snapRequest.id}/operations/${snapConfirmation.id}/export`);
+        assert.ok(await page.locator("#application-programs").getByText("Application submitted", { exact: true }).isVisible(),
+          "Program progress must agree with the validated current submission even before its plan refreshes.");
+        const program = page.locator("#application-programs article").first();
+        assert.equal(await program.getByText(snapRequest.plan.routes[0].summary, { exact: true }).count(), 0,
+          "A submission receipt must replace obsolete preparation instructions as well as the progress label.");
+        assert.ok(await program.getByText("Agency response", { exact: false }).isVisible());
+        assert.equal(await program.getByText("See the planned steps", { exact: true }).count(), 0);
+        assert.equal(await page.getByRole("button", { name: "Submit", exact: true }).count(), 0);
+      }
       if (label === "permission") {
         await page.getByRole("checkbox", { name: /Food for now/ }).check();
         await page.getByRole("checkbox", { name: /Apply for SNAP/ }).check();

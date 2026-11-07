@@ -33,14 +33,16 @@ export function ApplicationBrowser({
   request,
   canStart,
   hasAttempt,
+  preparedApplicationAvailable = false,
   onNeedsVerification,
 }: {
   request: SupportRequest;
   canStart: boolean;
   hasAttempt: boolean;
+  preparedApplicationAvailable?: boolean;
   onNeedsVerification?: (needed: boolean) => void;
 }) {
-  const { data, error, loading, reload } =
+  const { data, error, loading, reload, reloadIfIdle } =
     useParentResource<ApplicationBrowserResponse>(
       `/requests/${request.id}/browser`,
     );
@@ -74,12 +76,12 @@ export function ApplicationBrowser({
     if (!active) return;
     const timer = setInterval(() => {
       if (document.visibilityState === "visible" && !pendingControl.current) {
-        reload();
+        reloadIfIdle();
         setFrameRevision((value) => value + 1);
       }
     }, 5000);
     return () => clearInterval(timer);
-  }, [active, reload]);
+  }, [active, reloadIfIdle]);
   useEffect(() => () => pendingControl.current?.abort(), []);
   useEffect(() => {
     if (!expiresAt) return;
@@ -218,6 +220,11 @@ export function ApplicationBrowser({
       setStopping(false);
     }
   }
+  if (preparedApplicationAvailable && !loading && !error && !starting && !stopping && !startError && (!session || session.status === "closed"))
+    return <section className={layout.browserBody} id="application-browser" tabIndex={-1} aria-label="Official SNAP service">
+      <p className={styles.hint}>Your prepared SNAP application is above.</p>
+      <a className={styles.textLink} href={getProgram("snap-pa")!.officialUrl}>Open the official SNAP service</a>
+    </section>;
   return (
     <section
       className={layout.browser}
