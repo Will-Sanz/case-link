@@ -9,7 +9,7 @@ const container = "supabase_db_caselink";
 const databaseUrl = name => `postgresql://postgres:postgres@127.0.0.1:54322/${name}`;
 const suffix = randomUUID().replaceAll("-", "");
 const source = `caselink_restore_source_${suffix}`, target = `caselink_restore_target_${suffix}`;
-const schemas = ["public", "auth", "private", "extensions", "supabase_migrations"];
+const schemas = ["public", "auth", "private", "parent_private", "extensions", "supabase_migrations"];
 const schemaFlags = schemas.map(schema => `--schema=${schema}`);
 const created = [], clients = [];
 const admin = new Client({ connectionString: databaseUrl("postgres") });
@@ -55,6 +55,7 @@ try {
   sql(source, 'create extension pgcrypto with schema extensions; create extension "uuid-ossp" with schema extensions;');
   const original = await connect(source);
   await original.query("insert into private.production_controls(singleton,ai_enabled) values(true,false)");
+  await original.query("insert into parent_private.processing_controls(singleton) values(true)");
   for (const version of migrations) await original.query("insert into supabase_migrations.schema_migrations(version) values($1)", [version]);
   for (const [id, sid] of [[user, session], [stranger, otherSession]]) {
     await original.query("insert into auth.users(id,aud,role,email,created_at,updated_at) values($1,'authenticated','authenticated',$2,now(),now())", [id, `restore-${id}@example.test`]);
@@ -83,6 +84,8 @@ try {
   await restored.query("update public.plan_step_action_items set title='Changed after restore' where id=$1", [action]);
   assert.equal(await asUser(restored, user, session, async () => (await restored.query("select public.is_reviewed_plan_revision($1,$2,$3) allowed", [family, plan, revision])).rows[0].allowed), false, "stale review remains denied");
   assert.equal((await restored.query("select ai_enabled from private.production_controls where singleton")).rows[0].ai_enabled, false);
+  assert.equal((await restored.query("select parent_private.processing_enabled() enabled")).rows[0].enabled, false, "parent processing remains closed after restore");
+  await assert.rejects(() => asUser(restored, user, session, () => restored.query("select * from parent_private.processing_controls")), /permission denied/, "school users cannot read restored parent controls");
   // Enable the database-only budget fixtures; neither temporary database has an API service.
   await restored.query("update private.production_controls set ai_enabled=true where singleton");
   // The complete existing RLS/password-session/transaction/export suite runs only against the new target.
