@@ -1,5 +1,6 @@
-import { OUTCOME_LABELS, type SupportRoute } from "./domain";
-import { authorizeOperation } from "./policy";
+import { OUTCOME_LABELS, OUTCOME_PROGRESS, type SupportRoute } from "./domain";
+import { authorizeOperation, receiptSchema } from "./policy";
+import { snapProtectedReferenceSchema } from "./snap-protected-operation";
 
 type OperationAuthority = Parameters<typeof authorizeOperation>[0];
 export type ApplicationFieldEvidence = {
@@ -67,6 +68,7 @@ export function applicationReadiness(input: {
         !decision.allowed &&
         [
           "required_personal_act",
+          "snap_submission_review_required",
           "account_authority_unresolved",
           "booking_choice_required",
           "mandate_expired",
@@ -131,6 +133,8 @@ function authorityReason(reason: string): string {
   switch (reason) {
     case "required_personal_act":
       return "Complete the provider’s required personal step";
+    case "snap_submission_review_required":
+      return "Review and submit the exact SNAP application";
     case "account_authority_unresolved":
       return "Confirm authority for this utility account";
     case "booking_choice_required":
@@ -146,24 +150,55 @@ function authorityReason(reason: string): string {
   }
 }
 
-/** A plan is guidance; only a matching recorded artifact establishes an application was filled. */
-export function supportRouteLabel(
-  route: SupportRoute,
-  operations: readonly {
-    programId: string;
-    need?: SupportRoute["need"];
-    state: string;
-    artifactId?: string | null;
-  }[] = [],
-): string {
-  if (route.state !== "prepared") return OUTCOME_LABELS[route.state];
-  const prepared = operations.filter(
+type RecordedRouteOperation = {
+  programId: string;
+  need?: SupportRoute["need"];
+  state: string;
+  artifactId?: string | null;
+  preparationOnly?: boolean;
+  action?: string;
+  protectedPacket?: unknown;
+  receipt?: unknown;
+};
+
+export function supportRouteReceipt(
+  route: Pick<SupportRoute, "need" | "programId" | "state">,
+  operations: readonly RecordedRouteOperation[],
+) {
+  const receipts = operations.filter(
     (operation) =>
       operation.programId === route.programId &&
-      operation.need === route.need &&
-      operation.state === "prepared",
-  );
-  if (prepared.some((operation) => operation.artifactId))
+      operation.need === route.need,
+  ).flatMap((operation) => {
+    const receipt = receiptSchema.safeParse(operation.receipt);
+    return receipt.success && receipt.data.state === operation.state && receipt.data.reference.trim()
+      ? [receipt.data] : [];
+  }).sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt));
+  const decision = receipts.find((receipt) =>
+    ["agency_submitted", "assistance_approved", "support_received", "declined"].includes(receipt.state));
+  const strongest = decision ?? receipts.sort((a, b) =>
+    (OUTCOME_PROGRESS[b.state] ?? -1) - (OUTCOME_PROGRESS[a.state] ?? -1))[0];
+  if (strongest && (strongest.state === "declined" ||
+    (OUTCOME_PROGRESS[strongest.state] ?? -1) >= (OUTCOME_PROGRESS[route.state] ?? -1)))
+    return strongest;
+  return null;
+}
+
+/** A plan is guidance; an ordinary form or canonical protected reference records application preparation. */
+export function supportRouteLabel(
+  route: SupportRoute,
+  operations: readonly RecordedRouteOperation[] = [],
+): string {
+  const receipt = supportRouteReceipt(route, operations);
+  if (receipt) return OUTCOME_LABELS[receipt.state];
+  if (route.state !== "prepared") return OUTCOME_LABELS[route.state];
+  const prepared = operations.filter((operation) => operation.programId === route.programId &&
+    operation.need === route.need && operation.state === "prepared");
+  if (prepared.some(operation => route.need === "snap_new" && route.programId === "snap-pa" && operation.action === "submit" && operation.artifactId === null && snapProtectedReferenceSchema.safeParse(operation.protectedPacket).success))
     return "Application prepared";
+  const forms = prepared.filter((operation) => operation.artifactId);
+  if (forms.some((operation) => !operation.preparationOnly))
+    return "Application prepared";
+  if (forms.length) return "Incomplete draft prepared";
   return prepared.length ? "Information packet prepared" : "Guidance ready";
 }

@@ -32,6 +32,7 @@ it("reports only actual configured services and clears readiness when it stops",
   );
   expect(mocks.plan).toHaveBeenCalledTimes(1);
   expect(mocks.assistant).toHaveBeenCalledTimes(1);
+  expect(mocks.plan.mock.invocationCallOrder[0]).toBeLessThan(mocks.assistant.mock.invocationCallOrder[0]);
   expect(input.database.query).toHaveBeenLastCalledWith(
     "select parent_private.parent_record_worker_health(false,false)",
   );
@@ -79,3 +80,11 @@ it("continues authorized work independently of page polling until stopped", asyn
     stop.abort();
   }
 }, 10000);
+it.each(["missing model key", "unavailable broker"])("checks only exact continuations with a private port and %s", async missing => {
+  const input = options(), protectedSnapSubmission = { execute: vi.fn(), reconcile: vi.fn() };
+  if (missing === "unavailable broker") input.fetcher.mockRejectedValue(new Error("offline"));
+  await runParentWorkerService({ ...input, apiKey: missing === "missing model key" ? undefined : input.apiKey, protectedSnapSubmission });
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, protectedSnapSubmission }));
+  if (missing === "missing model key") { expect(mocks.assistant).not.toHaveBeenCalled(); expect(input.fetcher).not.toHaveBeenCalled(); }
+  expect(protectedSnapSubmission.execute).not.toHaveBeenCalled(); expect(protectedSnapSubmission.reconcile).not.toHaveBeenCalled();
+});

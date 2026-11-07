@@ -40,6 +40,18 @@ afterEach(() => {
 });
 
 describe("one coherent upfront support intake", () => {
+  it.each(["wic_new", "wic_continuing"])("keeps private WIC collection closed for %s while retaining official access", async need => {
+    render(<ParentIntake initialNeed={need} />);
+    await screen.findAllByRole("checkbox", { name: /WIC/ });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.queryByLabelText("Any children under five?")).toBeNull();
+    expect(screen.queryByLabelText("Pregnant or postpartum?")).toBeNull();
+    expect(screen.getByText(/Private WIC questions are not available/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Household ZIP code"), { target: { value: "19104" } });
+    fireEvent.click(screen.getByLabelText(/I’m 18 or older/));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getAllByRole("link", { name: "Open official program" }).some(link => link.getAttribute("href")?.includes("wic"))).toBe(true);
+  });
   it("requires an explicit choice between SNAP and food today from the food entry point", async () => {
     render(<ParentIntake initialNeed="food" />);
     const snap = await screen.findByRole("checkbox", {

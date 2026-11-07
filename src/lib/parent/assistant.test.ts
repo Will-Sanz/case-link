@@ -33,6 +33,15 @@ const response = (selected: unknown) =>
   });
 
 describe("request-grounded parent assistant", () => {
+  it("can answer from owned legacy records without sending private WIC answers to the model or erasing them", async () => {
+    const request = fixtureRequest(); request.intake.needs = ["wic_continuing"];
+    request.intake.childrenUnderFive = true; request.intake.pregnantOrPostpartum = false; request.mandate.recipientIds = ["wic-pa"];
+    let body = "";
+    await answerParentQuestion({ snapshot: snapshot({ request }), question: "What is happening with my saved request?", apiKey: "synthetic-key", now: fixtureNow, beforeCall: async () => {},
+      fetcher: vi.fn(async (_url: unknown, options?: RequestInit) => { body = String(options?.body); return response({ intro: "scope", factIds: ["request-status"], actionIds: [] }); }) as typeof fetch });
+    expect(body).not.toContain("childrenUnderFive"); expect(body).not.toContain("pregnantOrPostpartum");
+    expect(request.intake.childrenUnderFive).toBe(true); expect(request.intake.pregnantOrPostpartum).toBe(false);
+  });
   it("uses a real Responses contract but renders only selected trusted evidence and existing actions", async () => {
     const bodies: Record<string, unknown>[] = [];
     const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {

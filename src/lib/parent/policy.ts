@@ -6,9 +6,11 @@ import {
   type SupportRequest,
   type SupportNeed,
 } from "./domain";
-import { getProgram } from "./programs";
+import { getProgram, supportsInitialServiceDelivery } from "./programs";
 import { factAnswerSchema } from "./answers";
 import { CURRENT_INTAKE_FIELDS, currentIntakeFields } from "./current-intake-fields";
+import { sameSnapProtectedPacket, snapProtectedOperationSchema, type SnapProtectedOperation } from "./snap-protected-operation";
+import { hasExcludedAssistantInformation } from "./assistant-contract";
 
 export type ProviderCapability = {
   programId: string;
@@ -18,6 +20,7 @@ export type ProviderCapability = {
   permissionExpiresAt: string | null;
   dataCategories: ServiceMandate["allowedData"];
   personalActsComplete: boolean;
+  permissionVersion?: string | null;
 };
 export type ProposedOperation = {
   need?: SupportNeed;
@@ -28,6 +31,7 @@ export type ProposedOperation = {
   documentIds: string[];
   packet: Record<string, unknown>;
   idempotencyKey: string;
+  protectedSnap?: SnapProtectedOperation;
 };
 const packetSchema = z
   .object({
@@ -204,17 +208,28 @@ export function authorizeOperation(input: {
   const sideEffect = !["research", "prepare"].includes(operation.action);
   if (sideEffect && request.mandate.mode !== "full")
     return deny("preparation_only");
+  if (!supportsInitialServiceDelivery(need, operation.action))
+    return deny("journey_not_supported");
   if (
     operation.dataCategories.some(
       (c) => !request.mandate.allowedData.includes(c),
     )
   )
     return deny("data_not_authorized");
-  const parsedPacket = packetSchema.safeParse(operation.packet);
+  const protectedPacket = operation.packet != null && typeof operation.packet === "object" && Object.hasOwn(operation.packet, "protectedSnapPacket");
+  if (operation.protectedSnap && !protectedPacket) return deny("invalid_protected_operation");
+  const canonical = protectedPacket ? snapProtectedOperationSchema.safeParse(operation.protectedSnap) : null;
+  if (protectedPacket && (!canonical?.success || need !== "snap_new" || operation.programId !== "snap-pa" || operation.action !== "submit" ||
+    canonical.data.state !== "prepared" || canonical.data.requestId !== request.id || canonical.data.requestVersion !== operation.requestVersion ||
+    canonical.data.idempotencyKey !== operation.idempotencyKey || !sameSnapProtectedPacket(canonical.data.packet, operation.packet) ||
+    JSON.stringify(canonical.data.dataCategories) !== JSON.stringify(operation.dataCategories) || operation.documentIds.length))
+    return deny("invalid_protected_operation");
+  if (canonical?.success && !canonical.data.protectedPacketCurrent) return deny("protected_packet_not_current");
+  const parsedPacket = packetSchema.safeParse(protectedPacket ? {} : operation.packet);
   if (!parsedPacket.success || !Object.keys(operation.packet).length)
     return deny("invalid_packet");
   if (
-    Object.keys(operation.packet).some(
+    !protectedPacket && Object.keys(operation.packet).some(
       (field) => !operation.dataCategories.includes(FIELD_CATEGORY[field]),
     )
   )
@@ -262,8 +277,10 @@ export function authorizeOperation(input: {
     operation.dataCategories.some((c) => !capability.dataCategories.includes(c))
   )
     return deny("provider_data_not_permitted");
+  if (canonical?.success && capability.permissionVersion !== canonical.data.permissionVersion)
+    return deny("provider_permission_unverified");
   const knownCase = operation.action === "follow_up" && parsedPacket.data.statusReference !== undefined;
-  if (sideEffect && !knownCase && (current.zip === undefined || !/^191\d{2}$/.test(current.zip)))
+  if (sideEffect && !knownCase && !protectedPacket && (current.zip === undefined || !/^191\d{2}$/.test(current.zip)))
     return deny("routing_source_not_current");
   if (sideEffect && ["electricity", "gas", "water"].includes(need)) {
     const expected = (
@@ -281,6 +298,9 @@ export function authorizeOperation(input: {
   }
   if (sideEffect && !capability.personalActsComplete)
     return deny("required_personal_act");
+  if (canonical?.success && !canonical.data.personalActsComplete) return deny("required_personal_act");
+  if (canonical?.success && !canonical.data.protectedParentSubmitReady) return deny("required_personal_act");
+  if (canonical?.success && !canonical.data.snapSubmissionAuthorized) return deny("snap_submission_review_required");
   if (
     sideEffect &&
     operation.dataCategories.includes("utility") &&
@@ -301,6 +321,25 @@ export function authorizeOperation(input: {
     return deny("packet_too_large");
   return { allowed: true };
 }
+const noticeLabel = z.string().trim().min(1).max(160).refine(
+  value => !hasExcludedAssistantInformation(value) && !/[<>]/.test(value),
+  "Use a document description without private identifiers or markup.",
+);
+export const agencyStatusSchema = z.object({
+  reference: z.string().trim().min(1).max(200),
+  observedAt: z.iso.datetime({ offset: true }),
+  documents: z.array(z.object({
+    name: noticeLabel,
+    dueDate: z.iso.date().optional(),
+  }).strict()).min(1).max(8).optional(),
+  interview: z.object({
+    scheduledAt: z.iso.datetime({ offset: true }).optional(),
+    dueDate: z.iso.date().optional(),
+    channel: z.enum(["phone", "in_person", "video"]).optional(),
+  }).strict().optional(),
+  waitingForDecision: z.literal(true).optional(),
+}).strict().refine(value => Boolean(value.documents || value.interview || value.waitingForDecision),
+  "A status record needs an observed next step.");
 export const receiptSchema = z
   .object({
     state: z.enum([
@@ -319,9 +358,22 @@ export const receiptSchema = z
       "operator_confirmed",
     ]),
     reference: z.string().min(1).max(200),
-    recordedAt: z.iso.datetime(),
+    recordedAt: z.iso.datetime({ offset: true }),
+    agencyStatus: agencyStatusSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((receipt, context) => {
+    if (!receipt.agencyStatus) return;
+    if (!["agency_submitted", "assistance_approved", "support_received", "declined"].includes(receipt.state))
+      context.addIssue({ code: "custom", path: ["agencyStatus"], message: "A transport acknowledgement is not an agency status record." });
+    if (Date.parse(receipt.agencyStatus.observedAt) > Date.parse(receipt.recordedAt))
+      context.addIssue({ code: "custom", path: ["agencyStatus", "observedAt"], message: "The status must have been observed by the recorded time." });
+    if (receipt.agencyStatus.waitingForDecision && receipt.state !== "agency_submitted")
+      context.addIssue({ code: "custom", path: ["agencyStatus", "waitingForDecision"], message: "A recorded decision is no longer awaiting a decision." });
+    // Existing reconciliation stores a bounded receipt; never truncate a notice or drop its attribution.
+    if (new TextEncoder().encode(JSON.stringify(receipt)).byteLength > 1600)
+      context.addIssue({ code: "custom", path: ["agencyStatus"], message: "The status record is too large." });
+  });
 export function validateReceipt(value: unknown): boolean {
   return receiptSchema.safeParse(value).success;
 }

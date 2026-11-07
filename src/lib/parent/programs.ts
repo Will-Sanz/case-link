@@ -1,4 +1,10 @@
-import type { SupportNeed } from "./domain";
+import type { SupportAction, SupportNeed } from "./domain";
+
+/** These journeys have no verified initial operation; a program's new-application capability cannot stand in for one. */
+export function supportsInitialServiceDelivery(need: SupportNeed, action: SupportAction): boolean {
+  return !["submit", "share", "schedule"].includes(action) ||
+    !["snap_renewal", "snap_pending", "snap_problem", "wic_new", "wic_continuing"].includes(need);
+}
 
 export type SupportProgram = {
   id: string;

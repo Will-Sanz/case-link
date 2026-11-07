@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { canonicalProjectOrigin } from "./project-origin";
+import { parentStorageDownloadAllowed } from "./storage-download";
 
 export const storagePurposeSchema = z
   .object({
@@ -180,11 +181,7 @@ export function createStorageBroker(input: {
             purpose.objectPath,
             30,
           );
-          const target = new URL(signedUrl);
-          if (
-            target.origin !== supabaseOrigin ||
-            !target.pathname.startsWith("/storage/v1/object/")
-          )
+          if (!parentStorageDownloadAllowed(signedUrl, supabaseOrigin, purpose.bucket, purpose.objectPath))
             throw new Error("invalid_signed_destination");
           return reply({ signedUrl });
         }

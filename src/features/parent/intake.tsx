@@ -53,13 +53,6 @@ export const initialIntake: SupportIntake = {
   contactPreference: "in_app",
   adultConfirmed: true,
 };
-function optionalBoolean(value: string): boolean | null {
-  return value === "unknown" ? null : value === "yes";
-}
-function booleanValue(value: boolean | null): string {
-  return value === null ? "unknown" : value ? "yes" : "no";
-}
-
 export function buildMandate(
   intake: SupportIntake,
   recipientIds: string[],
@@ -552,50 +545,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
                           (need) =>
                             need === "wic_new" || need === "wic_continuing",
                         ) && (
-                          <div className={styles.row}>
-                            <div className={styles.field}>
-                              <label htmlFor="children-under-five">
-                                Any children under five?
-                              </label>
-                              <select
-                                id="children-under-five"
-                                className={styles.select}
-                                value={booleanValue(intake.childrenUnderFive)}
-                                onChange={(e) =>
-                                  change(
-                                    "childrenUnderFive",
-                                    optionalBoolean(e.target.value),
-                                  )
-                                }
-                              >
-                                <option value="unknown">Not sure / skip</option>
-                                <option value="yes">Yes</option>
-                                <option value="no">No</option>
-                              </select>
-                            </div>
-                            <div className={styles.field}>
-                              <label htmlFor="pregnancy">
-                                Pregnant or postpartum?
-                              </label>
-                              <select
-                                id="pregnancy"
-                                className={styles.select}
-                                value={booleanValue(
-                                  intake.pregnantOrPostpartum,
-                                )}
-                                onChange={(e) =>
-                                  change(
-                                    "pregnantOrPostpartum",
-                                    optionalBoolean(e.target.value),
-                                  )
-                                }
-                              >
-                                <option value="unknown">Not sure / skip</option>
-                                <option value="yes">Yes</option>
-                                <option value="no">No</option>
-                              </select>
-                            </div>
-                          </div>
+                          <p className={styles.hint}>Private WIC questions are not available here yet. You can use the official WIC service without sharing those details with CaseLink.</p>
                         )}
                         <div className={styles.row}>
                           <div className={styles.field}>

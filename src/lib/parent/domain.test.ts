@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { intakeSchema, monthlyIncome, mandateSchema } from "./domain";
+import { intakeSchema, storedIntakeSchema, monthlyIncome, mandateSchema } from "./domain";
 import { fixtureIntake, fixtureMandate } from "./test-fixtures";
 describe("parent facts and mandate", () => {
+  it("reads owned historical facts without authorizing new private collection or discarding stored values", () => {
+    const saved = fixtureIntake({ needs: ["wic_continuing"], childrenUnderFive: true, pregnantOrPostpartum: false });
+    expect(storedIntakeSchema.parse(saved)).toEqual(saved);
+    expect(intakeSchema.safeParse(saved).success).toBe(false);
+    expect(storedIntakeSchema.safeParse({ ...saved, zip: "invalid" }).success).toBe(false);
+  });
+  it.each(["food_now", "snap_new", "wic_new", "wic_continuing"] as const)("keeps private WIC household collection closed for %s", need => {
+    for (const field of ["childrenUnderFive", "pregnantOrPostpartum"] as const) {
+      for (const value of [true, false]) expect(intakeSchema.safeParse({ ...fixtureIntake({ needs: [need] }), [field]: value }).success).toBe(false);
+    }
+    expect(intakeSchema.safeParse(fixtureIntake({ needs: [need], childrenUnderFive: null, pregnantOrPostpartum: null })).success).toBe(true);
+  });
   it("keeps unknown and zero income distinct with explicit period", () => {
     expect(intakeSchema.safeParse(fixtureIntake()).success).toBe(true);
     expect(

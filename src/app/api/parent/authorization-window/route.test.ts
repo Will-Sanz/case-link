@@ -10,6 +10,7 @@ describe("authorization deadline endpoint", () => {
     const authorization = {
       issuedAt: "2026-10-26T12:00:00.000Z",
       expiresAt: "2026-11-25T12:00:00.000Z",
+      snapApplication: { collectionEnabled: false, noticeVersion: null },
     };
     getWindow.mockResolvedValueOnce(authorization);
     const response = await GET();

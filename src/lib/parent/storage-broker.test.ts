@@ -48,8 +48,8 @@ beforeEach(() => {
       expectedSha256: digest,
     })),
     signDownload: vi.fn(
-      async () =>
-        "http://127.0.0.1:55321/storage/v1/object/sign/parent-documents/file?token=synthetic",
+      async (bucket, path) =>
+        `http://127.0.0.1:55321/storage/v1/s3/${bucket}/${path}?signed=synthetic`,
     ),
     upload: vi.fn(async () => {}),
   };
@@ -133,6 +133,10 @@ describe("isolated purpose-bound storage broker", () => {
     expect(
       (await handle(grantRequest({ ...purpose, mode: "download" }))).status,
     ).toBe(403);
+  });
+  it("rejects a same-project grant for a different object before returning it", async () => {
+    vi.mocked(ports.signDownload).mockResolvedValueOnce("http://127.0.0.1:55321/storage/v1/s3/parent-documents/other.pdf?synthetic=1");
+    expect((await broker()(grantRequest({ ...purpose, mode: "download" }))).status).toBe(403);
   });
   it("returns only a short-lived broker upload grant and checks registered bytes before upload", async () => {
     const handle = broker();

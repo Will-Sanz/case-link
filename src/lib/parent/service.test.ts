@@ -8,6 +8,7 @@ import {
   fixtureMandate,
   fixtureNow,
   fixtureRequest,
+  fixtureProtectedSnapOperation,
 } from "./test-fixtures";
 import {
   runSupportService,
@@ -41,6 +42,8 @@ function capability(programId: string): ServiceCapability {
     permissionExpiresAt: "2026-11-20T00:00:00Z",
     dataCategories: ["household", "income", "utility", "documents"],
     personalActsComplete: true,
+    permissionVersion: "synthetic-permission",
+    protectedSubmissionConfigured: true,
   };
 }
 function setup(request = fixtureRequest()) {
@@ -77,7 +80,7 @@ function setup(request = fixtureRequest()) {
           : { state: "blocked", reason: decision.reason };
       },
     ),
-    preparePersonalStep: vi.fn(async () => {}),
+    prepareOperation: vi.fn(async () => {}),
     personalActsComplete: vi.fn(async () => false),
     reconcile: vi.fn(async () => null),
     fillForm: vi.fn(async () => null),
@@ -90,6 +93,57 @@ function setup(request = fixtureRequest()) {
     now: fixtureNow,
   };
 }
+describe("service adoption of the exact protected SNAP operation", () => {
+  function protectedSetup(authorized = false) {
+    const test = setup(fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"], zip: "19000" }), mandate: fixtureMandate({ recipientIds: ["snap-pa"] }) }));
+    const canonical = fixtureProtectedSnapOperation({ personalActsComplete: authorized, snapSubmissionAuthorized: authorized });
+    const previous: ServiceOperation = { id: canonical.operationId, need: "snap_new", programId: "snap-pa", action: "submit", state: "prepared",
+      idempotencyKey: canonical.idempotencyKey, packet: canonical.packet, updatedAt: fixtureNow.toISOString(), protectedSnap: canonical, snapSubmissionAuthorized: authorized };
+    return { ...test, operations: [previous], canonical };
+  }
+  it("shows one genuine Submit for an already-frozen exact PDF without refilling or repeated intake", async () => {
+    const test = protectedSetup(); const result = await runSupportService(test);
+    expect(test.ports.fillForm).not.toHaveBeenCalled(); expect(test.ports.prepareOperation).not.toHaveBeenCalled(); expect(test.ports.execute).not.toHaveBeenCalled();
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "submission_review", field: "snap_final_submit", resolver: "parent" })]);
+  });
+  it("continues the exact authorized operation with its existing key and records only transport acknowledgement", async () => {
+    const test = protectedSetup(true); const result = await runSupportService(test);
+    expect(test.ports.execute).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ idempotencyKey: test.canonical.idempotencyKey,
+      packet: test.canonical.packet, protectedSnap: test.canonical, documentIds: [] }));
+    expect(test.ports.fillForm).not.toHaveBeenCalled(); expect(test.ports.prepareOperation).not.toHaveBeenCalled();
+    expect(result.plan.routes[0].state).toBe("sent"); expect(result.requiredActions).toEqual([]);
+  });
+  it.each(["expired", "ambiguous", "wrong_owner", "wrong_hash", "unbound"])("keeps %s canonical work with the service without choosing a different PDF", async kind => {
+    const test = protectedSetup(true);
+    if (kind === "expired") test.canonical.protectedPacketCurrent = false;
+    if (kind === "ambiguous") test.operations.push({ ...test.operations[0], id: "11111111-1111-4111-8111-111111111111" });
+    if (kind === "wrong_owner") test.canonical.requestId = "11111111-1111-4111-8111-111111111111";
+    if (kind === "wrong_hash") test.canonical.packet = { protectedSnapPacket: { ...test.canonical.packet.protectedSnapPacket, contentSha256: "e".repeat(64) } };
+    if (kind === "unbound") delete test.operations[0].protectedSnap;
+    const result = await runSupportService(test);
+    expect(test.ports.execute).not.toHaveBeenCalled(); expect(test.ports.fillForm).not.toHaveBeenCalled();
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "execution_issue", resolver: "operator" })]);
+  });
+  it("does not turn changed personal evidence into a repeated signing prompt", async () => {
+    const test = protectedSetup(true); test.canonical.personalActsComplete = false;
+    const result = await runSupportService(test); expect(test.ports.execute).not.toHaveBeenCalled();
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "execution_issue", resolver: "operator" })]);
+  });
+  it("does not offer an unusable first Submit while another actor's required evidence is missing", async () => {
+    const test = protectedSetup(); test.canonical.protectedParentSubmitReady = false;
+    const result = await runSupportService(test);
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "execution_issue", resolver: "operator" })]);
+    expect(result.requiredActions.some(action => action.reason === "submission_review")).toBe(false);
+    expect(test.ports.execute).not.toHaveBeenCalled(); expect(test.ports.prepareOperation).not.toHaveBeenCalled();
+  });
+  it.each([undefined, false])("does not offer protected Submit when sender configuration is %s", async configured => {
+    const test = protectedSetup(); vi.mocked(test.ports.capability).mockImplementation(async programId => ({ ...capability(programId), protectedSubmissionConfigured: configured }));
+    const result = await runSupportService(test);
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "execution_issue", resolver: "operator" })]);
+    expect(result.requiredActions.some(action => action.reason === "submission_review")).toBe(false); expect(test.ports.execute).not.toHaveBeenCalled();
+  });
+});
+
 function document(
   requestId: string,
   overrides: Partial<ServiceDocument> = {},
@@ -146,6 +200,134 @@ function singleUtilityRequest(): SupportRequest {
     mandate: fixtureMandate({ recipientIds: ["peco-cap"] }),
   });
 }
+
+function finalSnapFixture() {
+  const input = setup(fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }),
+    mandate: fixtureMandate({ recipientIds: ["snap-pa"] }) }));
+  vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+    programId, templateId: "synthetic-complete-snap-form", version: "1", validated: true,
+    artifactId: "synthetic-final-artifact", contentSha256: "a".repeat(64),
+    formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
+    missingFields: [], personalActs: [],
+  }));
+  return input;
+}
+function frozenSnap(operation: ServiceProposedOperation): ServiceOperation {
+  return { id: "synthetic-final-snap-operation", need: operation.need, programId: operation.programId,
+    action: operation.action, state: "prepared", idempotencyKey: operation.idempotencyKey,
+    packet: operation.packet, updatedAt: fixtureNow.toISOString(), snapSubmissionAuthorized: true };
+}
+
+describe("new SNAP final Submit orchestration", () => {
+  it("freezes the exact final operation for review and executes it only after its explicit authorization", async () => {
+    const input = finalSnapFixture();
+    const waiting = await runSupportService(input);
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    expect(waiting.requiredActions).toEqual([expect.objectContaining({ need: "snap_new", reason: "submission_review", field: "snap_final_submit", resolver: "parent" })]);
+    expect(waiting.requiredActions[0].url).toBeUndefined();
+    expect(waiting.nextActor).toBe("parent");
+    expect(waiting.nextTrigger).toBe("parent_action_completed");
+    expect(waiting.plan.routes[0]).toMatchObject({ state: "prepared", nextActor: "parent" });
+    expect(waiting.plan.routes[0].limitation).toBe("Your prepared SNAP application is ready for your review. Nothing has been sent.");
+    const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
+    expect(operation).toMatchObject({ need: "snap_new", action: "submit", form: { artifactId: "synthetic-final-artifact" } });
+    const authorized = frozenSnap(operation);
+    await runSupportService({ ...input, operations: [{ ...authorized, snapSubmissionAuthorized: false }] });
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    const submitted = await runSupportService({ ...input, operations: [authorized] });
+    expect(input.ports.execute).toHaveBeenCalledExactlyOnceWith(operation);
+    expect(submitted.plan.routes[0].state).toBe("sent");
+    expect(submitted.requiredActions.some(action => action.reason === "submission_review")).toBe(false);
+  });
+
+  it.each([undefined, false, "true", 1, null])("does not treat the flag %s as parent authorization", async flag => {
+    const input = finalSnapFixture(); await runSupportService(input);
+    const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
+    const previous = { ...frozenSnap(operation), snapSubmissionAuthorized: flag } as unknown as ServiceOperation;
+    const result = await runSupportService({ ...input, operations: [previous] });
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    expect(result.requiredActions).toContainEqual(expect.objectContaining({ reason: "submission_review", field: "snap_final_submit" }));
+  });
+
+  it.each(["idempotency_key", "request_version", "packet", "final_bytes", "need", "program", "action", "state"])("does not reuse authorization for a changed %s", async change => {
+    const input = finalSnapFixture(); await runSupportService(input);
+    const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
+    const previous = frozenSnap(operation);
+    if (change === "idempotency_key") previous.idempotencyKey = "another-exact-packet";
+    if (change === "request_version") input.request.version++;
+    if (change === "packet") input.request.intake.householdSize = (input.request.intake.householdSize ?? 3) + 1;
+    if (change === "final_bytes") vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+      programId, templateId: "synthetic-complete-snap-form", version: "1", validated: true,
+      artifactId: "synthetic-corrected-artifact", contentSha256: "b".repeat(64),
+      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"), missingFields: [], personalActs: [],
+    }));
+    if (change === "need") previous.need = "snap_renewal";
+    if (change === "program") previous.programId = "uesf-benefits";
+    if (change === "action") previous.action = "prepare";
+    if (change === "state") previous.state = "unresolved";
+    await runSupportService({ ...input, operations: [previous] });
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
+
+  it("requires genuine personal acts before final review and cannot substitute the Submit decision for them", async () => {
+    const input = finalSnapFixture();
+    vi.mocked(input.ports.capability).mockImplementation(async programId => ({ ...capability(programId), personalActsComplete: false,
+      requiredPersonalActs: [{ id: "signature", title: "Sign the official application", explanation: "The synthetic verified form requires your genuine signature." }] }));
+    const first = await runSupportService(input);
+    const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
+    expect(first.requiredActions).toEqual([expect.objectContaining({ reason: "personal_step" })]);
+    const forgedShortcut = await runSupportService({ ...input, operations: [frozenSnap(operation)] });
+    expect(forgedShortcut.requiredActions).toEqual([expect.objectContaining({ reason: "personal_step" })]);
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    vi.mocked(input.ports.personalActsComplete).mockResolvedValue(true);
+    const review = await runSupportService(input);
+    expect(review.requiredActions).toEqual([expect.objectContaining({ reason: "submission_review" })]);
+    const submitted = await runSupportService({ ...input, operations: [frozenSnap(operation)] });
+    expect(input.ports.execute).toHaveBeenCalledExactlyOnceWith(operation);
+    expect(submitted.requiredActions.some(action => action.reason === "personal_step" || action.reason === "submission_review")).toBe(false);
+  });
+
+  it.each(["snap_renewal", "snap_pending", "snap_problem", "wic_new", "wic_continuing"] as const)("does not borrow an enabled program submission for the unsupported %s journey", async need => {
+    const program = need.startsWith("snap_") ? "snap-pa" : "wic-pa";
+    const input = setup(fixtureRequest({ intake: fixtureIntake({ needs: [need] }), mandate: fixtureMandate({ recipientIds: [program] }) }));
+    const result = await runSupportService(input);
+    expect(input.ports.execute).not.toHaveBeenCalled(); expect(input.ports.prepareOperation).not.toHaveBeenCalled();
+    expect(result.requiredActions).toEqual(expect.arrayContaining([expect.objectContaining({ need, reason: "execution_issue", resolver: "operator" })]));
+  });
+  it("adds no routine final approval step for food_now", async () => {
+    const need = "food_now", program = "philly-food";
+    const input = setup(fixtureRequest({ intake: fixtureIntake({ needs: [need] }), mandate: fixtureMandate({ recipientIds: [program] }) }));
+    const result = await runSupportService(input);
+    expect(input.ports.execute).toHaveBeenCalledOnce();
+    expect(input.ports.prepareOperation).not.toHaveBeenCalled();
+    expect(result.requiredActions.some(action => action.reason === "submission_review")).toBe(false);
+  });
+
+  it("does not ask for another final click on a new-SNAP follow-up", async () => {
+    const input = finalSnapFixture();
+    const prior = { ...acknowledged(input.request, "sent", "2026-10-24T10:00:00Z"), need: "snap_new" as const, programId: "snap-pa" };
+    input.request.plan = buildSupportPlan(input.request, fixtureNow);
+    input.request.plan.routes[0].state = "sent";
+    const result = await runSupportService({ ...input, operations: [prior] });
+    expect(input.ports.execute).toHaveBeenCalledWith(expect.objectContaining({ action: "follow_up" }));
+    expect(result.requiredActions.some(action => action.reason === "submission_review")).toBe(false);
+  });
+
+  it("keeps an incomplete private preview in preparation even with an unrelated true authorization", async () => {
+    const input = finalSnapFixture(); await runSupportService(input);
+    const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
+    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+      programId, templateId: "synthetic-private-preview", version: "1", validated: true, preparationOnly: true,
+      artifactId: "synthetic-incomplete-preview", contentSha256: "b".repeat(64),
+      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"), missingFields: [], personalActs: [],
+    }));
+    const result = await runSupportService({ ...input, operations: [frozenSnap(operation)] });
+    expect(vi.mocked(input.ports.prepareOperation).mock.calls.at(-1)?.[0].action).toBe("prepare");
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    expect(result.requiredActions.some(action => action.reason === "submission_review")).toBe(false);
+    expect(result.requiredActions).toContainEqual(expect.objectContaining({ reason: "execution_issue", resolver: "operator" }));
+  });
+});
 
 describe("parent service orchestration", () => {
   it("routes each need by its current ZIP instead of another need's mirror", async () => {
@@ -224,7 +406,7 @@ describe("parent service orchestration", () => {
     const result = await runSupportService(input);
     expect(result.requiredActions.filter((action) => action.resolver !== "operator").map((action) => action.field).sort()).toEqual(["bookingPreference", "householdSize", "zip"]);
     expect(input.ports.execute).not.toHaveBeenCalled();
-    expect(input.ports.preparePersonalStep).not.toHaveBeenCalled();
+    expect(input.ports.prepareOperation).not.toHaveBeenCalled();
   });
 
   it("requests routing permission before collecting a ZIP and keeps internal routing out of a utility-only packet", async () => {
@@ -888,6 +1070,109 @@ describe("parent service orchestration", () => {
       result.requiredActions.every((action) => action.resolver === "operator"),
     ).toBe(true);
   });
+  it.each(["prepare_only", "full"] as const)(
+    "prepares a verified form under %s permission without a delivery channel or repeated personal approval",
+    async (mode) => {
+      const request = fixtureRequest({
+        intake: fixtureIntake({ needs: ["snap_new"] }),
+        mandate: fixtureMandate({ mode, recipientIds: ["snap-pa"],
+          allowedActions: mode === "prepare_only" ? ["research", "prepare"] : ["research", "prepare", "submit"] }),
+      });
+      const input = setup(request);
+      vi.mocked(input.ports.capability).mockImplementation(async (programId, action) =>
+        action === "prepare" ? { ...capability(programId), actions: ["prepare"],
+          requiresForm: true, allowedFields: ["zip"] } : null);
+      vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+        programId, templateId: "verified-snap-test", version: "1", validated: true,
+        artifactId: "owned-prepared-artifact", contentSha256: "a".repeat(64),
+        formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
+        missingFields: [], personalActs: [{ id: "signature", title: "Required signature", explanation: "Required before an actual submission." }],
+      }));
+      const result = await runSupportService(input);
+      expect(input.ports.fillForm).toHaveBeenCalledWith("snap-pa", { zip: "19104" }, "snap_new");
+      expect(input.ports.prepareOperation).toHaveBeenCalledOnce();
+      expect(vi.mocked(input.ports.prepareOperation).mock.calls[0][0]).toMatchObject({
+        action: "prepare", programId: "snap-pa", need: "snap_new", packet: { zip: "19104" },
+        dataCategories: ["household"], documentIds: [], form: { artifactId: "owned-prepared-artifact" },
+      });
+      expect(input.ports.execute).not.toHaveBeenCalled();
+      expect(input.ports.personalActsComplete).not.toHaveBeenCalled();
+      expect(result.requiredActions.filter(action => action.resolver === "parent")).toEqual([]);
+      expect(result.plan.routes[0].state).toBe("prepared");
+      expect(result.nextRunAt).toBeNull();
+      expect(result.nextTrigger).toBe(mode === "full" ? "provider_capability_enabled" : "none");
+    },
+  );
+  it("does not start preparation when that action is outside the mandate", async () => {
+    const request = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }),
+      mandate: fixtureMandate({ recipientIds: ["snap-pa"], allowedActions: ["research"] }) });
+    const input = setup(request);
+    vi.mocked(input.ports.capability).mockResolvedValue(null);
+    await runSupportService(input);
+    expect(input.ports.fillForm).not.toHaveBeenCalled();
+    expect(input.ports.prepareOperation).not.toHaveBeenCalled();
+  });
+  it("prepares an incomplete form without requesting a booking choice for the superseded action", async () => {
+    const request = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }),
+      mandate: fixtureMandate({ recipientIds: ["snap-pa"], allowedActions: ["prepare", "schedule"], bookingPreference: "ask_me" }) });
+    const input = setup(request);
+    vi.mocked(input.ports.capability).mockImplementation(async (programId, action) =>
+      action === "schedule" ? { ...capability(programId), actions: ["schedule"], requiresForm: true, allowedFields: ["zip"] } : null);
+    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+      programId, templateId: "verified-snap-test", version: "1", validated: true, preparationOnly: true,
+      artifactId: "owned-prepared-artifact", contentSha256: "a".repeat(64),
+      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"), missingFields: [], personalActs: [],
+    }));
+    const result = await runSupportService(input);
+    expect(input.ports.prepareOperation).toHaveBeenCalledOnce();
+    expect(vi.mocked(input.ports.prepareOperation).mock.calls[0][0].action).toBe("prepare");
+    expect(result.requiredActions.some(action => action.field === "bookingPreference")).toBe(false);
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
+  it("keeps an unsupported required form detail service-owned during preparation", async () => {
+    const request = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }),
+      mandate: fixtureMandate({ mode: "prepare_only", recipientIds: ["snap-pa"], allowedActions: ["prepare"] }) });
+    const input = setup(request);
+    vi.mocked(input.ports.capability).mockImplementation(async (programId, action) =>
+      action === "prepare" ? { ...capability(programId), actions: ["prepare"], requiresForm: true, allowedFields: ["zip"] } : null);
+    vi.mocked(input.ports.fillForm).mockResolvedValue({ programId: "snap-pa", templateId: "test", version: "1", validated: true,
+      formInputDigest: createHash("sha256").update(JSON.stringify({ zip: "19104" })).digest("hex"),
+      missingFields: ["unsupported-applicant-field"], personalActs: [] });
+    const result = await runSupportService(input);
+    expect(input.ports.prepareOperation).not.toHaveBeenCalled();
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "execution_issue", resolver: "operator" })]);
+    expect(result.plan.routes[0].nextActor).toBe("caselink");
+  });
+  it.each(["needs_current_facts", "service_blocked", "ready"] as const)("uses private SNAP %s metadata without generic answers or execution", async state => {
+    const request = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }),
+      mandate: fixtureMandate({ mode: "prepare_only", recipientIds: ["snap-pa"], allowedActions: ["research", "prepare"] }) });
+    const input = setup(request);
+    vi.mocked(input.ports.capability).mockImplementation(async (programId, action) => action === "prepare"
+      ? { ...capability(programId), actions: ["prepare"], requiresForm: true, allowedFields: ["zip"] } : null);
+    let binding = "a".repeat(64);
+    vi.mocked(input.ports.fillForm).mockImplementation(async (programId, packet) => ({
+      programId, templateId: "private-snap-preview", version: "1", validated: true, preparationOnly: true,
+      formInputDigest: createHash("sha256").update(JSON.stringify(packet)).digest("hex"), personalActs: [],
+      missingFields: state === "needs_current_facts" ? ["snap_application_details"] : [],
+      ...(state === "ready" ? { artifactId: "artifact", contentSha256: "c".repeat(64) } : {}),
+      snapApplication: { snapshotId: "11111111-1111-4111-8111-111111111111", snapshotHash: binding, state,
+        missingFields: [], invalidCurrentFields: [], staleFields: [], serviceQuestions: [], renderingRequirements: state === "service_blocked" ? ["field_layout_or_font_support"] : [], dataCategories: ["household", "income"] },
+    }));
+    const result = await runSupportService(input);
+    expect(input.ports.execute).not.toHaveBeenCalled();
+    if (state === "needs_current_facts") {
+      expect(input.ports.prepareOperation).not.toHaveBeenCalled();
+      expect(result.requiredActions).toEqual([expect.objectContaining({ field: "snap_application_details", resolver: "parent", reason: "missing_fact" })]);
+    } else if (state === "service_blocked") {
+      expect(input.ports.prepareOperation).not.toHaveBeenCalled();
+      expect(result.requiredActions).toEqual([expect.objectContaining({ reason: "execution_issue", resolver: "operator" })]);
+    } else {
+      const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
+      expect(operation.packet).toEqual({}); expect(operation.dataCategories).toEqual(["household", "income"]);
+      binding = "b".repeat(64); await runSupportService(input);
+      expect(vi.mocked(input.ports.prepareOperation).mock.calls[1][0].idempotencyKey).not.toBe(operation.idempotencyKey);
+    }
+  });
   it("asks only for actual required personal acts, continues food, and resumes after verified completion", async () => {
     const request = fixtureRequest();
     const input = setup(request);
@@ -977,7 +1262,7 @@ describe("parent service orchestration", () => {
     expect(vi.mocked(input.ports.execute).mock.calls.some(
       ([operation]) => operation.programId === "peco-cap",
     )).toBe(false);
-    const prepared = vi.mocked(input.ports.preparePersonalStep).mock.calls[0][0];
+    const prepared = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
     vi.mocked(input.ports.personalActsComplete).mockImplementation(async (operation) =>
       JSON.stringify(operation) === JSON.stringify(prepared),
     );

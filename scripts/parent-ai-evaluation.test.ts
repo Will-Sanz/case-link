@@ -31,15 +31,36 @@ describe("parent synthetic evaluation corpus", () => {
     "deterministic journey: $id ($language)",
     async (test) => {
       const result = await runParentEvalCase(test);
+      const expectedFailures: string[] = [];
+      if (result.implementationBlock) {
+        if (test.scenario === "unknown_delivery") expectedFailures.push("unknown_delivery_no_blind_retry");
+        if (test.scenario === "scoped_personal_act") expectedFailures.push("personal_act_before_dispatch_0", "personal_act_before_dispatch_1");
+        if (test.scenario !== "scope_and_revocation") expectedFailures.push("every_independent_need_reaches_received_support");
+        expect(result.checks.find(check => check.code === "closed_initial_journey_never_dispatched")?.passed).toBe(true);
+        expect(result.turns.every(turn => turn.routes.find(route => route.need === test.need)?.state === "prepared")).toBe(true);
+      }
       expect(
-        result.checks.filter((check) => !check.passed),
+        result.checks.filter((check) => !check.passed).map(check => check.code),
         JSON.stringify(result),
-      ).toEqual([]);
+      ).toEqual(expectedFailures);
       expect(result.turns).toHaveLength(4);
       expect(result.humanReview).toBe("pending");
       expect(result.turns.every((turn) => turn.modelCalls === 0)).toBe(true);
     },
   );
+  it("retains blocked journeys and failed outcomes in the full corpus denominator", async () => {
+    const results = await Promise.all(PARENT_EVAL_CASES.map(test => runParentEvalCase(test)));
+    const summary = summarizeParentEvaluation(results, "deterministic", "synthetic-source-hash");
+    expect(summary.cases).toBe(60); expect(summary.turns).toBe(240);
+    expect(summary.blockedInitialJourneyCases).toBe(12);
+    expect(summary.outcomeCases).toBe(50); expect(summary.receivedSupportCases).toBe(40);
+    expect(summary.criticalFailures).toBeGreaterThan(0);
+    for (const result of results.filter(result => ["snap_pending", "snap_problem", "wic_continuing"].includes(result.need) && result.scenario === "unknown_delivery")) {
+      expect(result.implementationBlock).toBeNull();
+      expect(result.checks.find(check => check.code === "unknown_delivery_no_blind_retry")?.passed).toBe(true);
+      expect(result.checks.find(check => check.code === "existing_application_not_restarted")?.passed).toBe(true);
+    }
+  });
   it("does not interpret ordinary production credentials or an incomplete flag as live-eval approval", () => {
     expect(
       parentLiveEvaluationConfig({ OPENAI_API_KEY: "ordinary-production-key" }),

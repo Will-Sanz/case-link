@@ -145,6 +145,13 @@ describe("complete parent data pagination", () => {
       "parent_form_artifacts",
     ])
       tables[table] = [{ id: id(1), request_id: id(105) }];
+    tables.parent_snap_application_details = Array.from({ length: 102 }, (_, index) => ({
+      id: id(index + 1),
+      request_id: id(105),
+      revision: index + 1,
+      details: { applicant: { firstName: "Sample" } },
+      provenance: { "applicant.firstName": { source: "parent", asOf: "2026-11-03T12:00:00.000Z" } },
+    }));
     const exported = await exportParentInformation();
     expect(exported.requests).toHaveLength(105);
     const last = exported.requests.find((request) => request.id === id(105))!;
@@ -155,10 +162,13 @@ describe("complete parent data pagination", () => {
     expect(last.mandates).toHaveLength(1);
     expect(last.forms).toHaveLength(1);
     expect(last.assistant).toHaveLength(1);
+    expect(last.snapApplicationDetails).toHaveLength(102);
+    expect((last.snapApplicationDetails as Row[]).at(-1)?.provenance).toEqual(tables.parent_snap_application_details.at(-1)?.provenance);
     expect(maxPending).toBeLessThanOrEqual(2); // Only the established household/account pair runs together.
     expect(calls.filter((call) => call.table === "parent_events")).toHaveLength(
       3,
     );
+    expect(calls.filter((call) => call.table === "parent_snap_application_details")).toHaveLength(2);
   });
   it("shows the newest200 events chronologically and reports that earlier history exists", async () => {
     tables.parent_requests = [{ ...fixtureRequest(), id: id(1) }];
@@ -168,6 +178,7 @@ describe("complete parent data pagination", () => {
       created_at: "2026-10-25T12:00:00Z",
     }));
     const request = await getSupportRequest(id(1));
+    expect(calls.some(call => call.table === "parent_snap_application_details")).toBe(false);
     expect(request?.events).toHaveLength(200);
     expect(request?.events?.[0].id).toBe(id(6));
     expect(request?.events?.at(-1)?.id).toBe(id(205));

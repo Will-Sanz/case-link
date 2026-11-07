@@ -117,4 +117,12 @@ describe("parent HTTP trust boundary", () => {
       ),
     ).toEqual({ ok: true });
   });
+  it("keeps the ordinary JSON bound while allowing the bounded SNAP envelope", async () => {
+    const input = { value: "a".repeat(41000) };
+    const request = () => new Request("https://app.example", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    await expect(readParentJson(request())).rejects.toThrow("parent_invalid_input");
+    expect(await readParentJson(request(), 65536)).toEqual(input);
+    const oversized = new Request("https://app.example", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value: "a".repeat(65536) }) });
+    await expect(readParentJson(oversized, 65536)).rejects.toThrow("parent_invalid_input");
+  });
 });

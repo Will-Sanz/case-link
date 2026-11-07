@@ -197,7 +197,7 @@ describe("parent purpose and environment boundary", () => {
     expect(issues).toHaveLength(2);
     expect(issues.join()).not.toContain("private-sensitive-value");
     expect(issues.join()).not.toContain("secret-value");
-    for (const name of ["OPENAI_API_KEY", "RESEND_API_KEY"])
+    for (const name of ["OPENAI_API_KEY", "RESEND_API_KEY", "CASELINK_PARENT_STORAGE_BROKER_S3_ACCESS_KEY_ID", "CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY", "CASELINK_PARENT_STORAGE_BROKER_S3_REGION"])
       expect(
         parentConfigurationIssues({
           ...local,

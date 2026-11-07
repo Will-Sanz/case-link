@@ -310,35 +310,40 @@ describe("support detail", () => {
     expect(screen.getByText("Parent reported")).toBeTruthy();
     expect(screen.getByText(/Showing the latest 200 updates/)).toBeTruthy();
   });
-  it("allows correcting WIC household answers without inventing an answer for Not sure", async () => {
+  it("corrects ordinary WIC routing without collecting private WIC answers", async () => {
     const request = fixture();
     request.intake.needs = ["wic_new"];
-    const fetch = vi.fn().mockResolvedValue(response(request));
+    const fetch = vi.fn(async(_url:string,init?:RequestInit)=>response(init?.method==='POST'?{...request,version:2,intake:{...request.intake,zip:'19105'}}:request));
     vi.stubGlobal("fetch", fetch);
     render(<SupportDetail requestId={requestId} />);
     fireEvent.click(
       await screen.findByText("Correct household or bill information"),
     );
-    fireEvent.change(
-      screen.getByLabelText("Does your household include a child under five?"),
-      { target: { value: "false" } },
-    );
-    fireEvent.change(
-      screen.getByLabelText("Is anyone pregnant or recently postpartum?"),
-      { target: { value: "unknown" } },
-    );
+    expect(screen.queryByLabelText("Does your household include a child under five?")).toBeNull();
+    expect(screen.queryByLabelText("Is anyone pregnant or recently postpartum?")).toBeNull();
+    fireEvent.change(screen.getByLabelText('ZIP code'),{target:{value:'19105'}});
     fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
+    await screen.findByText(/Your correction is saved/);
     await waitFor(() =>
       expect(fetch.mock.calls.some((call) => call[1]?.method === "POST")).toBe(
         true,
       ),
     );
     const post = fetch.mock.calls.find((call) => call[1]?.method === "POST")!;
-    expect(JSON.parse(post[1].body)).toMatchObject({
+    expect(JSON.parse(String(post[1]!.body))).toMatchObject({
       action: "correct",
-      intake: { childrenUnderFive: false, pregnantOrPostpartum: null },
+      intake: { zip:'19105',childrenUnderFive: null, pregnantOrPostpartum: null },
       version: 1,
     });
+  });
+  it('preserves legacy private WIC answers read-only without silently clearing them for a ZIP correction',async()=>{
+    const request=fixture();request.intake={...request.intake,needs:['wic_new'],childrenUnderFive:false,pregnantOrPostpartum:true};
+    const fetch=vi.fn().mockResolvedValue(response(request));vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>);
+    await screen.findByText(/safe update for your previously saved private WIC answers/);
+    expect(screen.queryByText('Correct household or bill information')).toBeNull();expect(screen.queryByRole('button',{name:'Save correction'})).toBeNull();
+    expect(screen.getByText('Previously saved child-under-five answer').nextElementSibling?.textContent).toBe('No');
+    expect(screen.getByText('Previously saved pregnancy or postpartum answer').nextElementSibling?.textContent).toBe('Yes');
+    expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);expect(request.intake.pregnantOrPostpartum).toBe(true);
   });
   it("offers wrapping permission choices and requires fresh consent after changing actions", async () => {
     const request = fixture();

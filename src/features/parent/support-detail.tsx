@@ -133,8 +133,10 @@ function CorrectDetails({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const legacyPrivate = request.intake.childrenUnderFive !== null || request.intake.pregnantOrPostpartum !== null;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (legacyPrivate) return;
     setError("");
     setSaved(false);
     const parsed = intakeSchema.safeParse(intake);
@@ -176,6 +178,11 @@ function CorrectDetails({
     setIntake((current) => ({ ...current, [field]: value }));
     setSaved(false);
   }
+  if(legacyPrivate)return <div className={styles.space}>
+    <p className={styles.notice} role="status">CaseLink needs a safe update for your previously saved private WIC answers before household corrections can be made here. Your saved request and answers are unchanged. You can still pause or cancel work and use the <a className={styles.textLink} href={getProgram('wic-pa')!.officialUrl}>official WIC service</a>.</p>
+    <dl className={styles.factList}><dt>Previously saved child-under-five answer</dt><dd>{request.intake.childrenUnderFive===null?'Not provided':request.intake.childrenUnderFive?'Yes':'No'}</dd>
+      <dt>Previously saved pregnancy or postpartum answer</dt><dd>{request.intake.pregnantOrPostpartum===null?'Not provided':request.intake.pregnantOrPostpartum?'Yes':'No'}</dd></dl>
+  </div>;
   return (
     <details className={styles.disclosure} open={editing}>
       <summary
@@ -272,65 +279,7 @@ function CorrectDetails({
               </select>
             </div>
           </div>
-          {intake.needs.some((need) => need.startsWith("wic_")) && (
-            <fieldset className={styles.fieldset}>
-              <legend className={styles.legend}>
-                WIC household information
-              </legend>
-              <div className={styles.field}>
-                <label htmlFor="correct-children">
-                  Does your household include a child under five?
-                </label>
-                <select
-                  id="correct-children"
-                  className={styles.select}
-                  value={
-                    intake.childrenUnderFive === null
-                      ? "unknown"
-                      : String(intake.childrenUnderFive)
-                  }
-                  onChange={(event) =>
-                    change(
-                      "childrenUnderFive",
-                      event.target.value === "unknown"
-                        ? null
-                        : event.target.value === "true",
-                    )
-                  }
-                >
-                  <option value="unknown">Not sure / not provided</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-              <div className={`${styles.field} ${styles.space}`}>
-                <label htmlFor="correct-pregnancy">
-                  Is anyone pregnant or recently postpartum?
-                </label>
-                <select
-                  id="correct-pregnancy"
-                  className={styles.select}
-                  value={
-                    intake.pregnantOrPostpartum === null
-                      ? "unknown"
-                      : String(intake.pregnantOrPostpartum)
-                  }
-                  onChange={(event) =>
-                    change(
-                      "pregnantOrPostpartum",
-                      event.target.value === "unknown"
-                        ? null
-                        : event.target.value === "true",
-                    )
-                  }
-                >
-                  <option value="unknown">Not sure / not provided</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-            </fieldset>
-          )}
+          {intake.needs.some(need => need.startsWith("wic_")) && <p className={styles.hint}>Private WIC questions are not available here yet. Ordinary routing changes do not collect those answers.</p>}
           {request.intake.needs.some((need) =>
             ["electricity", "gas", "water"].includes(need),
           ) && (

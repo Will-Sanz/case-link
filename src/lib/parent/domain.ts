@@ -26,7 +26,7 @@ export const NEED_LABELS: Record<SupportNeed, string> = {
   gas: "Gas bill",
   water: "Water bill",
 };
-export const intakeSchema = z
+export const storedIntakeSchema = z
   .object({
     needs: z
       .array(needSchema)
@@ -91,6 +91,13 @@ export const intakeSchema = z
         });
     }
   });
+export const intakeSchema = storedIntakeSchema.superRefine((v, ctx) => {
+  for (const field of ["childrenUnderFive", "pregnantOrPostpartum"] as const)
+    if (v[field] !== null) ctx.addIssue({
+      code: "custom", path: [field],
+      message: "Private WIC household questions are not available here yet. Leave this answer empty and use the official WIC service.",
+    });
+});
 export type SupportIntake = z.infer<typeof intakeSchema>;
 
 export const actionSchema = z.enum([
@@ -165,6 +172,16 @@ export const outcomeSchema = z.enum([
   "withdrawn",
 ]);
 export type OutcomeState = z.infer<typeof outcomeSchema>;
+export const OUTCOME_PROGRESS: Partial<Record<OutcomeState, number>> = {
+  checking: 0,
+  prepared: 1,
+  sent: 2,
+  partner_received: 3,
+  partner_accepted: 4,
+  agency_submitted: 5,
+  assistance_approved: 6,
+  support_received: 7,
+};
 export const OUTCOME_LABELS: Record<OutcomeState, string> = {
   checking: "Checking options",
   prepared: "Prepared",
@@ -185,6 +202,7 @@ export type NecessaryAction = {
     | "missing_fact"
     | "expanded_permission"
     | "personal_step"
+    | "submission_review"
     | "meaningful_choice"
     | "qualified_help"
     | "execution_issue";

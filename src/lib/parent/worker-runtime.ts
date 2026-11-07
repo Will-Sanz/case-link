@@ -12,17 +12,25 @@ import {
   type ExtractedFacts,
 } from "./documents";
 import {
-  intakeSchema,
+  storedIntakeSchema,
   mandateSchema,
   needSchema,
   type SupportAction,
+  type SupportNeed,
   type SupportRequest,
 } from "./domain";
 import { executeSupportOperation, type ExecutablePacket } from "./execution";
+import { buildSupportPlan } from "./planning";
 import { fillVerifiedForm, type VerifiedFormContract } from "./forms";
 import { receiptSchema } from "./policy";
+import { sameSnapProtectedPacket, sameSnapProtectedOperationBinding, snapProtectedOperationSchema, snapProtectedReferenceSchema, type SnapProtectedOperation } from "./snap-protected-operation";
+import { snapProtectedSubmissionResultSchema, type SnapProtectedSubmissionIntent, type SnapProtectedSubmissionPort } from "./snap-protected-submission-port";
+import { parseSnapPendingCapture, runSnapCaptureCheck, snapCaptureCheckResultSchema, type SnapCapturePreparationPort, type SnapPendingCapture } from "./snap-pending-capture";
 import { canonicalProjectOrigin } from "./project-origin";
-import { getProgram } from "./programs";
+import { parentStorageDownloadAllowed } from "./storage-download";
+import { getProgram, programRoutingIssue } from "./programs";
+import { renderSnapPreparationDraft, renderSnapApplicationPreview, SNAP_DRAFT_CONTRACT } from "./snap-draft";
+import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema, SNAP_PREVIEW_TEMPLATE_ID, SNAP_PREVIEW_TEMPLATE_VERSION } from "./snap-application-snapshot";
 import {
   runSupportService,
   type ServiceCapability,
@@ -70,10 +78,13 @@ export const PARENT_TRANSPORTS: ReadonlyMap<string, RuntimeTransport> =
 export type WorkerRuntimeOptions = {
   database: WorkerDatabase;
   apiKey?: string;
+  continuationOnly?: boolean;
   brokerOrigin: string;
   brokerSecret: string;
   supabaseOrigin: string;
   transports?: ReadonlyMap<string, RuntimeTransport>;
+  protectedSnapSubmission?: SnapProtectedSubmissionPort;
+  snapCapturePreparation?: SnapCapturePreparationPort;
   fetcher?: typeof fetch;
   now?: () => Date;
   processDocument?: typeof processParentDocument;
@@ -103,6 +114,9 @@ const rawOperationSchema = z
     created_at: iso.optional(),
     evidence: z.record(z.string(), z.unknown()).nullable().optional(),
     personalActsComplete: z.boolean().optional(),
+    snapSubmissionAuthorized: z.boolean().optional(),
+    protectedPacketCurrent: z.boolean().optional(),
+    protectedParentSubmitReady: z.boolean().optional(),
     executed_at: z.string().nullable().optional(),
     artifact_id: z.uuid().nullable().optional(),
   })
@@ -129,6 +143,7 @@ const capabilitySchema = z
       ]),
     ),
     permissionReference: z.string().nullable(),
+    permissionVersion: z.string().nullable().optional(),
     permissionExpiresAt: z.string().nullable(),
     dataCategories: z.array(
       z.enum(["household", "income", "utility", "documents"]),
@@ -148,7 +163,7 @@ const claimSchema = z.object({
       version: z.number().int().positive(),
       status: z.enum(["active", "paused", "cancelled", "closed"]),
       required_actions: z.array(z.unknown()),
-      intake: intakeSchema,
+      intake: storedIntakeSchema,
       mandate: mandateSchema,
     })
     .passthrough(),
@@ -168,6 +183,7 @@ const templateSchema = z
     personal_fields: z.array(z.string()).default([]),
     verified_until: iso,
     active: z.literal(true),
+    preparation_only: z.boolean().default(false),
   })
   .passthrough();
 const digest = (value: Uint8Array | string) =>
@@ -189,6 +205,7 @@ export function normalizeWorkerOperation(
     source: evidence.source,
     reference: evidence.reference,
     recordedAt: evidence.recordedAt ?? evidence.observedAt,
+    ...(evidence.agencyStatus !== undefined ? { agencyStatus: evidence.agencyStatus } : {}),
   });
   const state = receipt.success
     ? receipt.data.state
@@ -198,6 +215,15 @@ export function normalizeWorkerOperation(
         ? "prepared"
         : null;
   if (!state) return null;
+  const protectedSnap = Object.hasOwn(operation.packet, "protectedSnapPacket") ? snapProtectedOperationSchema.parse({
+    operationId: operation.id, requestId: operation.request_id, requestVersion: operation.request_version,
+    need: operation.need, programId: operation.program_id, action: operation.action, state,
+    packet: operation.packet, packetHash: operation.packet_hash, dataCategories: operation.data_categories, documentIds: operation.document_ids,
+    artifactId: operation.artifact_id, idempotencyKey: operation.idempotency_key, permissionVersion: operation.permission_version,
+    protectedPacketCurrent: operation.protectedPacketCurrent === true, personalActsComplete: operation.personalActsComplete === true,
+    protectedParentSubmitReady: operation.protectedParentSubmitReady === true,
+    snapSubmissionAuthorized: operation.snapSubmissionAuthorized === true,
+  }) : undefined;
   return {
     id: operation.id,
     need: operation.need,
@@ -208,7 +234,10 @@ export function normalizeWorkerOperation(
     packet: operation.packet,
     updatedAt: operation.updated_at,
     ...(operation.created_at ? { createdAt: operation.created_at } : {}),
+    ...(operation.executed_at ? { executedAt: operation.executed_at } : {}),
     ...(receipt.success ? { receipt: receipt.data } : {}),
+    snapSubmissionAuthorized: operation.snapSubmissionAuthorized === true,
+    ...(protectedSnap ? { protectedSnap } : {}),
   };
 }
 
@@ -334,8 +363,8 @@ export async function runOneParentJob(
   if (!brokerOrigin || !supabaseOrigin || options.brokerSecret.length < 32)
     throw new Error("isolated_worker_configuration_required");
   const claimed = await db.query(
-    "select parent_private.parent_claim_job($1) as job",
-    [300],
+    options.continuationOnly ? "select parent_private.parent_claim_job($1,$2) as job" : "select parent_private.parent_claim_job($1) as job",
+    options.continuationOnly ? [300, true] : [300],
   );
   if (!claimed.rows[0]?.job) return { state: "idle" };
   const job = claimSchema.parse(claimed.rows[0].job),
@@ -355,6 +384,7 @@ export async function runOneParentJob(
       Date.parse(String(expiry)) <= now().getTime()
     )
       throw new Error("authority_changed");
+    return String(expiry);
   };
   const beforeCall = async () => {
     await lease();
@@ -396,10 +426,7 @@ export async function runOneParentJob(
   const download = async (bucket: string, path: string) => {
     const grant = await brokerGrant(bucket, path, "download");
     const url = new URL(grant.signedUrl);
-    if (
-      url.origin !== supabaseOrigin ||
-      !url.pathname.startsWith("/storage/v1/object/")
-    )
+    if (!parentStorageDownloadAllowed(grant.signedUrl, supabaseOrigin, bucket, path))
       throw new Error("private_download_destination_rejected");
     return readBytes(
       await fetcher(url, {
@@ -438,17 +465,89 @@ export async function runOneParentJob(
       [job.jobId, job.leaseToken, artifact.id, digest(bytes)],
     );
   };
-  const rawOperations = z
-    .array(rawOperationSchema)
-    .parse(
-      await rpc("select parent_private.parent_get_operations($1,$2) as value", [
-        job.jobId,
-        job.leaseToken,
-      ]),
-    );
-  const operations = rawOperations
+  const loadOperations = async () => z.array(rawOperationSchema).parse(await rpc("select parent_private.parent_get_operations($1,$2) as value", [job.jobId, job.leaseToken]));
+  const readPendingCapture = async (leaseUntil: string) => {
+    const value = await rpc("select parent_private.parent_get_snap_pending_capture($1,$2) as value", [job.jobId, job.leaseToken]);
+    return value == null ? null : parseSnapPendingCapture(value, { requestId: request.id, requestVersion: request.version, leaseUntil, now: now() });
+  };
+  let pendingCapture: SnapPendingCapture | null = null;
+  let snapCapture: Parameters<typeof runSupportService>[0]["snapCapture"];
+  let leaseUntil = "";
+  const captureRetryAt = (deadline: string) => {
+    const current = now().getTime(), retry = Math.min(current+300000, Date.parse(deadline)-1000, Date.parse(request.mandate.expiresAt)-1000);
+    return retry>=current+30000 ? new Date(retry).toISOString() : undefined;
+  };
+  if (request.intake.needs.includes("snap_new")) try {
+    leaseUntil = await lease(); pendingCapture = await readPendingCapture(leaseUntil);
+  } catch { snapCapture = { state: "service_unavailable", reason: "check_unavailable", retryAt: captureRetryAt(leaseUntil) }; }
+  let rawOperations = await loadOperations();
+  let operations = rawOperations
     .map(normalizeWorkerOperation)
     .filter((operation): operation is ServiceOperation => operation !== null);
+  const continuations = operations.flatMap(operation => {
+    const canonical = operation.protectedSnap;
+    return canonical?.requestId === request.id && request.intake.needs.includes("snap_new") &&
+      (canonical.state === "delivery_unknown" || canonical.state === "prepared" && canonical.requestVersion === request.version &&
+        canonical.protectedPacketCurrent && canonical.protectedParentSubmitReady && canonical.personalActsComplete && canonical.snapSubmissionAuthorized)
+      ? [canonical] : [];
+  });
+  const continuation = continuations.length > 0;
+  let deliveryJobAttempts: number | undefined;
+  if (continuation && options.protectedSnapSubmission) try {
+    deliveryJobAttempts = z.number().int().min(1).max(48).parse(await rpc(
+      "select parent_private.parent_get_snap_delivery_job_attempts($1,$2) as value", [job.jobId, job.leaseToken]));
+  } catch { /* Missing current scheduling authority must not promise an automatic retry. */ }
+  let continuationPass = continuation;
+  const serviceRequest: SupportRequest = continuation ? { ...request,
+    intake: { ...request.intake, needs: ["snap_new"] }, required_actions: request.required_actions.filter(action => action.need === "snap_new"),
+    plan: request.plan ? { ...request.plan, routes: request.plan.routes.filter(route => route.need === "snap_new") } : null,
+  } : request;
+  if (pendingCapture && !continuation) {
+    const original = pendingCapture;
+    const unresolved = operations.some(operation => operation.need === "snap_new" && operation.state === "delivery_unknown");
+    const shouldCheck = !unresolved && options.snapCapturePreparation && original.intent && original.deadline &&
+      (original.state === "pending" || (original.state === "service_unavailable" && original.reason === "check_unavailable"));
+    let checkedOperationId: string | undefined;
+    if (shouldCheck) {
+      try {
+        const checkStartedAt = now().getTime();
+        const timeoutMs = Math.floor(Math.min(90000, Date.parse(original.deadline!) - checkStartedAt, Date.parse(leaseUntil) - checkStartedAt));
+        if (timeoutMs<1) throw new Error("snap_capture_check_unconfirmed");
+        const result = snapCaptureCheckResultSchema.parse(await runSnapCaptureCheck(options.snapCapturePreparation!, {
+          jobId: job.jobId, leaseToken: job.leaseToken, requestId: request.id, requestVersion: request.version,
+          packetId: original.packetId, intent: original.intent!, deadline: new Date(checkStartedAt+timeoutMs).toISOString(),
+        }, timeoutMs));
+        if (result.packetId !== original.packetId || result.requestId !== request.id || result.requestVersion !== request.version ||
+          result.contentSha256 !== original.intent!.contentSha256) throw new Error("snap_capture_scope_changed");
+        checkedOperationId = result.operationId;
+      } catch { /* Recover a possibly committed check through fresh owned metadata, never a repeated write. */ }
+      try {
+        leaseUntil = await lease(); pendingCapture = await readPendingCapture(leaseUntil);
+        if (!pendingCapture || pendingCapture.packetId !== original.packetId || JSON.stringify(pendingCapture.intent) !== JSON.stringify(original.intent))
+          throw new Error("snap_capture_scope_changed");
+        rawOperations = await loadOperations(); operations = rawOperations.map(normalizeWorkerOperation).filter((operation): operation is ServiceOperation => operation !== null);
+      } catch { pendingCapture = null; }
+    }
+    if (!unresolved) {
+      if (pendingCapture?.state === "checked") {
+        const matches = operations.flatMap(operation => operation.protectedSnap?.state === "prepared" && operation.protectedSnap.protectedPacketCurrent &&
+          operation.protectedSnap.requestId === request.id && operation.protectedSnap.requestVersion === request.version &&
+          operation.protectedSnap.packet.protectedSnapPacket.packetId === original.packetId ? [operation.protectedSnap] : []);
+        const ref = matches[0]?.packet.protectedSnapPacket, intent = original.intent;
+        if (matches.length !== 1 || !intent || ref.authorizationId !== intent.authorizationId || ref.snapshotId !== intent.snapshotId ||
+          ref.snapshotHash !== intent.snapshotHash || ref.contentSha256 !== intent.contentSha256 || ref.byteLength !== intent.byteLength ||
+          (checkedOperationId && matches[0].operationId !== checkedOperationId)) snapCapture = { state: "service_unavailable", reason: "check_unavailable" };
+      } else snapCapture = pendingCapture ? { state: pendingCapture.state, reason: pendingCapture.reason } : { state: "service_unavailable", reason: "check_unavailable" };
+      if (shouldCheck && (snapCapture?.state === "pending" || (snapCapture?.state === "service_unavailable" && snapCapture.reason === "check_unavailable"))) {
+        snapCapture.retryAt = captureRetryAt(original.deadline!);
+      }
+    }
+  }
+  const protectedIntent = (canonical: SnapProtectedOperation, signal: AbortSignal): SnapProtectedSubmissionIntent => ({
+    jobId: job.jobId, leaseToken: job.leaseToken, operationId: canonical.operationId, requestId: canonical.requestId,
+    requestVersion: canonical.requestVersion, idempotencyKey: canonical.idempotencyKey, packetHash: canonical.packetHash,
+    protectedPacket: canonical.packet.protectedSnapPacket, signal,
+  });
   const documentRows = new Map(
     job.documents.map((document) => [String(document.id), document]),
   );
@@ -459,7 +558,17 @@ export async function runOneParentJob(
   const prepare = async (
     operation: ServiceProposedOperation,
   ): Promise<string> => {
+    if (continuationPass && (!operation.protectedSnap || !continuations.some(known => sameSnapProtectedOperationBinding(known, operation.protectedSnap!))))
+      throw new Error("fresh_planning_required");
     await lease();
+    if (operation.protectedSnap) {
+      const current = await currentProtectedOperation(operation.protectedSnap);
+      if (!current.protectedPacketCurrent || !current.protectedParentSubmitReady || !current.personalActsComplete || !current.snapSubmissionAuthorized) throw new Error("protected_operation_authority_changed");
+      return current.operationId;
+    }
+    if (operation.form?.snapApplication) return z.uuid().parse(await rpc(
+      "select parent_private.parent_prepare_snap_application_preview($1,$2,$3,$4,$5) as value",
+      [job.jobId, job.leaseToken, operation.requestVersion, operation.form.artifactId, operation.idempotencyKey]));
     return z
       .uuid()
       .parse(
@@ -481,11 +590,67 @@ export async function runOneParentJob(
         ),
       );
   };
+  const currentProtectedOperation = async (expected: SnapProtectedOperation) => {
+    const rows = z.array(rawOperationSchema).parse(await rpc("select parent_private.parent_get_operations($1,$2) as value", [job.jobId, job.leaseToken]));
+    const matches = rows.map(normalizeWorkerOperation).flatMap(value => value?.protectedSnap && value.id === expected.operationId ? [value.protectedSnap] : []);
+    if (matches.length !== 1 || matches[0].state !== "prepared" || matches[0].requestId !== request.id ||
+      matches[0].requestVersion !== request.version || !sameSnapProtectedOperationBinding(matches[0], expected)) throw new Error("protected_operation_scope_changed");
+    return matches[0];
+  };
+  const snapPreviewSchema = z.object({
+    snapshot: snapApplicationSnapshotSchema, snapshotHash: z.string().regex(/^[a-f0-9]{64}$/),
+    dataCategories: z.array(z.enum(["household", "income"])).min(1).max(2),
+    template: templateSchema, artifact: artifactSchema.extend({
+      request_id: z.uuid(), request_version: z.number().int().positive(), snap_snapshot_id: z.uuid(), snap_snapshot_hash: z.string().regex(/^[a-f0-9]{64}$/),
+      template_id: z.literal(SNAP_PREVIEW_TEMPLATE_ID), template_version: z.literal(SNAP_PREVIEW_TEMPLATE_VERSION),
+      template_hash: z.literal(SNAP_DRAFT_CONTRACT.sha256), preparation_only: z.literal(true), status: z.literal("stored"), expires_at: iso,
+    }).nullable(),
+  }).strict();
+  const snapPreview = async () => {
+    await lease();
+    const raw = await rpc("select parent_private.parent_get_snap_application_preparation($1,$2,$3) as value",
+      [job.jobId, job.leaseToken, request.version]);
+    if (raw == null) return null;
+    const state = snapPreviewSchema.parse(raw), template = state.template;
+    if (state.snapshot.request_id !== request.id || template.id !== SNAP_PREVIEW_TEMPLATE_ID ||
+      template.version !== SNAP_PREVIEW_TEMPLATE_VERSION || template.program_id !== "snap-pa" ||
+      template.needs.length !== 1 || template.needs[0] !== "snap_new" || !template.preparation_only ||
+      Object.keys(template.field_map).length || template.required_fields.length || template.personal_fields.length || template.required_acts.length ||
+      template.content_sha256 !== SNAP_DRAFT_CONTRACT.sha256 || Date.parse(template.verified_until) <= now().getTime() ||
+      Date.parse(template.verified_until) > Date.parse(SNAP_DRAFT_CONTRACT.verifiedUntil))
+      throw new Error("snap_preview_contract_changed");
+    if (state.artifact && (state.artifact.request_id !== request.id || state.artifact.request_version !== request.version ||
+      state.artifact.snap_snapshot_id !== state.snapshot.id || state.artifact.snap_snapshot_hash !== state.snapshotHash ||
+      Date.parse(state.artifact.expires_at) <= now().getTime())) throw new Error("snap_preview_binding_changed");
+    return state;
+  };
   const getCapability = async (
     programId: string,
     action: SupportAction,
+    need?: SupportNeed,
   ): Promise<ServiceCapability> => {
     await lease();
+    if (action === "prepare") {
+      if (programId === "snap-pa" && need === "snap_new") {
+        const preview = await snapPreview();
+        if (preview) return {
+          programId, enabled: true, actions: ["prepare"], permissionReference: null, permissionExpiresAt: null,
+          dataCategories: preview.dataCategories, personalActsComplete: true, requiresForm: true, allowedFields: [], privateSnapPreview: true,
+        };
+      }
+      const template = templateSchema.nullable().parse(await rpc(
+        "select parent_private.parent_get_form_template($1,$2) as value", [programId, need ?? null],
+      ));
+      const enabled = !!template && template.program_id === programId && !!need &&
+        template.needs.includes(need) && Date.parse(template.verified_until) > now().getTime();
+      return {
+        programId, enabled, actions: enabled ? ["prepare"] : [],
+        permissionReference: null, permissionExpiresAt: null,
+        dataCategories: request.mandate.allowedData,
+        personalActsComplete: true, requiresForm: true,
+        allowedFields: enabled ? [...new Set(Object.values(template.field_map))] : [],
+      };
+    }
     const raw = capabilitySchema.parse(
       await rpc("select parent_private.parent_get_capability($1,$2) as value", [
         programId,
@@ -494,6 +659,11 @@ export async function runOneParentJob(
     );
     return {
       ...raw,
+      // This private port reconciles its exact fax attempt; it does not register an agency-status transport.
+      ...(programId === "snap-pa" && (action === "submit" || action === "follow_up")
+        ? { protectedSubmissionConfigured: Boolean(options.protectedSnapSubmission) } : {}),
+      ...(programId === "snap-pa" && action === "follow_up"
+        ? { snapStatusTransportConfigured: typeof transports.get("snap-pa:follow_up")?.execute === "function" } : {}),
       requiresForm: raw.requiresForm ?? false,
       requiredPersonalActs: (raw.requiredActs ?? []).map((id) => ({
         id,
@@ -505,6 +675,7 @@ export async function runOneParentJob(
   };
   const personalActsComplete = async (operation: ServiceProposedOperation) => {
     await lease();
+    if (operation.protectedSnap) return (await currentProtectedOperation(operation.protectedSnap)).personalActsComplete;
     const current = z
       .array(rawOperationSchema)
       .parse(
@@ -528,7 +699,8 @@ export async function runOneParentJob(
   };
   const ports: ServicePorts = {
     coordinate: async (request) => {
-      if (!options.apiKey)
+      if (continuationPass) return { plan: buildSupportPlan(request, now(), { snap_new: "snap-pa" }), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
+      if (options.continuationOnly || !options.apiKey)
         throw new DocumentProcessingError("configuration_unavailable");
       return (options.coordinate ?? coordinateSupport)({
         request,
@@ -551,7 +723,7 @@ export async function runOneParentJob(
             mediaType: document.media_type,
             apiKey: options.apiKey ?? "",
             now: now(),
-            beforeProcessing: lease,
+            beforeProcessing: async () => { await lease(); },
             beforeCall,
             fetcher,
           },
@@ -594,20 +766,24 @@ export async function runOneParentJob(
       extracted.delete(id);
     },
     capability: getCapability,
-    preparePersonalStep: async (operation) => {
+    prepareOperation: async (operation) => {
       await prepare(operation);
     },
     personalActsComplete,
     execute: async (operation) => {
+      if (continuationPass && (!operation.protectedSnap || !continuations.some(known => sameSnapProtectedOperationBinding(known, operation.protectedSnap!))))
+        return { state: "blocked", reason: "fresh_planning_required" };
       const capability = await getCapability(
         operation.programId,
         operation.action,
       );
       if (!capability.personalActsComplete)
         capability.personalActsComplete = await personalActsComplete(operation);
-      const transport = transports.get(
+      const transport = operation.protectedSnap ? undefined : transports.get(
         `${operation.programId}:${operation.action}`,
       );
+      const protectedSender = operation.protectedSnap ? options.protectedSnapSubmission : undefined;
+      let transportFailed = false;
       const result = await executeSupportOperation({
         request,
         operation,
@@ -630,7 +806,7 @@ export async function runOneParentJob(
           prepare: async () => prepare(operation),
           begin: async (operationId) => {
             await lease();
-            const frozen = z
+            const schema = z
               .object({
                 operationId: z.uuid(),
                 programId: z.string(),
@@ -639,10 +815,11 @@ export async function runOneParentJob(
                 idempotencyKey: z.string(),
                 packet: z.record(z.string(), z.unknown()),
                 packetHash: z.string().regex(/^[a-f0-9]{64}$/),
+                permissionVersion: z.string().optional(),
+                protectedPacket: snapProtectedReferenceSchema.nullable().optional(),
                 artifact: artifactSchema.nullable().optional(),
-              })
-              .passthrough()
-              .parse(
+              });
+            const frozen = (operation.protectedSnap ? schema.strict() : schema.passthrough()).parse(
                 await rpc(
                   "select parent_private.parent_begin_operation($1,$2,$3) as value",
                   [operationId, job.jobId, job.leaseToken],
@@ -656,6 +833,11 @@ export async function runOneParentJob(
               frozen.idempotencyKey !== operation.idempotencyKey
             )
               throw new Error("frozen_operation_scope_changed");
+            if (operation.protectedSnap && (frozen.artifact != null || frozen.packetHash !== operation.protectedSnap.packetHash ||
+              frozen.permissionVersion !== operation.protectedSnap.permissionVersion ||
+              !sameSnapProtectedPacket(frozen.packet, operation.protectedSnap.packet) ||
+              !sameSnapProtectedPacket({ protectedSnapPacket: frozen.protectedPacket }, operation.protectedSnap.packet)))
+              throw new Error("frozen_protected_operation_changed");
             return frozen;
           },
           finish: async (operationId, state, evidence) => {
@@ -685,6 +867,7 @@ export async function runOneParentJob(
             }),
           ),
           formVerified:
+            operation.protectedSnap?.protectedPacketCurrent === true ||
             operation.action === "follow_up" ||
             !capability.requiresForm ||
             Boolean(
@@ -694,7 +877,22 @@ export async function runOneParentJob(
               !operation.form.missingFields.length,
             ),
         },
-        transport: transport
+        transport: protectedSender && operation.protectedSnap ? {
+          execute: async frozen => {
+            await lease();
+            const canonical = operation.protectedSnap!;
+            if (frozen.operationId !== canonical.operationId || frozen.packetHash !== canonical.packetHash || !sameSnapProtectedPacket(frozen.packet, canonical.packet))
+              throw new Error("protected_operation_scope_changed");
+            const result = snapProtectedSubmissionResultSchema.parse(await protectedSender.execute(protectedIntent(canonical, frozen.signal)));
+            if (result.operationId !== canonical.operationId || result.packetId !== canonical.packet.protectedSnapPacket.packetId ||
+              result.contentSha256 !== canonical.packet.protectedSnapPacket.contentSha256) throw new Error("protected_delivery_unconfirmed");
+            if (!("receipt" in result)) {
+              transportFailed = result.transportStatus === "FAILURE";
+              throw new Error("protected_delivery_unconfirmed");
+            }
+            return result.receipt;
+          },
+        } : transport
           ? {
               execute: async (frozen) => {
                 const artifact = (
@@ -757,11 +955,14 @@ export async function runOneParentJob(
         !receiptSchema.safeParse(result.receipt).success
       )
         throw new Error("unattributed_execution_result");
-      return result as Awaited<ReturnType<ServicePorts["execute"]>>;
+      return { ...result, ...(transportFailed && result.state === "delivery_unknown" ? { transportStatus: "FAILURE" as const } : {}) } as Awaited<ReturnType<ServicePorts["execute"]>>;
     },
     reconcile: async (operation) => {
-      const transport = transports.get(`${operation.programId}:follow_up`);
-      if (!transport?.reconcile) return null;
+      if (continuationPass && (!operation.protectedSnap || !continuations.some(known => sameSnapProtectedOperationBinding(known, operation.protectedSnap!)))) return null;
+      const protectedPacket = Object.hasOwn(operation.packet, "protectedSnapPacket");
+      const transport = protectedPacket ? undefined : transports.get(`${operation.programId}:follow_up`);
+      const protectedSender = protectedPacket ? options.protectedSnapSubmission : undefined;
+      if (protectedPacket ? !protectedSender || !operation.protectedSnap || operation.protectedSnap.requestId !== request.id : !transport?.reconcile) return null;
       const current = await getCapability(operation.programId, "follow_up");
       if (
         !current.enabled ||
@@ -774,8 +975,17 @@ export async function runOneParentJob(
       )
         return null;
       await lease();
-      const receipt = receiptSchema.parse(
-        await transport.reconcile(
+      let observed: unknown;
+      if (protectedPacket) {
+        const canonical = operation.protectedSnap!;
+        const value = await protectedSender!.reconcile(protectedIntent(canonical, AbortSignal.timeout(60000)));
+        if (value === null) return null;
+        const result = snapProtectedSubmissionResultSchema.parse(value);
+        if (result.operationId !== canonical.operationId || result.packetId !== canonical.packet.protectedSnapPacket.packetId ||
+          result.contentSha256 !== canonical.packet.protectedSnapPacket.contentSha256) throw new Error("protected_reconciliation_scope_changed");
+        if (!("receipt" in result)) return result.transportStatus === "FAILURE" ? { state: "delivery_unknown", transportStatus: "FAILURE" } : null;
+        observed = result.receipt;
+      } else observed = await transport!.reconcile!(
           {
             id: operation.id,
             need: operation.need,
@@ -783,8 +993,8 @@ export async function runOneParentJob(
             idempotencyKey: operation.idempotencyKey,
           },
           AbortSignal.timeout(60000),
-        ),
-      );
+        );
+      const receipt = receiptSchema.parse(observed);
       await rpc(
         "select parent_private.parent_reconcile_operation($1,$2,$3,$4,$5) as value",
         [
@@ -798,7 +1008,42 @@ export async function runOneParentJob(
       return receipt;
     },
     fillForm: async (programId, packet, need): Promise<ServiceForm | null> => {
+      if (continuationPass) return null;
       await lease();
+      if (programId === "snap-pa" && need === "snap_new") {
+        const preview = await snapPreview();
+        if (preview) {
+          const { snapshot, readiness } = assessSnapApplicationSnapshot(preview.snapshot, now());
+          if (!readiness.sourceReviewCurrent) throw new Error("snap_preview_source_expired");
+          const metadata = {
+            snapshotId: snapshot.id, snapshotHash: preview.snapshotHash,
+            state: "ready" as "ready" | "needs_current_facts" | "service_blocked",
+            missingFields: readiness.missingFields, invalidCurrentFields: readiness.invalidCurrentFields, staleFields: readiness.staleFields,
+            serviceQuestions: readiness.serviceQuestions, renderingRequirements: [] as string[], dataCategories: preview.dataCategories,
+          };
+          const common = {
+            programId, templateId: preview.template.id, version: preview.template.version,
+            formInputDigest: digest(JSON.stringify(packet)), validated: true as const, preparationOnly: true,
+            personalActs: [], missingFields: [] as string[], snapApplication: metadata,
+          };
+          if (programRoutingIssue(getProgram("snap-pa")!, undefined, now())) return { ...common,
+            snapApplication: { ...metadata, state: "service_blocked", serviceQuestions: [...metadata.serviceQuestions, "program_source_review"] } };
+          if (!readiness.nonProtectedDataReadyForReview) return { ...common, missingFields: ["snap_application_details"],
+            snapApplication: { ...metadata, state: "needs_current_facts" } };
+          if (programRoutingIssue(getProgram("snap-pa")!, snapshot.details.zip, now())) return { ...common,
+            snapApplication: { ...metadata, state: "service_blocked", serviceQuestions: [...metadata.serviceQuestions, "service_area_review"] } };
+          if (preview.artifact) return { ...common, artifactId: preview.artifact.id, contentSha256: preview.artifact.content_sha256 };
+          const source = await download("parent-known-forms", preview.template.object_path);
+          const rendered = await renderSnapApplicationPreview(source, snapshot.details, now());
+          if (!rendered.bytes) return { ...common, snapApplication: { ...metadata, state: "service_blocked",
+            renderingRequirements: rendered.readiness.renderingRequirements } };
+          const artifact = artifactSchema.parse(await rpc(
+            "select parent_private.parent_register_snap_application_preview($1,$2,$3,$4,$5,$6) as value",
+            [job.jobId, job.leaseToken, request.version, snapshot.id, preview.snapshotHash, digest(rendered.bytes)]));
+          await upload(artifact, rendered.bytes);
+          return { ...common, artifactId: artifact.id, contentSha256: artifact.content_sha256 };
+        }
+      }
       const raw = await rpc(
         "select parent_private.parent_get_form_template($1,$2) as value",
         [programId, need ?? null],
@@ -812,6 +1057,18 @@ export async function runOneParentJob(
         Date.parse(template.verified_until) <= now().getTime()
       )
         throw new Error("form_purpose_changed");
+      if (template.preparation_only && !request.mandate.allowedActions.includes("prepare"))
+        throw new Error("form_preparation_not_authorized");
+      const snapDraft = template.id === SNAP_DRAFT_CONTRACT.id;
+      if (snapDraft && (programId !== "snap-pa" || need !== "snap_new" ||
+        template.version !== SNAP_DRAFT_CONTRACT.version ||
+        template.content_sha256 !== SNAP_DRAFT_CONTRACT.sha256 || !template.preparation_only ||
+        now().getTime() < Date.parse(`${SNAP_DRAFT_CONTRACT.sourceCheckedAt}T00:00:00Z`) ||
+        now().getTime() >= Date.parse(SNAP_DRAFT_CONTRACT.verifiedUntil) ||
+        Date.parse(template.verified_until) > Date.parse(SNAP_DRAFT_CONTRACT.verifiedUntil) ||
+        Object.values(template.field_map).some(field => field !== "zip") ||
+        Object.keys(packet).some(field => field !== "zip")))
+        throw new Error("snap_preparation_contract_changed");
       const formInputDigest = digest(JSON.stringify(packet));
       const personalActs = template.required_acts.map((id) => ({
         id,
@@ -828,6 +1085,7 @@ export async function runOneParentJob(
         version: template.version,
         formInputDigest,
         validated: true as const,
+        preparationOnly: template.preparation_only,
         personalActs,
         missingFields,
       };
@@ -862,12 +1120,14 @@ export async function runOneParentJob(
         requiredFields: template.required_fields,
         personalFields: template.personal_fields,
       };
-      const bytes = await fillVerifiedForm(
-        contract,
-        await download("parent-known-forms", template.object_path),
-        packet,
-        now(),
-      );
+      const source = await download("parent-known-forms", template.object_path);
+      let bytes: Uint8Array;
+      if (snapDraft) {
+        const draft = await renderSnapPreparationDraft(source, {
+          kind: "current_scoped_facts", zip: packet.zip, language: request.intake.language,
+        }, now());
+        bytes = draft.bytes;
+      } else bytes = await fillVerifiedForm(contract, source, packet, now());
       const artifact = artifactSchema.parse(
         await rpc(
           "select parent_private.parent_register_form_artifact($1,$2,$3,$4,$5,$6,$7,$8) as value",
@@ -900,12 +1160,57 @@ export async function runOneParentJob(
   };
   try {
     const result = await runSupportService({
-      request,
-      documents: job.documents.map(normalizeDocument),
+      request: serviceRequest,
+      documents: continuation ? [] : job.documents.map(normalizeDocument),
       operations,
+      jobAttempts: deliveryJobAttempts,
+      ...(snapCapture && !continuation ? { snapCapture } : {}),
       now: now(),
       ports,
     });
+    const otherNeeds = request.intake.needs.filter(need => need !== "snap_new");
+    if (continuation && otherNeeds.length) {
+      let otherRoutes = (request.plan?.routes ?? []).filter(route => route.need !== "snap_new");
+      let otherActions = request.required_actions.filter(action => action.need !== "snap_new");
+      let retryDriver = true;
+      if (options.apiKey && !options.continuationOnly) {
+        continuationPass = false;
+        try {
+          const other = await runSupportService({
+            request: { ...request, intake: { ...request.intake, needs: otherNeeds }, required_actions: otherActions,
+              plan: request.plan ? { ...request.plan, routes: otherRoutes } : null },
+            documents: job.documents.map(normalizeDocument),
+            operations: operations.filter(operation => operation.need !== "snap_new"), now: now(), ports,
+          });
+          otherRoutes = other.plan.routes; otherActions = other.requiredActions; retryDriver = false;
+          result.modelCalls += other.modelCalls; result.inputTokens += other.inputTokens; result.outputTokens += other.outputTokens;
+          result.plan.model = other.plan.model ?? result.plan.model;
+          if (other.nextRunAt && (!result.nextRunAt || Date.parse(other.nextRunAt) < Date.parse(result.nextRunAt))) {
+            result.nextRunAt = other.nextRunAt; result.nextActor = other.nextActor; result.nextTrigger = other.nextTrigger;
+          } else if (!result.nextRunAt && other.nextActor) {
+            result.nextActor = other.nextActor; result.nextTrigger = other.nextTrigger;
+          }
+        } catch {
+          // Independent planning cannot roll back a recorded SNAP result or erase its saved sibling work.
+          retryDriver = true;
+        }
+      }
+      const snapRoutes = result.plan.routes;
+      result.plan.routes = request.intake.needs.flatMap(need => (need === "snap_new" ? snapRoutes : otherRoutes).filter(route => route.need === need));
+      result.requiredActions = [...otherActions, ...result.requiredActions];
+      const next = now().getTime() + 300_000;
+      if (retryDriver && next < Date.parse(request.mandate.expiresAt)) {
+        result.nextRunAt = new Date(Math.min(next, Date.parse(result.nextRunAt ?? "") || Infinity)).toISOString();
+        result.nextTrigger = "scheduled_follow_up";
+        result.nextActor = "caselink";
+      }
+      if (result.requiredActions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent"))) result.nextActor = "parent";
+    }
+    if (deliveryJobAttempts === 48 && result.nextRunAt) {
+      result.nextRunAt = null;
+      if (result.nextActor !== "parent") result.nextActor = "operator";
+      result.nextTrigger = result.nextActor === "parent" ? "parent_action_completed" : "route_review_required";
+    }
     await rpc(
       "select parent_private.parent_save_job_plan($1,$2,$3,$4,$5,$6,$7,$8) as value",
       [

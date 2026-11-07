@@ -5,6 +5,7 @@ import { factAnswerSchema } from "./answers";
 import { currentIntakeFields } from "./current-intake-fields";
 import type { CoordinatorResult } from "./coordinator";
 import {
+  OUTCOME_PROGRESS as outcomeOrder,
   type NecessaryAction,
   type OutcomeState,
   type ParentDocument,
@@ -31,7 +32,11 @@ import {
   getProgram,
   getProgramsForNeeds,
   programRoutingIssue,
+  supportsInitialServiceDelivery,
 } from "./programs";
+import { sameSnapProtectedPacket, snapProtectedOperationSchema, type SnapProtectedOperation } from "./snap-protected-operation";
+import type { SnapCaptureProgress } from "./snap-capture-progress";
+import { snapTransportFailureSchema } from "./snap-protected-submission-port";
 
 export type ServiceReceipt = z.infer<typeof receiptSchema>;
 export type ServiceDocument = ParentDocument & {
@@ -51,7 +56,10 @@ export type ServiceOperation = {
   packet: Record<string, unknown>;
   updatedAt: string;
   createdAt?: string;
+  executedAt?: string;
   receipt?: ServiceReceipt;
+  snapSubmissionAuthorized?: boolean;
+  protectedSnap?: SnapProtectedOperation;
 };
 const personalActSchema = z
   .object({
@@ -73,13 +81,24 @@ export const serviceFormSchema = z
       .optional(),
     formInputDigest: z.string().regex(/^[a-f0-9]{64}$/),
     validated: z.literal(true),
+    preparationOnly: z.boolean().optional(),
+    snapApplication: z.object({
+      snapshotId: z.uuid(), snapshotHash: z.string().regex(/^[a-f0-9]{64}$/),
+      state: z.enum(["ready", "needs_current_facts", "service_blocked"]),
+      missingFields: z.array(z.string().min(1).max(200)).max(2000),
+      invalidCurrentFields: z.array(z.string().min(1).max(200)).max(2000),
+      staleFields: z.array(z.string().min(1).max(200)).max(2000),
+      serviceQuestions: z.array(z.string().min(1).max(100)).max(20),
+      renderingRequirements: z.array(z.string().min(1).max(100)).max(20),
+      dataCategories: z.array(z.enum(["household", "income"])).min(1).max(2),
+    }).strict().optional(),
     personalActs: z.array(personalActSchema).max(10).default([]),
     missingFields: z.array(z.string().min(1).max(100)).max(20).default([]),
   })
   .strict()
   .refine(
     (form) =>
-      form.missingFields.length > 0 ||
+      form.missingFields.length > 0 || form.snapApplication?.state === "service_blocked" ||
       !!(form.artifactId && form.contentSha256),
     "An executable form needs its exact stored artifact.",
   );
@@ -88,6 +107,9 @@ export type ServiceCapability = ProviderCapability & {
   requiredPersonalActs?: z.infer<typeof personalActSchema>[];
   requiresForm?: boolean;
   allowedFields?: string[];
+  privateSnapPreview?: true;
+  protectedSubmissionConfigured?: boolean;
+  snapStatusTransportConfigured?: boolean;
 };
 export type ServiceProposedOperation = ProposedOperation & {
   need: SupportNeed;
@@ -97,6 +119,7 @@ export type ServiceExecutionResult = {
   state: OutcomeState | "delivery_unknown" | "blocked";
   reason?: string;
   receipt?: ServiceReceipt;
+  transportStatus?: "FAILURE";
 };
 export type ServiceEvent = {
   id: string;
@@ -122,10 +145,11 @@ export type ServicePorts = {
   capability(
     programId: string,
     action: SupportAction,
+    need?: SupportNeed,
   ): Promise<ServiceCapability | null>;
   execute(operation: ServiceProposedOperation): Promise<ServiceExecutionResult>;
-  /** Freeze the exact packet for a required personal act without beginning delivery. */
-  preparePersonalStep(operation: ServiceProposedOperation): Promise<void>;
+  /** Freeze an authorized preparation or exact packet without beginning delivery. */
+  prepareOperation(operation: ServiceProposedOperation): Promise<void>;
   personalActsComplete(operation: ServiceProposedOperation): Promise<boolean>;
   reconcile(operation: ServiceOperation): Promise<unknown | null>;
   fillForm(
@@ -153,16 +177,6 @@ export type ServiceResult = {
   modelCalls: number;
   inputTokens: number;
   outputTokens: number;
-};
-const outcomeOrder: Partial<Record<OutcomeState, number>> = {
-  checking: 0,
-  prepared: 1,
-  sent: 2,
-  partner_received: 3,
-  partner_accepted: 4,
-  agency_submitted: 5,
-  assistance_approved: 6,
-  support_received: 7,
 };
 const utilityNeeds: SupportNeed[] = ["electricity", "gas", "water"];
 const fieldQuestions: Record<string, { title: string; explanation: string }> = {
@@ -415,6 +429,8 @@ export async function runSupportService(input: {
   documents: ServiceDocument[];
   operations?: ServiceOperation[];
   unknownOperations?: ServiceOperation[];
+  snapCapture?: { state: SnapCaptureProgress["state"]; reason: SnapCaptureProgress["reason"]; retryAt?: string };
+  jobAttempts?: number;
   now: Date;
   ports: ServicePorts;
 }): Promise<ServiceResult> {
@@ -677,6 +693,8 @@ export async function runSupportService(input: {
   const nextRuns: number[] = [];
   let unknownDelivery = false;
   let routesExhausted = false;
+  let captureRetryActionId: string | undefined;
+  const reconciliationActionIds = new Set<string>();
   const addAction = (
     route: SupportRoute,
     reason: NecessaryAction["reason"],
@@ -696,10 +714,29 @@ export async function runSupportService(input: {
         explanation,
         resolver,
         ...(field ? { field } : {}),
-        ...(resolver === "parent" && getProgram(route.programId)
+        ...(resolver === "parent" && reason !== "submission_review" && field !== "snap_personal_pages" && getProgram(route.programId)
           ? { url: getProgram(route.programId)!.officialUrl }
           : {}),
       });
+    return id;
+  };
+  const scheduleProtectedReconciliation = async (canonical: SnapProtectedOperation | undefined, attemptedAt: string,
+    knownCapability?: ServiceCapability | null) => {
+    try {
+      const attempts = input.jobAttempts;
+      if (!canonical || canonical.requestId !== request.id || !snapProtectedOperationSchema.safeParse(canonical).success ||
+        request.mandate.mode !== "full" || !request.mandate.allowedActions.includes("follow_up") ||
+        !request.mandate.allowedData.includes("household") || !request.mandate.recipientIds.includes("snap-pa") ||
+        typeof attempts !== "number" || !Number.isInteger(attempts) || attempts < 1 || attempts >= 48) return false;
+      const capability = knownCapability ?? await ports.capability("snap-pa", "follow_up");
+      if (!capability?.enabled || capability.programId !== "snap-pa" || !capability.actions.includes("follow_up") ||
+        !capability.permissionReference || !capability.permissionExpiresAt || !capability.dataCategories.includes("household") ||
+        capability.protectedSubmissionConfigured !== true) return false;
+      const started = Date.parse(attemptedAt), retry = now.getTime() + 300000;
+      const deadline = Math.min(started + 7200000, expiry, Date.parse(capability.permissionExpiresAt));
+      if (!Number.isFinite(started) || started > now.getTime() || !Number.isFinite(deadline) || retry >= deadline) return false;
+      nextRuns.push(retry); return true;
+    } catch { return false; }
   };
   const record = async (route: SupportRoute, receipt?: ServiceReceipt) => {
     const prior = request.plan?.routes.find((previous) =>
@@ -727,6 +764,25 @@ export async function runSupportService(input: {
   for (let index = 0; index < plan.routes.length; index++) {
     let route = plan.routes[index];
     try {
+      let canonical: SnapProtectedOperation | undefined;
+      const protectedCandidates = route.need === "snap_new" ? operations.filter(operation => operation.state === "prepared" &&
+        Object.hasOwn(operation.packet, "protectedSnapPacket") && (!operation.protectedSnap || operation.protectedSnap.requestVersion === request.version)) : [];
+      if (request.mandate.mode === "full" && protectedCandidates.length && (outcomeOrder[route.state] ?? 0) < 2) {
+        for (let actionIndex = actions.length - 1; actionIndex >= 0; actionIndex--)
+          if (actions[actionIndex].need === route.need && actions[actionIndex].reason === "missing_fact") actions.splice(actionIndex, 1);
+        const owned = protectedCandidates[0], parsed = snapProtectedOperationSchema.safeParse(owned.protectedSnap);
+        if (protectedCandidates.length !== 1 || !parsed.success || parsed.data.state !== "prepared" || !parsed.data.protectedPacketCurrent ||
+          parsed.data.requestId !== request.id || parsed.data.operationId !== owned.id || parsed.data.idempotencyKey !== owned.idempotencyKey ||
+          parsed.data.programId !== owned.programId || parsed.data.need !== owned.need || parsed.data.action !== owned.action ||
+          !sameSnapProtectedPacket(parsed.data.packet, owned.packet)) {
+          addAction(route, "execution_issue", "CaseLink is checking the prepared application",
+            "The exact current application or its authority needs a service check. Your saved work remains recorded.");
+          plan.routes[index] = route; continue;
+        }
+        canonical = parsed.data;
+        const snap = getProgram("snap-pa")!;
+        route = { ...route, programId: snap.id, title: snap.name, summary: snap.description, officialUrl: snap.officialUrl, sourceUrl: snap.sourceUrl };
+      }
       let program = getProgram(route.programId);
       if (!program || !program.needs.includes(route.need)) continue;
       if (!request.mandate.recipientIds.includes(program.id)) {
@@ -760,12 +816,15 @@ export async function runSupportService(input: {
           operation.state === "delivery_unknown",
       );
       let stillUnknown = false;
+      let unresolvedRetries = true;
+      let transportFailed = false;
       for (const operation of unknown) {
         if (
           request.mandate.mode !== "full" ||
           !request.mandate.allowedActions.includes("follow_up")
         ) {
           stillUnknown = true;
+          unresolvedRetries = false;
           continue;
         }
         try {
@@ -783,6 +842,7 @@ export async function runSupportService(input: {
               "recipientIds",
             );
             stillUnknown = true;
+            unresolvedRetries = false;
             continue;
           }
           if (
@@ -793,13 +853,19 @@ export async function runSupportService(input: {
             Date.parse(currentCapability.permissionExpiresAt) <= now.getTime()
           ) {
             stillUnknown = true;
+            unresolvedRetries = false;
             continue;
           }
-          const receipt = receiptSchema.safeParse(
-            await ports.reconcile(operation),
-          );
+          const observed = await ports.reconcile(operation);
+          if (operation.protectedSnap && snapTransportFailureSchema.safeParse(observed).success) {
+            stillUnknown = true; transportFailed = true; unresolvedRetries = false;
+            continue;
+          }
+          const receipt = receiptSchema.safeParse(observed);
           if (!receipt.success) {
             stillUnknown = true;
+            unresolvedRetries = await scheduleProtectedReconciliation(operation.protectedSnap,
+              operation.executedAt ?? operation.updatedAt, currentCapability) && unresolvedRetries;
             continue;
           }
           // A real old-account receipt remains history; it does not complete the changed account.
@@ -828,19 +894,47 @@ export async function runSupportService(input: {
           await record(route, receipt.data);
         } catch {
           stillUnknown = true;
+          unresolvedRetries = await scheduleProtectedReconciliation(operation.protectedSnap,
+            operation.executedAt ?? operation.updatedAt) && unresolvedRetries;
         }
       }
       if (stillUnknown) {
         unknownDelivery = true;
-        addAction(
+        const issueId = addAction(
           route,
           "execution_issue",
-          "Confirm the previous delivery",
-          "The previous attempt has no reliable receipt yet. CaseLink must reconcile it before retrying; nothing will be blindly resubmitted.",
+          transportFailed ? "Resolve the failed fax transmission" : "Confirm the previous delivery",
+          transportFailed ? "The fax service reported a failed transmission. Some pages may have arrived. CaseLink must check agency receipt and the permitted next step before any resend."
+            : "The previous attempt has no reliable receipt yet. CaseLink must reconcile it before retrying; nothing will be blindly resubmitted.",
         );
+        if (unresolvedRetries) reconciliationActionIds.add(issueId);
         route.nextActor = "caselink";
         plan.routes[index] = route;
         continue;
+      }
+      if ((outcomeOrder[route.state] ?? 0) >= 2) canonical = undefined;
+      if (route.need === "snap_new" && input.snapCapture && input.snapCapture.state !== "checked" && (outcomeOrder[route.state] ?? 0) < 2) {
+        for (let actionIndex = actions.length - 1; actionIndex >= 0; actionIndex--)
+          if (actions[actionIndex].need === route.need && actions[actionIndex].reason === "missing_fact") actions.splice(actionIndex, 1);
+        const reason = input.snapCapture.reason;
+        const personal: Record<string, [string, string]> = {
+          page_1_unreadable: ["Retake the first personal application page", "The first personal page could not be read. Replace it through the protected application pages; your saved answers stay reused."],
+          page_5_unreadable: ["Retake the certification application page", "The certification page could not be read. Replace it through the protected application pages; your saved answers stay reused."],
+          applicant_identifier_needed: ["Complete the required secure identifier step", "A required applicant identifier or accepted exception needs protected entry. Use the protected application pages and keep identifiers out of chat."],
+          personal_mark_or_date_needed: ["Complete the required personal marks and dates", "The exact application still needs a required personal mark or date. Complete that step through the protected application pages."],
+          facts_correction_needed: ["Check the personal application pages", "The saved answers and personal pages differ. Review the exact application and correct only the affected information."],
+        };
+        if (input.snapCapture.state === "needs_parent" && reason && personal[reason]) {
+          addAction(route, "personal_step", ...personal[reason], "parent", "snap_personal_pages", reason); route.nextActor = "parent";
+        } else {
+          const issueId = addAction(route, "execution_issue", "CaseLink is checking your saved application",
+            "The exact file is saved, but its private check or permitted source needs a service check. Nothing has been submitted."); route.nextActor = "caselink";
+          const retry = Date.parse(input.snapCapture.retryAt ?? "");
+          if (Number.isFinite(retry) && retry>=now.getTime()+30000 && retry<expiry && (input.snapCapture.state === "pending" || reason === "check_unavailable")) {
+            nextRuns.push(retry); captureRetryActionId = issueId;
+          }
+        }
+        plan.routes[index] = route; continue;
       }
       if (route.state === "support_received" || route.state === "withdrawn") {
         plan.routes[index] = route;
@@ -933,7 +1027,7 @@ export async function runSupportService(input: {
       const progress = outcomeOrder[route.state] ?? 0;
       let action: SupportAction | null = null;
       let capability: ServiceCapability | null = null;
-      if (request.mandate.mode === "prepare_only") {
+      if (request.mandate.mode === "prepare_only" && progress >= 2) {
         await record(route);
         plan.routes[index] = route;
         continue;
@@ -963,7 +1057,7 @@ export async function runSupportService(input: {
         }
         if (
           !request.mandate.allowedActions.includes("follow_up") ||
-          !capability?.enabled
+          !capability?.enabled || capability.snapStatusTransportConfigured === false
         ) {
           addAction(
             route,
@@ -981,11 +1075,12 @@ export async function runSupportService(input: {
         }
         action = "follow_up";
       } else {
-        for (const candidateAction of [
+        for (const candidateAction of request.mandate.mode === "full" ? [
           "submit",
           "share",
           "schedule",
-        ] as const) {
+        ] as const : []) {
+          if (!supportsInitialServiceDelivery(route.need, candidateAction)) continue;
           if (!request.mandate.allowedActions.includes(candidateAction))
             continue;
           const candidate = await ports.capability(
@@ -1001,8 +1096,22 @@ export async function runSupportService(input: {
             break;
           }
         }
+        if (!action && request.mandate.allowedActions.includes("prepare")) {
+          const preparation = await ports.capability(route.programId, "prepare", route.need);
+          if (preparation?.enabled && preparation.actions.includes("prepare") &&
+            preparation.requiresForm && (preparation.allowedFields?.length ||
+              (preparation.privateSnapPreview && route.programId === "snap-pa" && route.need === "snap_new"))) {
+            action = "prepare";
+            capability = preparation;
+          }
+        }
       }
       if (!action || !capability) {
+        if (request.mandate.mode === "prepare_only") {
+          await record(route);
+          plan.routes[index] = route;
+          continue;
+        }
         addAction(
           route,
           "execution_issue",
@@ -1015,16 +1124,22 @@ export async function runSupportService(input: {
         await record(route);
         continue;
       }
+      if (canonical && action !== "submit") {
+        addAction(route, "execution_issue", "CaseLink is verifying the application connection",
+          "The exact prepared application is saved. CaseLink must restore its permitted submission connection before continuing.");
+        plan.routes[index] = route; continue;
+      }
       const knownCase = action === "follow_up" && history.some((operation) => operation.receipt);
       const zip = currentIntakeFields(request, now, route.need).zip;
-      if (!knownCase && programRoutingIssue(program, zip, now)) {
+      const privatePreviewRoute = capability.privateSnapPreview && action === "prepare" && route.programId === "snap-pa" && route.need === "snap_new";
+      if (!knownCase && !privatePreviewRoute && !canonical && programRoutingIssue(program, zip, now)) {
         route.state = "unresolved";
         addAction(route, "execution_issue", "Check this program’s current coverage",
           "CaseLink must verify its supported service area or refresh this program's source information before starting new work.");
         plan.routes[index] = route;
         continue;
       }
-      const needsRouting = !knownCase && zip === undefined;
+      const needsRouting = !knownCase && !canonical && zip === undefined;
       if (needsRouting) {
         if (!request.mandate.allowedData.includes("household"))
           addAction(route, "expanded_permission", "Review permission for routing details",
@@ -1035,25 +1150,19 @@ export async function runSupportService(input: {
             "CaseLink currently coordinates new support in Philadelphia. A current ZIP lets us check the service area for this need; this is a CaseLink routing check, not an extra program form requirement.",
             "parent", "zip", "zip");
       }
-      const needsBookingChoice = action === "schedule" && request.mandate.bookingPreference === "ask_me";
-      if (needsBookingChoice) {
-        addAction(
-          route,
-          "meaningful_choice",
-          "Choose an appointment time",
-          "A confirmed appointment choice is required before booking. Other permitted preparation can continue.",
-          "parent",
-          "bookingPreference",
-        );
-      }
       let followUpCycle: string | null = null;
       let preparedForm: ServiceForm | undefined;
+      let privateSnapPreparation = false;
+      let needsFormDetails = false;
       let packet = packetFor(
         { ...request, intake: effectiveIntake },
         route,
         validDocuments,
         now,
       );
+      if (canonical) {
+        packet = canonical.packet;
+      }
       if (
         utilityNeeds.includes(route.need) &&
         action !== "follow_up" &&
@@ -1088,7 +1197,7 @@ export async function runSupportService(input: {
           .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
         packet = { statusReference: last.receipt!.reference };
         followUpCycle = `${last.id}:${last.updatedAt}`;
-      } else {
+      } else if (!canonical) {
         try {
           const formInputDigest = digest(packet);
           const form = await ports.fillForm(
@@ -1103,7 +1212,38 @@ export async function runSupportService(input: {
               checked.formInputDigest !== formInputDigest
             )
               throw new Error("form_packet_mismatch");
+            if (checked.snapApplication) {
+              if (route.need !== "snap_new" || route.programId !== "snap-pa" || !checked.preparationOnly)
+                throw new Error("private_form_purpose_mismatch");
+              privateSnapPreparation = true;
+              for (let actionIndex = actions.length - 1; actionIndex >= 0; actionIndex--)
+                if (actions[actionIndex].need === route.need && actions[actionIndex].reason === "missing_fact") actions.splice(actionIndex, 1);
+              // The private snapshot is bound separately; no private answer enters an ordinary packet.
+              packet = {};
+            }
+            if (checked.preparationOnly) {
+              if (!request.mandate.allowedActions.includes("prepare"))
+                throw new Error("form_preparation_not_authorized");
+              action = "prepare";
+            }
+            if (checked.snapApplication?.state === "service_blocked") {
+              route.state = "unresolved";
+              addAction(route, "execution_issue", "CaseLink is checking the application",
+                "CaseLink must resolve a verified form or service-area requirement before preparation can finish. You do not need to shorten an answer or approve again.");
+              plan.routes[index] = route;
+              continue;
+            }
+            if (checked.snapApplication?.state === "needs_current_facts") {
+              route.state = "checking";
+              addAction(route, "missing_fact", "Update the required SNAP application answers",
+                "Open the grouped SNAP application details to supply only the missing or outdated answers. Your saved answers and service permission remain recorded.",
+                "parent", "snap_application_details", "snap_application_details");
+              route.nextActor = "parent";
+              plan.routes[index] = route;
+              continue;
+            }
             if (checked.missingFields.length) {
+              needsFormDetails = true;
               const missingFields = [
                 ...new Set(
                   checked.missingFields.map((field) =>
@@ -1149,11 +1289,7 @@ export async function runSupportService(input: {
                     "The form requests information outside this supported data inventory. CaseLink must verify a safe direct-entry or qualified help route.",
                   );
               }
-              route.nextActor = "parent";
-              plan.routes[index] = route;
-              continue;
-            }
-            preparedForm = checked;
+            } else preparedForm = checked;
           } else if (capability.requiresForm) {
             addAction(
               route,
@@ -1175,29 +1311,84 @@ export async function runSupportService(input: {
           continue;
         }
       }
-      if (needsRouting || needsBookingChoice) {
-        route.nextActor = "parent";
+      const needsBookingChoice = action === "schedule" && request.mandate.bookingPreference === "ask_me";
+      if (needsBookingChoice) {
+        addAction(
+          route,
+          "meaningful_choice",
+          "Choose an appointment time",
+          "A confirmed appointment choice is required before booking. Other permitted preparation can continue.",
+          "parent",
+          "bookingPreference",
+        );
+      }
+      if ((needsRouting && !privateSnapPreparation) || needsBookingChoice || needsFormDetails) {
+        route.nextActor = actions.some((item) => item.need === route.need &&
+          !item.resolved && (!item.resolver || item.resolver === "parent")) ? "parent" : "caselink";
         plan.routes[index] = route;
         continue;
       }
-      const operation: ServiceProposedOperation = {
+      const operation: ServiceProposedOperation = canonical ? {
+        need: "snap_new", requestVersion: canonical.requestVersion, programId: "snap-pa", action: "submit",
+        packet: canonical.packet, dataCategories: canonical.dataCategories, documentIds: [], idempotencyKey: canonical.idempotencyKey, protectedSnap: canonical,
+      } : {
         need: route.need,
         ...(preparedForm ? { form: preparedForm } : {}),
         requestVersion: request.version,
         programId: route.programId,
         action,
-        dataCategories: packetCategories(packet),
+        dataCategories: [...new Set([...packetCategories(packet), ...(preparedForm?.snapApplication?.dataCategories ?? [])])],
         documentIds: Array.isArray(packet.documentIds)
           ? (packet.documentIds as string[])
           : [],
         packet,
-        idempotencyKey: `parent:${request.id}:${digest({ requestVersion: request.version, need: route.need, programId: route.programId, action, packet, formDigest: preparedForm?.contentSha256 ?? null, followUpCycle })}`,
+        idempotencyKey: `parent:${request.id}:${digest({ requestVersion: request.version, need: route.need, programId: route.programId, action, packet, formDigest: preparedForm?.contentSha256 ?? null,
+          snapSnapshot: preparedForm?.snapApplication ? { id: preparedForm.snapApplication.snapshotId, hash: preparedForm.snapApplication.snapshotHash } : undefined, followUpCycle })}`,
       };
+      if (canonical && !canonical.protectedParentSubmitReady) {
+        addAction(route, "execution_issue", "CaseLink is checking the remaining personal-step route",
+          "An additional required personal step needs an accepted completion route before this application can be submitted. Your exact file remains saved.");
+        plan.routes[index] = route; continue;
+      }
+      if (canonical && capability.protectedSubmissionConfigured !== true) {
+        addAction(route, "execution_issue", "CaseLink is connecting application submission",
+          "The exact application is saved. CaseLink must connect its isolated submission service before asking you to submit it.");
+        plan.routes[index] = route; continue;
+      }
+      if (canonical && !canonical.snapSubmissionAuthorized) {
+        route.state = "prepared"; route.nextActor = "parent";
+        route.limitation = "The exact protected application is saved for your review. Nothing has been sent.";
+        addAction(route, "submission_review", "Review and submit your SNAP application",
+          "Review the exact application, correct anything needed, and confirm your completed handwritten certifications when choosing Submit.",
+          "parent", "snap_final_submit", canonical.idempotencyKey);
+        plan.routes[index] = route; continue;
+      }
+      if (canonical && !canonical.personalActsComplete) {
+        addAction(route, "execution_issue", "CaseLink is checking the personal-step evidence",
+          "A required step or its evidence has changed. CaseLink must identify the exact remaining requirement before asking you to repeat anything.");
+        plan.routes[index] = route; continue;
+      }
+      if (action === "prepare") {
+        await ports.prepareOperation(operation);
+        route.state = "prepared";
+        route.nextActor = "caselink";
+        route.limitation = preparedForm?.snapApplication
+          ? "The saved SNAP application answers are filled in an unsigned preview. Required protected fields, genuine certifications and permitted submission remain incomplete. No application has been sent."
+          : preparedForm?.preparationOnly
+          ? "An incomplete unsigned draft is saved. Current supported details are filled; protected application fields and permitted submission still need a service connection. No application has been sent."
+          : "An unsigned application form is prepared. No application has been sent.";
+        if (request.mandate.mode === "full")
+          addAction(route, "execution_issue", "CaseLink is verifying the service connection",
+            "Your prepared form is saved. CaseLink must verify the permitted submission and status channel; there is nothing for you to approve again.");
+        plan.routes[index] = route;
+        await record(route);
+        continue;
+      }
       if (
         !capability.personalActsComplete &&
         !(await ports.personalActsComplete(operation))
       ) {
-        await ports.preparePersonalStep(operation);
+        await ports.prepareOperation(operation);
         const acts = preparedForm?.personalActs.length
           ? [
               ...preparedForm.personalActs,
@@ -1229,16 +1420,38 @@ export async function runSupportService(input: {
         plan.routes[index] = route;
         continue;
       }
+      if (operation.need === "snap_new" && operation.action === "submit" && !operations.some(
+        (previous) => previous.need === operation.need && previous.programId === operation.programId &&
+          previous.action === operation.action && previous.state === "prepared" &&
+          previous.idempotencyKey === operation.idempotencyKey && previous.snapSubmissionAuthorized === true &&
+          currentAccountOperation(previous),
+      )) {
+        await ports.prepareOperation(operation);
+        route.state = "prepared";
+        route.nextActor = "parent";
+        route.limitation = "Your prepared SNAP application is ready for your review. Nothing has been sent.";
+        addAction(route, "submission_review", "Review and submit your SNAP application",
+          "Review the exact prepared application and correct anything needed, then choose Submit. This choice is separate from required signatures and certifications.",
+          "parent", "snap_final_submit", operation.idempotencyKey);
+        plan.routes[index] = route;
+        continue;
+      }
       try {
         const result = await ports.execute(operation);
         if (result.state === "delivery_unknown") {
           unknownDelivery = true;
-          addAction(
+          const failed = canonical && result.transportStatus === "FAILURE";
+          const retrying = !failed && await scheduleProtectedReconciliation(canonical,
+            operations.find(item => item.id === canonical?.operationId)?.executedAt ?? now.toISOString());
+          const issueId = addAction(
             route,
             "execution_issue",
-            "Confirm the attempted delivery",
-            "CaseLink will reconcile the exact attempt before retrying. A timeout is not proof that the program did or did not receive it.",
+            failed ? "Resolve the failed fax transmission" : retrying ? "CaseLink is checking application delivery" : "Confirm the attempted delivery",
+            failed ? "The fax service reported a failed transmission. Some pages may have arrived. CaseLink must check agency receipt and the permitted next step before any resend."
+              : retrying ? "CaseLink will check the exact fax automatically. Delivery and agency receipt remain unconfirmed; nothing will be blindly resubmitted."
+              : "The exact attempt needs a service check before any retry. A timeout is not proof that the program did or did not receive it.",
           );
+          if (retrying) reconciliationActionIds.add(issueId);
         } else if (result.state === "blocked")
           addAction(
             route,
@@ -1250,33 +1463,36 @@ export async function runSupportService(input: {
           const receipt = receiptSchema.safeParse(result.receipt);
           if (!receipt.success || receipt.data.state !== result.state) {
             unknownDelivery = true;
-            addAction(
+            const issueId = addAction(
               route,
               "execution_issue",
               "Check the program’s receipt",
               "The result is missing reliable matching evidence. CaseLink must reconcile it before retrying.",
             );
+            if (await scheduleProtectedReconciliation(canonical, operations.find(item => item.id === canonical?.operationId)?.executedAt ?? now.toISOString()))
+              reconciliationActionIds.add(issueId);
           } else {
             route = advance(route, receipt.data);
             await record(route, receipt.data);
-            if (
-              route.state !== "support_received" &&
-              route.state !== "declined"
-            )
-              nextRuns.push(
-                now.getTime() +
-                  (request.intake.urgency === "today" ? 3600000 : 86400000),
-              );
+            if (route.state !== "support_received" && route.state !== "declined") {
+              const status = canonical ? await ports.capability("snap-pa", "follow_up") : null;
+              if (canonical && (!status?.enabled || status.snapStatusTransportConfigured === false))
+                addAction(route, "execution_issue", "Connect verified status updates",
+                  "The carrier delivery result is recorded. CaseLink needs an authorized agency status channel; fax delivery is not DHS confirmation.");
+              else nextRuns.push(now.getTime() + (request.intake.urgency === "today" ? 3600000 : 86400000));
+            }
           }
         }
       } catch {
         unknownDelivery = true;
-        addAction(
+        const issueId = addAction(
           route,
           "execution_issue",
           "Check the attempted service step",
           "The execution result is uncertain. CaseLink must verify the recorded operation before any retry.",
         );
+        if (await scheduleProtectedReconciliation(canonical, operations.find(item => item.id === canonical?.operationId)?.executedAt ?? now.toISOString()))
+          reconciliationActionIds.add(issueId);
       }
       plan.routes[index] = route;
     } catch {
@@ -1311,7 +1527,7 @@ export async function runSupportService(input: {
       !action.resolved && (!action.resolver || action.resolver === "parent"),
   );
   const operatorNeeded = actions.some(
-    (action) => !action.resolved && action.resolver === "operator",
+    (action) => !action.resolved && action.resolver === "operator" && action.id !== captureRetryActionId && !reconciliationActionIds.has(action.id),
   );
   return {
     plan,

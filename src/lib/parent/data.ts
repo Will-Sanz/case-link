@@ -158,7 +158,12 @@ export async function exportParentInformation() {
     [
       "forms",
       "parent_form_artifacts",
-      "id,request_id,request_version,need,program_id,template_id,template_version,template_hash,form_input_digest,content_sha256,status,expires_at,created_at",
+      "id,request_id,request_version,need,program_id,template_id,template_version,template_hash,form_input_digest,content_sha256,status,expires_at,created_at,snap_snapshot_id,snap_snapshot_hash",
+    ],
+    [
+      "snapApplicationDetails",
+      "parent_snap_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,notice_version,created_at,idempotency_key,confirmed_paths",
     ],
   ] as const;
   for (const [key, table, columns] of tables) {

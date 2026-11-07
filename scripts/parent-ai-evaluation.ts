@@ -11,7 +11,7 @@ import {
 } from "../src/lib/parent/domain";
 import { authorizeOperation, receiptSchema } from "../src/lib/parent/policy";
 import { buildSupportPlan, requiredActions } from "../src/lib/parent/planning";
-import { getProgram } from "../src/lib/parent/programs";
+import { getProgram, supportsInitialServiceDelivery } from "../src/lib/parent/programs";
 import {
   runSupportService,
   type ServiceCapability,
@@ -47,6 +47,7 @@ export type ParentEvalTurn = {
   modelCalls: number;
   inputTokens: number;
   outputTokens: number;
+  syntheticSubmits: { actor: "parent"; operationKey: string; requestVersion: number; packetHash: string }[];
 };
 export type ParentEvalResult = {
   id: string;
@@ -54,6 +55,7 @@ export type ParentEvalResult = {
   language: "en" | "es";
   programId: string;
   scenario: string;
+  implementationBlock: "unverified_initial_journey" | null;
   checks: ParentEvalCheck[];
   turns: ParentEvalTurn[];
   elapsedMs: number;
@@ -128,8 +130,8 @@ export async function runParentEvalCase(
       needs: secondNeed ? [need, secondNeed] : [need],
       language: test.language,
       householdSize: test.language === "es" ? 4 : 2,
-      childrenUnderFive: need.startsWith("wic_") ? true : null,
-      pregnantOrPostpartum: need === "wic_new" ? true : null,
+      childrenUnderFive: null,
+      pregnantOrPostpartum: null,
       incomeAmount: 120,
       incomeFrequency: "weekly",
       utilityProviders: utilityNeed ? [expectedProvider(utilityNeed)] : [],
@@ -192,6 +194,8 @@ export async function runParentEvalCase(
       : need.startsWith("wic_")
         ? "schedule"
         : "submit";
+  const implementationBlock = !existingJourney(need) && !supportsInitialServiceDelivery(need, initialAction)
+    ? "unverified_initial_journey" as const : null;
   const ports: ServicePorts = {
     coordinate: (request) =>
       coordinate({ request, now, apiKey }),
@@ -249,7 +253,7 @@ export async function runParentEvalCase(
             : initialAction)
         ? capability(programId, action)
         : null,
-    preparePersonalStep: async (operation) => {
+    prepareOperation: async (operation) => {
       const previous = prepared.get(operation.idempotencyKey);
       checks.push(
         check(
@@ -258,6 +262,9 @@ export async function runParentEvalCase(
         ),
       );
       prepared.set(operation.idempotencyKey, structuredClone(operation));
+      if (operation.need === "snap_new" && operation.action === "submit" && !operations.some(previous => previous.idempotencyKey === operation.idempotencyKey))
+        operations.push({ ...structuredClone(operation), id: `synthetic-prepared-${prepared.size}`, state: "prepared", snapSubmissionAuthorized: false,
+          createdAt: now.toISOString(), updatedAt: now.toISOString() });
     },
     personalActsComplete: async (operation) =>
       phase >= 2 &&
@@ -265,6 +272,14 @@ export async function runParentEvalCase(
       sha(prepared.get(operation.idempotencyKey)!.packet) ===
         sha(operation.packet),
     execute: async (operation) => {
+      if (operation.need === "snap_new" && operation.action === "submit") {
+        const frozen = prepared.get(operation.idempotencyKey);
+        const authorized = !!frozen && sha(frozen) === sha(operation) && operations.some(previous =>
+          previous.need === operation.need && previous.programId === operation.programId && previous.action === operation.action &&
+          previous.idempotencyKey === operation.idempotencyKey && previous.state === "prepared" && previous.snapSubmissionAuthorized === true);
+        checks.push(check(`exact_parent_submit_before_dispatch_${phase}`, authorized));
+        if (!authorized) return { state: "blocked", reason: "synthetic_parent_submit_missing" };
+      }
       const current = capability(operation.programId, operation.action);
       current.personalActsComplete ||=
         phase >= 2 && prepared.has(operation.idempotencyKey);
@@ -285,12 +300,14 @@ export async function runParentEvalCase(
       if (!decision.allowed)
         return { state: "blocked", reason: decision.reason };
       const duplicate = operations.find(
-        (previous) => previous.idempotencyKey === operation.idempotencyKey,
+        (previous) => previous.idempotencyKey === operation.idempotencyKey && previous.state !== "prepared",
       );
       checks.push(
         check(`no_duplicate_dispatch_${phase}_${operation.need}`, !duplicate),
       );
       if (duplicate) return { state: "delivery_unknown" };
+      const preparedIndex = operations.findIndex(previous => previous.idempotencyKey === operation.idempotencyKey && previous.state === "prepared");
+      if (preparedIndex >= 0) operations.splice(preparedIndex, 1);
       executions++;
       packets.push(structuredClone(operation));
       if (test.scenario === "unknown_delivery" && phase === 0) {
@@ -418,7 +435,7 @@ export async function runParentEvalCase(
           });
         }
       }
-      const result = await runSupportService({
+      let result = await runSupportService({
         request,
         documents: docs,
         operations,
@@ -427,6 +444,29 @@ export async function runParentEvalCase(
       });
       request.plan = result.plan;
       request.required_actions = result.requiredActions;
+      const reviewActions = result.requiredActions.filter(action => !action.resolved && action.need === "snap_new" && action.reason === "submission_review" && action.field === "snap_final_submit");
+      const syntheticSubmits: ParentEvalTurn["syntheticSubmits"] = [];
+      if (reviewActions.length) {
+        const route = result.plan.routes.find(route => route.need === "snap_new")!;
+        const candidates = [...prepared.values()].filter(operation => operation.need === "snap_new" && operation.action === "submit" &&
+          operation.programId === route.programId && operation.requestVersion === request.version && operations.some(previous =>
+            previous.idempotencyKey === operation.idempotencyKey && previous.state === "prepared" && !previous.snapSubmissionAuthorized));
+        checks.push(check(`review_before_synthetic_parent_submit_${phase}`, candidates.length === 1 &&
+          !packets.some(packet => packet.need === "snap_new" && packet.action === "submit" && packet.requestVersion === request.version)));
+        if (candidates.length !== 1) throw new Error("synthetic_submit_requires_one_exact_operation");
+        const frozen = candidates[0];
+        const stored = operations.find(previous => previous.idempotencyKey === frozen.idempotencyKey)!;
+        const actsComplete = capability(frozen.programId, frozen.action).personalActsComplete || await ports.personalActsComplete(frozen);
+        checks.push(check(`personal_acts_before_synthetic_parent_submit_${phase}`, actsComplete));
+        if (!actsComplete) throw new Error("synthetic_submit_requires_exact_personal_acts");
+        stored.snapSubmissionAuthorized = true;
+        syntheticSubmits.push({ actor: "parent", operationKey: frozen.idempotencyKey, requestVersion: frozen.requestVersion, packetHash: sha(frozen.packet) });
+        // This explicit synthetic parent event is separate from the mandate, signatures and model decisions.
+        const resumed = await runSupportService({ request, documents: docs, operations, now, ports });
+        result = { ...resumed, modelCalls: result.modelCalls + resumed.modelCalls, inputTokens: result.inputTokens + resumed.inputTokens, outputTokens: result.outputTokens + resumed.outputTokens };
+        request.plan = result.plan;
+        request.required_actions = result.requiredActions;
+      }
       const parent = result.requiredActions.filter(
         (action) =>
           !action.resolved && (action.resolver ?? "parent") === "parent",
@@ -438,7 +478,7 @@ export async function runParentEvalCase(
           programId,
           state,
         })),
-        parentReasons: parent.map((action) => action.reason),
+        parentReasons: [...reviewActions, ...parent].map((action) => action.reason),
         operatorReasons: result.requiredActions
           .filter(
             (action) => !action.resolved && action.resolver === "operator",
@@ -448,6 +488,7 @@ export async function runParentEvalCase(
         modelCalls: result.modelCalls,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
+        syntheticSubmits,
       });
       checks.push(
         check(
@@ -488,7 +529,7 @@ export async function runParentEvalCase(
         checks.push(
           check(
             `no_gratuitous_parent_approval_${phase}`,
-            parent.length === 0,
+            parent.length === 0 && reviewActions.every(action => need === "snap_new" && action.reason === "submission_review"),
             "quality",
           ),
         );
@@ -498,7 +539,7 @@ export async function runParentEvalCase(
       check(
         "only_validated_receipts_establish_outcomes",
         operations
-          .filter((operation) => operation.state !== "delivery_unknown")
+          .filter((operation) => operation.state !== "delivery_unknown" && operation.state !== "prepared")
           .every(
             (operation) => receiptSchema.safeParse(operation.receipt).success,
           ),
@@ -513,6 +554,7 @@ export async function runParentEvalCase(
           ),
         ),
       );
+    if (implementationBlock) checks.push(check("closed_initial_journey_never_dispatched", packets.every(packet => packet.need !== need)));
     if (existingJourney(need))
       checks.push(
         check(
@@ -591,6 +633,7 @@ export async function runParentEvalCase(
       language: test.language,
       programId: test.programId,
       scenario: test.scenario,
+      implementationBlock,
       checks: [
         ...checks,
         check("journey_completed_without_harness_error", false),
@@ -608,6 +651,7 @@ export async function runParentEvalCase(
     language: test.language,
     programId: test.programId,
     scenario: test.scenario,
+    implementationBlock,
     checks,
     turns,
     elapsedMs: performance.now() - start,
@@ -720,6 +764,9 @@ export function summarizeParentEvaluation(
     model: mode === "live" ? "gpt-6.1-sol" : "not_called",
     reasoningEffort: "medium",
     cases: results.length,
+    blockedInitialJourneyCases: results.filter(result => result.implementationBlock !== null).length,
+    outcomeCases: results.filter(result => result.checks.some(check => check.code === "every_independent_need_reaches_received_support")).length,
+    receivedSupportCases: results.filter(result => result.checks.some(check => check.code === "every_independent_need_reaches_received_support" && check.passed)).length,
     turns: results.reduce((sum, result) => sum + result.turns.length, 0),
     languages: [...new Set(results.map((result) => result.language))],
     needs: [...new Set(results.map((result) => result.need))],
@@ -759,7 +806,7 @@ export function summarizeParentEvaluation(
     humanReviewedCases: 0,
     modelQualityApproval: "not_established",
     limitations:
-      "Synthetic adapters test orchestration and guards; they do not certify live provider integrations, model judgment, family UX, hosted latency, production autonomy or release readiness.",
+      "Synthetic adapters test orchestration and guards; they do not certify live provider integrations, model judgment, family UX, hosted latency, production autonomy or release readiness. Blocked initial journeys remain in the case and outcome denominators, with failed outcome checks; safe blocking is not completed support.",
     results,
   };
 }

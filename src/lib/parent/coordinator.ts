@@ -87,17 +87,6 @@ export async function coordinateSupport(input: {
     };
   const shared = currentIntakeFields(input.request, now);
   const facts: Record<string, unknown> = { ...shared };
-  if (mandate.allowedData.includes("household"))
-    Object.assign(facts, {
-      ...(intake.needs.some(
-        (need) => need === "wic_new" || need === "wic_continuing",
-      )
-        ? {
-            childrenUnderFive: intake.childrenUnderFive,
-            pregnantOrPostpartum: intake.pregnantOrPostpartum,
-          }
-        : {}),
-    });
   if (mandate.allowedData.includes("utility"))
     Object.assign(facts, {
       utilityProviders: intake.utilityProviders,

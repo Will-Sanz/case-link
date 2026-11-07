@@ -10,6 +10,7 @@ import {
   fixtureMandate,
   fixtureNow,
   fixtureRequest,
+  fixtureProtectedSnapOperation,
 } from "./test-fixtures";
 
 const field: ApplicationFieldEvidence = {
@@ -56,6 +57,24 @@ function ready(): Parameters<typeof applicationReadiness>[0] {
   };
 }
 describe("automatic application handling", () => {
+  it("recognizes only an exact canonical SNAP reference as a prepared application", () => {
+    const route = buildSupportPlan(fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }), mandate: fixtureMandate({ recipientIds: ["snap-pa"] }) }), fixtureNow).routes[0];
+    const operation = { programId: "snap-pa", need: "snap_new" as const, action: "submit", state: "prepared", artifactId: null, protectedPacket: fixtureProtectedSnapOperation().packet.protectedSnapPacket };
+    expect(supportRouteLabel({ ...route, state: "prepared" }, [operation])).toBe("Application prepared");
+    for (const change of [{ action: "follow_up" }, { need: "snap_renewal" as const }, { protectedPacket: { raw: "PRIVATE-CANARY" } }])
+      expect(supportRouteLabel({ ...route, state: "prepared" }, [{ ...operation, ...change }])).not.toBe("Application prepared");
+  });
+  it("uses exact private readiness without another routine approval after genuine Submit", () => {
+    const canonical = fixtureProtectedSnapOperation({ personalActsComplete: true, snapSubmissionAuthorized: true }), value = ready();
+    value.authority.request = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"], zip: "19000" }), mandate: fixtureMandate({ recipientIds: ["snap-pa"] }) });
+    value.authority.operation = { need: "snap_new", requestVersion: 1, programId: "snap-pa", action: "submit", packet: canonical.packet,
+      dataCategories: canonical.dataCategories, documentIds: [], idempotencyKey: canonical.idempotencyKey, protectedSnap: canonical };
+    value.authority.capability = { ...value.authority.capability, programId: "snap-pa", permissionVersion: canonical.permissionVersion, dataCategories: canonical.dataCategories };
+    value.requiredFields = [];
+    expect(applicationReadiness(value)).toMatchObject({ automaticHandlingAllowed: true, reviewRequired: false, parentActionRequired: false });
+    canonical.snapSubmissionAuthorized = false;
+    expect(applicationReadiness(value)).toMatchObject({ automaticHandlingAllowed: false, parentActionRequired: true, authorityDeniedReason: "snap_submission_review_required" });
+  });
   it("keeps an operation with an expired packet source with the service", () => {
     const input = ready();
     input.authority.request.created_at = new Date(fixtureNow.getTime() - 46 * 86400000).toISOString();
@@ -196,6 +215,17 @@ describe("honest application labels", () => {
         { ...operation, artifactId: "verified-form-artifact" },
       ]),
     ).toBe("Application prepared");
+    expect(
+      supportRouteLabel(route, [
+        { ...operation, artifactId: "incomplete-form", preparationOnly: true },
+      ]),
+    ).toBe("Incomplete draft prepared");
+    expect(
+      supportRouteLabel(route, [
+        { ...operation, artifactId: "incomplete-form", preparationOnly: true },
+        { ...operation, artifactId: "complete-form", preparationOnly: false },
+      ]),
+    ).toBe("Application prepared");
   });
   it("does not mistake a different journey or program’s artifact for the current application", () => {
     expect(
@@ -219,9 +249,39 @@ describe("honest application labels", () => {
       ]),
     ).toBe("Guidance ready");
   });
-  it("retains the actual recorded outcome after submission", () => {
-    expect(supportRouteLabel({ ...route, state: "agency_submitted" })).toBe(
-      "Application submitted",
-    );
+  it.each([
+    ["agency_submitted", "Application submitted"],
+    ["assistance_approved", "Assistance approved"],
+    ["support_received", "Support received"],
+  ] as const)("retains the stronger %s state despite an earlier draft", (state, label) => {
+    expect(supportRouteLabel({ ...route, state }, [{
+      programId: route.programId, need: route.need, state: "prepared",
+      artifactId: "earlier-draft", preparationOnly: true,
+    }])).toBe(label);
+  });
+  it("uses the matching recorded receipt while a saved plan still shows preparation", () => {
+    const receipt = { state: "agency_submitted", source: "agency_receipt", reference: "Synthetic submitted application",
+      recordedAt: "2026-11-03T12:00:00+00:00" };
+    const operation = { programId: route.programId, need: route.need, state: "agency_submitted", receipt };
+    expect(supportRouteLabel(route, [operation])).toBe("Application submitted");
+    expect(supportRouteLabel(route, [{ ...operation, need: "snap_renewal" }])).toBe("Guidance ready");
+    expect(supportRouteLabel(route, [{ ...operation, receipt: { ...receipt, source: "parent_reported" } }])).toBe("Guidance ready");
+    expect(supportRouteLabel(route, [{ ...operation, state: "prepared" }])).toBe("Information packet prepared");
+    expect(supportRouteLabel(route, [operation, { ...operation, state: "assistance_approved",
+      receipt: { ...receipt, state: "assistance_approved", recordedAt: "2026-11-03T15:00:00Z" } }])).toBe("Assistance approved");
+    expect(supportRouteLabel({ ...route, state: "agency_submitted" }, [{ ...operation, state: "support_received",
+      receipt: { ...receipt, state: "support_received", recordedAt: "2026-11-03T15:00:00Z" } }])).toBe("Support received");
+  });
+  it("does not let a later follow-up acknowledgement erase established progress", () => {
+    const receipt = { state: "agency_submitted", source: "agency_receipt", reference: "Synthetic application",
+      recordedAt: "2026-11-03T12:00:00Z" };
+    const operation = { programId: route.programId, need: route.need, state: "agency_submitted", receipt };
+    const sent = { ...operation, state: "sent", receipt: { ...receipt, state: "sent", recordedAt: "2026-11-03T13:00:00Z" } };
+    expect(supportRouteLabel(route, [operation, sent])).toBe("Application submitted");
+    expect(supportRouteLabel({ ...route, state: "assistance_approved" }, [sent])).toBe("Assistance approved");
+    expect(supportRouteLabel(route, [{ ...operation, state: "partner_received",
+      receipt: { ...receipt, state: "partner_received" } }, sent])).toBe("Partner received");
+    expect(supportRouteLabel(route, [{ ...operation, state: "declined",
+      receipt: { ...receipt, state: "declined" } }, sent])).toBe("Declined");
   });
 });

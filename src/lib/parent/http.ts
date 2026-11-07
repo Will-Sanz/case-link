@@ -53,10 +53,10 @@ export async function readBoundedBody(
   }
   return body;
 }
-export async function readParentJson(request: Request): Promise<unknown> {
+export async function readParentJson(request: Request, limit = 40000): Promise<unknown> {
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     throw new Error("parent_invalid_input");
-  const text = new TextDecoder().decode(await readBoundedBody(request, 40000));
+  const text = new TextDecoder().decode(await readBoundedBody(request, limit));
   try {
     return JSON.parse(text);
   } catch {

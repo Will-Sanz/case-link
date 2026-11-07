@@ -2,13 +2,14 @@ import "server-only";
 import { z } from "zod";
 import { requireParentSession, createParentClient } from "./auth";
 import { needSchema } from "./domain";
+import { snapProtectedReferenceSchema } from "./snap-protected-operation";
 const uuid = z.uuid();
 export async function listRequestOperations(requestId: string) {
   const { supabase } = await requireParentSession();
   const { data, error } = await supabase
     .from("parent_operations")
     .select(
-      "id,request_id,request_version,need,program_id,action,packet_hash,state,evidence,created_at,executed_at,artifact_id",
+      "id,request_id,request_version,need,program_id,action,packet_hash,state,evidence,created_at,executed_at,artifact_id,protected_packet:packet->protectedSnapPacket,form:parent_form_artifacts(preparation_only,snap_snapshot_id,snap_snapshot_hash)",
     )
     .eq("request_id", uuid.parse(requestId))
     .order("created_at", { ascending: false })
@@ -16,7 +17,10 @@ export async function listRequestOperations(requestId: string) {
   if (error)
     throw new Error("The activity could not be loaded. Please try again.");
   return {
-    operations: (data ?? []).slice(0, 100),
+    operations: (data ?? []).slice(0, 100).map(operation => {
+      const reference = snapProtectedReferenceSchema.safeParse(operation.protected_packet);
+      return { ...operation, protected_packet: operation.need === "snap_new" && operation.program_id === "snap-pa" && operation.action === "submit" && operation.artifact_id === null && reference.success ? reference.data : null };
+    }),
     historyLimited: (data?.length ?? 0) > 100,
   };
 }

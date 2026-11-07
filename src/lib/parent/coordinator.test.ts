@@ -2,6 +2,15 @@ import { describe, it, expect, vi } from "vitest";
 import { coordinateSupport } from "./coordinator";
 import { fixtureIntake, fixtureMandate, fixtureNow, fixtureRequest } from "./test-fixtures";
 describe("Responses support coordinator", () => {
+  it.each(["wic_new", "wic_continuing"] as const)("does not send legacy private WIC answers to a model for %s without approved collection", async need => {
+    let body = "";
+    const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => { body = String(options?.body); return Response.json({ status: "completed", output: [] }); }) as typeof fetch;
+    const request = fixtureRequest({ intake: fixtureIntake({ needs: [need], childrenUnderFive: true, pregnantOrPostpartum: true }), mandate: fixtureMandate({ recipientIds: ["wic-pa"] }) });
+    await coordinateSupport({ request, now: fixtureNow, apiKey: "synthetic-key", fetcher });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(body).not.toContain("childrenUnderFive"); expect(body).not.toContain("pregnantOrPostpartum");
+    expect(request.intake.childrenUnderFive).toBe(true); expect(request.intake.pregnantOrPostpartum).toBe(true);
+  });
   it("executes bounded validated program selection without inventing execution", async () => {
     const beforeCall = vi.fn(async () => {});
     const bodies: Record<string, unknown>[] = [];

@@ -5,7 +5,7 @@ import {
   type ParentAssistantAnswer,
 } from "./assistant-contract";
 import {
-  intakeSchema,
+  storedIntakeSchema,
   mandateSchema,
   NEED_LABELS,
   OUTCOME_LABELS,
@@ -56,7 +56,7 @@ export function buildAssistantFacts(
   now: Date,
 ): { facts: AssistantFact[]; actionIds: string[] } {
   const { request } = snapshot;
-  const intake = intakeSchema.parse(request.intake),
+  const intake = storedIntakeSchema.parse(request.intake),
     mandate = mandateSchema.parse(request.mandate);
   const facts: AssistantFact[] = [];
   const add = (
