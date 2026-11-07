@@ -31,7 +31,7 @@ describe("toStructuredJsonSchema", () => {
   });
   it("rejects unsupported composition instead of silently weakening it", () => {
     expect(() => toStructuredJsonSchema(z.strictObject({
-      value: z.intersection(z.strictObject({ one: z.string() }), z.strictObject({ two: z.string() })),
+      value: z.intersection(z.string().min(1), z.string().max(3)),
     }))).toThrow(/Unsupported.*allOf/);
   });
 

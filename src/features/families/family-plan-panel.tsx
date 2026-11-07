@@ -2,7 +2,7 @@
 
 import { addCalendarDays, schoolDate, formatDateOnly as formatTargetDate } from "@/lib/dates";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWorkspaceUserId } from "@/components/layout/workspace-session-boundary";
@@ -54,6 +54,16 @@ type RefinementPreview = { changes: RefinementChange[]; selected: string[]; base
 function readStoredActionDraft(userId: string, planId: string): LocalActionDraft | null {
   pruneLocalActionDrafts(userId);
   return parseLocalActionDraft(window.sessionStorage.getItem(localActionDraftKey(userId, planId)), userId, planId, Date.now(), Number(window.localStorage.getItem(DRAFT_LOGOUT_KEY)) || 0);
+}
+
+function storedActionDraftSnapshot(userId: string, planId: string): string | null | false {
+  try {
+    const value = window.sessionStorage.getItem(localActionDraftKey(userId, planId));
+    const clearedAt = Number(window.localStorage.getItem(DRAFT_LOGOUT_KEY)) || 0;
+    return parseLocalActionDraft(value, userId, planId, Date.now(), clearedAt) ? value : null;
+  } catch {
+    return false;
+  }
 }
 
 function removeStoredActionDraft(key: string): void {
@@ -335,10 +345,11 @@ export function FamilyPlanPanel({
   const [manualHandoffPending, setManualHandoffPending] = useState(false);
   const [pending, startTransition] = useTransition();
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
-  const [stepDraft, setStepDraft] = useState<PlanStepRow | null>(null);
-  const [recoverableDraft, setRecoverableDraft] = useState<LocalActionDraft | null>(null);
-  const [recoveryWarning, setRecoveryWarning] = useState<string | null>(null);
-  const draftRecoveryLoadedPlanIdRef = useRef<string | null>(null);
+  const [stepDraft, setStepDraftState] = useState<PlanStepRow | null>(null);
+  // One editor event can patch the step and its details before React renders.
+  const stepDraftRef = useRef<PlanStepRow | null>(null);
+  const [dismissedDraftKey, setDismissedDraftKey] = useState<string | null>(null);
+  const [recoveryIssue, setRecoveryWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editConflict, setEditConflict] = useState<PlanEditConflict | null>(null);
@@ -414,6 +425,29 @@ export function FamilyPlanPanel({
   );
 
   const actionDraftStorageKey = plan && userId ? localActionDraftKey(userId, plan.id) : null;
+  const subscribeStoredActionDraft = useCallback((onChange: () => void) => {
+    if (userId && plan && actionDraftStorageKey) {
+      try {
+        const stored = readStoredActionDraft(userId, plan.id);
+        if (!stored || !plan.steps.some(step => step.id === stored.step.id)) removeStoredActionDraft(actionDraftStorageKey);
+      } catch {
+        setRecoveryWarning("Draft recovery is unavailable in this browser. Keep this tab open until your edits are saved.");
+      }
+    }
+    window.addEventListener("storage", onChange);
+    return () => window.removeEventListener("storage", onChange);
+  }, [userId, plan, actionDraftStorageKey]);
+  const storedDraft = useSyncExternalStore(
+    subscribeStoredActionDraft,
+    () => userId && plan ? storedActionDraftSnapshot(userId, plan.id) : null,
+    () => null,
+  );
+  const parsedRecovery = useMemo(() => typeof storedDraft === "string" && userId && plan
+    ? parseLocalActionDraft(storedDraft, userId, plan.id) : null, [storedDraft, userId, plan]);
+  const recoverableDraft = dismissedDraftKey !== actionDraftStorageKey && parsedRecovery &&
+    plan?.steps.some(step => step.id === parsedRecovery.step.id) ? parsedRecovery : null;
+  const recoveryWarning = recoveryIssue ?? (storedDraft === false
+    ? "Draft recovery is unavailable in this browser. Keep this tab open until your edits are saved." : null);
 
   useEffect(() => {
     if (!plan) return;
@@ -431,47 +465,34 @@ export function FamilyPlanPanel({
     }
   }, [familyId, plan]);
 
-  useEffect(() => {
-    if (!plan || !userId || !actionDraftStorageKey || draftRecoveryLoadedPlanIdRef.current === plan.id) {
-      return;
-    }
-    draftRecoveryLoadedPlanIdRef.current = plan.id;
-    let stored: LocalActionDraft | null;
-    try { stored = readStoredActionDraft(userId, plan.id); } catch {
-      setRecoveryWarning("Draft recovery is unavailable in this browser. Keep this tab open until your edits are saved.");
-      return;
-    }
-    if (!stored || stored.planId !== plan.id) {
-      removeStoredActionDraft(actionDraftStorageKey);
-      return;
-    }
-    if (!plan.steps.some((step) => step.id === stored.step.id)) {
-      removeStoredActionDraft(actionDraftStorageKey);
-      return;
-    }
-    setRecoverableDraft(stored);
-  }, [actionDraftStorageKey, plan, userId]);
-
-  useEffect(() => {
-    if (conflictResolution !== "keep_draft" || !editConflict || !plan) return;
+  if (conflictResolution === "keep_draft" && editConflict && plan) {
     const latestTimestamp =
       editConflict.kind === "step"
         ? plan.steps.find((step) => step.id === editConflict.entityId)?.updated_at
         : plan.steps
             .flatMap((step) => step.action_items ?? [])
             .find((action) => action.id === editConflict.entityId)?.updated_at;
-    if (latestTimestamp !== editConflict.currentUpdatedAt) return;
+    if (latestTimestamp === editConflict.currentUpdatedAt) {
+      setEditConflict(null);
+      setConflictResolution(null);
+      setSuccess("The latest version is loaded and your draft is still open. Review it, then save again.");
+    }
+  }
 
-    setEditConflict(null);
-    setConflictResolution(null);
-    setSuccess("The latest version is loaded and your draft is still open. Review it, then save again.");
-  }, [conflictResolution, editConflict, plan]);
+  function setStepDraft(next: PlanStepRow | null) {
+    stepDraftRef.current = next;
+    setStepDraftState(next);
+  }
 
-  useEffect(() => {
-    if (!actionDraftStorageKey || !userId || !stepDirty || !stepDraft || !plan) return;
+  function updateStepDraft(update: PlanStepRow | ((previous: PlanStepRow) => PlanStepRow)) {
+    const previous = stepDraftRef.current;
+    const next = typeof update === "function" ? (previous ? update(previous) : null) : update;
+    if (!next) return;
+    setStepDraft(next);
+    if (!actionDraftStorageKey || !userId || !plan || !stepNeedsPersist(plan.steps.find(step => step.id === next.id), next)) return;
     try {
       pruneLocalActionDrafts(userId);
-      const value = serializeLocalActionDraft(userId, plan.id, stepDraft);
+      const value = serializeLocalActionDraft(userId, plan.id, next);
       // Remove a previous copy immediately when identifying text or invalid content is entered.
       window.sessionStorage.removeItem(actionDraftStorageKey);
       if (!value) {
@@ -483,7 +504,7 @@ export function FamilyPlanPanel({
     } catch {
       setRecoveryWarning("Draft recovery is unavailable in this browser. Keep this tab open until your edits are saved.");
     }
-  }, [actionDraftStorageKey, plan, stepDirty, stepDraft, userId]);
+  }
 
   useEffect(() => {
     if (!stepDirty && !planAiDirty) return;
@@ -536,7 +557,7 @@ export function FamilyPlanPanel({
 
   function clearLocalActionDraft() {
     if (actionDraftStorageKey) removeStoredActionDraft(actionDraftStorageKey);
-    setRecoverableDraft(null);
+    setDismissedDraftKey(actionDraftStorageKey);
     setRecoveryWarning(null);
   }
 
@@ -550,8 +571,8 @@ export function FamilyPlanPanel({
       return;
     }
     setEditingStepId(stored.step.id);
-    setStepDraft(cloneStep(stored.step));
-    setRecoverableDraft(null);
+    updateStepDraft(cloneStep(stored.step));
+    setDismissedDraftKey(actionDraftStorageKey);
     setError(null);
     setSuccess("Unsaved action edit restored. Review it before saving.");
   }
@@ -606,12 +627,9 @@ export function FamilyPlanPanel({
 
   function keepConflictDraft() {
     if (!editConflict || conflictResolution) return;
-    setStepDraft(previous => {
-      if (!previous) return previous;
-      return editConflict.kind === "step"
-        ? { ...previous, updated_at: editConflict.currentUpdatedAt }
-        : { ...previous, action_items: previous.action_items?.map(action => action.id === editConflict.entityId ? { ...action, updated_at: editConflict.currentUpdatedAt } : action) };
-    });
+    if (stepDraft) updateStepDraft(editConflict.kind === "step"
+      ? { ...stepDraft, updated_at: editConflict.currentUpdatedAt }
+      : { ...stepDraft, action_items: stepDraft.action_items?.map(action => action.id === editConflict.entityId ? { ...action, updated_at: editConflict.currentUpdatedAt } : action) });
     setConflictResolution("keep_draft");
     setError(null);
     router.refresh();
@@ -635,17 +653,13 @@ export function FamilyPlanPanel({
   function patchEditingStep(patch: Partial<PlanStepRow>) {
     cancelStepPreviewRequest();
     setAiPreview(null);
-    setStepDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+    updateStepDraft(previous => ({ ...previous, ...patch }));
   }
 
   function patchEditingStepDetails(patch: Partial<PlanStepDetails>) {
     cancelStepPreviewRequest();
     setAiPreview(null);
-    setStepDraft((prev) => {
-      if (!prev) return prev;
-      const d = (prev.details ?? {}) as PlanStepDetails;
-      return { ...prev, details: { ...d, ...patch } };
-    });
+    updateStepDraft(previous => ({ ...previous, details: { ...previous.details, ...patch } }));
   }
 
   function patchEditingActionItem(
@@ -654,15 +668,11 @@ export function FamilyPlanPanel({
   ) {
     cancelStepPreviewRequest();
     setAiPreview(null);
-    setStepDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        action_items: (prev.action_items ?? []).map((action) =>
-          action.id === actionItemId ? { ...action, ...patch } : action,
-        ),
-      };
-    });
+    updateStepDraft(previous => ({
+      ...previous,
+      action_items: (previous.action_items ?? []).map(action =>
+        action.id === actionItemId ? { ...action, ...patch } : action),
+    }));
   }
 
   async function persistSteps(steps: PlanStepRow[], bulk = false): Promise<boolean> {
@@ -958,7 +968,7 @@ export function FamilyPlanPanel({
       setError("The draft or saved plan changed. Generate a new preview before applying changes.");
       return;
     }
-    setStepDraft(applyRefinementChanges([stepDraft], aiPreview.changes, aiPreview.selected)[0]);
+    updateStepDraft(applyRefinementChanges([stepDraft], aiPreview.changes, aiPreview.selected)[0]);
     cancelStepPreviewRequest();
     setAiStepId(null);
     setAiPreview(null);

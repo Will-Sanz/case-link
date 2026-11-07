@@ -65,13 +65,6 @@ function initialCustomBarriers(
   }));
 }
 
-function formatElapsed(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (mins === 0) return `${secs}s`;
-  return `${mins}m ${String(secs).padStart(2, "0")}s`;
-}
-
 function ResourceMatchCard({
   resource,
   copied,
@@ -228,8 +221,6 @@ export function FamilyLiteWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [localPlanGenerating, setLocalPlanGenerating] = useState(false);
-  const [generateStartedAt, setGenerateStartedAt] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
   const [resourceRetrying, setResourceRetrying] = useState(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -312,9 +303,11 @@ export function FamilyLiteWorkspace({
     await promise;
   }, [familyId, router, tab]);
 
-  useEffect(() => {
+  const [previousInitialResult, setPreviousInitialResult] = useState(initialResult);
+  if (previousInitialResult !== initialResult) {
+    setPreviousInitialResult(initialResult);
     setResult(initialResult);
-  }, [initialResult]);
+  }
 
   /**
    * If the user landed or refreshed while a staged plan is still running, resume polling once.
@@ -336,21 +329,6 @@ export function FamilyLiteWorkspace({
       }
     })();
   }, [planGenerationStatus, plan?.id, runStagedPlanPolling]);
-
-  useEffect(() => {
-    if (!planGenerateBusy) {
-      setGenerateStartedAt(null);
-      setElapsedSeconds(0);
-      return;
-    }
-    const startedAt = Date.now();
-    setGenerateStartedAt(startedAt);
-    setElapsedSeconds(0);
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [planGenerateBusy]);
 
   function toggleLabel(label: BarrierPresetLabel) {
     setSelected((prev) =>
@@ -523,11 +501,8 @@ export function FamilyLiteWorkspace({
             lastSavedAt={result?.lastSavedAt}
             error={error}
             generateBusy={planGenerateBusy}
-            generateStartedAt={generateStartedAt}
-            elapsedSeconds={elapsedSeconds}
             onGenerate={generate}
             hasGeneratedThisSession={hasGeneratedThisSession}
-            formatElapsed={formatElapsed}
           />
           <div className="flex justify-end pt-1">
             <ArchiveFamilyFromListControl familyId={familyId} />

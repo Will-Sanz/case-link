@@ -2,7 +2,7 @@
 
 import { formatSchoolTimestamp } from "@/lib/dates";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { Check, Xmark } from "iconoir-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,20 @@ import type { BarrierPresetLabel } from "@/types/barrier-workflow";
 type BarrierOption = { key: string; label: string };
 
 type CustomBarrierRow = { id: string; text: string };
+
+function GenerationElapsed() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const minutes = Math.floor(seconds / 60);
+  const elapsed = minutes === 0 ? `${seconds}s` : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  return <span>Preparing actions and target dates… {elapsed}</span>;
+}
 
 export function FamilyOverviewSetupCanvas({
   familyName,
@@ -29,11 +43,8 @@ export function FamilyOverviewSetupCanvas({
   lastSavedAt,
   error,
   generateBusy,
-  generateStartedAt,
-  elapsedSeconds,
   onGenerate,
   hasGeneratedThisSession,
-  formatElapsed,
 }: {
   familyName: string;
   barrierOptions: readonly BarrierOption[];
@@ -48,11 +59,8 @@ export function FamilyOverviewSetupCanvas({
   error: string | null;
   /** True while plan generation (including staged 60/90 phases) is in progress. */
   generateBusy: boolean;
-  generateStartedAt: number | null;
-  elapsedSeconds: number;
   onGenerate: () => void;
   hasGeneratedThisSession: boolean;
-  formatElapsed: (seconds: number) => string;
 }) {
   const [customDraft, setCustomDraft] = useState("");
 
@@ -282,13 +290,13 @@ export function FamilyOverviewSetupCanvas({
                   : "Draft action plan"}
             </Button>
           </div>
-          {generateBusy && generateStartedAt ? (
+          {generateBusy ? (
             <div className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
               <span
                 className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-rule-strong)] border-t-[var(--color-accent)]"
                 aria-hidden
               />
-              <span>Preparing actions and target dates… {formatElapsed(elapsedSeconds)}</span>
+              <GenerationElapsed />
             </div>
           ) : null}
         </div>

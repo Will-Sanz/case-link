@@ -61,7 +61,7 @@ describe("explicit connected parent launcher", () => {
       { CASELINK_PARENT_RECOVERY_SITE_URL: "http://127.0.0.1:3200" },
     ])
       expect(() =>
-        parentConnectedEnvironment(source, { ...approval, ...overrides }),
+        parentConnectedEnvironment(source, { ...approval, ...overrides }, {}),
       ).toThrow("not approved");
     expect(() =>
       parentConnectedEnvironment(
@@ -70,6 +70,7 @@ describe("explicit connected parent launcher", () => {
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_private-canary",
         },
         approval,
+        {},
       ),
     ).toThrow("public Supabase");
   });

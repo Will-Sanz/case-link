@@ -180,3 +180,37 @@ it("restarts a cancelled mount safely and stops advancing after leaving the page
     expect(advance).toHaveBeenCalledTimes(1);
   } finally { view.unmount(); vi.useRealTimers(); }
 });
+
+it("shows refreshed saved context without replacing an unfinished intake edit", () => {
+  const initialResult = { familyId, referenceId: "Family 014", selectedBarriers: [], additionalBarriers: "", additionalDetails: "Saved context", sections: [], resources: [], resourceStatus: "empty" as const, lastSavedAt: null };
+  const props = { familyId, familyUpdatedAt: "2026-10-13T12:00:00Z", familyName: "Family 014", barrierOptions: [], initialResult, plan: null };
+  const view = render(<FamilyLiteWorkspace {...props} tab="overview" />);
+  fireEvent.change(screen.getByRole("textbox", { name: /Family priorities and context/ }), { target: { value: "Unfinished intake edit" } });
+  const refreshed = { ...initialResult, additionalDetails: "New saved context" };
+  view.rerender(<FamilyLiteWorkspace {...props} initialResult={refreshed} tab="overview" />);
+  expect((screen.getByRole("textbox", { name: /Family priorities and context/ }) as HTMLTextAreaElement).value).toBe("Unfinished intake edit");
+  view.rerender(<FamilyLiteWorkspace {...props} initialResult={refreshed} tab="plan" />);
+  expect(screen.getByText("New saved context")).toBeTruthy();
+  expect(screen.queryByText("Saved context")).toBeNull();
+});
+
+it("ticks the visible generation clock, resets on retry and removes its timer on unmount", async () => {
+  vi.useFakeTimers();
+  let finish!: (value: Awaited<ReturnType<typeof generateBarrierWorkflowForFamilyAction>>) => void;
+  vi.mocked(generateBarrierWorkflowForFamilyAction).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const view = render(<FamilyLiteWorkspace familyId={familyId} familyUpdatedAt="2026-10-13T12:00:00Z" familyName="Family 014" barrierOptions={BARRIER_PRESETS} initialResult={null} plan={null} tab="overview" />);
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "Housing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
+    expect(screen.getByText("Preparing actions and target dates… 0s")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+    expect(screen.getByText("Preparing actions and target dates… 1m 01s")).toBeTruthy();
+    await act(async () => { finish({ ok: false, error: "Retry preparation" }); });
+    expect(screen.queryByText(/Preparing actions and target dates/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Draft action plan" }));
+    expect(screen.getByText("Preparing actions and target dates… 0s")).toBeTruthy();
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => { finish({ ok: false, error: "Stopped" }); });
+  } finally { view.unmount(); vi.useRealTimers(); }
+});

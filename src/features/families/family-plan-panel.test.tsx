@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { markPlanReviewed, previewRefinePlan, previewRefinePlanStep, savePlanEdits, continuePlanManually } from "@/app/actions/plans";
 import { FamilyPlanPanel } from "@/features/families/family-plan-panel";
 import type { PlanWithSteps } from "@/types/family";
-import { localActionDraftKey } from "@/lib/domain/plan/local-action-draft";
+import { DRAFT_LOGOUT_KEY, localActionDraftKey, serializeLocalActionDraft } from "@/lib/domain/plan/local-action-draft";
 import { toRefinementDraft } from "@/lib/domain/plan/refinement-review";
 
 const routerRefresh = vi.hoisted(() => vi.fn());
@@ -584,6 +584,65 @@ describe("FamilyPlanPanel stale edit recovery", () => {
       within(conflictPanel!).getByRole("button", { name: "Use latest version" }),
     ).toBeTruthy();
     await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(1));
+  });
+
+  it("preserves both updates from one editor event in memory and the recovery copy", () => {
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.change(screen.getByLabelText("Priority"), { target: { value: "low" } });
+    expect((screen.getByLabelText("Priority") as HTMLSelectElement).value).toBe("low");
+    const stored = JSON.parse(sessionStorage.getItem(localActionDraftKey(owner, plan.id))!);
+    expect(stored.step.priority).toBe("low");
+    expect(stored.step.details.priority).toBe("low");
+  });
+
+  it("keeps a conflicting draft until the exact refreshed revision arrives, then saves that revision", async () => {
+    const revision = "2026-08-03T12:05:00.000Z";
+    vi.mocked(savePlanEdits).mockResolvedValueOnce({ ok: false, error: "Changed", conflict: {
+      kind: "step", entityId: plan.steps[0].id, currentUpdatedAt: revision,
+      current: { title: "Updated saved title", description: plan.steps[0].description, status: "pending", phase: "30", priority: "high", details: plan.steps[0].details!, workflow_data: {} },
+    } }).mockResolvedValue({ ok: true });
+    const view = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call the housing intake line" }));
+    fireEvent.change(screen.getByDisplayValue("Call the housing intake line"), { target: { value: "Keep my local title" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Keep my draft" }));
+    view.rerender(<FamilyPlanPanel familyId={plan.family_id} plan={{ ...plan }} workflow={null} />);
+    expect((screen.getByRole("button", { name: "Loading latest…" }) as HTMLButtonElement).disabled).toBe(true);
+    const refreshed = { ...plan, steps: [{ ...plan.steps[0], title: "Updated saved title", updated_at: revision }] };
+    view.rerender(<FamilyPlanPanel familyId={plan.family_id} plan={refreshed} workflow={null} />);
+    expect(screen.queryByRole("heading", { name: "Another tab saved this action" })).toBeNull();
+    expect(screen.getByDisplayValue("Keep my local title")).toBeTruthy();
+    expect(screen.getByText(/The latest version is loaded and your draft is still open/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    await waitFor(() => expect(savePlanEdits).toHaveBeenCalledTimes(2));
+    expect(savePlanEdits).toHaveBeenLastCalledWith(expect.objectContaining({ steps: [expect.objectContaining({ expectedUpdatedAt: revision, patch: expect.objectContaining({ title: "Keep my local title" }) })] }));
+  });
+
+  it("does not renew a stored draft on refresh and removes its recovery offer after another tab signs out", () => {
+    const key = localActionDraftKey(owner, plan.id);
+    const savedAt = Date.now() - 1000;
+    const stored = serializeLocalActionDraft(owner, plan.id, { ...plan.steps[0], title: "Recover this edit" }, savedAt)!;
+    sessionStorage.setItem(key, stored);
+    const view = render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    expect(screen.getByRole("button", { name: "Restore edit" })).toBeTruthy();
+    view.rerender(<FamilyPlanPanel familyId={plan.family_id} plan={{ ...plan }} workflow={null} />);
+    expect(sessionStorage.getItem(key)).toBe(stored);
+    act(() => {
+      localStorage.setItem(DRAFT_LOGOUT_KEY, String(savedAt + 1));
+      window.dispatchEvent(new StorageEvent("storage", { key: DRAFT_LOGOUT_KEY }));
+    });
+    expect(screen.queryByRole("button", { name: "Restore edit" })).toBeNull();
+  });
+
+  it("warns when old browser recovery copies cannot be pruned", () => {
+    localStorage.setItem(localActionDraftKey(owner, plan.id), "obsolete copy");
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new DOMException("Unavailable", "SecurityError"); });
+    render(<FamilyPlanPanel familyId={plan.family_id} plan={plan} workflow={null} />);
+    expect(screen.getByText(/Draft recovery is unavailable/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit action" })).toBeTruthy();
   });
 
   it("keeps the plan usable when browser draft storage is restricted", () => {
