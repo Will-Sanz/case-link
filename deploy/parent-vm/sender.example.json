@@ -1,0 +1,19 @@
+{
+  "enabled": false,
+  "approvalReference": "REQUIRES_RECORDED_AUTHORITY",
+  "approvedUntil": "2000-01-01T00:00:00Z",
+  "publicOrigin": "https://pilot.thecaselink.com",
+  "projectOrigin": "https://zpfypkizsapvsxeykmdq.supabase.co",
+  "service": "sender",
+  "databaseUrl": "REQUIRES_DEDICATED_LOGIN_DIRECT_VERIFY_FULL_URL",
+  "sendingApproved": false,
+  "senderSecret": "REQUIRES_SHARED_SENDER_SECRET",
+  "carrier": {
+    "projectId": "REQUIRES_VERIFIED_PROJECT",
+    "serviceId": "REQUIRES_VERIFIED_SERVICE",
+    "fromNumber": "REQUIRES_ASSIGNED_NUMBER",
+    "accessKey": "REQUIRES_CARRIER_KEY",
+    "secretKey": "REQUIRES_CARRIER_SECRET",
+    "destinations": []
+  }
+}

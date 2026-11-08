@@ -5,6 +5,7 @@ export type AppUserRow = {
   id: string;
   email: string;
   role: UserRole;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
   /** Workspace profile (nullable until filled in). */

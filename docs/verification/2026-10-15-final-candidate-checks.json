@@ -1,0 +1,51 @@
+{
+  "commit": "8ace965e86fc556844d63318680b255ca57cbff9",
+  "ciRun": 38676628477,
+  "ciAttempt": 2,
+  "ciConclusion": "success",
+  "codeqlRun": 38676628671,
+  "codeqlConclusion": "success",
+  "unitComponentTests": 686,
+  "browserScenarios": 7,
+  "databaseDirectoryRegression": "passed",
+  "localFullStackRestarted": false,
+  "releasePreflight": "passed before production candidate creation",
+  "firstCiAttempt": {
+    "stage": "Start isolated Supabase and apply migrations",
+    "failure": "Registry rate limit and occupied 54322 port before test execution",
+    "action": "Retry failed job on remote infrastructure; no test or gate disabled"
+  },
+  "hostedPreview": {
+    "id": "dpl_ETfuSDhVtDE6jrab3g5TsThwGGKr",
+    "url": "https://case-link-7hgb7ony3-will-sanzs-projects.vercel.app",
+    "state": "READY",
+    "workflowEvidence": "2026-10-15-hosted-directory-fix.json"
+  },
+  "productionCandidate": {
+    "id": "dpl_7TyYy3KhJREBvVer5YY4x6rLnmNh",
+    "url": "case-link-oxq4j9up0-will-sanzs-projects.vercel.app",
+    "target": "production",
+    "readyState": "READY",
+    "gitSource": {
+      "type": "github",
+      "repoId": 1187614129,
+      "ref": "8ace965e86fc556844d63318680b255ca57cbff9",
+      "sha": "8ace965e86fc556844d63318680b255ca57cbff9"
+    },
+    "requestedAutoAssignCustomDomains": false,
+    "alias": [
+      "case-link-will-sanzs-projects.vercel.app",
+      "case-link-git-8ace965e86fc556844d633-1c1b31-will-sanzs-projects.vercel.app"
+    ],
+    "createdAt": "2026-10-15T03:44:35.483Z",
+    "verifiedCommit": "8ace965e86fc556844d63318680b255ca57cbff9",
+    "workflowEvidence": "2026-10-15-production-candidate-workflow.json"
+  },
+  "productionPromoted": false,
+  "canonicalAlias": {
+    "hostname": "www.thecaselink.com",
+    "deploymentId": "dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW",
+    "unchanged": true
+  },
+  "releaseHeld": true
+}

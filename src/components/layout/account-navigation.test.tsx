@@ -1,11 +1,17 @@
 /** @vitest-environment jsdom */
 
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({
   pathname: "/families",
   replace: vi.fn(),
+  pending: false,
+}));
+
+vi.mock("next/link", async (importOriginal) => ({
+  ...await importOriginal<typeof import("next/link")>(),
+  useLinkStatus: () => ({ pending: navigation.pending }),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -16,6 +22,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/actions/auth", () => ({ signOutAction: vi.fn() }));
 vi.mock("@/app/actions/profile", () => ({ updateCaseManagerProfile: vi.fn() }));
 
+import { signOutAction } from "@/app/actions/auth";
 import { FamilyCaseChrome } from "@/components/layout/family-case-chrome";
 import { CaseManagerProfileClient } from "@/features/profile/case-manager-profile-client";
 
@@ -51,6 +58,7 @@ describe("account navigation", () => {
           id: "11111111-1111-4111-8111-111111111111",
           email: "case.manager@example.org",
           role: "case_manager",
+          is_active: true,
           created_at: "2026-08-01T12:00:00.000Z",
           updated_at: "2026-08-02T12:00:00.000Z",
           display_name: "Case Manager",
@@ -62,4 +70,35 @@ describe("account navigation", () => {
     expect(screen.queryByText(/User ID:/)).toBeNull();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
+});
+
+it("announces a pending destination without changing its accessible name or current page", () => {
+  navigation.pending = true;
+  navigation.pathname = "/families";
+  const view = render(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  const account = within(screen.getByRole("navigation", { name: "Account and help" }));
+  const settings = account.getByRole("link", { name: "Settings" });
+  expect(within(settings).getByRole("status").textContent).toBe("Opening Settings…");
+  expect(settings.getAttribute("aria-current")).toBeNull();
+  navigation.pending = false;
+  view.rerender(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  expect(within(settings).getByRole("status").textContent).toBe("");
+});
+
+it("closes the mobile menu after navigation completes", () => {
+  navigation.pathname = "/families";
+  const view = render(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  const menu = view.container.querySelector("details")!;
+  menu.open = true;
+  navigation.pathname = "/profile";
+  view.rerender(<FamilyCaseChrome>Content</FamilyCaseChrome>);
+  expect(view.container.querySelector("details")!.open).toBe(false);
+});
+
+it("shows sign-out failure and keeps the retry button available", async () => {
+  vi.mocked(signOutAction).mockResolvedValue({ error: "Sign-out could not be confirmed. Please try again." });
+  render(<CaseManagerProfileClient profile={{ id: "staff-id", email: "staff@example.test", role: "case_manager", is_active: true, created_at: "2026-08-01T12:00:00Z", updated_at: "2026-08-01T12:00:00Z" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Sign-out could not be confirmed");
+  expect((screen.getByRole("button", { name: "Sign out" }) as HTMLButtonElement).disabled).toBe(false);
 });

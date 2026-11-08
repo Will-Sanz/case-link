@@ -1,16 +1,13 @@
-import { Link as Link2 } from "iconoir-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 export function CaseLinkMark({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={cn(
-        "grid size-10 shrink-0 place-items-center rounded-[9px] bg-[var(--color-accent)] text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)]",
-        className,
-      )}
+      className={cn("inline-flex size-10 shrink-0", className)}
     >
-      <Link2 className="size-6" strokeWidth={2.25} />
+      <Image src="/favicon.svg?v=4" width={40} height={40} alt="" />
     </span>
   );
 }

@@ -24,26 +24,6 @@ export function contactsToEditable(contacts: PlanStepDetails["contacts"] | undef
     .join("\n");
 }
 
-const PART_SEP = /\s*·\s*/;
-
-export function contactsFromEditable(text: string): PlanStepDetails["contacts"] {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
-  if (lines.length === 0) return [];
-  return lines.map((line) => {
-    const parts = line.split(PART_SEP).map((p) => p.trim()).filter(Boolean);
-    if (parts.length === 0) return { name: line };
-    if (parts.length === 1) return { name: parts[0] };
-    if (parts.length === 2) return { name: parts[0], phone: parts[1] };
-    if (parts.length === 3) return { name: parts[0], phone: parts[1], email: parts[2] };
-    return {
-      name: parts[0],
-      phone: parts[1],
-      email: parts[2],
-      notes: parts.slice(3).join(" · "),
-    };
-  });
-}
-
 /**
  * Narrative body: summary + action items (prose) + timing.
  * Persisted primarily in `description`; timing line may be extracted on save.
@@ -118,23 +98,4 @@ export function formatRecordNotes(wf: PlanStepRow["workflow_data"]): string | nu
   if (br) parts.push(`Currently blocked: ${br}`);
   if (parts.length === 0) return null;
   return parts.join("\n\n");
-}
-
-export type CaseNoteDraftSlice = {
-  title: string;
-  mainParagraph: string;
-  documentsEditable: string;
-  contactEditable: string;
-  outcome: string;
-};
-
-export function stepToCaseNoteDraft(step: PlanStepRow): CaseNoteDraftSlice {
-  const d = (step.details ?? {}) as PlanStepDetails;
-  return {
-    title: step.title,
-    mainParagraph: buildMainParagraph(step),
-    documentsEditable: documentsToEditable(d),
-    contactEditable: contactsToEditable(d.contacts),
-    outcome: d.expected_outcome?.trim() ?? "",
-  };
 }

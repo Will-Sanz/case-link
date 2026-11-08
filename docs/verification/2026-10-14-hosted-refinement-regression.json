@@ -1,0 +1,50 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "deployment": "dpl_6WnhWDnq42nv6RvLjD39UNp4uRJM",
+  "affectedCommit": "5ec04a34b4937f472d2df36a4bb300c97aa4ef28",
+  "syntheticOnly": true,
+  "headless": true,
+  "reproducedAt": "2026-10-14T22:32:52.055Z",
+  "problem": "Opening full-plan refinement immediately after saving an action can clone the previous plan while the route refresh is still pending. The current-revision guard then rejects the preview.",
+  "visibleError": "The saved plan changed. Your working copy is still here; review the latest plan before generating another preview.",
+  "checksBeforeFailure": [
+    "Real password sign-in to protected immutable staging preview",
+    "Minimal family intake with two barriers and no description",
+    "Live AI generation of three persisted goals",
+    "No invented phone/email in the no-directory draft",
+    "Zero automated WCAG 2A/AA and 2.1AA plan-page violations",
+    "Unsaved action recovered after reload",
+    "Waiting edit saved and survived reload",
+    "Live action refinement required explicit field selection and preserved the manual task and waiting note"
+  ],
+  "timingsMilliseconds": {
+    "generation": 23141,
+    "actionRefinement": 3439
+  },
+  "fix": "Reuse the existing pending transition and save state to disable and guard opening full-plan refinement until the current save/refresh finishes. Preserve all revision checks.",
+  "regression": {
+    "file": "src/features/families/family-plan-panel.test.tsx",
+    "test": "waits for an action save before opening full-plan refinement with the refreshed plan",
+    "beforeFix": "Failed: the full-plan refinement button remained enabled while the action save was pending",
+    "afterFix": "Passed, including the refreshed revision and saved manual task reaching the subsequent AI request",
+    "componentSuitePassed": 23,
+    "typecheck": "passed",
+    "targetedLint": "passed",
+    "browserRegression": "Existing intake-to-PDF workflow extended with full-plan refinement and exact preservation of saved action rows; remote CI and fresh hosted candidate still required"
+  },
+  "review": "Normal correctness/security/privacy/accessibility/regression review and a separate Ponytail deletion pass completed; two application lines reuse existing state, with no new dependency or authorization change",
+  "priorAttemptFailures": [
+    "Vercel env run from the repository loaded .env.local despite an empty remote Development scope. The runner's credential guard stopped before browser, fixture or application requests; a clean temporary working directory resolved this without loading application/provider keys.",
+    "The first browser runner assumed one task Status selector. Live generation returned multiple tasks; the selector was narrowed to the intended first task.",
+    "The first full-plan attempt waited for a preview without watching the error alert. A diagnostic attempt captured the reproducible saved-plan-changed message. No AI preview was applied."
+  ],
+  "cleanup": {
+    "eachDisposableFamilyRemoved": true,
+    "eachDisposableAccountRemoved": true,
+    "browserClosed": true,
+    "operatorAccountPreserved": true,
+    "auditHistoryRetained": true,
+    "credentialsPrintedOrPersisted": false
+  },
+  "limits": "This record proves the defect and focused fix, not a passing hosted full-plan/PDF/assistant journey. Follow-up candidate verification is required."
+}

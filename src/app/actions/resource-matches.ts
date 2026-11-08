@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireAppUserWithClient } from "@/lib/auth/session";
 import { publicSessionError } from "@/lib/auth/session-errors";
 import { rankResourcesForFamily } from "@/lib/matching/engine";
-import type { FamilyMatchInput, MatchableResource } from "@/lib/matching/types";
+import type { FamilyMatchInput } from "@/lib/matching/types";
 import { publicMessageFromCaughtError, publicMessageFromSupabaseError } from "@/lib/errors/public-action-error";
+import { loadMatchingResources } from "@/lib/services/matching-resources";
 import { getFamilyDetail } from "@/lib/services/families";
 import { searchResourcesForPicker } from "@/lib/services/resources-picker";
 import { linkResourceToStepSchema } from "@/lib/validations/plans";
@@ -34,7 +35,12 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
 
   const { familyId } = parsed.data;
 
-  const detail = await getFamilyDetail(supabase, familyId);
+  let detail;
+  try {
+    detail = await getFamilyDetail(supabase, familyId);
+  } catch (error) {
+    return { ok: false, error: publicMessageFromCaughtError("resource-matching", error) };
+  }
   if (!detail) {
     return { ok: false, error: "Family not found" };
   }
@@ -52,31 +58,12 @@ export async function runResourceMatching(input: unknown): Promise<ActionResult>
     household_notes: detail.household_notes,
   };
 
-  const { data: resourceRows, error: resErr } = await supabase
-    .from("resources")
-    .select(
-      `
-      id,
-      program_name,
-      office_or_department,
-      description,
-      category,
-      search_text,
-      tags,
-      recruit_for_grocery_giveaways,
-      tabling_at_events,
-      promotional_materials,
-      educational_workshops,
-      volunteer_recruitment_support
-    `,
-    )
-    .eq("active", true);
-
-  if (resErr) {
-    return { ok: false, error: publicMessageFromSupabaseError(resErr) };
+  let resources;
+  try {
+    resources = await loadMatchingResources(supabase);
+  } catch (error) {
+    return { ok: false, error: publicMessageFromCaughtError("resource-matching", error) };
   }
-
-  const resources = (resourceRows ?? []) as MatchableResource[];
   const ranked = rankResourcesForFamily(matchInput, resources);
 
   const { error: replaceError } = await supabase.rpc("replace_suggested_resource_matches", {

@@ -1,0 +1,262 @@
+{
+  "createdAt": "2026-10-15T20:13:22.927Z",
+  "project": "zpfypkizsapvsxeykmdq",
+  "archiveSha256": "2389d5a6290f13ce92bf2fc93b2255f0a5b5a44a1a346a7b708a45ebe2f58531",
+  "encryptedSha256": "d9d0ad1c29c0e1a20dd478182795df9ac8b91203cc9497ca48b4ecef69d4b9e5",
+  "bytes": 598354,
+  "tables": [
+    {
+      "table": "auth.audit_log_entries",
+      "rows": 0
+    },
+    {
+      "table": "auth.custom_oauth_providers",
+      "rows": 0
+    },
+    {
+      "table": "auth.flow_state",
+      "rows": 16
+    },
+    {
+      "table": "auth.identities",
+      "rows": 13
+    },
+    {
+      "table": "auth.instances",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_amr_claims",
+      "rows": 11
+    },
+    {
+      "table": "auth.mfa_challenges",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_factors",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_recovery_code_sets",
+      "rows": 0
+    },
+    {
+      "table": "auth.mfa_recovery_codes",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_authorizations",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_client_states",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_clients",
+      "rows": 0
+    },
+    {
+      "table": "auth.oauth_consents",
+      "rows": 0
+    },
+    {
+      "table": "auth.one_time_tokens",
+      "rows": 1
+    },
+    {
+      "table": "auth.refresh_tokens",
+      "rows": 50
+    },
+    {
+      "table": "auth.saml_providers",
+      "rows": 0
+    },
+    {
+      "table": "auth.saml_relay_states",
+      "rows": 0
+    },
+    {
+      "table": "auth.schema_migrations",
+      "rows": 82
+    },
+    {
+      "table": "auth.scim_tokens",
+      "rows": 0
+    },
+    {
+      "table": "auth.scim_users",
+      "rows": 0
+    },
+    {
+      "table": "auth.sessions",
+      "rows": 11
+    },
+    {
+      "table": "auth.sso_domains",
+      "rows": 0
+    },
+    {
+      "table": "auth.sso_providers",
+      "rows": 0
+    },
+    {
+      "table": "auth.users",
+      "rows": 13
+    },
+    {
+      "table": "auth.webauthn_challenges",
+      "rows": 0
+    },
+    {
+      "table": "auth.webauthn_credentials",
+      "rows": 0
+    },
+    {
+      "table": "private.ai_job_claims",
+      "rows": 0
+    },
+    {
+      "table": "private.ai_rate_counters",
+      "rows": 20
+    },
+    {
+      "table": "private.production_controls",
+      "rows": 1
+    },
+    {
+      "table": "public.activity_log",
+      "rows": 12
+    },
+    {
+      "table": "public.app_users",
+      "rows": 11
+    },
+    {
+      "table": "public.barrier_plan_records",
+      "rows": 0
+    },
+    {
+      "table": "public.case_notes",
+      "rows": 0
+    },
+    {
+      "table": "public.case_progress_updates",
+      "rows": 0
+    },
+    {
+      "table": "public.demo_requests",
+      "rows": 0
+    },
+    {
+      "table": "public.families",
+      "rows": 1
+    },
+    {
+      "table": "public.family_barriers",
+      "rows": 2
+    },
+    {
+      "table": "public.family_case_managers",
+      "rows": 0
+    },
+    {
+      "table": "public.family_goals",
+      "rows": 0
+    },
+    {
+      "table": "public.family_members",
+      "rows": 0
+    },
+    {
+      "table": "public.plan_step_action_items",
+      "rows": 6
+    },
+    {
+      "table": "public.plan_step_activity",
+      "rows": 0
+    },
+    {
+      "table": "public.plan_step_resources",
+      "rows": 0
+    },
+    {
+      "table": "public.plan_steps",
+      "rows": 3
+    },
+    {
+      "table": "public.plans",
+      "rows": 1
+    },
+    {
+      "table": "public.referrals",
+      "rows": 0
+    },
+    {
+      "table": "public.resource_import_runs",
+      "rows": 1
+    },
+    {
+      "table": "public.resource_matches",
+      "rows": 8
+    },
+    {
+      "table": "public.resources",
+      "rows": 54
+    },
+    {
+      "table": "public.security_audit_log",
+      "rows": 16
+    },
+    {
+      "table": "public.tasks",
+      "rows": 0
+    },
+    {
+      "table": "storage.buckets",
+      "rows": 0
+    },
+    {
+      "table": "storage.buckets_analytics",
+      "rows": 0
+    },
+    {
+      "table": "storage.buckets_vectors",
+      "rows": 0
+    },
+    {
+      "table": "storage.migrations",
+      "rows": 74
+    },
+    {
+      "table": "storage.objects",
+      "rows": 0
+    },
+    {
+      "table": "storage.s3_multipart_uploads",
+      "rows": 0
+    },
+    {
+      "table": "storage.s3_multipart_uploads_parts",
+      "rows": 0
+    },
+    {
+      "table": "storage.vector_indexes",
+      "rows": 0
+    },
+    {
+      "table": "supabase_migrations.schema_migrations",
+      "rows": 41
+    }
+  ],
+  "tlsCertificateVerified": true,
+  "consistentSnapshot": true,
+  "archiveExpansionPassed": true,
+  "encryptionRoundTripPassed": true,
+  "restorationPending": true,
+  "encryptedArchivePrivate": true,
+  "keyStoredSeparatelyInOperatorKeychain": true,
+  "freshArchiveRestoredDuringThisRelease": false,
+  "priorRestoreDrill": "2026-10-15-hosted-restore.json"
+}

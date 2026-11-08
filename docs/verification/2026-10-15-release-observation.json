@@ -1,0 +1,390 @@
+{
+  "origin": "https://www.thecaselink.com",
+  "deploymentId": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+  "commit": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "startedAt": "2026-10-15T15:02:54.277Z",
+  "plannedMinutes": 30,
+  "syntheticReadOnly": true,
+  "checks": [
+    {
+      "sample": 0,
+      "at": "2026-10-15T15:02:54.277Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 291,
+      "passed": true
+    },
+    {
+      "sample": 0,
+      "at": "2026-10-15T15:02:54.568Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 113,
+      "passed": true
+    },
+    {
+      "sample": 0,
+      "at": "2026-10-15T15:02:54.681Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 158,
+      "passed": true
+    },
+    {
+      "sample": 1,
+      "at": "2026-10-15T15:03:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 252,
+      "passed": true
+    },
+    {
+      "sample": 2,
+      "at": "2026-10-15T15:04:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 944,
+      "passed": true
+    },
+    {
+      "sample": 3,
+      "at": "2026-10-15T15:05:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 857,
+      "passed": true
+    },
+    {
+      "sample": 4,
+      "at": "2026-10-15T15:06:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 179,
+      "passed": true
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-15T15:07:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 157,
+      "passed": true
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-15T15:07:54.436Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 112,
+      "passed": true
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-15T15:07:54.548Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 188,
+      "passed": true
+    },
+    {
+      "sample": 6,
+      "at": "2026-10-15T15:08:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 167,
+      "passed": true
+    },
+    {
+      "sample": 7,
+      "at": "2026-10-15T15:09:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 190,
+      "passed": true
+    },
+    {
+      "sample": 8,
+      "at": "2026-10-15T15:10:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 305,
+      "passed": true
+    },
+    {
+      "sample": 9,
+      "at": "2026-10-15T15:11:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 186,
+      "passed": true
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-15T15:12:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 231,
+      "passed": true
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-15T15:12:54.510Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 117,
+      "passed": true
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-15T15:12:54.627Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 117,
+      "passed": true
+    },
+    {
+      "sample": 11,
+      "at": "2026-10-15T15:13:54.280Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 238,
+      "passed": true
+    },
+    {
+      "sample": 12,
+      "at": "2026-10-15T15:14:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 232,
+      "passed": true
+    },
+    {
+      "sample": 13,
+      "at": "2026-10-15T15:15:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 195,
+      "passed": true
+    },
+    {
+      "sample": 14,
+      "at": "2026-10-15T15:16:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 167,
+      "passed": true
+    },
+    {
+      "sample": 15,
+      "at": "2026-10-15T15:17:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 277,
+      "passed": true
+    },
+    {
+      "sample": 15,
+      "at": "2026-10-15T15:17:54.555Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 153,
+      "passed": true
+    },
+    {
+      "sample": 15,
+      "at": "2026-10-15T15:17:54.708Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 186,
+      "passed": true
+    },
+    {
+      "sample": 16,
+      "at": "2026-10-15T15:18:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 219,
+      "passed": true
+    },
+    {
+      "sample": 17,
+      "at": "2026-10-15T15:19:54.277Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 172,
+      "passed": true
+    },
+    {
+      "sample": 18,
+      "at": "2026-10-15T15:20:54.280Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 326,
+      "passed": true
+    },
+    {
+      "sample": 19,
+      "at": "2026-10-15T15:21:54.282Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 197,
+      "passed": true
+    },
+    {
+      "sample": 20,
+      "at": "2026-10-15T15:22:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 163,
+      "passed": true
+    },
+    {
+      "sample": 20,
+      "at": "2026-10-15T15:22:54.442Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 98,
+      "passed": true
+    },
+    {
+      "sample": 20,
+      "at": "2026-10-15T15:22:54.540Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 142,
+      "passed": true
+    },
+    {
+      "sample": 21,
+      "at": "2026-10-15T15:23:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 267,
+      "passed": true
+    },
+    {
+      "sample": 22,
+      "at": "2026-10-15T15:24:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 224,
+      "passed": true
+    },
+    {
+      "sample": 23,
+      "at": "2026-10-15T15:25:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 161,
+      "passed": true
+    },
+    {
+      "sample": 24,
+      "at": "2026-10-15T15:26:54.277Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 173,
+      "passed": true
+    },
+    {
+      "sample": 25,
+      "at": "2026-10-15T15:27:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 262,
+      "passed": true
+    },
+    {
+      "sample": 25,
+      "at": "2026-10-15T15:27:54.540Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 101,
+      "passed": true
+    },
+    {
+      "sample": 25,
+      "at": "2026-10-15T15:27:54.641Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 143,
+      "passed": true
+    },
+    {
+      "sample": 26,
+      "at": "2026-10-15T15:28:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 168,
+      "passed": true
+    },
+    {
+      "sample": 27,
+      "at": "2026-10-15T15:29:54.278Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 163,
+      "passed": true
+    },
+    {
+      "sample": 28,
+      "at": "2026-10-15T15:30:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 167,
+      "passed": true
+    },
+    {
+      "sample": 29,
+      "at": "2026-10-15T15:31:54.279Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 207,
+      "passed": true
+    },
+    {
+      "sample": 30,
+      "at": "2026-10-15T15:32:54.331Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 195,
+      "passed": true
+    },
+    {
+      "sample": 30,
+      "at": "2026-10-15T15:32:54.526Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 171,
+      "passed": true
+    },
+    {
+      "sample": 30,
+      "at": "2026-10-15T15:32:54.697Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 193,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "finishedAt": "2026-10-15T15:32:54.890Z",
+  "elapsedMilliseconds": 1800614,
+  "providerLogReview": {
+    "provider": "Vercel",
+    "deploymentId": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+    "windowStart": "2026-10-15T15:02:54Z",
+    "windowEnd": "2026-10-15T15:33:00Z",
+    "errorOrFatalLogGroups": 0,
+    "querySucceeded": true,
+    "supabaseLogConnector": "Unavailable: permission denied earlier in this continuation; no Supabase-log conclusion asserted"
+  },
+  "aliasReadback": {
+    "origin": "https://www.thecaselink.com",
+    "deploymentId": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+    "unchangedAfterObservation": true
+  },
+  "maximumProbeMilliseconds": 944,
+  "limits": "Read-only health/routing/header observation. Full Auth, database, AI and PDF operation is evidenced separately by the canonical workflow; this is not sustained load, ongoing monitoring or provider spend/alert verification."
+}

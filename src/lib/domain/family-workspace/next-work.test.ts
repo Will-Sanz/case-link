@@ -98,4 +98,21 @@ describe("selectNextFamilyWork", () => {
       ]),
     ).toBeNull();
   });
+  it("uses the next follow-up date for Waiting work, including older rows with a different target date", () => {
+    const steps = [step({ action_items: [action({ title: "Wait for reply", status: "blocked", target_date: "2026-08-01", follow_up_date: "2026-08-10" }), action({ id: "action-2", title: "Prepare intake", target_date: "2026-08-06" })] })];
+    expect(selectNextFamilyWork(steps)?.action_needed_now).toBe("Prepare intake");
+    steps[0].action_items = [action({ status: "blocked", target_date: "2026-08-01", follow_up_date: "2026-08-10" })];
+    expect(selectNextFamilyWork(steps)?.due_date).toBe("2026-08-10");
+  });
+  it("does not resurrect completed tasks when a legacy parent still has an open status", () => {
+    expect(selectNextFamilyWork([step({ status: "pending", action_items: [action({ status: "completed" })] })])).toBeNull();
+  });
+
+  it("breaks same-date/order ties by stable IDs regardless of input order", () => {
+    const first = step({ id: "step-a", action_items: [action({ id: "action-b", title: "Second" }), action({ id: "action-a", title: "First" })] });
+    const second = step({ id: "step-b", action_items: [action({ title: "Other goal" })] });
+    expect(selectNextFamilyWork([second, first])?.action_needed_now).toBe("First");
+    expect(selectNextFamilyWork([first, second])?.action_needed_now).toBe("First");
+    expect(selectNextFamilyWork([step({ id: "step-b", action_items: [] }), step({ id: "step-a", action_items: [] })])?.id).toBe("step-a");
+  });
 });

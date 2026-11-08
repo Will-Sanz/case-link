@@ -1,0 +1,32 @@
+{
+  "messageId": "1a13d254876a2297",
+  "inInbox": true,
+  "received": "1792027215000",
+  "from": "The Case Link Team <no-reply@thecaselink.com>",
+  "links": [
+    {
+      "origin": "https://www.thecaselink.com",
+      "path": "/auth/callback",
+      "credentialOnlyInFragment": true,
+      "purpose": "recovery"
+    },
+    {
+      "origin": "https://www.thecaselink.com",
+      "path": "/auth/callback",
+      "credentialOnlyInFragment": true,
+      "purpose": "recovery"
+    }
+  ],
+  "hasExplicitContinueCopy": true,
+  "hasFifteenMinuteExpiry": true,
+  "singleUse": true,
+  "authentication": [
+    {
+      "spfPass": true,
+      "dkimPass": true
+    }
+  ],
+  "credentialsPrinted": false,
+  "credentialRedeemed": false
+}
+

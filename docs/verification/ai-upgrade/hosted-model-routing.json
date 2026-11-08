@@ -1,0 +1,62 @@
+{
+  "deploymentId": "dpl_JD8JD3bGvbaSWLqBUgVRVXXSa4Ca",
+  "commit": "187a93f3ef4660bed30cdaf3028691e5f439a4b7",
+  "scope": "Content-free provider metadata from the first synthetic hosted attempt; no prompts, output, credentials or case identifiers retained. Later browser test harness assertion failed after email output, unrelated to model dispatch.",
+  "records": [
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:45:38.526Z",
+      "estimatedUsd": 0.005549699999999999,
+      "elapsedMs": 4948.0,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:45:32.461Z",
+      "estimatedUsd": 0.0058322,
+      "elapsedMs": 6626.0,
+      "ok": true
+    },
+    {
+      "route": "previewRefinePlan",
+      "taskType": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:45:15.113Z",
+      "estimatedUsd": 0.0097285,
+      "elapsedMs": 7939.0,
+      "ok": true
+    },
+    {
+      "route": "previewRefinePlanStep",
+      "taskType": "step_refinement",
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:45:05.153Z",
+      "estimatedUsd": 0.000354925,
+      "elapsedMs": 4884.0,
+      "ok": true
+    },
+    {
+      "route": "generateCompletePlan",
+      "taskType": "plan_generation",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T19:44:52.315Z",
+      "estimatedUsd": 0.0087311,
+      "elapsedMs": 17536.0,
+      "ok": true
+    }
+  ]
+}

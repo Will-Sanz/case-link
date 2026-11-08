@@ -39,4 +39,9 @@ describe("resolveActionTargetDate", () => {
       }),
     ).toBe("2026-09-02");
   });
+  it("anchors a timestamp to the school's day and crosses DST without shifting the chosen date", () => {
+    expect(resolveActionTargetDate({ planStartDate: "2026-10-14T02:00:00Z", weekIndex: 1 })).toBe("2026-10-15");
+    expect(resolveActionTargetDate({ planStartDate: "2026-03-07T23:00:00Z", weekIndex: 1 })).toBe("2026-03-09");
+  });
+
 });

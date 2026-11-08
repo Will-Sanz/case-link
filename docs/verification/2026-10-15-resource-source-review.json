@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-15",
+  "timezone": "America/New_York",
+  "status": "Official-source review; school resource-owner approval and provider confirmation remain open.",
+  "scope": {
+    "production_rows_read": 54,
+    "production_rows_changed": 0,
+    "provider_calls": 0,
+    "provider_emails": 0,
+    "personal_contact_data_included": false,
+    "staging_seed_prepared": 8,
+    "staging_seed_applied_by_this_review": false
+  },
+  "catalog_observations": {
+    "active_count": 54,
+    "missing_description_count": 3,
+    "missing_category_count": 10,
+    "record_update_dates": [
+      "2026-03-21"
+    ],
+    "update_date_meaning": "All rows share the 2026-03-21 import/update date. That does not prove provider verification or that details remain current.",
+    "missing_description_programs": [
+      "Child Welfare Operations",
+      "Community Evening Resource Center",
+      "Community Umbrella Agency 10"
+    ],
+    "coverage_questions": [
+      "No dedicated immediate-food pantry or household-broadband service was identifiable from the exported names/descriptions; school staff should identify the routes they actually use. This does not establish that no such service exists.",
+      "Benefits navigation and digital-skills education are not substitutes for immediate food or working internet.",
+      "School outreach, foster-parent recruitment and youth enrichment records should not automatically imply housing or childcare service fit."
+    ]
+  },
+  "source_reviews": [
+    {
+      "existing_record_name": "Community Legal Services of Philadelphia",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://clsphila.org/services/private-housing/",
+        "https://clsphila.org/services/housing/"
+      ],
+      "official_page_facts": "Legal help for low-income Philadelphia renters facing eviction, lockout, utility shutoff or repair disputes. Private and subsidized housing have different intake pages. The private-rental page lists the Philly Tenant Hotline and asks callers to gather any lease, court papers, rent receipts and income evidence they have.",
+      "catalog_gap": "Existing description lacks the intake route, preparation and private/subsidized housing distinction.",
+      "unknowns": [
+        "Whether the family meets intake criteria and can receive representation.",
+        "Current response time and capacity.",
+        "Phone hours differ between the current service page and an older Get Legal Help page; do not copy hours without reconfirming."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "Utility Emergency Service Funding",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://uesfacts.org/our-programs/utility-grant-program/",
+        "https://uesfacts.org/i-need-help-with/benefits/"
+      ],
+      "official_page_facts": "UESF offers utility grants for eligible Philadelphia households facing shutoff or utility arrears, and help accessing public benefits. Grant support and other contributions must resolve the covered balance. Ask the program to assess the household and utility account; the website is not an eligibility decision.",
+      "catalog_gap": "Existing description describes broad housing stabilization without the utility-grant intake conditions.",
+      "unknowns": [
+        "Live funding, award eligibility and account-specific requirements.",
+        "The utility page says every two years in one paragraph but later distinguishes 24 months for water and 12 months for PECO; do not infer a single repeat-assistance rule."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "Customer Assistance Program (CAP)",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://www.phila.gov/services/payments-assistance-taxes/payment-plans-and-assistance-programs/senior-citizen-programs/apply-for-water-bill-customer-assistance/",
+        "https://cap.phila.gov/"
+      ],
+      "official_page_facts": "Philadelphia Water Department customers can use one application for water-bill assistance, including TAP and the senior discount. Low income or special hardship may be relevant. Online, mailed and partner-assisted application routes are available. Contact the program before traveling; application documents cannot be submitted by email.",
+      "catalog_gap": "Existing record gives benefit claims without application route or the distinction from plumbing-repair loans.",
+      "unknowns": [
+        "A particular account's eligibility, application status and processing time.",
+        "Current availability of in-person help at the chosen partner."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "Basic Systems Repair Program, Philly First Home, Turn the Key",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://phdcphila.org/repair/basic-systems-repair-program/",
+        "https://phdcphila.org/philly-first-home/",
+        "https://phdcphila.org/turnthekey/"
+      ],
+      "official_page_facts": "This entry combines different PHDC programs. BSRP covers qualifying emergency repairs in eligible owner-occupied Philadelphia homes. Philly First Home and Turn the Key support qualifying home purchases and require approved homeownership counseling. They are not general rental assistance or emergency family shelter. Identify the relevant program before referring.",
+      "catalog_gap": "A single broad record conflates homeowner repairs and homebuyer programs; the short description omits the owner/buyer boundary.",
+      "unknowns": [
+        "Household/program eligibility, funds, properties, contractor availability and wait time.",
+        "Which of the three programs the family actually needs."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "Runaway and Homeless Youth",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://www.hopephl.org/youth-emergency-service.html"
+      ],
+      "official_page_facts": "HopePHL Youth Emergency Service supports youth ages 12–17 facing housing insecurity or unsafe home situations. The Basic Center Runaway Homeless Youth service is described for youth not in the child-welfare system and can support nonresidential youth. The official page lists a 24-hour service-access number. This is a youth-specific route, not general family shelter.",
+      "catalog_gap": "Existing description supplies ages but not the program/provider distinction or the Basic Center child-welfare boundary.",
+      "unknowns": [
+        "Bed availability, safe referral arrangements, eligibility and suitability for this youth."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "ESOL Family Literacy/Adult Education",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://beyondliteracy.org/start/",
+        "https://beyondliteracy.org/programs/familyliteracy/",
+        "https://beyondliteracy.org/programs/esol/"
+      ],
+      "official_page_facts": "Beyond Literacy offers no-cost adult education, English, family literacy and digital-skills learning. Family literacy supports early-elementary children and their caregivers. On the source-review date, the ESOL page stated classes were full and invited interest-form submissions for later contact. Digital-skills learning does not establish an offer of home internet service.",
+      "catalog_gap": "Existing record omits the published ESOL capacity notice and current general enrollment route.",
+      "unknowns": [
+        "Whether the published full-classes notice remains current.",
+        "Places, schedules and school-partnership availability for the selected class.",
+        "Connectivity/device assistance; no broadband benefit is confirmed by these pages."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "Early Learning Unit",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://www.xiente.org/programs/human-capital/early-education/head-start/",
+        "https://www.xiente.org/programs/human-capital/early-education/early-head-start/"
+      ],
+      "official_page_facts": "Xiente offers Head Start for children ages 3–5 and Early Head Start for younger children. The Head Start page describes English/Spanish learning and lists the Children's Center enrollment phone. Ask staff which age-appropriate program, site and application route fits the family. Do not treat a published enrollment invitation as an available place.",
+      "catalog_gap": "Existing description only says enrollment applications; it omits ages and the public intake route.",
+      "unknowns": [
+        "Places, schedule, transport, current eligibility and any wraparound-care terms.",
+        "The Head Start FAQ still links its free-service explanation to 2023 income guidelines; current criteria need confirmation."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    },
+    {
+      "existing_record_name": "Re-Engagement Center",
+      "source_reviewed_on": "2026-10-15",
+      "official_sources": [
+        "https://www.philasd.org/backontrack/"
+      ],
+      "official_page_facts": "The School District of Philadelphia Re-Engagement Center helps students explore routes back to school and toward a high-school diploma. The district's Back On Track page offers appointments with a specialist. Different pathways have their own age, credit and enrollment rules; a case manager should request pathway advice instead of assuming one program fits.",
+      "catalog_gap": "Existing description lacks the current appointment route and pathway-specific eligibility distinction.",
+      "unknowns": [
+        "Appointment capacity, appropriate pathway and placement availability."
+      ],
+      "live_availability_verified": false,
+      "public_contact_found": true,
+      "staging_seed_included": true
+    }
+  ],
+  "additional_findings": [
+    {
+      "program": "T-VOCE and Backstage Pass",
+      "catalog_claim": "Description dates the Backstage Pass session to May 2024.",
+      "official_page_finding": "The Backstage Pass page reviewed on 2026-10-15 gives a session ending May 31, 2027. No claim is made about current T-VOCE operation or enrollment.",
+      "sources": [
+        "https://operaphila.org/community/backstage-pass/"
+      ],
+      "action": "School owner should refresh the dated description and review whether the two programs remain appropriately bundled. No production edit made."
+    },
+    {
+      "program": "Community Evening Resource Center",
+      "catalog_claim": "Description and category are empty.",
+      "official_page_finding": "The City describes free evening activities for Philadelphia youth ages 10–17 and lists multiple sites. The catalog row does not identify which site it refers to.",
+      "sources": [
+        "https://www.phila.gov/programs/community-evening-resource-centers/"
+      ],
+      "action": "School owner should identify the intended site and confirm its access arrangements before adding a specific address or route."
+    },
+    {
+      "program": "Education Support Center",
+      "catalog_claim": "Broad educational-stability support for DHS-committed students.",
+      "official_page_finding": "The City distinguishes Education Stability Services for DHS-involved youth from TIPS attendance services with school-led referral routes.",
+      "sources": [
+        "https://www.phila.gov/programs/education-support-center/",
+        "https://www.phila.gov/programs/truancy-intervention-and-prevention-services-tips/"
+      ],
+      "action": "Preserve that distinction; do not infer that an internal DHS contact is the right route for every school attendance issue."
+    }
+  ],
+  "matching_regression": {
+    "method": "Pure local replay of current engine using the 54 exported names/descriptions/categories/tags, no case data and no database writes. Omitted search_text and service flags do not affect the Housing-only category reproduction.",
+    "input": {
+      "barrier_key": "housing_instability",
+      "label": "Housing",
+      "other_context": null
+    },
+    "before": {
+      "matching_records_before_default_limit": 44,
+      "all_scores": 18,
+      "cause": "Generic family and youth category words counted as housing evidence. Default display limit is 35, with ID ordering for ties.",
+      "unrelated_examples": [
+        "T-VOCE and Backstage Pass",
+        "Girls Inc.",
+        "Re-Engagement Center"
+      ]
+    },
+    "change": "Removed generic family/youth category evidence for housing and childcare. Added explicit housing and childcare service phrases to retain relevant broadly categorized records. Youth category bonus now requires an explicit youth-programming goal. Narrative overlap now counts distinct, meaningful whole words, excluding common function words and generic family/service language.",
+    "after": {
+      "housing_instability": [
+        {
+          "program": "Basic Systems Repair Program, Philly First Home, Turn the Key",
+          "score": 10,
+          "reason": "Program or services relate to housing instability"
+        },
+        {
+          "program": "Runaway and Homeless Youth",
+          "score": 10,
+          "reason": "Program or services relate to housing instability"
+        },
+        {
+          "program": "Utility Emergency Service Funding",
+          "score": 10,
+          "reason": "Program or services relate to housing instability"
+        },
+        {
+          "program": "Community Legal Services of Philadelphia",
+          "score": 10,
+          "reason": "Program or services relate to housing instability"
+        }
+      ],
+      "childcare_barrier": [
+        {
+          "program": "Methodist services",
+          "score": 10,
+          "reason": "Program or services relate to childcare barrier"
+        },
+        {
+          "program": "Early Learning Unit",
+          "score": 10,
+          "reason": "Program or services relate to childcare barrier"
+        },
+        {
+          "program": "CUA 9 - Parent and Teen Cafe's",
+          "score": 10,
+          "reason": "Program or services relate to childcare barrier"
+        },
+        {
+          "program": "Zhang Sah Martial Arts and Learning Center",
+          "score": 10,
+          "reason": "Program or services relate to childcare barrier"
+        }
+      ]
+    },
+    "limits": [
+      "Results remain keyword-based suggestions, not eligibility or suitability decisions.",
+      "A description mentioning incidental childcare may match; actual schedule and fit remain a case-manager check.",
+      "No provider capacity, broader ranking overhaul or production rematching was performed.",
+      "Post-change counts are a replay of exported fields, not a live production rematch; any extra search_text in full rows could affect the result."
+    ],
+    "regression_tests": {
+      "command": "npm run test:run -- src/lib/matching/engine.test.ts src/features/families/plan-contact-picker.test.tsx src/app/actions/resource-matches.test.ts",
+      "result": "14 tests passed in 3 files",
+      "red_before_fix": "Three initial service-fit tests failed before the category fix. Three additional narrative/repetition/substring tests failed before the narrative fix."
+    }
+  },
+  "limitations": [
+    "Only a targeted shortlist and concrete gaps were source-researched, not all 54 providers.",
+    "Official pages can be outdated or internally inconsistent; explicit contradictions are recorded above.",
+    "No provider was contacted. No availability, funding, eligibility, school approval or referral outcome has been certified.",
+    "Public-source descriptions and public program contacts were prepared only for an optional isolated-staging subset.",
+    "No production directory, existing referral or reviewed plan was changed."
+  ]
+}

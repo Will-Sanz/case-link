@@ -11,7 +11,11 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "tmp/**",
+    "output/**",
     "next-env.d.ts",
+    // Unmodified PDF.js codec; the viewer test checks installed-package byte equality.
+    "public/pdfjs/6.5.438/jbig2_nowasm_fallback.js",
     // Project-local design tooling and generated visual artifacts.
     ".agents/**",
     ".impeccable/**",

@@ -1,0 +1,67 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://case-link-p0ljvv1lh-will-sanzs-projects.vercel.app",
+  "commit": "7c9af9e572e33fcf72b3f6354740977269b50738",
+  "startedAt": "2026-10-15T03:17:16.585Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "Protected immutable production login returns 200",
+    "Testing access stays on exact production candidate origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Standard staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description"
+  ],
+  "timings": {},
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "visibleAlerts": [
+    "Your case details were saved, but the plan could not be prepared. Could not create plan",
+    "CaseLink"
+  ],
+  "visibleButtons": [
+    "Housing",
+    "Employment",
+    "Food access",
+    "Transportation",
+    "Childcare",
+    "Mental health",
+    "Physical health",
+    "Substance use",
+    "Legal issues",
+    "Benefits / ID documents",
+    "Education",
+    "Domestic violence",
+    "Financial hardship",
+    "",
+    "",
+    "Add",
+    "Draft action plan",
+    "Remove family from my list"
+  ],
+  "failure": {
+    "stage": "live AI generation",
+    "type": "Error",
+    "message": "expect(page).toHaveURL(expected) failed"
+  },
+  "finishedAt": "2026-10-15T03:20:36.077Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "8f2811d2ddf76ab4748a59b94a88a81a0208b76f64f8cab095020ea01e380f55"
+}

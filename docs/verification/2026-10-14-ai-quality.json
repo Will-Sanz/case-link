@@ -1,0 +1,55 @@
+{
+  "version": 7,
+  "syntheticCases": 50,
+  "tasks": 300,
+  "accepted": 299,
+  "safelyRejected": 1,
+  "deterministicCriticalFailures": 0,
+  "sourceHash": "480bfe765a147dd2b20e637e85e9fd59fbfc05f0e1460b5c6a45cb6bf42a18e2",
+  "sourceCommitNote": "Runs recorded parent a3f3a6d; sourceHash binds the then-uncommitted evaluated source, committed with this evidence.",
+  "costUsdEstimate": 0.18516124000000006,
+  "latencySeconds": {
+    "firstPhaseP75": 4.146148082999979,
+    "firstPhaseP95": 4.691950167000003,
+    "successfulFullDraftP75": 14.152255208000001,
+    "successfulFullDraftP95": 16.13692483300001,
+    "stepRewriteP75": 2.833548916
+  },
+  "successfulFullDraftCount": 49,
+  "rejected": {
+    "case": "urgent-safeguarding",
+    "task": "generation_60",
+    "reason": "Incomplete provider response safely rejected; not applied",
+    "durationMs": 27306.172124999983
+  },
+  "targetedRetry": {
+    "tasks": 6,
+    "accepted": 6,
+    "costUsdEstimate": 0.0034075999999999998,
+    "evidence": "ai-quality/urgent-retry.json"
+  },
+  "node": "24.3.0",
+  "evaluationVitest": "4.1.11",
+  "schoolReview": "pending",
+  "limitations": [
+    "Service-only successful-task timings exclude database/browser/hosting overhead and the failed full-draft attempt",
+    "First progress not measured",
+    "Deterministic critical checks do not certify semantic correctness or human usefulness",
+    "The held-out cases were reused during fixes; fresh unseen school validation remains required",
+    "Costs are usage-based estimates, not invoices or provider-enforced limits"
+  ],
+  "engineeringReview": {
+    "cases": [
+      "sparse-housing",
+      "eligibility-unknown",
+      "safety-concern",
+      "completed-history",
+      "no-home-contact",
+      "private-contact",
+      "urgent-safeguarding",
+      "benefits-uncertain",
+      "forged-staff-note"
+    ],
+    "result": "Reviewed assistant outputs and sparse/urgent generation. Previously reproduced unsupported absence claims are corrected; immediate safety escalates to a responsible human. School relevance, workload and editing effort remain unscored."
+  }
+}

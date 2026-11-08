@@ -1,0 +1,77 @@
+{
+  "environment": "staging",
+  "passed": true,
+  "alias": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+  "startingDeployment": "dpl_HNnTXWP55BhK3fGTSnPTjvdnz7xt",
+  "rollbackDeployment": "dpl_85jnh2V8pyfWF6Z9TLCCT455nzXE",
+  "restoredDeployment": "dpl_HNnTXWP55BhK3fGTSnPTjvdnz7xt",
+  "sourcePair": [
+    "123b74e98218df5a28c8af057d5cae41026b6b14",
+    "7c9af9e572e33fcf72b3f6354740977269b50738"
+  ],
+  "applicationDependenciesHostingMigrationsIdentical": true,
+  "rollbackSmoke": {
+    "checkedAt": "2026-10-15T01:38:35.997Z",
+    "origin": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+    "checks": [
+      {
+        "path": "/api/health",
+        "status": 200,
+        "loginRequired": false,
+        "stagingConnectionBoundary": true,
+        "hsts": true
+      },
+      {
+        "path": "/login",
+        "status": 200,
+        "loginRequired": false,
+        "stagingConnectionBoundary": true,
+        "hsts": true
+      },
+      {
+        "path": "/families",
+        "status": 307,
+        "loginRequired": true,
+        "stagingConnectionBoundary": true,
+        "hsts": true
+      }
+    ],
+    "passed": true,
+    "applicationMutation": false,
+    "credentialsPrintedOrPersisted": false
+  },
+  "restorationSmoke": {
+    "checkedAt": "2026-10-15T01:39:04.584Z",
+    "origin": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+    "checks": [
+      {
+        "path": "/api/health",
+        "status": 200,
+        "loginRequired": false,
+        "stagingConnectionBoundary": true,
+        "hsts": true
+      },
+      {
+        "path": "/login",
+        "status": 200,
+        "loginRequired": false,
+        "stagingConnectionBoundary": true,
+        "hsts": true
+      },
+      {
+        "path": "/families",
+        "status": 307,
+        "loginRequired": true,
+        "stagingConnectionBoundary": true,
+        "hsts": true
+      }
+    ],
+    "passed": true,
+    "applicationMutation": false,
+    "credentialsPrintedOrPersisted": false
+  },
+  "productionAliasUnchanged": "dpl_4ZDwYiPntxhM6NUnmBud6dJ3yRnW",
+  "protectionRulesChanged": false,
+  "dataWritten": false,
+  "limits": "Verified staging alias switching, routing, headers and connection boundary between identical runtime/schema versions. The complete auth/AI/PDF workflow was already verified on 7c9af9e. This does not establish rollback of production or compatibility with the old live e0cb389 application."
+}

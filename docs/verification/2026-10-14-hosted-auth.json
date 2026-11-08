@@ -1,0 +1,63 @@
+{
+  "checkedAt": "2026-10-14T16:30:19.745Z",
+  "project": "zpfypkizsapvsxeykmdq",
+  "status": 200,
+  "disableSignup": false,
+  "autoconfirm": false,
+  "externalProviders": {
+    "anonymous_users": false,
+    "apple": false,
+    "azure": false,
+    "bitbucket": false,
+    "discord": false,
+    "facebook": false,
+    "snapchat": false,
+    "figma": false,
+    "fly": false,
+    "github": false,
+    "gitlab": false,
+    "google": false,
+    "keycloak": false,
+    "kakao": false,
+    "linkedin": false,
+    "linkedin_oidc": false,
+    "notion": false,
+    "spotify": false,
+    "slack": false,
+    "slack_oidc": false,
+    "workos": false,
+    "twitch": false,
+    "twitter": false,
+    "email": true,
+    "phone": false,
+    "zoom": false
+  },
+  "staging": {
+    "project": "umnbyupudhunyccqhyrp",
+    "source": "Authenticated dashboard, saved settings reopened for verification",
+    "disableSignup": true,
+    "anonymousSignIn": false,
+    "emailConfirmation": true,
+    "secureEmailChange": true,
+    "securePasswordChange": true,
+    "minimumPasswordLengthConfigured": 14,
+    "passwordRequirements": "lowercase, uppercase, digits and symbols",
+    "emailOtpExpirySeconds": 900,
+    "emailOtpLength": 8,
+    "requireCurrentPasswordForChanges": false,
+    "leakedPasswordProtection": "Unavailable on Free; no upgrade purchased",
+    "actualHostedDelivery": "not tested",
+    "remaining": [
+      "SMTP and installed templates",
+      "Exact HTTPS staging origin and redirects",
+      "Session/MFA configuration and actual hosted tokens",
+      "Synthetic school mailbox and link scanner"
+    ]
+  },
+  "emailCodeRegression": {
+    "previousLimit": 6,
+    "supportedDigits": "6\u20138",
+    "tests": "16 auth form tests passed; original code failed the expanded regression",
+    "note": "The provider remains authoritative for code correctness and expiry. TOTP remains six digits."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://case-link-oxq4j9up0-will-sanzs-projects.vercel.app",
+  "commit": "8ace965e86fc556844d63318680b255ca57cbff9",
+  "startedAt": "2026-10-15T03:53:37.730Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "Protected immutable production login returns 200",
+    "Testing access stays on exact production candidate origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds"
+  ],
+  "timings": {},
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "failure": {
+    "stage": "synthetic account",
+    "type": "TimeoutError",
+    "message": "page.goto: Timeout 30000ms exceeded."
+  },
+  "finishedAt": "2026-10-15T03:55:27.106Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "7ae3778b7a47c8c50e079d7938413207f1b651b815720f4c52aca54d317f88cd",
+  "providerLogReview": {
+    "windowStart": "2026-10-15T03:53:00Z",
+    "windowEnd": "2026-10-15T03:56:00Z",
+    "vercelRuntimeErrors": 0,
+    "supabaseCancellationsOrEdge5xx": 0,
+    "causeEstablished": false
+  }
+}

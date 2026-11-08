@@ -199,7 +199,9 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
     return { ok: true };
   }
 
-  const { supabase } = await requireAppUserWithClient();
+  let supabase;
+  try { ({ supabase } = await requireAppUserWithClient()); }
+  catch (error) { return { ok: false, error: publicSessionError(error) }; }
   const { data: updated, error } = await supabase.rpc("update_family_meta", {
     p_family_id: familyId,
     p_patch: patch,
@@ -213,6 +215,7 @@ export async function updateFamilyMeta(input: unknown): Promise<ActionResult> {
 
   revalidatePath("/families");
   revalidatePath(`/families/${familyId}`);
+  for (const page of ["profile", "overview", "plan", "paperwork"]) revalidatePath(`/families/${familyId}/${page}`);
   return { ok: true };
 }
 

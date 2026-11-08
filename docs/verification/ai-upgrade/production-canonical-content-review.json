@@ -1,0 +1,38 @@
+{
+  "deploymentId": "dpl_BtUijxvxRbopdJ5Ebr214t36grWU",
+  "source": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "reviewers": [
+    "root",
+    "family_needs"
+  ],
+  "artifacts": "Canonical synthetic generation, assistant, email, call, meeting update and all three rendered PDF pages",
+  "criticalDefects": [],
+  "passed": true,
+  "practitionerReview": false,
+  "grounding": [
+    "Maintains twice-weekly relative help without assuming more support",
+    "Family calls occur after work; provider availability remains separately unverified",
+    "Pending application is followed up rather than restarted",
+    "Provider/school contact requires family permission; plan review is not consent",
+    "Meeting update Tuesday/Thursday support is explicitly supplied in test input",
+    "Does not claim to send, call or change records"
+  ],
+  "sourceCheck": {
+    "program": "Safe Routes to School",
+    "resourceId": "7dbbe41e-71c3-4182-bfac-8645176db2ee",
+    "sourceDescription": "Through education\u2014in and out of school\u2014and infrastructure improvements\u2014such as school speed cushions\u2014make it safter for students to walk, bike, or SEPTA to school.",
+    "queryScope": "Read only this public resource description from production",
+    "claim": "Email describes education/infrastructure supporting safer walking, biking and SEPTA travel and asks what is currently available; it does not promise transport.",
+    "matched": true
+  },
+  "pdf": [
+    "Readable monochrome pages, no clipping or overlap",
+    "Table continues across record pages normally",
+    "Selected family takeaway excludes internal progress/context and includes owner/follow-up/check-in"
+  ],
+  "minorFindings": [
+    "Repeated do-not-restart wording",
+    "Travel follow-up asks about days rather than explicitly both journey directions",
+    "Email extracted text uses inline bullet characters"
+  ]
+}

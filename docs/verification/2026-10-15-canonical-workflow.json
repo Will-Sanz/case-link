@@ -1,0 +1,139 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://www.thecaselink.com",
+  "commit": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "startedAt": "2026-10-15T15:02:52.672Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Public canonical login returns 200",
+    "Browser stays on the canonical production origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Standard staff profile has no MFA prompt",
+    "Five consecutive Settings loads succeed",
+    "Minimal hosted intake persists without a description",
+    "Live generation reaches the saved plan",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "The current 54-resource directory supplies matched programs",
+    "Hosted generated plan passes automated accessibility checks",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Current saved step title is available for a precise refinement request",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Live assistant produces a substantive answer",
+    "No unhandled browser application errors",
+    "Hosted browser logout returns to sign-in"
+  ],
+  "timings": {
+    "generationMilliseconds": 24045,
+    "actionRefinementMilliseconds": 3446,
+    "fullRefinementMilliseconds": 4984,
+    "assistantMilliseconds": 7425
+  },
+  "saveMilliseconds": [
+    858,
+    855
+  ],
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": true,
+  "protection": {
+    "providerTestingCredentialUsed": false,
+    "caseLinkSignInRequired": true,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "settingsReloadMilliseconds": [
+    2438,
+    2753,
+    1670,
+    925,
+    700
+  ],
+  "generatedPlanSteps": 3,
+  "directory": {
+    "resources": 54,
+    "matched": 24,
+    "generatedContacts": 0
+  },
+  "planReloadMilliseconds": [
+    930,
+    1166,
+    603
+  ],
+  "pdf": {
+    "pages": 2,
+    "sha256": "0f8738ce5f8825ddc99fd49283b0f24d63d8db7aa57d7b6746c80b921e934493",
+    "bytes": 8480
+  },
+  "finishedAt": "2026-10-15T15:04:14.052Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "6fc26a8321e4c342b6c434b0a9b0fa56c0641138849a55dcdb5fd84cb0d29581",
+  "requestSummary": {
+    "count": 600,
+    "httpErrors": [],
+    "slowCompletedRequests": [
+      {
+        "stage": "live case assistant",
+        "path": "/families/[synthetic-id]/assistant",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 7211
+      }
+    ],
+    "abortedRequests": 89,
+    "abortedRequestsNotClassifiedAsApplicationErrors": true
+  },
+  "pdfVisualReview": {
+    "pagesInspected": [
+      1,
+      2
+    ],
+    "readable": true,
+    "clippingOrOverlappingText": false,
+    "blankPages": false,
+    "editedActionAndWaitingNotePresent": true,
+    "rendererDiagnosticsBytes": 0
+  },
+  "aiSampleReview": {
+    "asksForPrioritiesConsentLanguageSafeContact": true,
+    "claimsReferralOrEligibilityConfirmed": false,
+    "usesSavedWaitingStateAndExactFollowUpDates": true,
+    "schoolUsefulnessSignoff": false
+  },
+  "providerLogReview": {
+    "vercelErrorOrFatalGroups": 0,
+    "windowStart": "2026-10-15T15:02:00Z",
+    "supabaseLogConnector": "Permission denied; no database-log conclusion asserted"
+  },
+  "saveAssertionTimeoutMilliseconds": 30000,
+  "deploymentId": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+  "finalDatabaseCounts": {
+    "anonymousPrivilegedExecute": 0,
+    "applicationAccounts": 11,
+    "authAccounts": 13,
+    "families": 0,
+    "latestMigration": "20261015143343",
+    "mfaFactors": 0,
+    "migrations": 41,
+    "plans": 0,
+    "publicTablesWithoutRls": 0,
+    "resources": 54,
+    "scratchDatabases": 0
+  }
+}

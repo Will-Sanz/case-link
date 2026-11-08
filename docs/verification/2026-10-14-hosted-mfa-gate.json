@@ -1,0 +1,36 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "deployment": "dpl_6WnhWDnq42nv6RvLjD39UNp4uRJM",
+  "commit": "5ec04a34b4937f472d2df36a4bb300c97aa4ef28",
+  "account": "Existing operator-controlled staging account explicitly authorized in this chat",
+  "authorization": "User explicitly approved temporary administrator access for staging MFA/access verification, followed by case-manager restoration",
+  "operation": "public.operator_set_user_role",
+  "checks": {
+    "initialPasswordSetPrivatelyByUser": true,
+    "emailConfirmed": true,
+    "passwordSignInReachedFamilies": true,
+    "temporaryAdministratorGrantAudited": true,
+    "passwordOnlyAdministratorRedirectedToVerification": true,
+    "noSkipControlAtAdministratorGate": true,
+    "caseManagerRoleRestoredAndAudited": true,
+    "activeAccountPreserved": true,
+    "familiesAccessibleAgainAfterRestoration": true
+  },
+  "roleAfterVerification": "case_manager",
+  "verifiedFactorsAfterRestoration": 0,
+  "unfinishedFactorsAfterRestoration": 1,
+  "auditEntries": 2,
+  "enrollmentAndChallengeCompleted": false,
+  "reasonIncomplete": "User stopped authenticator enrollment and requested investigation of Face ID/fingerprint verification instead",
+  "followUp": "passkey-readiness.md; CL-43",
+  "passwordChangeNotification": {
+    "sender": "CaseLink Staging <staging@thecaselink.com>",
+    "subject": "Password changed — CaseLink",
+    "inInbox": true,
+    "spfPass": true,
+    "dkimPass": true,
+    "credentialLinkPresent": false,
+    "mailBodyOrCredentialPrinted": false
+  },
+  "scopeLimit": "Actual hosted MFA challenge, removal/recovery and school-device acceptance remain open; this proves the administrator gate and role restoration only"
+}

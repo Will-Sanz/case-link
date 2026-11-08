@@ -1,0 +1,374 @@
+{
+  "origin": "https://www.thecaselink.com",
+  "deploymentId": "dpl_BtUijxvxRbopdJ5Ebr214t36grWU",
+  "commit": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "startedAt": "2026-10-15T20:23:17.088Z",
+  "plannedMinutes": 30,
+  "syntheticReadOnly": true,
+  "checks": [
+    {
+      "sample": 0,
+      "at": "2026-10-15T20:23:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 301,
+      "passed": true
+    },
+    {
+      "sample": 0,
+      "at": "2026-10-15T20:23:17.390Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 117,
+      "passed": true
+    },
+    {
+      "sample": 0,
+      "at": "2026-10-15T20:23:17.507Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 130,
+      "passed": true
+    },
+    {
+      "sample": 1,
+      "at": "2026-10-15T20:24:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 211,
+      "passed": true
+    },
+    {
+      "sample": 2,
+      "at": "2026-10-15T20:25:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 156,
+      "passed": true
+    },
+    {
+      "sample": 3,
+      "at": "2026-10-15T20:26:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 230,
+      "passed": true
+    },
+    {
+      "sample": 4,
+      "at": "2026-10-15T20:27:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 173,
+      "passed": true
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-15T20:28:17.092Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 170,
+      "passed": true
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-15T20:28:17.262Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 279,
+      "passed": true
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-15T20:28:17.541Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 133,
+      "passed": true
+    },
+    {
+      "sample": 6,
+      "at": "2026-10-15T20:29:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 232,
+      "passed": true
+    },
+    {
+      "sample": 7,
+      "at": "2026-10-15T20:30:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 163,
+      "passed": true
+    },
+    {
+      "sample": 8,
+      "at": "2026-10-15T20:31:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 500,
+      "passed": true
+    },
+    {
+      "sample": 9,
+      "at": "2026-10-15T20:32:17.092Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 203,
+      "passed": true
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-15T20:33:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 184,
+      "passed": true
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-15T20:33:17.274Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 135,
+      "passed": true
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-15T20:33:17.409Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 163,
+      "passed": true
+    },
+    {
+      "sample": 11,
+      "at": "2026-10-15T20:34:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 217,
+      "passed": true
+    },
+    {
+      "sample": 12,
+      "at": "2026-10-15T20:35:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 244,
+      "passed": true
+    },
+    {
+      "sample": 13,
+      "at": "2026-10-15T20:36:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 215,
+      "passed": true
+    },
+    {
+      "sample": 14,
+      "at": "2026-10-15T20:37:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 192,
+      "passed": true
+    },
+    {
+      "sample": 15,
+      "at": "2026-10-15T20:38:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 212,
+      "passed": true
+    },
+    {
+      "sample": 15,
+      "at": "2026-10-15T20:38:17.302Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 122,
+      "passed": true
+    },
+    {
+      "sample": 15,
+      "at": "2026-10-15T20:38:17.424Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 189,
+      "passed": true
+    },
+    {
+      "sample": 16,
+      "at": "2026-10-15T20:39:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 229,
+      "passed": true
+    },
+    {
+      "sample": 17,
+      "at": "2026-10-15T20:40:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 262,
+      "passed": true
+    },
+    {
+      "sample": 18,
+      "at": "2026-10-15T20:41:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 158,
+      "passed": true
+    },
+    {
+      "sample": 19,
+      "at": "2026-10-15T20:42:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 166,
+      "passed": true
+    },
+    {
+      "sample": 20,
+      "at": "2026-10-15T20:43:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 217,
+      "passed": true
+    },
+    {
+      "sample": 20,
+      "at": "2026-10-15T20:43:17.308Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 88,
+      "passed": true
+    },
+    {
+      "sample": 20,
+      "at": "2026-10-15T20:43:17.396Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 132,
+      "passed": true
+    },
+    {
+      "sample": 21,
+      "at": "2026-10-15T20:44:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 209,
+      "passed": true
+    },
+    {
+      "sample": 22,
+      "at": "2026-10-15T20:45:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 159,
+      "passed": true
+    },
+    {
+      "sample": 23,
+      "at": "2026-10-15T20:46:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 234,
+      "passed": true
+    },
+    {
+      "sample": 24,
+      "at": "2026-10-15T20:47:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 284,
+      "passed": true
+    },
+    {
+      "sample": 25,
+      "at": "2026-10-15T20:48:17.090Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 206,
+      "passed": true
+    },
+    {
+      "sample": 25,
+      "at": "2026-10-15T20:48:17.296Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 117,
+      "passed": true
+    },
+    {
+      "sample": 25,
+      "at": "2026-10-15T20:48:17.413Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 166,
+      "passed": true
+    },
+    {
+      "sample": 26,
+      "at": "2026-10-15T20:49:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 200,
+      "passed": true
+    },
+    {
+      "sample": 27,
+      "at": "2026-10-15T20:50:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 174,
+      "passed": true
+    },
+    {
+      "sample": 28,
+      "at": "2026-10-15T20:51:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 252,
+      "passed": true
+    },
+    {
+      "sample": 29,
+      "at": "2026-10-15T20:52:17.089Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 188,
+      "passed": true
+    },
+    {
+      "sample": 30,
+      "at": "2026-10-15T20:53:17.091Z",
+      "path": "/api/health",
+      "status": 200,
+      "milliseconds": 185,
+      "passed": true
+    },
+    {
+      "sample": 30,
+      "at": "2026-10-15T20:53:17.276Z",
+      "path": "/login",
+      "status": 200,
+      "milliseconds": 96,
+      "passed": true
+    },
+    {
+      "sample": 30,
+      "at": "2026-10-15T20:53:17.372Z",
+      "path": "/families",
+      "status": 307,
+      "milliseconds": 175,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "finishedAt": "2026-10-15T20:53:17.547Z",
+  "elapsedMilliseconds": 1800460
+}

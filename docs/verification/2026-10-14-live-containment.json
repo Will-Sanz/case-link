@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-10-14T16:56:23.878Z",
+  "project": "zpfypkizsapvsxeykmdq",
+  "userApproved": true,
+  "permissions": {
+    "account_rows_digest": "ede31e2a830b93d85d1ae96e07cabcea",
+    "app_accounts": 11,
+    "families": 44,
+    "resources": 54,
+    "authenticated_insert": false,
+    "role_update": false,
+    "id_update": false,
+    "email_update": false,
+    "profile_update": true,
+    "anon_admin_rpc": false,
+    "anon_access_rpc": false,
+    "anon_intake_rpc": false,
+    "authenticated_admin_rpc": true,
+    "timestamp_function_settings": [
+      "search_path=\"\""
+    ]
+  },
+  "accountsUnchanged": true,
+  "countsUnchanged": true,
+  "readOnlyVerification": true,
+  "noLiveAccountExploit": true,
+  "productionApplicationDeployed": false,
+  "migration": {
+    "version": "20261014165601",
+    "name": "legacy_account_permission_containment"
+  }
+}

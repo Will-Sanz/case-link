@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-26T16:55:51.316Z",
+  "source": "https://www.compass.dhs.pa.gov/intake/#/getstarted",
+  "mode": "live_public_navigation",
+  "stages": [
+    "getstarted",
+    "applynow/gettingstarted",
+    "applynow/gettingstarted/tutorial",
+    "applynow/gettingstarted/importantinformation",
+    "applynow/gettingstarted/submitreferral",
+    "applynow/gettingstarted/WICpreapplication",
+    "applynow/gettingstarted/gatepost",
+    "applynow/gettingstarted/existingaccount",
+    "applynow/gettingstarted/familysafety"
+  ],
+  "householdValuesEntered": false,
+  "accountCreated": false,
+  "captchaSolvedOrBypassed": false,
+  "submissionAttempted": false,
+  "executionReady": false,
+  "outcome": "provider_verification_required",
+  "noAccountPathConfirmed": true,
+  "providerVerificationMessage": "We were unable to verify your information at this time. You can try again.",
+  "stoppedAt": "#/applynow/gettingstarted/familysafety"
+}

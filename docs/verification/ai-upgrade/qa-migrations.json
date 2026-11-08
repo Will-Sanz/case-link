@@ -1,0 +1,24 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "migrations": [
+    {
+      "file": "supabase/migrations/20261015185455_compact_plan_generation.sql",
+      "sha256": "a2c75f2f8a43505b0cd7cc9b3fba24281caa219839b14a18752079fabcebf7cd"
+    },
+    {
+      "file": "supabase/migrations/20261015191247_manual_plan_handoff.sql",
+      "sha256": "c7ca61f6745b98975b211c7f53a9466172aaff2f0b71dcfd26a07a0ba5ba0fca"
+    }
+  ],
+  "verifiedAt": "2026-10-15T19:29:29.367752+00:00",
+  "migrationCount": 43,
+  "latest": "20261015191247",
+  "recordedMigrationHashesMatch": true,
+  "transactionalGuardsPassed": [
+    "Expected prior inventory:41/latest20261015143343",
+    "Existing function ownership, security-definer status, search path and grants unchanged",
+    "New manual handoff available to authenticated role, denied to anonymous and service roles",
+    "Family, plan, resource, application-account and authentication-account counts unchanged"
+  ],
+  "productionTargeted": false
+}

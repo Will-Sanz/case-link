@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect } from "react";
 import { CheckCircle as CheckCircle2, FloppyDisk as Save, LogOut } from "iconoir-react";
 import { signOutAction } from "@/app/actions/auth";
+import { clearLocalActionDrafts } from "@/lib/domain/plan/local-action-draft";
 import { updateCaseManagerProfile, type ProfileSaveState } from "@/app/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { selectInputClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
+import { SCHOOL_TIME_ZONE } from "@/lib/dates";
 import type { AppUserRow } from "@/types/database";
 
 const initialSaveState: ProfileSaveState = { ok: false, message: null };
@@ -50,8 +52,10 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
     updateCaseManagerProfile,
     initialSaveState,
   );
+  const [signOutState, signOutFormAction, signOutPending] = useActionState(signOutAction, { error: null });
   const displayName = profile.display_name?.trim() || profile.email;
-  const updatedAt = new Date(profile.updated_at).toLocaleString(undefined, {
+  const updatedAt = new Date(profile.updated_at).toLocaleString("en-US", {
+    timeZone: SCHOOL_TIME_ZONE,
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -82,14 +86,15 @@ export function CaseManagerProfileClient({ profile }: { profile: AppUserRow }) {
             <div className="py-3.5">
               <dt className="text-xs font-semibold text-[var(--color-ink-faint)]">Member since</dt>
               <dd className="mt-1 text-[var(--color-ink-2)]">
-                {new Date(profile.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}
+                {new Date(profile.created_at).toLocaleDateString("en-US", { timeZone: SCHOOL_TIME_ZONE, dateStyle: "long" })}
               </dd>
             </div>
           </dl>
 
-          <form action={signOutAction} className="mt-5">
-            <Button type="submit" variant="outline" className="flex min-h-10 w-full items-center justify-center gap-2">
-              <LogOut className="size-4" aria-hidden /> Sign out
+          <form action={signOutFormAction} onSubmit={clearLocalActionDrafts} className="mt-5">
+            {signOutState.error ? <p role="alert" className="mb-3 text-sm text-[var(--color-error)]">{signOutState.error}</p> : null}
+            <Button type="submit" variant="outline" disabled={signOutPending} className="flex min-h-10 w-full items-center justify-center gap-2">
+              <LogOut className="size-4" aria-hidden /> {signOutPending ? "Signing out…" : "Sign out"}
             </Button>
           </form>
         </aside>

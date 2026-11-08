@@ -1,0 +1,11 @@
+{
+  "alias": "case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+  "status": 200,
+  "health": {
+    "status": "ok",
+    "service": "caselink"
+  },
+  "stagingDatabaseInCsp": true,
+  "productionDatabaseInCsp": false,
+  "cookiesOrAuthHeadersPersisted": false
+}

@@ -1,0 +1,89 @@
+{
+  "checkedAt": "2026-10-15T20:13:55.791Z",
+  "entries": [
+    {
+      "key": "CASELINK_PRODUCTION_SUPABASE_URL",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_ENVIRONMENT",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_HSTS",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_INVITE_ONLY",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_TENANCY_MODE",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NEXT_PUBLIC_SITE_URL",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "type": "encrypted",
+      "visibility": "config",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "type": "sensitive",
+      "visibility": "secret",
+      "target": [
+        "production"
+      ]
+    }
+  ],
+  "noModelOrTokenLimitOverrides": true,
+  "providerKeySecret": true,
+  "secretValuesReadOrPrinted": false,
+  "productionConfigVerifiedInIsolatedDirectory": true,
+  "canonicalSiteUrlMatched": true,
+  "productionDatabaseBoundaryMatched": true,
+  "publicDatabaseKeyAccepted": true,
+  "signupDisabled": true,
+  "webServiceRoleKeyAbsent": true,
+  "obsoletePdfFlagAbsent": true,
+  "productionAiKeyAvailabilityProvenByHostedCalls": true,
+  "diagnostic": "An initial env-run from the repository inherited its local development file; validation failed closed. The isolated /private/tmp invocation then verified production config. No provider env was changed."
+}

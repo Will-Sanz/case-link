@@ -1,0 +1,190 @@
+{
+  "outputWrittenAt": "2026-10-26T21:10:42.455044+00:00",
+  "liveCompass": true,
+  "isolatedLocalAuth": true,
+  "checks": 184,
+  "cleanupPassed": true,
+  "ordinaryContinuations": 1,
+  "confirmedHouseholdResumption": false,
+  "householdInputs": 0,
+  "modelCalls": 0,
+  "filing": false,
+  "causeOfRejection": "Unresolved; visible DHS verification error observed, resource outcomes do not establish causation.",
+  "diagnostic": {
+    "events": 151,
+    "truncated": false,
+    "lastPublicRoute": "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/familysafety",
+    "terminal": {
+      "status": "blocked",
+      "summary": "COMPASS blocked this browser connection. No household information was entered or submitted. CaseLink must resolve the connection before this application can continue here."
+    },
+    "resources": [
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "/intake/",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "/[public-asset].js",
+        "policy": "allow",
+        "requests": 24,
+        "failures": 0,
+        "statuses": {
+          "200": 24
+        }
+      },
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "/[public-asset].css",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://fonts.gstatic.com",
+        "path": "/[public-asset].woff2",
+        "policy": "deny",
+        "requests": 8,
+        "failures": 8,
+        "statuses": {}
+      },
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "[redacted-path]",
+        "policy": "allow",
+        "requests": 12,
+        "failures": 1,
+        "statuses": {
+          "200": 11
+        }
+      },
+      {
+        "origin": "[unrecognized-origin]",
+        "path": "[redacted-path]",
+        "policy": "deny",
+        "requests": 1,
+        "failures": 1,
+        "statuses": {}
+      },
+      {
+        "origin": "https://www.google.com",
+        "path": "/recaptcha/api.js",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "/[public-asset].svg",
+        "policy": "allow",
+        "requests": 8,
+        "failures": 0,
+        "statuses": {
+          "200": 8
+        }
+      },
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "/[public-asset].woff2",
+        "policy": "allow",
+        "requests": 3,
+        "failures": 0,
+        "statuses": {
+          "200": 3
+        }
+      },
+      {
+        "origin": "https://www.gstatic.com",
+        "path": "/[public-asset].js",
+        "policy": "allow",
+        "requests": 3,
+        "failures": 0,
+        "statuses": {
+          "200": 3
+        }
+      },
+      {
+        "origin": "https://www.google.com",
+        "path": "/recaptcha/api2/anchor",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.gstatic.com",
+        "path": "/[public-asset].css",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.google.com",
+        "path": "/[public-asset].js",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.gstatic.com",
+        "path": "/[public-asset].png",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.compass.dhs.pa.gov",
+        "path": "/[public-asset].png",
+        "policy": "allow",
+        "requests": 7,
+        "failures": 0,
+        "statuses": {
+          "200": 7
+        }
+      },
+      {
+        "origin": "https://www.google.com",
+        "path": "/recaptcha/api2/reload",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 0,
+        "statuses": {
+          "200": 1
+        }
+      },
+      {
+        "origin": "https://www.google.com",
+        "path": "/recaptcha/api2/clr",
+        "policy": "allow",
+        "requests": 1,
+        "failures": 1,
+        "statuses": {
+          "200": 1
+        }
+      }
+    ]
+  }
+}

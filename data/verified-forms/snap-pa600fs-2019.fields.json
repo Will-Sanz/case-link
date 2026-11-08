@@ -1,0 +1,283 @@
+{
+  "id": "pa-snap-pa600fs-sg-2019-field-inventory",
+  "version": "2026-11-03.v1",
+  "status": "engineering_inventory_only_not_runtime_collection_or_submission_authority",
+  "source": {
+    "manifest": "snap-pa600fs-2019.json",
+    "pdf": "snap-pa600fs-2019.pdf",
+    "sha256": "21df1916ca4e05b72ebe4075d9005246cea35f755dd44a61c48772d20f0f57e0",
+    "printedRevision": "PA 600 FS (SG) 9/19",
+    "reviewedAt": "2026-11-03",
+    "method": "All 12 source pages visually inspected; applicant fields cross-checked with extracted text and snap-draft.ts. No source bytes changed.",
+    "changeRule": "A changed source or reviewed mapping needs a new version; this inventory does not extend the manifest review window."
+  },
+  "conventions": {
+    "pdfPage": "One-based physical PDF page; printedPage is the page number printed on the form.",
+    "fieldIdentity": "group.id plus field.id. Repeated rows use the same field definitions for each row; capacities are printed space, not eligibility or household limits.",
+    "requiredness": {
+      "minimum_filing": "The source permits starting with name, address and signature. Other fields must not delay a valid minimum filing.",
+      "requested_for_decision": "The source requests answers unless it says optional. It does not define a validation rule or absence alternative for every field; never fabricate an answer or impose a new minimum-filing blocker.",
+      "conditional": "Complete only when the stated condition applies; unknown is not No or zero.",
+      "deduction_election": "The source says unreported expenses or missing required proof are treated as not seeking that deduction. Do not silently waive a potentially useful deduction.",
+      "optional": "The source explicitly permits omission; default no collection, inference or model completion.",
+      "personal_act": "Exact source certification/signature must use the actual accepted personal/representative process. No generated signature or inferred assent.",
+      "agency_only": "Never requested from the family, inferred, or filled by the agent."
+    },
+    "formatter": {
+      "scoped": "Current production-facing current_scoped_facts formatter can place this fact when permitted and fresh; the worker currently projects only ZIP.",
+      "rehearsal": "Only the synthetic_rehearsal renderer maps this field. This is not an operational collection path.",
+      "missing": "No existing formatter mapping.",
+      "protected": "Metadata only; no plaintext value schema, acquisition or submission path implemented.",
+      "excluded": "Intentionally left blank by the current formatter."
+    },
+    "reuse": "Only exact-need, subject-owned, current, source-backed facts within current permission and retention may be reused. Existing aggregate values are not per-person or per-source evidence."
+  },
+  "pageCoverage": [
+    { "pdfPage": 1, "printedPage": null, "role": "Cover/instructions and CAO registration fields", "groups": ["cover_cao"] },
+    { "pdfPage": 2, "printedPage": null, "role": "Blank", "groups": [] },
+    { "pdfPage": 3, "printedPage": 1, "role": "Applicant, contact, screening, roster, first certification", "groups": ["applicant", "screening", "household", "first_certification"] },
+    { "pdfPage": 4, "printedPage": 2, "role": "Income and three history questions", "groups": ["income", "fleeing_or_probation", "welfare_fraud", "other_state_disqualification"] },
+    { "pdfPage": 5, "printedPage": 3, "role": "Household expenses and medical deduction types", "groups": ["expenses", "housing_costs", "medical_expenses"] },
+    { "pdfPage": 6, "printedPage": 4, "role": "Optional demographics/voter choice and CAO-only fields", "groups": ["demographics", "voter_choice", "cao_voter", "cao_expedited"] },
+    { "pdfPage": 7, "printedPage": 5, "role": "Rights/certifications and representative designation", "groups": ["final_certification", "authorized_representative"] },
+    { "pdfPage": 8, "printedPage": 6, "role": "Rights and responsibilities; no input fields", "groups": [] },
+    { "pdfPage": 9, "printedPage": 7, "role": "Prohibitions and penalties; no input fields", "groups": [] },
+    { "pdfPage": 10, "printedPage": 8, "role": "Client copy of rights; no input fields", "groups": [] },
+    { "pdfPage": 11, "printedPage": 9, "role": "Client copy of penalties; no input fields", "groups": [] },
+    { "pdfPage": 12, "printedPage": null, "role": "Back cover; no input fields", "groups": [] }
+  ],
+  "groups": [
+    {
+      "id": "cover_cao", "pdfPage": 1, "requiredness": "agency_only", "formatter": "excluded",
+      "fields": [
+        { "id": "application_registration_number", "label": "APPLICATION REGISTRATION NUMBER" },
+        { "id": "caseload", "label": "CASELOAD" },
+        { "id": "county", "label": "COUNTY" },
+        { "id": "district", "label": "DISTRICT" },
+        { "id": "record_number", "label": "RECORD NUMBER" },
+        { "id": "date_stamp", "label": "DATE STAMP" }
+      ]
+    },
+    {
+      "id": "applicant", "pdfPage": 3, "requiredness": "requested_for_decision", "formatter": "rehearsal",
+      "fields": [
+        { "id": "preferred_language", "label": "What language do you prefer?", "choices": ["English/Inglés", "Spanish/Español", "Other/Otro (specify/especifique)"], "formatter": "scoped", "reuse": "request.intake.language is en/es only; do not infer a preferred language from nationality or a document's language." },
+        { "id": "other_language", "label": "Other/Otro (specify/especifique)", "requiredness": "conditional", "condition": "Preferred language is Other", "formatter": "missing" },
+        { "id": "interpreter_needed", "label": "Do you need an interpreter?", "choices": ["Yes", "No"], "path": "interpreter" },
+        { "id": "interpreter_language", "label": "If yes, what language?", "requiredness": "conditional", "condition": "interpreter_needed is Yes", "path": "interpreterLanguage" },
+        { "id": "last_name", "label": "YOUR LAST NAME", "requiredness": "minimum_filing", "path": "applicant.lastName", "reuse": "Same verified applicant as household row SELF; account email is not a name." },
+        { "id": "first_name", "label": "YOUR FIRST NAME", "requiredness": "minimum_filing", "path": "applicant.firstName", "reuse": "Same verified applicant as household row SELF." },
+        { "id": "middle_initial", "label": "MIDDLE INITIAL", "requiredness": "conditional", "condition": "Applicant has a middle initial", "path": "applicant.middleInitial" },
+        { "id": "address", "label": "YOUR ADDRESS (Include city, state, & ZIP code)", "requiredness": "minimum_filing", "parts": ["street", "city", "state", "ZIP"], "path": "address plus zip", "reuse": "Only ZIP is in currentIntakeFields(request, now, snap_new). A ZIP is not a street address; no fixed-address alternative is specified in this PDF." },
+        { "id": "county", "label": "COUNTY", "path": "county", "reuse": "May derive from a validated complete address and authoritative geography; not from a guessed address." },
+        { "id": "home_phone", "label": "PHONE NUMBER (Home)", "path": "phone", "note": "The PDF does not say a telephone is necessary to start filing or specify an alternative if none." },
+        { "id": "other_phone", "label": "PHONE NUMBER (Other)", "path": "otherPhone", "requiredness": "conditional", "condition": "Another usable phone exists" },
+        { "id": "best_call_time", "label": "BEST TIME TO CALL", "path": "bestTimeToCall", "note": "Meaningful contact preference; do not invent an availability window." }
+      ]
+    },
+    {
+      "id": "screening", "pdfPage": 3, "requiredness": "requested_for_decision", "formatter": "rehearsal", "choices": ["Yes", "No"],
+      "note": "Source wording contains 2019 policy thresholds. Preserve the printed question; this inventory does not establish current eligibility or authorize calculating eligibility from old thresholds.",
+      "fields": [
+        { "id": "cash_and_income", "label": "Does your household have $100 or less in available cash and bank accounts and expect to receive less than $150 in income this month?", "path": "screening.lowCashAndIncome", "reuse": "Current incomeAmount/frequency cannot establish expected current-month income or liquid resources." },
+        { "id": "migrant_or_seasonal", "label": "Are you a migrant or seasonal farm worker?", "path": "screening.migrantOrSeasonal" },
+        { "id": "below_shelter_costs", "label": "Is your monthly gross income and cash on hand less than your rent/mortgage and utility costs for this month?", "path": "screening.belowShelterCosts", "reuse": "Utility arrears/shutoff data are not monthly shelter costs. No cash or bank balance field is printed in the applicant section." }
+      ]
+    },
+    {
+      "id": "household", "pdfPage": 3, "requiredness": "requested_for_decision", "formatter": "rehearsal", "printedRows": 8,
+      "instruction": "List EVERYONE in your home on the left; complete SSN and citizenship on the right ONLY for a person requesting SNAP benefits.",
+      "fields": [
+        { "id": "name", "label": "Last name, first name, middle initial:", "path": "household[].lastName/firstName/middleInitial", "reuse": "Reuse applicant name for SELF only; householdSize is not a roster." },
+        { "id": "sex", "label": "Sex:", "choices": ["M", "F"], "path": "household[].sex", "note": "No inference from name or relationship; this is the exact printed choice set, not an implemented identity schema." },
+        { "id": "student", "label": "Student?", "choices": ["Yes", "No"], "path": "household[].student" },
+        { "id": "birthdate", "label": "Birthdate: (mm/dd/yyyy)", "path": "household[].dateOfBirth", "note": "New subject-specific sensitive fact; a household child-under-five answer cannot supply a date of birth." },
+        { "id": "relationship", "label": "Relationship to you:", "path": "household[].relationship", "note": "First printed row is SELF. Other relationships must be supplied or validated, not guessed." },
+        { "id": "social_security_number", "label": "Social Security number:", "requiredness": "conditional", "condition": "Person requests SNAP; source printed page 5 also recognizes an SSN applied for", "formatter": "protected", "handling": "Required identifier metadata only. Exact required identifier/exception and accepted entry must be verified; never ordinary facts, chat, model context, general operation JSON or routine export. Do not collect for a non-applicant." },
+        { "id": "us_citizen", "label": "U.S. Citizen? (If NO, Alien documentation is required.)", "choices": ["Yes", "No"], "requiredness": "conditional", "condition": "Person requests SNAP", "path": "household[].citizen", "handling": "Immigration-related sensitive fact; new purpose/collection review required. Never infer citizenship; omit for non-applicants." }
+      ],
+      "routingMetadata": { "requestingSnap": "A necessary per-person applicant selection to enforce the printed boundary; no separate printed checkbox/column. Existing rehearsal uses household[].requestingSnap. This must not become a citizenship or SSN request for every resident." },
+      "overflow": "More than 8 residents needs a verified accepted continuation method; never truncate or treat the printed table as an eligibility limit."
+    },
+    {
+      "id": "first_certification", "pdfPage": 3, "requiredness": "personal_act", "formatter": "protected",
+      "statement": "I certify that the information contained on this page is true to the best of my knowledge and belief, and that there are penalties for not telling the truth about my family and myself.",
+      "fields": [
+        { "id": "signature", "label": "SIGNATURE OF APPLICANT", "minimumFiling": true },
+        { "id": "date", "label": "DATE", "note": "Genuine act date, not draft-rendering time." }
+      ]
+    },
+    {
+      "id": "income", "pdfPage": 4, "requiredness": "requested_for_decision", "formatter": "rehearsal", "printedRows": 5,
+      "instruction": "If yes, list income you have already received this month or expect to receive.",
+      "fields": [
+        { "id": "any_income", "label": "Does anyone have any income?", "choices": ["Yes", "No"], "path": "income.hasIncome", "reuse": "Unknown aggregate income is not No; zero from one source does not establish no household income." },
+        { "id": "person", "label": "Person with income", "requiredness": "conditional", "condition": "any_income is Yes; repeated per income entry", "path": "income.entries[].personIndex resolves household name" },
+        { "id": "source", "label": "Type/source of income", "requiredness": "conditional", "condition": "any_income is Yes; repeated per income entry", "path": "income.entries[].source" },
+        { "id": "amount", "label": "How much?", "requiredness": "conditional", "condition": "any_income is Yes; repeated per income entry", "path": "income.entries[].amount", "reuse": "Current aggregate incomeAmount cannot be assigned to a person/source or converted to current-month receipts without evidence." },
+        { "id": "frequency", "label": "How often?", "requiredness": "conditional", "condition": "any_income is Yes; repeated per income entry", "path": "income.entries[].frequency", "reuse": "Current aggregate incomeFrequency does not identify which person's source it describes. The PDF is free text; rehearsal supports only five frequencies." },
+        { "id": "date_received", "label": "Date received", "requiredness": "conditional", "condition": "any_income is Yes; repeated per income entry", "path": "income.entries[].receivedOn", "gap": "Rehearsal accepts only actual current-month dates up to today; the source also requests expected income. Future/expected dates and irregular or multiple payments need an explicit evidence-grounded representation, not an invented received date." }
+      ],
+      "sourceExamples": ["Wages", "Sick benefits", "Commissions/Royalties", "Baby sitting", "Child support", "Rent", "Self employment", "Veteran’s benefits", "Strike benefits", "Gambling", "Alimony/Support", "Social Security", "SSI", "Room and board", "Pensions", "Unemployment or Workers’ Compensation", "Money for college or training", "Dividends or interest"],
+      "overflow": "More than 5 entries needs verified continuation; never merge unrelated persons/sources or truncate.",
+      "selfEmployment": "Listed as an income source only; no business name, tax ID, gross-receipts/expense/net-profit worksheet, hours or assets fields in this PDF. Obtain only an actual recipient-required supplement after its contract is verified."
+    },
+    {
+      "id": "fleeing_or_probation", "pdfPage": 4, "requiredness": "requested_for_decision", "formatter": "rehearsal", "handling": "New criminal-history data; no current production fact schema or collection authority added.",
+      "fields": [
+        { "id": "answer", "label": "Are you or anyone in your household a fleeing felon or fleeing to avoid prosecution, custody, or confinement in a correctional facility for an attempted felony, or violating a condition of probation or parole imposed under a federal or state law?", "choices": ["Yes", "No"], "path": "history.fleeingOrProbation.answer" },
+        { "id": "names", "label": "Name of household member(s):", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.fleeingOrProbation.names" },
+        { "id": "date", "label": "Date:", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.fleeingOrProbation.date" },
+        { "id": "state", "label": "State:", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.fleeingOrProbation.state" }
+      ]
+    },
+    {
+      "id": "welfare_fraud", "pdfPage": 4, "requiredness": "requested_for_decision", "formatter": "rehearsal", "handling": "New criminal/history data; do not infer an answer or legal effect.",
+      "fields": [
+        { "id": "answer", "label": "Has anyone been convicted of welfare fraud?", "choices": ["Yes", "No"], "path": "history.welfareFraud.answer" },
+        { "id": "names", "label": "Name of household member(s):", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.welfareFraud.names" },
+        { "id": "date", "label": "Date:", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.welfareFraud.date" },
+        { "id": "state", "label": "State:", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.welfareFraud.state" }
+      ]
+    },
+    {
+      "id": "other_state_disqualification", "pdfPage": 4, "requiredness": "requested_for_decision", "formatter": "rehearsal",
+      "fields": [
+        { "id": "answer", "label": "Have you or anyone in your household been disqualified or agreed to be disqualified for food stamps or SNAP benefits in another state?", "choices": ["Yes", "No"], "path": "history.otherStateDisqualification.answer" },
+        { "id": "who", "label": "If yes, tell us who:", "requiredness": "conditional", "condition": "answer is Yes", "path": "history.otherStateDisqualification.names", "note": "No date or state blank is printed for this third question." }
+      ]
+    },
+    {
+      "id": "expenses", "pdfPage": 5, "requiredness": "deduction_election", "formatter": "rehearsal", "pathPrefix": "expenses",
+      "fields": [
+        { "id": "childSupport", "label": "Does anyone in your home pay child support to a person who does not live with you?", "choices": ["Yes", "No"] },
+        { "id": "courtOrdered", "label": "If yes, is it court ordered?", "choices": ["Yes", "No"], "requiredness": "conditional", "condition": "childSupport is Yes", "note": "No payment amount, recipient-name or court-order-number input is printed." },
+        { "id": "mealsIncludedInRent", "label": "Are meals included in your rent?", "choices": ["Yes", "No"] },
+        { "id": "heat", "label": "Do you pay for heat?", "choices": ["Yes", "No"] },
+        { "id": "housingAssistance", "label": "Does anyone in your home get housing assistance?", "choices": ["Yes", "No"] },
+        { "id": "housingAssistanceKind", "label": "If yes, what kind?", "requiredness": "conditional", "condition": "housingAssistance is Yes" },
+        { "id": "utilityAllowance", "label": "Do you get a utility allowance?", "choices": ["Yes", "No"], "requiredness": "conditional", "condition": "housingAssistance is Yes" },
+        { "id": "outsidePayer", "label": "Is there anyone outside of your household who pays any of your expenses?", "choices": ["Yes", "No"] },
+        { "id": "outsideExpenses", "label": "If yes, what expenses?", "requiredness": "conditional", "condition": "outsidePayer is Yes" },
+        { "id": "outsideAmount", "label": "How much?", "requiredness": "conditional", "condition": "outsidePayer is Yes" },
+        { "id": "outsideFrequency", "label": "How often?", "requiredness": "conditional", "condition": "outsidePayer is Yes" },
+        { "id": "outsidePayee", "label": "To whom?", "requiredness": "conditional", "condition": "outsidePayer is Yes", "note": "Preserve this actual question; do not invent an additional outside-payer identity field." },
+        { "id": "airConditioning", "label": "Do you pay for central air or to run a room air conditioner(s)?", "choices": ["Yes", "No"] },
+        { "id": "utilities", "label": "Check any expenses paid each month by you or anyone in your home. Please check even if you only pay part of the bill.", "choices": ["Telephone", "Water", "Garbage", "Utility installation", "Electric", "Oil, coal, wood, kerosene", "Sewer", "Gas", "Propane", "Other:"], "reuse": "Utility provider/account authority and a bill balance do not establish this checkbox list or who pays recurring costs." },
+        { "id": "otherUtility", "label": "Other:", "requiredness": "conditional", "condition": "utilities includes Other" },
+        { "id": "care", "label": "Does anyone pay for childcare or care for an adult with a disability so he or she can go to work, school or training?", "choices": ["Yes", "No"] },
+        { "id": "careMonthlyAmount", "label": "If yes, how much per month? $", "requiredness": "conditional", "condition": "care is Yes", "unit": "monthly" },
+        { "id": "careRecipient", "label": "Who receives care?", "requiredness": "conditional", "condition": "care is Yes" }
+      ]
+    },
+    {
+      "id": "housing_costs", "pdfPage": 5, "requiredness": "deduction_election", "formatter": "rehearsal", "unit": "monthly", "condition": "If you have any of these expenses", "pathPrefix": "expenses",
+      "fields": [
+        { "id": "rent", "label": "Rent: $" },
+        { "id": "condoFees", "label": "Condo fees: $" },
+        { "id": "mortgage", "label": "Mortgage: $" },
+        { "id": "propertyFees", "label": "Property fees: $" },
+        { "id": "homeownersInsurance", "label": "Homeowner’s insurance: $" }
+      ],
+      "note": "Only applicable expenses are requested. No provider account number, bank details or automatic financial commitment belongs here."
+    },
+    {
+      "id": "medical_expenses", "pdfPage": 5, "requiredness": "deduction_election", "formatter": "rehearsal",
+      "condition": "Source says a household member is 60 or older, or disabled, and has medical expenses. Birthday may establish age; disability is not implied by age, pregnancy or receipt of care.",
+      "fields": [
+        { "id": "types", "label": "Check any medical expense below that you or someone in your home pays.", "path": "expenses.medical", "choices": ["Dental bills", "Doctor bills", "Medical equipment", "Health insurance or Medicare premiums", "Hospital bills", "Prescription medicines", "Health aides (people in your home to help with medical treatments", "Health-related supplies (such as eyeglasses, hearing aids, adult diapers)", "Any costs to get medical appointments, medical treatment, or to pick up prescriptions. These can be costs such as taxis and public transportation.", "Other:"] },
+        { "id": "other", "label": "Other:", "path": "expenses.otherMedical", "requiredness": "conditional", "condition": "types includes Other" }
+      ],
+      "note": "Health-related sensitive data requires its actual purpose/privacy decision before collection. This PDF has no medical amount, diagnosis, disability yes/no or person-name blank in this section. Do not invent those as original form fields."
+    },
+    {
+      "id": "demographics", "pdfPage": 6, "requiredness": "optional", "formatter": "excluded", "printedRows": 6,
+      "rowLabels": ["NAME (YOURSELF)", "NAME (PERSON 2)", "NAME (PERSON 3)", "NAME (PERSON 4)", "NAME (PERSON 5)", "NAME (PERSON 6)"],
+      "fields": [
+        { "id": "name", "label": "NAME" },
+        { "id": "race", "label": "Racial and Ethnic Information (Optional)", "choices": ["Black or African American", "White", "American Indian or Alaska Native", "Asian", "Native Hawaiian or Pacific Islander"] },
+        { "id": "ethnicity", "label": "Racial and Ethnic Information (Optional)", "choices": ["Hispanic", "Non-Hispanic"] }
+      ],
+      "note": "No inference or automatic selection. Optional omission is complete; never a mandatory intake step."
+    },
+    {
+      "id": "voter_choice", "pdfPage": 6, "requiredness": "optional", "formatter": "excluded",
+      "fields": [
+        { "id": "apply", "label": "If you are not registered to vote where you live now, would you like to apply to register to vote here today?", "choices": ["Yes", "No"] }
+      ],
+      "note": "Personal political choice outside the food mandate. The source permits leaving both blank and says it does not affect assistance. Do not infer or default-select a choice."
+    },
+    {
+      "id": "cao_voter", "pdfPage": 6, "requiredness": "agency_only", "formatter": "excluded",
+      "instruction": "COUNTY ASSISTANCE OFFICE STAFF WILL COMPLETE THIS BOX BASED UPON YOUR RESPONSE ABOVE",
+      "fields": [
+        { "id": "given_to_client", "label": "Given to Client", "parts": ["checkbox", "date"] },
+        { "id": "sent_to_registration", "label": "Sent to voter registration", "parts": ["checkbox", "date"] },
+        { "id": "mailed_to_client", "label": "Mailed to Client", "parts": ["checkbox", "date"] },
+        { "id": "declined_not_interested", "label": "Declined, not interested", "parts": ["checkbox", "date"] },
+        { "id": "not_us_citizen", "label": "Not a U.S. citizen", "parts": ["checkbox", "date"] },
+        { "id": "declined_registered", "label": "Declined, already registered", "parts": ["checkbox", "date"] }
+      ]
+    },
+    {
+      "id": "cao_expedited", "pdfPage": 6, "requiredness": "agency_only", "formatter": "excluded",
+      "fields": [
+        { "id": "existing_snap", "label": "Is anyone in the application group receiving SNAP and not living in a certified shelter for battered women and children?", "choices": ["Yes", "No"] },
+        { "id": "postponed_verification", "label": "Is there any postponed verification from a previous expedited issuance that the household must provide?", "choices": ["Yes", "No"] },
+        { "id": "resources", "label": "Are the household liquid resources equal to or less than $100?", "choices": ["Yes", "No"] },
+        { "id": "income", "label": "Is the countable monthly gross income less than $150?", "choices": ["Yes", "No"] },
+        { "id": "migrant", "label": "Is this a migrant or seasonal farm worker household?", "choices": ["Yes", "No"] },
+        { "id": "destitute", "label": "Is the household destitute?", "choices": ["Yes", "No"] },
+        { "id": "below_shelter", "label": "Are combined monthly gross income and liquid resources less than monthly shelter expenses?", "choices": ["Yes", "No"] },
+        { "id": "initials", "label": "Initials:" },
+        { "id": "date", "label": "Date:" },
+        { "id": "review", "label": "EXPEDITED REVIEW", "choices": ["Eligible", "Denied"] },
+        { "id": "client_notified", "label": "CLIENT NOTIFIED", "note": "Unformatted agency recording area, not a family input." },
+        { "id": "denial_reason", "label": "Reason for denial:" },
+        { "id": "categories", "label": "REGISTERED FOR CATEGORIES" }
+      ]
+    },
+    {
+      "id": "final_certification", "pdfPage": 7, "requiredness": "personal_act", "formatter": "protected",
+      "instruction": "Read about your rights and responsibilities and then sign.",
+      "meaning": "Exact printed confidentiality/verification, information release, reporting, hearing, SSN, language-assistance, truth/perjury, expense-deduction and representative provisions remain part of the form. Signing also certifies the applicants' citizenship or lawful immigration status. Preserve all source text; one UI action may serve both source signatures only if the actual accepted route establishes that meaning and evidence.",
+      "fields": [
+        { "id": "applicant_signature", "label": "YOUR SIGNATURE" },
+        { "id": "applicant_date", "label": "DATE", "note": "Actual accepted personal act date, not preparation timestamp." },
+        { "id": "witness_signature", "label": "PROVIDER/EMPLOYEE/WITNESS SIGNATURE", "requiredness": "conditional", "condition": "Only if actual accepted signing route requires a provider/employee/witness; the PDF does not define when", "note": "Never create a witness or substitute the AI's signature." },
+        { "id": "representative_signature", "label": "SIGNATURE OF AUTHORIZED REPRESENTATIVE", "requiredness": "conditional", "condition": "An actual representative is designated and signs under the accepted route" },
+        { "id": "representative_date", "label": "DATE", "requiredness": "conditional", "condition": "Representative signs" }
+      ]
+    },
+    {
+      "id": "authorized_representative", "pdfPage": 7, "requiredness": "conditional", "condition": "Parent chooses to designate an actual authorized representative under the agency's accepted process", "formatter": "excluded",
+      "fields": [
+        { "id": "name", "label": "Name of Authorized Representative" },
+        { "id": "address", "label": "Address of Authorized Representative" },
+        { "id": "phone", "label": "Phone Number" }
+      ],
+      "note": "CaseLink service mandate, partnership, account login or browser assistance is not this designation. Do not invent an AI representative or require designation for an applicant filing personally."
+    }
+  ],
+  "supportingEvidence": [
+    { "id": "income_last_30_days", "pdfPage": 4, "condition": "Household received income", "instruction": "Attach proof of income your household received for the last 30 days. Proof includes pay stubs or a copy of award letters or pay checks.", "reuse": "Existing consented uploads may be reused only after exact SNAP purpose, subject, period, provenance, fields and recipient acceptance checks. Current generic upload capability does not establish every new extraction field." },
+    { "id": "noncitizen_applicant_documents", "pdfPage": 3, "condition": "A person requests SNAP and answers No to U.S. Citizen", "instruction": "Alien documentation is required.", "handling": "Protected, subject-specific channel. The PDF does not specify document types, document numbers or immigration dates; their actual recipient contract must determine any extra capture." },
+    { "id": "expense_proof", "pdfPage": 5, "condition": "Claimed deduction and agency requires proof", "instruction": "You may need to provide proof of your expenses.", "reuse": "Use permitted relevant existing documents first. Do not require every possible expense document from every household or silently waive a deduction." }
+  ],
+  "notPrintedAsApplicantFields": [
+    "Email, COMPASS username/password, EBT PIN, application password or bank-link requirement",
+    "Detailed immigration status/category, alien/document number, arrival date, sponsor or citizenship-document questionnaire",
+    "Bank account number, institution list, complete resource/vehicle/property inventory; applicant cash/bank questions are the expedited Yes/No comparisons only",
+    "Separate self-employment business, receipts, cost, profit, tax-ID or hours worksheet; self employment is an income-source example",
+    "Medical expense dollar amounts, diagnoses, disability determination or work-exemption questionnaire",
+    "A child-support payment amount/order-number blank or shelter/utility-account identifiers",
+    "A separate applicant checkbox for current SNAP participation; preserve explicit snap_new versus existing-benefit routing without copying CAO-only fields into family intake"
+  ],
+  "implementationBoundary": {
+    "currentReusableFacts": ["Exact current SNAP ZIP", "Existing en/es preferred language when applicable", "Household size as a consistency aid only", "Aggregate income/frequency as context only, not per-person table rows"],
+    "newFactsNotAuthorizedByThisFile": ["Names/address/phones and household roster/birthdates/student details", "Person-specific income sources/receipts/expected income", "Immigration-related answers/evidence", "Criminal/disqualification history", "Expense/dependent-care and health-related facts", "Representative designation and personal certifications"],
+    "flow": "One bounded applicable known-facts intake before background preparation; reuse permitted current evidence first; one complete final overview and genuine accepted Submit action; only indispensable unresolved facts or required personal steps interrupt. No routine work-viewer click triggers preparation.",
+    "submissionReady": false,
+    "runtimeChanges": "None. The existing renderer and worker retain their incomplete preparation-only boundaries. This is not a Zod/JSON collection schema or permission to save these fields."
+  }
+}

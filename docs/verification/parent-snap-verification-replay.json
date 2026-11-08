@@ -1,0 +1,70 @@
+{
+  "scope": "Corrected post-verification normal Next contract; explicit toy provider, real local Auth/Next/private browser",
+  "initialFailure": {
+    "stage": "Initial UI/control stage, before scoped desktop/mobile audits",
+    "cleanupPassed": true,
+    "rootCause": "Unlocalized; static stage labels added without changing interaction logic"
+  },
+  "successfulUnchangedRuns": [
+    {
+      "recordedAt": "2026-10-26T21:53:16.978Z",
+      "syntheticOnly": true,
+      "providerReplay": true,
+      "liveCompass": false,
+      "checks": 124,
+      "cleanupPassed": true,
+      "serviceContexts": 3,
+      "completedChecks": 1,
+      "cancelledContexts": 1,
+      "expiredContexts": 1,
+      "protectedScreenshots": 0,
+      "householdInputs": 0,
+      "modelCalls": 0,
+      "accessibility": [
+        {
+          "state": "desktop-challenge",
+          "violations": []
+        },
+        {
+          "state": "mobile-challenge",
+          "violations": []
+        },
+        {
+          "state": "mobile-completed",
+          "violations": []
+        }
+      ]
+    },
+    {
+      "recordedAt": "2026-10-26T21:55:15.997Z",
+      "syntheticOnly": true,
+      "providerReplay": true,
+      "liveCompass": false,
+      "checks": 124,
+      "cleanupPassed": true,
+      "serviceContexts": 3,
+      "completedChecks": 1,
+      "cancelledContexts": 1,
+      "expiredContexts": 1,
+      "protectedScreenshots": 0,
+      "householdInputs": 0,
+      "modelCalls": 0,
+      "accessibility": [
+        {
+          "state": "desktop-challenge",
+          "violations": []
+        },
+        {
+          "state": "mobile-challenge",
+          "violations": []
+        },
+        {
+          "state": "mobile-completed",
+          "violations": []
+        }
+      ]
+    }
+  ],
+  "liveVerificationAccepted": false,
+  "productionReliabilityEstablished": false
+}

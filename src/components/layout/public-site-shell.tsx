@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Menu } from "iconoir-react";
+import { Menu } from "iconoir-react";
 import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
+import { ChatGptFuturesBanner } from "@/components/brand/chatgpt-futures-banner";
 
-const navigation = [
-  { href: "/product", label: "Product" },
-];
+const navigation = [{ href: "/product", label: "Product" }];
 
 const navLinkClass =
   "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-[var(--public-ink-strong)] transition-colors hover:bg-[var(--public-accent-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-focus)]";
@@ -18,9 +17,9 @@ export function PublicSiteShell({
   /** When true, show the signed-in workspace link. */
   authenticated: boolean;
 }) {
-  const accountLink = authenticated ?
-    { href: "/families", label: "Workspace" }
-  : { href: "/login", label: "Sign in" };
+  const accountLink = authenticated
+    ? { href: "/families", label: "Workspace" }
+    : { href: "/login", label: "Sign in" };
 
   return (
     <div className="public-site flex min-h-full flex-col bg-[var(--public-paper)] text-[var(--public-ink)]">
@@ -31,20 +30,7 @@ export function PublicSiteShell({
         Skip to main content
       </a>
 
-      <a
-        href="https://openai.com/index/introducing-chatgpt-futures-class-of-2026/"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Selected for OpenAI's inaugural ChatGPT Futures Class of 2026"
-        className="flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap bg-[var(--public-ink)] px-4 py-2 text-center text-xs font-medium text-[var(--public-paper-2)] transition-colors hover:bg-[var(--public-ink-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-[var(--public-accent-ink)] sm:text-sm"
-      >
-        <span className="sm:hidden">OpenAI ChatGPT Futures Class of 2026</span>
-        <span className="hidden sm:inline">Selected for OpenAI&apos;s inaugural ChatGPT Futures Class of 2026</span>
-        <ArrowUpRight
-          className="size-3.5 shrink-0"
-          aria-hidden
-        />
-      </a>
+      <ChatGptFuturesBanner />
 
       <header className="sticky top-0 z-40 bg-[var(--public-paper-2)]">
         <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
@@ -56,7 +42,10 @@ export function PublicSiteShell({
             <CaseLinkWordmark />
           </Link>
 
-          <nav className="ml-auto hidden items-center gap-2 lg:flex" aria-label="Primary">
+          <nav
+            className="ml-auto hidden items-center gap-2 lg:flex"
+            aria-label="Primary"
+          >
             {navigation.map((item) => (
               <Link key={item.href} href={item.href} className={navLinkClass}>
                 {item.label}
@@ -65,7 +54,10 @@ export function PublicSiteShell({
             <Link href={accountLink.href} className={navLinkClass}>
               {accountLink.label}
             </Link>
-            <Link href="/request-demo" className="public-primary-action min-h-11 px-5">
+            <Link
+              href="/request-demo"
+              className="public-primary-action min-h-11 px-5"
+            >
               Request a demo
             </Link>
           </nav>
@@ -83,14 +75,24 @@ export function PublicSiteShell({
             >
               <div className="flex flex-col gap-1">
                 {navigation.map((item) => (
-                  <Link key={item.href} href={item.href} className={`${navLinkClass} min-h-11`}>
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`${navLinkClass} min-h-11`}
+                  >
                     {item.label}
                   </Link>
                 ))}
-                <Link href={accountLink.href} className={`${navLinkClass} min-h-11`}>
+                <Link
+                  href={accountLink.href}
+                  className={`${navLinkClass} min-h-11`}
+                >
                   {accountLink.label}
                 </Link>
-                <Link href="/request-demo" className="public-primary-action mt-2 w-full">
+                <Link
+                  href="/request-demo"
+                  className="public-primary-action mt-2 w-full"
+                >
                   Request a demo
                 </Link>
               </div>
@@ -113,32 +115,58 @@ export function PublicSiteShell({
               </p>
             </div>
 
-            <nav className="grid content-start gap-2 text-sm" aria-label="Footer navigation">
-              <p className="mb-1 font-semibold text-[var(--public-ink)]">Explore</p>
-              <Link href="/product" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+            <nav
+              className="grid content-start gap-2 text-sm"
+              aria-label="Footer navigation"
+            >
+              <p className="mb-1 font-semibold text-[var(--public-ink)]">
+                Explore
+              </p>
+              <Link
+                href="/product"
+                className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline"
+              >
                 Product
               </Link>
-              <Link href="/request-demo" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+              <Link
+                href="/request-demo"
+                className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline"
+              >
                 Request a demo
               </Link>
-              <Link href={accountLink.href} className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+              <Link
+                href={accountLink.href}
+                className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline"
+              >
                 {accountLink.label}
               </Link>
             </nav>
 
-            <nav className="grid content-start gap-2 text-sm" aria-label="Legal">
-              <p className="mb-1 font-semibold text-[var(--public-ink)]">Legal</p>
-              <Link href="/privacy" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+            <nav
+              className="grid content-start gap-2 text-sm"
+              aria-label="Legal"
+            >
+              <p className="mb-1 font-semibold text-[var(--public-ink)]">
+                Legal
+              </p>
+              <Link
+                href="/privacy"
+                className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline"
+              >
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline">
+              <Link
+                href="/terms"
+                className="text-[var(--public-ink-muted)] hover:text-[var(--public-accent)] focus-visible:outline-none focus-visible:underline"
+              >
                 Terms of Service
               </Link>
             </nav>
           </div>
 
           <p className="mt-10 border-t border-[var(--public-rule-faint)] pt-6 text-xs text-[var(--public-ink-3)]">
-            © {new Date().getFullYear()} CaseLink. Built in collaboration with school case managers.
+            © {new Date().getFullYear()} CaseLink. Built in collaboration with
+            school case managers.
           </p>
         </div>
       </footer>

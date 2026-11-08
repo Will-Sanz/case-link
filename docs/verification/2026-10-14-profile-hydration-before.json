@@ -1,0 +1,49 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "deployment": "dpl_Cnuq1J1WJjaBpt3dWKfVFP37qk27",
+  "commit": "323314ceffa43d69564bd7e5a886c62e209043b5",
+  "startedAt": "2026-10-14T23:35:16.244Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "Short-lived preview credential available",
+    "No application/provider secrets injected into browser runner",
+    "Protected immutable preview login returns 200",
+    "Preview access stays on exact staging origin",
+    "Staging operator is authenticated",
+    "Operator key belongs to the fixed staging key identifier",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Audited disposable administrator provisioning succeeds",
+    "Password-only administrator reaches Families and profile without MFA",
+    "Staging publishable key identified",
+    "Independent fresh administrator password session succeeds",
+    "Fresh password-only administrator can access staging cases",
+    "Hosted Auth rejects disabled TOTP enrollment",
+    "Disposable account returned to case-manager scope"
+  ],
+  "timings": {},
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": false,
+  "browserErrors": [
+    {
+      "stage": "password-only administrator",
+      "name": "Error",
+      "path": "/profile",
+      "message": "Minified React error #418; visit [URL] for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    }
+  ],
+  "failure": {
+    "stage": "password-only administrator",
+    "type": "Error",
+    "message": "Administrator profile renders without a hydration error"
+  },
+  "finishedAt": "2026-10-14T23:35:24.227Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "a1e16c7893bd813b4223e69feadba3a46c5ce2ab0f36ce45b0f3e8bd7a6510f1"
+}

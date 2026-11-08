@@ -1,0 +1,38 @@
+[Unit]
+Description=Independent CaseLink protected PDF and key cleanup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=caselink-retention
+Group=caselink-retention
+WorkingDirectory=/opt/caselink/current
+ExecStart=/usr/bin/node --import tsx scripts/parent-hosted-services.ts /etc/caselink/retention/profile.json
+Environment=NODE_ENV=production
+Environment=PATH=/usr/bin:/bin
+Environment=HOME=/var/lib/caselink-retention
+Environment=TMPDIR=/tmp
+StateDirectory=caselink-retention
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=120
+TimeoutStopSec=10
+KillMode=control-group
+LimitCORE=0
+MemoryMax=256M
+TasksMax=64
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+LockPersonality=yes

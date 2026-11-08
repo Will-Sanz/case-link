@@ -1,0 +1,67 @@
+project_id = "caselink-parent"
+
+[api]
+enabled = true
+port = 55321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 55322
+shadow_port = 55320
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = true
+port = 55324
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3200"
+additional_redirect_urls = []
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_refresh_token_rotation = true
+
+[auth.rate_limit]
+email_sent = 60
+sign_in_sign_ups = 60
+token_verifications = 60
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 900
+
+[auth.email.template.magic_link]
+subject = "Your CaseLink sign-in code"
+content_path = "./supabase/email-templates/parent-code.html"
+
+[auth.email.template.confirmation]
+subject = "Your CaseLink sign-in code"
+content_path = "./supabase/email-templates/parent-code.html"
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/parent_before_user_created"
+
+[analytics]
+enabled = false

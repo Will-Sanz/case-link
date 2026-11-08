@@ -1,0 +1,35 @@
+{
+	admin off
+	persist_config off
+	# Do not retain request paths, query strings, headers or bodies in proxy errors.
+	log {
+		output discard
+	}
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 60s
+			write 90s
+			idle 60s
+		}
+	}
+}
+
+# Proposed pilot hostname. Replace only after DNS/TLS authority is approved;
+# publicOrigin in every service profile must match exactly.
+pilot.thecaselink.com {
+	request_body {
+		max_size 10485760
+	}
+	reverse_proxy 127.0.0.1:3200 {
+		header_up Host pilot.thecaselink.com
+		header_up -Forwarded
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Proto
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 65s
+		}
+	}
+}

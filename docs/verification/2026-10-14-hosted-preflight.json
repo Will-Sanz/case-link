@@ -1,0 +1,163 @@
+{
+  "checkedAt": "2026-10-14T16:30:19.745Z",
+  "project": "zpfypkizsapvsxeykmdq",
+  "organization": "esnufmvikgpxzgoosqnw",
+  "name": "Will-Sanz's Project",
+  "region": "us-east-1",
+  "status": "ACTIVE_HEALTHY",
+  "databaseVersion": "17.6.1.084",
+  "organizationPlan": "free",
+  "inspection": "read-only metadata and aggregate counts only",
+  "recordedMigrations": [],
+  "counts": {
+    "authAccounts": 13,
+    "appAccounts": 11,
+    "familyRecords": 44,
+    "directoryRecords": 54
+  },
+  "publicTables": 20,
+  "publicTablesWithRls": 20,
+  "privateTablesObserved": 0,
+  "securityAdvisors": [
+    {
+      "name": "function_search_path_mutable",
+      "title": "Function Search Path Mutable",
+      "level": "WARN",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects functions where the search_path parameter is not set.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable",
+      "count": 1,
+      "findings": [
+        {
+          "detail": "Function \\`public.set_updated_at\\` has a role mutable search_path",
+          "metadata": {
+            "name": "set_updated_at",
+            "type": "function",
+            "schema": "public"
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        }
+      ]
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "title": "Public Can Execute SECURITY DEFINER Function",
+      "level": "WARN",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+      "count": 3,
+      "findings": [
+        {
+          "detail": "Function `public.can_access_family(p_family_id uuid)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_access_family`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+          "metadata": {
+            "name": "can_access_family",
+            "schema": "public",
+            "language": "sql",
+            "arguments": "p_family_id uuid",
+            "security_definer": true
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        },
+        {
+          "detail": "Function `public.create_family_intake_row(p_name text, p_summary text, p_urgency public.family_urgency, p_household_notes text, p_status public.family_status)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/create_family_intake_row`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+          "metadata": {
+            "name": "create_family_intake_row",
+            "schema": "public",
+            "language": "plpgsql",
+            "arguments": "p_name text, p_summary text, p_urgency public.family_urgency, p_household_notes text, p_status public.family_status",
+            "security_definer": true
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        },
+        {
+          "detail": "Function `public.is_app_admin()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_app_admin`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+          "metadata": {
+            "name": "is_app_admin",
+            "schema": "public",
+            "language": "sql",
+            "arguments": "",
+            "security_definer": true
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        }
+      ]
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+      "level": "WARN",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+      "count": 3,
+      "findings": [
+        {
+          "detail": "Function `public.can_access_family(p_family_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_access_family`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+          "metadata": {
+            "name": "can_access_family",
+            "schema": "public",
+            "language": "sql",
+            "arguments": "p_family_id uuid",
+            "security_definer": true
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        },
+        {
+          "detail": "Function `public.create_family_intake_row(p_name text, p_summary text, p_urgency public.family_urgency, p_household_notes text, p_status public.family_status)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/create_family_intake_row`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+          "metadata": {
+            "name": "create_family_intake_row",
+            "schema": "public",
+            "language": "plpgsql",
+            "arguments": "p_name text, p_summary text, p_urgency public.family_urgency, p_household_notes text, p_status public.family_status",
+            "security_definer": true
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        },
+        {
+          "detail": "Function `public.is_app_admin()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_app_admin`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+          "metadata": {
+            "name": "is_app_admin",
+            "schema": "public",
+            "language": "sql",
+            "arguments": "",
+            "security_definer": true
+          },
+          "observed_at": "2026-10-14T16:29:10.207Z"
+        }
+      ]
+    },
+    {
+      "name": "auth_leaked_password_protection",
+      "title": "Leaked Password Protection Disabled",
+      "level": "WARN",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Leaked password protection is currently disabled.",
+      "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+      "count": 1,
+      "findings": [
+        {
+          "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
+          "metadata": {
+            "type": "auth",
+            "entity": "Auth"
+          }
+        }
+      ]
+    }
+  ],
+  "initialMigrationReadFailure": "Database system shutting down during restore; retry returned empty migration inventory",
+  "hostedMutationsPerformed": false
+}

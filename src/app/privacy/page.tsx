@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { PublicSiteShell } from "@/components/layout/public-site-shell";
 import { LegalDocumentBody } from "@/components/layout/legal-doc-layout";
 import { PrivacyPolicySections } from "@/features/legal/legal-document-sections";
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function PrivacyPolicyPage() {
+  if (process.env.CASELINK_PRODUCT !== "school") redirect("/support/privacy");
   let user = null;
   try {
     user = await getSessionUser();

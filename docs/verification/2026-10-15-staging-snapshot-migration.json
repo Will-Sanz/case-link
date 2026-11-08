@@ -1,0 +1,38 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "target": "staging",
+  "filename": "20261015143343_materialize_plan_snapshot.sql",
+  "startedAt": "2026-10-15T14:39:23.491Z",
+  "migrationSha256": "129b82b78808518706235d4ef7a1b7848d2e0ebdf6edc1fc695e214fd8db6f35",
+  "passed": true,
+  "countsPreserved": {
+    "families": 1,
+    "resources": 0,
+    "app_accounts": 1,
+    "auth_accounts": 1
+  },
+  "grantsSecuritySearchPathOwnerUnchanged": true,
+  "transactionCommitted": true,
+  "migrations": {
+    "count": 41,
+    "latest": "20261015143343"
+  },
+  "finishedAt": "2026-10-15T14:39:27.211Z",
+  "credentialsPersistedOrPrinted": false,
+  "securityAdvisors": {
+    "source": "official signed-in CLI; connector denied access",
+    "errors": 0,
+    "warnings": 31,
+    "categories": {
+      "auth_insufficient_mfa_options": 1,
+      "auth_leaked_password_protection": 1,
+      "authenticated_security_definer_function_executable": 29
+    },
+    "changeFromPriorDisposition": "none",
+    "remediationLinks": [
+      "https://supabase.com/docs/guides/auth/auth-mfa",
+      "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+      "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+    ]
+  }
+}

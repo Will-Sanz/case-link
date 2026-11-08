@@ -1,0 +1,149 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "deploymentUrl": "https://case-link-5r6jnsdzo-will-sanzs-projects.vercel.app",
+  "commit": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "startedAt": "2026-10-15T14:58:34.664Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "No application/provider secrets injected into browser runner",
+    "Existing user-approved Vercel testing access is available without changing protection",
+    "Protected immutable production login returns 200",
+    "Testing access stays on exact production candidate origin",
+    "Production operator is authenticated",
+    "Operator key belongs to the fixed production project",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Standard staff profile has no MFA prompt",
+    "Five consecutive Settings loads succeed",
+    "Minimal hosted intake persists without a description",
+    "Live generation reaches the saved plan",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "The current 54-resource directory supplies matched programs",
+    "Hosted generated plan passes automated accessibility checks",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Current saved step title is available for a precise refinement request",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Live assistant produces a substantive answer",
+    "No unhandled browser application errors",
+    "Hosted browser logout returns to sign-in"
+  ],
+  "timings": {
+    "generationMilliseconds": 35071,
+    "actionRefinementMilliseconds": 6548,
+    "fullRefinementMilliseconds": 4989,
+    "assistantMilliseconds": 4873
+  },
+  "saveMilliseconds": [
+    883,
+    845
+  ],
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": true,
+  "protection": {
+    "method": "official CLI existing authenticated access",
+    "cookieKeptInMemory": true,
+    "newBypassSecretCreated": false,
+    "protectionChanged": false
+  },
+  "browserErrors": [],
+  "settingsReloadMilliseconds": [
+    509,
+    776,
+    548,
+    498,
+    644
+  ],
+  "generatedPlanSteps": 3,
+  "directory": {
+    "resources": 54,
+    "matched": 24,
+    "generatedContacts": 0
+  },
+  "planReloadMilliseconds": [
+    760,
+    2770,
+    861
+  ],
+  "pdf": {
+    "pages": 2,
+    "sha256": "426336713bcb42762b7c5b86ad6ee42d1a0e0543350b47fbff0823cee7c4048d",
+    "bytes": 8439
+  },
+  "finishedAt": "2026-10-15T15:00:14.737Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "3188312b530b9f8df57a8a022387b7e1afa8390339e37e8e9a87dfda197b26fd",
+  "requestSummary": {
+    "count": 590,
+    "httpErrors": [],
+    "slowCompletedRequests": [
+      {
+        "stage": "live action refinement",
+        "path": "/families/[synthetic-id]/plan",
+        "method": "POST",
+        "type": "fetch",
+        "status": 200,
+        "milliseconds": 6470
+      },
+      {
+        "stage": "logout",
+        "path": "/profile",
+        "method": "GET",
+        "type": "document",
+        "status": 200,
+        "milliseconds": 10561
+      }
+    ],
+    "abortedRequests": 81,
+    "abortedRequestsNotClassifiedAsApplicationErrors": true
+  },
+  "pdfVisualReview": {
+    "pagesInspected": [
+      1,
+      2
+    ],
+    "readable": true,
+    "clippingOrOverlappingText": false,
+    "blankPages": false,
+    "editedActionAndWaitingNotePresent": true,
+    "rendererDiagnosticsBytes": 0
+  },
+  "aiSampleReview": {
+    "asksForPrioritiesConsentLanguageSafeContact": true,
+    "claimsReferralOrEligibilityConfirmed": false,
+    "usesSavedWaitingStateAndExactFollowUpDates": true,
+    "schoolUsefulnessSignoff": false
+  },
+  "providerLogReview": {
+    "vercelErrorOrFatalGroups": 0,
+    "windowStart": "2026-10-15T14:58:20Z",
+    "supabaseLogConnector": "Permission denied; no database-log conclusion asserted"
+  },
+  "saveAssertionTimeoutMilliseconds": 30000,
+  "previousAttempt": "2026-10-15-production-save-test-cutoff.json",
+  "finalDatabaseCounts": {
+    "anonymousPrivilegedExecute": 0,
+    "applicationAccounts": 11,
+    "authAccounts": 13,
+    "families": 0,
+    "latestMigration": "20261015143343",
+    "mfaFactors": 0,
+    "migrations": 41,
+    "plans": 0,
+    "publicTablesWithoutRls": 0,
+    "resources": 54,
+    "scratchDatabases": 0
+  }
+}

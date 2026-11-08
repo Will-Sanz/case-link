@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, "src");
 const allowedFiles = new Set([
-  "lib/ai/client.ts",
   "lib/ai/pdf-boundary-safety.test.ts",
 ]);
 
@@ -24,7 +23,7 @@ describe("PDF AI data boundary", () => {
     const rawFileInputToken = ["file", "Inputs"].join("");
     const callers = sourceFiles(sourceRoot)
       .filter((path) => !allowedFiles.has(relative(sourceRoot, path)))
-      .filter((path) => readFileSync(path, "utf8").includes(rawFileInputToken))
+      .filter((path) => [rawFileInputToken, ["input", "file"].join("_"), ["file", "data"].join("_")].some(token => readFileSync(path, "utf8").includes(token)))
       .map((path) => relative(sourceRoot, path));
 
     expect(callers).toEqual([]);

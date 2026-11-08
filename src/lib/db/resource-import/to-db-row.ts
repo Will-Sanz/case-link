@@ -1,10 +1,11 @@
+import { isDemoResource } from "@/lib/matching/resource-availability";
 import type { ParsedResourceRow } from "@/lib/db/resource-import/types";
 
 /** Payload for `resources` upsert (matches `public.resources` columns). */
 export function parsedResourceToDbRow(row: ParsedResourceRow) {
   return {
     slug: row.slug,
-    active: true,
+    is_demo: isDemoResource(row.programName, row.officeOrDepartment),
     import_key: row.importKey,
     office_or_department: row.officeOrDepartment,
     program_name: row.programName,

@@ -57,23 +57,25 @@ async function main() {
       process.exit(1);
     }
     filePath = resolved.absolutePath;
-    console.info(`Using default resource seed (${resolved.source}): ${filePath}`);
+    console.info(`Using default resource seed: ${resolved.source}`);
   }
 
-  console.info(`Reading CSV: ${filePath}`);
+  console.info(`Reading CSV: ${path.basename(filePath)}`);
   const parsed = parseResourceCsvFromPath(filePath);
 
   if (parsed.issues.length > 0) {
     console.warn(`\nParse warnings / skipped rows (${parsed.issues.length}):`);
     for (const issue of parsed.issues.slice(0, 50)) {
       console.warn(
-        `  Row ${issue.rowNumber}: ${issue.message}${issue.rawPreview ? ` | ${issue.rawPreview}` : ""}`,
+        `  Row ${issue.rowNumber}: ${issue.message}`,
       );
     }
     if (parsed.issues.length > 50) {
       console.warn(`  … and ${parsed.issues.length - 50} more`);
     }
   }
+
+  if (!parsed.rows.length) throw new Error("No valid resource rows to import.");
 
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -82,17 +84,17 @@ async function main() {
   const { data: runRow, error: runErr } = await supabase
     .from("resource_import_runs")
     .insert({
-      source_path: filePath,
+      source_path: path.basename(filePath),
       row_count: parsed.rows.length + parsed.issues.length,
       success_count: 0,
       error_count: parsed.issues.length,
-      error_log: parsed.issues.slice(0, 200),
+      error_log: parsed.issues.slice(0, 200).map(({ rowNumber, message }) => ({ rowNumber, message })),
     })
     .select("id")
     .single();
 
   if (runErr) {
-    console.error("Failed to create import run record:", runErr.message);
+    console.error("Failed to create import run record:", runErr.code);
     process.exit(1);
   }
 
@@ -106,10 +108,11 @@ async function main() {
     const payload = slice.map((r) => parsedResourceToDbRow(r));
     const { error } = await supabase.from("resources").upsert(payload, {
       onConflict: "import_key",
+      defaultToNull: false,
     });
 
     if (error) {
-      console.error(`Batch ${i / batchSize + 1} failed:`, error.message);
+      console.error(`Batch ${i / batchSize + 1} failed:`, error.code);
       upsertErrors += slice.length;
     } else {
       upserted += slice.length;
@@ -122,20 +125,22 @@ async function main() {
       finished_at: new Date().toISOString(),
       success_count: upserted,
       error_count: parsed.issues.length + upsertErrors,
-      error_log: parsed.issues.slice(0, 200),
+      error_log: parsed.issues.slice(0, 200).map(({ rowNumber, message }) => ({ rowNumber, message })),
     })
     .eq("id", runId);
 
   if (finErr) {
-    console.error("Failed to finalize import run:", finErr.message);
+    console.error("Failed to finalize import run:", finErr.code);
   }
+
+  if (upsertErrors || finErr) process.exitCode = 1;
 
   console.info(
     `\nDone. Upserted: ${upserted}, parse issues: ${parsed.issues.length}, batch failures (rows): ${upsertErrors}, import_run id: ${runId}`,
   );
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch(() => {
+  console.error("Import failed. Check the CSV format, credentials, and database connection.");
   process.exit(1);
 });

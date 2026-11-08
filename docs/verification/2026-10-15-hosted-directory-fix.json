@@ -1,0 +1,76 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "deploymentUrl": "https://case-link-7hgb7ony3-will-sanzs-projects.vercel.app",
+  "commit": "8ace965e86fc556844d63318680b255ca57cbff9",
+  "startedAt": "2026-10-15T03:39:16.863Z",
+  "headless": true,
+  "syntheticOnly": true,
+  "checks": [
+    "Short-lived preview credential available",
+    "No application/provider secrets injected into browser runner",
+    "Protected immutable preview login returns 200",
+    "Preview access stays on exact staging origin",
+    "Staging operator is authenticated",
+    "Operator key belongs to the fixed staging key identifier",
+    "Disposable confirmed account created without email",
+    "Audited case-manager provisioning succeeds",
+    "Real browser password sign-in succeeds",
+    "Staff profile has no MFA prompt",
+    "Minimal hosted intake persists without a description",
+    "One saved plan after live hosted generation",
+    "Live generated steps persist",
+    "No invented phone or email in the no-directory draft",
+    "Hosted generated plan passes automated accessibility checks",
+    "Unsaved browser edit recovers and waiting edit survives reload",
+    "Live action refinement requires selected fields and preserves human work",
+    "Saved action baseline is available",
+    "Current saved step title is available for a precise refinement request",
+    "Live full-plan title refinement preserves action identities, tasks, dates and progress",
+    "PDF preview uses local browser bytes",
+    "Downloaded PDF exactly matches preview bytes",
+    "Downloaded PDF has the expected document metadata and pages",
+    "Human review is persisted before PDF export",
+    "Live assistant produces a substantive answer",
+    "No unhandled browser application errors",
+    "Hosted browser logout returns to sign-in"
+  ],
+  "timings": {
+    "generationMilliseconds": 22164,
+    "actionRefinementMilliseconds": 3428,
+    "fullRefinementMilliseconds": 6514,
+    "assistantMilliseconds": 3853
+  },
+  "cleanup": {
+    "families": true,
+    "account": true
+  },
+  "passed": true,
+  "browserErrors": [],
+  "generatedGoals": 3,
+  "pdf": {
+    "pages": 2,
+    "sha256": "7cef73fe9e8627a4c58b579b82726ec37ea42671280d478baf05cb67aa7c8fe8",
+    "bytes": 8665
+  },
+  "finishedAt": "2026-10-15T03:40:29.591Z",
+  "credentialsPersistedOrPrinted": false,
+  "auditHistoryRetained": true,
+  "sourceSha256": "773721361302d602dc1d5d71e6fcef0a89e18d2b064ed9c4988d61c9a171dce5",
+  "pdfVisualReview": {
+    "pagesInspected": [
+      1,
+      2
+    ],
+    "readable": true,
+    "clippingOrOverlappingText": false,
+    "blankPages": false,
+    "humanEditsAndWaitingNotePresent": true,
+    "rendererDiagnosticsBytes": 0
+  },
+  "aiSampleReview": {
+    "sparseCaseRequiresClarification": true,
+    "claimsReferralOrEligibilityConfirmed": false,
+    "assistantUsesSavedWaitingState": true,
+    "schoolUsefulnessSignoff": false
+  }
+}

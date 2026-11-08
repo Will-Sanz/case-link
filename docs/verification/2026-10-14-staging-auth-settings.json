@@ -1,0 +1,73 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "environment": "isolated staging",
+  "verification": "Authenticated Supabase dashboard, saved values and enabled states; no credentials or account contents recorded",
+  "siteUrl": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+  "redirectAllowlist": [
+    "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app/auth/callback"
+  ],
+  "wildcardRedirects": false,
+  "accessTokenExpirySeconds": 3600,
+  "refreshTokenRotation": true,
+  "refreshTokenReuseIntervalSeconds": 10,
+  "totp": "enabled",
+  "maximumMfaFactors": 10,
+  "limitUnverifiedAal1Sessions": true,
+  "unverifiedAal1LimitMinutes": 15,
+  "smsMfa": "disabled; not required by the application",
+  "singleSessionPerUser": "off; configurable only on Pro or above",
+  "maximumSessionLifetime": "not configured; configurable only on Pro or above",
+  "inactivityTimeout": "not configured; configurable only on Pro or above",
+  "securityEmailNotificationsEnabled": [
+    "password changed",
+    "email address changed",
+    "phone number changed",
+    "sign-in method linked",
+    "sign-in method removed",
+    "MFA method added",
+    "MFA method removed"
+  ],
+  "customSmtpConfigured": true,
+  "customTemplatesInstalled": true,
+  "templateEditingBlocker": null,
+  "mailSentByThisSetup": true,
+  "paidUpgradePerformed": false,
+  "limits": [
+    "Real hosted password sign-in, invitation confirmation/setup, standard-role isolation, offboarding, retained-token denial and the password-only administrator gate pass. Hosted recovery and completed MFA challenge remain open.",
+    "Operator-controlled test mailbox authorized; invitation and password-change notice received through Free Resend. School mailbox/scanner acceptance remains open.",
+    "School acceptance of session policy and provider plan remains open",
+    "These settings do not change the production-intended project"
+  ],
+  "smtp": {
+    "host": "smtp.resend.com",
+    "port": 465,
+    "username": "resend",
+    "senderEmail": "staging@thecaselink.com",
+    "senderName": "CaseLink Staging",
+    "minimumIntervalPerUserSeconds": 60,
+    "credentialEnteredPrivatelyByUser": true,
+    "savedReadback": "Custom SMTP on, stored password hidden, Save changes disabled"
+  },
+  "templateInstallationFailure": "Initial native accessibility setValue changed the visible editor value but did not update the dashboard editor model. Saved subject persisted while the body remained the provider default. Reopening the invitation caught this before any email was sent. Native paste and persisted-body verification are now required.",
+  "templateRegressionChecks": {
+    "testFiles": [
+      "scripts/auth-email-templates.test.ts",
+      "scripts/invite-user-operation.test.ts"
+    ],
+    "passedTests": 10,
+    "hostedOnlyNotificationCredentialInjectionRejected": true,
+    "mutation": "Synthetic compact TokenHash placeholder appended to phone-change template; expected regression failure observed; original restored byte-for-byte",
+    "scope": "All seven notification files now checked, including three absent from local Auth configuration"
+  },
+  "operatorAccess": {
+    "provider": "Official Supabase CLI",
+    "authenticatedBy": "User completed local sign-in",
+    "project": "umnbyupudhunyccqhyrp",
+    "adminAuthConnectionVerified": true,
+    "projectSecretUsage": "Existing staging secret key retrieved through authenticated CLI and used only in memory for a read-only Auth account-count check",
+    "keyPrintedOrSavedByTest": false,
+    "authAccountCountAtInitialPreInvitationCheck": 0,
+    "laterVerification": "2026-10-14-hosted-invitation.json, 2026-10-14-hosted-access-smoke.json and 2026-10-14-hosted-mfa-gate.json; disposable fixtures removed and the operator account preserved"
+  },
+  "templateManifest": "2026-10-14-staging-email-templates.json"
+}

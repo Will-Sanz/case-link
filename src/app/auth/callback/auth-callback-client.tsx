@@ -1,151 +1,55 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  safeAuthSessionClientMessage,
-  safeOAuthRedirectMessage,
-} from "@/lib/auth/safe-client-auth-message";
-import { safeInternalPath } from "@/lib/auth/safe-internal-path";
+import { Button } from "@/components/ui/button";
+import { AUTH_CALLBACK_ERROR_PATH, completeAuthCallback } from "@/lib/auth/complete-auth-callback";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-/** Survives React Strict Mode remount without persisting bearer tokens in browser storage. */
-let pendingAuthFragment = "";
+// Share only the current operation across Strict Mode and route remounts; never persist tokens.
+let inFlight: Promise<string> | null = null;
 
-function readFragmentForCallback(): string {
-  if (typeof window === "undefined") return "";
-  const fromUrl = window.location.hash.replace(/^#/, "");
-  if (fromUrl) {
-    pendingAuthFragment = fromUrl;
-    return fromUrl;
-  }
-  return pendingAuthFragment;
-}
-
-function clearStoredAuthFragment() {
-  pendingAuthFragment = "";
-}
-
-/**
- * Supabase may complete auth via:
- * - PKCE: `?code=...`
- * - Implicit: `#access_token=...&refresh_token=...` (hash never hits the server)
- * - Email link: `?token_hash=...&type=...` (verifyOtp)
- * - Failure: `?error=...&error_description=...`
- */
 export function AuthCallbackClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [status, setStatus] = useState("Confirming sign-in…");
-  const navigatedRef = useRef(false);
-
+  const capturedUrl = useRef<URL | null>(null);
+  const [status, setStatus] = useState<"initial" | "confirm" | "exchange">("initial");
   useEffect(() => {
-    const oauthError = searchParams.get("error");
-    const oauthDesc = searchParams.get("error_description");
-    const code = searchParams.get("code");
-    const token_hash = searchParams.get("token_hash");
-    const type = searchParams.get("type");
-    const next = safeInternalPath(searchParams.get("next"));
-
-    function finishRedirect(path: string) {
-      if (navigatedRef.current) return;
-      navigatedRef.current = true;
-      clearStoredAuthFragment();
-      router.replace(path);
-      router.refresh();
-    }
-
-    function goLoginError(msg: string) {
-      finishRedirect(`/login?error=${encodeURIComponent(msg)}`);
-    }
-
+    let active = true;
     void (async () => {
-      if (oauthError) {
-        const raw = oauthDesc?.replace(/\+/g, " ") ?? oauthError;
-        goLoginError(safeOAuthRedirectMessage(raw));
-        return;
+      let path = AUTH_CALLBACK_ERROR_PATH;
+      try {
+        const url = capturedUrl.current ?? new URL(window.location.href);
+        capturedUrl.current = url;
+        // Clear query credentials as well as fragment credentials before Supabase auto-detection.
+        window.history.replaceState(window.history.state, "", url.pathname);
+        if (!inFlight && status !== "exchange" && (url.searchParams.has("token_hash") || new URLSearchParams(url.hash.slice(1)).has("token_hash"))) {
+          setStatus("confirm");
+          return;
+        }
+        if (!inFlight) {
+          const operation = completeAuthCallback(url, createSupabaseBrowserClient);
+          inFlight = operation;
+          void operation.finally(() => { if (inFlight === operation) inFlight = null; });
+        }
+        path = await inFlight;
+      } catch {
+        // Cookie/history restrictions and provider failures use the same safe recovery destination.
       }
-
-      const supabase = createSupabaseBrowserClient();
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          goLoginError(safeAuthSessionClientMessage(error.message));
-          return;
-        }
-        const { data: after } = await supabase.auth.getSession();
-        if (!after.session) {
-          goLoginError("Could not establish a session. Try opening the link again.");
-          return;
-        }
-        finishRedirect(next);
-        return;
+      if (active) {
+        router.replace(path);
+        router.refresh();
       }
-
-      if (token_hash && type) {
-        const { error } = await supabase.auth.verifyOtp({
-          type: type as "signup" | "invite" | "magiclink" | "email_change" | "email" | "recovery",
-          token_hash,
-        });
-        if (error) {
-          goLoginError(safeAuthSessionClientMessage(error.message));
-          return;
-        }
-        const { data: afterOtp } = await supabase.auth.getSession();
-        if (!afterOtp.session) {
-          goLoginError("Could not establish a session. Try opening the link again.");
-          return;
-        }
-        finishRedirect(next);
-        return;
-      }
-
-      const fragmentStr = readFragmentForCallback();
-      if (fragmentStr.length > 0) {
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${window.location.search}`,
-        );
-        const params = new URLSearchParams(fragmentStr);
-        const access_token = params.get("access_token");
-        const refresh_token = params.get("refresh_token");
-        const hashError = params.get("error");
-        const hashErrorDesc = params.get("error_description");
-        if (hashError) {
-          const raw = hashErrorDesc?.replace(/\+/g, " ") ?? hashError;
-          goLoginError(safeOAuthRedirectMessage(raw));
-          return;
-        }
-        if (access_token && refresh_token) {
-          setStatus("Setting up your session…");
-          const { error } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
-          if (error) {
-            goLoginError(safeAuthSessionClientMessage(error.message));
-            return;
-          }
-          const { data: afterHash } = await supabase.auth.getSession();
-          if (!afterHash.session) {
-            goLoginError("Could not establish a session. Try opening the link again.");
-            return;
-          }
-          finishRedirect(next);
-          return;
-        }
-      }
-
-      clearStoredAuthFragment();
-      finishRedirect(`/login?error=${encodeURIComponent("auth")}`);
     })();
-  }, [router, searchParams]);
+    return () => { active = false; };
+  }, [router, status]);
 
-  return (
-    <p className="text-center text-sm text-[var(--public-ink-muted)]" role="status">
-      {status}
-    </p>
+  if (status === "confirm") return (
+    <div className="max-w-sm space-y-4 text-center">
+      <h1 className="text-xl font-semibold">Continue to your account</h1>
+      <p className="text-sm text-[var(--public-ink-muted)]">Continue to set or reset your CaseLink password. This link can be used once.</p>
+      <Button onClick={() => setStatus("exchange")}>Continue to password setup</Button>
+    </div>
   );
+
+  return <p className="text-center text-sm text-[var(--public-ink-muted)]" role="status">Confirming sign-in…</p>;
 }

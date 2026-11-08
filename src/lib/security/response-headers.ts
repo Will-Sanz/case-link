@@ -26,8 +26,9 @@ export function buildSecurityHeaders(options: {
     }
   }
 
+  // The bundled PDF layout engine needs WebAssembly, not JavaScript string evaluation.
   const scriptSrc = options.production
-    ? "script-src 'self' 'unsafe-inline'"
+    ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
     : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
   const csp = [
     "default-src 'self'",

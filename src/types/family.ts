@@ -96,10 +96,16 @@ export type CaseProgressUpdateRow = {
 
 export type MatchedResourceSummary = {
   id: string;
+  active: boolean;
+  is_demo: boolean;
+  updated_at: string;
   slug: string;
   program_name: string;
   office_or_department: string;
   category: string | null;
+  description?: string | null;
+  services_select_all?: string | null;
+  additional_info?: string | null;
   primary_contact_name: string | null;
   primary_contact_title: string | null;
   primary_contact_email: string | null;
@@ -138,6 +144,8 @@ export type PlanStepDetails = {
   checklist?: string[];
   required_documents?: string[];
   contacts?: Array<{
+    source_resource_id?: string;
+    source_updated_at?: string;
     name?: string;
     phone?: string;
     email?: string;
@@ -231,14 +239,30 @@ export type PlanClientDisplay = {
   /** Explicit case-manager approval required before the plan can be exported. */
   reviewedAt?: string;
   reviewedById?: string;
+  reviewedRevision?: string;
+};
+
+export type PlanGenerationSnapshot = {
+  family_id: string;
+  captured_at: string;
+  revision: string;
+  brief: string;
+  resources: string;
+  resource_catalog: import("@/lib/matching/plan-resources").ResourceCatalogEntry[];
 };
 
 /** Staged lean generation progress (plans.generation_state JSONB). */
 export type PlanGenerationState = {
   v: 1;
+  /** Missing on legacy drafts that still resume their saved three-stage workflow. */
+  generation_strategy?: "single";
+  /** Explicit human handoff ends the AI job; it does not mean AI generation succeeded. */
+  completion_method?: "manual";
   status: "running" | "complete" | "failed";
   pending_phase: "30" | "60" | "90" | null;
-  planning_brief: string;
+  /** Legacy rows need a fresh generation run; never mix their partial context with current data. */
+  planning_brief?: string;
+  input_snapshot?: PlanGenerationSnapshot;
   phases_complete: { "30": boolean; "60": boolean; "90": boolean };
   models_used: string[];
   stage_timings_ms: Partial<Record<"30" | "60" | "90", number>>;
@@ -262,6 +286,10 @@ export type PlanRow = {
 };
 
 export type PlanWithSteps = PlanRow & {
+  /** Hashes from the same database snapshot as these rows; absent on legacy fixtures. */
+  review_revision?: string;
+  material_revision?: string;
+  resource_contacts_current?: boolean;
   steps: PlanStepRow[];
   /** Derived on the server for UI, avoids branching on raw `generation_source` in components. */
   presentation: {
@@ -297,4 +325,10 @@ export type FamilyDetail = {
     created_at: string;
     actor_email?: string;
   }>;
+};
+
+export type FamilyProfile = Pick<FamilyDetail, "id" | "name" | "summary" | "urgency" | "household_notes" | "status" | "updated_at"> & {
+  goalCount: number;
+  barrierCount: number;
+  hasPlan: boolean;
 };

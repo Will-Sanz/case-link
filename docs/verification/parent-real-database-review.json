@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-10-26T08:48:57.616Z",
+  "engine": "Actual isolated Supabase PostgreSQL17.11",
+  "databasePort": 55322,
+  "assertions": 159,
+  "boundedBudgetChecks": "passed",
+  "concurrentCancellationDispatch": "passed",
+  "processingControlsAndOperatorMembershipsRestored": "passed",
+  "sourceManifest": [
+    {
+      "path": "scripts/test-parent-database-security.ts",
+      "sha256": "cfbebae1789629e48de10a863c3c981875ff66053299e0ea64769db9a8538715"
+    },
+    {
+      "path": "supabase/migrations/20261026012733_parent_support_foundation.sql",
+      "sha256": "c5abbde3ff5ab507ca69eb48d27e36763dea6f580b20fe18adead6886e40b59c"
+    },
+    {
+      "path": "supabase/migrations/20261026014950_parent_scoped_evidence_and_outcomes.sql",
+      "sha256": "ca1b9d12b1a1e44d6134150e22dd9a915405905a44cddf6db59d3ea5c5b0650d"
+    },
+    {
+      "path": "supabase/migrations/20261026015736_parent_verified_form_artifacts.sql",
+      "sha256": "08e1909838d1216e51e2b48ae0a56da43f492909c161e28f1c210200059e6cf0"
+    },
+    {
+      "path": "supabase/migrations/20261026020521_parent_facts_and_mandate_resumption.sql",
+      "sha256": "abcd741df6ea45c18e1a92535ed8b4c33beee42ffa0267894382f5479ac87cc0"
+    },
+    {
+      "path": "supabase/migrations/20261026022658_parent_notifications_and_resume_metadata.sql",
+      "sha256": "770ab324997d6bfb8d88ae6ed538beb123ba3ae2f1690e8db03b225232749740"
+    },
+    {
+      "path": "supabase/migrations/20261026033815_parent_existing_accounts.sql",
+      "sha256": "672cc71be375a5ac9c9f35a9277ec4986ed7f31ff20816d2fb003e56d57e188c"
+    },
+    {
+      "path": "supabase/migrations/20261026040540_parent_preserve_corrected_facts.sql",
+      "sha256": "c053032829e4bf91bbccb48a8a14feb152fbe3cb46eb3ce4ad5aaa1143788780"
+    },
+    {
+      "path": "supabase/migrations/20261026044443_parent_storage_upload_preflight.sql",
+      "sha256": "e18a707f52fd605728f2d346e4e5f6f3fb3c82dbaf35293aa350e7d2ced92de9"
+    },
+    {
+      "path": "supabase/migrations/20261026052446_parent_authoritative_mandate_window.sql",
+      "sha256": "7b4b16685b93611a13ecd59d708323d8cd86f6c51eff0fd0d44365a9ec651b67"
+    }
+  ],
+  "limitations": [
+    "Synthetic fixtures only; no hosted migration or partner delivery.",
+    "Auth/Storage browser and isolated parser evidence are separate."
+  ]
+}

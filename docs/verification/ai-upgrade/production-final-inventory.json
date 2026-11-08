@@ -1,0 +1,15 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "checkedAt": "2026-10-15T20:36:36.078Z",
+  "active_generation_leases": 0,
+  "app_accounts": 11,
+  "auth_accounts": 13,
+  "families": 1,
+  "mfa_factors": 0,
+  "migrations": 43,
+  "plans": 1,
+  "resources": 54,
+  "unfinished_compact_drafts": 0,
+  "passed": true,
+  "scope": "Aggregate read-back after all synthetic candidate and public-site attempts were cleaned up."
+}

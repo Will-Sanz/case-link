@@ -1,0 +1,52 @@
+{
+  "deployment": "dpl_5s8otL99maxH17n99NQBFnZVVifb",
+  "commit": "5a3e282718f7cfdc1825807e6c5ebc057956bed4",
+  "checkedWith": "Vercel authenticated curl; no application session",
+  "results": [
+    {
+      "route": "/api/health",
+      "exitCode": 0,
+      "status": "200",
+      "headers": {
+        "cache-control": "no-store, max-age=0",
+        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://umnbyupudhunyccqhyrp.supabase.co wss://umnbyupudhunyccqhyrp.supabase.co; frame-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff"
+      },
+      "health": {
+        "status": "ok",
+        "service": "caselink"
+      }
+    },
+    {
+      "route": "/login",
+      "exitCode": 0,
+      "status": "200",
+      "headers": {
+        "cache-control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://umnbyupudhunyccqhyrp.supabase.co wss://umnbyupudhunyccqhyrp.supabase.co; frame-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+        "content-type": "text/html; charset=utf-8",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff"
+      }
+    },
+    {
+      "route": "/families",
+      "exitCode": 0,
+      "status": "307",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://umnbyupudhunyccqhyrp.supabase.co wss://umnbyupudhunyccqhyrp.supabase.co; frame-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+        "content-type": "text/plain",
+        "location": "/login",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff"
+      }
+    }
+  ],
+  "limits": "Public health/login/routing checks only; no invitation, AI, export or production promotion"
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run ordinary document/account cleanup independently of collection and sending
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Persistent=true
+Unit=caselink-parent-ordinary-retention.service
+
+[Install]
+WantedBy=timers.target

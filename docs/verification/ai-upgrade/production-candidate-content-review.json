@@ -1,0 +1,30 @@
+{
+  "deploymentId": "dpl_BtUijxvxRbopdJ5Ebr214t36grWU",
+  "source": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "reviewed": "production candidate synthetic plan, assistant, email, call, substantive meeting output and three PDF pages",
+  "reviewers": [
+    "root",
+    "family_needs"
+  ],
+  "criticalDefects": [],
+  "grounding": [
+    "Preserves twice-weekly existing help and after-work family contact",
+    "Follows pending application without restarting",
+    "Requires family agreement before provider or school contact",
+    "Unknown provider hours, availability and eligibility remain unknown",
+    "No invented resource, contact, sent/called/recorded claim",
+    "Meeting Tuesday/Thursday detail matches explicitly supplied update"
+  ],
+  "pdf": [
+    "Two record pages and one family page visually inspected",
+    "Readable monochrome, no clipping or overlap",
+    "Family PDF excludes internal progress and family context"
+  ],
+  "minorFindings": [
+    "Repeated do-not-restart wording",
+    "Two same-day family discussions could be combined",
+    "Second goal table continues on page two without repeated goal heading"
+  ],
+  "practitionerReview": false,
+  "passed": true
+}

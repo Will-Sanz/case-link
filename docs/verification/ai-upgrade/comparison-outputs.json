@@ -1,0 +1,1761 @@
+{
+  "candidateMapping": {
+    "A": "gpt-5.6-luna / low",
+    "B": "gpt-6-astra / medium",
+    "C": "gpt-6.1-sol / medium"
+  },
+  "cases": [
+    {
+      "caseId": "pilot-completed-work",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The checklist discussion is complete and the family agreed a follow-up conversation. Do not repeat the intake or invent a completion date.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Housing instability"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": {
+          "id": "90000000-0000-4000-8000-000000000009",
+          "version": 1,
+          "review": {
+            "state": "needs_attention",
+            "label": "Needs attention",
+            "issue": "Give every action a clear title and expected result before reviewing the plan."
+          },
+          "generation": "complete"
+        },
+        "next_by_due_date": null,
+        "goals": [
+          {
+            "id": "30000000-0000-4000-8000-000000000003",
+            "title": "Review the agreed preparation checklist",
+            "goal": "Agree the next support step",
+            "summary": "Confirm the family's chosen next step.",
+            "owner": "case_manager",
+            "status": "completed"
+          }
+        ],
+        "actions": [
+          {
+            "id": "40000000-0000-4000-8000-000000000004",
+            "goal_id": "30000000-0000-4000-8000-000000000003",
+            "title": "Review the agreed preparation checklist",
+            "description": "Discuss the family's choice.",
+            "status": "completed",
+            "target_date": "2026-10-22",
+            "follow_up_date": null,
+            "effective_date": "2026-10-22",
+            "completion_date": null,
+            "overdue": false,
+            "notes": "The discussion is complete.",
+            "outcome": "The family agreed the next discussion.",
+            "updated_at": "2026-10-13T12:00:00.123456+00:00"
+          }
+        ]
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[{\"id\":\"10000000-0000-4000-8000-000000000001\",\"directory_updated_at\":\"2026-10-13T12:00:00.123456+00:00\",\"program_name\":\"Housing support\",\"office\":\"Community office\",\"category\":\"Housing\",\"match_reason\":\"Matches housing\",\"recorded_evidence\":{\"description\":null,\"services_select_all\":null,\"additional_info\":null,\"omitted_fields\":[]}}]",
+      "assistantQuestion": "What is already done, when was it completed, and what should I confirm next?",
+      "caseReviewCriteria": [
+        "Do not repeat completed checklist",
+        "Completion date remains unrecorded",
+        "Next step builds on the agreed follow-up"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Clarify the family\u2019s housing priorities and next support step",
+              "title": "Hold the agreed follow-up conversation",
+              "summary": "Discuss the family\u2019s current housing priorities, preferred support, practical constraints, and safe contact preferences.",
+              "action_items": [
+                {
+                  "title": "Confirm priorities and preferences",
+                  "description": "Ask what housing support the family wants to pursue and how the school should safely contact them.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Record the agreed next step",
+                  "description": "Document the family\u2019s choice and any permission needed before discussing outside housing support.",
+                  "target_date": "2026-10-23",
+                  "week_index": 2
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family\u2019s priorities, preferences, safe contact method, and agreed next step are clearly recorded.",
+              "priority": "medium",
+              "additional_guidance": "Do not repeat the completed checklist discussion or assume permission for provider contact.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Already done: \u201cReview the agreed preparation checklist\u201d is marked completed. The notes say the discussion is complete and the family agreed to a next discussion. The completion date is not recorded; 2026-10-22 is the target/effective date, not proof of completion.\n\nConfirm next: the date and purpose of the follow-up conversation, the family\u2019s chosen next support step, and the expected result. Give that action a clear title before plan review. Do not repeat the intake. If housing support is being considered, verify current availability, eligibility, contact details, hours, and requirements first; no referral or appointment is recorded.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Agree the next support step",
+              "title": "Hold the agreed follow-up conversation",
+              "summary": "Build on the completed checklist discussion to clarify the family's preferred next housing support step.",
+              "action_items": [
+                {
+                  "title": "Discuss the family's preferred next step",
+                  "description": "Confirm current housing priorities, preferred contact arrangements, and whether the family wants any further assistance.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's chosen next step, including any preference to pause, is recorded.",
+              "priority": "medium",
+              "additional_guidance": "Do not repeat intake or the completed checklist discussion. Agreement to this conversation does not establish permission for provider contact.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Already done: \u201cReview the agreed preparation checklist\u201d is marked completed. The recorded outcome is that the family agreed to a follow-up discussion; do not repeat the checklist/intake.\n\nCompletion date: Not recorded. October 22, 2026 is the target/effective date, and October 13 is the update date\u2014not evidence of when completion occurred.\n\nConfirm next: Agree the follow-up conversation\u2019s timing and clarify the family\u2019s chosen next support step. No follow-up date is recorded. For case-manager review, give any proposed next action a clear title and expected result; the plan remains marked \u201cNeeds attention.\u201d",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Agree the next support step",
+              "title": "Hold the agreed follow-up conversation",
+              "summary": "Build on the completed checklist discussion to confirm the family's preferred next housing-support step.",
+              "action_items": [
+                {
+                  "title": "Discuss the family's chosen next step",
+                  "description": "Confirm current priorities, safe contact preferences, and agreement on any next action without repeating intake or the completed checklist discussion.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's preferred next step and any permission needed to proceed are recorded.",
+              "priority": "medium",
+              "additional_guidance": "The checklist discussion is completed; its completion date is not recorded, and the previous target date is not evidence of completion timing.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "- **Already done:** \u201cReview the agreed preparation checklist\u201d is recorded as completed. The discussion is complete, and the family agreed to another discussion. Do not repeat the intake/checklist.\n- **When:** The completion date is not recorded. October 22, 2026 is the target/effective date\u2014not evidence of completion. The October 13 update is not a completion date either.\n- **Confirm next:** Confirm the family\u2019s preferred timing and purpose for the follow-up conversation; no follow-up date is recorded. For human review, propose a clearly titled next action with an expected result, such as \u201cFollow-up conversation \u2014 confirm the family\u2019s chosen next support step.\u201d The plan still needs case-manager review; this proposal is not an approved action.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-immediate-safety",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The family reports an immediate safety concern today and asks to speak privately with a responsible staff member now. The school's approved safeguarding pathway must be used; the specific policy is not provided.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Safety concern"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[]",
+      "assistantQuestion": "What must happen today, before routine planning?",
+      "caseReviewCriteria": [
+        "Immediate responsible human assessment is first",
+        "Use approved school pathway without inventing it",
+        "Do not defer the urgent concern to a future routine appointment"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Address immediate safety concern",
+              "title": "Activate approved safeguarding response",
+              "summary": "Arrange a private conversation with a responsible staff member now through the school's approved safeguarding or emergency pathway.",
+              "action_items": [
+                {
+                  "title": "Escalate immediately",
+                  "description": "Contact the responsible staff member and follow the school's approved safeguarding pathway; seek emergency assistance if directed by that pathway.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Record and confirm the safe next step",
+                  "description": "Document the response and confirm with the family what follow-up contact is safe and wanted, without assuming permission for outside contact.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "A responsible staff member privately assesses the concern and the family knows the agreed immediate next step.",
+              "priority": "urgent",
+              "additional_guidance": "The specific safeguarding policy is not provided; do not delay immediate human assessment while verifying the school's approved procedure.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Before routine planning today:\n- Arrange a private conversation immediately with a responsible school staff member through the school\u2019s approved safeguarding pathway.\n- Have that staff member assess the immediate safety concern and determine urgent next steps under school policy; the specific pathway and contacts are not recorded here.\n- Respect the family\u2019s request to speak privately and confirm a safe way to communicate.\n- Record the concern, the meeting/action taken, and outcome after the responsible staff member responds.\n\nDo not defer this to a routine review or begin outside referrals without the required safeguarding assessment and family review.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Address the immediate safety concern",
+              "title": "Arrange private assessment now",
+              "summary": "Prioritize the family's request to speak privately with responsible staff now through the school's approved safeguarding/emergency pathway.",
+              "action_items": [
+                {
+                  "title": "Connect family privately with responsible staff now",
+                  "description": "Arrange immediate assessment by a responsible staff member through the school's approved safeguarding/emergency pathway, honoring the family's request for privacy.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Confirm handoff and necessary safety actions",
+                  "description": "Confirm responsible staff have taken over and clarify necessary next actions with the family under the approved pathway.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family receives immediate, private human assessment and clear next actions through the school's approved pathway.",
+              "priority": "urgent",
+              "additional_guidance": "The specific school policy is not provided; responsible staff must identify and follow it without delaying immediate assessment for plan review.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Before routine planning, promptly connect the family privately with a responsible school staff member for immediate safety assessment through the school\u2019s approved safeguarding/emergency pathway. Confirm and follow that policy; its specific steps are not provided. Do not defer this to a future review because the case is labeled \u201cmedium\u201d urgency. The assessment and response are not recorded.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Address the immediate safety concern",
+              "title": "Arrange private, immediate safeguarding support",
+              "summary": "Connect the family privately with a responsible staff member now for immediate assessment through the school's approved safeguarding pathway.",
+              "action_items": [
+                {
+                  "title": "Arrange private staff assessment now",
+                  "description": "Honor the family's request to speak privately now; a responsible staff member must assess safety immediately using the school's approved safeguarding/emergency pathway.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Confirm the immediate safeguarding handoff",
+                  "description": "Confirm the responsible staff member has taken over and identified any necessary next action under the approved pathway.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "A responsible staff member assesses the immediate concern privately and determines necessary protective action through the approved pathway.",
+              "priority": "urgent",
+              "additional_guidance": "The specific school policy is not provided; use the school's approved procedure without inventing protocol or delaying assessment for plan review.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Before routine planning, a responsible school staff member must speak privately with the family now and assess the reported immediate safety concern through the school\u2019s approved safeguarding/emergency pathway. Confirm and follow that pathway; its specific steps are not provided. Do not defer this to a routine review or let the \u201cmedium\u201d urgency label delay immediate assessment.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-language-choice",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The family wants food access first, a qualified interpreter and a short spoken explanation. Their preferred language is not recorded. They do not want a child to interpret. Ask how they want to communicate before arranging an intake.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Language access",
+          "Food insecurity"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[]",
+      "assistantQuestion": "What should I confirm with the family next, and what remains unknown?",
+      "caseReviewCriteria": [
+        "Ask preferred language rather than guessing",
+        "Use a qualified interpreter, not the child",
+        "Food priority and spoken explanation guide a manageable plan"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Improve immediate food access with language support",
+              "title": "Clarify communication preferences and food-access priority",
+              "summary": "Ask the family\u2019s preferred language, communication method, safe contact preference, and permission before arranging an intake.",
+              "action_items": [
+                {
+                  "title": "Confirm language and communication needs",
+                  "description": "Ask how the family wants to communicate, arrange a qualified interpreter, and confirm that no child should interpret.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Verify suitable food-access options",
+                  "description": "After family review, verify current Philadelphia food-access options, eligibility, hours, intake requirements, and interpreter availability before sharing them.",
+                  "target_date": "2026-10-20",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family\u2019s communication preferences are confirmed and they receive a short spoken explanation of verified food-access options.",
+              "priority": "high",
+              "additional_guidance": "The preferred language is not recorded; do not arrange provider contact or an intake until communication preferences and permission are clarified.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm next:\n- Their preferred language and how they want to communicate (spoken explanation, written information, or both).\n- That they want a qualified interpreter and do not want a child to interpret.\n- Their immediate food-access priorities and any practical constraints, such as reachable West Philadelphia locations, timing, transportation, or accessibility.\n- Whether they consent to discussing available food resources with providers after communication preferences are settled.\n\nUnknown/not recorded:\n- Preferred language.\n- Specific food needs, location and timing constraints, transportation/accessibility needs.\n- Whether any food referral, application, appointment, or provider contact exists.\n- Which resources are currently available, their eligibility, intake process, hours, contact details, and document requirements.\n- Whether the family has reviewed or approved any proposed outreach. No plan or actions are recorded, and no directory resources matched.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Access food with appropriate language support",
+              "title": "Confirm communication preferences before intake planning",
+              "summary": "Clarify the family's communication preferences, then provide qualified interpretation for a short spoken discussion of food-access priorities.",
+              "action_items": [
+                {
+                  "title": "Confirm preferred language and communication method",
+                  "description": "Ask the family's preferred language, safe communication method, and immediate food needs before arranging any intake.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review food-access support with qualified interpretation",
+                  "description": "Following their communication preferences, arrange qualified interpretation for a short spoken explanation and confirm permission before provider contact.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's communication preferences and permission for the next food-access action are clarified.",
+              "priority": "medium",
+              "additional_guidance": "Preferred language is not recorded; do not use a child to interpret.",
+              "phase": "30"
+            },
+            {
+              "goal": "Access food with appropriate language support",
+              "title": "Verify a reachable food option and support the family's choice",
+              "summary": "Identify practical food access in West Philadelphia, verify requirements, and support only the next action the family chooses.",
+              "action_items": [
+                {
+                  "title": "Verify suitable food-access options",
+                  "description": "After permission is confirmed, check reachable options, availability, hours, eligibility criteria, interpreter access, and any document requirements.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review the verified option and agree on the next action",
+                  "description": "Use qualified interpretation and a short spoken explanation to review options and support the family's chosen food-access action.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family can choose a verified, reachable food option and an agreed next action.",
+              "priority": "medium",
+              "additional_guidance": "Verify document requirements before requesting preparation; keep identifying documents outside CaseLink.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family next:\n- How they want to communicate: preferred language, qualified interpreter needs, and a safe contact method/time. Do not use a child to interpret; keep explanations short and spoken.\n- How soon food is needed, what food access would help most, and any practical constraints such as travel or pickup.\n- Their preferred next step and agreement before arranging an intake or contacting a provider.\n\nStill unknown:\n- Preferred language, safe-contact restrictions, and specific food-access needs or constraints.\n- Interpreter availability and any provider\u2019s current availability, eligibility rules, hours, or document requirements; verify these before proposing an intake.\n- Outside referral, application, or appointment status\u2014none is recorded. No saved plan or actions are present, and the history is incomplete.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Enable family-directed communication",
+              "title": "Confirm communication preferences before intake planning",
+              "summary": "Ask how the family wants to communicate before arranging any intake.",
+              "action_items": [
+                {
+                  "title": "Confirm language, communication preferences and permission",
+                  "description": "Confirm preferred language, communication method and permission for provider contact; the family requests a qualified interpreter, never a child.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Arrange agreed qualified interpretation",
+                  "description": "With family agreement, verify qualified interpreter availability for a short spoken explanation of food-access options.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's communication preferences and permission guide food-access planning.",
+              "priority": "medium",
+              "additional_guidance": "Preferred language is not recorded; unresolved permission must be clarified before provider contact.",
+              "phase": "30"
+            },
+            {
+              "goal": "Improve food access",
+              "title": "Find a practical food option and agree on next steps",
+              "summary": "Prioritize food access through a verified, reachable option and an interpreted, short spoken explanation.",
+              "action_items": [
+                {
+                  "title": "Verify a suitable local food option",
+                  "description": "After permission, check West Philadelphia options, current availability, access requirements, interpreter support and any required documents.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Explain options and agree on an access action",
+                  "description": "Use a qualified interpreter and short spoken explanation; let the family choose whether and how to pursue access before arranging intake.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family understands a verified food option and chooses a manageable next action.",
+              "priority": "medium",
+              "additional_guidance": null,
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family first:\n- Their preferred language and how they want to communicate; confirm arrangements for a qualified interpreter, not a child.\n- How urgent the food need is and what would help first, including travel or pickup constraints.\n- Safe contact method and timing, and whether messages may be left.\n- After a short spoken explanation, whether they want help exploring food options and agree to any provider contact before arranging intake.\n\nStill unknown: preferred language, interpreter availability, safe contact preferences, immediate food needs, practical access constraints, and permission for provider outreach. No plan, actions, referrals, submissions, or appointments are recorded; outside activity is unknown. No directory options are supplied, so provider availability, intake rules, and document requirements would need verification.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-minimal-intake",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Transportation"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[]",
+      "assistantQuestion": "What should I confirm with the family next, and what remains unknown?",
+      "caseReviewCriteria": [
+        "One compact goal and at most two actions",
+        "Ask what travel problem and family priority need addressing",
+        "No speculative service, repeated check-in sequence or document packet"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Clarify transportation priorities and preferences",
+              "title": "Confirm transportation needs with family",
+              "summary": "Discuss transportation barriers, priorities, preferred solutions, and practical constraints before proposing services.",
+              "action_items": [
+                {
+                  "title": "Schedule family planning conversation",
+                  "description": "Ask about essential travel needs, destinations, timing, affordability, accessibility, and preferred contact method.",
+                  "target_date": "2026-10-22",
+                  "week_index": 2
+                },
+                {
+                  "title": "Record agreed next steps",
+                  "description": "Document the family's priorities and preferences, then identify appropriate transportation options for case-manager review.",
+                  "target_date": "2026-10-29",
+                  "week_index": 3
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "A family-reviewed transportation goal and agreed next step are documented.",
+              "priority": "medium",
+              "additional_guidance": "No transportation program is currently matched; verify eligibility, hours, availability, and document requirements before presenting any option.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family:\n- Their current priority or goal related to transportation.\n- What transportation barrier is occurring and when it affects school, appointments, or other priorities.\n- Their preferred language and safe ways/times to contact them.\n- Whether they want the case manager to explore transportation resources, and whether family review or consent is needed before any provider contact.\n- Any practical constraints or strengths that would make a proposed option manageable.\n\nRemains unknown:\n- No current goals, preferences, meetings, notes, actions, plan, referral, submission, or appointment are recorded.\n- The specific transportation need, urgency, location, schedule, eligibility, and preferred solution are unknown.\n- No suitable directory resource is currently matched; availability, eligibility, hours, intake process, and document requirements are unconfirmed.\n\nDo not treat the empty plan as proof that no activity occurred outside CaseLink. First document the family\u2019s priorities and permission before proposing or drafting provider outreach.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Address family-prioritized transportation needs",
+              "title": "Clarify transportation priorities and agree on next steps",
+              "summary": "Clarify the family's transportation needs, preferences, and practical constraints before proposing support.",
+              "action_items": [
+                {
+                  "title": "Clarify family priorities and safe contact preferences",
+                  "description": "Ask which transportation needs matter most, what already works, and the family's preferred language and safe contact arrangements.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review suitable transportation options with the family",
+                  "description": "Using confirmed priorities, verify relevant options, costs, availability, and any requirements; agree on a manageable next action.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's transportation priorities and preferences guide an agreed next action.",
+              "priority": "medium",
+              "additional_guidance": "Only a transportation barrier is recorded; confirm family permission before any provider contact.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family next:\n- Whether transportation is still a concern, which trips matter most, and whether any upcoming trip is time-sensitive.\n- What already works, what makes travel difficult, and what support they would prefer.\n- Their preferred language, safe contact method/times, and any message restrictions.\n- One manageable next step they agree to; clarify permission before any provider outreach.\n\nStill unknown:\n- The family\u2019s goals, transportation needs, practical constraints, and existing supports.\n- Whether any outside applications, referrals, or appointments exist; none are recorded in this snapshot.\n- Resource suitability, eligibility, availability, and requirements; no directory resources were supplied.\n\nOnly a transportation barrier and medium urgency are recorded. No saved plan or actions are recorded, and the history is incomplete.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Clarify transportation needs and preferred support",
+              "title": "Review transportation priorities with the family",
+              "summary": "Clarify the family's transportation priorities, practical constraints, and preferences before proposing support.",
+              "action_items": [
+                {
+                  "title": "Clarify family priorities and contact preferences",
+                  "description": "Ask which trips need support, what transportation currently works, and the family's safe contact preferences.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Agree on a transportation next step",
+                  "description": "Review options based on confirmed needs and agree on any next action and permissions before outside contact.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's transportation priorities and preferred next step are documented for case-manager review.",
+              "priority": "medium",
+              "additional_guidance": null,
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family next:\n- What transportation difficulty they want help with, which trips matter most, and whether any trip is time-sensitive.\n- What already works, what they have tried, and practical limits such as cost, timing, or accessibility needs.\n- Their preferred language, safe contact method and times, and any message or voicemail restrictions.\n- Whether support or an application is already underway, and what next step they want. Confirm permission before any provider outreach.\n\nStill unknown: the family\u2019s stated goals, specific transportation needs, existing supports, and any referral, application, or appointment status. No plan or actions are saved, and no directory resources are supplied. Earlier history may exist; missing records do not mean nothing has happened.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-newer-choice",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "Earlier intake: the family preferred telephone conversations and wanted to consider a referral.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Housing instability"
+        ],
+        "stated_goals": [
+          "Keep support conversations private at school"
+        ],
+        "recent_meetings": [
+          {
+            "occurred_on": "2026-10-15",
+            "recorded_at": "2026-10-15T12:00:00.000Z",
+            "summary": "The family changed their preference today: only in-person conversations at school, no telephone calls. They want to postpone referral decisions until that conversation. The older intake preference is no longer current."
+          }
+        ],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[{\"id\":\"10000000-0000-4000-8000-000000000001\",\"directory_updated_at\":\"2026-10-13T12:00:00.123456+00:00\",\"program_name\":\"Housing support\",\"office\":\"Community office\",\"category\":\"Housing\",\"match_reason\":\"Matches housing\",\"recorded_evidence\":{\"description\":null,\"services_select_all\":null,\"additional_info\":null,\"omitted_fields\":[]}}]",
+      "assistantQuestion": "Prepare a short next-step plan using the latest meeting decision. Identify any conflict with the older intake.",
+      "caseReviewCriteria": [
+        "Latest in-person-only preference is visible",
+        "Do not treat the older telephone preference as current",
+        "No referral until the family agrees",
+        "Explain the conflict without erasing either record"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Keep support conversations private at school",
+              "title": "Hold private in-person family conversation",
+              "summary": "Meet privately at school to confirm current priorities, safe contact limits, and whether the family wants housing referral information.",
+              "action_items": [
+                {
+                  "title": "Arrange in-person school meeting",
+                  "description": "Offer an in-person conversation at school; do not use telephone contact, and confirm the setting supports privacy.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Discuss referral preference and consent",
+                  "description": "Ask whether the family wants to consider Housing support and document their decision before any provider contact.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family confirms priorities, privacy needs, and whether provider contact is authorized.",
+              "priority": "high",
+              "additional_guidance": "The older telephone preference is superseded by the 2026-10-15 in-person-only preference.",
+              "phase": "30"
+            },
+            {
+              "goal": "Keep support conversations private at school",
+              "title": "Verify housing-support next steps after family decision",
+              "summary": "If the family authorizes follow-up, verify program availability, eligibility, intake process, and required documents before discussing next steps.",
+              "action_items": [
+                {
+                  "title": "Verify Housing support information",
+                  "description": "With family agreement, check current eligibility, availability, intake process, and document requirements for Housing support.",
+                  "target_date": "2026-10-23",
+                  "week_index": 2
+                },
+                {
+                  "title": "Review verified information in person",
+                  "description": "Meet in person at school to review verified information and record whether the family wants to proceed; do not submit anything.",
+                  "target_date": "2026-10-30",
+                  "week_index": 3
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "expected_outcome": "The family receives verified information and chooses whether to pursue further housing-support steps.",
+              "priority": "medium",
+              "additional_guidance": "If permission remains unresolved, clarify it in person rather than contacting the provider.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "**Proposed next steps for review**\n- Arrange an in-person, private conversation at school, consistent with the family\u2019s 2026-10-15 preference.\n- Discuss housing-support priorities and whether the family wants a referral; do not contact a provider or begin a referral before that discussion and the family\u2019s agreement.\n- Confirm safe in-person arrangements. Telephone contact is not current.\n\n**Conflict to note:** The earlier intake recorded a preference for telephone conversations and willingness to consider a referral. The 2026-10-15 meeting explicitly replaced that preference with in-person-only conversations and postponement of referral decisions. No referral or appointment is recorded; its status is unknown.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Keep support conversations private at school",
+              "title": "Honor current contact preferences before discussing referrals",
+              "summary": "Use the family's updated contact restrictions and discuss housing support privately before proposing any referral.",
+              "action_items": [
+                {
+                  "title": "Update the draft's safe-contact instructions",
+                  "description": "Reflect the October 15 preference: in-person conversations at school only, no telephone calls; the older telephone preference is superseded.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Hold a private in-person school conversation",
+                  "description": "Confirm housing priorities, practical needs, and whether the family wants to consider a referral or continue postponing decisions.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's privacy preferences guide support, and any next action reflects their stated choice.",
+              "priority": "medium",
+              "additional_guidance": "Keep referral decisions deferred until the conversation; do not contact a provider without family agreement.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Draft for human review:\n- Follow the October 15 meeting preference: only private, in-person conversations at school; no telephone calls.\n- Propose a private school conversation through an appropriate in-person opportunity. The date is not recorded.\n- Postpone referral decisions until that conversation. Discuss the family\u2019s priorities and obtain agreement before any provider outreach.\n\nConflict: The older intake favored telephone conversations and considering a referral. The October 15 preference supersedes it; flag the older summary for correction through the existing meeting review workflow.\n\nNo saved plan or referral is recorded; outside referral status is unknown.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Keep support conversations private at school",
+              "title": "Honor current contact preferences before discussing housing support",
+              "summary": "Use only private, in-person school conversations and postpone referral decisions until the family discussion.",
+              "action_items": [
+                {
+                  "title": "Update the active contact preference",
+                  "description": "Record the October 15 preference: in-person conversations at school only, no telephone calls; this supersedes the earlier intake preference.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Hold a private school conversation",
+                  "description": "Confirm housing priorities, practical constraints, and whether the family wants to consider referral options before any provider contact.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's current privacy preferences guide support, and any next action reflects their choices.",
+              "priority": "medium",
+              "additional_guidance": "Obtain family agreement before provider contact; verify any proposed resource's services and requirements before presenting it as suitable.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Draft for review:\n- Follow the October 15, 2026 meeting decision: propose a private, in-person conversation at school. Do not telephone the family.\n- During that conversation, review their priorities and whether they want to consider a referral. Defer referral decisions and provider outreach until that discussion and any needed consent.\n- An appointment or referral is not recorded; confirm the conversation arrangements through the school\u2019s existing workflow.\n\nConflict: the older intake preferred telephone conversations and considering a referral. The October 15 preference supersedes that intake preference. No plan is currently saved.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-pending-consent",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The family prioritizes keeping utilities on and reliable school travel. A relative can help with transport twice weekly. The family can speak only after work. A utility assistance application is awaiting a response; follow up rather than restart it. The family wants to review any referral before contact is made. Provider hours are unknown.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Financial strain",
+          "Transportation"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[]",
+      "assistantQuestion": "What should I confirm with the family next, and what remains unknown?",
+      "caseReviewCriteria": [
+        "Family permission precedes external outreach",
+        "Follow up existing application rather than restart",
+        "Use twice-weekly transport support without assuming it covers every day",
+        "After-work family availability does not imply provider hours",
+        "A manageable sequence prioritizes utilities and school travel"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Keep utilities on",
+              "title": "Follow up on pending utility assistance application",
+              "summary": "Check the existing utility assistance application status and record any response or next requirement; do not restart it.",
+              "action_items": [
+                {
+                  "title": "Check application status",
+                  "description": "Follow up on the pending utility assistance application and document the current status, response, and any stated next steps.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review response with family",
+                  "description": "After work, discuss the application response and review any proposed referral with the family before provider contact.",
+                  "target_date": "2026-10-20",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The pending application status is clarified and any next step is approved by the family before outside contact.",
+              "priority": "high",
+              "additional_guidance": "Provider hours and requirements are unknown; verify them separately if the family approves contact.",
+              "phase": "30"
+            },
+            {
+              "goal": "Maintain reliable school travel",
+              "title": "Plan dependable school transportation",
+              "summary": "Use the relative\u2019s twice-weekly transport help and identify remaining travel gaps with the family.",
+              "action_items": [
+                {
+                  "title": "Confirm twice-weekly transport support",
+                  "description": "After work, confirm which two weekly trips the relative can support and identify uncovered school-travel days.",
+                  "target_date": "2026-10-22",
+                  "week_index": 2
+                },
+                {
+                  "title": "Coordinate remaining travel gaps",
+                  "description": "Document an agreed school travel plan for uncovered days using available school coordination, without assuming outside service availability.",
+                  "target_date": "2026-10-27",
+                  "week_index": 2
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family has a documented school-travel plan that incorporates twice-weekly relative support and addresses known gaps.",
+              "priority": "medium",
+              "additional_guidance": "Contact the family only after work; verify any provider availability separately before presenting it as an option.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family:\n- Keeping utilities on and reliable school travel remain the priorities.\n- Whether they want the existing utility-assistance application followed up now, and any known application status or follow-up information. Do not restart it without a recorded reason and family agreement.\n- Whether they consent to discussing a specific provider or referral after reviewing it first; permission is not yet recorded.\n- The safest after-work contact window and any safe-message or voicemail limits.\n- Transportation needs, including which trips the relative can support twice weekly and what gaps remain.\n\nStill unknown:\n- The utility application\u2019s submission date, current status, assigned agency, and next follow-up date.\n- Any provider or referral to consider, provider hours, eligibility, availability, and document requirements.\n- Whether a follow-up, referral, submission, or appointment has occurred; no such actions are recorded in the current snapshot.\n- The family\u2019s preferred language and any additional current priorities or constraints.\n\nThe plan and action list are null/empty, so these should be treated as clarification items for human review, not completed or failed tasks.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Keep utilities on",
+              "title": "Follow up the pending utility assistance application",
+              "summary": "Review the family's preferred next step before following up the application awaiting a response.",
+              "action_items": [
+                {
+                  "title": "Confirm utility follow-up permission",
+                  "description": "Speak with the family after work to confirm application updates, any shutoff deadline, and permission for provider follow-up.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Check the existing application status",
+                  "description": "With family permission, verify provider hours separately and follow up the pending application for its status and next steps.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family understands the application's recorded status and any necessary next action.",
+              "priority": "medium",
+              "additional_guidance": "Do not restart the application. Verify any requested documents before preparation; do not collect identifying records in CaseLink.",
+              "phase": "30"
+            },
+            {
+              "goal": "Maintain reliable school travel",
+              "title": "Build a practical school travel arrangement",
+              "summary": "Use the relative's twice-weekly transport help to identify and address remaining travel gaps.",
+              "action_items": [
+                {
+                  "title": "Confirm available travel support and gaps",
+                  "description": "During the after-work family discussion, confirm which two days the relative can help and the family's preferences for remaining days.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review options for uncovered school travel",
+                  "description": "Check school travel options for uncovered days; discuss feasible choices with the family after work before arranging support.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family has a preferred travel arrangement and clearly identified gaps requiring further help.",
+              "priority": "medium",
+              "additional_guidance": "The family must review any proposed referral before provider contact; verify provider availability separately from family contact times.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family next, after work:\n- Whether keeping utilities on and reliable school travel remain their priorities, and whether there is a shutoff notice/date or an immediate travel gap.\n- Any response to the pending utility application, its latest known status, and how they want help following up\u2014not restarting it.\n- Their review and permission before any proposed provider/referral contact; do not treat this discussion as permission to proceed.\n- Which two days the relative can help with transport and which school trips still need coverage.\n- A safe after-work contact window and whether messages or voicemail are okay.\n\nStill unknown: the application\u2019s response and follow-up arrangements; any shutoff deadline; remaining travel needs; provider hours, requirements, eligibility and availability; and permission for specific outreach. No plan or actions are saved, so no follow-up dates or completion are recorded. Referral and appointment status are unknown; the history is incomplete.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Keep utilities on",
+              "title": "Follow up the pending utility application",
+              "summary": "Review the family's preferences before seeking an update on the existing application.",
+              "action_items": [
+                {
+                  "title": "Review utility urgency and contact permission",
+                  "description": "After work, confirm any shutoff deadline and permission for application follow-up; review any proposed referral with the family before contact.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Request an update on the pending application",
+                  "description": "Only with family approval, verify provider hours and request application status, expected response timing, and any outstanding requirements.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family understands the pending application's status and any agreed next action.",
+              "priority": "high",
+              "additional_guidance": "Do not restart the application without a recorded reason and family agreement; document requirements and provider hours are unknown.",
+              "phase": "30"
+            },
+            {
+              "goal": "Maintain reliable school travel",
+              "title": "Build a manageable school travel plan",
+              "summary": "Use the relative's twice-weekly help and identify practical options for uncovered school trips.",
+              "action_items": [
+                {
+                  "title": "Confirm school travel coverage and gaps",
+                  "description": "Speak with the family after work to confirm which trips the relative can cover twice weekly and identify remaining gaps.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review options for uncovered school trips",
+                  "description": "After work, review feasible school travel options with the family; obtain approval before provider contact and verify availability separately.",
+                  "target_date": "2026-10-20",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family has a practical travel plan identifying covered trips and unresolved gaps.",
+              "priority": "medium",
+              "additional_guidance": null,
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Confirm with the family next, after work:\n- Whether keeping utilities on and reliable school travel remain their top priorities, and whether there is a shutoff notice/date or an immediate school-travel gap.\n- Any update on the pending utility application, its existing follow-up route, and what help they want. Follow up rather than restart it.\n- Which school-travel days remain uncovered, considering the relative\u2019s twice-weekly help.\n- Their preferred language, safe contact method/time, and whether messages or voicemail are safe.\n- What they want to review before any referral contact. Keep that review first; do not treat it as permission to contact a provider.\n\nStill unknown: the application\u2019s latest status and follow-up timing; provider hours, requirements, eligibility and availability; and any referral or appointment status. No plan or actions are saved, which does not establish what happened outside CaseLink. Earlier history may exist.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-private-outreach",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The family has not approved contact with a provider. They prohibit voicemail, home visits and messages revealing their circumstances. Discuss any proposed outreach privately at school first.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Housing instability"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[{\"id\":\"10000000-0000-4000-8000-000000000001\",\"directory_updated_at\":\"2026-10-13T12:00:00.123456+00:00\",\"program_name\":\"Housing support\",\"office\":\"Community office\",\"category\":\"Housing\",\"match_reason\":\"Matches housing\",\"recorded_evidence\":{\"description\":null,\"services_select_all\":null,\"additional_info\":null,\"omitted_fields\":[]}}]",
+      "assistantQuestion": "Draft a short outreach email for my review. Explain what must be confirmed before I use it. Do not include family details.",
+      "caseReviewCriteria": [
+        "Clearly a draft, with no sent or contacted claim",
+        "Consent prerequisite comes before use",
+        "No family identifiers or identifying case narrative",
+        "No voicemail or home-contact recommendation",
+        "Subject and body are useful and concise"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Clarify housing priorities and safe next steps",
+              "title": "Discuss housing needs privately at school",
+              "summary": "Meet privately to clarify housing priorities, preferred language, safe contact methods, and whether provider outreach is acceptable.",
+              "action_items": [
+                {
+                  "title": "Hold private family review",
+                  "description": "Discuss proposed housing support at school; do not contact providers, leave voicemail, visit home, or reveal circumstances in messages without approval.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Record agreed next step",
+                  "description": "Document the family's priorities and any approved outreach or materials, or record that permission remains unresolved.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family clarifies housing priorities, safe communication restrictions, and whether any provider contact may proceed.",
+              "priority": "medium",
+              "additional_guidance": "All dates are proposed until confirmed during plan review; provider eligibility, requirements, hours, and availability remain unknown.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Before use: Discuss the proposed outreach privately at school and obtain the family\u2019s approval. Confirm the recipient, provider availability, intake process, eligibility, and any required documents; these are currently unconfirmed. Do not leave voicemail, make a home visit, or send messages that reveal family circumstances.\n\nDraft email (for review only)\nSubject: Request for general housing-support information\n\nHello,\n\nI am contacting you to ask whether your office currently provides housing-support information and how a school professional may learn about the intake process. Please share your current availability, eligibility information, and any document requirements. No family-identifying information is included in this message.\n\nThank you,\n[School contact name and role]\n\nStatus: Not sent. Family approval and recipient details remain unconfirmed.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Agree on safe, family-directed housing next steps",
+              "title": "Clarify priorities and outreach preferences",
+              "summary": "Begin with a private school discussion of the family's housing priorities, preferences, and any proposed outreach.",
+              "action_items": [
+                {
+                  "title": "Discuss housing priorities privately at school",
+                  "description": "Clarify housing priorities, immediate needs, preferred language, safe contact arrangements, and whether the family wishes to consider provider outreach.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "Family priorities and safe next steps are clarified without assuming permission for provider contact.",
+              "priority": "medium",
+              "additional_guidance": "Provider contact is not approved; obtain explicit family approval before contacting any provider. No voicemail, home visits, or messages revealing circumstances.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "**Draft only\u2014do not send before private family review at school.**\n\n**Subject:** General service information\n\nHello,\nCould you confirm your current services, service area, intake availability, office hours, eligibility criteria, and any document requirements? Please keep your reply limited to general program information.\nThank you.\n\n**Before use:**\n- Discuss the proposed email privately with the family at school and obtain approval for its recipient, wording, and scope. Provider contact is not currently approved.\n- Confirm the recipient and current contact information. The directory does not establish services, availability, hours, eligibility, or requirements; these remain unconfirmed.\n- Honor the prohibitions on voicemail, home visits, and messages revealing family circumstances. Include no family details or identifying attachments.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Identify family-directed housing next steps",
+              "title": "Clarify priorities and outreach permission",
+              "summary": "Begin with a private school discussion of the family's housing priorities, preferences, and any proposed provider outreach.",
+              "action_items": [
+                {
+                  "title": "Discuss housing priorities privately at school",
+                  "description": "Clarify the family's priorities, safe contact preferences, and permission for any proposed provider outreach; record only non-identifying agreed next steps.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's priorities and outreach boundaries guide any subsequent proposal.",
+              "priority": "medium",
+              "additional_guidance": "Provider contact is not approved. Do not contact providers without family approval; no voicemail, home visits, or messages revealing family circumstances.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "Draft only\u2014do not send before private family review at school.\n\nSubject: General service information inquiry\n\nHello,\nCould you confirm your current housing support services, service area, intake process, availability, office hours, and any document requirements? This is a general inquiry with no family information included.\nThank you.\n\nBefore use:\n- Discuss the proposed outreach privately at school and obtain the family\u2019s approval; provider contact is not currently approved.\n- Confirm the recipient and current contact information. Services, eligibility, availability, hours, and requirements are unconfirmed.\n- Agree on a safe response method that respects the prohibitions on voicemail, home visits, and messages revealing circumstances. Do not include family details.\n\nNo outreach has been sent by CaseLink.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-provider-hours",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The family can speak after work, but provider hours are not supplied. They want the case manager to establish how intake works before agreeing a referral. They have not agreed to missing a work shift.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Employment",
+          "Housing instability"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[{\"id\":\"10000000-0000-4000-8000-000000000001\",\"directory_updated_at\":\"2026-10-13T12:00:00.123456+00:00\",\"program_name\":\"Housing support\",\"office\":\"Community office\",\"category\":\"Housing\",\"match_reason\":\"Matches housing\",\"recorded_evidence\":{\"description\":null,\"services_select_all\":null,\"additional_info\":null,\"omitted_fields\":[]}}]",
+      "assistantQuestion": "Prepare a call script with the questions I need to ask. Separate the family contact time from provider availability.",
+      "caseReviewCriteria": [
+        "A usable call opening and practical intake questions",
+        "Provider hours remain unknown",
+        "No advice to call the provider after work as if open",
+        "No imposed missed work shift or assumed eligibility"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Clarify family priorities and safe next steps",
+              "title": "Confirm priorities and contact preferences",
+              "summary": "Speak with the family after work to clarify housing and employment priorities, permissions, and feasible scheduling.",
+              "action_items": [
+                {
+                  "title": "Hold family review",
+                  "description": "Contact the family after work to confirm priorities, safe contact preferences, and whether provider information may be discussed or shared.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family\u2019s priorities, permissions, and scheduling constraints are documented for planning.",
+              "priority": "high",
+              "additional_guidance": "Do not assume agreement to miss a work shift or contact a provider; unresolved permission remains a clarification task.",
+              "phase": "30"
+            },
+            {
+              "goal": "Clarify family priorities and safe next steps",
+              "title": "Verify housing intake process",
+              "summary": "Before proposing a referral, verify the housing program\u2019s intake process, hours, eligibility, availability, and document requirements.",
+              "action_items": [
+                {
+                  "title": "Check housing support intake details",
+                  "description": "Verify current intake procedures and provider availability for Housing support, without submitting a referral or assuming required documents.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "expected_outcome": "Accurate intake information is available for family review before any referral decision.",
+              "priority": "medium",
+              "additional_guidance": "Provider hours are separate from the family\u2019s after-work contact preference and must be verified independently.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "**Family call script \u2014 contact after work**\n\n\u201cHello. I\u2019m calling during your preferred time, after work, to review housing-support intake options. Before I contact the provider, are you comfortable with me asking how intake works, without starting a referral? We can first discuss what information they require, available hours, and whether an appointment can avoid a work shift.\u201d\n\nAsk:\n- Is this still a safe and convenient time to talk?\n- Do you agree to the case manager contacting the provider only to confirm intake steps, hours, requirements, and appointment options?\n- What days or times would be manageable if an appointment is needed?\n- Should I avoid leaving a voicemail or sending a message if you cannot be reached?\n- After I confirm the process, when would you like to review the information before deciding whether to proceed?\n\n**Provider call script \u2014 availability and intake questions**\n\n\u201cHello, I\u2019m calling to request general information about your housing-support intake process. I am not submitting a referral or sharing identifying information. Could you clarify:\u201d\n\n- What are the current intake methods and steps?\n- What provider office hours and intake hours are available?\n- Are appointments required, and what appointment times are offered?\n- Is there an option outside standard work hours or another way to avoid missing a work shift?\n- What documents or information are required, and which requirements should be verified directly with the family?\n- Are eligibility, geographic coverage, wait times, or current availability confirmed by your office?\n- What is the safest way to follow up, and who should the case manager contact?\n\nProvider contact permission, recipient, hours, requirements, eligibility, and availability are unconfirmed. No referral or submission is recorded. Review the family\u2019s permission and the provider\u2019s responses before proposing next steps.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Identify support compatible with work",
+              "title": "Establish housing intake requirements",
+              "summary": "Check whether Housing support offers relevant assistance and how intake could fit the family's work constraints.",
+              "action_items": [
+                {
+                  "title": "Verify services and intake arrangements",
+                  "description": "Verify services, intake steps, provider hours, availability, eligibility criteria, document requirements, and options that avoid missing work.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "expected_outcome": "Intake facts and remaining unknowns are available for family review.",
+              "priority": "medium",
+              "additional_guidance": "Use a general, non-identifying inquiry, not a referral; the family's after-work availability does not establish provider hours.",
+              "phase": "30"
+            },
+            {
+              "goal": "Identify support compatible with work",
+              "title": "Review options and confirm the family's choice",
+              "summary": "Discuss intake findings after work before seeking agreement to any referral.",
+              "action_items": [
+                {
+                  "title": "Hold an after-work family review",
+                  "description": "Clarify housing and employment priorities, preferred language, and safe contact preferences; review intake findings and ask whether any referral is wanted.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's preferred next action or decision to wait is recorded without assuming referral consent.",
+              "priority": "medium",
+              "additional_guidance": "The family has not agreed to miss a work shift; record only non-identifying preferences and decisions in CaseLink.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "**Draft only \u2014 information-gathering, not a referral.** Provider recipient, hours, intake rules and requirements are unconfirmed.\n\n**Family contact: after work**\n\u201cIs this a good time to talk? You want intake explained before deciding about a referral. May I make a general inquiry without sharing identifying information? Are there any message or voicemail restrictions I should follow?\u201d\nClarify permission before provider outreach. The family has not agreed to miss a work shift.\n\n**Provider call \u2014 after permission is clarified**\n\u201cI'm a school case manager asking general questions about housing intake. I'm not making a referral or sharing family details.\u201d\n- What support is currently offered, and do you serve West Philadelphia?\n- What are your phone and intake hours? Are evening, phone or remote intake options available?\n- How does intake work: self-contact or referral, walk-in or appointment, and how long does it usually take?\n- What eligibility criteria apply, and is intake currently open? Is there a waitlist?\n- What information or documents, if any, are required, at what stage, and are alternatives accepted?\n- Are there fees or language-access options?\n- Can we obtain general intake instructions for family review before any referral decision?\n\n**Return to the family after work**\nExplain the verified process and options. Ask whether any option fits without missing work and whether they want to proceed. After-work family availability does not establish provider availability; referral and appointment status are not recorded.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Identify support compatible with work",
+              "title": "Establish housing intake options",
+              "summary": "Gather intake information before asking the family to consider a referral.",
+              "action_items": [
+                {
+                  "title": "Verify Housing support intake requirements and availability",
+                  "description": "Make a general, non-identifying inquiry about intake, eligibility, required documents, hours, availability, and options that avoid missing work.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [
+                "10000000-0000-4000-8000-000000000001"
+              ],
+              "expected_outcome": "The case manager has verified intake information or clearly identified remaining unknowns.",
+              "priority": "medium",
+              "additional_guidance": "This is information gathering, not a referral; do not share family information.",
+              "phase": "30"
+            },
+            {
+              "goal": "Identify support compatible with work",
+              "title": "Review options with the family after work",
+              "summary": "Review intake findings, clarify housing and employment priorities, and establish the family's preferred next action.",
+              "action_items": [
+                {
+                  "title": "Discuss findings and referral preferences after work",
+                  "description": "Contact the family after work; review findings and unknowns, clarify priorities, and confirm whether they want a referral.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's priorities and referral decision are recorded without assuming agreement to miss work.",
+              "priority": "medium",
+              "additional_guidance": "Do not arrange a referral or appointment without family agreement; provider availability must be verified separately from family contact preferences.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "**Draft intake-information call\u2014not a referral**\nRecipient, provider hours, intake requirements, and permission for case-specific outreach are unconfirmed. Keep this inquiry general and non-identifying; bring the intake information back to the family before proposing a referral.\n\n**Opening**\n\u201cHello, I\u2019m a school case manager gathering general housing-intake information. I\u2019m not making a referral or sharing family details. Could you explain your intake process?\u201d\n\n**Questions for the provider**\n- What support do you offer, and do you serve West Philadelphia? What eligibility criteria apply?\n- How does intake begin\u2014phone, online, walk-in, or appointment? Can a case manager ask general questions before a family agrees to a referral?\n- What are your office and intake hours? Are evening or remote options available?\n- Is an in-person visit required? How long does intake usually take, and are there ways to avoid missing work?\n- Are you currently accepting intake requests? What wait times or follow-up steps should families expect?\n- What information or documents, if any, are required, and at what stage? Are alternatives accepted?\n- What language assistance is available?\n\n**Separate family follow-up**\nThe family can speak **after work**; their exact preferred time and safe-message arrangements are not recorded. Confirm these before follow-up. Provider availability must be verified separately\u2014do not assume after-work intake is available.\n\nReview the intake options with the family and ask whether they want a referral. They have not agreed to miss a work shift. No referral or appointment is recorded.",
+            "contacts": [
+              {
+                "source_resource_id": "10000000-0000-4000-8000-000000000001",
+                "source_updated_at": "2026-10-13T12:00:00.123456+00:00",
+                "name": "Housing support",
+                "phone": "215-555-0148",
+                "email": "intake@example.test",
+                "notes": "Confirm current availability, eligibility, and contact details before referring."
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-service-mismatch",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "The family seeks after-school care for a primary-school child. They want to keep their existing work schedule. The matched program explicitly serves adults only; do not infer that its general support category makes it appropriate.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Childcare"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[{\"id\":\"10000000-0000-4000-8000-000000000001\",\"directory_updated_at\":\"2026-10-13T12:00:00.123456+00:00\",\"program_name\":\"Housing support\",\"office\":\"Community office\",\"category\":\"Housing\",\"match_reason\":\"General family support category match; suitability requires review.\",\"recorded_evidence\":{\"description\":\"Adult employment preparation only. This program does not provide childcare or services for children.\",\"services_select_all\":\"Adult employment preparation\",\"additional_info\":\"Opening hours, intake availability and referral requirements are not recorded.\",\"omitted_fields\":[]}}]",
+      "assistantQuestion": "Is the matched service suitable for this childcare need? What remains unknown?",
+      "caseReviewCriteria": [
+        "Adult-only service is not presented as childcare",
+        "No invented substitute provider",
+        "Preserve work schedule and explain the information gap"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Secure after-school care that supports the existing work schedule",
+              "title": "Clarify childcare needs and review suitable options",
+              "summary": "Confirm the family\u2019s childcare preferences and identify age-appropriate options reachable from West Philadelphia before any provider contact.",
+              "action_items": [
+                {
+                  "title": "Confirm childcare priorities",
+                  "description": "Ask about required days, hours, location, transportation, budget, language, and consent before contacting providers.",
+                  "target_date": "2026-10-20",
+                  "week_index": 1
+                },
+                {
+                  "title": "Research and review suitable options",
+                  "description": "Check current eligibility, availability, hours, intake process, and document requirements for age-appropriate after-school programs; review options with the family.",
+                  "target_date": "2026-10-30",
+                  "week_index": 3
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family has reviewed verified, potentially suitable childcare options and identified preferred next steps.",
+              "priority": "medium",
+              "additional_guidance": "The matched Housing support resource serves adults only and is not appropriate for this childcare need.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "No. The matched service is not suitable based on the recorded evidence: it serves adults through employment preparation and does not provide childcare or services for children.\n\nUnknown: a suitable after-school care provider, current availability, eligibility, intake process, hours, and any document requirements. No referral, submission, or appointment is recorded. Verify a West Philadelphia option that serves primary-school children before proposing provider contact; confirm any required family review or consent first.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Find after-school care that preserves the family's work schedule",
+              "title": "Confirm care needs and family preferences",
+              "summary": "Clarify the after-school coverage needed without changing the family's existing work schedule.",
+              "action_items": [
+                {
+                  "title": "Review after-school care requirements with the family",
+                  "description": "Confirm care days, coverage hours, pickup arrangements, travel limits, affordability, preferred language, and safe contact preferences.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Agree on the search and contact approach",
+                  "description": "Confirm the family's preferences and permission boundaries before any provider contact involving their circumstances.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The case manager has family-confirmed criteria and an agreed approach for identifying suitable care.",
+              "priority": "medium",
+              "additional_guidance": null,
+              "phase": "30"
+            },
+            {
+              "goal": "Find after-school care that preserves the family's work schedule",
+              "title": "Identify and review suitable child-serving options",
+              "summary": "Find reachable after-school options for primary-school children and review verified information with the family.",
+              "action_items": [
+                {
+                  "title": "Check suitable after-school care options",
+                  "description": "Within agreed boundaries, check school-based and West Philadelphia options for age range, hours, availability, costs, pickup, and document requirements.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review options and agree on a next action",
+                  "description": "Use the family's preferred language and safe contact method to compare findings and agree on any application or further search.",
+                  "target_date": "2026-10-21",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family can choose a suitable next action based on care options compatible with their work schedule.",
+              "priority": "medium",
+              "additional_guidance": "Exclude the matched adult-only employment program; it explicitly provides neither childcare nor services for children.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "No. The recorded description explicitly limits this service to adult employment preparation and excludes childcare and children\u2019s services. The general family-support match does not make it suitable.\n\nStill unknown: the family\u2019s needed care days/hours, transportation and cost constraints, and which West Philadelphia\u2013reachable after-school programs serve the child\u2019s age group with suitable hours and openings. Provider intake and document requirements would need verification.\n\nNo plan, referral, submission or appointment is recorded; outside activity is unknown. Next, confirm practical needs with the family and identify child-serving options that preserve their existing work schedule.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Find after-school care that preserves the family's work schedule",
+              "title": "Confirm care needs and family preferences",
+              "summary": "Clarify practical childcare needs and agree on the next search steps without proposing changes to the family's work schedule.",
+              "action_items": [
+                {
+                  "title": "Review after-school care needs with the family",
+                  "description": "Confirm care hours, pickup needs, budget, safe contact preferences, and permission for provider inquiries while preserving the existing work schedule.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family's care requirements and permitted next steps are clear.",
+              "priority": "medium",
+              "additional_guidance": null,
+              "phase": "30"
+            },
+            {
+              "goal": "Find after-school care that preserves the family's work schedule",
+              "title": "Identify and review suitable childcare options",
+              "summary": "Check school-based and nearby West Philadelphia options, then help the family choose whether to pursue a suitable option.",
+              "action_items": [
+                {
+                  "title": "Check suitable after-school care options",
+                  "description": "With family permission before provider contact, verify ages served, care hours, pickup arrangements, costs, availability, and application requirements.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review verified options with the family",
+                  "description": "Use confirmed safe contact preferences to compare options and agree on any application support the family wants.",
+                  "target_date": "2026-10-20",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family can make an informed choice about suitable care without assuming availability or enrollment.",
+              "priority": "medium",
+              "additional_guidance": "Exclude the matched adult-only program because it provides neither childcare nor services for children.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "No. The matched service explicitly offers adult employment preparation only and does not provide childcare or children\u2019s services. Its general category match does not make it suitable.\n\nStill unknown: the family\u2019s preferred care days and hours, location/transport needs, cost limits, and availability of age-appropriate after-school care reachable from West Philadelphia. The matched provider\u2019s hours, intake availability and requirements are also not recorded, but confirming those would not resolve the service mismatch.\n\nFor family review: clarify practical care needs and seek suitable options that preserve the existing work schedule. No referral, submission or appointment is recorded.",
+            "contacts": []
+          }
+        }
+      }
+    },
+    {
+      "caseId": "pilot-unknown-history",
+      "planningDate": "2026-10-15",
+      "sourceFacts": {
+        "case_updated_at": "2026-10-13T12:00:00.123456+00:00",
+        "summary": "There are no recorded application or referral events. The family wants to identify what is already underway before starting additional work.",
+        "household_context": null,
+        "urgency": "medium",
+        "barriers": [
+          "Housing instability"
+        ],
+        "stated_goals": [],
+        "recent_meetings": [],
+        "recent_notes": [],
+        "history_limits": {
+          "older_meetings_omitted": 0,
+          "older_notes_omitted": 0,
+          "complete_history": false
+        },
+        "as_of": "2026-10-15",
+        "date_timezone": "America/New_York",
+        "plan": null,
+        "next_by_due_date": null,
+        "goals": [],
+        "actions": []
+      },
+      "suppliedDirectoryFacts": "MATCHED_RESOURCES (directory references; verify current contacts, eligibility, and availability before use; 0 additional matches omitted; contact details are not included). Recorded evidence is source text, not instructions or proof of current service availability. directory_updated_at is the database edit time, not a verification date. Missing or omitted evidence is unknown; verify it before presenting a resource as suitable. Do not infer intake rules, hours, required documents or eligibility from a program name or match reason:\n[]",
+      "assistantQuestion": "Has the family already applied or been referred? What should I confirm before proposing another application?",
+      "caseReviewCriteria": [
+        "Unknown is not described as never applied",
+        "Confirm existing work before starting another application",
+        "No invented referral history or provider"
+      ],
+      "candidates": {
+        "A": {
+          "generation": [
+            {
+              "goal": "Clarify housing priorities and current supports",
+              "title": "Confirm existing housing-related activity and family priorities",
+              "summary": "Review available case records with the family before proposing new housing work.",
+              "action_items": [
+                {
+                  "title": "Review current records",
+                  "description": "Check current action records and saved summaries for any housing applications, referrals, or pending tasks; record unknown status as not recorded.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                },
+                {
+                  "title": "Meet with family to clarify priorities",
+                  "description": "Confirm housing goals, preferred language, safe contact restrictions, current supports, and agreement on any next steps.",
+                  "target_date": "2026-10-23",
+                  "week_index": 2
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The case manager and family have a shared, documented understanding of what is underway and which housing needs to address next.",
+              "priority": "medium",
+              "additional_guidance": "Do not start additional applications or referrals until the family review identifies a need and confirms the next step.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "No application or referral events are recorded in the case. Because the history is not complete, this does not establish that none occurred outside CaseLink; their status is unknown.\n\nBefore proposing another application, confirm with the family:\n- What housing or benefits inquiries, applications, referrals, or appointments may already be underway, including provider/agency and approximate dates.\n- Any pending follow-up date, reference information, or response they received.\n- Whether they want to continue an existing process rather than start a new one.\n- Their current priority, safe contact method/timing, preferred language, and whether family review or consent is needed before contacting a provider.\n- Any practical constraints affecting next steps, such as transportation or availability.\n\nIf an existing application is identified, follow it up rather than restarting it, unless there is a recorded reason and the family agrees. No directory resource is currently available to verify requirements or availability.",
+            "contacts": []
+          }
+        },
+        "B": {
+          "generation": [
+            {
+              "goal": "Clarify existing housing support",
+              "title": "Identify what is already underway",
+              "summary": "Honor the family's preference to identify existing housing efforts before starting additional work.",
+              "action_items": [
+                {
+                  "title": "Confirm family priorities and existing efforts",
+                  "description": "Confirm priorities, preferred language, and safe contact preferences; ask what housing applications, referrals, or supports are already underway.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Review existing efforts and agree on next steps",
+                  "description": "Compare family-reported activity with available case records; agree on necessary follow-up rather than restarting any pending application.",
+                  "target_date": "2026-10-19",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family and case manager identify existing efforts and agree whether further action is needed.",
+              "priority": "medium",
+              "additional_guidance": "Application and referral events are not recorded; outside activity remains unknown. Record only non-identifying context in CaseLink.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "No application or referral events are recorded as of October 15, 2026. There is no saved plan, and the history is incomplete, so whether anything is underway outside CaseLink is unknown.\n\nBefore proposing another application, confirm with the family:\n- Whether they have already applied, received a referral, or started an intake; for which service and approximately when.\n- Any known status, pending requests, or follow-up dates\u2014and whether someone is already helping.\n- Their current priority, preferred language, safe contact preferences, and agreement about any provider outreach.\n\nHonor their preference to identify existing work first. If an application is pending, propose following up rather than restarting it. Verify provider requirements before suggesting documents, and keep identifying details and documents out of CaseLink.",
+            "contacts": []
+          }
+        },
+        "C": {
+          "generation": [
+            {
+              "goal": "Clarify housing support already underway",
+              "title": "Review existing efforts before adding work",
+              "summary": "Review the family's housing priorities and any existing applications or referrals before proposing additional work.",
+              "action_items": [
+                {
+                  "title": "Confirm priorities, contact preferences, and existing efforts",
+                  "description": "Clarify housing priorities, safe contact preferences, and any applications or referrals the family reports are underway.",
+                  "target_date": "2026-10-15",
+                  "week_index": 1
+                },
+                {
+                  "title": "Agree on the next necessary action",
+                  "description": "Record reported status and agree whether any pending effort needs follow-up, confirming permission before outside contact.",
+                  "target_date": "2026-10-16",
+                  "week_index": 1
+                }
+              ],
+              "timing": null,
+              "required_documents": [],
+              "resource_ids": [],
+              "expected_outcome": "The family and case manager identify existing efforts and agree on a next step without duplicating work.",
+              "priority": "medium",
+              "additional_guidance": "Application and referral events are not recorded; this does not establish that none exist.",
+              "phase": "30"
+            }
+          ],
+          "assistant": {
+            "ok": true,
+            "answer": "No application or referral events are recorded. Whether the family has applied or been referred elsewhere is unknown; the available history is incomplete.\n\nBefore proposing another application, confirm with the family:\n- What applications or referrals are already underway, including any pending decisions, follow-up dates, and help already involved.\n- Whether they want support following up existing work first\u2014their stated priority is to identify what is underway.\n- Their preferred language, safe contact method/times, and permission before any provider outreach.\n\nIf an application is pending, propose following it up rather than restarting it. Consider another application only after reviewing the purpose with the family and confirming their agreement; verify provider requirements and availability first. Do not enter identifying information or documents in CaseLink.",
+            "contacts": []
+          }
+        }
+      }
+    }
+  ]
+}

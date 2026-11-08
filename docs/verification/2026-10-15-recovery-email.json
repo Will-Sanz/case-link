@@ -1,0 +1,29 @@
+{
+  "messageId": "1a13d0afdebec09b",
+  "inInbox": true,
+  "received": "1792025492000",
+  "hasExplicitContinueCopy": true,
+  "links": [
+    {
+      "origin": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+      "path": "/auth/callback",
+      "credentialOnlyInFragment": true,
+      "purpose": "recovery"
+    },
+    {
+      "origin": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+      "path": "/auth/callback",
+      "credentialOnlyInFragment": true,
+      "purpose": "recovery"
+    }
+  ],
+  "authentication": [
+    {
+      "spfPass": true,
+      "dkimPass": true
+    }
+  ],
+  "credentialsPrinted": false,
+  "credentialRedeemed": false,
+  "instruction": "Open the link, then choose Continue to reset your password. Link expires in 15 minutes and can be used once."
+}

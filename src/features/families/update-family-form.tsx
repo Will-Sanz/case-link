@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { updateFamilyMeta } from "@/app/actions/families";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,11 +13,10 @@ export function UpdateFamilyForm({
   onCancel,
   onSuccess,
 }: {
-  family: FamilyDetail;
+  family: Pick<FamilyDetail, "id" | "summary" | "household_notes" | "urgency" | "status">;
   onCancel?: () => void;
   onSuccess?: () => void;
 }) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [summaryPrivacyError, setSummaryPrivacyError] = useState<string | null>(null);
   const [notesPrivacyError, setNotesPrivacyError] = useState<string | null>(null);
@@ -67,9 +65,10 @@ export function UpdateFamilyForm({
       if (!r.ok) {
         setError(r.error);
       } else {
-        router.refresh();
         onSuccess?.();
       }
+    } catch {
+      setError("The save could not be confirmed. Your edits are still here; check the saved profile before trying again.");
     } finally {
       setPending(false);
     }

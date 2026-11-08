@@ -1,0 +1,21 @@
+{
+  "deploymentId": "dpl_31fem9LnVRymBT3XGhpBx3p2gtAh",
+  "commit": "8c614d012df2487c79dedbfdd3ee5cdcee5e74cb",
+  "result": "ERROR",
+  "command": "npm run verify",
+  "failedTests": 1,
+  "passedTests": 685,
+  "file": "src/features/families/family-plan-panel.test.tsx",
+  "test": "submits all changed goals once and keeps the full working copy available after a failed save",
+  "assertion": "beforeunload defaultPrevented should be false after successful save",
+  "observed": true,
+  "expected": false,
+  "cause": "Assertion observed success text before passive-effect listener cleanup finished",
+  "correction": "Wait for the same observable unload assertion, preserving its bounded failure if cleanup never completes",
+  "applicationCodeChanged": false,
+  "focusedValidation": {
+    "passedTests": 23,
+    "eslint": "passed"
+  },
+  "fullRemoteAndHostedVerification": "pending"
+}

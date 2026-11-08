@@ -1,6 +1,5 @@
 export type ProductionPosture = {
   CASELINK_TENANCY_MODE?: string;
-  CASELINK_PDF_MODE?: string;
   CASELINK_INVITE_ONLY?: string;
   CASELINK_HSTS?: string;
   NEXT_PUBLIC_SITE_URL?: string;
@@ -33,9 +32,6 @@ export function productionPostureIssues(env: ProductionPosture): string[] {
   const issues: string[] = [];
   if (env.CASELINK_TENANCY_MODE !== "single-tenant") {
     issues.push("CASELINK_TENANCY_MODE must be single-tenant");
-  }
-  if (env.CASELINK_PDF_MODE !== "fillable-only") {
-    issues.push("CASELINK_PDF_MODE must be fillable-only");
   }
   if (env.CASELINK_INVITE_ONLY !== "1") {
     issues.push("CASELINK_INVITE_ONLY must be 1");

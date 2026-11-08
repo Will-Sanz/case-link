@@ -1,0 +1,76 @@
+{
+  "checkedAt": "2026-10-14T01:31:29.646Z",
+  "syntheticOnly": true,
+  "results": [
+    {
+      "model": "gpt-5.6-luna",
+      "task": "phase_30",
+      "passed": true,
+      "elapsedMs": 3289,
+      "totalTokens": 465
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "phase_60",
+      "passed": true,
+      "elapsedMs": 2725,
+      "totalTokens": 464
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "phase_90",
+      "passed": true,
+      "elapsedMs": 2351,
+      "totalTokens": 462
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "refinement",
+      "passed": true,
+      "elapsedMs": 2299,
+      "totalTokens": 535
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "task": "assistant",
+      "passed": true,
+      "elapsedMs": 1904,
+      "totalTokens": 118
+    },
+    {
+      "model": "gpt-4o",
+      "task": "phase_30",
+      "passed": true,
+      "elapsedMs": 2070,
+      "totalTokens": 430
+    },
+    {
+      "model": "gpt-4o",
+      "task": "phase_60",
+      "passed": true,
+      "elapsedMs": 1839,
+      "totalTokens": 430
+    },
+    {
+      "model": "gpt-4o",
+      "task": "phase_90",
+      "passed": true,
+      "elapsedMs": 1744,
+      "totalTokens": 430
+    },
+    {
+      "model": "gpt-4o",
+      "task": "refinement",
+      "passed": true,
+      "elapsedMs": 1237,
+      "totalTokens": 506
+    },
+    {
+      "model": "gpt-4o",
+      "task": "assistant",
+      "passed": true,
+      "elapsedMs": 903,
+      "totalTokens": 94
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "sourceProject": "zpfypkizsapvsxeykmdq",
+  "scope": "Application definitions and postgres default privileges only; no row data. Captured after approved containment.",
+  "sections": {
+    "types": {
+      "count": 9,
+      "sha256": "91c8879facd67af0f8ab4334666493689f28b8a1843c542192651c9b6436a41d"
+    },
+    "grants": {
+      "count": 640,
+      "sha256": "281febe2268b14a1f38559fc0aec768e6e46510f0ad5a99d4fbf73be0ab13fae"
+    },
+    "tables": {
+      "count": 20,
+      "sha256": "cf4a897d5550d36015ab0dbb6a8bc2b7a8043689b4f7e2ee156f87563bdc2fc7"
+    },
+    "columns": {
+      "count": 199,
+      "sha256": "58a61c9a8952632f4ba2f0c30af6fc28e847d4de49c5ff0762fbe2a9e7a8a969"
+    },
+    "indexes": {
+      "count": 48,
+      "sha256": "d2fb566e78e630d2ebc07ea989bbf0fd941f0893ed8ecfa8c0389262c5100ed5"
+    },
+    "defaults": {
+      "count": 48,
+      "sha256": "10e82a8f50d3c46e7689b929eb6e2df79e214a6e3ae93afac5ab7c1ff8146b95"
+    },
+    "policies": {
+      "count": 58,
+      "sha256": "47abdead14e8804fab7d5890e1f5186bdf8c9cc201f9215f6d16cc50b669b6c8"
+    },
+    "triggers": {
+      "count": 9,
+      "sha256": "d61f18b67c79c02ffad165d4650f1485ac2de7c7899d334c22bacce84543a00c"
+    },
+    "functions": {
+      "count": 5,
+      "sha256": "5781d6cdfd24200d98365270194a772f4414c644e05e20241cb6894b17e6d8e5"
+    },
+    "constraints": {
+      "count": 64,
+      "sha256": "868d57c12ad19cad3fa6e660ff696d3080a8efb30c45eb2bcd940ef36eb92469"
+    }
+  }
+}

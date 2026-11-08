@@ -1,3 +1,5 @@
+
+import { formatDateOnly as formatTargetDate } from "@/lib/dates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -10,6 +12,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enrichFamiliesWithCurrentStep, listFamilies } from "@/lib/services/families";
 import { parseFamilyListQuery } from "@/lib/validations/family-list-query";
+import { familyCaseStepHref } from "@/lib/routes/family-case";
 
 type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -20,15 +23,6 @@ export const metadata: Metadata = {
 };
 
 const statusLabel = { active: "Active", on_hold: "On hold", closed: "Closed" } as const;
-
-function formatTargetDate(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
-}
 
 export default async function FamiliesPage({ searchParams }: PageProps) {
   const parsed = parseFamilyListQuery(await searchParams);
@@ -45,7 +39,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
           <h1 className="workspace-display text-3xl text-[var(--color-ink)] sm:text-4xl">Families</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--color-ink-muted)]">Your active family records and support plans.</p>
         </div>
-        <Link href="/families/new" className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] transition-colors hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 focus-visible:ring-offset-2 active:bg-[var(--color-accent)]">
+        <Link prefetch={false} href="/families/new" className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] [box-shadow:var(--shadow-action)] transition-colors hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 focus-visible:ring-offset-2 active:bg-[var(--color-accent)]">
           <Plus className="size-4" aria-hidden /> Add a family
         </Link>
       </header>
@@ -67,7 +61,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
             <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--color-surface)] text-[var(--color-accent)] [box-shadow:var(--shadow-surface)]"><UsersRound className="size-6" aria-hidden /></span>
             <h2 className="workspace-display mt-6 text-2xl text-[var(--color-ink)]">Add your first family</h2>
             <p className="mt-3 text-sm leading-6 text-[var(--color-ink-muted)]">Start with a family label and the barriers you are helping them address. That is enough to begin a plan.</p>
-            <Link href="/families/new" className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 focus-visible:ring-offset-2">
+            <Link prefetch={false} href="/families/new" className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] hover:bg-[var(--color-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 focus-visible:ring-offset-2">
               Add a family <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
@@ -76,12 +70,12 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
         <section className="mt-10 rounded-xl border border-[var(--color-rule)] bg-[var(--color-surface)] px-6 py-14 text-center">
           <h2 className="text-lg font-semibold text-[var(--color-ink)]">No families match that search.</h2>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">Try a shorter family label or clear the search.</p>
-          <Link href="/families" className="mt-5 inline-flex text-sm font-semibold text-[var(--color-accent)] underline decoration-[var(--color-accent-rule)] decoration-2 underline-offset-4">Clear search</Link>
+          <Link prefetch={false} href="/families" className="mt-5 inline-flex text-sm font-semibold text-[var(--color-accent)] underline decoration-[var(--color-accent-rule)] decoration-2 underline-offset-4">Clear search</Link>
         </section>
       ) : (
         <div className="mt-2 divide-y divide-[var(--color-rule)]">
           {items.map((family) => (
-            <Link key={family.id} href={`/families/${family.id}/profile`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 sm:grid-cols-[1fr_auto] sm:items-center">
+            <Link prefetch={false} key={family.id} href={family.current_step ? familyCaseStepHref(family.id, family.current_step.id) : `/families/${family.id}/profile`} className="group grid gap-4 py-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="truncate text-lg font-semibold tracking-[-0.015em] text-[var(--color-ink)] group-hover:text-[var(--color-accent)]">{family.name}</h2>
@@ -97,7 +91,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                       {family.current_step.action_needed_now || family.current_step.title}
                       <span className="text-[var(--color-ink-faint)]">
                         {family.current_step.due_date
-                          ? ` · Target ${formatTargetDate(family.current_step.due_date)}`
+                          ? ` · ${family.current_step.status === "blocked" ? "Follow up" : "Target"} ${formatTargetDate(family.current_step.due_date)}`
                           : " · Target date needed"}
                       </span>
                     </p>
@@ -107,6 +101,7 @@ export default async function FamiliesPage({ searchParams }: PageProps) {
                 </div>
               </div>
               <div className="flex items-center gap-3 text-xs text-[var(--color-ink-faint)] sm:justify-end">
+                {family.current_step ? <span className="font-semibold text-[var(--color-accent)]">Continue plan</span> : null}
                 <span>Updated {new Date(family.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 <ArrowRight className="size-4 text-[var(--color-positive)] transition-transform group-hover:translate-x-1" aria-hidden />
               </div>
