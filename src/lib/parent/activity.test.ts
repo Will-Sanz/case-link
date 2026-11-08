@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ session: vi.fn() }));
-vi.mock("./auth", () => ({ requireParentSession: mocks.session }));
-import { listRequestOperations } from "./activity";
+const mocks = vi.hoisted(() => ({ session: vi.fn(), client: vi.fn() }));
+vi.mock("./auth", () => ({ requireParentSession: mocks.session, createParentClient: mocks.client }));
+import { listRequestOperations, trustedReferral } from "./activity";
 import { fixtureProtectedSnapOperation } from "./test-fixtures";
 
 describe("owned operation history", () => {
@@ -67,5 +67,50 @@ describe("owned operation history", () => {
     const result = await listRequestOperations("11111111-1111-4111-8111-111111111111");
     expect(result.operations.map(row => row.protected_packet)).toEqual([reference, null, null, null, null, null]);
     expect(JSON.stringify(result)).not.toContain("PRIVATE-CANARY");
+  });
+});
+
+
+describe("scoped SNAP agency next-step ingestion", () => {
+  const operationId = "11111111-1111-4111-8111-111111111111";
+  const observedAt = "2026-11-07T12:00:00Z";
+  const status = { state: "agency_submitted", reference: "Synthetic SNAP notice", observedAt,
+    agencyStatus: { reference: "Synthetic SNAP notice", observedAt, documents: [{ name: "Proof of income", dueDate: "2026-11-18" }],
+      interview: { scheduledAt: "2026-11-19T10:00:00-05:00", channel: "phone" } } };
+  function client() {
+    const rpc = vi.fn().mockResolvedValue({ data: "receipt-id", error: null });
+    mocks.client.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email_confirmed_at: observedAt } }, error: null }) }, rpc });
+    return rpc;
+  }
+  it("forwards the actual observation and absolute deadlines without inventing source or refreshing observation time", async () => {
+    const rpc = client();
+    expect(await trustedReferral(operationId, status)).toBe("receipt-id");
+    expect(rpc).toHaveBeenCalledWith("parent_record_referral_status", {
+      p_operation_id: operationId, p_state: status.state,
+      p_evidence: { reference: status.reference, observedAt, agencyStatus: status.agencyStatus },
+    });
+  });
+  it("trims JavaScript whitespace before sending canonical notice labels to the database", async () => {
+    const rpc = client();
+    await trustedReferral(operationId, { ...status, reference: "\u00a0Synthetic SNAP notice\t", agencyStatus: { ...status.agencyStatus, reference: "\tSynthetic SNAP notice\ufeff", documents: [{ name: "\tProof of income\u00a0" }] } });
+    expect(rpc.mock.calls[0][1].p_evidence).toMatchObject({ reference: status.reference, agencyStatus: { reference: status.reference, documents: [{ name: "Proof of income" }] } });
+  });
+  it.each([
+    { ...status, source: "agency_receipt" },
+    { ...status, reason: "provider_declined" },
+    { ...status, state: "partner_received" },
+    { ...status, agencyStatus: { ...status.agencyStatus, observedAt: "2026-11-07T13:00:00Z" } },
+    { ...status, agencyStatus: { ...status.agencyStatus, reference: "Different notice" } },
+    { ...status, agencyStatus: { ...status.agencyStatus, program: "Medicaid" } },
+    { ...status, agencyStatus: { ...status.agencyStatus, documents: [{ name: "SSN: 123-45-6789" }] } },
+    { ...status, agencyStatus: { ...status.agencyStatus, interview: {} } },
+    { ...status, state: "assistance_approved", agencyStatus: { ...status.agencyStatus, waitingForDecision: true } },
+  ])("rejects inconsistent or unrelated next-step evidence %# before RPC", async input => {
+    const rpc = client(); await expect(trustedReferral(operationId, input)).rejects.toThrow(); expect(rpc).not.toHaveBeenCalled();
+  });
+  it("retains the existing non-SNAP referral input contract", async () => {
+    const rpc = client();
+    await trustedReferral(operationId, { state: "partner_received", reference: "Synthetic legacy receipt", observedAt });
+    expect(rpc).toHaveBeenCalledWith("parent_record_referral_status", { p_operation_id: operationId, p_state: "partner_received", p_evidence: { reference: "Synthetic legacy receipt", observedAt } });
   });
 });

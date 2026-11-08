@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { requireParentSession, createParentClient } from "./auth";
 import { needSchema } from "./domain";
+import { agencyStatusSchema, receiptSchema } from "./policy";
 import { snapProtectedReferenceSchema } from "./snap-protected-operation";
 const uuid = z.uuid();
 export async function listRequestOperations(requestId: string) {
@@ -127,11 +128,20 @@ export async function trustedReferral(operationId: string, status?: unknown) {
         "unresolved",
       ]),
       reference: z.string().trim().min(1).max(200),
-      observedAt: z.iso.datetime(),
+      observedAt: z.iso.datetime({ offset: true }),
+      agencyStatus: agencyStatusSchema.optional(),
       reason: z.string().trim().max(500).optional(),
     })
     .strict()
     .parse(status);
+  if (value.agencyStatus) {
+    receiptSchema.parse({ state: value.state, source: "operator_confirmed", reference: value.reference,
+      recordedAt: value.observedAt, agencyStatus: value.agencyStatus });
+    if ((value.reason && value.state !== "declined") || value.agencyStatus.reference !== value.reference || Date.parse(value.agencyStatus.observedAt) !== Date.parse(value.observedAt)
+      || (value.agencyStatus.interview && !Object.keys(value.agencyStatus.interview).length)
+)
+      throw new Error("The SNAP notice must describe the same observed SNAP status.");
+  }
   const { data, error } = await supabase.rpc("parent_record_referral_status", {
     p_operation_id: uuid.parse(operationId),
     p_state: value.state,
@@ -139,6 +149,7 @@ export async function trustedReferral(operationId: string, status?: unknown) {
       reference: value.reference,
       observedAt: value.observedAt,
       ...(value.reason ? { reason: value.reason } : {}),
+      ...(value.agencyStatus ? { agencyStatus: value.agencyStatus } : {}),
     },
   });
   if (error)
