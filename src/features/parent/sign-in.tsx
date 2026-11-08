@@ -41,7 +41,7 @@ export function ParentSignIn({
   }, [sent]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!ready) return;
+    if (!ready || pending) return;
     setPending(true);
     setError("");
     try {
@@ -73,7 +73,7 @@ export function ParentSignIn({
     }
   }
   async function resend() {
-    if (!ready) return;
+    if (!ready || pending) return;
     setPending(true);
     setError("");
     setResent(false);
@@ -143,7 +143,7 @@ export function ParentSignIn({
                 autoComplete="username"
                 inputMode="email"
                 required
-                disabled={!ready}
+                disabled={!ready || pending}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 maxLength={254}
@@ -166,7 +166,7 @@ export function ParentSignIn({
                 pattern="[0-9]{6,10}"
                 autoComplete="one-time-code"
                 required
-                disabled={!ready}
+                disabled={!ready || pending}
                 maxLength={10}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
@@ -186,7 +186,7 @@ export function ParentSignIn({
                 type="password"
                 autoComplete="current-password"
                 required
-                disabled={!ready}
+                disabled={!ready || pending}
                 maxLength={1024}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
