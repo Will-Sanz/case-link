@@ -1,4 +1,4 @@
-import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createS3Storage, s3StorageCredentialsSchema, storageArtifactGuardReady } from "./storage-s3";
 
@@ -57,4 +57,51 @@ describe("Storage-only S3 ports", () => {
   it.each([false, undefined, "true", 1])("does not treat malformed or absent database guard readiness as authorization", async ready => {
     expect(await storageArtifactGuardReady({ query: async () => ({ rows: [{ ready }] }) })).toBe(false);
   });
+});
+
+const deletionOwner = "11111111-1111-4111-8111-111111111111", deletionObject = "22222222-2222-4222-8222-222222222222";
+it("deletes only exact ordinary document/artifact keys with one bounded S3 request", async () => {
+  const send = vi.spyOn(S3Client.prototype, "send").mockResolvedValue({} as never);
+  const timeout = vi.spyOn(AbortSignal, "timeout"); const storage = createS3Storage(config);
+  try {
+    for (const [bucket, path] of [["parent-documents", `${deletionOwner}/${deletionObject}/${deletionObject}`], ["parent-form-artifacts", `${deletionOwner}/${deletionObject}.pdf`]]) {
+      await storage.remove(bucket, path, new AbortController().signal);
+      const call = send.mock.calls.at(-1)!;
+      expect(call[0]).toBeInstanceOf(DeleteObjectCommand); expect(call[0].input).toEqual({ Bucket: bucket, Key: path });
+      expect(call[1]).toMatchObject({ abortSignal: expect.any(AbortSignal) });
+    }
+    expect(send).toHaveBeenCalledTimes(2); expect(timeout).toHaveBeenCalledWith(15000);
+    send.mockRejectedValueOnce(new Error("PRIVATE_PROVIDER_CANARY"));
+    await expect(storage.remove("parent-form-artifacts", `${deletionOwner}/${deletionObject}.pdf`, new AbortController().signal)).rejects.toThrow(/^deletion_unconfirmed$/);
+  } finally { storage.destroy(); }
+});
+it.each([
+  ["school-documents", `${deletionOwner}/${deletionObject}/${deletionObject}`],
+  ["parent-known-forms", `${deletionOwner}/${deletionObject}.pdf`],
+  ["parent-documents", `${deletionOwner}/${deletionObject}.pdf`],
+  ["parent-form-artifacts", `${deletionOwner}/${deletionObject}`],
+  ["parent-documents", `${deletionOwner}/../${deletionObject}`],
+  ["parent-form-artifacts", `${deletionOwner}/not-a-uuid.pdf`],
+])("refuses deletion outside the exact ordinary object purposes %#", async (bucket, path) => {
+  const send = vi.spyOn(S3Client.prototype, "send"), storage = createS3Storage(config);
+  try { await expect(storage.remove(bucket, path, new AbortController().signal)).rejects.toThrow("purpose"); expect(send).not.toHaveBeenCalled(); }
+  finally { storage.destroy(); }
+});
+it.each(["caller", "timeout"])("rejects late deletion acknowledgement after %s cancellation", async cause => {
+  const controller = new AbortController(), timeout = new AbortController();
+  vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout.signal);
+  let resolve!: (value: unknown) => void;
+  const send = vi.spyOn(S3Client.prototype, "send").mockImplementation(() => new Promise(done => { resolve = done; }) as never);
+  const storage = createS3Storage(config);
+  try {
+    const result = storage.remove("parent-form-artifacts", `${deletionOwner}/${deletionObject}.pdf`, controller.signal);
+    (cause === "caller" ? controller : timeout).abort();
+    expect((send.mock.calls[0][1] as { abortSignal: AbortSignal }).abortSignal.aborted).toBe(true);
+    resolve({}); await expect(result).rejects.toThrow(/^deletion_unconfirmed$/);
+  } finally { storage.destroy(); }
+});
+it("does not send a deletion when its authority was already cancelled", async () => {
+  const send = vi.spyOn(S3Client.prototype, "send"), storage = createS3Storage(config), controller = new AbortController(); controller.abort();
+  try { await expect(storage.remove("parent-form-artifacts", `${deletionOwner}/${deletionObject}.pdf`, controller.signal)).rejects.toThrow("unconfirmed"); expect(send).not.toHaveBeenCalled(); }
+  finally { storage.destroy(); }
 });

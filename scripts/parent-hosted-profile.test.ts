@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmodSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HOSTED_PROJECT, hostedChildEnvironment, parseHostedProfile, readHostedProfile, stopAtHostedDeadline } from "./parent-hosted-profile";
@@ -71,4 +71,33 @@ describe("hosted single-service profiles", () => {
     vi.useFakeTimers(); vi.setSystemTime(now); const stop = vi.fn(); const cancel = stopAtHostedDeadline(new Date(now + 1000).toISOString(), stop); cancel();
     vi.advanceTimersByTime(2000); expect(stop).not.toHaveBeenCalled(); stopAtHostedDeadline(new Date(now).toISOString(), stop); expect(stop).toHaveBeenCalledOnce();
   });
+});
+
+const ordinary = { ...base, service: "ordinary-retention", databaseUrl, storage: { s3AccessKeyId: "synthetic-s3-access-id", s3SecretAccessKey: "synthetic-s3-secret-at-least-20", s3Region: "us-east-1" } };
+it("isolates ordinary maintenance credentials and authority from every other service", () => {
+  const ambient = { NODE_ENV: "production" as const, CASELINK_PARENT_RETENTION_STORAGE_KEY: "ambient", OPENAI_API_KEY: "ambient", CASELINK_PARENT_SNAP_SENDER_SECRET: "ambient", CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY: "ambient" };
+  const env = hostedChildEnvironment(parseHostedProfile(ordinary, now), ambient);
+  expect(env.CASELINK_PARENT_RETENTION_MODE).toBe("ordinary"); expect(env.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY).toBe(ordinary.storage.s3SecretAccessKey);
+  expect(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL).toBe(base.approvedUntil);
+  expect(env.CASELINK_PARENT_RETENTION_STORAGE_KEY).toBeUndefined(); expect(env.OPENAI_API_KEY).toBeUndefined(); expect(env.CASELINK_PARENT_SNAP_SENDER_SECRET).toBeUndefined();
+  for (const profile of [web, worker, { ...base, service: "retention", databaseUrl }]) {
+    const other = hostedChildEnvironment(parseHostedProfile(profile, now), ambient);
+    expect(other.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY).toBeUndefined();
+  }
+});
+it.each([{ enabled: false }, { approvedUntil: "2000-01-01T00:00:00Z" }, { storage: undefined }, { projectOrigin: "https://other.supabase.co" }, { databaseUrl: databaseUrl.replace("verify-full", "require") }, { storageKey: "SYNTHETIC_API_KEY" }])("ordinary maintenance refuses incomplete or expanded profiles %#", delta => {
+  expect(() => parseHostedProfile({ ...ordinary, ...delta }, now)).toThrow();
+});
+it("ships disabled expired maintenance examples and independent isolated oneshots", () => {
+  for (const name of ["retention", "ordinary-retention"]) {
+    const read = (file: string) => readFileSync(new URL(`../deploy/parent-vm/${file}`, import.meta.url), "utf8");
+    const example = JSON.parse(read(`${name}.example.json`)); expect(example.enabled).toBe(false); expect(Date.parse(example.approvedUntil)).toBeLessThan(now);
+    expect(() => parseHostedProfile(example, now)).toThrow();
+    const service = read(`caselink-parent-${name}.service`), timer = read(`caselink-parent-${name}.timer`);
+    expect(service).toContain(`User=caselink-${name}\n`); expect(service).toContain(`/etc/caselink/${name}/profile.json`);
+    for (const value of ["Type=oneshot", "KillMode=control-group", "TimeoutStartSec=120", "TimeoutStopSec=10", "ProtectSystem=strict", "ProtectHome=yes", "ProtectProc=invisible", "PrivateTmp=yes", "NoNewPrivileges=yes", "UMask=0077", "LimitCORE=0", "MemoryMax=256M"]) expect(service).toContain(value);
+    expect(service + timer).not.toMatch(/(?:Requires|BindsTo|PartOf)=.*(?:worker|frontdoor|review|sender)/);
+    expect(timer).toContain(`Unit=caselink-parent-${name}.service`); expect(timer).toContain("OnUnitInactiveSec=60s");
+    expect(service).not.toMatch(/EnvironmentFile=|STORAGE_KEY|OPENAI|SINCH|NODE_OPTIONS/);
+  }
 });

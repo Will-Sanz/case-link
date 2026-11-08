@@ -26,6 +26,7 @@ export const hostedProfileSchema = z.discriminatedUnion("service", [
   z.object({ ...common, service: z.literal("sender"), databaseUrl, senderSecret: secret,
     sendingApproved: z.boolean().default(false), carrier: snapSenderCarrierConfigSchema }).strict(),
   z.object({ ...common, service: z.literal("retention"), databaseUrl }).strict(),
+  z.object({ ...common, service: z.literal("ordinary-retention"), databaseUrl, storage: s3StorageCredentialsSchema }).strict(),
 ]);
 export type HostedProfile = z.infer<typeof hostedProfileSchema>;
 export const HOSTED_UNAVAILABLE = "The hosted service is disabled, expired, or not configured. No credentials or household information are logged.";
@@ -88,11 +89,16 @@ export function hostedChildEnvironment(config: HostedProfile, system: NodeJS.Pro
       CASELINK_PARENT_STORAGE_BROKER_SUPABASE_URL: config.projectOrigin, CASELINK_PARENT_STORAGE_BROKER_ORIGIN: "http://127.0.0.1:3310",
       CASELINK_PARENT_STORAGE_BROKER_SECRET: config.brokerSecret, CASELINK_PARENT_STORAGE_BROKER_S3_ACCESS_KEY_ID: config.storage.s3AccessKeyId,
       CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY: config.storage.s3SecretAccessKey, CASELINK_PARENT_STORAGE_BROKER_S3_REGION: config.storage.s3Region });
-  } else if (config.service === "retention") {
+  } else if (config.service === "retention" || config.service === "ordinary-retention") {
     Object.assign(env, { CASELINK_PARENT_RETENTION_APPROVED: "1", CASELINK_PARENT_RETENTION_DATABASE_URL: config.databaseUrl,
-      CASELINK_PARENT_RETENTION_SUPABASE_URL: config.projectOrigin, CASELINK_PARENT_RETENTION_MODE: "snap-packets",
+      CASELINK_PARENT_RETENTION_SUPABASE_URL: config.projectOrigin, CASELINK_PARENT_RETENTION_MODE: config.service === "retention" ? "snap-packets" : "ordinary",
       CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED: "1", CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE: config.approvalReference,
       CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: config.approvedUntil });
+    if (config.service === "ordinary-retention") Object.assign(env, {
+      CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID: config.storage.s3AccessKeyId,
+      CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY: config.storage.s3SecretAccessKey,
+      CASELINK_PARENT_RETENTION_S3_REGION: config.storage.s3Region,
+    });
   }
   return env;
 }

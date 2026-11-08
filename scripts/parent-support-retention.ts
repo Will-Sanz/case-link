@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { createS3Storage, s3StorageCredentialsSchema } from "../src/lib/parent/storage-s3";
 import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
 import {
   canonicalProjectOrigin,
@@ -9,20 +10,21 @@ import {
 
 async function main() {
   const env = process.env;
-  const mode = z.enum(["all", "snap-packets"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
-  const packetsOnly = mode === "snap-packets";
+  const mode = z.enum(["all", "snap-packets", "ordinary"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
+  const packetsOnly = mode === "snap-packets", ordinaryOnly = mode === "ordinary";
+  const maintained = packetsOnly || ordinaryOnly;
   const connectionString = env.CASELINK_PARENT_RETENTION_DATABASE_URL;
   const projectUrl = env.CASELINK_PARENT_RETENTION_SUPABASE_URL;
   const storageKey = env.CASELINK_PARENT_RETENTION_STORAGE_KEY;
   let maintenanceUntil: number | undefined;
-  if (packetsOnly) {
+  if (maintained) {
     z.literal("1").parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED);
     z.string().trim().min(1).max(500).parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE);
     maintenanceUntil = Date.parse(z.iso.datetime({ offset: true }).parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL));
     if (maintenanceUntil <= Date.now() || storageKey !== undefined)
-      throw new Error("Protected packet cleanup needs current maintenance approval and no Storage credential.");
+      throw new Error("Maintenance needs current approval and no project API credential.");
   }
-  if (!connectionString || !projectUrl || (!packetsOnly && !storageKey))
+  if (!connectionString || !projectUrl || (mode === "all" && !storageKey))
     throw new Error(
       "Set the isolated retention database, parent project URL and protected storage/Auth credential.",
     );
@@ -72,7 +74,7 @@ async function main() {
     throw new Error(
       "Remote retention requires approval and an isolated parent project.",
     );
-  if (packetsOnly) {
+  if (maintained) {
     const ref = /^https:\/\/([a-z0-9]+)\.supabase\.co$/.exec(canonicalProject)?.[1];
     if (!["postgres:", "postgresql:"].includes(dbUrl.protocol) || !dbUrl.username || !dbUrl.password
       || dbUrl.pathname !== "/postgres" || dbUrl.hash
@@ -80,8 +82,15 @@ async function main() {
         : !ref || dbUrl.hostname !== `db.${ref}.supabase.co` || !["", "5432"].includes(dbUrl.port)
           || dbUrl.searchParams.getAll("sslmode").length !== 1 || dbUrl.searchParams.get("sslmode") !== "verify-full"
           || [...dbUrl.searchParams.keys()].some(key => !["sslmode", "sslrootcert"].includes(key) || dbUrl.searchParams.getAll(key).length !== 1)))
-      throw new Error("Protected packet cleanup requires the exact approved database with verified TLS.");
+      throw new Error("Maintenance requires the exact approved database with verified TLS.");
   }
+  const s3Credentials = ordinaryOnly ? s3StorageCredentialsSchema.parse({
+    s3AccessKeyId: env.CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID,
+    s3SecretAccessKey: env.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY,
+    s3Region: env.CASELINK_PARENT_RETENTION_S3_REGION,
+  }) : null;
+  if (packetsOnly && [env.CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID, env.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY, env.CASELINK_PARENT_RETENTION_S3_REGION].some(value => value !== undefined))
+    throw new Error("Protected packet maintenance cannot receive Storage credentials.");
   const batchSchema = z.object({
     batchId: z.uuid(),
     leaseToken: z.uuid(),
@@ -94,7 +103,7 @@ async function main() {
             .regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/),
         }),
       )
-      .max(100),
+      .max(ordinaryOnly ? 1 : 100),
     artifacts: z
       .array(
         z.object({
@@ -102,10 +111,10 @@ async function main() {
           objectPath: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf$/),
         }),
       )
-      .max(100)
+      .max(ordinaryOnly ? 1 : 100)
       .default([]),
-    accountIds: z.array(z.uuid()).max(100),
-    requestIds: z.array(z.uuid()).max(100),
+    accountIds: z.array(z.uuid()).max(ordinaryOnly ? 1 : 100),
+    requestIds: z.array(z.uuid()).max(ordinaryOnly ? 1 : 100),
   });
   const db = new Client({
     connectionString,
@@ -114,12 +123,15 @@ async function main() {
     query_timeout: 18000,
     statement_timeout: 15000,
   });
-  const supabase = !packetsOnly && storageKey ? createClient(canonicalProject, storageKey, {
+  const supabase = mode === "all" && storageKey ? createClient(canonicalProject, storageKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   }) : null;
+  const s3 = s3Credentials ? createS3Storage({ projectUrl: canonicalProject, ...s3Credentials }) : null;
+  const controller = new AbortController();
   let closed = false, rejectStop!: (error: Error) => void;
   const close = () => {
     if (closed) return; closed = true;
+    controller.abort(); s3?.destroy();
     db.connection.stream.destroy();
     try { void db.end().catch(() => {}); } catch {}
   };
@@ -135,6 +147,7 @@ async function main() {
   const query = (text: string, values?: unknown[]) => run(() => db.query(text, values));
   const timer = maintenanceUntil === undefined ? undefined : setTimeout(abort, Math.min(60000, maintenanceUntil - Date.now()));
   db.on("error", abort);
+  if (ordinaryOnly) { process.once("SIGTERM", abort); process.once("SIGINT", abort); }
   try {
     await run(() => db.connect());
     const principal = (
@@ -172,7 +185,7 @@ async function main() {
     let removedDocuments = 0,
       removedAccounts = 0,
       removedPackets = 0;
-    for (let count = 0; count < 10; count++) {
+    for (let count = 0; !ordinaryOnly && count < 10; count++) {
       const result = await query(
         "select parent_private.parent_purge_snap_final_packets(100) removed",
       );
@@ -184,10 +197,10 @@ async function main() {
       process.stdout.write(`Retention completed: ${removedPackets} protected packets erased.\n`);
       return;
     }
-    if (!supabase) throw new Error("Ordinary retention requires its Storage credential.");
+    if (!supabase && !s3) throw new Error("Ordinary retention requires its Storage credential.");
     for (let count = 0; count < 10; count++) {
       const result = await query(
-        "select parent_private.parent_claim_cleanup(100) batch",
+        ordinaryOnly ? "select parent_private.parent_claim_cleanup(1) batch" : "select parent_private.parent_claim_cleanup(100) batch",
       );
       if (!result.rows[0]?.batch) break;
       const batch = batchSchema.parse(result.rows[0].batch);
@@ -195,23 +208,29 @@ async function main() {
         artifacts: string[] = [],
         accounts = batch.accountIds;
       for (const doc of batch.documents) {
-        const { data, error } = await supabase.storage
-          .from("parent-documents")
-          .remove([doc.objectPath]);
-        if (error || !data)
-          throw new Error(
-            "A private object could not be erased. Its lease will expire for a safe retry.",
-          );
+        if (s3) await run(() => s3.remove("parent-documents", doc.objectPath, controller.signal));
+        else {
+          const { data, error } = await supabase!.storage
+            .from("parent-documents")
+            .remove([doc.objectPath]);
+          if (error || !data)
+            throw new Error(
+              "A private object could not be erased. Its lease will expire for a safe retry.",
+            );
+        }
         documents.push(doc.id);
       }
       for (const artifact of batch.artifacts) {
-        const { data, error } = await supabase.storage
-          .from("parent-form-artifacts")
-          .remove([artifact.objectPath]);
-        if (error || !data)
-          throw new Error(
-            "A private form could not be erased. Its lease remains available for retry.",
-          );
+        if (s3) await run(() => s3.remove("parent-form-artifacts", artifact.objectPath, controller.signal));
+        else {
+          const { data, error } = await supabase!.storage
+            .from("parent-form-artifacts")
+            .remove([artifact.objectPath]);
+          if (error || !data)
+            throw new Error(
+              "A private form could not be erased. Its lease remains available for retry.",
+            );
+        }
         artifacts.push(artifact.id);
       }
       // Parent erasure must not delete a shared Auth identity or cascade school records.
@@ -226,6 +245,7 @@ async function main() {
       `Retention completed: ${removedPackets} protected packets, ${removedDocuments} private objects and ${removedAccounts} parent memberships erased.\n`,
     );
   } finally {
+    if (ordinaryOnly) { process.removeListener("SIGTERM", abort); process.removeListener("SIGINT", abort); }
     clearTimeout(timer); close();
   }
 }

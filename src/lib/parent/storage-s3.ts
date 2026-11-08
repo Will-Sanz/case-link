@@ -1,4 +1,4 @@
-import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { z } from "zod";
 import { canonicalProjectOrigin } from "./project-origin";
@@ -34,7 +34,7 @@ export async function storageArtifactGuardReady(database: WorkerDatabase): Promi
 }
 
 export function createS3Storage(input: { projectUrl: string } & z.infer<typeof s3StorageCredentialsSchema>):
-  Required<Pick<StorageBrokerPorts, "signDownload" | "upload" | "checkHealth">> & { destroy(): void } {
+  Required<Pick<StorageBrokerPorts, "signDownload" | "upload" | "checkHealth">> & { remove(bucket: string, path: string, signal: AbortSignal): Promise<void>; destroy(): void } {
   const project = canonicalProjectOrigin(input.projectUrl);
   if (!project) throw new Error("isolated_storage_origin_required");
   const credentials = s3StorageCredentialsSchema.parse({ s3AccessKeyId: input.s3AccessKeyId, s3SecretAccessKey: input.s3SecretAccessKey, s3Region: input.s3Region });
@@ -58,6 +58,18 @@ export function createS3Storage(input: { projectUrl: string } & z.infer<typeof s
         throw new Error("upload_purpose_unavailable");
       try { await client.send(new PutObjectCommand({ Bucket: bucket, Key: path, Body: bytes, ContentType: mediaType }), { abortSignal: AbortSignal.timeout(15000) }); }
       catch { throw new Error("upload_unconfirmed"); }
+    },
+    async remove(bucket, path, signal) {
+      const parts = path.replace(/\.pdf$/, "").split("/");
+      if (!((bucket === "parent-documents" && parts.length === 3 && !path.endsWith(".pdf"))
+        || (bucket === "parent-form-artifacts" && parts.length === 2 && path.endsWith(".pdf")))
+        || parts.some(part => !z.uuid().safeParse(part).success)) throw new Error("deletion_purpose_unavailable");
+      try {
+        const bounded = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
+        bounded.throwIfAborted();
+        await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: path }), { abortSignal: bounded });
+        bounded.throwIfAborted();
+      } catch { throw new Error("deletion_unconfirmed"); }
     },
     destroy: () => client.destroy(),
   };

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ client: vi.fn(), storage: vi.fn(), query: vi.fn(), end: vi.fn(), connect: vi.fn(), destroy: vi.fn() }));
+const mocks = vi.hoisted(() => ({ client: vi.fn(), storage: vi.fn(), query: vi.fn(), end: vi.fn(), connect: vi.fn(), destroy: vi.fn(), s3: vi.fn(), remove: vi.fn(), s3Destroy: vi.fn() }));
 vi.mock("pg", () => ({
   Client: class {
     constructor(options: unknown) {
@@ -13,6 +13,9 @@ vi.mock("pg", () => ({
   },
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.storage }));
+vi.mock("../src/lib/parent/storage-s3", async importOriginal => ({
+  ...await importOriginal<typeof import("../src/lib/parent/storage-s3")>(), createS3Storage: mocks.s3,
+}));
 const originalExit = process.exitCode;
 afterEach(() => {
   process.exitCode = originalExit;
@@ -73,6 +76,7 @@ async function localRetention(counts: unknown[], options: Options = {}) {
   }))vi.stubEnv(key,value);
   let next=0;
   mocks.storage.mockReturnValue({});
+  mocks.s3.mockReturnValue({ remove: mocks.remove, destroy: mocks.s3Destroy });
   if(options.hangAt==="connect")mocks.connect.mockImplementation(()=>new Promise(()=>{}));
   if(options.hangAt==="end")mocks.end.mockImplementation(()=>new Promise(()=>{}));
   if(options.errorAt==="connect")mocks.connect.mockRejectedValue(new Error("PRIVATE_CONNECTION_CANARY"));
@@ -221,4 +225,77 @@ it("preserves default full Storage cleanup and parent-membership acknowledgement
   expect(from.mock.calls.map(call=>call[0])).toEqual(["parent-documents","parent-form-artifacts"]);expect(remove).toHaveBeenCalledTimes(2);
   expect(mocks.query.mock.calls.find(([sql])=>String(sql).includes("parent_finish_cleanup"))?.[1]).toEqual([id,doc,[doc],[account],[artifact]]);
   expect(deleteUser).not.toHaveBeenCalled();expect(result.stdout).toBe("Retention completed: 0 protected packets, 2 private objects and 1 parent memberships erased.\n");
+});
+
+const cleanupId = "11111111-1111-4111-8111-111111111111", cleanupDoc = "22222222-2222-4222-8222-222222222222", cleanupArtifact = "33333333-3333-4333-8333-333333333333";
+const cleanupBatch = { batchId: cleanupId, leaseToken: cleanupDoc, documents: [{ id: cleanupDoc, objectPath: `${cleanupId}/${cleanupDoc}/${cleanupArtifact}` }],
+  artifacts: [{ id: cleanupArtifact, objectPath: `${cleanupId}/${cleanupArtifact}.pdf` }], accountIds: [cleanupId], requestIds: [] };
+const ordinaryRetention = (options: Options = {}) => localRetention([], { ...options, env: {
+  CASELINK_PARENT_RETENTION_MODE: "ordinary", CASELINK_PARENT_RETENTION_STORAGE_KEY: undefined,
+  CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED: "1", CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE: "Synthetic ordinary maintenance only",
+  CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: new Date(Date.now()+3600000).toISOString(),
+  CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID: "synthetic-s3-access-id", CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY: "synthetic-s3-secret-at-least-20", CASELINK_PARENT_RETENTION_S3_REGION: "local", ...options.env,
+} });
+it("ordinary-only maintenance uses S3 and exact acknowledgements without protected purge or Auth API", async () => {
+  const result = await ordinaryRetention({ batch: cleanupBatch });
+  expect(mocks.storage).not.toHaveBeenCalled(); expect(mocks.s3).toHaveBeenCalledOnce(); expect(mocks.remove).toHaveBeenCalledTimes(2);
+  expect(mocks.remove.mock.calls.map(([bucket, path]) => [bucket, path])).toEqual([["parent-documents", cleanupBatch.documents[0].objectPath], ["parent-form-artifacts", cleanupBatch.artifacts[0].objectPath]]);
+  expect(mocks.query.mock.calls.find(([sql]) => String(sql).includes("parent_finish_cleanup"))?.[1]).toEqual([cleanupId, cleanupDoc, [cleanupDoc], [cleanupId], [cleanupArtifact]]);
+  expect(result.queries.some(sql => sql.includes("parent_purge_snap"))).toBe(false); expect(result.queries).toContain("select parent_private.parent_claim_cleanup(1) batch");
+  expect(result.stdout).toContain("2 private objects and 1 parent memberships erased"); expect(mocks.s3Destroy).toHaveBeenCalledOnce();
+});
+it.each([
+  { CASELINK_PARENT_RETENTION_STORAGE_KEY: "SYNTHETIC_API_KEY" },
+  { CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY: undefined },
+  { CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY: "sb_secret_synthetic-test-key" },
+  { CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED: undefined },
+  { CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: "2000-01-01T00:00:00Z" },
+  { ...remoteScope, CASELINK_PARENT_RETENTION_DATABASE_URL: "postgresql://synthetic_retention:synthetic@db.other.supabase.co/postgres?sslmode=verify-full" },
+])("ordinary maintenance rejects missing authority or broad/wrong credentials before clients %#", async env => {
+  await ordinaryRetention({ env }); expect(process.exitCode).toBe(1); expect(mocks.client).not.toHaveBeenCalled(); expect(mocks.s3).not.toHaveBeenCalled(); expect(mocks.storage).not.toHaveBeenCalled();
+});
+it("ordinary maintenance refuses broad SQL role authority before any deletion", async () => {
+  await ordinaryRetention({ principal: { ...principal(), broader_membership: true }, batch: cleanupBatch });
+  expect(process.exitCode).toBe(1); expect(mocks.remove).not.toHaveBeenCalled(); expect(mocks.s3Destroy).toHaveBeenCalledOnce();
+});
+it("failed Storage erasure leaves its lease unacknowledged and hides private errors", async () => {
+  mocks.remove.mockRejectedValueOnce(new Error("PRIVATE_PROVIDER_CANARY"));
+  const result = await ordinaryRetention({ batch: cleanupBatch });
+  expect(process.exitCode).toBe(1); expect(result.queries.some(sql => sql.includes("parent_finish_cleanup"))).toBe(false);
+  expect(mocks.remove).toHaveBeenCalledOnce(); expect(result.stderr).not.toContain("PRIVATE_PROVIDER_CANARY"); expect(mocks.s3Destroy).toHaveBeenCalledOnce();
+});
+it.each([100, 60000])("ordinary maintenance cancels a hanging Storage operation at its bounded deadline %i", async deadline => {
+  vi.useFakeTimers(); mocks.remove.mockImplementation(() => new Promise(() => {}));
+  await ordinaryRetention({ batch: cleanupBatch, wait: false, env: { CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: new Date(Date.now() + (deadline === 100 ? 100 : 3600000)).toISOString() } });
+  await vi.waitFor(() => expect(mocks.remove).toHaveBeenCalledOnce()); const signal = mocks.remove.mock.calls[0][2] as AbortSignal;
+  await vi.advanceTimersByTimeAsync(deadline); await vi.waitFor(() => expect(process.exitCode).toBe(1));
+  expect(signal.aborted).toBe(true); expect(mocks.s3Destroy).toHaveBeenCalledOnce(); expect(mocks.destroy).toHaveBeenCalledOnce();
+  expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes("parent_finish_cleanup"))).toBe(false); expect(vi.getTimerCount()).toBe(0);
+});
+it("ordinary cleanup cannot acknowledge a late success after its original maintenance authority expired", async () => {
+  vi.useFakeTimers(); let finish!: () => void; mocks.remove.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  await ordinaryRetention({ batch: cleanupBatch, wait: false, env: { CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: new Date(Date.now()+100).toISOString() } });
+  await vi.waitFor(() => expect(mocks.remove).toHaveBeenCalledOnce()); vi.setSystemTime(Date.now()+200); finish();
+  await vi.waitFor(() => expect(process.exitCode).toBe(1)); expect(mocks.remove).toHaveBeenCalledOnce();
+  expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes("parent_finish_cleanup"))).toBe(false);
+});
+it("ordinary cleanup rejects oversized batches before Storage deletion", async () => {
+  await ordinaryRetention({ batch: { ...cleanupBatch, documents: [...cleanupBatch.documents, ...cleanupBatch.documents] } });
+  expect(process.exitCode).toBe(1); expect(mocks.remove).not.toHaveBeenCalled();
+});
+it("protected-only cleanup rejects injected S3 credentials", async () => {
+  await packetRetention([], { env: { CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID: "synthetic-s3-access-id" } });
+  expect(process.exitCode).toBe(1); expect(mocks.client).not.toHaveBeenCalled(); expect(mocks.s3).not.toHaveBeenCalled();
+});
+
+it.each(["SIGTERM", "SIGINT"] as const)("ordinary maintenance cancels in-flight deletion on %s and removes its handlers", async signalName => {
+  const listeners = process.listenerCount(signalName), once = vi.spyOn(process, "once");
+  mocks.remove.mockImplementation(() => new Promise(() => {}));
+  await ordinaryRetention({ batch: cleanupBatch, wait: false });
+  await vi.waitFor(() => expect(mocks.remove).toHaveBeenCalledOnce());
+  const handler = once.mock.calls.find(([name]) => name === signalName)?.[1]; expect(handler).toBeTypeOf("function"); handler!();
+  await vi.waitFor(() => expect(process.exitCode).toBe(1));
+  expect((mocks.remove.mock.calls[0][2] as AbortSignal).aborted).toBe(true); expect(mocks.s3Destroy).toHaveBeenCalledOnce();
+  expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes("parent_finish_cleanup"))).toBe(false);
+  expect(process.listenerCount(signalName)).toBe(listeners);
 });
