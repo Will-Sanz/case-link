@@ -1084,6 +1084,37 @@ describe("synthetic reference-only protected SNAP worker", () => {
       test.options.snapCapturePreparation = checker;
       return { ...test, pending, checker, intent };
     }
+    it("automatically saves exact review after direct completion through the real coordinator without dispatch or protected model input", async () => {
+      const test = pendingSetup();
+      test.state.claim.request.intake.zip = "19104";
+      test.state.pendingCapture = { ...test.pending, state: "checked" };
+      test.state.operations = [test.raw];
+      delete test.options.coordinate;
+      const model = vi.fn<typeof fetch>(async (url, init): Promise<Response> => {
+        expect(url).toBe("https://api.openai.com/v1/responses");
+        expect(test.database.query.mock.calls.filter(([sql]) => sql.includes("parent_reserve_ai_call"))).toHaveLength(model.mock.calls.length);
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({ model: "gpt-6.1-sol", store: false, max_output_tokens: 3000 });
+        expect(JSON.parse(body.input[0].content)).toMatchObject({ needs: ["snap_new"], authorizedRecipients: ["snap-pa"] });
+        expect(String(init?.body)).not.toMatch(/protectedSnapPacket|snapshotHash|contentSha256|authorizationId|verificationId|strokes|ssn/i);
+        for (const id of [test.intent.packetId, test.intent.authorizationId, test.intent.snapshotId, test.intent.requestId])
+          expect(String(init?.body)).not.toContain(id);
+        return Response.json({ status: "completed", output: model.mock.calls.length === 1 ? [{ type: "function_call", name: "select_programs",
+          call_id: "synthetic-first-review", arguments: JSON.stringify({ selections: [{ need: "snap_new", programId: "snap-pa" }] }) }] : [],
+          usage: { input_tokens: 10, output_tokens: 10 } });
+      });
+      test.options.fetcher = model;
+      expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
+      expect(model).toHaveBeenCalledTimes(2);
+      expect(test.checker.prepareCapture).not.toHaveBeenCalled();
+      expect(test.port.execute).not.toHaveBeenCalled(); expect(test.port.reconcile).not.toHaveBeenCalled();
+      expect(test.execute).not.toHaveBeenCalled(); expect(test.state.prepared).toEqual([]);
+      expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_begin_operation"))).toBe(false);
+      expect(JSON.parse(String(test.state.saved.at(-1)![4]))).toContainEqual(expect.objectContaining({
+        reason: "submission_review", field: "snap_final_submit", resolver: "parent",
+      }));
+      expect(test.raw.snapSubmissionAuthorized).toBe(false); expect(test.raw.personalActsComplete).toBe(false);
+    });
     it("checks the durable exact pointer under the lease, then reloads real canonical metadata for review", async () => {
       const test = pendingSetup(); await runOneParentJob(test.options);
       expect(test.checker.prepareCapture).toHaveBeenCalledExactlyOnceWith({ jobId, leaseToken, requestId: test.intent.requestId, requestVersion: 1,
