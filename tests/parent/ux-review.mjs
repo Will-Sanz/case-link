@@ -60,7 +60,8 @@ const answeredConversation = {
   ],
 };
 const browser = await chromium.launch({ headless: true }),
-  results = [];
+  results = [],
+  deletionResults = [];
 try {
   for (const [name, width, height] of [
     ["laptop", 1440, 1000],
@@ -631,6 +632,142 @@ try {
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await page.getByRole("main").getByRole("alert").waitFor();
     await snapshot("sign-in-recovery");
+
+    // This journey uses only synthetic rights API replies; it does not authenticate or erase real data.
+    const deletionOwner = "11111111-1111-4111-8111-111111111111";
+    const rightsCalls = [], outsideOrigins = [];
+    let rightsSignedIn = false, deletionRecorded = false, deletionReply;
+    let recoveryChecked = false;
+    const localOnly = async (route) => {
+      const requestedOrigin = new URL(route.request().url()).origin;
+      if (requestedOrigin !== new URL(origin).origin) {
+        outsideOrigins.push(requestedOrigin);
+        await route.abort();
+      } else await route.fallback();
+    };
+    const deletionRoute = async (route) => {
+      const path = new URL(route.request().url()).pathname, method = route.request().method();
+      const payload = method === "POST" ? route.request().postDataJSON() : null;
+      rightsCalls.push({ path, method, ...(payload ? { action: payload.action } : {}) });
+      let status = 200, body;
+      if (path === "/api/parent/account" && method === "GET") {
+        status = 503; body = { ok: false, error: "Synthetic processing closure: support work is closed." };
+      } else if (path === "/api/parent/account/deletion" && method === "GET") {
+        status = rightsSignedIn ? 200 : 401;
+        body = rightsSignedIn ? { ok: true, ownerId: deletionOwner, status: deletionRecorded ? "deletion_requested" : "active" }
+          : { ok: false, error: "Sign in again." };
+      } else if (path === "/api/parent/auth" && method === "POST") {
+        if (payload.action === "sign_in_for_deletion") {
+          assert.deepEqual(payload, { action: "sign_in_for_deletion", email: "family@example.test", password: "synthetic-deletion-password" });
+          rightsSignedIn = true;
+        } else {
+          assert.deepEqual(payload, { action: "sign_out" });
+          assert.equal(deletionRecorded, true, "A rejected deletion must not sign out.");
+          rightsSignedIn = false;
+        }
+        body = { ok: true };
+      } else if (path === "/api/parent/account" && method === "POST") {
+        assert.equal(rightsSignedIn, true);
+        assert.equal(deletionRecorded, false, "Recorded deletion must not be submitted again.");
+        assert.deepEqual(payload, { action: "delete", confirmation: "DELETE", expectedOwnerId: deletionOwner });
+        assert.ok(deletionReply);
+        const reply = deletionReply; deletionReply = undefined;
+        await route.fulfill(await reply);
+        return; // The browser check releases this reply only after collapsing the pending form.
+      } else assert.fail(`Unexpected rights API request: ${method} ${path}`);
+      await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    };
+    await page.route("**/api/parent/**", deletionRoute);
+    await page.route("**/*", localOnly);
+    try {
+      async function signInForDeletion() {
+        const link = page.getByRole("link", { name: "Sign in for deletion", exact: true });
+        await link.waitFor(); assert.equal(await link.getAttribute("href"), "/sign-in?purpose=delete-parent-data");
+        await link.focus(); await page.keyboard.press("Enter");
+        await page.waitForURL(new URL("/sign-in?purpose=delete-parent-data", origin).href);
+        await page.getByRole("heading", { name: "Sign in to manage deletion" }).waitFor();
+        assert.equal(await page.getByRole("button", { name: "Use an email code instead" }).count(), 0);
+        assert.equal(await page.getByLabel("Email code", { exact: true }).count(), 0);
+        const recovery = page.getByRole("link", { name: "Forgot your password?", exact: true });
+        if (process.env.CASELINK_PARENT_ACCOUNT_MODE === "existing") assert.equal(await recovery.count(), 1, "Existing-account runtime must expose its original recovery link.");
+        if (await recovery.count()) {
+          assert.equal(await recovery.getAttribute("href"), "https://www.thecaselink.com/forgot-password");
+          await page.getByText("Reset on the existing CaseLink site, then return here to sign in.", { exact: false }).waitFor();
+          recoveryChecked = true; // Inspect only: never navigate to or invoke account recovery.
+        }
+        await snapshot(deletionRecorded ? "deletion-return-password-sign-in" : "deletion-password-sign-in");
+        const email = page.getByLabel("Your email address"), password = page.getByLabel("Password", { exact: true });
+        await email.fill("family@example.test"); await email.focus(); await page.keyboard.press("Tab");
+        assert.equal(await password.evaluate(element => document.activeElement === element), true);
+        await password.fill("synthetic-deletion-password");
+        await page.getByRole("button", { name: "Sign in", exact: true }).focus(); await page.keyboard.press("Enter");
+        await page.waitForURL(new URL("/account?delete=1", origin).href);
+      }
+      await page.goto(`${origin}/account`, { waitUntil: "networkidle" });
+      await page.getByRole("link", { name: "Sign in for deletion", exact: true }).waitFor();
+      await snapshot("deletion-processing-closed");
+      await signInForDeletion();
+      const confirmation = page.getByLabel("Type DELETE to confirm");
+      await confirmation.waitFor();
+      assert.equal(await page.getByRole("link", { name: "Download my information" }).count(), 0);
+      assert.equal(await page.getByLabel("Support updates", { exact: true }).count(), 0);
+      await snapshot("deletion-confirmation");
+      for (const status of [409, 500, 200]) {
+        let releaseReply;
+        deletionReply = new Promise(resolve => { releaseReply = resolve; });
+        const delivered = page.waitForResponse(response => new URL(response.url()).pathname === "/api/parent/account" && response.request().method() === "POST");
+        void delivered.catch(() => {});
+        await confirmation.fill("DELETE");
+        await page.getByRole("button", { name: "Delete parent-support data & stop work", exact: true }).focus();
+        await page.keyboard.press("Enter");
+        await page.getByRole("button", { name: "Recording deletion…", exact: true }).waitFor();
+        const summary = page.locator("summary").filter({ hasText: "Delete my parent-support data & stop future work" });
+        await summary.focus(); await page.keyboard.press("Enter");
+        assert.equal(await summary.evaluate(element => element.closest("details").open), false);
+        if (status === 409) await snapshot("deletion-pending-collapsed");
+        const error = status === 409 ? "Your signed-in account changed. Reload before confirming deletion."
+          : "We couldn’t record your deletion request. Please try again.";
+        const signedOut = status === 200 ? page.waitForResponse(response => new URL(response.url()).pathname === "/api/parent/auth"
+          && response.request().method() === "POST" && response.request().postDataJSON().action === "sign_out") : null;
+        if (status === 200) deletionRecorded = true;
+        releaseReply({ status, contentType: "application/json", body: JSON.stringify(status === 200 ? { ok: true } : { ok: false, error }) });
+        assert.equal((await delivered).status(), status);
+        if (signedOut) await signedOut;
+        if (status !== 200) {
+          const alert = page.getByRole("alert"); await alert.waitFor();
+          assert.equal(await alert.innerText(), error); assert.equal(await alert.isVisible(), true);
+          assert.equal(await alert.evaluate(element => element.closest("details") === null), true);
+          assert.equal(await summary.evaluate(element => element.closest("details").open), false);
+          assert.equal(await page.getByRole("heading", { name: "Your deletion request is recorded" }).count(), 0);
+          assert.equal(rightsCalls.filter(call => call.action === "sign_out").length, 0);
+          await snapshot(`deletion-rejected-${status}`);
+          await page.reload({ waitUntil: "networkidle" }); await confirmation.waitFor();
+          assert.equal(await confirmation.inputValue(), "", "Reload requires a fresh deletion confirmation.");
+        }
+      }
+      const recorded = page.getByRole("heading", { name: "Your deletion request is recorded" });
+      await recorded.waitFor();
+      await page.waitForFunction(() => document.activeElement?.textContent === "Your deletion request is recorded");
+      await page.getByText(/Private files and eligible parent records enter the deletion process/).waitFor();
+      assert.equal(rightsCalls.filter(call => call.action === "sign_out").length, 1);
+      await snapshot("deletion-recorded");
+      await page.getByRole("link", { name: "Return home", exact: true }).focus(); await page.keyboard.press("Enter");
+      await page.waitForURL(new URL("/", origin).href);
+      await page.goto(`${origin}/account?delete=1`, { waitUntil: "networkidle" });
+      await signInForDeletion(); await recorded.waitFor();
+      await page.reload({ waitUntil: "networkidle" }); await recorded.waitFor();
+      assert.equal(await confirmation.count(), 0);
+      assert.equal(rightsCalls.filter(call => call.action === "delete").length, 3);
+      assert.equal(rightsCalls.filter(call => call.action === "sign_in_for_deletion").length, 2);
+      assert.equal(rightsCalls.filter(call => call.action === "sign_out").length, 1);
+      assert.equal(rightsCalls.filter(call => call.path === "/api/parent/account" && call.method === "GET").length, 1);
+      await snapshot("deletion-recorded-reload");
+      assert.deepEqual(outsideOrigins, []);
+      deletionResults.push({ viewport: name, api: "explicitly synthetic; no actual authentication or erasure", recovery: recoveryChecked ? "canonical_existing_site_verified" : "absent_in_runtime_configuration", rejectedStatuses: [409, 500], recordedAfterSignInAndReload: true, outsideRequests: outsideOrigins.length });
+    } finally {
+      await page.unroute("**/api/parent/**", deletionRoute);
+      await page.unroute("**/*", localOnly);
+    }
     await page.goto(`${origin}/support/help`, { waitUntil: "networkidle" });
     await snapshot("help");
     await context.close();
@@ -645,6 +782,7 @@ writeFileSync(
       notice:
         "Actual production UI with explicitly synthetic API fixtures. No live Auth, model, partner or family data used.",
       results,
+      deletionResults,
     },
     null,
     2,
@@ -653,6 +791,7 @@ writeFileSync(
 console.log(
   JSON.stringify({
     screens: results.length,
+    deletionResults,
     overflow: results.filter((item) => item.overflow),
     accessibility: results.filter((item) => item.violations.length),
   }),
