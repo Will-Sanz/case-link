@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { AuthenticationRequiredError } from "@/lib/auth/session-errors";
+import { getParentDeletionStatus } from "@/lib/parent/account-deletion";
 import { createParentClient } from "@/lib/parent/auth";
 import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
 import {
@@ -11,7 +13,7 @@ import {
 const schema = z.discriminatedUnion("action", [
   z
     .object({
-      action: z.literal("sign_in"),
+      action: z.enum(["sign_in", "sign_in_for_deletion"]),
       email: z.email().max(254),
       password: z.string().min(1).max(1024),
       captchaToken: z.string().max(4000).optional(),
@@ -93,9 +95,9 @@ export async function POST(request: Request) {
         message: "If this email can receive a code, it will arrive shortly.",
       });
     }
-    if (value.action === "verify_code" || value.action === "sign_in") {
+    if (value.action === "verify_code" || value.action === "sign_in" || value.action === "sign_in_for_deletion") {
       const result =
-        value.action === "sign_in"
+        value.action !== "verify_code"
           ? await client.auth.signInWithPassword({
               email: value.email.trim().toLowerCase(),
               password: value.password,
@@ -122,12 +124,23 @@ export async function POST(request: Request) {
           {
             ok: false,
             error:
-              value.action === "sign_in"
+              value.action !== "verify_code"
                 ? "Could not sign in. Check your email and password and try again."
                 : "That code is incorrect or expired. Check it or request a new code.",
           },
           400,
         );
+      if (value.action === "sign_in_for_deletion") {
+        try {
+          await getParentDeletionStatus(client);
+        } catch (error) {
+          await client.auth.signOut({ scope: "local" });
+          if (error instanceof AuthenticationRequiredError)
+            return parentJson({ ok: false, error: "Could not sign in. Check your email and password and try again." }, 400);
+          throw error;
+        }
+        return parentJson({ ok: true });
+      }
       const account = await client.rpc("parent_ensure_account");
       if (account.error) {
         await client.auth.signOut({ scope: "local" });

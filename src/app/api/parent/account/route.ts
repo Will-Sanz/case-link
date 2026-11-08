@@ -18,7 +18,7 @@ export async function GET() {
     const household = await getHousehold();
     return parentJson({
       ok: true,
-      account: { email: user.email, preferences: household.preferences },
+      account: { id: user.id, email: user.email, preferences: household.preferences },
     });
   } catch (error) {
     return parentError(error);
@@ -39,14 +39,17 @@ export async function POST(request: Request) {
           .object({
             action: z.literal("delete"),
             confirmation: z.literal("DELETE"),
+            expectedOwnerId: z.uuid({ error: "Reload your account before confirming deletion." }),
           })
           .strict(),
       ])
       .parse(await readParentJson(request));
-    if (value.action === "delete") await requestAccountDeletion();
+    if (value.action === "delete") await requestAccountDeletion(value.expectedOwnerId);
     else await updateParentPreferences(value.preferences);
     return parentJson({ ok: true });
   } catch (error) {
+    if (error instanceof Error && error.message === "parent_deletion_owner_changed")
+      return parentJson({ ok: false, error: "Your signed-in account changed. Reload before confirming deletion." }, 409);
     return parentError(error);
   }
 }

@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const account = {
   ok: true,
   account: {
+    id: "11111111-1111-4111-8111-111111111111",
     email: "synthetic@example.test",
     preferences: {
       contactPreference: "in_app",
@@ -103,6 +104,7 @@ describe("parent account controls", () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
       action: "delete",
       confirmation: "DELETE",
+      expectedOwnerId: "11111111-1111-4111-8111-111111111111",
     });
   });
 });

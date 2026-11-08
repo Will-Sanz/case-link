@@ -61,3 +61,34 @@ describe("pending sign-in fields", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 });
+
+
+describe("deletion sign-in purpose", () => {
+  it("uses password-only deletion authentication and an exact deletion return, preserving original-site recovery", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetchMock);
+    render(<ParentSignIn deletionOnly returnTo="https://attacker.example.test" existingAccountRecovery recoveryHref="https://original.example.test/forgot-password" />);
+    expect(screen.queryByRole("button", { name: "Use an email code instead" })).toBeNull();
+    expect(screen.queryByText(/By continuing, you agree/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Forgot your password?" }).getAttribute("href")).toBe("https://original.example.test/forgot-password");
+    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "existing@example.test" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/account?delete=1"));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ action: "sign_in_for_deletion", email: "existing@example.test", password: "synthetic-password" });
+  });
+  it("cannot carry an old email-code flow into deletion authentication when the purpose changes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetchMock);
+    const { rerender } = render(<ParentSignIn />);
+    fireEvent.click(screen.getByRole("button", { name: "Use an email code instead" }));
+    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "existing@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+    await screen.findByLabelText("Email code");
+    rerender(<ParentSignIn deletionOnly />);
+    expect(screen.queryByLabelText("Email code")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send a new code" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/account?delete=1"));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).action).toBe("sign_in_for_deletion");
+  });
+});

@@ -12,18 +12,21 @@ const subscribeReady = () => () => {};
 
 export function ParentSignIn({
   returnTo,
+  deletionOnly = false,
   existingAccountRecovery = false,
   recoveryHref = "/forgot-password",
   emailCodeAvailable = true,
   authNotice,
 }: {
   returnTo?: string;
+  deletionOnly?: boolean;
   existingAccountRecovery?: boolean;
   recoveryHref?: string;
   emailCodeAvailable?: boolean;
   authNotice?: "password-reset-success" | "auth-link-error";
 }) {
   const router = useRouter();
+  const allowEmailCode = emailCodeAvailable && !deletionOnly;
   const ready = useSyncExternalStore(subscribeReady, () => true, () => false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,9 +39,11 @@ export function ParentSignIn({
   );
   const [resent, setResent] = useState(false);
   const codeInput = useRef<HTMLInputElement>(null);
+  const effectiveMethod = deletionOnly ? "password" : method;
+  const codeSent = !deletionOnly && sent;
   useEffect(() => {
-    if (sent) codeInput.current?.focus();
-  }, [sent]);
+    if (codeSent) codeInput.current?.focus();
+  }, [codeSent]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!ready || pending) return;
@@ -48,16 +53,16 @@ export function ParentSignIn({
       await parentApi("/auth", {
         method: "POST",
         body: JSON.stringify(
-          method === "password"
-            ? { action: "sign_in", email, password }
-            : sent
+          effectiveMethod === "password"
+            ? { action: deletionOnly ? "sign_in_for_deletion" : "sign_in", email, password }
+            : codeSent
               ? { action: "verify_code", email, token }
               : { action: "send_code", email },
         ),
       });
-      if (method === "password" || sent) {
+      if (effectiveMethod === "password" || codeSent) {
         setPassword("");
-        router.replace(safeReturnPath(returnTo));
+        router.replace(deletionOnly ? "/account?delete=1" : safeReturnPath(returnTo));
         router.refresh();
       } else {
         setSent(true);
@@ -73,7 +78,7 @@ export function ParentSignIn({
     }
   }
   async function resend() {
-    if (!ready || pending) return;
+    if (!ready || pending || deletionOnly) return;
     setPending(true);
     setError("");
     setResent(false);
@@ -104,7 +109,7 @@ export function ParentSignIn({
         <p>
           Your CaseLink account brings your support together. Sign in with the
           email and password you already use
-          {emailCodeAvailable ? ", or get a secure email code." : "."}
+          {allowEmailCode ? ", or get a secure email code." : "."}
         </p>
         <div className={styles.trustLine}>
           <Lock width={22} height={22} aria-hidden="true" />
@@ -117,23 +122,24 @@ export function ParentSignIn({
       <section className={styles.surface} aria-labelledby="signin-title">
         <div className={styles.formHeader}>
           <h2 id="signin-title">
-            {sent ? "Check your email" : "Welcome to CaseLink"}
+            {codeSent ? "Check your email" : deletionOnly ? "Sign in to manage deletion" : "Welcome to CaseLink"}
           </h2>
           <p>
-            {sent ? (
+            {codeSent ? (
               <>
                 Enter the code sent to <strong>{email}</strong>. It may take a
                 moment to arrive.
               </>
-            ) : method === "password" ? (
+            ) : effectiveMethod === "password" ? (
               "Use your existing CaseLink email and password."
             ) : (
               "New here or need a code? We’ll email you a secure sign-in code."
             )}
           </p>
         </div>
+        {deletionOnly && <p className={styles.hint}>This sign-in checks access to your existing parent-support data for deletion. It does not create an account, reopen support work or authorize new collection.</p>}
         <form className={styles.form} onSubmit={submit}>
-          {!sent ? (
+          {!codeSent ? (
             <div className={styles.field}>
               <label htmlFor="parent-email">Your email address</label>
               <input
@@ -177,7 +183,7 @@ export function ParentSignIn({
               </p>
             </div>
           )}
-          {method === "password" && (
+          {effectiveMethod === "password" && (
             <div className={styles.field}>
               <label htmlFor="parent-password">Password</label>
               <input
@@ -216,7 +222,7 @@ export function ParentSignIn({
               Your password is updated. Sign in with your new password.
             </p>
           )}
-          {resent && (
+          {resent && allowEmailCode && (
             <p className={styles.success} role="status">
               A new code is on its way. Check your spam folder, too.
             </p>
@@ -227,25 +233,25 @@ export function ParentSignIn({
             type="submit"
           >
             {pending
-              ? method === "password" || sent
+              ? effectiveMethod === "password" || codeSent
                 ? "Signing you in…"
                 : "Sending your code…"
-              : method === "password" || sent
+              : effectiveMethod === "password" || codeSent
                 ? "Sign in"
                 : "Email me a code"}{" "}
-            {method === "password" || sent ? (
+            {effectiveMethod === "password" || codeSent ? (
               <ArrowRight width={19} height={19} aria-hidden="true" />
             ) : (
               <Mail width={19} height={19} aria-hidden="true" />
             )}
           </button>
         </form>
-        {emailCodeAvailable && (
+        {allowEmailCode && (
           <button
             className={`${styles.quiet} ${styles.space}`}
             disabled={!ready || pending}
             onClick={() => {
-              setMethod(method === "password" ? "code" : "password");
+              setMethod(effectiveMethod === "password" ? "code" : "password");
               setPassword("");
               setSent(false);
               setToken("");
@@ -253,12 +259,12 @@ export function ParentSignIn({
               setResent(false);
             }}
           >
-            {method === "password"
+            {effectiveMethod === "password"
               ? "Use an email code instead"
               : "Use my CaseLink password"}
           </button>
         )}
-        {sent && (
+        {codeSent && (
           <div className={`${styles.inline} ${styles.space}`}>
             <button
               className={styles.quiet}
@@ -281,7 +287,7 @@ export function ParentSignIn({
             </button>
           </div>
         )}
-        <p className={`${styles.hint} ${styles.space}`}>
+        {!deletionOnly && <p className={`${styles.hint} ${styles.space}`}>
           By continuing, you agree to our{" "}
           <Link className={styles.textLink} href="/support/terms">
             terms
@@ -291,7 +297,7 @@ export function ParentSignIn({
             privacy notice
           </Link>
           . Signing in does not authorize sharing or applications.
-        </p>
+        </p>}
       </section>
     </div>
   );

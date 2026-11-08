@@ -36,3 +36,13 @@ it("uses the original provider recovery site for the connected local account exp
   );
   expect(page.props.emailCodeAvailable).toBe(false);
 });
+
+it.each(["connected", "production"])("preserves original-site recovery and the deletion-only purpose in %s", async environment => {
+  vi.stubEnv("CASELINK_ENVIRONMENT", environment);
+  vi.stubEnv("CASELINK_PARENT_ACCOUNT_MODE", "existing");
+  vi.stubEnv("CASELINK_PARENT_RECOVERY_SITE_URL", "https://original.example.test");
+  const page = await SignInPage({ searchParams: Promise.resolve({ purpose: "delete-parent-data" }) });
+  expect(page.props.recoveryHref).toBe("https://original.example.test/forgot-password");
+  expect(page.props.deletionOnly).toBe(true);
+  expect(page.props.emailCodeAvailable).toBe(false);
+});

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   password: vi.fn(),
+  getUser: vi.fn(),
   code: vi.fn(),
   verify: vi.fn(),
   signOut: vi.fn(),
@@ -18,12 +19,14 @@ beforeEach(() => {
   mocks.create.mockResolvedValue({
     auth: {
       signInWithPassword: mocks.password,
+      getUser: mocks.getUser,
       signInWithOtp: mocks.code,
       verifyOtp: mocks.verify,
       signOut: mocks.signOut,
     },
     rpc: mocks.rpc,
   });
+  mocks.getUser.mockResolvedValue({ data: { user: { id: "11111111-1111-4111-8111-111111111111", email: "synthetic@example.test", email_confirmed_at: "2026-11-07", is_anonymous: false } }, error: null });
   for (const operation of [
     mocks.password,
     mocks.code,
@@ -326,5 +329,40 @@ describe("existing parent account sign-in", () => {
   it("signs out only this parent session", async () => {
     expect((await POST(request({ action: "sign_out" }))).status).toBe(200);
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+});
+
+
+describe("password-only sign-in for existing parent deletion", () => {
+  const input = { action: "sign_in_for_deletion", email: "synthetic@example.test", password: "synthetic-password" };
+  it.each(["active", "deletion_requested"])("authenticates an existing %s owner without enrollment or a processing grant", async status => {
+    mocks.rpc.mockResolvedValue({ data: status, error: null });
+    const result = await POST(request(input));
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ ok: true });
+    expect(mocks.rpc.mock.calls).toEqual([["parent_get_deletion_status"]]);
+    expect(mocks.getUser).toHaveBeenCalledOnce();
+    expect(mocks.code).not.toHaveBeenCalled(); expect(mocks.verify).not.toHaveBeenCalled();
+  });
+  it("uses the same generic response for incorrect passwords and absent owned parent data", async () => {
+    mocks.password.mockResolvedValueOnce({ error: { status: 400, message: "PRIVATE-CANARY" } });
+    const invalid = await POST(request(input));
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "PRIVATE-CANARY" } });
+    const unowned = await POST(request(input));
+    expect(invalid.status).toBe(400); expect(unowned.status).toBe(400);
+    expect(await unowned.json()).toEqual(await invalid.json());
+    expect(mocks.signOut.mock.calls).toEqual([[{ scope: "local" }]]);
+  });
+  it.each([429, 503])("keeps Auth rate limits/outages (%s) and never proceeds to ownership after failed authentication", async status => {
+    mocks.password.mockResolvedValueOnce({ error: { status, message: "PRIVATE-CANARY" } });
+    const result = await POST(request(input));
+    expect(result.status).toBe(status);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(await result.text()).not.toContain("PRIVATE-CANARY");
+  });
+  it("keeps origin, password and strict-body controls before Auth", async () => {
+    for (const req of [request(input,"https://attacker.example.test"),request({action:"sign_in_for_deletion",email:input.email,token:"123456"}),request({...input,ownerId:"another-parent"})])
+      expect((await POST(req)).status).toBeGreaterThanOrEqual(400);
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 });

@@ -83,6 +83,7 @@ try {
         body = {
           ok: true,
           account: {
+            id: "11111111-1111-4111-8111-111111111111",
             email: "family@example.test",
             preferences: {
               contactPreference: "in_app",

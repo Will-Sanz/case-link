@@ -265,11 +265,7 @@ export async function updateParentPreferences(
   });
   check(error);
 }
-export async function requestAccountDeletion(): Promise<void> {
-  const { supabase } = await requireParentSession();
-  const { error } = await supabase.rpc("parent_request_deletion");
-  check(error);
-}
+export { requestAccountDeletion } from "./account-deletion";
 
 const documentSchema = z
   .object({

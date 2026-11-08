@@ -3,14 +3,15 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, LogOut, Lock } from "iconoir-react";
+import { LogOut, Lock } from "iconoir-react";
 import type { ParentPreferences } from "@/lib/parent/domain";
 import { parentApi } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
+import { AccountDeletion, AccountDeletionAccess } from "./account-deletion";
 import { useParentResource } from "./use-parent-resource";
 import styles from "./parent.module.css";
 
-type Account = { email: string; preferences: ParentPreferences };
+type Account = { id: string; email: string; preferences: ParentPreferences };
 const hourLabel = (hour: number) =>
   `${hour % 12 || 12}:00 ${hour < 12 ? "AM" : "PM"}`;
 function AccountSettings({
@@ -24,8 +25,6 @@ function AccountSettings({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [confirmation, setConfirmation] = useState("");
   const [deleted, setDeleted] = useState(false);
   const router = useRouter();
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -72,64 +71,9 @@ function AccountSettings({
       setPending(false);
     }
   }
-  async function remove(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setError("");
-    try {
-      await parentApi("/account", {
-        method: "POST",
-        body: JSON.stringify({ action: "delete", confirmation }),
-      });
-      setDeleted(true);
-      try {
-        await parentApi("/auth", {
-          method: "POST",
-          body: JSON.stringify({ action: "sign_out" }),
-        });
-      } catch {
-        setError(
-          "Parent-support access is disabled, but we couldn’t confirm sign-out on this device. Close this browser before leaving a shared device.",
-        );
-      }
-      router.refresh();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "We couldn’t record your deletion request. Please try again.",
-      );
-    } finally {
-      setPending(false);
-    }
-  }
-  if (deleted)
-    return (
-      <section className={styles.surface}>
-        <h2>Your deletion request is recorded</h2>
-        <p className={`${styles.subtle} ${styles.space}`}>
-          Future parent-support work is stopped and parent access is disabled.
-          Private files and eligible parent records enter the deletion process.
-          Your existing CaseLink sign-in and school records are kept separate.
-          Information already sent to a program may remain under that program’s
-          retention rules.
-        </p>
-        <p className={`${styles.hint} ${styles.space}`}>
-          Deletion does not withdraw an application already held by an agency.
-          Contact that program directly for its options.
-        </p>
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-        <Link className={`${styles.button} ${styles.space}`} href="/">
-          Return home
-        </Link>
-      </section>
-    );
   return (
     <div className={styles.stack}>
+      {!deleted && <>
       <section className={styles.surface}>
         <div className={styles.between}>
           <div>
@@ -263,85 +207,14 @@ function AccountSettings({
           </button>
         </form>
       </section>
-      <section className={styles.surface}>
-        <h2>Your information & control</h2>
-        <p className={`${styles.subtle} ${styles.small}`}>
-          Download your account information and recorded support history.
-          Individual request pages also include printable summaries.
-        </p>
-        <a
-          className={`${styles.secondary} ${styles.space}`}
-          href="/api/parent/account/export"
-        >
-          <Download width={18} height={18} aria-hidden="true" />
-          Download my information
-        </a>
-        <div className={styles.disclosure}>
-          <Link className={styles.textLink} href="/support/privacy">
-            Read privacy, retention and sharing details
-          </Link>
-        </div>
-        <details
-          className={styles.disclosure}
-          open={deleteOpen}
-          onToggle={(event) => setDeleteOpen(event.currentTarget.open)}
-        >
-          <summary>Delete my parent-support data & stop future work</summary>
-          <div>
-            <p className={`${styles.small} ${styles.subtle}`}>
-              This stops parent-support work, blocks parent access and records a
-              deletion request. It keeps your existing CaseLink sign-in and
-              school records. Minimal service evidence and information already
-              delivered to a program have separate retention rules. Download
-              anything you need first.
-            </p>
-            <form
-              className={`${styles.form} ${styles.space}`}
-              onSubmit={remove}
-            >
-              <div className={styles.field}>
-                <label htmlFor="delete-confirmation">
-                  Type DELETE to confirm
-                </label>
-                <input
-                  id="delete-confirmation"
-                  className={styles.input}
-                  autoComplete="off"
-                  value={confirmation}
-                  onChange={(e) => setConfirmation(e.target.value)}
-                  required
-                  pattern="DELETE"
-                />
-              </div>
-              <button
-                className={styles.danger}
-                type="submit"
-                disabled={pending || confirmation !== "DELETE"}
-              >
-                {pending
-                  ? "Recording deletion…"
-                  : "Delete parent-support data & stop work"}
-              </button>
-              <button
-                className={styles.quiet}
-                type="button"
-                onClick={() => {
-                  setDeleteOpen(false);
-                  setConfirmation("");
-                }}
-              >
-                Keep my parent-support data
-              </button>
-            </form>
-          </div>
-        </details>
-      </section>
-      {message && (
+      </>}
+      <AccountDeletion key={account.id} ownerId={account.id} showExport onRecorded={() => setDeleted(true)} />
+      {!deleted && message && (
         <p className={styles.success} role="status">
           {message}
         </p>
       )}
-      {error && (
+      {!deleted && error && (
         <p className={styles.error} role="alert">
           {error}
         </p>
@@ -350,28 +223,22 @@ function AccountSettings({
   );
 }
 
-export function ParentAccount() {
+function AccountResource() {
   const { data, error, loading, reload } = useParentResource<{
     account: Account;
   }>("/account");
+  return loading ? <ParentLoading label="Loading your account" /> : error ? <><ServiceError error={error} retry={reload} returnTo="/account" /><AccountDeletionAccess /></> :
+    data && <AccountSettings key={data.account.id} account={data.account} onChange={reload} />;
+}
+
+export function ParentAccount({ deletionOnly = false }: { deletionOnly?: boolean }) {
   return (
     <div className={`${styles.container} ${styles.narrow}`}>
-      <div className={styles.pageTop}>
-        <div>
-          <h1>Your account</h1>
-          <p>
-            Choose how to hear from us, protect your information, and stay in
-            control.
-          </p>
-        </div>
-      </div>
-      {loading ? (
-        <ParentLoading label="Loading your account" />
-      ) : error ? (
-        <ServiceError error={error} retry={reload} returnTo="/account" />
-      ) : (
-        data && <AccountSettings account={data.account} onChange={reload} />
-      )}
+      <div className={styles.pageTop}><div>
+        <h1>{deletionOnly ? "Delete parent-support data" : "Your account"}</h1>
+        <p>Choose how to hear from us, protect your information, and stay in control.</p>
+      </div></div>
+      {deletionOnly ? <AccountDeletionAccess /> : <AccountResource />}
     </div>
   );
 }
