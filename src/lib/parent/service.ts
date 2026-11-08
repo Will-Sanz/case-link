@@ -1039,9 +1039,9 @@ export async function runSupportService(input: {
               operation.receipt &&
               receiptSchema.safeParse(operation.receipt).success,
           )
-          .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+          .sort((a, b) => Date.parse(b.receipt?.agencyStatus?.observedAt ?? b.updatedAt) - Date.parse(a.receipt?.agencyStatus?.observedAt ?? a.updatedAt))[0];
         const due = last
-          ? Date.parse(last.updatedAt) +
+          ? Date.parse(last.receipt?.agencyStatus?.observedAt ?? last.updatedAt) +
             (request.intake.urgency === "today" ? 3600000 : 86400000)
           : NaN;
         capability = await ports.capability(route.programId, "follow_up");

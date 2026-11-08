@@ -313,6 +313,27 @@ describe("new SNAP final Submit orchestration", () => {
     expect(result.requiredActions.some(action => action.reason === "submission_review")).toBe(false);
   });
 
+  it("does not make an old agency observation fresh when it is ingested later", async () => {
+    const input = finalSnapFixture();
+    const observedAt = "2026-10-25T10:00:00Z";
+    const prior = { ...acknowledged(input.request, "agency_submitted", fixtureNow.toISOString()), need: "snap_new" as const, programId: "snap-pa",
+      receipt: { ...receipt("agency_submitted", observedAt), agencyStatus: { reference: "Synthetic observed SNAP status", observedAt, waitingForDecision: true as const } } };
+    input.request.plan = buildSupportPlan(input.request, fixtureNow); input.request.plan.routes[0].state = "agency_submitted";
+    await runSupportService({ ...input, operations: [prior] });
+    expect(input.ports.execute).toHaveBeenCalledWith(expect.objectContaining({ action: "follow_up", packet: { statusReference: prior.receipt.reference } }));
+  });
+  it("uses the newest actual agency observation across out-of-order ingestion", async () => {
+    const input = finalSnapFixture();
+    const observations = [
+      { observedAt: "2026-10-25T15:30:00Z", ingestedAt: "2026-10-25T15:31:00Z" },
+      { observedAt: "2026-10-25T10:00:00Z", ingestedAt: fixtureNow.toISOString() },
+    ].map(({ observedAt, ingestedAt }, index) => ({ ...acknowledged(input.request, "agency_submitted", ingestedAt), id: `observed-${index}`, need: "snap_new" as const, programId: "snap-pa",
+      receipt: { ...receipt("agency_submitted", observedAt), agencyStatus: { reference: `Synthetic notice ${index}`, observedAt, waitingForDecision: true as const } } }));
+    input.request.plan = buildSupportPlan(input.request, fixtureNow); input.request.plan.routes[0].state = "agency_submitted";
+    const result = await runSupportService({ ...input, operations: observations });
+    expect(input.ports.execute).not.toHaveBeenCalled(); expect(result.nextRunAt).toBe("2026-10-25T16:30:00.000Z");
+  });
+
   it("keeps an incomplete private preview in preparation even with an unrelated true authorization", async () => {
     const input = finalSnapFixture(); await runSupportService(input);
     const operation = vi.mocked(input.ports.prepareOperation).mock.calls[0][0];
