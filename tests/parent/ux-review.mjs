@@ -734,7 +734,7 @@ try {
         assert.equal((await delivered).status(), status);
         if (signedOut) await signedOut;
         if (status !== 200) {
-          const alert = page.getByRole("alert"); await alert.waitFor();
+          const alert = page.getByRole("main").getByRole("alert"); await alert.waitFor();
           assert.equal(await alert.innerText(), error); assert.equal(await alert.isVisible(), true);
           assert.equal(await alert.evaluate(element => element.closest("details") === null), true);
           assert.equal(await summary.evaluate(element => element.closest("details").open), false);
