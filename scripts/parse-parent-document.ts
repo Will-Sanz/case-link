@@ -29,9 +29,10 @@ async function main() {
         let text = extracted[page - 1] ?? "";
         if (text.replace(/\s/g, "").length < 30) {
           const image = join(directory, `page-${page}`);
-          await run("pdftoppm", ["-f", String(page), "-l", String(page), "-singlefile", "-scale-to", "1600", "-png", source, image], limits);
+          await run("pdftoppm", ["-f", String(page), "-l", String(page), "-singlefile", "-r", "300", "-scale-to", "3200", "-png", source, image], limits);
           await chmod(`${image}.png`, 0o600);
           text = (await run("tesseract", [`${image}.png`, "stdout", "-l", "eng+spa", "--psm", "3"], limits)).stdout;
+          await rm(`${image}.png`);
         }
         if (text.length > 50000) throw new Error("Page text exceeds the supported limit.");
         pages.push(text);

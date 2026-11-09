@@ -1,5 +1,19 @@
 # Real isolated document parser review — October 26, 2026
 
+## Azure follow-up — November 9, 2026
+
+The actual Ubuntu/rootless deployment exposed a regression in the original image: its Spanish scanned-PDF fixture dropped the leading letters in two labels. The original22/23 result and two unsuccessful candidates remain recorded in the November8 hosting evidence. No assertion was weakened.
+
+The small source correction renders PDF OCR pages at300DPI, bounded to3200pixels on the longest edge, and removes each temporary raster immediately after OCR. The latter keeps successive pages from accumulating inside the existing96MiB scratch filesystem. Native PDF extraction, English/Spanish OCR settings, five-page/input/output limits, timeouts and all container protections remain unchanged. This follows [Tesseract's raster-quality guidance](https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html#rescaling); the bounded3200pixel maximum can still reduce effective DPI for a large physical page.
+
+The final separate image `caselink-document-parser@sha256:185b95cc5bdf9aabd97e6cf76401112cf94cf512069653e626bbfb58566a750e` passes **24/24 actual integration checks** with generated fixtures and no model calls. This retains the previous23 cases and adds a maximum five-page Spanish scan regression. All five pages preserve the exact labels and numbers in6.437seconds; the complete suite takes38.26seconds. No diacritic warnings occurred in this run. [Aggregate result and exact source fingerprints](../../output/verification/azure-host-2026-11-09/parser-final24-result.json).
+
+Actual rootless identity and cleanup are verified; no test containers remain, and the production worker/profile remains inactive/disabled. The image is a tested candidate, not an activated connected release. The existing512MiB container memory,64PIDs, no-network/read-only/non-root execution and768MiB/one-CPU/96-task daemon bounds were retained. Focused parser/cleanup unit checks, TypeScript and targeted lint pass. Normal correctness/privacy/resource review and a separate Ponytail pass retain the current libraries, actual entry point and small regression; no dependency or general parser framework was added.
+
+These fixtures do not establish arbitrary camera-document accuracy or Spanish semantic financial extraction. The English-only financial allowlist/grounding limitation below remains; no consequential Spanish processing or family launch is approved by OCR results.
+
+## Historical local verification
+
 The local Docker integration suite passed **23/23 functional checks** using the actual `extractIsolatedDocument` production entry point and image `caselink-document-parser:local`, ID `sha256:8d40b107157d4ba9bd60d6633c34b963ae1167187bd6afbf8f04bab5a146f90f`. The image's configured user was verified as `65534:65534`. No production source changed during this verification.
 
 The [aggregate result](parent-document-parser-local.json) records each check, timing, page/character counts, image identity, source fingerprints and three explicit Spanish diacritic warnings. It contains no source text, document images, account identifiers or credentials. Synthetic PDF, PNG and JPEG fixtures were generated in memory and were not written to disk. No OpenAI request, real family document or partner transport was used.
