@@ -101,6 +101,7 @@ describe.skipIf(!modulePath)(
             )
           ).rows[0].existing_identity_created_before,
         ).toBeNull();
+        expect((await db.query("select pilot_account_ids from parent_private.processing_controls")).rows[0].pilot_account_ids).toBeNull();
         await db.query(
           "update parent_private.processing_controls set enabled=true,existing_accounts_enabled=true,approval_reference='synthetic existing-identity cutoff',approved_until=now()+interval '1 day'",
         );
@@ -202,6 +203,34 @@ describe.skipIf(!modulePath)(
               .rows,
           ).toEqual([]);
         }
+        await db.query(
+          "update parent_private.processing_controls set pilot_account_ids=$1::uuid[]",
+          [[older.id, staff.id, newer.id, banned.id, unverified.id]],
+        );
+        for (const identity of [older, staff]) {
+          expect((await parent(identity, "select public.parent_ensure_account() household")).rows[0].household).toBeTruthy();
+          expect(await grant(identity)).toEqual({ granted: true, notification: true });
+        }
+        for (const identity of [boundary, newer, newerStaff, missingDate, banned, unverified]) {
+          await denied(identity);
+          if (identity.request) {
+            expect(await grant(identity)).toEqual({ granted: false, notification: false });
+            expect((await parent(identity, "select id from public.parent_accounts")).rows).toEqual([]);
+          }
+        }
+        await expect(parent(older, "update parent_private.processing_controls set pilot_account_ids=null"))
+          .rejects.toMatchObject({ code: "42501" });
+        expect((await db.query("select parent_private.assistant_owner_available($1,1) allowed", [boundary.request])).rows[0].allowed).toBe(false);
+        await db.query("update parent_private.processing_controls set pilot_account_ids='{}'::uuid[]");
+        for (const identity of [older, staff]) {
+          await denied(identity);
+          expect(await grant(identity)).toEqual({ granted: false, notification: false });
+        }
+        expect((await db.query("select existing_identity_created_before from parent_private.processing_controls")).rows[0].existing_identity_created_before)
+          .toEqual(cutoff);
+        await db.query("update parent_private.processing_controls set pilot_account_ids=null");
+        expect((await parent(boundary, "select public.parent_ensure_account() household")).rows[0].household).toBeTruthy();
+        expect(await grant(boundary)).toEqual({ granted: true, notification: true });
         await denied(staff, "otp");
         await denied(banned);
         await denied(unverified);
