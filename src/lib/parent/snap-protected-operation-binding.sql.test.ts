@@ -53,7 +53,9 @@ describe.skipIf(!modulePath)("protected SNAP canonical operation binding SQL (sy
       snap_protected_approved_until=now()+interval '3 days',snap_protected_max_retention_seconds=$1`, [retentionSeconds]);
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [session, owner]);
-    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"] })), randomUUID()], owner)).rows[0].id as string;
+    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"],
+      ...(retentionSeconds !== 300 ? { expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() } : {}),
+    })), randomUUID()], owner)).rows[0].id as string;
     const snapshot = (await role("authenticated", "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(fixtureSnapApplication(new Date())), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], owner)).rows[0].id as string;
     const version = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const snapshotHash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, version])).rows[0].hash as string;

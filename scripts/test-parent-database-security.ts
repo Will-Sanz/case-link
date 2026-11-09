@@ -112,7 +112,7 @@ async function main() {
     zip: "19104",
     language: "en",
     householdSize: 3,
-    childrenUnderFive: true,
+    childrenUnderFive: null,
     pregnantOrPostpartum: null,
     incomeAmount: 500,
     incomeFrequency: "weekly",
