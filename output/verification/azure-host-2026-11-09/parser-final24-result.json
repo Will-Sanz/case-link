@@ -1,0 +1,238 @@
+{
+  "report": {
+    "recordedAt": "2026-11-09T06:37:55.152Z",
+    "scope": "real_local_isolated_parser_synthetic_fixtures_only",
+    "image": {
+      "name": "caselink-document-parser@sha256:185b95cc5bdf9aabd97e6cf76401112cf94cf512069653e626bbfb58566a750e",
+      "id": "sha256:185b95cc5bdf9aabd97e6cf76401112cf94cf512069653e626bbfb58566a750e",
+      "defaultUser": "65534:65534"
+    },
+    "checks": [
+      {
+        "name": "native-pdf-english-page-order",
+        "passed": true,
+        "durationMs": 1447.248181,
+        "pageCount": 2,
+        "characterCounts": [
+          74,
+          72
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "native-pdf-spanish",
+        "passed": true,
+        "durationMs": 1475.3056669999996,
+        "pageCount": 1,
+        "characterCounts": [
+          101
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "png-ocr-english",
+        "passed": true,
+        "durationMs": 1725.043921,
+        "pageCount": 1,
+        "characterCounts": [
+          73
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "jpeg-ocr-english",
+        "passed": true,
+        "durationMs": 1708.8394349999999,
+        "pageCount": 1,
+        "characterCounts": [
+          73
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "scanned-pdf-ocr-english",
+        "passed": true,
+        "durationMs": 2527.538228999999,
+        "pageCount": 1,
+        "characterCounts": [
+          73
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "png-ocr-spanish",
+        "passed": true,
+        "durationMs": 1738.980044,
+        "pageCount": 1,
+        "characterCounts": [
+          99
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "jpeg-ocr-spanish",
+        "passed": true,
+        "durationMs": 1686.4193490000016,
+        "pageCount": 1,
+        "characterCounts": [
+          99
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "scanned-pdf-ocr-spanish",
+        "passed": true,
+        "durationMs": 2559.192118000001,
+        "pageCount": 1,
+        "characterCounts": [
+          99
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "five-page-limit-accepted",
+        "passed": true,
+        "durationMs": 1423.9670380000007,
+        "pageCount": 5,
+        "characterCounts": [
+          88,
+          88,
+          88,
+          88,
+          88
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "five-page-scanned-spanish-accepted",
+        "passed": true,
+        "durationMs": 6437.002779000002,
+        "pageCount": 5,
+        "characterCounts": [
+          99,
+          99,
+          99,
+          99,
+          99
+        ],
+        "exactTextMatch": true
+      },
+      {
+        "name": "six-page-limit-rejected",
+        "passed": true,
+        "durationMs": 1370.559803
+      },
+      {
+        "name": "zero-page-pdf-rejected",
+        "passed": true,
+        "durationMs": 1393.8097479999997
+      },
+      {
+        "name": "malformed-pdf-rejected",
+        "passed": true,
+        "durationMs": 1381.3810139999987
+      },
+      {
+        "name": "malformed-png-rejected",
+        "passed": true,
+        "durationMs": 1406.263242000001
+      },
+      {
+        "name": "malformed-jpeg-rejected",
+        "passed": true,
+        "durationMs": 1363.5333329999994
+      },
+      {
+        "name": "pdf-claimed-as-image-rejected",
+        "passed": true,
+        "durationMs": 1405.1692839999996
+      },
+      {
+        "name": "image-claimed-as-pdf-rejected",
+        "passed": true,
+        "durationMs": 1359.8254820000002
+      },
+      {
+        "name": "png-claimed-as-jpeg-rejected",
+        "passed": true,
+        "durationMs": 1360.2736129999976
+      },
+      {
+        "name": "unsupported-media-type-rejected",
+        "passed": true,
+        "durationMs": 0.22218399999837857
+      },
+      {
+        "name": "empty-document-rejected",
+        "passed": true,
+        "durationMs": 0.20220700000209035
+      },
+      {
+        "name": "oversized-document-rejected",
+        "passed": true,
+        "durationMs": 0.12521299999934854
+      },
+      {
+        "name": "oversized-image-pixel-budget-rejected",
+        "passed": true,
+        "durationMs": 1665.791965999997
+      },
+      {
+        "name": "active-pdf-rejected",
+        "passed": true,
+        "durationMs": 1393.0071619999944
+      },
+      {
+        "name": "embedded-file-pdf-rejected",
+        "passed": true,
+        "durationMs": 1428.5719949999984
+      }
+    ],
+    "passed": true,
+    "qualityWarnings": [],
+    "modelCalls": 0,
+    "realFamilyDocuments": 0,
+    "sourceTextRecorded": false,
+    "fixtureFilesWritten": false,
+    "sourceManifest": [
+      {
+        "path": "scripts/test-parent-document-parser.ts",
+        "sha256": "d46bd52e878972bd6bc4b6fed4dc17118009ea83d3d178254764f676ed1d0b6c"
+      },
+      {
+        "path": "scripts/parse-parent-document.ts",
+        "sha256": "4207917759aecab284e77c689e7005a2e97d1e3f5542149b040e54bb3aab717c"
+      },
+      {
+        "path": "src/lib/parent/document-processing.ts",
+        "sha256": "ff61e94abf6e7c6a5c2ae97d1a36351834a416c1d756b0e657c21e6ee338fd3c"
+      },
+      {
+        "path": "src/lib/parent/documents.ts",
+        "sha256": "dca88fefe427b61bc8d1aa1c8e52cd285c4bb7f8e8470b9c21ce0bbd84a2f5b5"
+      },
+      {
+        "path": "src/lib/parent/constants.ts",
+        "sha256": "d7b42c1654f185b11553b02807538e611b90777746468fe29a071c9b157312d9"
+      },
+      {
+        "path": "docker/parent-document-worker.Dockerfile",
+        "sha256": "6ac8f2138cf10621c664d125a0b9c4c3b70542d5c5f5562854336dc02ba1f091"
+      },
+      {
+        "path": "docker/parent-document-worker.Dockerfile.dockerignore",
+        "sha256": "394a04885de4c876e8b0ce94dc2f7ff8e1d1ffdf7155ec4f9f1ef98679155f05"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "4c0e7f990c23f62e8a1243dac0f91f0c348322c31792e394449a6e45463f75d0"
+      }
+    ]
+  },
+  "report_sha256": "8233f4f3f184c9d031e49fb5d30e8f54344affeaec0115d295f67e5e524585ec",
+  "checks_finished": true,
+  "no_remaining_containers": true,
+  "worker_still_inactive": true,
+  "rootless_daemon_verified": true,
+  "retrieved_at_utc": "2026-11-09T06:39:25.356854+00:00"
+}

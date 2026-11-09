@@ -38,12 +38,13 @@ async function textPdf(pages: string[][]) {
   }
   return pdf.save({ addDefaultPage: false });
 }
-async function imagePdf(image: Uint8Array) {
+async function imagePdf(image: Uint8Array, pageCount = 1) {
   const pdf = await PDFDocument.create();
   const embedded = await pdf.embedPng(image);
-  pdf
-    .addPage([800, 400])
-    .drawImage(embedded, { x: 0, y: 0, width: 800, height: 400 });
+  for (let page = 0; page < pageCount; page++)
+    pdf
+      .addPage([800, 400])
+      .drawImage(embedded, { x: 0, y: 0, width: 800, height: 400 });
   return pdf.save();
 }
 async function textImage(language: "en" | "es") {
@@ -192,6 +193,13 @@ async function main() {
       await textPdf(fivePages),
       "application/pdf",
       fivePages.map((_, index) => [`Synthetic page ${index + 1}`]),
+    ),
+  );
+  await check("five-page-scanned-spanish-accepted", async () =>
+    readable(
+      await imagePdf(esPng, 5),
+      "application/pdf",
+      Array.from({ length: 5 }, () => lines.es),
     ),
   );
   await check("six-page-limit-rejected", async () =>
