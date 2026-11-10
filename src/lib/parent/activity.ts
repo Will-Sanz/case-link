@@ -33,7 +33,7 @@ export async function getExactOperation(
   const { data, error } = await supabase
     .from("parent_operations")
     .select(
-      "id,request_id,request_version,program_id,action,packet,packet_hash,state,evidence,created_at,executed_at",
+      "id,request_id,request_version,program_id,action,packet,packet_hash,state,evidence,created_at,executed_at,controlled_test",
     )
     .eq("request_id", uuid.parse(requestId))
     .eq("id", uuid.parse(operationId))

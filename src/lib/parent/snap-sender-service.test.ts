@@ -63,6 +63,13 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("isolated exact-PDF SNAP delivery", () => {
+  it("attributes a completed controlled transmission to the emulator instead of a real fax", async () => {
+    const f = setup();
+    Object.assign(f.attempt, { kind: "sinch_emulation", requestId: id, snapshotHash: intent().protectedPacket.snapshotHash, to: "+19898989898",
+      destinationId: "sinch-free-emulator", destinationVersion: "controlled-test-v1" });
+    const result = await f.delivery.execute(intent(), controller().signal);
+    expect(result).toMatchObject({ receipt: { state: "sent", source: "provider_api", reference: "sinch-emulation:fax-id" } });
+  });
   it("returns a persisted terminal carrier failure without claiming agency rejection or polling it again", async () => {
     const f = setup();
     f.carrier.reconcile.mockResolvedValue({ providerId: "fax-id", providerStatus: "FAILURE" });

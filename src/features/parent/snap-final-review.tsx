@@ -116,8 +116,8 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
     <p>Future application work is stopped. Check <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for anything already sent or confirmed.</p>
   </section>;
   return <section className={styles.section} id="snap-final-review" aria-labelledby="snap-final-review-title" tabIndex={-1}>
-    <h2 id="snap-final-review-title">Review your SNAP application</h2>
-    <p>Check this complete application before choosing Submit. Correct any saved answer or personal page that needs changing.</p>
+    <h2 id="snap-final-review-title">{request.controlled_test ? "Review your fictional test application" : "Review your SNAP application"}</h2>
+    <p>{request.controlled_test ? "Review this fictional application and its test marks. Submit sends only to Sinch’s free emulator and cannot file an application with DHS." : "Check this complete application before choosing Submit. Correct any saved answer or personal page that needs changing."}</p>
     {!mandateCurrent && <p className={styles.notice} role="status">Your application permission has expired or could not be checked. Check your request’s permission before continuing. Your saved answers and receipts are kept.</p>}
     {saved.loading ? <ParentLoading label="Loading your exact application"/> : saved.error ? <ServiceError error={saved.error} retry={saved.reload}/> : !review ?
       <p className={styles.notice}>The exact application is not available for review yet. Your saved answers are kept. Check Activity &amp; receipts for recorded delivery status.</p> : <>
@@ -133,7 +133,7 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
           <button type="button" className={styles.quiet} disabled={!current || writeAttempted || review.state !== "prepared"} onClick={replacePages}>Replace personal pages</button>
         </div>
         {maySubmit ? <>
-          <p id="snap-final-submit-report" className={`${styles.hint} ${styles.space}`}>By choosing Submit, I confirm that my required handwritten signatures and dates are complete on form pages 1 and 5 of this exact application, and ask CaseLink to send it to Pennsylvania SNAP.</p>
+          <p id="snap-final-submit-report" className={`${styles.hint} ${styles.space}`}>{request.controlled_test ? "Submit authorizes this fictional test packet to the free fax emulator only. The marks are test input and do not certify a real application." : "By choosing Submit, I confirm that my required handwritten signatures and dates are complete on form pages 1 and 5 of this exact application, and ask CaseLink to send it to Pennsylvania SNAP."}</p>
           <button type="button" className={`${styles.button} ${styles.space}`} aria-describedby="snap-final-submit-report" disabled={pending} onClick={submit}>{pending ? "Recording Submit…" : "Submit"}</button>
         </> : current && exactFile && !writeAttempted && <p className={styles.notice}>CaseLink must resolve the application’s remaining submission requirements. You do not need to repeat your saved answers.</p>}
       </>}

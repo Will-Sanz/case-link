@@ -34,6 +34,7 @@ export function ParentSummaryDocument({
     <Document title="Your CaseLink support summary" author="CaseLink">
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.title}>Your support, in one place.</Text>
+        {request.controlled_test && <Text style={styles.label}>FICTIONAL SIGNING / FAX TEST — No application filed with an agency.</Text>}
         <Text style={styles.subtitle}>
           CaseLink food and utility support · {request.created_at.slice(0, 10)}
         </Text>
@@ -131,6 +132,7 @@ export async function renderParentSummary(
 
 export type RecordedPacket = {
   id: string;
+  controlled_test?: boolean;
   request_id: string;
   request_version: number;
   program_id: string;
@@ -165,6 +167,7 @@ export function ParentPacketDocument({
     <Document title="CaseLink recorded packet and receipt" author="CaseLink">
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.title}>Your recorded support packet</Text>
+        {operation.controlled_test && <Text style={styles.label}>FICTIONAL SIGNING / FAX TEST — No agency filing or real signature.</Text>}
         <Text style={styles.subtitle}>
           {getProgram(operation.program_id)?.name ?? operation.program_id}
         </Text>

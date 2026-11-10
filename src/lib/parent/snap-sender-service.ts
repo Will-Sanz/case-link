@@ -34,7 +34,7 @@ export function createSnapProtectedDelivery(options: { store: SnapSenderStore; c
     if (observed.providerStatus !== "COMPLETED" || !observed.providerId || !observed.completedAt
       || saved.providerId !== observed.providerId || saved.providerStatus !== "COMPLETED") return unknown(intent);
     return { operationId: intent.operationId, packetId: intent.protectedPacket.packetId, contentSha256: intent.protectedPacket.contentSha256,
-      receipt: { state: "sent", source: "provider_api", reference: `sinch-fax:${observed.providerId}`, recordedAt: observed.completedAt } };
+      receipt: { state: "sent", source: "provider_api", reference: `${"kind" in saved ? "sinch-emulation" : "sinch-fax"}:${observed.providerId}`, recordedAt: observed.completedAt } };
   }
   async function reconcile(input: SnapSenderIntent, signal: AbortSignal): Promise<DeliveryResult> {
     const intent = snapSenderIntentSchema.parse(input);

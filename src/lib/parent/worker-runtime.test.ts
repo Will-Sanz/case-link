@@ -709,6 +709,25 @@ describe("synthetic reference-only protected SNAP worker", () => {
     test.options.transports = new Map([["snap-pa:submit", { execute: test.execute }], ["snap-pa:follow_up", { execute: test.execute, reconcile: vi.fn(async () => receipt) }]]);
     return { ...test, canonical, raw, port, result };
   }
+  it.each([true, false])("stops agency follow-up only after a persisted free-emulator receipt (persisted=%s)", async persisted => {
+    const test = protectedSetup(); delete test.options.apiKey;
+    test.state.claim.request.controlled_test = true;
+    const emulatorReceipt = { ...receipt, reference: "sinch-emulation:synthetic-completed" };
+    test.port.execute.mockResolvedValue({ ...test.result, receipt: emulatorReceipt });
+    const base = test.database.query.getMockImplementation()!;
+    test.database.query.mockImplementation(async (sql, values = []) => {
+      const result = await base(sql, values);
+      if (persisted && sql.includes("parent_finish_operation")) Object.assign(test.raw, { state: "sent", evidence: emulatorReceipt });
+      return result;
+    });
+    await runOneParentJob(test.options);
+    expect(test.port.execute).toHaveBeenCalledOnce();
+    if (persisted) {
+      expect(test.state.saved[0].slice(5)).toEqual([null, null, "none"]);
+      expect(JSON.parse(String(test.state.saved[0][3])).summary).toContain("No application was filed with DHS");
+    } else expect(test.state.saved[0][5]).not.toBeNull();
+    expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_reserve_ai_call"))).toBe(false);
+  });
   it.each(["execute", "reconcile"] as const)("stops scheduled carrier checks after persisted terminal failure on %s without enabling a resend", async action => {
     const test = protectedSetup(); delete test.options.apiKey;
     const failed = { operationId, packetId: test.canonical.packet.protectedSnapPacket.packetId,

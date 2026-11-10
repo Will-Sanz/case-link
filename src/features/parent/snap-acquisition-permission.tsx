@@ -99,14 +99,14 @@ export function SnapAcquisitionPermission({ request, snapshot, context, acquisit
   const pending = attempt?.scope === scope && attempt.state === "pending";
   return <section className={styles.space} aria-labelledby="snap-private-permission-title">
     <h3 id="snap-private-permission-title">Allow private SNAP personal steps</h3>
-    <p>The application needs Social Security numbers for the people applying, plus your own signatures and dates on form pages 1 and 5.</p>
+    <p>{request.controlled_test ? "This fictional test excludes Social Security numbers. You can draw test marks on the two certification pages and review the exact test PDF." : "The application needs Social Security numbers for the people applying, plus your own signatures and dates on form pages 1 and 5."}</p>
     <p><strong>People applying:</strong> {scope.people.map(person => `${person.firstName} ${person.lastName}`).join(", ")}.</p>
     <p>CaseLink may use these entries to complete, privately store and show your Pennsylvania SNAP application, and deliver it only after your separate Submit choice and a verified service connection. Protected entries stay out of AI, chat and ordinary household records. This permission does not sign or send anything.</p>
     <p>Permission and the private form expire by <strong>{displayDate(scope.deadline, true)} Eastern time</strong>. Use “Cancel request &amp; withdraw permission” on this request to stop future work. Copies already delivered follow the recipient’s own rules.</p>
     <details><summary>Permission details</summary><p>Program: Pennsylvania SNAP · Form: PA 600 FS (SG) 9/19 · Policy: {scope.value.policyVersion} · Retention policy: {scope.value.retentionPolicyVersion}.</p></details>
     {declined ? <p className={styles.notice} role="status">Personal steps are paused. Your saved answers are kept. You can continue through Pennsylvania’s official service.</p> : <label className={`${styles.checkbox} ${styles.space}`}>
       <input type="checkbox" checked={declared} disabled={pending || unknown} onChange={event => setDeclaration(event.target.checked ? scope : null)}/>
-      <span>I may provide the applying people’s information, and I allow this private use for their SNAP application.</span>
+      <span>{request.controlled_test ? "I allow this fictional test to use the saved fictional answers and test marks, with no real application or signature." : "I may provide the applying people’s information, and I allow this private use for their SNAP application."}</span>
     </label>}
     <div className={`${styles.inline} ${styles.space}`}>
       {declined && <button type="button" className={styles.quiet} onClick={() => { setDeclinedScope(null); setDeclaration(null); }}>Review personal-step permission</button>}

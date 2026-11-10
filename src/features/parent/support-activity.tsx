@@ -178,7 +178,7 @@ export function SupportActivity({
                   {getProgram(operation.program_id)?.name ?? "Named program"}
                 </strong>
                 <p className={styles.hint}>
-                  {operation.state === "prepared" && protectedRecordedSnapPacket(operation)
+                  {request.controlled_test ? recordedReceipt(operation)?.reference.startsWith("sinch-emulation:") ? "Free emulator test completed · no agency filing" : "Fictional test record · no agency filing" : operation.state === "prepared" && protectedRecordedSnapPacket(operation)
                     ? "SNAP application prepared · not submitted"
                     : operation.state === "prepared" && operation.form?.preparation_only
                     ? "Incomplete unsigned draft · not submitted"
@@ -227,7 +227,7 @@ export function SupportActivity({
           </button>
         </div>
       )}
-      <details className={styles.disclosure}>
+      {!request.controlled_test && <details className={styles.disclosure}>
         <summary>Tell us about an outcome</summary>
         <div>
           <p className={styles.hint}>
@@ -296,7 +296,7 @@ export function SupportActivity({
             )}
           </form>
         </div>
-      </details>
+      </details>}
     </>
   );
 }

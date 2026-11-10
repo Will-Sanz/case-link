@@ -40,10 +40,10 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
   const [revision, setRevision] = useState(0);
   // Status polling must not erase personal work when its actual authorization and application are unchanged.
   const serialized = JSON.stringify({ request: { id: requestProp.id, version: requestProp.version, status: requestProp.status,
-    intake: { needs: requestProp.intake.needs }, mandate: requestProp.mandate,
+    intake: { needs: requestProp.intake.needs }, mandate: requestProp.mandate, controlled_test: !!requestProp.controlled_test,
     required_actions: requestProp.required_actions.filter(isSnapFinalReviewAction) }, snapshot: snapshotProp, context: contextProp, acquisition: acquisitionProp, revision });
   const scope = useMemo(() => JSON.parse(serialized) as {
-    request: Pick<SupportRequest, "id" | "version" | "status" | "mandate" | "required_actions"> & { intake: Pick<SupportRequest["intake"], "needs"> };
+    request: Pick<SupportRequest, "id" | "version" | "status" | "mandate" | "required_actions" | "controlled_test"> & { intake: Pick<SupportRequest["intake"], "needs"> };
     snapshot: SnapApplicationSnapshot; context: SnapCaptureContext; acquisition: SnapDirectAcquisitionResult; revision: number;
   }, [serialized]);
   const { request, snapshot, context, acquisition } = scope;
@@ -139,7 +139,7 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
     const controller = work.current, copy = ready.copy;
     const completion: SnapDirectCompletion = { requestId: request.id, requestVersion: request.version, snapshotId: snapshot.id,
       snapshotHash: context.snapshotHash, source: context.source, unsignedContentSha256: copy.trusted.unsignedContentSha256,
-      signingRoute: "applicant_name_handwriting", identifiers: applicants.map(person => deferredIdentifiers[person.id]
+      signingRoute: "applicant_name_handwriting", identifiers: applicants.map(person => request.controlled_test || deferredIdentifiers[person.id]
         ? { personId: person.id.toLowerCase(), kind: "provide_to_agency_later" } : { personId: person.id.toLowerCase(), kind: "ssn", value: identifiers[person.id] ?? "" }),
       certifications: drawingActs.map(act => drawings[act]!).filter(Boolean) };
     if (!drawingActs.every(act => pages[act]) || !parseSnapDirectCompletionInputs(copy.trusted, completion, new Date()).ok) return;
@@ -181,10 +181,11 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
   if (!active || !ready) return <ParentLoading label="Preparing the protected personal steps"/>;
   return <form ref={bindForm} className={styles.space} onSubmit={finish} autoComplete="off">
     <h3>Personal steps for your SNAP application</h3>
-    <p className={styles.hint}>Your saved answers are already included. Add numbers only for people applying for SNAP, or choose to provide them to DHS later. Make your own certifications below. These entries stay out of chat, AI and ordinary household records. Finishing these steps stores the exact application privately; you review it and choose Submit separately.</p>
+    <p className={styles.hint}>{request.controlled_test ? "Your saved fictional answers are already included. Draw test marks below to prepare a private test PDF, then review it and choose the free-emulator Submit separately." : "Your saved answers are already included. Add numbers only for people applying for SNAP, or choose to provide them to DHS later. Make your own certifications below. These entries stay out of chat, AI and ordinary household records. Finishing these steps stores the exact application privately; you review it and choose Submit separately."}</p>
     <fieldset disabled={pending} className={`${styles.fieldset} ${styles.space} ${styles.stack}`}>
       <legend className={styles.legend}>Applicant information</legend>
-      {applicants.map(person => <div className={styles.space} key={person.id}><label className={styles.field}>{person.firstName} {person.lastName} — Social Security number
+      {request.controlled_test && <p className={styles.notice}>Fictional test only. No Social Security numbers are collected. Draw test marks below; these do not certify a real application or represent anyone’s signature.</p>}
+      {!request.controlled_test && applicants.map(person => <div className={styles.space} key={person.id}><label className={styles.field}>{person.firstName} {person.lastName} — Social Security number
         <input className={styles.input} type="password" inputMode="numeric" autoComplete="off" required={!deferredIdentifiers[person.id]} disabled={pending || deferredIdentifiers[person.id]} pattern="[0-9]{9}" maxLength={11}
           value={identifiers[person.id] ?? ""} onChange={event => setIdentifiers(values => ({ ...values, [person.id]: event.target.value.replace(/[ -]/g, "") }))}/>
       </label><label className={styles.checkbox}><input type="checkbox" checked={deferredIdentifiers[person.id] ?? false} onChange={event => {
@@ -198,11 +199,11 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
         <h4>{index ? "Rights and responsibilities — printed page 5" : "Applicant certification — printed page 1"}</h4>
         <SnapReviewPdf source={ready.blob} initialPage={index ? 7 : 3} onReady={pageReady[act]}/>
         <SnapPersonalDrawing actId={act} label={index ? "Your rights and responsibilities certification" : "Your applicant certification"}
-          instructions="Read the exact official page above, then write your own name below. CaseLink cannot sign for you."
+          instructions={request.controlled_test ? "Review this fictional example, then draw a simple test mark below. This is not a real signature or certification." : "Read the exact official page above, then write your own name below. CaseLink cannot sign for you."}
           expiresAt={expiresAt} disabled={pending || !pages[act]} onRecovery={recover}
           onChange={value => setDrawings(values => ({ ...values, [act]: value ?? undefined }))}/>
       </div>)}
-      <button className={styles.button} type="submit" disabled={pending || duplicateNumbers || !applicants.every(person => deferredIdentifiers[person.id] || /^[0-9]{9}$/.test(identifiers[person.id] ?? "")) || !drawingActs.every(act => drawings[act] && pages[act])}>
+      <button className={styles.button} type="submit" disabled={pending || duplicateNumbers || !applicants.every(person => request.controlled_test || deferredIdentifiers[person.id] || /^[0-9]{9}$/.test(identifiers[person.id] ?? "")) || !drawingActs.every(act => drawings[act] && pages[act])}>
         {pending ? "Preparing your exact application…" : "Finish personal steps"}
       </button>
       <button className={styles.quiet} type="button" onClick={recover}>Get help with personal steps</button>

@@ -5,6 +5,7 @@ import { publicKeyIsSafe, parentConfigurationIssues } from "../src/lib/parent/co
 import { hostedParentServiceAllowed } from "../src/lib/parent/hosted-service";
 import { snapSenderCarrierConfigSchema } from "../src/lib/parent/snap-sender-carrier";
 import { s3StorageCredentialsSchema } from "../src/lib/parent/storage-s3";
+import { snapEmulatorConfigSchema } from "../src/lib/parent/snap-sender-emulator";
 
 export const HOSTED_PROJECT = "https://zpfypkizsapvsxeykmdq.supabase.co";
 export const HOSTED_PORTS = { web: 3100, frontdoor: 3200, broker: 3310, review: 3400, sender: 3500 } as const;
@@ -22,9 +23,10 @@ export const hostedProfileSchema = z.discriminatedUnion("service", [
     parserDaemonId: z.string().regex(/^[A-Za-z0-9:_.-]{16,128}$/),
     senderSecret: secret.optional() }).strict(),
   z.object({ ...common, service: z.literal("broker"), databaseUrl, brokerSecret: secret, storage: s3StorageCredentialsSchema }).strict(),
-  z.object({ ...common, service: z.literal("review"), databaseUrl, publicKey, collectionApproved: z.boolean().default(false) }).strict(),
+  z.object({ ...common, service: z.literal("review"), databaseUrl, publicKey, collectionApproved: z.boolean().default(false),
+    controlledTest: snapEmulatorConfigSchema.pick({ requestId: true, snapshotHash: true }).optional() }).strict(),
   z.object({ ...common, service: z.literal("sender"), databaseUrl, senderSecret: secret,
-    sendingApproved: z.boolean().default(false), carrier: snapSenderCarrierConfigSchema }).strict(),
+    sendingApproved: z.boolean().default(false), carrier: snapSenderCarrierConfigSchema, emulator: snapEmulatorConfigSchema.optional() }).strict(),
   z.object({ ...common, service: z.literal("retention"), databaseUrl }).strict(),
   z.object({ ...common, service: z.literal("ordinary-retention"), databaseUrl, storage: s3StorageCredentialsSchema }).strict(),
 ]);
@@ -48,7 +50,7 @@ export function parseHostedProfile(input: unknown, now = Date.now(), operation: 
       || !hostedParentServiceAllowed(authority(config), database, config.projectOrigin, "http://127.0.0.1:3310", cleanup ? Date.parse(config.approvedUntil) - 1 : now)
       || (config.service === "web" && !config.realDataApproved)
       || (config.service === "review" && !config.collectionApproved)
-      || (config.service === "sender" && !config.sendingApproved)) throw new Error();
+      || (config.service === "sender" && (config.emulator ? config.sendingApproved : !config.sendingApproved))) throw new Error();
     return config;
   } catch { throw new Error(HOSTED_UNAVAILABLE); }
 }

@@ -26,6 +26,7 @@ export type SnapSenderStore = {
 export function validateSnapDeliveryAttempt(intent: SnapSenderIntent, value: unknown) {
   const attempt = snapSenderAttemptSchema.parse(value);
   if (attempt.operationId !== intent.operationId || attempt.packetId !== intent.protectedPacket.packetId
+    || ("kind" in attempt && (attempt.requestId !== intent.requestId || attempt.snapshotHash !== intent.protectedPacket.snapshotHash))
     || attempt.contentSha256 !== intent.protectedPacket.contentSha256
     || attempt.operationRef !== createHash("sha256").update(intent.idempotencyKey).digest("hex")
     || Date.parse(attempt.expiresAt) <= Date.now() || Date.parse(attempt.attemptedAt) > Date.now()
@@ -61,7 +62,7 @@ function connection(value: string) {
 }
 
 /** Private process only: dedicated one-operation connections never enter a general worker pool. */
-export function createSnapSenderStore(options: { connectionString: string }): SnapSenderStore {
+export function createSnapSenderStore(options: { connectionString: string; emulation?: boolean }): SnapSenderStore {
   let target: ReturnType<typeof connection>;
   try { target = connection(options.connectionString); } catch { throw new Error(SNAP_SENDER_ERROR); }
   async function session<T>(signal: AbortSignal, action: (query: (sql: string, values?: unknown[]) => Promise<unknown>) => Promise<T>) {
@@ -97,8 +98,12 @@ export function createSnapSenderStore(options: { connectionString: string }): Sn
       let commitDispatched = false;
       try {
         await query("begin");
-        const result = reservationSchema.parse(await query(resume ? "select parent_private.parent_resume_snap_delivery($1::jsonb) value" : "select parent_private.parent_reserve_snap_delivery($1::jsonb) value", [encoded]));
+        const command = options.emulation
+          ? resume ? "select parent_private.parent_resume_snap_test_delivery($1::jsonb) value" : "select parent_private.parent_reserve_snap_test_delivery($1::jsonb) value"
+          : resume ? "select parent_private.parent_resume_snap_delivery($1::jsonb) value" : "select parent_private.parent_reserve_snap_delivery($1::jsonb) value";
+        const result = reservationSchema.parse(await query(command, [encoded]));
         validateSnapDeliveryAttempt(intent, result.attempt);
+        if (("kind" in result.attempt) !== !!options.emulation) throw new Error();
         if (result.state === "dispatch_allowed" && (result.attempt.dispatchAuthorizedAt !== null || result.attempt.providerId !== null || result.attempt.providerStatus !== "UNKNOWN")) throw new Error();
         commitDispatched = true; await query("commit");
         return result;
@@ -114,7 +119,9 @@ export function createSnapSenderStore(options: { connectionString: string }): Sn
     resume: (intent, signal) => reservation(intent, signal, true),
     async recheck(intent, signal) {
       const encoded = input(intent);
-      return session(signal, async query => validateSnapDeliveryAttempt(intent, await query("select parent_private.parent_recheck_snap_delivery($1::jsonb) value", [encoded])));
+      return session(signal, async query => validateSnapDeliveryAttempt(intent, await query(options.emulation
+        ? "select parent_private.parent_recheck_snap_test_delivery($1::jsonb) value"
+        : "select parent_private.parent_recheck_snap_delivery($1::jsonb) value", [encoded])));
     },
     async read(intent, signal) {
       const encoded = input(intent);

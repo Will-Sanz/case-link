@@ -1206,6 +1206,17 @@ export async function runOneParentJob(
       }
       if (result.requiredActions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent"))) result.nextActor = "parent";
     }
+    if (request.controlled_test && request.intake.needs.length === 1 && request.intake.needs[0] === "snap_new") {
+      const completed = (await loadOperations()).filter(operation => operation.request_version === request.version).map(normalizeWorkerOperation).some(operation =>
+        operation?.programId === "snap-pa" && operation.action === "submit" &&
+        operation.receipt?.source === "provider_api" && operation.receipt.state === "sent" && operation.receipt.reference.startsWith("sinch-emulation:"));
+      if (completed) {
+        result.nextRunAt = null;
+        result.nextActor = null;
+        result.nextTrigger = "none";
+        result.plan.summary = "The fictional signing and fax test is complete. No application was filed with DHS.";
+      }
+    }
     if (deliveryJobAttempts === 48 && result.nextRunAt) {
       result.nextRunAt = null;
       if (result.nextActor !== "parent") result.nextActor = "operator";

@@ -8,6 +8,7 @@ import { publicKeyIsSafe } from "../src/lib/parent/configuration";
 import { createLocalParentProtectedFrontdoor } from "../src/lib/parent/protected-frontdoor";
 import { createSnapProtectedReviewServer } from "../src/lib/parent/snap-protected-review";
 import { createSinchSnapFaxCarrier, snapSenderCarrierConfigSchema } from "../src/lib/parent/snap-sender-carrier";
+import { createSinchSnapFaxEmulatorCarrier, snapEmulatorConfigSchema } from "../src/lib/parent/snap-sender-emulator";
 import { createSnapProtectedDelivery, createSnapProtectedSenderHandler } from "../src/lib/parent/snap-sender-service";
 import { createSnapSenderStore } from "../src/lib/parent/snap-sender-store";
 
@@ -81,9 +82,10 @@ export function snapPrivateChildEnvironment(service: SnapPrivateService, value: 
   return env;
 }
 
-export function senderServer(origin: string, secretValue: string, databaseUrl: string, carrier: z.infer<typeof snapSenderCarrierConfigSchema>) {
+export function senderServer(origin: string, secretValue: string, databaseUrl: string, carrier: z.infer<typeof snapSenderCarrierConfigSchema>, emulator?: z.infer<typeof snapEmulatorConfigSchema>) {
   const handle = createSnapProtectedSenderHandler({ origin, secret: secretValue,
-    delivery: createSnapProtectedDelivery({ store: createSnapSenderStore({ connectionString: databaseUrl }), carrier: createSinchSnapFaxCarrier(carrier) }) });
+    delivery: createSnapProtectedDelivery({ store: createSnapSenderStore({ connectionString: databaseUrl, emulation: !!emulator }),
+      carrier: emulator ? createSinchSnapFaxEmulatorCarrier(emulator) : createSinchSnapFaxCarrier(carrier) }) });
   const server = createServer({ maxHeaderSize: 16384 }, async (incoming, outgoing) => {
     const stop = new AbortController(), timer = setTimeout(() => { stop.abort(); outgoing.destroy(); }, 55_000);
     const abort = () => stop.abort(); incoming.once("aborted", abort);

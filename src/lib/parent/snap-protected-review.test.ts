@@ -315,6 +315,28 @@ describe("closed isolated direct construction channel (synthetic finalizer repli
       headers: { Host: new URL(config.publicOrigin).host, Origin: config.publicOrigin, Cookie: "caselink-parent-auth=synthetic-cookie",
         "Content-Type": "application/json", "Content-Length": String(typeof body === "string" ? Buffer.byteLength(body) : JSON.stringify(syntheticInput).length), ...headers } });
   }
+  it("rejects identifier entry in the exact controlled test before invoking the finalizer", async () => {
+    metadata.state = "authorized";
+    const controlledTest = { requestId, snapshotHash: String(metadata.intent.snapshotHash) };
+    const body = JSON.stringify({ ...syntheticInput, requestId, snapshotHash: controlledTest.snapshotHash });
+    const result = await createSnapProtectedReviewHandler({ ...config, controlledTest })(completion(body));
+    expect(result.status).toBe(400); expect(mocks.direct).not.toHaveBeenCalled();
+  });
+  it("limits controlled uploads to the approved snapshot and excludes legacy PDF uploads", async () => {
+    metadata.state = "authorized";
+    const controlledTest = { requestId, snapshotHash: "f".repeat(64) };
+    expect((await createSnapProtectedReviewHandler({ ...config, controlledTest })(completion())).status).toBe(403);
+    expect(mocks.direct).not.toHaveBeenCalled();
+  });
+  it("allows only deferred identifier metadata in a controlled upload", async () => {
+    metadata.state = "authorized";
+    const controlledTest = { requestId, snapshotHash: String(metadata.intent.snapshotHash) };
+    const body = JSON.stringify({ requestId, snapshotHash: controlledTest.snapshotHash,
+      identifiers: [{ personId: id(6), kind: "provide_to_agency_later" }] });
+    mocks.direct.mockImplementation(async intent => ({ state: "stored", binding: { ...intent, expiresAt: new Date(Date.now() + 60000).toISOString() } }));
+    const result = await createSnapProtectedReviewHandler({ ...config, controlledTest })(completion(body));
+    expect(result.status).toBe(201); expect(mocks.direct).toHaveBeenCalledOnce();
+  });
   it("checks current owned authority before reading JSON and supplies only the pinned public template to the isolated finalizer", async () => {
     metadata.state = "authorized";
     const raw = Buffer.from(JSON.stringify(syntheticInput));

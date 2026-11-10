@@ -518,6 +518,10 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         <ArrowLeft width={17} height={17} aria-hidden="true" />
         My support
       </Link>
+      {request.controlled_test && <aside className={`${styles.notice} ${styles.space}`} aria-label="Fictional signing and fax test">
+        <strong>Fictional signing and fax test</strong>
+        <p>This example uses test marks and Sinch’s free fax emulator. No application is sent to DHS or another real recipient. Any delivery result below describes the test only.</p>
+      </aside>}
       <div className={`${styles.pageTop} ${styles.space}`}>
         <div>
           <h1>{supportTitle(request)}</h1>
@@ -661,7 +665,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                     <span
                       className={`${styles.badge} ${["checking", "unresolved"].includes(state) ? styles.badgeWait : ""}`}
                     >
-                      {receipt ? OUTCOME_LABELS[receipt.state] : snapDeliveryCheck ? attemptRecorded ? "Delivery result not confirmed" : "Submit decision recorded" : supportRouteLabel(route, currentOperations)}
+                      {request.controlled_test ? receipt?.reference.startsWith("sinch-emulation:") ? "Test fax completed — no agency filing" : "Fictional test in progress" : receipt ? OUTCOME_LABELS[receipt.state] : snapDeliveryCheck ? attemptRecorded ? "Delivery result not confirmed" : "Submit decision recorded" : supportRouteLabel(route, currentOperations)}
                     </span>
                   </div>
                   <p>

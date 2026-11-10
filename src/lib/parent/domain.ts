@@ -253,6 +253,7 @@ export type ParentDocument = {
 };
 export type SupportRequest = {
   id: string;
+  controlled_test?: boolean;
   household_id: string;
   status: "active" | "paused" | "cancelled" | "closed";
   intake: SupportIntake;

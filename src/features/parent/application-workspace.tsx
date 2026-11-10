@@ -189,6 +189,12 @@ export function ApplicationWorkspace({
         : undefined,
   );
   const snapSubmissionComplete = snap && application.currentVersionSubmitted;
+  if (request.controlled_test) {
+    const completed = operations.some(operation => recordedReceipt(operation)?.reference.startsWith("sinch-emulation:"));
+    application.label = completed ? "Fictional fax test completed" : "Fictional signing and fax test";
+    application.detail = completed ? "Sinch’s free emulator confirmed the test transmission. No agency application was filed." : "Only this fictional example can use the free fax emulator. Test marks do not certify a real application.";
+    application.submitted = false;
+  }
   const draft = !loading && !error && !reviewRequested && !protectedPrepared && !reviewFinished && !application.submitted ? currentSnapDraft(request, operations) : null;
   const snapSubmission = snapSubmissionComplete
     ? operations.filter((operation) => operation.program_id === "snap-pa" &&

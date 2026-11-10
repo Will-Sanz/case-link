@@ -67,6 +67,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("closed already-authorized SNAP personal entry", () => {
+  it("excludes identifier entry from the explicit fictional test and sends only deferred identifier metadata", async () => {
+    api(); const value = props();
+    render(<SnapDirectPersonalEntry {...value} request={{ ...value.request, controlled_test: true }}/>);
+    await screen.findByText(/No Social Security numbers are collected/);
+    expect(screen.queryByLabelText(/Social Security number/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Your applicant certification" }));
+    fireEvent.click(screen.getByRole("button", { name: "Your rights and responsibilities certification" }));
+    const finish = screen.getByRole("button", { name: "Finish personal steps" });
+    await waitFor(() => expect((finish as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(finish);
+    await waitFor(() => expect(mocks.send).toHaveBeenCalledOnce());
+    expect(mocks.send.mock.calls[0][3].identifiers).toEqual([{ personId: context.applyingSubjectIds[0], kind: "provide_to_agency_later" }]);
+  });
   it("mounts private controls only after fresh exact permission and NULL capture/current-intent metadata; reuses saved answers", async () => {
     const fetcher = api(); render(<SnapDirectPersonalEntry {...props()}/>);
     expect(document.querySelector("input,canvas")).toBeNull(); await screen.findByLabelText(/Social Security number/);

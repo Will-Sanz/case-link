@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { snapSenderAttemptSchema, snapSenderCarrierId, snapSenderPhone, snapSenderStatus, SNAP_SENDER_ERROR, type SnapSenderAttempt } from "./snap-sender-contract";
+import { liveSnapSenderAttemptSchema, snapSenderAttemptSchema, snapSenderCarrierId, snapSenderPhone, snapSenderStatus, SNAP_SENDER_ERROR, type SnapSenderAttempt } from "./snap-sender-contract";
 import { boundedSnapSenderWork, readSnapSenderJson } from "./snap-sender-http";
 import { MAX_SNAP_PACKET_BYTES } from "./snap-packet-contract";
 
-const destinationSchema = z.object({ id: snapSenderAttemptSchema.shape.destinationId, version: snapSenderAttemptSchema.shape.destinationVersion,
+const destinationSchema = z.object({ id: liveSnapSenderAttemptSchema.shape.destinationId, version: liveSnapSenderAttemptSchema.shape.destinationVersion,
   number: snapSenderPhone, verifiedUntil: z.iso.datetime({ offset: true }) }).strict();
 export const snapSenderCarrierConfigSchema = z.object({
   projectId: snapSenderCarrierId, serviceId: snapSenderCarrierId, fromNumber: snapSenderPhone,
@@ -32,6 +32,28 @@ const faxSchema = z.object({
 }).passthrough();
 const empty = (value: unknown) => value === undefined || value === null || value === "";
 
+/** Shared read-only service checks for separately configured live and emulated transports. */
+export async function checkSinchSnapFaxService(config: Pick<SnapSenderCarrierConfig, "projectId" | "serviceId" | "fromNumber">,
+  get: (path: string) => Promise<unknown>, signal: AbortSignal): Promise<void> {
+  try {
+        const [service, emails, numbers] = await Promise.all([
+          get(`/services/${config.serviceId}`), get(`/services/${config.serviceId}/emails?pageSize=1`),
+          get(`/services/${config.serviceId}/numbers?pageSize=100`),
+        ]);
+        const settings = z.object({ id: z.literal(config.serviceId), projectId: z.literal(config.projectId),
+          saveOutboundFaxDocuments: z.literal(false), numberOfRetries: z.literal(0), inProgressNotifications: z.literal(false),
+          coverPageId: z.unknown().optional(), callbackUrl: z.unknown().optional(), defaultFrom: z.unknown().optional() }).passthrough().parse(service);
+        if (!empty(settings.coverPageId) || !empty(settings.callbackUrl) || (!empty(settings.defaultFrom) && settings.defaultFrom !== config.fromNumber)) throw new Error();
+        z.object({ emails: z.array(z.unknown()).length(0), totalItems: z.literal(0), totalPages: z.number().int().min(0).max(1) }).passthrough().parse(emails);
+        const assigned = z.object({ numbers: z.array(z.object({ phoneNumber: z.string(), projectId: snapSenderCarrierId, serviceId: snapSenderCarrierId }).passthrough()).max(100),
+          page: z.number().int().min(0).max(1), pageSize: z.number().int().min(1).max(100), totalItems: z.number().int().min(1).max(100), totalPages: z.literal(1) }).passthrough().parse(numbers);
+        const matches = assigned.numbers.filter(number => number.phoneNumber === config.fromNumber);
+        if (assigned.numbers.length !== assigned.totalItems || assigned.totalItems > assigned.pageSize || matches.length !== 1
+          || matches[0].projectId !== config.projectId || matches[0].serviceId !== config.serviceId) throw new Error();
+        signal.throwIfAborted();
+  } catch { throw new Error(SNAP_SENDER_ERROR); }
+}
+
 /** Live, allowlisted byte delivery only. The emulator remains a separate implementation. */
 export function createSinchSnapFaxCarrier(options: SnapSenderCarrierConfig & { fetcher?: typeof fetch }): SnapSenderCarrier {
   const { fetcher = fetch, ...raw } = options;
@@ -43,7 +65,7 @@ export function createSinchSnapFaxCarrier(options: SnapSenderCarrierConfig & { f
   function validateAttempt(input: unknown, recovery = false) {
     try {
       const attempt = snapSenderAttemptSchema.parse(input), target = config.destinations.find(value => value.id === attempt.destinationId);
-      if (attempt.projectId !== config.projectId || attempt.serviceId !== config.serviceId || attempt.from !== config.fromNumber
+      if ("kind" in attempt || attempt.projectId !== config.projectId || attempt.serviceId !== config.serviceId || attempt.from !== config.fromNumber
         || (!recovery && (!target || target.version !== attempt.destinationVersion || target.number !== attempt.to || Date.parse(target.verifiedUntil) <= Date.now()))
         || Date.parse(attempt.expiresAt) <= Date.now()
         || Date.parse(attempt.attemptedAt) > Date.now()) throw new Error();
@@ -85,25 +107,7 @@ export function createSinchSnapFaxCarrier(options: SnapSenderCarrierConfig & { f
   }
   return {
     validateAttempt,
-    async checkConfiguration(signal) {
-      try {
-        const [service, emails, numbers] = await Promise.all([
-          request(`/services/${config.serviceId}`, "GET", signal), request(`/services/${config.serviceId}/emails?pageSize=1`, "GET", signal),
-          request(`/services/${config.serviceId}/numbers?pageSize=100`, "GET", signal),
-        ]);
-        const settings = z.object({ id: z.literal(config.serviceId), projectId: z.literal(config.projectId),
-          saveOutboundFaxDocuments: z.literal(false), numberOfRetries: z.literal(0), inProgressNotifications: z.literal(false),
-          coverPageId: z.unknown().optional(), callbackUrl: z.unknown().optional(), defaultFrom: z.unknown().optional() }).passthrough().parse(service);
-        if (!empty(settings.coverPageId) || !empty(settings.callbackUrl) || (!empty(settings.defaultFrom) && settings.defaultFrom !== config.fromNumber)) throw new Error();
-        z.object({ emails: z.array(z.unknown()).length(0), totalItems: z.literal(0), totalPages: z.number().int().min(0).max(1) }).passthrough().parse(emails);
-        const assigned = z.object({ numbers: z.array(z.object({ phoneNumber: z.string(), projectId: snapSenderCarrierId, serviceId: snapSenderCarrierId }).passthrough()).max(100),
-          page: z.number().int().min(0).max(1), pageSize: z.number().int().min(1).max(100), totalItems: z.number().int().min(1).max(100), totalPages: z.literal(1) }).passthrough().parse(numbers);
-        const matches = assigned.numbers.filter(number => number.phoneNumber === config.fromNumber);
-        if (assigned.numbers.length !== assigned.totalItems || assigned.totalItems > assigned.pageSize || matches.length !== 1
-          || matches[0].projectId !== config.projectId || matches[0].serviceId !== config.serviceId) throw new Error();
-        signal.throwIfAborted();
-      } catch { throw new Error(SNAP_SENDER_ERROR); }
-    },
+    checkConfiguration: signal => checkSinchSnapFaxService(config, path => request(path, "GET", signal), signal),
     async send(input, bytes, beforeSend, signal) {
       const attempt = validateAttempt(input);
       let copy: Uint8Array<ArrayBuffer> | undefined;

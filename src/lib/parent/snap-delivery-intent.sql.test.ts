@@ -37,6 +37,8 @@ describe.skipIf(!modulePath)("closed SNAP delivery SQL (synthetic Vault, non-PDF
     });
   }
   async function setup(withRoute = true): Promise<Scope> {
+    await fixture.admin.query("update parent_private.provider_capabilities set execution_kind='live'");
+    await fixture.admin.query("delete from parent_private.snap_controlled_tests");
     await fixture.admin.query("delete from parent_private.snap_delivery_destinations");
     await fixture.admin.query(`update parent_private.processing_controls set enabled=true,approval_reference='synthetic delivery SQL only',approved_until=now()+interval '1 day',
       snap_details_enabled=true,snap_details_approval_reference='synthetic only',snap_details_approved_until=now()+interval '1 day',snap_details_notice_version=$1,
@@ -96,6 +98,54 @@ describe.skipIf(!modulePath)("closed SNAP delivery SQL (synthetic Vault, non-PDF
     await fixture.admin.query("update public.parent_jobs set state='queued',run_at=clock_timestamp(),lease_token=null,lease_until=null where id=$1", [s.intent.jobId]);
     const job = await claim(s.request); return { ...s.intent, jobId: job.jobId, leaseToken: job.leaseToken };
   }
+
+  async function controlled(s: Scope) {
+    await fixture.admin.query("update public.parent_requests set controlled_test=true where id=$1", [s.request]);
+    await fixture.admin.query(`insert into parent_private.snap_controlled_tests(request_id,owner_id,snapshot_id,snapshot_hash,project_id,service_id,from_number,enabled,evidence_reference,expires_at)
+      values($1,$2,$3,$4,'test-project','test-service','+12155550100',true,'synthetic SQL test only',clock_timestamp()+interval '5 minutes')`, [s.request,s.owner,s.snapshot,s.snapshotHash]);
+    await fixture.admin.query("update parent_private.provider_capabilities set execution_kind='sinch_emulation' where program_id='snap-pa'");
+  }
+  it("reserves the free emulator separately while every production destination stays closed", async () => {
+    const s = await setup(false); await controlled(s);
+    await destination();
+    await expect(reserve(s)).rejects.toMatchObject({code:'42501'});
+    await fixture.admin.query('delete from parent_private.snap_delivery_destinations');
+    const value = (await role('parent_snap_sender','select parent_private.parent_reserve_snap_test_delivery($1) value',[JSON.stringify(s.intent)])).rows[0].value as {state:string;attempt:Record<string,unknown>};
+    expect(value.state).toBe('dispatch_allowed');
+    await expect(fixture.admin.query('update public.parent_requests set controlled_test=false where id=$1',[s.request])).rejects.toMatchObject({code:'42501'});
+    expect(value.attempt).toMatchObject({kind:'sinch_emulation',requestId:s.request,snapshotHash:s.snapshotHash,to:'+19898989898'});
+    const checked = (await role('parent_snap_sender','select parent_private.parent_recheck_snap_test_delivery($1) value',[JSON.stringify(s.intent)])).rows[0].value as Record<string,unknown>;
+    expect(checked.dispatchAuthorizedAt).toBeTruthy();
+    await expect(role('parent_snap_sender','select parent_private.parent_recheck_snap_test_delivery($1) value',[JSON.stringify(s.intent)])).rejects.toMatchObject({code:'42501'});
+    const replay = (await role('parent_snap_sender','select parent_private.parent_reserve_snap_test_delivery($1) value',[JSON.stringify(s.intent)])).rows[0].value as {state:string};
+    expect(replay.state).toBe('reconcile_only');
+    expect((await fixture.admin.query('select count(*)::int n from parent_private.snap_delivery_destinations')).rows[0].n).toBe(0);
+    await expect(fixture.admin.query("update public.parent_operations set state='agency_submitted' where id=$1",[s.operation])).rejects.toMatchObject({code:'42501'});
+  });
+  it.each(['disabled','snapshot','owner','expired','additional_need'])("rejects %s controlled scope without a delivery reservation", async kind => {
+    const s=await setup(false); await controlled(s);
+    if(kind==='disabled') await fixture.admin.query('update parent_private.snap_controlled_tests set enabled=false');
+    if(kind==='snapshot') await fixture.admin.query("update parent_private.snap_controlled_tests set snapshot_hash=repeat('b',64)");
+    if(kind==='additional_need') await fixture.admin.query("update public.parent_requests set intake=jsonb_set(intake,'{needs}','[\"snap_new\",\"electricity\"]'::jsonb) where id=$1",[s.request]);
+    if(kind==='owner') {
+      const other=randomUUID();
+      await fixture.admin.query('insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())',[other,`${other}@example.invalid`]);
+      await fixture.admin.query('insert into public.parent_accounts(id) values($1)',[other]);
+      await fixture.admin.query('update parent_private.snap_controlled_tests set owner_id=$1',[other]);
+    }
+    if(kind==='expired') await fixture.admin.query("update parent_private.snap_controlled_tests set expires_at=created_at+interval '1 microsecond'");
+    await expect(role('parent_snap_sender','select parent_private.parent_reserve_snap_test_delivery($1) value',[JSON.stringify(s.intent)])).rejects.toMatchObject({code:'42501'});
+    expect((await fixture.admin.query('select count(*)::int n from parent_private.snap_delivery_intents where operation_id=$1',[s.operation])).rows[0].n).toBe(0);
+  });
+  it("does not advertise the test as a live connection and denies ordinary access to its private controls", async () => {
+    const s=await setup(false); await controlled(s);
+    const summary=(await role('authenticated','select public.parent_capability_summary() value',[],s.owner)).rows[0].value as {programId:string;enabled:boolean}[];
+    expect(summary.find(v=>v.programId==='snap-pa')?.enabled).toBe(false);
+    for(const actor of ['anon','authenticated','service_role','parent_worker','parent_storage_broker','parent_retention_worker','parent_snap_finalizer','parent_snap_sender']) {
+      expect((await fixture.admin.query("select has_table_privilege($1,'parent_private.snap_controlled_tests','SELECT') allowed",[actor])).rows[0].allowed).toBe(false);
+      expect((await fixture.admin.query("select has_function_privilege($1,'parent_private.parent_reserve_snap_test_delivery(jsonb)','EXECUTE') allowed",[actor])).rows[0].allowed).toBe(actor==='parent_snap_sender');
+    }
+  });
 
   it("ships empty, disabled by access, and callable only by the dedicated non-login sender", async () => {
     expect((await fixture.admin.query("select count(*)::int n from parent_private.snap_delivery_destinations")).rows[0].n).toBe(0);
