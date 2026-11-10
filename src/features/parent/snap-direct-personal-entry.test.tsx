@@ -72,6 +72,7 @@ describe("closed already-authorized SNAP personal entry", () => {
     render(<SnapDirectPersonalEntry {...value} request={{ ...value.request, controlled_test: true }}/>);
     await screen.findByText(/No Social Security numbers are collected/);
     expect(screen.queryByLabelText(/Social Security number/)).toBeNull();
+    await waitFor(() => expect((screen.getByRole("button", { name: "Your applicant certification" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Your applicant certification" }));
     fireEvent.click(screen.getByRole("button", { name: "Your rights and responsibilities certification" }));
     const finish = screen.getByRole("button", { name: "Finish personal steps" });

@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureProtectedSnapOperation, fixtureRequest } from "@/lib/parent/test-fixtures";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { SupportActivity, SnapDraftReview, currentSnapDraft, currentSnapReview, type RecordedOperation } from "./support-activity";
 
 const reviewPdf = vi.hoisted(() => vi.fn());
 vi.mock("./snap-review-pdf", () => ({ SnapReviewPdf: (props: unknown) => { reviewPdf(props); return <div role="region" aria-label="Exact draft preview"/>; } }));
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-06T22:00:00Z")); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("recorded form downloads", () => {

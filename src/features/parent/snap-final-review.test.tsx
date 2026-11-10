@@ -35,6 +35,7 @@ function api(review: unknown = operation, post?: (url: string, init: RequestInit
   vi.stubGlobal("fetch", fetcher); return fetcher;
 }
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-06T16:30:00Z"));
   vi.clearAllMocks(); mocks.reloads.clear(); mocks.display.mockReturnValue(true); mocks.load.mockImplementation(async () => bytes()); mocks.create.mockReturnValue("blob:https://caselink.test/synthetic-pdf");
   vi.stubGlobal("URL", class extends URL { static createObjectURL = mocks.create; static revokeObjectURL = mocks.revoke; });
 });
