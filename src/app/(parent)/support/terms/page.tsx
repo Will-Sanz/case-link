@@ -12,11 +12,7 @@ export default function ParentTermsPage() {
       <p>Terms of service</p>
       <h1>Clear expectations for support.</h1>
       <p>Last updated October 25, 2026 · Parent service</p>
-      <div className={styles.notice}>
-        CaseLink is in early access. Live assistance and real-family intake
-        require the recorded service, permission and privacy checks. These terms
-        do not enable an unavailable program connection.
-      </div>
+
       <h2>Who this service is for</h2>
       <p>
         The parent service is for adults seeking food support or utility

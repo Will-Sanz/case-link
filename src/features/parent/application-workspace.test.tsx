@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { useParentResource } from "./use-parent-resource";
@@ -104,11 +104,15 @@ describe("canonical application continuity", () => {
     const request = fixture(), operation: RecordedOperation = { id: "draft", request_id: request.id, request_version: request.version, need: "snap_new", program_id: "snap-pa", action: "prepare", state: "prepared", artifact_id: "exact-form", form: { preparation_only: true }, created_at: request.created_at };
     mockApi(); const history = { data: { operations: [operation], historyLimited: false }, loading: false, error: null, reload: vi.fn() };
     render(<ApplicationWorkspace request={request} history={history}><section id="application-receipts"><SupportActivity request={request} history={history} onChange={vi.fn()}/></section></ApplicationWorkspace>);
-    const overview = screen.getByRole("heading", { name: "Where your application stands" }), draft = screen.getByRole("region", { name: "Your prepared SNAP draft" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
+    const overview = screen.getByRole("heading", { name: "Where your application stands" });
+    openSection(/Your application/);
+    const draft = screen.getByRole("region", { name: "Your prepared SNAP draft" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
     expect(overview.compareDocumentPosition(draft) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(draft.compareDocumentPosition(answers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "View prepared draft" })).toHaveLength(1);
+    openSection(/Activity & receipts/);
     expect(screen.getByRole("link", { name: "Download incomplete unsigned draft" }).getAttribute("href")).toBe(`/api/parent/requests/${request.id}/forms/exact-form`);
+    openSection(/Official website/);
     await screen.findByRole("link", { name: "Start a new SNAP application with DHS" });
   });
   it("opens exact review before the answer recap and suppresses a duplicate COMPASS start", async () => {
@@ -117,10 +121,12 @@ describe("canonical application continuity", () => {
       { id: "earlier-draft", request_id: request.id, program_id: "snap-pa", need: "snap_new", action: "prepare", request_version: request.version, state: "prepared", artifact_id: "unsigned-form", form: { preparation_only: true } }]);
     renderWorkspace(request); await screen.findByText("SNAP application prepared");
     expect(screen.getByRole("link", { name: "Review application and Submit" }).getAttribute("href")).toBe("#snap-final-review");
+    fireEvent.click(screen.getByRole("link", { name: "Review application and Submit" }));
     const review = screen.getByRole("heading", { name: "Review your SNAP application" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
     expect(review.compareDocumentPosition(answers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Open application view" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
+    openSection(/Official website/);
     expect(screen.getByRole("link", { name: "Open the official SNAP service" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "View prepared draft" })).toBeNull();
   });
@@ -169,6 +175,10 @@ describe("canonical application continuity", () => {
     expect(screen.getByRole("link", { name: "Review application and Submit" })).toBeTruthy();
   });
 });
+beforeEach(() => window.history.replaceState(null, "", "/"));
+function openSection(name: RegExp) {
+  fireEvent.click(within(screen.getByRole("navigation", { name: "Your application checklist" })).getByRole("link", { name }));
+}
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -198,11 +208,12 @@ it.each(["challenge", "continue"] as const)("shows only an actual %s handoff as 
     },
   });
   const view = renderWorkspace();
+  openSection(/Official website/);
   const image = await screen.findByRole("img");
   fireEvent.load(image);
   if (kind === "challenge") {
     await screen.findByText("Next: You — COMPASS verification");
-    expect(screen.getByRole("link", { name: /COMPASS verification\s*Needs you now/ }).getAttribute("href")).toBe("#application-browser");
+    expect(screen.getByRole("link", { name: /Official website\s*Needs you now/ }).getAttribute("href")).toBe("#application-browser");
     expect(screen.queryByText("Nothing requested")).toBeNull();
     expect(screen.queryByRole("button", { name: "Check and continue" })).toBeNull();
     fireEvent.error(image);
@@ -522,7 +533,8 @@ describe("application workspace", () => {
     const checklist = screen.getByRole("navigation", {
       name: "Your application checklist",
     });
-    expect(within(checklist).getAllByRole("link")).toHaveLength(6);
+    expect(within(checklist).getAllByRole("link")).toHaveLength(12);
+    openSection(/Your next steps/);
     const input = screen.getByRole("textbox", { name: "Unsaved answer" });
     fireEvent.change(input, { target: { value: "Not saved yet" } });
     fireEvent.click(
@@ -535,11 +547,30 @@ describe("application workspace", () => {
         .getAttribute("aria-current"),
     ).toBe("location");
     expect((input as HTMLInputElement).value).toBe("Not saved yet");
-    expect(screen.getByText("Permission controls")).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Unsaved answer" })).toBeNull();
+    expect(screen.getByText("Permission controls").closest("[data-workspace-panel]")?.hasAttribute("hidden")).toBe(true);
+    openSection(/Your next steps/);
+    expect(screen.getByRole("textbox", { name: "Unsaved answer" })).toBe(input);
+    expect((input as HTMLInputElement).value).toBe("Not saved yet");
+  });
+  it("opens a bookmarked section and follows browser history without losing the workspace", async () => {
+    mockApi();
+    window.history.replaceState(null, "", "/#application-documents");
+    renderWorkspace();
+    expect(screen.getByText("Document controls").closest("[data-workspace-panel]")?.hasAttribute("hidden")).toBe(false);
+    expect(screen.queryByRole("heading", { name: "Where your application stands" })).toBeNull();
+    openSection(/Your next steps/);
+    expect(screen.getByRole("textbox", { name: "Unsaved answer" })).toBeTruthy();
+    window.history.replaceState(null, "", "/");
+    fireEvent.popState(window);
+    expect(screen.getByRole("heading", { name: "Where your application stands" })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Unsaved answer" })).toBeNull();
+    await screen.findByText("No application submission recorded");
   });
   it("does not invent a live website or filling work when no provider session exists", async () => {
     mockApi();
     renderWorkspace();
+    openSection(/Official website/);
     await screen.findByText("The provider connection is not operational.");
     expect(screen.queryByRole("img")).toBeNull();
     expect(
@@ -579,6 +610,7 @@ describe("application workspace", () => {
       await screen.findByText("Earlier application history needs checking"),
     ).toBeTruthy();
     expect(screen.queryByText("No application submission recorded")).toBeNull();
+    openSection(/Official website/);
     expect(
       screen.getByRole("button", { name: "Open application view" }),
     ).toBeTruthy();
@@ -641,6 +673,7 @@ describe("application workspace", () => {
   it("starts only the actual available SNAP connection and refreshes recorded state", async () => {
     const fetch = mockApi({ available: true, reason: null, session: null });
     renderWorkspace();
+    openSection(/Official website/);
     fireEvent.click(
       await screen.findByRole("button", { name: "Open application view" }),
     );
@@ -698,6 +731,7 @@ describe("application workspace", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderWorkspace();
+    openSection(/Official website/);
     fireEvent.click(
       await screen.findByRole("button", { name: "Stop website view" }),
     );
@@ -749,6 +783,7 @@ describe("application workspace", () => {
         name: "Start a new SNAP application with DHS",
       }),
     ).toBeNull();
+    openSection(/Official website/);
     expect(
       screen.getByRole("link", { name: "Open the official SNAP service" }),
     ).toBeTruthy();
@@ -767,6 +802,7 @@ describe("application workspace", () => {
     request.intake.needs = ["snap_new", "snap_renewal"];
     renderWorkspace(request);
     await screen.findByText("No application submission recorded");
+    openSection(/Official website/);
     expect(
       screen.getByRole("button", { name: "Open application view" }),
     ).toBeTruthy();
@@ -782,6 +818,7 @@ describe("application workspace", () => {
     expect(
       screen.getByText(/A separate SNAP journey also has recorded activity/),
     ).toBeTruthy();
+    openSection(/Overview/);
     expect(
       screen
         .getByRole("link", { name: "Review Activity & receipts" })
@@ -833,6 +870,7 @@ describe("application workspace", () => {
       },
     });
     renderWorkspace();
+    openSection(/Official website/);
     const image = await screen.findByRole("img", {
       name: /Current official application page/,
     });

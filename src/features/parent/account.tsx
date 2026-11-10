@@ -146,7 +146,7 @@ function AccountSettings({
               <option value="es">Spanish / Español</option>
             </select>
             <p className={styles.hint}>
-              This early-access interface is in English. Recording a Spanish
+              This interface is in English. Recording a Spanish
               preference helps route support; program language availability is
               confirmed separately.
             </p>
@@ -233,7 +233,7 @@ function AccountResource() {
 
 export function ParentAccount({ deletionOnly = false }: { deletionOnly?: boolean }) {
   return (
-    <div className={`${styles.container} ${styles.narrow}`}>
+    <div className={styles.container}>
       <div className={styles.pageTop}><div>
         <h1>{deletionOnly ? "Delete parent-support data" : "Your account"}</h1>
         <p>Choose how to hear from us, protect your information, and stay in control.</p>

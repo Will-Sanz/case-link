@@ -7,9 +7,9 @@ import { ParentLanding } from "./landing";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 afterEach(cleanup);
 
-it("keeps the original recognition and complete policy/contact access throughout the parent shell", () => {
+it("keeps the original recognition and complete policy/contact access on the homepage", () => {
   render(
-    <ParentShell>
+    <ParentShell showRecognition>
       <p>Parent support</p>
     </ParentShell>,
   );
@@ -36,14 +36,14 @@ it("keeps the original recognition and complete policy/contact access throughout
   ).toBe("mailto:willsanz23@gmail.com");
 });
 
-it("provides working food, utility and urgent entry paths alongside the approved illustration", () => {
+it("provides working food and urgent entry paths alongside the approved illustration", () => {
   render(
     <ParentShell>
       <ParentLanding />
     </ParentShell>,
   );
   expect(screen.getByRole("heading", { level: 1 }).textContent).toContain(
-    "Food and utility support,",
+    "Food support for your family,",
   );
   expect(
     screen
@@ -53,11 +53,9 @@ it("provides working food, utility and urgent entry paths alongside the approved
   expect(
     screen.getByRole("link", { name: /Food & benefits/ }).getAttribute("href"),
   ).toBe("/get-support?need=food");
-  expect(
-    screen
-      .getByRole("link", { name: /Help with utility bills/ })
-      .getAttribute("href"),
-  ).toBe("/get-support?need=utilities");
+  expect(screen.queryByRole("link", { name: /Help with utility bills/ })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "A few things you might be wondering" })).toBeNull();
+  expect(screen.queryByText(/Live assistance is preparing to launch/)).toBeNull();
   expect(
     screen
       .getByRole("link", { name: /Need immediate help/ })
@@ -70,4 +68,9 @@ it("provides working food, utility and urgent entry paths alongside the approved
       })
       .getAttribute("src"),
   ).toBeTruthy();
+});
+
+it("omits the recognition banner from the regular parent shell", () => {
+  render(<ParentShell><p>Support page</p></ParentShell>);
+  expect(screen.queryByRole("link", { name: /Selected for OpenAI's inaugural/ })).toBeNull();
 });

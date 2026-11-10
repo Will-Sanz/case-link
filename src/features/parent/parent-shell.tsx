@@ -9,9 +9,11 @@ import chatStyles from "./floating-assistant.module.css";
 
 export function ParentShell({
   children,
+  showRecognition = false,
   signedIn = false,
 }: {
   children: ReactNode;
+  showRecognition?: boolean;
   signedIn?: boolean;
 }) {
   return (
@@ -19,7 +21,7 @@ export function ParentShell({
       <a className={styles.skip} href="#main-content">
         Skip to content
       </a>
-      <ChatGptFuturesBanner />
+      {showRecognition && <ChatGptFuturesBanner />}
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link className={styles.brand} href="/" aria-label="CaseLink home">

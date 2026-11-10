@@ -11,9 +11,11 @@ const navLinkClass =
 
 export function PublicSiteShell({
   children,
+  showRecognition = false,
   authenticated,
 }: {
   children: ReactNode;
+  showRecognition?: boolean;
   /** When true, show the signed-in workspace link. */
   authenticated: boolean;
 }) {
@@ -30,7 +32,7 @@ export function PublicSiteShell({
         Skip to main content
       </a>
 
-      <ChatGptFuturesBanner />
+      {showRecognition && <ChatGptFuturesBanner />}
 
       <header className="sticky top-0 z-40 bg-[var(--public-paper-2)]">
         <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">

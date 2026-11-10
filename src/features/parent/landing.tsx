@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Lock, ShoppingBag, HomeSimple } from "iconoir-react";
+import { ArrowRight, Lock, ShoppingBag } from "iconoir-react";
 import styles from "./parent.module.css";
 
 export function UrgentHelp() {
@@ -33,7 +33,7 @@ export function ParentLanding() {
         <div className={styles.hero}>
           <div className={styles.heroText}>
             <h1>
-              Food and utility support,
+              Food support for your family,
               <br />
               made simpler.
             </h1>
@@ -46,11 +46,7 @@ export function ParentLanding() {
               Find support for my family{" "}
               <ArrowRight width={19} height={19} aria-hidden="true" />
             </Link>
-            <p className={styles.heroFootnote}>
-              Early access in Philadelphia.
-              <br />
-              Live assistance is preparing to launch.
-            </p>
+
             <Link className={styles.heroDirectHelp} href="/support/help#urgent">
               Need help today? Find direct resources{" "}
               <ArrowRight width={16} height={16} aria-hidden="true" />
@@ -77,19 +73,6 @@ export function ParentLanding() {
           <div>
             <strong>Food & benefits</strong>
             <span>Food today, SNAP and WIC. Find a place to start.</span>
-          </div>
-          <ArrowRight width={21} height={21} aria-hidden="true" />
-        </Link>
-        <Link
-          className={styles.serviceChoice}
-          href="/get-support?need=utilities"
-        >
-          <span className={styles.serviceIcon}>
-            <HomeSimple width={31} height={31} aria-hidden="true" />
-          </span>
-          <div>
-            <strong>Help with utility bills</strong>
-            <span>Support with electricity, gas and water bills.</span>
           </div>
           <ArrowRight width={21} height={21} aria-hidden="true" />
         </Link>
@@ -133,7 +116,7 @@ export function ParentLanding() {
                 <h3>Choose what CaseLink can handle</h3>
                 <p>
                   See the named programs, information and limits before
-                  starting. Share a bill or notice only if it helps.
+                  starting. Share a document only if it helps.
                 </p>
               </div>
             </li>
@@ -150,44 +133,7 @@ export function ParentLanding() {
           </ol>
         </div>
       </section>
-      <section className={styles.faq}>
-        <h2>A few things you might be wondering</h2>
-        <details>
-          <summary>Does this mean I qualify for assistance?</summary>
-          <p>
-            No. Programs decide eligibility, funding and applications. CaseLink
-            helps find relevant options and complete supported steps; it cannot
-            promise approval or available funds.
-          </p>
-        </details>
-        <details>
-          <summary>Will you send my information without asking?</summary>
-          <p>
-            Your starting authorization names the programs, allowed information
-            and actions. Work outside those limits needs your permission. You
-            can also choose preparation only, with no external sharing.
-          </p>
-        </details>
-        <details>
-          <summary>Can I apply directly instead?</summary>
-          <p>
-            Yes. You can always use official applications or contact a program
-            directly. You do not need to finish CaseLink intake or upload
-            documents first.{" "}
-            <Link className={styles.textLink} href="/support/help">
-              Find official options.
-            </Link>
-          </p>
-        </details>
-        <details>
-          <summary>Will I need to stay on this page?</summary>
-          <p>
-            When live service is enabled, authorized work can continue after you
-            leave or sign out. Your support page keeps the current status, and
-            you can pause or cancel future work there.
-          </p>
-        </details>
-      </section>
+
     </>
   );
 }

@@ -219,12 +219,25 @@ try {
         : progress;
       await page.goto(origin + path, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
+      assert.equal(await page.getByRole("link", { name: /Selected for OpenAI's inaugural/ }).count(), label === "home" ? 1 : 0,
+        "Recognition is shown only on the homepage.");
+      if (["detail", "snap-detail", "snap-confirmation"].includes(label)) {
+        const chrome = await page.locator('[data-case-workspace]').evaluate(element => element.getBoundingClientRect().top + element.firstElementChild.getBoundingClientRect().height);
+        assert.ok(chrome <= (width > 850 ? 130 : 155), "Compact headers must leave the viewport for case work.");
+      }
+      if (["product", "help"].includes(label) && width > 850) {
+        const layout = await page.locator('main > div, main > article').first().boundingBox();
+        assert.ok(layout && layout.width >= width * 0.85 && Math.abs(layout.x - (width - layout.width) / 2) < 2,
+          "Information pages share a wide centered frame.");
+      }
+
       if (label === "snap-confirmation") {
         await page.getByText("SNAP application complete", { exact: true }).waitFor();
         const record = page.getByRole("region", { name: "Your SNAP submission record" });
         assert.ok(await record.getByText(snapConfirmation.evidence.reference, { exact: false }).isVisible());
         assert.equal(await record.getByRole("link", { name: "Download this exact submission record" }).getAttribute("href"),
           `/api/parent/requests/${snapRequest.id}/operations/${snapConfirmation.id}/export`);
+        await page.getByRole("navigation", { name: "Your application checklist" }).getByRole("link", { name: /Program progress/ }).click();
         assert.ok(await page.locator("#application-programs").getByText("Application submitted", { exact: true }).isVisible(),
           "Program progress must agree with the validated current submission even before its plan refreshes.");
         const program = page.locator("#application-programs article").first();
@@ -315,7 +328,7 @@ try {
           );
           assert.ok(
             services.y + services.height <= height,
-            "Both support choices must fit in the initial desktop viewport.",
+            "The food support choice must fit in the initial desktop viewport.",
           );
           assert.ok(
             panorama && panorama.height <= 400 && panorama.width <= 1600,
