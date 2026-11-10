@@ -85,7 +85,7 @@ describe('full SNAP intake before background work',()=>{
     snapApi();render(<ParentIntake initialNeed="snap_new"/>);await screen.findByLabelText('Your first name');
     fireEvent.click(screen.getByRole('button',{name:'Back'}));
     fireEvent.click(screen.getByRole('checkbox',{name:/Apply for SNAP/}));
-    fireEvent.click(screen.getByRole('checkbox',{name:'Electric bill'}));
+    fireEvent.click(screen.getByRole('checkbox',{name:/Food for now/}));
     fireEvent.click(screen.getByRole('button',{name:'Continue'}));
     const progress=screen.getByRole('list',{name:'Support request steps'});
     expect(within(progress).getAllByRole('listitem')).toHaveLength(3);
@@ -163,12 +163,12 @@ describe('full SNAP intake before background work',()=>{
     expect((screen.getByLabelText('Are you a student?') as HTMLSelectElement).value).toBe('');
     expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
   });
-  it('preserves full SNAP answers and combined utility inputs when going back without duplicate aggregate questions',async()=>{
+  it('preserves full SNAP answers when going back without duplicate aggregate questions',async()=>{
     snapApi();render(<ParentIntake initialNeed="snap_new"/>);await screen.findByLabelText('Your first name');
     answerSnap('applicant.firstName','Maria');answerSnap('zip','19104');fireEvent.click(screen.getByRole('button',{name:'Back'}));
-    fireEvent.click(screen.getByRole('checkbox',{name:'Electric bill'}));fireEvent.click(screen.getByRole('button',{name:'Continue'}));
+    expect(screen.queryByRole('checkbox',{name:'Electric bill'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'Continue'}));
     expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Maria');
-    expect((screen.getByLabelText('ZIP code') as HTMLInputElement).value).toBe('19104');expect(screen.getByLabelText('PECO')).toBeTruthy();
+    expect((screen.getByLabelText('ZIP code') as HTMLInputElement).value).toBe('19104');expect(screen.queryByLabelText('PECO')).toBeNull();
     expect(screen.queryByLabelText('Household income before taxes ($)')).toBeNull();
   });
   it('retries an uncertain atomic start with the identical payload and key',async()=>{
@@ -369,27 +369,16 @@ describe("one coherent upfront support intake", () => {
     expect(screen.queryByLabelText("Pregnant or postpartum?")).toBeNull();
     expect(screen.getByLabelText("Household ZIP code")).toBeTruthy();
   });
-  it("keeps utility questions visible in the same bundle and can proceed with unknown optional facts", async () => {
-    render(<ParentIntake initialNeed="utilities" />);
-    const electricity = await screen.findByRole("checkbox", {
-      name: "Electric bill",
-    });
-    expect((electricity as HTMLInputElement).checked).toBe(false);
-    fireEvent.click(electricity);
+  it.each(["utilities", "electricity", "gas", "water"])("does not offer or preselect unsupported utility service via %s", async (initialNeed) => {
+    render(<ParentIntake initialNeed={initialNeed} />);
+    await screen.findByRole("heading", { name: "What would help your household?" });
+    expect(screen.queryByRole("group", { name: "Utility bills" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /Electric bill|Gas bill|Water bill/ })).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Food for now/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(
-      screen
-        .getByRole("group", { name: "Your utility information" })
-        .closest("details"),
-    ).toBeNull();
-    expect(screen.getByLabelText("PECO")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Household ZIP code"), {
-      target: { value: "19104" },
-    });
-    fireEvent.click(screen.getByLabelText(/I’m 18 or older/));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() =>
-      expect(screen.getByText("Named programs for this request")).toBeTruthy(),
-    );
+    expect(screen.queryByLabelText("PECO")).toBeNull();
+    expect(screen.queryByLabelText("Shutoff date on a notice, if known")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Your utility information" })).toBeNull();
+    expect(screen.getByLabelText("Household ZIP code")).toBeTruthy();
   });
 });

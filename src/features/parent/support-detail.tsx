@@ -92,7 +92,7 @@ function RequiredStep({
         {action.title}
       </h2>
       <p>{action.explanation}</p>
-      {snapSubmit ? <a className={styles.button} href="#snap-final-review">Review application and Submit</a> : snapDetails ? <button className={styles.button} onClick={onSnapDetails}>Answer SNAP application questions</button> : canAnswer ? (
+      {snapSubmit ? <a className={styles.button} href="#snap-final-review">Review application and Submit</a> : snapDetails ? <a className={styles.button} href="#application-answers" onClick={onSnapDetails}>Answer SNAP application questions</a> : canAnswer ? (
         <NecessaryAnswer
           action={action}
           request={request}
@@ -106,12 +106,13 @@ function RequiredStep({
                 Choose the named programs and information for this step. We’ll
                 resume only the work you authorize.
               </p>
-              <button
+              <a
                 className={`${styles.button} ${styles.space}`}
+                href="#application-controls"
                 onClick={onReviewPermission}
               >
                 Review permission
-              </button>
+              </a>
             </>
           )}
           {url && (
@@ -510,26 +511,17 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       !action.resolved && action.resolver && action.resolver !== "parent",
   );
   return (
-    <div className={styles.container}>
+    <div className={workspace.caseView} data-case-workspace>
+      <div className={workspace.caseHeader}>
       <Link
         className={`${styles.quiet} ${styles.hidePrint}`}
         href="/my-support"
+        aria-label="My support"
       >
         <ArrowLeft width={17} height={17} aria-hidden="true" />
-        My support
+        <span className={workspace.caseBackLabel}>My support</span>
       </Link>
-      {request.controlled_test && <aside className={`${styles.notice} ${styles.space}`} aria-label="Fictional signing and fax test">
-        <strong>Fictional signing and fax test</strong>
-        <p>This example uses test marks and Sinch’s free fax emulator. No application is sent to DHS or another real recipient. Any delivery result below describes the test only.</p>
-      </aside>}
-      <div className={`${styles.pageTop} ${styles.space}`}>
-        <div>
-          <h1>{supportTitle(request)}</h1>
-          <p>
-            Your saved information, the work actually completed, and your next
-            step are together here.
-          </p>
-        </div>
+      <h1>{supportTitle(request)}</h1>
         {outdatedParentWait ? <span className={styles.badge}>{submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded"}</span> : data?.progress && !error ? (
           <ProgressBadge progress={data.progress} />
         ) : (
@@ -540,6 +532,10 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           </span>
         )}
       </div>
+      {request.controlled_test && <aside className={`${styles.notice} ${styles.space}`} aria-label="Fictional signing and fax test">
+        <strong>Fictional signing and fax test</strong>
+        <p>This example uses test marks and Sinch’s free fax emulator. No application is sent to DHS or another real recipient. Any delivery result below describes the test only.</p>
+      </aside>}
       {notice && (
         <p className={`${styles.success} ${styles.space}`} role="status">
           {notice}
@@ -557,10 +553,13 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         onReviewChange={onSnapReviewChange}
         onChange={()=>{reload();reloadHistory();}}
       >
-        {!outdatedParentWait && <SupportProgressPanel
-          progress={error ? undefined : data?.progress}
-          onRefresh={reload}
-        />}
+        {!outdatedParentWait && <details className={styles.disclosure}>
+          <summary>Work status & updates</summary>
+          <div><SupportProgressPanel
+            progress={error ? undefined : data?.progress}
+            onRefresh={reload}
+          /></div>
+        </details>}
         {request.intake.urgency === "today" && (
           <div className={styles.space}>
             <UrgentHelp />
@@ -587,8 +586,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           </h2>
           {acceptingActions && actions.length > 0 && (
             <p className={styles.subtle}>
-              These are the saved household steps for this request. Check the
-              application window above for any website verification.
+              These are the saved household steps for this request. Open the official website section for any website verification.
             </p>
           )}
           {(!actions.length || !acceptingActions) && (
@@ -601,7 +599,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                     : "Your Submit decision is saved. CaseLink owns the delivery check; you do not need to repeat the review."
                 : submittedNeeds.length === request.intake.needs.length
                   ? "Use the recorded submission and any official notices above for your next step. No household update is currently requested."
-                : "No household updates are requested in this section. Check the application window and work status above for any website verification or other next step."}
+                : "No household updates are requested in this section. Check the official website and overview sections for any website verification or other next step."}
             </p>
           )}
           {acceptingActions && (
@@ -640,14 +638,14 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             </details>
           )}
         </section>
-        {request.intake.needs.includes("food_now") && (
-          <FoodSites zip={currentIntakeFields(request, new Date(), "food_now").zip} />
-        )}
         <section
           id="application-programs"
           className={`${styles.surface} ${workspace.section}`}
           tabIndex={-1}
         >
+        {request.intake.needs.includes("food_now") && (
+          <FoodSites zip={currentIntakeFields(request, new Date(), "food_now").zip} />
+        )}
           <h2>Program progress</h2>
           {request.plan?.routes.length ? (
             request.plan.routes.map((route, i) => {
@@ -755,8 +753,8 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               </div>}
             </div>
           )}
+          <SupportPartners request={request} />
         </section>
-        <SupportPartners request={request} />
         <section
           id="application-receipts"
           className={`${styles.surface} ${workspace.section}`}
@@ -839,12 +837,12 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             Your download reflects the recorded state. Submitted packet versions
             and receipts are preserved when a permitted channel produces them.
           </p>
+          <SupportActivity
+            request={request}
+            onChange={reload}
+            history={history}
+          />
         </section>
-        <SupportActivity
-          request={request}
-          onChange={reload}
-          history={history}
-        />
         <div
           id="application-documents"
           className={workspace.section}
@@ -1006,15 +1004,17 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                 Find help and direct program options.
               </Link>{" "}
               No program outcome is guaranteed.
+              <nav className={`${styles.inline} ${styles.space} ${styles.small}`} aria-label="Case policies and contact">
+                <Link className={styles.textLink} href="/support/privacy#data-policy">Data policy</Link>
+                <Link className={styles.textLink} href="/support/privacy">Privacy</Link>
+                <Link className={styles.textLink} href="/support/terms">Terms</Link>
+                <a className={styles.textLink} href="mailto:willsanz23@gmail.com">Contact CaseLink</a>
+              </nav>
             </div>
           </div>
         </div>
       </ApplicationWorkspace>
-      <p className={`${styles.hint} ${styles.space}`}>
-        Last recorded request update: {displayDate(request.updated_at, true)}.
-        This page checks for updates every 30 seconds while visible. The status
-        above shows whether background work is active.
-      </p>
+
     </div>
   );
 }

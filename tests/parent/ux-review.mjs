@@ -247,6 +247,7 @@ try {
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,
       );
+      await page.waitForFunction(() => document.title.trim().length > 0);
       const axe = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
         .analyze();
@@ -279,7 +280,7 @@ try {
     await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await page.getByRole("checkbox", { name: /Food for now/ }).check();
-    await page.getByLabel("Electric bill", { exact: true }).check();
+    assert.equal(await page.getByLabel("Electric bill", { exact: true }).count(), 0);
     await snapshot("needs");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByLabel("Household ZIP code").fill("19104");
@@ -507,6 +508,8 @@ try {
       false,
       "Close chat before returning to the application controls.",
     );
+    const checklist = page.getByRole("navigation", { name: "Your application checklist" });
+    await checklist.getByRole("link", { name: /Your next steps/ }).click();
     rejectAnswer = true;
     await page
       .getByLabel("How are you connected to the account?")
@@ -528,6 +531,7 @@ try {
     await page.getByText("All your answers are saved. Permitted work can continue.").waitFor();
     assert.equal(await page.getByRole("button", { name: "Save all answers and continue", exact: true }).count(), 0);
     await snapshot("answers-saved");
+    await checklist.getByRole("link", { name: /Details & controls/ }).click();
     await page
       .getByRole("button", { name: "Change or renew permission" })
       .click();
@@ -537,6 +541,7 @@ try {
         .getByRole("heading", { name: "Your permission", exact: true })
         .locator(".."),
     );
+    await checklist.getByRole("link", { name: /Your documents/ }).click();
     await page
       .getByText("Add a document or take a photo", { exact: true })
       .click();
@@ -575,6 +580,7 @@ try {
     await page.goto(`${origin}/support/${request.id}`, {
       waitUntil: "networkidle",
     });
+    await checklist.getByRole("link", { name: /Your next steps/ }).click();
     assert.equal(
       await page
         .getByRole("region", {
@@ -600,7 +606,7 @@ try {
     };
     await page.reload({ waitUntil: "networkidle" });
     await page
-      .getByRole("button", { name: "Review permission", exact: true })
+      .getByRole("link", { name: "Review permission", exact: true })
       .click();
     assert.equal(
       await page.evaluate(() => document.activeElement?.getAttribute("type")),
