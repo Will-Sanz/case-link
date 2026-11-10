@@ -484,25 +484,15 @@ export async function runOneParentJob(
   let operations = rawOperations
     .map(normalizeWorkerOperation)
     .filter((operation): operation is ServiceOperation => operation !== null);
-  const continuations = operations.flatMap(operation => {
+  const protectedContinuations = () => operations.flatMap(operation => {
     const canonical = operation.protectedSnap;
     return canonical?.requestId === request.id && request.intake.needs.includes("snap_new") &&
       (canonical.state === "delivery_unknown" || canonical.state === "prepared" && canonical.requestVersion === request.version &&
-        canonical.protectedPacketCurrent && canonical.protectedParentSubmitReady && canonical.personalActsComplete && canonical.snapSubmissionAuthorized)
+        canonical.protectedPacketCurrent && canonical.protectedParentSubmitReady && (!canonical.snapSubmissionAuthorized || canonical.personalActsComplete))
       ? [canonical] : [];
   });
-  const continuation = continuations.length > 0;
-  let deliveryJobAttempts: number | undefined;
-  if (continuation && options.protectedSnapSubmission) try {
-    deliveryJobAttempts = z.number().int().min(1).max(48).parse(await rpc(
-      "select parent_private.parent_get_snap_delivery_job_attempts($1,$2) as value", [job.jobId, job.leaseToken]));
-  } catch { /* Missing current scheduling authority must not promise an automatic retry. */ }
-  let continuationPass = continuation;
-  const serviceRequest: SupportRequest = continuation ? { ...request,
-    intake: { ...request.intake, needs: ["snap_new"] }, required_actions: request.required_actions.filter(action => action.need === "snap_new"),
-    plan: request.plan ? { ...request.plan, routes: request.plan.routes.filter(route => route.need === "snap_new") } : null,
-  } : request;
-  if (pendingCapture && !continuation) {
+  const priorContinuation = protectedContinuations().length > 0;
+  if (pendingCapture && !priorContinuation) {
     const original = pendingCapture;
     const unresolved = operations.some(operation => operation.need === "snap_new" && operation.state === "delivery_unknown");
     const shouldCheck = !unresolved && options.snapCapturePreparation && original.intent && original.deadline &&
@@ -543,6 +533,18 @@ export async function runOneParentJob(
       }
     }
   }
+  const continuations = (priorContinuation || !snapCapture) ? protectedContinuations() : [];
+  const continuation = continuations.length > 0;
+  let deliveryJobAttempts: number | undefined;
+  if (continuation && options.protectedSnapSubmission) try {
+    deliveryJobAttempts = z.number().int().min(1).max(48).parse(await rpc(
+      "select parent_private.parent_get_snap_delivery_job_attempts($1,$2) as value", [job.jobId, job.leaseToken]));
+  } catch { /* Missing current scheduling authority must not promise an automatic retry. */ }
+  let continuationPass = continuation;
+  const serviceRequest: SupportRequest = continuation ? { ...request,
+    intake: { ...request.intake, needs: ["snap_new"] }, required_actions: request.required_actions.filter(action => action.need === "snap_new"),
+    plan: request.plan ? { ...request.plan, routes: request.plan.routes.filter(route => route.need === "snap_new") } : null,
+  } : request;
   const protectedIntent = (canonical: SnapProtectedOperation, signal: AbortSignal): SnapProtectedSubmissionIntent => ({
     jobId: job.jobId, leaseToken: job.leaseToken, operationId: canonical.operationId, requestId: canonical.requestId,
     requestVersion: canonical.requestVersion, idempotencyKey: canonical.idempotencyKey, packetHash: canonical.packetHash,

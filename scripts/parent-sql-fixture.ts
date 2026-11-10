@@ -115,6 +115,7 @@ export async function createParentSqlFixture(
   "20261108015124_parent_deletion_after_processing_closure.sql",
   "20261109182712_parent_pilot_account_scope.sql",
   "20261110141330_parent_controlled_snap_test.sql",
+  "20261110161631_parent_snap_review_continuation.sql",
   ];
   try {
     for (const migration of migrations)
