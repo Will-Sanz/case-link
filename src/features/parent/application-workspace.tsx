@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { Children, isValidElement, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Clock } from "iconoir-react";
 import type { SupportNeed, SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
@@ -162,6 +163,33 @@ export function ApplicationWorkspace({
   onReviewChange?: (review: SnapProtectedOperation | null) => void;
 }) {
   const [activeSection, setActiveSection] = useState("application-overview");
+  const focusTarget = useRef<HTMLElement | null>(null);
+  const workspace = useRef<HTMLDivElement>(null);
+  const selectTarget = useCallback((id: string) => {
+    const target = document.getElementById(id);
+    const panel = target?.closest<HTMLElement>("[data-workspace-panel]");
+    if (!target || !panel || !workspace.current?.contains(panel)) return false;
+    focusTarget.current = target;
+    setActiveSection(panel.dataset.workspacePanel!);
+    // The current panel may already be open, so no render would move focus.
+    if (!panel.hidden) target.focus();
+    return true;
+  }, []);
+  useLayoutEffect(() => {
+    const followHash = () => selectTarget(window.location.hash.slice(1) || "application-overview");
+    if (window.location.hash) followHash();
+    window.addEventListener("hashchange", followHash);
+    window.addEventListener("popstate", followHash);
+    return () => {
+      window.removeEventListener("hashchange", followHash);
+      window.removeEventListener("popstate", followHash);
+    };
+  }, [selectTarget]);
+  useLayoutEffect(() => {
+    const target = focusTarget.current;
+    if (target && !target.closest("[data-workspace-panel]")?.contains(document.activeElement)) target.focus();
+    focusTarget.current = null;
+  }, [activeSection]);
   const [verification, setVerification] = useState({ requestId: request.id, needed: false });
   const onNeedsVerification = useCallback((needed: boolean) => {
     setVerification({ requestId: request.id, needed });
@@ -241,9 +269,9 @@ export function ApplicationWorkspace({
   const nextDetail = inactive
     ? "Your recorded information and history stay available below. Your permission controls show whether this request can resume."
     : needsVerification
-      ? "COMPASS needs a verification step in the website window below. CaseLink will check the result and continue the supported connection steps automatically."
+      ? "COMPASS needs a verification step in the Official website section. CaseLink will check the result and continue the supported connection steps automatically."
     : actions.length
-      ? `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Everything currently known to need you is grouped below.`
+      ? `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Open Your next steps to continue.`
       : application.outcome === "support_received"
         ? "Support received is recorded. Your receipt and any remaining support steps are below. This outcome does not start another application."
         : application.outcome === "assistance_approved"
@@ -255,29 +283,27 @@ export function ApplicationWorkspace({
                 ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry. No repeat Submit decision is requested."
                 : "Your Submit decision is saved. CaseLink must check delivery and record any agency confirmation. You do not need to choose Submit again."
             : progress?.state === "running"
-              ? `${progress.summary} The browser below shows the official site connection and any recorded blocker.`
+              ? `${progress.summary} The Official website section shows the official site connection and any recorded blocker.`
               : progress?.state === "queued"
                 ? progress.summary
                 : application.submitted
                   ? "Check Activity & receipts for the actual agency record and any interview, document or follow-up requirement."
                   : historyLimited
-                    ? "Earlier application and delivery records need checking before a new filing. The public website view remains available below."
+                    ? "Earlier application and delivery records need checking before a new filing. The Official website section remains available."
                     : needsService
                       ? "CaseLink has a service connection to resolve. You do not need to repeat your household details. Official program access remains available."
-                      : "No application is currently confirmed as submitted. Check the application connection below; you can also use the official program directly.";
+                      : "No application is currently confirmed as submitted. Open the Official website section; you can also use the official program directly.";
   const steps = [
     {
       id: "application-overview",
-      label: "Request & permission",
+      label: "Overview",
       detail: "Saved",
       done: true,
     },
-    ...(needsVerification && !inactive ? [{
-      id: "application-browser",
-      label: "COMPASS verification",
-      detail: "Needs you now",
-      done: false,
-    }] : []),
+    ...(snap ? [
+      { id: "application-review", label: "Your application", detail: reviewRequested && !reviewFinished ? "Review needed" : "Answers & preparation", done: false },
+      { id: "application-browser", label: "Official website", detail: needsVerification && !inactive ? "Needs you now" : "COMPASS connection", done: false },
+    ] : []),
     {
       id: "your-next-steps",
       label: "Your next steps",
@@ -296,7 +322,7 @@ export function ApplicationWorkspace({
     },
     {
       id: "application-programs",
-      label: "Application progress",
+      label: "Program progress",
       detail:
         loading || error
           ? "Checking records"
@@ -325,29 +351,31 @@ export function ApplicationWorkspace({
     },
   ];
   return (
-    <div className={layout.workspace}>
+    <div className={layout.workspace} ref={workspace} onClick={event => {
+      const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]');
+      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (selectTarget(link.hash.slice(1))) {
+        event.preventDefault();
+        if (window.location.hash !== link.hash) window.history.pushState(null, "", link.hash);
+      }
+    }}>
       <nav className={layout.checklist} aria-label="Your application checklist">
-        <h2>{snap ? "Your SNAP checklist" : "Your support checklist"}</h2>
+        <h2>{snap ? "Your SNAP request" : "Your support request"}</h2>
         <ol>
-          {steps.map((step, index) => (
+          {steps.map((step) => (
             <li key={step.id}>
               <a
                 href={`#${step.id}`}
                 aria-current={
                   activeSection === step.id ? "location" : undefined
                 }
-                onClick={() => {
-                  setActiveSection(step.id);
-                  document
-                    .getElementById(step.id)
-                    ?.focus({ preventScroll: true });
-                }}
+
               >
                 <span
                   className={`${layout.marker} ${step.done ? layout.markerDone : ""}`}
                   aria-hidden="true"
                 >
-                  {step.done ? <Check width={15} height={15} /> : index + 1}
+                  {step.done ? <Check width={15} height={15} /> : <Clock width={14} height={14} />}
                 </span>
                 <span>
                   <strong>{step.label}</strong>
@@ -357,10 +385,18 @@ export function ApplicationWorkspace({
             </li>
           ))}
         </ol>
+        <div className={layout.helpLinks}>
+          <Link href="/support/help">Get help</Link>
+          <Link href="/support/privacy">Privacy & data</Link>
+          <Link href="/support/terms">Terms</Link>
+          <a href="mailto:willsanz23@gmail.com">Contact CaseLink</a>
+        </div>
       </nav>
       <div className={layout.content}>
         <section
           className={layout.overview}
+          data-workspace-panel="application-overview"
+          hidden={activeSection !== "application-overview"}
           id="application-overview"
           tabIndex={-1}
           aria-labelledby="application-state"
@@ -409,10 +445,7 @@ export function ApplicationWorkspace({
             <a
               className={styles.button}
               href="#application-receipts"
-              onClick={() => {
-                setActiveSection("application-receipts");
-                document.getElementById("application-receipts")?.focus({ preventScroll: true });
-              }}
+
             >
               View application receipt <ArrowRight width={17} height={17} aria-hidden="true" />
             </a>
@@ -451,28 +484,14 @@ export function ApplicationWorkspace({
               </a>
             )}
           </div>
-          <ul
-            className={layout.completeList}
-            aria-label="Saved for this request"
-          >
-            <li>
-              <Check width={15} height={15} aria-hidden="true" /> Your support
-              needs
-            </li>
-            <li>
-              <Check width={15} height={15} aria-hidden="true" /> Household ZIP{" "}
-              {request.intake.zip}
-            </li>
-            <li>
-              <Check width={15} height={15} aria-hidden="true" /> Bounded
-              permission
-            </li>
-          </ul>
         </section>
+        <div id="application-review" tabIndex={-1} className={layout.panel} data-workspace-panel="application-review" hidden={activeSection !== "application-review"}>
         {draft && <SnapDraftReview key={`${request.id}:${request.version}:${draft.artifact_id}`} request={request} operation={draft}/>}
         {reviewRequested && <SnapFinalReview key={`${request.id}:${request.version}`} request={request} onChange={onChange} onReviewChange={onReviewChange}/>}
         {snap && <SnapApplicationReview key={`snap-answers:${request.id}`} request={request} onChange={onChange} answerRequest={snapAnswerRequest}/>}
+        </div>
         {snap && (
+          <div className={layout.panel} data-workspace-panel="application-browser" hidden={activeSection !== "application-browser"}>
           <ApplicationBrowser
             key={`compass-browser:${request.id}`}
             request={request}
@@ -488,8 +507,12 @@ export function ApplicationWorkspace({
             }
             onNeedsVerification={onNeedsVerification}
           />
+          </div>
         )}
-        {children}
+        {Children.map(children, child => {
+          const section = isValidElement<{ id?: string }>(child) && child.props.id || "application-overview";
+          return <div className={layout.panel} data-workspace-panel={section} hidden={activeSection !== section}>{child}</div>;
+        })}
       </div>
     </div>
   );

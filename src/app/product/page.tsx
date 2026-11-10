@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Lock } from "iconoir-react";
+import { ArrowRight, Check } from "iconoir-react";
 import { PublicSiteShell } from "@/components/layout/public-site-shell";
 import { ProductPageContent } from "@/features/marketing/product-page-content";
 import { getSessionUser } from "@/lib/auth/session";
@@ -10,7 +10,7 @@ import styles from "@/features/parent/parent.module.css";
 export const metadata: Metadata = {
   title: "How CaseLink works",
   description:
-    "Understand CaseLink’s parent-focused food and utility support, permission limits, required personal steps and honest progress.",
+    "Understand CaseLink’s parent-focused food support, permission limits, required personal steps and honest progress.",
 };
 export const dynamic = "force-dynamic";
 export default async function ProductPage() {
@@ -29,32 +29,22 @@ export default async function ProductPage() {
   }
   return (
     <ParentShell>
-      <div className={`${styles.container} ${styles.narrow}`}>
-        <div className={styles.pageTop}>
-          <div>
+      <div className={`${styles.container} ${styles.infoPage}`}>
+        <header className={styles.infoIntro}>
             <h1>
               Less chasing.
               <br />A clearer way forward.
             </h1>
             <p className={styles.lead}>
-              Food and utility assistance can involve several programs and a lot
+              Food assistance can involve several programs and a lot
               of repeated information. CaseLink brings your needs and next steps
               into one place.
             </p>
-          </div>
-        </div>
-        <div className={styles.notice}>
-          <Lock width={22} height={22} aria-hidden="true" />
-          <p>
-            We’re in early access. Live actions are enabled only after their
-            privacy, provider and service checks. Preparation is distinct from
-            an application or approval.
-          </p>
-        </div>
+        </header>
         <section className={styles.section}>
           <h2>Tell us once. Set clear limits.</h2>
           <p className={styles.lead}>
-            Choose food, SNAP, WIC, electricity, gas or water support. Share
+            Choose food, SNAP or WIC support. Share
             minimum household details, then see the named programs and actions
             before you authorize anything.
           </p>
@@ -101,7 +91,7 @@ export default async function ProductPage() {
             </Link>
           </div>
         </section>
-        <div className={styles.section}>
+        <div className={styles.infoWide}>
           <UrgentHelp />
         </div>
       </div>
