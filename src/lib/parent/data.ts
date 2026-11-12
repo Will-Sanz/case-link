@@ -241,6 +241,10 @@ export async function controlSupportRequest(
     p_request_id: uuid.parse(id),
     p_action: z.enum(["pause", "resume", "cancel"]).parse(action),
   });
+  if (error?.code === "23514" && error.message === "invalid request change")
+    throw new Error(
+      "This request is unavailable, or its permission has changed.",
+    );
   check(error);
 }
 export async function correctSupportRequest(

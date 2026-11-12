@@ -7,6 +7,7 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock("./auth", () => ({ requireParentSession: mock.session }));
 import {
+  controlSupportRequest,
   correctSupportRequest,
   confirmParentDocumentUpload,
   deleteParentDocument,
@@ -15,6 +16,7 @@ import {
   resolveParentAction,
   startSupportRequest,
 } from "./data";
+import { parentError } from "./http";
 import type { ServiceMandate, SupportIntake } from "./domain";
 const requestId = "11111111-1111-4111-8111-111111111111";
 const documentId = "22222222-2222-4222-8222-222222222222";
@@ -98,6 +100,26 @@ describe("parent data boundary", () => {
     await expect(correctSupportRequest(requestId, intake, 3)).rejects.toThrow(
       "permission has changed",
     );
+  });
+  it("reports an inactive request control as unavailable without hiding other database failures", async () => {
+    mock.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "23514", message: "invalid request change" },
+    });
+    const error = await controlSupportRequest(requestId, "resume").catch((value) => value);
+    const response = parentError(error);
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("invalid request change");
+    expect(mock.rpc).toHaveBeenCalledWith("parent_control_request", {
+      p_request_id: requestId,
+      p_action: "resume",
+    });
+    mock.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "23514", message: "other-private-constraint" },
+    });
+    const unexpected = await controlSupportRequest(requestId, "resume").catch((value) => value);
+    expect(parentError(unexpected).status).toBe(500);
   });
   it("does not fetch events or documents for an unavailable request", async () => {
     const builder = {
