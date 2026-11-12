@@ -21,12 +21,17 @@ describe("recorded form downloads", () => {
   function renderOperation(operation: Partial<RecordedOperation>) {
     render(<SupportActivity request={request} onChange={vi.fn()} history={{
       data: { operations: [{
-        id: "exact-operation", program_id: "snap-pa", state: "prepared",
+        id: "exact-operation", need: "snap_new", program_id: "snap-pa", state: "prepared",
         created_at: request.created_at, artifact_id: "exact-form", ...operation,
       }], historyLimited: false },
       loading: false, error: null, reload: vi.fn(),
     }} />);
   }
+  it("preserves non-SNAP preparation labels instead of projecting an application", () => {
+    renderOperation({ need: "food_now", program_id: "philly-food", action: "research", state: "prepared" });
+    expect(screen.getByText(/Prepared/)).toBeTruthy();
+    expect(screen.queryByText(/No application submission recorded/)).toBeNull();
+  });
   it("labels the incomplete unsigned draft and preserves both exact download routes", () => {
     renderOperation({ form: { preparation_only: true } });
     expect(screen.getByText(/Incomplete unsigned draft · not submitted/)).toBeTruthy();
@@ -42,14 +47,14 @@ describe("recorded form downloads", () => {
     expect(screen.queryByText(/Incomplete unsigned draft/)).toBeNull();
   });
   it("preserves a stronger recorded receipt rather than labeling it as an unsubmitted attempt", () => {
-    renderOperation({ state: "agency_submitted", form: { preparation_only: true } });
-    expect(screen.getByText(/Application submitted/)).toBeTruthy();
+    renderOperation({ state: "agency_submitted", form: { preparation_only: true }, evidence: { source: "agency_receipt", reference: "Synthetic receipt", recordedAt: request.created_at } });
+    expect(screen.getByText(/Application submission recorded/)).toBeTruthy();
     expect(screen.queryByText(/not submitted/)).toBeNull();
     expect(screen.getByRole("link", { name: "Download incomplete unsigned draft" })).toBeTruthy();
   });
   it("labels the exact protected SNAP application without creating an ordinary form download", () => {
     renderOperation({ need: "snap_new", action: "submit", artifact_id: null, protected_packet: fixtureProtectedSnapOperation().packet.protectedSnapPacket });
-    expect(screen.getByText(/SNAP application prepared · not submitted/)).toBeTruthy();
+    expect(screen.getByText(/SNAP application prepared/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Download this prepared form" })).toBeNull();
     expect(screen.getByRole("link", { name: "Download recorded information" }).getAttribute("href")).toContain("/operations/exact-operation/export");
   });

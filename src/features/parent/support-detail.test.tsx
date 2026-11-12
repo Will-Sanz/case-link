@@ -81,6 +81,14 @@ async function refreshSupport() {
 }
 
 describe("support detail", () => {
+  it("preserves the ordinary non-SNAP request header", async () => {
+    const request = fixture(); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
+    render(<SupportDetail requestId={request.id}/>);
+    await screen.findByRole("heading", { name: "Your utility support" });
+    const header = screen.getByRole("heading", { name: "Your utility support" }).parentElement!;
+    expect(within(header).getByText("Request saved")).toBeTruthy();
+    expect(within(header).queryByText(/application submission/)).toBeNull();
+  });
   it.each(["waiting", "needs_parent"] as const)("automatically shows the finished SNAP draft and slows checks after queued/running becomes %s", async ending => {
     vi.useFakeTimers();
     const request=fixture();request.intake.needs=["snap_new"];
@@ -563,7 +571,7 @@ describe("support detail", () => {
     }
     if (recorded) {
       expect(within(programs).getByText(/A submission is separate from approval or receiving support/)).toBeTruthy();
-      expect(screen.getByText("SNAP application complete")).toBeTruthy();
+      expect(screen.getAllByText("Application submission recorded").length).toBeGreaterThan(0);
     }
   });
   it.each([
@@ -593,7 +601,7 @@ describe("support detail", () => {
     render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     await screen.findByRole("heading", { name: "Program progress" });
     const programs = document.getElementById("application-programs")!;
-    await waitFor(() => expect(within(programs).getByText(label, { exact: true })).toBeTruthy());
+    await waitFor(() => expect(within(programs).getByText(state === "agency_submitted" ? "Application submission recorded" : label, { exact: true })).toBeTruthy());
     expect(within(programs).getByText(`${label} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`)).toBeTruthy();
     expect(within(programs).getByText(next, { exact: false })).toBeTruthy();
     expect(within(programs).queryByText(/Obsolete/)).toBeNull();

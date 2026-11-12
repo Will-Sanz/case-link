@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OUTCOME_LABELS } from "@/lib/parent/domain";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { useParentResource } from "./use-parent-resource";
@@ -21,6 +22,7 @@ import {
   supportTitle,
 } from "./application-workspace";
 
+const overview = () => within(document.getElementById("application-overview")!);
 const requestId = "11111111-1111-4111-8111-111111111111";
 const receiptEvidence = { source: "agency_receipt", reference: "SNAP receipt for this test", recordedAt: "2026-10-25T12:00:00Z" };
 function fixture(): SupportRequest {
@@ -100,11 +102,22 @@ function renderWorkspace(request = fixture()) {
 }
 const finalReviewAction = { id: "snap-final-review", need: "snap_new" as const, reason: "submission_review" as const, field: "snap_final_submit", resolver: "parent" as const, title: "Review the exact SNAP application", explanation: "Review before choosing Submit." };
 describe("canonical application continuity", () => {
+  it("describes verified emulator completion without asking to reconcile or repeat the completed transmission", () => {
+    const request = { ...fixture(), controlled_test: true };
+    const review = fixtureProtectedSnapOperation({ requestId: request.id, state: "sent" });
+    const operation: RecordedOperation = { id: review.operationId, request_id: request.id, request_version: request.version, need: "snap_new", program_id: "snap-pa", action: "submit", state: "sent", artifact_id: null, protected_packet: review.packet.protectedSnapPacket, created_at: request.updated_at, evidence: { source: "provider_api", reference: "sinch-emulation:fictional", recordedAt: request.updated_at } };
+    mockApi();
+    render(<ApplicationWorkspace request={request} snapReview={review} history={{ data: { operations: [operation], historyLimited: false }, loading: false, error: null, reload: vi.fn() }}>{null}</ApplicationWorkspace>);
+    expect(overview().getByText("Free emulator test completed · no agency filing")).toBeTruthy();
+    expect(overview().getAllByText(/The free emulator confirmed this fictional transmission/).length).toBeGreaterThan(0);
+    expect(overview().queryByText(/confirm its result before any retry/)).toBeNull();
+  });
   it("places one current prepared draft directly after the overview and before all answer details", async () => {
     const request = fixture(), operation: RecordedOperation = { id: "draft", request_id: request.id, request_version: request.version, need: "snap_new", program_id: "snap-pa", action: "prepare", state: "prepared", artifact_id: "exact-form", form: { preparation_only: true }, created_at: request.created_at };
     mockApi(); const history = { data: { operations: [operation], historyLimited: false }, loading: false, error: null, reload: vi.fn() };
     render(<ApplicationWorkspace request={request} history={history}><section id="application-receipts"><SupportActivity request={request} history={history} onChange={vi.fn()}/></section></ApplicationWorkspace>);
     const overview = screen.getByRole("heading", { name: "Where your application stands" });
+    expect(screen.getByRole("region", { name: "Application workspace" }).tabIndex).toBe(0);
     openSection(/Your application/);
     const draft = screen.getByRole("region", { name: "Your prepared SNAP draft" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
     expect(overview.compareDocumentPosition(draft) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -119,7 +132,7 @@ describe("canonical application continuity", () => {
     const request = fixture(); request.required_actions = [finalReviewAction];
     mockApi({ available: true, reason: null, session: null }, [{ id: "canonical", request_id: request.id, program_id: "snap-pa", need: "snap_new", action: "submit", request_version: request.version, state: "prepared", artifact_id: null, protected_packet: fixtureProtectedSnapOperation().packet.protectedSnapPacket },
       { id: "earlier-draft", request_id: request.id, program_id: "snap-pa", need: "snap_new", action: "prepare", request_version: request.version, state: "prepared", artifact_id: "unsigned-form", form: { preparation_only: true } }]);
-    renderWorkspace(request); await screen.findByText("SNAP application prepared");
+    renderWorkspace(request); await overview().findByText("SNAP application prepared");
     expect(screen.getByRole("link", { name: "Review application and Submit" }).getAttribute("href")).toBe("#snap-final-review");
     fireEvent.click(screen.getByRole("link", { name: "Review application and Submit" }));
     const review = screen.getByRole("heading", { name: "Review your SNAP application" }), answers = screen.getByRole("heading", { name: "Your SNAP application answers" });
@@ -139,9 +152,18 @@ describe("canonical application continuity", () => {
   it("gives a matching recorded Submit to CaseLink without inventing an agency receipt", async () => {
     const request = fixture(); request.required_actions = [finalReviewAction]; mockApi();
     render(<WorkspaceFixture request={request} review={fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true })}/>);
-    await screen.findByText("Next: CaseLink"); expect(screen.getByText("Submit decision recorded")).toBeTruthy();
+    await screen.findByText("Next: CaseLink"); expect(overview().getByText("Submit decision recorded")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Review application and Submit" })).toBeNull();
-    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(overview().queryByText("Application submission recorded")).toBeNull();
+  });
+  it("hands a recorded Submit back to CaseLink despite stale parent ownership and trigger", async () => {
+    const request = { ...fixture(), next_actor: "parent", next_trigger: "parent_action_completed", required_actions: [finalReviewAction] };
+    mockApi();
+    render(<WorkspaceFixture request={request} review={fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true })}/>);
+    await screen.findByText("Next: CaseLink");
+    expect(screen.queryByText("Next: You")).toBeNull();
+    expect(screen.getByText(/Submit is already recorded; delivery must be checked/)).toBeTruthy();
+    expect(screen.queryByText("Your required step is completed")).toBeNull();
   });
   it("preserves another necessary personal step after the exact Submit is recorded", async () => {
     const request = fixture(); request.required_actions = [finalReviewAction, { id: "interview", need: "snap_new", reason: "personal_step", resolver: "parent", title: "Complete the scheduled interview", explanation: "An independently required personal step." }]; mockApi();
@@ -165,7 +187,7 @@ describe("canonical application continuity", () => {
     mockApi(undefined, [{ id: canonical.operationId, request_id: request.id, request_version: request.version, program_id: "snap-pa", need: "snap_new", action: "submit", state, artifact_id: null, protected_packet: canonical.packet.protectedSnapPacket }]);
     render(<WorkspaceFixture request={request} review={review}/>); await screen.findByText("Next: CaseLink");
     expect(screen.queryByRole("link", { name: "Review application and Submit" })).toBeNull();
-    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(overview().queryByText("Application submission recorded")).toBeNull();
     expect(screen.getByText(/must confirm its result before any retry/)).toBeTruthy();
   });
   it.each([{ request_id: "33333333-3333-4333-8333-333333333333" }, { request_version: 0 }, { need: "snap_renewal" }, { action: "follow_up" }, { protected_packet: { raw: "PRIVATE-CANARY" } }, { state: "prepared" }])("does not retire review from unrelated, stale or unattempted metadata: %j", async change => {
@@ -379,7 +401,7 @@ describe("application workspace", () => {
     }]);
     renderWorkspace();
     await screen.findByText("An incomplete unsigned draft is saved. It is not a complete application and has not been submitted.");
-    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(overview().queryByText("Application submission recorded")).toBeNull();
     expect(screen.queryByRole("link", { name: "View application receipt" })).toBeNull();
   });
   it("does not call an ordinary prepared form incomplete because an earlier draft exists", async () => {
@@ -398,7 +420,7 @@ describe("application workspace", () => {
       evidence: receiptEvidence,
     }]);
     renderWorkspace();
-    await screen.findByText("SNAP application complete");
+    await overview().findByText("Application submission recorded");
     expect(screen.getByText(/Submission confirmed · benefits decision pending/)).toBeTruthy();
     const receipt = screen.getByRole("link", { name: "View application receipt" });
     expect(receipt.getAttribute("href")).toBe("#application-receipts");
@@ -418,7 +440,7 @@ describe("application workspace", () => {
     renderWorkspace();
     await screen.findByRole("navigation", { name: "Your application checklist" });
     await waitFor(() => expect(screen.queryByText("Checking application records…")).toBeNull());
-    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(overview().queryByText("Application submission recorded")).toBeNull();
     expect(screen.queryByRole("link", { name: "View application receipt" })).toBeNull();
   });
   it.each(["assistance_approved", "support_received", "declined"])("does not call a recorded %s decision pending after submission", async (state) => {
@@ -427,7 +449,7 @@ describe("application workspace", () => {
       { id: "snap-submitted", program_id: "snap-pa", need: "snap_new", request_version: 1, state: "agency_submitted", evidence: receiptEvidence },
     ]);
     renderWorkspace();
-    await screen.findByText("SNAP application complete");
+    await overview().findByText(OUTCOME_LABELS[state as keyof typeof OUTCOME_LABELS]);
     expect(screen.queryByText(/benefits decision pending/)).toBeNull();
     expect(screen.queryByText(/Watch for the official DHS notice/)).toBeNull();
     expect(screen.getByText(/recorded decision or support outcome/)).toBeTruthy();
@@ -438,7 +460,7 @@ describe("application workspace", () => {
       { id: "submitted", program_id: "snap-pa", need: "snap_new", request_version: 1, state: "agency_submitted", evidence: receiptEvidence },
     ]);
     renderWorkspace();
-    await screen.findByText("SNAP application complete");
+    await overview().findByText("Application submission recorded");
     expect(screen.getByText(/Submission confirmed · benefits decision pending/)).toBeTruthy();
   });
   it("uses evidence time when an older-created operation receives the latest decision", async () => {
@@ -449,8 +471,8 @@ describe("application workspace", () => {
         state: "assistance_approved", evidence: { source: "authenticated_partner", reference: "Later decision", observedAt: "2026-11-03T17:30:00+05:30" } },
     ]);
     renderWorkspace();
-    await screen.findByText("SNAP application complete");
-    expect(screen.getByText("Next: Program follow-up")).toBeTruthy();
+    await overview().findByText("Assistance approved");
+    expect(screen.getByText("Next actor not recorded")).toBeTruthy();
     expect(screen.queryByText(/benefits decision pending/)).toBeNull();
   });
   it("shows the latest valid notice by evidence time, regardless of operation response order", async () => {
@@ -465,7 +487,7 @@ describe("application workspace", () => {
         } } },
     ]);
     renderWorkspace();
-    await screen.findByText("SNAP application complete");
+    await overview().findByText("Application submission recorded");
     expect(screen.getByText(/Status reference: Latest synthetic notice/)).toBeTruthy();
     expect(screen.getByText(/Complete the required SNAP interview by phone/)).toBeTruthy();
     expect(screen.queryByText("Old requested document")).toBeNull();
@@ -483,7 +505,7 @@ describe("application workspace", () => {
           reference: "Newer observed notice", observedAt: "2026-11-03T11:00:00Z", interview: { channel: "phone" },
         } } },
     ]);
-    renderWorkspace(); await screen.findByText("SNAP application complete");
+    renderWorkspace(); await overview().findByText(decision ? "Assistance approved" : "Application submission recorded");
     expect(screen.queryByText("Superseded requested document")).toBeNull();
     if (decision) {
       expect(screen.queryByText(/benefits decision pending/)).toBeNull();
@@ -501,7 +523,7 @@ describe("application workspace", () => {
         state: "agency_submitted", evidence: receiptEvidence, created_at: fixture().created_at }], historyLimited: true },
       loading: false, error: null, reload: vi.fn(),
     }}>Saved work</ApplicationWorkspace>);
-    expect(screen.getByText("SNAP application complete")).toBeTruthy();
+    expect(overview().getByText("Application submission recorded")).toBeTruthy();
     expect(screen.queryByText(/benefits decision pending/)).toBeNull();
   });
   it.each(["sent", "partner_received", "partner_accepted", "agency_submitted", "assistance_approved", "support_received", "declined"])("keeps %s without receipt evidence unconfirmed and prevents a fresh application", async (state) => {
@@ -509,12 +531,12 @@ describe("application workspace", () => {
       id: "unverified", program_id: "snap-pa", need: "snap_new", request_version: 1, state,
     }]);
     renderWorkspace();
-    await screen.findByText("Agency submission not confirmed");
-    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    await overview().findByText("Agency submission not confirmed");
+    expect(overview().queryByText("Application submission recorded")).toBeNull();
     expect(screen.queryByRole("region", { name: "Your SNAP submission record" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Open application view" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
-    expect(screen.queryByText("No application submission recorded")).toBeNull();
+    expect(overview().queryByText("No application submission recorded")).toBeNull();
   });
   it.each(["loading", "error"])("hides retained confirmation data while history is %s", (state) => {
     mockApi();
@@ -524,12 +546,12 @@ describe("application workspace", () => {
       loading: state === "loading", error: state === "error" ? new Error("Unavailable") : null, reload: vi.fn(),
     }}>Saved work</ApplicationWorkspace>);
     expect(screen.queryByRole("region", { name: "Your SNAP submission record" })).toBeNull();
-    expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(overview().queryByText("Application submission recorded")).toBeNull();
   });
   it("keeps all work states reachable and retains unsaved input when navigating the checklist", async () => {
     mockApi();
     renderWorkspace();
-    await screen.findByText("No application submission recorded");
+    await overview().findByText("No application submission recorded");
     const checklist = screen.getByRole("navigation", {
       name: "Your application checklist",
     });
@@ -565,7 +587,7 @@ describe("application workspace", () => {
     fireEvent.popState(window);
     expect(screen.getByRole("heading", { name: "Where your application stands" })).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "Unsaved answer" })).toBeNull();
-    await screen.findByText("No application submission recorded");
+    await overview().findByText("No application submission recorded");
   });
   it("does not invent a live website or filling work when no provider session exists", async () => {
     mockApi();
@@ -607,9 +629,9 @@ describe("application workspace", () => {
     );
     renderWorkspace();
     expect(
-      await screen.findByText("Earlier application history needs checking"),
+      await overview().findByText("Earlier application history needs checking"),
     ).toBeTruthy();
-    expect(screen.queryByText("No application submission recorded")).toBeNull();
+    expect(overview().queryByText("No application submission recorded")).toBeNull();
     openSection(/Official website/);
     expect(
       screen.getByRole("button", { name: "Open application view" }),
@@ -631,17 +653,17 @@ describe("application workspace", () => {
   it.each([
     [
       "assistance_approved",
-      "Next: Program follow-up",
+      "Next actor not recorded",
       /Actual receipt of support is a separate step/,
     ],
     [
       "support_received",
-      "Outcome recorded: Support received",
+      "Next actor not recorded",
       /Your receipt and any remaining support steps/,
     ],
     [
       "declined",
-      "Next: Decision & follow-up",
+      "Next actor not recorded",
       /decision and Program progress for any recorded appeal or alternative/,
     ],
   ])(
@@ -691,7 +713,7 @@ describe("application workspace", () => {
     const request = fixture();
     request.status = "paused";
     renderWorkspace(request);
-    await screen.findByText("No application submission recorded");
+    await overview().findByText("No application submission recorded");
     expect(
       screen.queryByRole("button", { name: "Open application view" }),
     ).toBeNull();
@@ -774,7 +796,7 @@ describe("application workspace", () => {
       },
     ]);
     renderWorkspace();
-    await screen.findByText("Agency submission not confirmed");
+    await overview().findByText("Agency submission not confirmed");
     expect(
       screen.queryByRole("button", { name: "Open application view" }),
     ).toBeNull();
@@ -801,7 +823,7 @@ describe("application workspace", () => {
     const request = fixture();
     request.intake.needs = ["snap_new", "snap_renewal"];
     renderWorkspace(request);
-    await screen.findByText("No application submission recorded");
+    await overview().findByText("No application submission recorded");
     openSection(/Official website/);
     expect(
       screen.getByRole("button", { name: "Open application view" }),
@@ -877,7 +899,7 @@ describe("application workspace", () => {
     expect(image.getAttribute("src")).toContain(
       `/api/parent/requests/${requestId}/browser/frame?view=0`,
     );
-    expect(screen.getByText("No application submission recorded")).toBeTruthy();
+    expect(overview().getByText("No application submission recorded")).toBeTruthy();
     fireEvent.error(image);
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.getByText(/browser image could not load/)).toBeTruthy();
@@ -917,7 +939,7 @@ describe("application workspace", () => {
       },
     ];
     renderWorkspace(request);
-    await screen.findByText("A program outcome is recorded");
+    await overview().findByText(/Assistance approved|Support received|Declined/);
     expect(await screen.findByText("Next: You")).toBeTruthy();
     expect(
       screen
