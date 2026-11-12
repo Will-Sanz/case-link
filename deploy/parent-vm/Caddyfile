@@ -28,6 +28,7 @@ pilot.thecaselink.com {
 		header_up -X-Forwarded-Host
 		header_up -X-Forwarded-Proto
 		transport http {
+			max_conns_per_host 6
 			dial_timeout 5s
 			response_header_timeout 65s
 		}

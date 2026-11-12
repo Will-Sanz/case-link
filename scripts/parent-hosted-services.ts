@@ -34,8 +34,9 @@ async function main() {
     const server = config.service === "frontdoor"
       ? createHostedParentProtectedFrontdoor(config.publicOrigin, "http://127.0.0.1:3100", "http://127.0.0.1:3400")
       : config.service === "review" ? createSnapProtectedReviewServer({ mode: "hosted", publicOrigin: config.publicOrigin,
-        supabaseOrigin: config.projectOrigin, supabasePublicKey: config.publicKey, finalizerDatabaseUrl: config.databaseUrl })
-        : config.service === "sender" ? senderServer("http://127.0.0.1:3500", config.senderSecret, config.databaseUrl, config.carrier) : undefined;
+        supabaseOrigin: config.projectOrigin, supabasePublicKey: config.publicKey, finalizerDatabaseUrl: config.databaseUrl,
+        ...(config.controlledTest ? { controlledTest: config.controlledTest } : {}) })
+        : config.service === "sender" ? senderServer("http://127.0.0.1:3500", config.senderSecret, config.databaseUrl, config.carrier, config.emulator) : undefined;
     if (!server || !["frontdoor", "review", "sender"].includes(config.service)) throw new Error();
     let stopping = false, cancel = () => {};
     const stop = () => { if (stopping) return; stopping = true; cancel(); server.close(); server.closeAllConnections(); };

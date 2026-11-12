@@ -122,7 +122,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const authorization = useParentResource<ParentAuthorizationWindow>("/authorization-window");
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
-    needs: [...foodNeeds, ...utilityNeeds].includes(initialNeed as SupportNeed)
+    needs: foodNeeds.includes(initialNeed as SupportNeed)
       ? [initialNeed as SupportNeed]
       : [],
   }));
@@ -158,7 +158,6 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const snapValues={...(intake.zip?{zip:intake.zip}:{}),...snapDetails};
   const programs = getProgramsForNeeds(intake.needs).filter(program=>!fullSnap||program.id==='snap-pa'||
     program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need)));
-  const hasUtility = intake.needs.some((n) => utilityNeeds.includes(n));
   const hasBenefits = intake.needs.some((need) =>
     [
       "snap_new",
@@ -372,7 +371,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     }
   }
   return (
-    <div className={`${styles.container} ${styles.narrow}`}>
+    <div className={styles.container}>
       <div className={styles.pageTop}>
         <div>
           <h1>{directSnap ? "Apply for SNAP" : "Let’s make the next steps easier."}</h1>
@@ -429,7 +428,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                 <p>
                   {
                     [
-                      "Choose everything that applies. Food and utility support can move forward together.",
+                      "Choose the food support your household needs.",
                       fullSnap ? "Answer the questions that apply to you. CaseLink will use these answers to prepare your application; you can review and correct it afterward. Leave optional or uncertain answers blank." : "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
                       "These are the specific programs and limits for this request. No unknown recipients or open-ended permission.",
                     ][step]
@@ -487,21 +486,6 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                     </div>
                   </fieldset>
                   <fieldset className={styles.fieldset}>
-                    <legend className={styles.legend}>Utility bills</legend>
-                    <div className={`${styles.choices} ${styles.needChoices}`}>
-                      {utilityNeeds.map((need) => (
-                        <label className={styles.choice} key={need}>
-                          <input
-                            type="checkbox"
-                            checked={intake.needs.includes(need)}
-                            onChange={() => toggleNeed(need)}
-                          />
-                          <strong>{NEED_LABELS[need]}</strong>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       How soon do you need help?
                     </legend>
@@ -511,7 +495,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                           {
                             value: "today",
                             label:
-                              "Today — food is running out or service is off / at risk",
+                              "Today — food is running out",
                           },
                           {
                             value: "soon",
@@ -582,52 +566,14 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                       {intake.language === "es" && (
                         <p className={styles.hint}>
                           We’ll record your Spanish preference. This
-                          early-access interface is currently in English;
+                          interface is currently in English;
                           Spanish service availability depends on the program.
                         </p>
                       )}
                     </div>
                   </div>
                   </>}
-                  {hasUtility && (
-                    <fieldset className={styles.fieldset}>
-                      <legend className={styles.legend}>
-                        Your authority for all selected utility accounts
-                      </legend>
-                      <div className={styles.choices}>
-                        {(
-                          [
-                            {
-                              value: "self",
-                              label: "I hold every selected utility account",
-                            },
-                            {
-                              value: "authorized_caregiver",
-                              label:
-                                "I hold or have permission to act for every selected utility account",
-                            },
-                            {
-                              value: "not_sure",
-                              label: "I’m not sure what authority I need",
-                            },
-                          ] as const
-                        ).map((item) => (
-                          <label className={styles.choice} key={item.value}>
-                            <input
-                              type="radio"
-                              name="authority"
-                              checked={intake.accountAuthority === item.value}
-                              onChange={() =>
-                                change("accountAuthority", item.value)
-                              }
-                            />
-                            <span>{item.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  )}
-                  {(hasBenefits || hasUtility) && !(snapSelected&&authorization.loading) && (!fullSnap || intake.needs.some(need=>need==='wic_new'||need==='wic_continuing')) ? (
+                  {hasBenefits && !(snapSelected&&authorization.loading) && (!fullSnap || intake.needs.some(need=>need==='wic_new'||need==='wic_continuing')) ? (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
                         Household & income
@@ -737,84 +683,6 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                         personal identity check or declaration.
                       </p>
                     </div>
-                  )}
-                  {hasUtility && (
-                    <fieldset className={styles.fieldset}>
-                      <legend className={styles.legend}>
-                        Your utility information
-                      </legend>
-                      <div className={styles.stack}>
-                        <fieldset className={styles.fieldset}>
-                          <legend className={styles.legend}>
-                            Which providers are on the bills?
-                          </legend>
-                          <div className={styles.choices}>
-                            {(
-                              [
-                                { value: "peco", label: "PECO" },
-                                {
-                                  value: "pgw",
-                                  label: "Philadelphia Gas Works (PGW)",
-                                },
-                                { value: "pwd", label: "Philadelphia Water" },
-                                { value: "other", label: "Another provider" },
-                                { value: "unknown", label: "I’m not sure" },
-                              ] as const
-                            ).map((provider) => (
-                              <label
-                                className={styles.checkbox}
-                                key={provider.value}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={intake.utilityProviders.includes(
-                                    provider.value,
-                                  )}
-                                  onChange={() =>
-                                    change(
-                                      "utilityProviders",
-                                      intake.utilityProviders.includes(
-                                        provider.value,
-                                      )
-                                        ? intake.utilityProviders.filter(
-                                            (v) => v !== provider.value,
-                                          )
-                                        : [
-                                            ...intake.utilityProviders,
-                                            provider.value,
-                                          ],
-                                    )
-                                  }
-                                />
-                                {provider.label}
-                              </label>
-                            ))}
-                          </div>
-                        </fieldset>
-                        {intake.needs.filter((need) =>
-                          utilityNeeds.includes(need),
-                        ).length === 1 && (
-                          <div className={styles.field}>
-                            <label htmlFor="shutoff-date">
-                              Shutoff date on a notice, if known
-                            </label>
-                            <input
-                              id="shutoff-date"
-                              className={styles.input}
-                              type="date"
-                              value={intake.shutoffDate ?? ""}
-                              onChange={(e) =>
-                                change("shutoffDate", e.target.value || null)
-                              }
-                            />
-                            <p className={styles.hint}>
-                              Use the shutoff date, rather than the bill’s
-                              payment due date. Leave blank if uncertain.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </fieldset>
                   )}
                   <div className={styles.field}>
                     <label htmlFor="contact-preference">
@@ -978,8 +846,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                           {detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
                           {intake.needs.some((need) => need !== "food_now")
                             ? ", income information when a named program requires it"
-                            : ""}
-                          {hasUtility ? " and utility information" : ""}, only
+                            : ""}, only
                           for this request. Any bills or notices you later
                           choose to add can be used for this request and these
                           named programs, after separate document-processing

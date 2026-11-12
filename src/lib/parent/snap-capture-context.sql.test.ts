@@ -29,7 +29,7 @@ describe.skipIf(!modulePath)("owned current SNAP preparation context SQL", () =>
       snap_protected_enabled=false,snap_protected_policy_version=null,snap_protected_retention_policy_version=null`, [SNAP_APPLICATION_NOTICE_VERSION]);
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [session, owner]);
-    const mandate = fixtureMandate({ recipientIds: ["snap-pa"], ...(prepareOnly ? { mode: "prepare_only", allowedActions: ["research", "prepare"] } : {}) });
+    const mandate = fixtureMandate({ expiresAt: new Date(Date.now() + 86400000).toISOString(), recipientIds: ["snap-pa"], ...(prepareOnly ? { mode: "prepare_only", allowedActions: ["research", "prepare"] } : {}) });
     const request = (await parent(owner, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(mandate), randomUUID()])).rows[0].id as string;
     const details = fixtureSnapApplication(new Date());
     const snapshot = (await parent(owner, "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()])).rows[0].id as string;

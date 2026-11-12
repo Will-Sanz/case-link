@@ -32,6 +32,17 @@ describe("hosted single-service profiles", () => {
     expect(parseHostedProfile({ ...input, sendingApproved: true }, now).service).toBe("sender");
     expect(() => parseHostedProfile({ ...web, finalizerDatabaseUrl: databaseUrl }, now)).toThrow();
   });
+  it("separates a single-snapshot emulator profile from live sending permission", () => {
+    const emulator = { requestId: "11111111-1111-4111-8111-111111111111", snapshotHash: "a".repeat(64),
+      projectId: "test-project", serviceId: "test-service", fromNumber: "+12155550100", accessKey: "test-key", secretKey: "test-secret" };
+    const carrier = { projectId: "unconfigured", serviceId: "unconfigured", fromNumber: "+12155550100", accessKey: "unconfigured", secretKey: "unconfigured",
+      destinations: [{ id: "unused", version: "v1", number: "+12155550101", verifiedUntil: base.approvedUntil }] };
+    const input = { ...base, service: "sender", databaseUrl, senderSecret: "s".repeat(32), sendingApproved: false, carrier, emulator };
+    expect(parseHostedProfile(input, now).service).toBe("sender");
+    expect(() => parseHostedProfile({ ...input, sendingApproved: true }, now)).toThrow();
+    expect(() => parseHostedProfile({ ...input, emulator: { ...emulator, to: "+12155550101" } }, now)).toThrow();
+    expect(() => parseHostedProfile({ ...web, emulator }, now)).toThrow();
+  });
   it("passes only each role's credentials, never ambient secrets or runtime injection", () => {
     const ambient = { NODE_ENV: "production" as const, PATH: "/usr/bin", OPENAI_API_KEY: "ambient", DATABASE_URL: "ambient", NODE_OPTIONS: "--inspect" };
     const env = hostedChildEnvironment(parseHostedProfile(web, now), ambient);

@@ -7,6 +7,7 @@ import { loadSnapReviewFile } from "@/lib/parent/snap-review-file";
 import { boundedParentApi, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
+import { SnapDecisionSummary } from "./snap-decision-summary";
 import { SnapReviewPdf } from "./snap-review-pdf";
 import styles from "./parent.module.css";
 import { usePermissionWindow } from "./use-permission-window";
@@ -14,7 +15,7 @@ import { usePermissionWindow } from "./use-permission-window";
 const submitReply = z.object({ ok: z.literal(true), operationId: z.uuid(), state: z.literal("authorization_recorded") }).strict();
 const replacementReply = z.object({ ok: z.literal(true), requestVersion: z.number().int().positive().max(2147483647) }).strict();
 
-export function SnapFinalReview({ request, onChange, onReviewChange }: { request: SupportRequest; onChange?: () => void; onReviewChange?: (review: SnapProtectedOperation | null) => void }) {
+export function SnapFinalReview({ request, onChange, onReviewChange, applicationStatus }: { request: SupportRequest; onChange?: () => void; onReviewChange?: (review: SnapProtectedOperation | null) => void; applicationStatus?: string }) {
   const saved = useParentResource<{ review: unknown }>(`/requests/${request.id}/snap-submission?expectedVersion=${request.version}`);
   const review = useMemo(() => {
     const parsed = snapProtectedOperationSchema.safeParse(saved.data?.review);
@@ -76,7 +77,7 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
         const blob = new Blob([bytes], { type: "application/pdf" }); url = URL.createObjectURL(blob);
         setFile({ scope: loadScope, url, blob }); setFileError(null);
       } finally { bytes.fill(0); }
-    }).catch(() => { if (!controller.signal.aborted) setFileError({ scope: loadScope, error: new Error("The exact application could not be opened. Check access and try again before choosing Submit.") }); });
+    }).catch(() => { if (!controller.signal.aborted) setFileError({ scope: loadScope, error: new Error("The exact application could not be opened. Your saved answers and personal pages are kept. Try again to reopen the same application before choosing Submit.") }); });
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
   }, [review, binding, current, loadScope]);
   async function submit() {
@@ -116,24 +117,26 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
     <p>Future application work is stopped. Check <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for anything already sent or confirmed.</p>
   </section>;
   return <section className={styles.section} id="snap-final-review" aria-labelledby="snap-final-review-title" tabIndex={-1}>
-    <h2 id="snap-final-review-title">Review your SNAP application</h2>
-    <p>Check this complete application before choosing Submit. Correct any saved answer or personal page that needs changing.</p>
+    <h2 id="snap-final-review-title">{request.controlled_test ? "Review your fictional test application" : "Review your SNAP application"}</h2>
+    <p>{request.controlled_test ? "Review this fictional application and its test marks. Submit sends only to Sinch’s free emulator and cannot file an application with DHS." : "Check this complete application before choosing Submit. Correct any saved answer or personal page that needs changing."}</p>
+    {applicationStatus && <p><strong>{applicationStatus}</strong></p>}
     {!mandateCurrent && <p className={styles.notice} role="status">Your application permission has expired or could not be checked. Check your request’s permission before continuing. Your saved answers and receipts are kept.</p>}
     {saved.loading ? <ParentLoading label="Loading your exact application"/> : saved.error ? <ServiceError error={saved.error} retry={saved.reload}/> : !review ?
       <p className={styles.notice}>The exact application is not available for review yet. Your saved answers are kept. Check Activity &amp; receipts for recorded delivery status.</p> : <>
+      {current && review.protectedPacketCurrent && request.mandate.recipientIds.includes("snap-pa") && request.mandate.allowedActions.includes("submit") && request.mandate.allowedData.includes("household") && request.mandate.allowedData.includes("income") && <SnapDecisionSummary key={actionScope} request={request} review={review}/>}
       {exactFile && file ? <>
         <SnapReviewPdf source={file.blob} onReady={onDisplayReady}/>
         <a className={styles.textLink} href={file.url} target="_blank" rel="noopener noreferrer">Open this exact application PDF full size</a>
         <button type="button" className={styles.quiet} onClick={() => setFileRevision(value => value + 1)}>Reload application pages</button>
       </> : fileError?.scope === loadScope ? <ServiceError error={fileError.error} retry={() => { setFileError(null); setFileRevision(value => value + 1); }}/> : current ? <ParentLoading label="Checking and opening the exact PDF"/> : null}
-      {authorized ? <p className={styles.success} role="status">Your Submit decision is recorded. CaseLink will check the delivery result. An agency confirmation is a separate record and will appear when verified.</p> : snapProtectedDeliveryAttempt(review.state) ?
+      {authorized && !snapProtectedDeliveryAttempt(review.state) ? <p className={styles.success} role="status">Your Submit decision is recorded. CaseLink will check the delivery result. An agency confirmation is a separate record and will appear when verified.</p> : snapProtectedDeliveryAttempt(review.state) ?
         <p className={styles.notice} role="status"><span>See <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for the latest delivery record and any verified agency confirmation. You do not need to Submit this application again.</span></p> : <>
         <div className={`${styles.inline} ${styles.space}`}>
           <a className={styles.textLink} href="#application-answers">Correct saved answers</a>
           <button type="button" className={styles.quiet} disabled={!current || writeAttempted || review.state !== "prepared"} onClick={replacePages}>Replace personal pages</button>
         </div>
         {maySubmit ? <>
-          <p id="snap-final-submit-report" className={`${styles.hint} ${styles.space}`}>By choosing Submit, I confirm that my required handwritten signatures and dates are complete on form pages 1 and 5 of this exact application, and ask CaseLink to send it to Pennsylvania SNAP.</p>
+          <p id="snap-final-submit-report" className={`${styles.hint} ${styles.space}`}>{request.controlled_test ? "Submit authorizes this fictional test packet to the free fax emulator only. The marks are test input and do not certify a real application." : "By choosing Submit, I confirm that my required handwritten signatures and dates are complete on form pages 1 and 5 of this exact application, and ask CaseLink to send it to Pennsylvania SNAP."}</p>
           <button type="button" className={`${styles.button} ${styles.space}`} aria-describedby="snap-final-submit-report" disabled={pending} onClick={submit}>{pending ? "Recording Submit…" : "Submit"}</button>
         </> : current && exactFile && !writeAttempted && <p className={styles.notice}>CaseLink must resolve the application’s remaining submission requirements. You do not need to repeat your saved answers.</p>}
       </>}

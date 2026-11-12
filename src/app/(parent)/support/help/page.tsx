@@ -20,12 +20,14 @@ export default function HelpPage() {
       ? `${process.env.CASELINK_PARENT_RECOVERY_SITE_URL}/forgot-password`
       : "/forgot-password";
   return (
-    <div className={`${styles.container} ${styles.legal}`}>
+    <div className={`${styles.container} ${styles.infoPage}`}>
+      <header className={styles.infoIntro}>
       <h1>Help, without another hurdle.</h1>
       <p className={styles.lead}>
         You can use official programs directly at any time. You do not need to
         create a CaseLink account or upload a document first.
       </p>
+      </header>
       <section id="urgent" className={styles.section}>
         <h2>Need food or utility help now?</h2>
         <p>
@@ -77,9 +79,9 @@ export default function HelpPage() {
       <div className={styles.section}>
         <FoodSites />
       </div>
-      <section className={styles.section}>
+      <section className={`${styles.section} ${styles.infoWide}`}>
         <h2>Official programs & partner options</h2>
-        <ul className={styles.list}>
+        <ul className={`${styles.list} ${styles.programDirectory}`}>
           {PROGRAMS.map((program) => (
             <li className={styles.needRow} key={program.id}>
               <h3>
@@ -138,9 +140,8 @@ export default function HelpPage() {
         <h2>Want help from a person?</h2>
         <p>
           Use the program links above for benefits specialists and utility
-          assistance. CaseLink is in early access; team support hours and a
-          family contact channel must be confirmed before live service opens. Do
-          not wait for a CaseLink response when a program deadline is close.
+          assistance. Do not wait for a CaseLink response when a program
+          deadline is close.
         </p>
       </section>
       <section className={styles.section}>

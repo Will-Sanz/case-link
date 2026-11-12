@@ -1,6 +1,8 @@
+"use client";
 import { Clock, Refresh, WarningTriangle } from "iconoir-react";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { displayDate } from "./api";
+import { usePermissionWindow } from "./use-permission-window";
 import styles from "./parent.module.css";
 
 export const PROGRESS_LABELS: Record<SupportProgress["state"], string> = {
@@ -75,6 +77,12 @@ export function SupportProgressPanel({
               .
             </p>
           )}
+          {progress?.state === "waiting" && !progress.nextRunAt && (
+            <p>
+              No automatic check is currently scheduled. Check recorded activity
+              for the next step.
+            </p>
+          )}
           {progress?.canContinueAfterClosing && (
             <p>You can leave this page. Authorized work can continue.</p>
           )}
@@ -96,4 +104,17 @@ export function SupportProgressPanel({
       </div>
     </section>
   );
+}
+
+export function ApplicationSchedule({ request, progress, decisionFinished = false }: { request: import("@/lib/parent/domain").SupportRequest; progress?: SupportProgress; decisionFinished?: boolean }) {
+  const permitted = usePermissionWindow(Date.parse(request.mandate.expiresAt));
+  const triggers: Record<string, string> = {
+    scheduled_follow_up: "Scheduled follow-up", parent_action_completed: "Completion of your required step",
+    provider_capability_enabled: "The program connection becomes available", verified_receipt_available: "A verified receipt becomes available",
+    authorization_renewed: "Permission is renewed", route_review_required: "CaseLink reviews the program connection", parent_reentry: "You return to this request", none: "No next trigger recorded",
+  };
+  return <>
+    <p><strong>Next check:</strong> {request.status !== "active" ? "Future work is stopped." : !permitted ? "Permission has expired; future work is stopped." : !progress || progress.state === "service_offline" ? "The schedule cannot currently be verified." : progress.nextRunAt ? <time dateTime={progress.nextRunAt}>{displayDate(progress.nextRunAt, true)}</time> : "No automatic check is currently scheduled."}</p>
+    <p><strong>Next trigger:</strong> {decisionFinished && request.next_trigger === "parent_action_completed" ? "Submit is already recorded; delivery must be checked before another attempt" : triggers[request.next_trigger ?? ""] ?? "Not recorded"}.</p>
+  </>;
 }

@@ -66,7 +66,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
       snap_protected_policy_version='synthetic-policy-1',snap_protected_retention_policy_version='synthetic-retention-1',snap_protected_max_retention_seconds=$2`, [SNAP_APPLICATION_NOTICE_VERSION, retention]);
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [session, owner]);
-    const request = (await call("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"] })), randomUUID()], owner)).rows[0].id as string;
+    const request = (await call("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ expiresAt: new Date(Date.now() + 86400000).toISOString(), recipientIds: ["snap-pa"] })), randomUUID()], owner)).rows[0].id as string;
     const snapshot = (await call("authenticated", "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], owner)).rows[0].id as string;
     const requestVersion = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const snapshotHash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, requestVersion])).rows[0].hash as string;
@@ -112,7 +112,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
     const recorded = await row(s); expect((await discover(s)).rows[0].value).toEqual(stored); expect(await row(s)).toEqual(recorded);
     expect(JSON.stringify(stored)).not.toMatch(/keyBase64|ciphertext|firstName|strokes|submissionReady/);
   });
-  it("transitions real constructed SQL metadata through the ordinary worker to first review", async () => {
+  it("transitions real constructed SQL metadata through the ordinary worker to first review without replanning", async () => {
     await fixture.admin.query("update public.parent_jobs set run_at='infinity' where state in ('queued','waiting')");
     const s = await setup(); await complete(s);
     let modelCalls = 0, senderCalls = 0, firstClaim = true;
@@ -134,7 +134,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
       },
     };
     expect(await runOneParentJob(options)).toEqual({ state: "idle" }); expect(modelCalls).toBe(0);
-    expect(await runOneParentJob(options)).toEqual({ state: "saved" }); expect(modelCalls).toBe(2); expect(senderCalls).toBe(0);
+    expect(await runOneParentJob(options)).toEqual({ state: "saved" }); expect(modelCalls).toBe(0); expect(senderCalls).toBe(0);
     const request = (await fixture.admin.query("select required_actions from public.parent_requests where id=$1", [s.request])).rows[0];
     expect(request.required_actions).toEqual(expect.arrayContaining([expect.objectContaining({ field: "snap_final_submit", reason: "submission_review" })]));
   });

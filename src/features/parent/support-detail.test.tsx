@@ -54,6 +54,7 @@ const response = (request: SupportRequest) => ({
   }),
 });
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(fixtureNow);
 });
@@ -63,7 +64,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+async function openSection(name: RegExp) {
+  await act(async () => {});
+  const checklist = screen.getByRole("navigation", { name: "Your application checklist" });
+  fireEvent.click(within(checklist).getByRole("link", { name }));
+}
+
+async function refreshSupport() {
+  const previous = screen.getByRole("navigation", { name: "Your application checklist" }).querySelector('a[aria-current="location"]')!;
+  await openSection(/Overview/);
+  const status = screen.getByText("Work status & updates").closest("details")!;
+  if (!status.open) fireEvent.click(screen.getByText("Work status & updates"));
+  fireEvent.click(screen.getByRole("button", { name: "Refresh support progress" }));
+  await act(async () => {});
+  fireEvent.click(previous);
+}
+
 describe("support detail", () => {
+  it("preserves the ordinary non-SNAP request header", async () => {
+    const request = fixture(); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
+    render(<SupportDetail requestId={request.id}/>);
+    await screen.findByRole("heading", { name: "Your utility support" });
+    const header = screen.getByRole("heading", { name: "Your utility support" }).parentElement!;
+    expect(within(header).getByText("Request saved")).toBeTruthy();
+    expect(within(header).queryByText(/application submission/)).toBeNull();
+  });
   it.each(["waiting", "needs_parent"] as const)("automatically shows the finished SNAP draft and slows checks after queued/running becomes %s", async ending => {
     vi.useFakeTimers();
     const request=fixture();request.intake.needs=["snap_new"];
@@ -79,6 +104,7 @@ describe("support detail", () => {
     expect(reads).toBe(1);expect(screen.queryByRole("button",{name:"View prepared draft"})).toBeNull();
     state="running";await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});expect(reads).toBe(2);
     state=ending;ready=true;await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+    await openSection(/Your application/);
     expect(reads).toBe(3);expect(screen.getByRole("button",{name:"View prepared draft"})).toBeTruthy();
     await act(async()=>{await vi.advanceTimersByTimeAsync(29999);});expect(reads).toBe(3);
     await act(async()=>{await vi.advanceTimersByTimeAsync(1);});expect(reads).toBe(4);
@@ -124,7 +150,7 @@ describe("support detail", () => {
   it('locks the exact ordinary correction while saving, including the disclosure toggle',async()=>{
     const request=fixture();let finish!:(value:unknown)=>void;
     const fetch=vi.fn(async(_url:string,init?:RequestInit)=>init?.method==='POST'?new Promise(resolve=>{finish=resolve;}):response(request));
-    vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>);fireEvent.click(await screen.findByText('Correct household or bill information'));
+    vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);fireEvent.click(await screen.findByText('Correct household or bill information'));
     const input=screen.getByLabelText('ZIP code');fireEvent.change(input,{target:{value:'19105'}});fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
     expect(input.matches(':disabled')).toBe(true);fireEvent.change(input,{target:{value:'19106'}});fireEvent.click(screen.getByText('Correct household or bill information'));
     expect(screen.getByText('Correct household or bill information').closest('details')!.open).toBe(true);
@@ -135,19 +161,19 @@ describe("support detail", () => {
   it('preserves owner correction of a paused request after its service mandate expires',async()=>{
     const request=fixture();request.status='paused';request.mandate.expiresAt='2000-01-01T00:00:00Z';
     const fetch=vi.fn(async(_url:string,init?:RequestInit)=>response(init?.method==='POST'?{...request,version:2}:request));
-    vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>);fireEvent.click(await screen.findByText('Correct household or bill information'));
+    vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);fireEvent.click(await screen.findByText('Correct household or bill information'));
     fireEvent.click(screen.getByRole('button',{name:'Save correction'}));await screen.findByText(/Your correction is saved/);
     expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
   });
   it.each([0,1])('does not claim an ordinary correction saved from non-advanced reply version %i',async version=>{
     const request=fixture();vi.stubGlobal('fetch',vi.fn(async(_url:string,init?:RequestInit)=>response(init?.method==='POST'?{...request,version}:request)));
-    render(<SupportDetail requestId={requestId}/>);fireEvent.click(await screen.findByText('Correct household or bill information'));fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
+    render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);fireEvent.click(await screen.findByText('Correct household or bill information'));fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
     await screen.findByText(/correction result is not confirmed/);expect(screen.queryByText(/Your correction is saved/)).toBeNull();
   });
   it.each(['fetch','body'] as const)('bounds a stalled ordinary correction %s and keeps its draft',async kind=>{
     const request=fixture(),fetch=vi.fn(async(_url:string,init?:RequestInit)=>init?.method==='POST'?
       kind==='fetch'?new Promise(()=>{}):{ok:true,status:200,json:()=>new Promise(()=>{})}:response(request));
-    vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>);fireEvent.click(await screen.findByText('Correct household or bill information'));
+    vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);fireEvent.click(await screen.findByText('Correct household or bill information'));
     fireEvent.change(screen.getByLabelText('ZIP code'),{target:{value:'19105'}});vi.useFakeTimers();fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
     await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});
     expect(screen.getByRole('button',{name:'Save correction'}).matches(':disabled')).toBe(false);expect((screen.getByLabelText('ZIP code') as HTMLInputElement).value).toBe('19105');
@@ -156,10 +182,10 @@ describe("support detail", () => {
   it.each(['version','unmount'] as const)('ignores a late ordinary correction after %s changes',async kind=>{
     let finish!:(value:unknown)=>void;let current=fixture();
     const fetch=vi.fn(async(_url:string,init?:RequestInit)=>init?.method==='POST'?new Promise(resolve=>{finish=resolve;}):response(current));
-    vi.stubGlobal('fetch',fetch);const view=render(<SupportDetail requestId={requestId}/>);fireEvent.click(await screen.findByText('Correct household or bill information'));
+    vi.stubGlobal('fetch',fetch);const view=render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);fireEvent.click(await screen.findByText('Correct household or bill information'));
     fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
     if(kind==='unmount')view.unmount();else{
-      current={...current,version:2};fireEvent.click(screen.getByRole('button',{name:'Refresh support progress'}));await act(async()=>{});
+      current={...current,version:2};await refreshSupport();await act(async()=>{});
       fireEvent.click(screen.getByText('Correct household or bill information'));fireEvent.click(screen.getByText('Correct household or bill information'));
       fireEvent.change(screen.getByLabelText('ZIP code'),{target:{value:'19105'}});
     }
@@ -182,7 +208,7 @@ describe("support detail", () => {
       if (url.startsWith("/protected/")) return { ok: false, status: 403, json: async () => ({ error: "Unavailable" }) };
       return response(request);
     }));
-    render(<SupportDetail requestId={requestId}/>); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
+    render(<SupportDetail requestId={requestId}/>); await openSection(/Program progress/); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
     if (next === "pending") {
       await waitFor(() => expect(screen.queryByText("Loading your exact application")).toBeNull());
       expect(within(programs).getByText(/Preparation is pending\./)).toBeTruthy();
@@ -215,7 +241,7 @@ describe("support detail", () => {
       if (url.startsWith("/protected/")) return { ok: false, status: 403, json: async () => ({ error: "Unavailable" }) };
       return response(request);
     }));
-    render(<SupportDetail requestId={requestId}/>); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
+    render(<SupportDetail requestId={requestId}/>); await openSection(/Program progress/); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
     await waitFor(() => expect(within(programs).getByText(kind === "decision" ? /Your decision to send the exact SNAP application is recorded/ : /A delivery attempt is recorded/)).toBeTruthy());
     expect(within(programs).getByText("Next:").parentElement!.textContent).toBe("Next: CaseLink");
     expect(within(programs).queryByText(/Preparation is pending\./)).toBeNull();
@@ -235,7 +261,7 @@ describe("support detail", () => {
     const review = fixtureProtectedSnapOperation({ requestId, requestVersion: request.version });
     const operation = { id: review.operationId, request_id: requestId, request_version: request.version, program_id: "snap-pa", need: "snap_new", action: "submit", state: "executing", artifact_id: null, protected_packet: review.packet.protectedSnapPacket, created_at: request.created_at, ...change };
     vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/operations") ? { ok: true, status: 200, json: async () => ({ operations: [operation], historyLimited: false }) } : response(request)));
-    render(<SupportDetail requestId={requestId}/>); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
+    render(<SupportDetail requestId={requestId}/>); await openSection(/Program progress/); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
     await waitFor(() => expect(screen.queryByText("Checking application records…")).toBeNull());
     expect(within(programs).getByText(/Preparation is pending\./)).toBeTruthy();
     expect(within(programs).queryByText(/A delivery attempt is recorded/)).toBeNull();
@@ -256,7 +282,7 @@ describe("support detail", () => {
       if (url.startsWith("/protected/")) return { ok: false, status: 403, json: async () => ({ error: "Unavailable" }) };
       return response(request);
     }));
-    render(<SupportDetail requestId={requestId}/>); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
+    render(<SupportDetail requestId={requestId}/>); await openSection(/Program progress/); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
     await waitFor(() => expect(within(programs).getByText(`${label} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`)).toBeTruthy());
     expect(within(programs).getByText("Next:").parentElement!.textContent).toBe(`Next: ${next}`);
     expect(within(programs).queryByText(/Your decision to send the exact SNAP application is recorded/)).toBeNull();
@@ -267,7 +293,7 @@ describe("support detail", () => {
     const request = fixture(); request.intake.needs = ["snap_new"]; request.status = status;
     const review = fixtureProtectedSnapOperation({ requestId, requestVersion: request.version });
     vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/operations") ? { ok: true, status: 200, json: async () => ({ operations: [{ id: review.operationId, request_id: requestId, request_version: request.version, program_id: "snap-pa", need: "snap_new", action: "submit", state: "executing", artifact_id: null, protected_packet: review.packet.protectedSnapPacket, created_at: request.created_at }], historyLimited: false }) } : response(request)));
-    render(<SupportDetail requestId={requestId}/>); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
+    render(<SupportDetail requestId={requestId}/>); await openSection(/Program progress/); const programs = (await screen.findByRole("heading", { name: "Program progress" })).parentElement!;
     await waitFor(() => expect(within(programs).getByText(/Future SNAP application work is stopped/)).toBeTruthy());
     expect(within(programs).getByText("Next:").parentElement!.textContent).toBe("Next: Activity & receipts");
     expect(within(programs).queryByText(/CaseLink must confirm its result/)).toBeNull();
@@ -276,7 +302,7 @@ describe("support detail", () => {
   it("names the exact final-review task without a redundant Apply for SNAP eyebrow", async () => {
     const request = fixture(); request.intake.needs = ["snap_new"];
     request.required_actions = [{ id: "final", need: "snap_new", reason: "submission_review", field: "snap_final_submit", resolver: "parent", title: "Choose final SNAP Submit", explanation: "Review this exact application." }];
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request))); render(<SupportDetail requestId={requestId}/>);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request))); render(<SupportDetail requestId={requestId}/>); await openSection(/Your next steps/);
     const step = await screen.findByRole("region", { name: "Choose final SNAP Submit" });
     expect(within(step).queryByText("Apply for SNAP")).toBeNull();
   });
@@ -297,8 +323,10 @@ describe("support detail", () => {
     render(<SupportDetail requestId={requestId}/>); await screen.findByText("Next: CaseLink");
     expect(screen.queryByRole("heading", { name: "Choose final SNAP Submit" })).toBeNull();
     expect(screen.queryByText("A step needs you")).toBeNull();
-    expect(screen.getByText(attempt ? /No repeated review is requested/ : /CaseLink owns the delivery check/)).toBeTruthy();
     expect(screen.queryByText("SNAP application complete")).toBeNull();
+    await openSection(/Your next steps/);
+    expect(screen.getByText(attempt ? /No repeated review is requested/ : /CaseLink owns the delivery check/)).toBeTruthy();
+    await openSection(/Program progress/);
     const programs = screen.getByRole("heading", { name: "Program progress" }).parentElement!;
     expect(within(programs).queryByText("Old preparation is still pending.")).toBeNull();
     expect(within(programs).queryByText("Old connection limitation.")).toBeNull();
@@ -317,8 +345,8 @@ describe("support detail", () => {
       if(url.endsWith('/authorization-window'))return {ok:true,status:200,json:async()=>({authorization:{issuedAt:'2026-11-03T12:00:00Z',expiresAt:'2026-11-24T12:00:00Z',snapApplication:{collectionEnabled:true,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}}})};
       if(url.includes('/snap-application'))return {ok:true,status:200,json:async()=>init?.method==='POST'?{snapshotId:snapshot.id}:{snapshot}};
       return response(request);
-    });vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'Answer SNAP application questions'}));
+    });vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>); await openSection(/Your next steps/);
+    fireEvent.click(await screen.findByRole('link',{name:'Answer SNAP application questions'}));
     const form=await screen.findByRole('form',{name:'Correct SNAP application answers'});
     expect(screen.queryByRole('form',{name:'Household questions'})).toBeNull();expect(screen.queryByLabelText('Your answer')).toBeNull();
     await waitFor(()=>expect(document.activeElement).toBe(form.querySelector('input,select,button')));
@@ -329,8 +357,8 @@ describe("support detail", () => {
   });
   it.each(['snap_renewal','snap_pending'] as const)('does not send a %s worker field to the new-SNAP private editor',async need=>{
     const request=fixture();request.intake.needs=[need];request.required_actions=[{id:'other-snap-details',need,field:'snap_application_details',reason:'missing_fact',resolver:'parent',title:'Other SNAP question',explanation:'This is a different journey.'}];
-    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(response(request)));render(<SupportDetail requestId={requestId}/>);
-    await screen.findByRole('heading',{name:'Other SNAP question'});expect(screen.queryByRole('button',{name:'Answer SNAP application questions'})).toBeNull();expect(screen.queryByLabelText('Your answer')).toBeNull();
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(response(request)));render(<SupportDetail requestId={requestId}/>); await openSection(/Your next steps/);
+    await screen.findByRole('heading',{name:'Other SNAP question'});expect(screen.queryByRole('link',{name:'Answer SNAP application questions'})).toBeNull();expect(screen.queryByLabelText('Your answer')).toBeNull();
   });
   it("offers one save for all known factual questions while personal steps stay separate", async () => {
     const request = fixture();
@@ -341,7 +369,7 @@ describe("support detail", () => {
       { id: "declaration", need: "electricity", reason: "personal_step", resolver: "parent", title: "Complete the program declaration", explanation: "This separate personal step requires the program's accepted process." },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Your next steps/);
     await screen.findByRole("heading", { name: "Your next steps" });
     expect(screen.getAllByRole("button", { name: "Save all answers and continue" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Save and continue" })).toBeNull();
@@ -359,12 +387,12 @@ describe("support detail", () => {
       async () => response(refreshed ? latest : current),
     );
     vi.stubGlobal("fetch", fetch);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Your next steps/);
     const amountRegion = await screen.findByRole("region", { name: "Electric bill Bill amount" });
     fireEvent.change(within(amountRegion).getByLabelText("Your answer"), { target: { value: "15" } });
     fireEvent.change(within(screen.getByRole("region", { name: "Electric bill Household count" })).getByLabelText("Your answer"), { target: { value: "4" } });
     refreshed = true;
-    fireEvent.click(screen.getByRole("button", { name: "Refresh support progress" }));
+    await refreshSupport();
     await screen.findByRole("button", { name: "Review latest questions" });
     expect((within(screen.getByRole("region", { name: "Electric bill Bill amount" })).getByLabelText("Your answer") as HTMLInputElement).value).toBe("15");
     expect((within(screen.getByRole("region", { name: "Electric bill Household count" })).getByLabelText("Your answer") as HTMLInputElement).value).toBe("4");
@@ -383,7 +411,7 @@ describe("support detail", () => {
       ? { ok: true, status: 200, json: async () => ({ sites: [], checkedAt: fixtureNow.toISOString(), moreSitesAvailable: false }) }
       : response(request));
     vi.stubGlobal("fetch", fetch);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     await screen.findByRole("heading", { name: "Food locations near your ZIP" });
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.includes("/food-sites?"))).toBe(true));
     expect(fetch.mock.calls.filter(([url]) => url.includes("/food-sites?")).map(([url]) => url))
@@ -401,7 +429,7 @@ describe("support detail", () => {
       ? { ok: true, status: 200, json: async () => ({ sites: [], checkedAt: fixtureNow.toISOString(), moreSitesAvailable: false }) }
       : response(request));
     vi.stubGlobal("fetch", fetch);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     const zip = await screen.findByLabelText("Philadelphia ZIP code");
     expect(fetch.mock.calls.some(([url]) => url.includes("/food-sites?"))).toBe(false);
     fireEvent.change(zip, { target: { value: "19105" } });
@@ -425,7 +453,7 @@ describe("support detail", () => {
     ];
     const fetch = vi.fn().mockResolvedValue(response(request));
     vi.stubGlobal("fetch", fetch);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Your next steps/);
     expect(
       await screen.findByText(
         "No new personal steps are requested while this request is paused or finished.",
@@ -440,6 +468,7 @@ describe("support detail", () => {
       screen.queryByRole("button", { name: "Save and continue" }),
     ).toBeNull();
     expect(screen.queryByText("Add a document or take a photo")).toBeNull();
+    await openSection(/Details & controls/);
     expect(
       screen.getByRole("button", { name: "Change or renew permission" }),
     ).toBeTruthy();
@@ -493,7 +522,7 @@ describe("support detail", () => {
             : response(request),
         ),
       );
-      render(<SupportDetail requestId={requestId} />);
+      render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
       const article = (
         await screen.findByRole("heading", { name: /^Electric bill$/ })
       ).closest("article")!;
@@ -502,6 +531,7 @@ describe("support detail", () => {
       );
       if (label !== "Application prepared")
         expect(within(article).queryByText("Application prepared")).toBeNull();
+      await openSection(/Activity & receipts/);
       expect(
         await screen.findByRole("link", {
           name: preparationOnly ? "Download incomplete unsigned draft" : "Download this prepared form",
@@ -529,7 +559,7 @@ describe("support detail", () => {
           }] }),
         }
       : response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     await screen.findByRole("heading", { name: "Program progress" });
     await waitFor(() => expect(screen.queryByText("Checking application records…")).toBeNull());
     const programs = document.getElementById("application-programs")!;
@@ -541,7 +571,7 @@ describe("support detail", () => {
     }
     if (recorded) {
       expect(within(programs).getByText(/A submission is separate from approval or receiving support/)).toBeTruthy();
-      expect(screen.getByText("SNAP application complete")).toBeTruthy();
+      expect(screen.getAllByText("Application submission recorded").length).toBeGreaterThan(0);
     }
   });
   it.each([
@@ -568,10 +598,10 @@ describe("support detail", () => {
           evidence: { source: "agency_receipt", reference: "Synthetic newer response", recordedAt: "2026-10-25T16:00:00+00:00" },
         }] }) }
       : response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     await screen.findByRole("heading", { name: "Program progress" });
     const programs = document.getElementById("application-programs")!;
-    await waitFor(() => expect(within(programs).getByText(label, { exact: true })).toBeTruthy());
+    await waitFor(() => expect(within(programs).getByText(state === "agency_submitted" ? "Application submission recorded" : label, { exact: true })).toBeTruthy());
     expect(within(programs).getByText(`${label} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`)).toBeTruthy();
     expect(within(programs).getByText(next, { exact: false })).toBeTruthy();
     expect(within(programs).queryByText(/Obsolete/)).toBeNull();
@@ -603,7 +633,7 @@ describe("support detail", () => {
           ? null
           : buildSupportPlan(request, new Date(request.updated_at));
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-      render(<SupportDetail requestId={requestId} />);
+      render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
       await screen.findByRole("heading", { name: "Program progress" });
       if (need !== "snap_new")
         expect(
@@ -611,6 +641,7 @@ describe("support detail", () => {
             .getByRole("link", { name: "Official program & direct access" })
             .getAttribute("href"),
         ).toBe(getProgram("snap-pa")!.officialUrl);
+      if (need === "snap_new") await openSection(/Official website/);
       const shortcut =
         need === "snap_new"
           ? await screen.findByRole("link", {
@@ -648,11 +679,12 @@ describe("support detail", () => {
     ];
     request.events_truncated = true;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Activity & receipts/);
     expect(
       await screen.findByText("Reported outcome: Support received"),
     ).toBeTruthy();
     expect(screen.getByText("Pantry pickup on Monday.")).toBeTruthy();
+    await openSection(/Activity & receipts/);
     expect(screen.getByText("Parent reported")).toBeTruthy();
     expect(screen.getByText(/Showing the latest 200 updates/)).toBeTruthy();
   });
@@ -661,7 +693,7 @@ describe("support detail", () => {
     request.intake.needs = ["wic_new"];
     const fetch = vi.fn(async(_url:string,init?:RequestInit)=>response(init?.method==='POST'?{...request,version:2,intake:{...request.intake,zip:'19105'}}:request));
     vi.stubGlobal("fetch", fetch);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Details & controls/);
     fireEvent.click(
       await screen.findByText("Correct household or bill information"),
     );
@@ -684,7 +716,7 @@ describe("support detail", () => {
   });
   it('preserves legacy private WIC answers read-only without silently clearing them for a ZIP correction',async()=>{
     const request=fixture();request.intake={...request.intake,needs:['wic_new'],childrenUnderFive:false,pregnantOrPostpartum:true};
-    const fetch=vi.fn().mockResolvedValue(response(request));vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>);
+    const fetch=vi.fn().mockResolvedValue(response(request));vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);
     await screen.findByText(/safe update for your previously saved private WIC answers/);
     expect(screen.queryByText('Correct household or bill information')).toBeNull();expect(screen.queryByRole('button',{name:'Save correction'})).toBeNull();
     expect(screen.getByText('Previously saved child-under-five answer').nextElementSibling?.textContent).toBe('No');
@@ -705,7 +737,7 @@ describe("support detail", () => {
         : response(request),
     );
     vi.stubGlobal("fetch", fetchMock);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Details & controls/);
     fireEvent.click(
       await screen.findByRole("button", { name: "Change or renew permission" }),
     );
@@ -759,7 +791,7 @@ describe("support detail", () => {
     request.plan = buildSupportPlan(request, new Date(request.created_at));
     request.plan.routes[0].title = "PECO assistance programs";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     const heading = await screen.findByRole("heading", {
       name: /^Electric bill$/,
     });
@@ -783,9 +815,9 @@ describe("support detail", () => {
       },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Your next steps/);
     fireEvent.click(
-      await screen.findByRole("button", {
+      await screen.findByRole("link", {
         name: /^Review permission$/,
       }),
     );
@@ -809,7 +841,7 @@ describe("support detail", () => {
       explanation: "Your authority is needed for this account only.",
     }));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Your next steps/);
     expect(
       await screen.findByRole("region", {
         name: "Electric bill Can you act for this utility account?",
@@ -852,7 +884,7 @@ describe("support detail", () => {
       return response(reads > 1 ? { ...request, version: 2 } : request);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Details & controls/);
     fireEvent.click(
       await screen.findByText("Correct household or bill information"),
     );
@@ -863,9 +895,7 @@ describe("support detail", () => {
     fireEvent.change(screen.getByLabelText("ZIP code"), {
       target: { value: "19105" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Refresh support progress" }),
-    );
+    await refreshSupport();
     await waitFor(() => expect(reads).toBe(2));
     expect((screen.getByLabelText("ZIP code") as HTMLInputElement).value).toBe(
       "19105",
@@ -882,7 +912,7 @@ describe("support detail", () => {
     const request = fixture();
     const fetchMock = vi.fn().mockResolvedValue(response(request));
     vi.stubGlobal("fetch", fetchMock);
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Details & controls/);
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Cancel request & withdraw permission",
@@ -950,7 +980,7 @@ describe("support detail", () => {
         };
       }),
     );
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Details & controls/);
     fireEvent.click(
       await screen.findByText("Correct household or bill information"),
     );
@@ -958,13 +988,12 @@ describe("support detail", () => {
       target: { value: "19105" },
     });
     disconnected = true;
-    fireEvent.click(
-      screen.getByRole("button", { name: "Refresh support progress" }),
-    );
+    await refreshSupport();
     await screen.findByRole("alert");
     expect((screen.getByLabelText("ZIP code") as HTMLInputElement).value).toBe(
       "19105",
     );
+    await openSection(/Overview/);
     expect(
       screen.getByRole("heading", { name: "Status unavailable" }),
     ).toBeTruthy();
@@ -993,10 +1022,11 @@ describe("support detail", () => {
       },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
-    render(<SupportDetail requestId={requestId} />);
+    render(<SupportDetail requestId={requestId} />); await openSection(/Your next steps/);
     expect(
       await screen.findByText("A CaseLink service step is unresolved"),
     ).toBeTruthy();
+    await openSection(/Activity & receipts/);
     expect(screen.getByText("Parent reported")).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "Save and continue" }),

@@ -709,6 +709,42 @@ describe("synthetic reference-only protected SNAP worker", () => {
     test.options.transports = new Map([["snap-pa:submit", { execute: test.execute }], ["snap-pa:follow_up", { execute: test.execute, reconcile: vi.fn(async () => receipt) }]]);
     return { ...test, canonical, raw, port, result };
   }
+  it.each([true, false])("stops agency follow-up only after a persisted free-emulator receipt (persisted=%s)", async persisted => {
+    const test = protectedSetup(); delete test.options.apiKey;
+    test.state.claim.request.controlled_test = true;
+    const emulatorReceipt = { ...receipt, reference: "sinch-emulation:synthetic-completed" };
+    test.port.execute.mockResolvedValue({ ...test.result, receipt: emulatorReceipt });
+    const base = test.database.query.getMockImplementation()!;
+    test.database.query.mockImplementation(async (sql, values = []) => {
+      const result = await base(sql, values);
+      if (persisted && sql.includes("parent_finish_operation")) Object.assign(test.raw, { state: "sent", evidence: emulatorReceipt });
+      return result;
+    });
+    await runOneParentJob(test.options);
+    expect(test.port.execute).toHaveBeenCalledOnce();
+    if (persisted) {
+      expect(test.state.saved[0].slice(5)).toEqual([null, null, "none"]);
+      expect(JSON.parse(String(test.state.saved[0][3])).summary).toContain("No application was filed with DHS");
+    } else expect(test.state.saved[0][5]).not.toBeNull();
+    expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_reserve_ai_call"))).toBe(false);
+  });
+  it.each(["exhausted budget", "missing model key"])("offers exact protected review through %s without planning or sending", async unavailable => {
+    const test = protectedSetup();
+    test.raw.snapSubmissionAuthorized = false;
+    test.raw.personalActsComplete = false;
+    test.state.budget = false;
+    if (unavailable === "missing model key") delete test.options.apiKey;
+    const coordinate = vi.fn(test.options.coordinate!); test.options.coordinate = coordinate;
+    expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
+    expect(JSON.parse(String(test.state.saved[0][4]))).toContainEqual(expect.objectContaining({
+      reason: "submission_review", field: "snap_final_submit", resolver: "parent",
+    }));
+    expect(test.state.saved[0].slice(5)).toEqual([null, "parent", "parent_action_completed"]);
+    expect(coordinate).not.toHaveBeenCalled();
+    expect(test.port.execute).not.toHaveBeenCalled(); expect(test.port.reconcile).not.toHaveBeenCalled();
+    expect(test.fetcher).not.toHaveBeenCalled(); expect(test.execute).not.toHaveBeenCalled();
+    expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_reserve_ai_call") || sql.includes("parent_begin_operation"))).toBe(false);
+  });
   it.each(["execute", "reconcile"] as const)("stops scheduled carrier checks after persisted terminal failure on %s without enabling a resend", async action => {
     const test = protectedSetup(); delete test.options.apiKey;
     const failed = { operationId, packetId: test.canonical.packet.protectedSnapPacket.packetId,
@@ -1084,32 +1120,18 @@ describe("synthetic reference-only protected SNAP worker", () => {
       test.options.snapCapturePreparation = checker;
       return { ...test, pending, checker, intent };
     }
-    it("automatically saves exact review after direct completion through the real coordinator without dispatch or protected model input", async () => {
-      const test = pendingSetup();
-      test.state.claim.request.intake.zip = "19104";
-      test.state.pendingCapture = { ...test.pending, state: "checked" };
-      test.state.operations = [test.raw];
-      delete test.options.coordinate;
-      const model = vi.fn<typeof fetch>(async (url, init): Promise<Response> => {
-        expect(url).toBe("https://api.openai.com/v1/responses");
-        expect(test.database.query.mock.calls.filter(([sql]) => sql.includes("parent_reserve_ai_call"))).toHaveLength(model.mock.calls.length);
-        const body = JSON.parse(String(init?.body));
-        expect(body).toMatchObject({ model: "gpt-6.1-sol", store: false, max_output_tokens: 3000 });
-        expect(JSON.parse(body.input[0].content)).toMatchObject({ needs: ["snap_new"], authorizedRecipients: ["snap-pa"] });
-        expect(String(init?.body)).not.toMatch(/protectedSnapPacket|snapshotHash|contentSha256|authorizationId|verificationId|strokes|ssn/i);
-        for (const id of [test.intent.packetId, test.intent.authorizationId, test.intent.snapshotId, test.intent.requestId])
-          expect(String(init?.body)).not.toContain(id);
-        return Response.json({ status: "completed", output: model.mock.calls.length === 1 ? [{ type: "function_call", name: "select_programs",
-          call_id: "synthetic-first-review", arguments: JSON.stringify({ selections: [{ need: "snap_new", programId: "snap-pa" }] }) }] : [],
-          usage: { input_tokens: 10, output_tokens: 10 } });
-      });
+    it.each([true, false])("saves exact review without planning or sending after capture verification (already checked=%s)", async checked => {
+      const test = pendingSetup(); test.state.claim.request.intake.zip = "19104";
+      if (checked) { test.state.pendingCapture = { ...test.pending, state: "checked" }; test.state.operations = [test.raw]; }
+      delete test.options.coordinate; delete test.options.apiKey; test.state.budget = false;
+      const model = vi.fn<typeof fetch>(async () => { throw new Error("Fresh planning must not be needed for exact review"); });
       test.options.fetcher = model;
       expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
-      expect(model).toHaveBeenCalledTimes(2);
-      expect(test.checker.prepareCapture).not.toHaveBeenCalled();
+      expect(model).not.toHaveBeenCalled();
+      expect(test.checker.prepareCapture).toHaveBeenCalledTimes(checked ? 0 : 1);
       expect(test.port.execute).not.toHaveBeenCalled(); expect(test.port.reconcile).not.toHaveBeenCalled();
       expect(test.execute).not.toHaveBeenCalled(); expect(test.state.prepared).toEqual([]);
-      expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_begin_operation"))).toBe(false);
+      expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_begin_operation") || sql.includes("parent_reserve_ai_call"))).toBe(false);
       expect(JSON.parse(String(test.state.saved.at(-1)![4]))).toContainEqual(expect.objectContaining({
         reason: "submission_review", field: "snap_final_submit", resolver: "parent",
       }));

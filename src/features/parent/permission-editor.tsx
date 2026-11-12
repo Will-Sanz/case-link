@@ -167,11 +167,9 @@ export function PermissionEditor({
                   onChange={() => changeMode("full")}
                 />
                 <span>
-                  <strong>Prepare and carry out permitted steps</strong>
+                  <strong>{request.controlled_test ? "Run this fictional signing and fax test" : "Prepare and carry out permitted steps"}</strong>
                   <small>
-                    Share allowed information, submit supported applications,
-                    coordinate appointments and follow up. Required personal
-                    acts remain yours.
+                    {request.controlled_test ? "Use only the saved fictional application and test marks. Submit sends only to the free fax emulator; no real filing is authorized." : "Share allowed information, submit supported applications, coordinate appointments and follow up. Required personal acts remain yours."}
                   </small>
                 </span>
               </label>

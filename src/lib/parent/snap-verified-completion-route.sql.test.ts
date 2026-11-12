@@ -58,7 +58,7 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),clock_timestamp()+interval '1 hour')", [session, owner]);
     const s = { owner } as Scope;
-    const request = (await parent(s, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"] })), randomUUID()])).rows[0].id as string;
+    const request = (await parent(s, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"], expiresAt: new Date(Date.now()+3600000).toISOString() })), randomUUID()])).rows[0].id as string;
     const details = fixtureSnapApplication(new Date()), snapshot = (await parent(s, "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()])).rows[0].id as string;
     const version = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const hash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, version])).rows[0].hash as string;
@@ -195,8 +195,14 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
       expect((await fixture.admin.query("select state,attempts from public.parent_jobs where request_id=$1", [scope.request])).rows[0]).toEqual({ state: "queued", attempts: 0 });
       expect((await call("parent_worker", "select parent_private.parent_claim_job(300) job")).rows[0].job.request.id).toBe(scope.request);
     });
-    it.each(["missing Submit", "provider closed", "personal act expired", "mandate revoked"])("does not claim prepared work with %s", async missing => {
-      await park(); const scope = await ready(missing !== "missing Submit");
+    it("claims an exact verified packet for parent review while still denying dispatch without Submit", async () => {
+      await park(); const scope = await ready(false), job = (await claim()).rows[0].job;
+      expect(job.request.id).toBe(scope.request);
+      await expect(call("parent_worker", "select parent_private.parent_begin_operation($1,$2,$3)", [scope.operationId,job.jobId,job.leaseToken])).rejects.toMatchObject({code:"42501"});
+      expect((await fixture.admin.query("select state from public.parent_operations where id=$1",[scope.operationId])).rows[0].state).toBe("prepared");
+    });
+    it.each(["provider closed", "personal act expired", "mandate revoked"])("does not claim prepared work with %s", async missing => {
+      await park(); const scope = await ready();
       if (missing === "provider closed") await fixture.admin.query("update parent_private.provider_capabilities set enabled=false where program_id='snap-pa' and action='submit'");
       if (missing === "personal act expired") await fixture.admin.query("update parent_private.personal_act_evidence set expires_at=now()-interval '1 second' where operation_id=$1", [scope.operationId]);
       if (missing === "mandate revoked") await fixture.admin.query("update public.parent_requests set mandate_revoked_at=now() where id=$1", [scope.request]);

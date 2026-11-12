@@ -77,7 +77,7 @@ export async function getHousehold(): Promise<{
   };
 }
 const requestColumns =
-  "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts,account_changed_at,intake_confirmed_at,intake_need_scoped_fields";
+  "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts,account_changed_at,intake_confirmed_at,intake_need_scoped_fields,controlled_test";
 const eventColumns = "id,request_id,kind,actor,summary,created_at,evidence";
 const documentColumns =
   "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at";
@@ -241,6 +241,10 @@ export async function controlSupportRequest(
     p_request_id: uuid.parse(id),
     p_action: z.enum(["pause", "resume", "cancel"]).parse(action),
   });
+  if (error?.code === "23514" && error.message === "invalid request change")
+    throw new Error(
+      "This request is unavailable, or its permission has changed.",
+    );
   check(error);
 }
 export async function correctSupportRequest(

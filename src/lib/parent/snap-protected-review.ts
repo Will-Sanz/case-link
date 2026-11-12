@@ -18,6 +18,7 @@ const configFields = {
   publicOrigin: z.string().max(100),
   supabasePublicKey: z.string().min(1).max(4096).regex(/^[A-Za-z0-9._-]+$/).refine(publicKeyIsSafe),
   finalizerDatabaseUrl: z.string().min(1).max(2048),
+  controlledTest: z.object({ requestId: z.uuid(), snapshotHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().optional(),
 };
 const configSchema = z.discriminatedUnion("mode", [
   z.object({ ...configFields, mode: z.literal("local").optional(), supabaseOrigin: z.literal("http://127.0.0.1:55321") }).strict(),
@@ -124,6 +125,8 @@ export function createSnapProtectedReviewHandler(input: unknown) {
       const checked = snapPacketAuthorizationResultSchema.safeParse(metadata.data);
       if (!checked.success) return reply(503);
       const { intent } = checked.data;
+      if (config.controlledTest && ((upload && !scope.direct) || scope.requestId !== config.controlledTest.requestId
+        || intent.snapshotHash !== config.controlledTest.snapshotHash)) return reply(403);
       if (intent.ownerId !== session.user.id || intent.requestId !== scope.requestId || intent.packetId !== scope.packetId || intent.requestVersion !== scope.expectedVersion
         || Date.parse(checked.data.authorizationExpiresAt) <= Date.now() || Date.parse(checked.data.consentedAt) > Date.now()) return reply(403);
       signal.throwIfAborted();
@@ -134,6 +137,10 @@ export function createSnapProtectedReviewHandler(input: unknown) {
           try {
             bytes = await readProtectedBody(request, Number(length), signal);
             completion = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+            if (config.controlledTest && !z.object({ requestId: z.literal(config.controlledTest.requestId),
+              snapshotHash: z.literal(config.controlledTest.snapshotHash), identifiers: z.array(z.object({
+                personId: z.uuid(), kind: z.literal("provide_to_agency_later"),
+              }).strict()).min(1).max(30) }).passthrough().safeParse(completion).success) return reply(400);
           } catch { return reply(signal.aborted ? 503 : 400); }
           // A complete authorized upload survives navigation within its original deadline; database permission is rechecked before storage.
           completionSignal = deadlineSignal;
@@ -194,7 +201,7 @@ export function createSnapProtectedReviewHandler(input: unknown) {
       signal.throwIfAborted();
       if (Date.now() >= deadline.getTime() || Date.parse(binding.data.expiresAt) <= Date.now()) return reply(409);
       const response = new Response(Uint8Array.from(bytes), { headers: { ...responseHeaders, "Content-Type": "application/pdf", "Content-Length": String(bytes.length),
-        "Content-Disposition": 'inline; filename="caselink-snap-application.pdf"' } });
+        "Content-Disposition": config.controlledTest ? 'inline; filename="caselink-fictional-test-application.pdf"' : 'inline; filename="caselink-snap-application.pdf"' } });
       for (const cookie of cookies) response.headers.append("Set-Cookie", cookie);
       return response;
     } catch { return reply(503); }

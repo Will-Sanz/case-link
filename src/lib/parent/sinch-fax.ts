@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { finished } from "node:stream/promises";
 import { Worker } from "node:worker_threads";
 import { z } from "zod";
+import { checkSinchSnapFaxService } from "./snap-sender-carrier";
 
 // https://developers.sinch.com/docs/fax/api-reference/fax/faxes documents this no-charge emulator.
 export const SINCH_FAX_EMULATOR_NUMBER = "+19898989898";
@@ -165,6 +166,8 @@ export function createSinchFaxEmulator(input: {
   }
 
   return {
+    checkConfiguration: (signal: AbortSignal) => checkSinchSnapFaxService(config,
+      path => request(`https://fax.api.sinch.com/v3/projects/${config.projectId}${path}`, "GET", undefined, signal), signal),
     async sendSyntheticTest(value: { bytes: Uint8Array; contentSha256: string; pageCount: number; idempotencyKey: string }, signal?: AbortSignal,
       beforeSend?: (operation: SinchFaxEmulationOperation) => Promise<void>): Promise<SinchFaxEmulationEvidence> {
       const parsed = z.object({ bytes: z.instanceof(Uint8Array), contentSha256: hash, pageCount: sinchFaxEmulationOperationSchema.shape.pageCount, idempotencyKey: z.string().min(1).max(500) }).strict().safeParse(value);
