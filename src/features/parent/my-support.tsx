@@ -9,6 +9,8 @@ import { displayDate } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { ProgressBadge } from "./support-progress";
+import { currentApplicationState, type OperationHistory } from "./support-activity";
+import type { SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import styles from "./parent.module.css";
 
 export function requestStatus(request: SupportRequest): string {
@@ -25,6 +27,13 @@ export function requestStatus(request: SupportRequest): string {
   if (request.required_actions.some((action) => !action.resolved))
     return "Waiting on a service step";
   return request.plan ? "Guidance ready" : "Request saved";
+}
+
+function SnapCardStatus({ request }: { request: SupportRequest }) {
+  const history = useParentResource<NonNullable<OperationHistory["data"]>>(`/requests/${request.id}/operations?updated=${encodeURIComponent(request.updated_at)}`);
+  const saved = useParentResource<{ review: SnapProtectedOperation | null }>(`/requests/${request.id}/snap-submission?expectedVersion=${request.version}&updated=${encodeURIComponent(request.updated_at)}`);
+  const state = currentApplicationState(request, history, !saved.error && !saved.loading ? saved.data?.review : null);
+  return <span className={styles.badge}>{request.status !== "active" ? `${requestStatus(request)} · ` : ""}{saved.error && !state.hasAttempt ? "Application records unavailable" : state.label}</span>;
 }
 
 export function MySupport() {
@@ -86,7 +95,7 @@ export function MySupport() {
                       .map((need) => NEED_LABELS[need])
                       .join(" · ")}
                   </h2>
-                  {data.progress?.[request.id] ? (
+                  {request.intake.needs.includes("snap_new") ? <SnapCardStatus request={request}/> : data.progress?.[request.id] ? (
                     <ProgressBadge progress={data.progress[request.id]} />
                   ) : (
                     <span

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fixtureRequest } from "@/lib/parent/test-fixtures";
+import { fixtureRequest, fixtureIntake, fixtureProtectedSnapOperation } from "@/lib/parent/test-fixtures";
 import type { SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { MySupport } from "./my-support";
@@ -45,6 +45,16 @@ async function show() {
 }
 
 describe("current support-list progress", () => {
+  it("shows the same exact emulator milestone and retains cancellation separately", async () => {
+    const value = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }), controlled_test: true, status: "cancelled" });
+    const review = fixtureProtectedSnapOperation();
+    const fetch = vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => url.includes("/operations?") ? { ok: true, historyLimited: false, operations: [{ id: review.operationId, request_id: value.id, request_version: value.version, need: "snap_new", program_id: "snap-pa", action: "submit", artifact_id: null, protected_packet: review.packet.protectedSnapPacket, state: "sent", created_at: value.updated_at, evidence: { source: "provider_api", reference: "sinch-emulation:fixture", recordedAt: value.updated_at } }] } : url.includes("/snap-submission?") ? { ok: true, review: null } : { ok: true, requests: [value], progress: { [value.id]: { state: "waiting", summary: "Recorded background wait" } } } }));
+    vi.stubGlobal("fetch", fetch); await open();
+    expect(screen.getByText("Cancelled · Free emulator test completed · no agency filing")).toBeTruthy();
+    expect(screen.queryByText("Waiting for the next step")).toBeNull();
+    expect(fetch.mock.calls).toHaveLength(3);
+  });
+
   it("does not restart a slow outstanding refresh on a visibility event before its deadline", async () => {
     let finish!: (value: ReturnType<typeof response>) => void;
     const fetch = vi.fn().mockResolvedValueOnce(response("queued")).mockImplementationOnce(

@@ -17,6 +17,7 @@ vi.mock("./snap-review-pdf", async () => {
     return <div role="img" aria-label="Exact SNAP application test viewer"/>;
   } };
 });
+vi.mock("./snap-decision-summary", () => ({ SnapDecisionSummary: () => <div aria-label="Application decision summary"/> }));
 import { SnapFinalReview } from "./snap-final-review";
 
 const operation = fixtureProtectedSnapOperation(), request = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"], utilityProviders: [] }), mandate: fixtureMandate({ recipientIds: ["snap-pa"] }),
@@ -41,6 +42,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("exact parent SNAP final review and genuine Submit", () => {
+  it("removes the decision summary immediately when its data permission is withdrawn", async () => {
+    api(); const page = render(<SnapFinalReview request={request}/>);
+    await screen.findByLabelText("Application decision summary");
+    page.rerender(<SnapFinalReview request={{ ...request, mandate: { ...request.mandate, allowedData: ["household"] } }}/>);
+    expect(screen.queryByLabelText("Application decision summary")).toBeNull();
+  });
   it("waits for exact private rendering and records the visible personal-step report only with a genuine Submit click", async () => {
     let resolve!: (value: Uint8Array) => void; mocks.load.mockReturnValue(new Promise<Uint8Array>(done => { resolve = done; }));
     const fetcher = api(), changed = vi.fn(); render(<SnapFinalReview request={request} onChange={changed}/>);
@@ -92,6 +99,7 @@ describe("exact parent SNAP final review and genuine Submit", () => {
     api(review, () => json({ ok: true, requestVersion: request.version + 1 }));
     const page = render(<SnapFinalReview request={request} onChange={changed}/>); await screen.findByRole("button", { name: "Submit" });
     fireEvent.click(screen.getByRole("button", { name: "Replace personal pages" })); await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+    expect(screen.queryByLabelText("Application decision summary")).toBeNull();
     expect(screen.queryByRole("img")).toBeNull(); expect(screen.queryByRole("link", { name: /Open this exact application PDF/ })).toBeNull();
     expect(mocks.revoke).toHaveBeenCalledWith("blob:https://caselink.test/synthetic-pdf"); expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.getByText(/Waiting for the current application revision/)).toBeTruthy();
@@ -140,6 +148,7 @@ describe("exact parent SNAP final review and genuine Submit", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" })); fireEvent.click(screen.getByRole("button", { name: "Replace personal pages" }));
     expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.queryByLabelText("Application decision summary")).toBeNull();
     expect(screen.queryByRole("img")).toBeNull(); expect(screen.queryByRole("link", { name: /Open this exact application PDF/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull(); expect(screen.getByRole("button", { name: "Replace personal pages" }).matches(":disabled")).toBe(true);
     expect(screen.getByText(/Your application permission has expired or could not be checked/)).toBeTruthy();

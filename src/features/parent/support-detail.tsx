@@ -25,7 +25,7 @@ import { boundedParentApi, displayDate, parentApi, ParentApiError } from "./api"
 import { ParentLoading, ServiceError } from "./feedback";
 import { requestStatus } from "./my-support";
 import { SupportDocuments } from "./support-documents";
-import { SupportActivity, currentProtectedSnapAttempt, currentSnapReview, isSnapFinalReviewAction, recordedReceipt, type RecordedOperation } from "./support-activity";
+import { SupportActivity, currentApplicationState, currentProtectedSnapAttempt, currentSnapReview, isSnapFinalReviewAction, recordedReceipt, type RecordedOperation } from "./support-activity";
 import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { FoodSites } from "./food-sites";
 import { SupportPartners } from "./support-partners";
@@ -497,6 +497,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
   const decisionRecorded = ownedReview?.snapSubmissionAuthorized === true || (knownDecision?.snapSubmissionAuthorized === true && (!ownedReview || sameSnapProtectedOperationBinding(ownedReview, knownDecision)));
   const attemptRecorded = !!ownedReview && snapProtectedDeliveryAttempt(ownedReview.state) || !history.error && !history.loading && currentProtectedSnapAttempt(request, history.data?.operations ?? []);
   const reviewFinished = decisionRecorded || attemptRecorded;
+  const applicationState = currentApplicationState(request, history, decisionRecorded ? ownedReview?.snapSubmissionAuthorized ? ownedReview : knownDecision : ownedReview);
   const currentSnapReceipt = snapRequested ? supportRouteReceipt({ need: "snap_new", programId: "snap-pa", state: "checking" }, currentOperations) : null;
   const preparedSnapReview = ownedReview?.state === "prepared" && ownedReview.protectedPacketCurrent ? ownedReview : null;
   const snapReviewRequired = acceptingActions && preparedSnapReview?.protectedParentSubmitReady === true && request.required_actions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent") && isSnapFinalReviewAction(action));
@@ -522,7 +523,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         <span className={workspace.caseBackLabel}>My support</span>
       </Link>
       <h1>{supportTitle(request)}</h1>
-        {outdatedParentWait ? <span className={styles.badge}>{submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded"}</span> : data?.progress && !error ? (
+        {snapRequested ? <span className={styles.badge}>{request.status !== "active" ? `${requestStatus(request)} · ` : ""}{applicationState.label}</span> : outdatedParentWait ? <span className={styles.badge}>{submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded"}</span> : data?.progress && !error ? (
           <ProgressBadge progress={data.progress} />
         ) : (
           <span
@@ -663,7 +664,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                     <span
                       className={`${styles.badge} ${["checking", "unresolved"].includes(state) ? styles.badgeWait : ""}`}
                     >
-                      {request.controlled_test ? receipt?.reference.startsWith("sinch-emulation:") ? "Test fax completed — no agency filing" : "Fictional test in progress" : receipt ? OUTCOME_LABELS[receipt.state] : snapDeliveryCheck ? attemptRecorded ? "Delivery result not confirmed" : "Submit decision recorded" : supportRouteLabel(route, currentOperations)}
+                      {route.need === "snap_new" && route.programId === "snap-pa" ? applicationState.label : receipt ? OUTCOME_LABELS[receipt.state] : supportRouteLabel(route, currentOperations)}
                     </span>
                   </div>
                   <p>
@@ -672,7 +673,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                       <> · {program.name}</>
                     )}
                   </p>
-                  <p>{receipt
+                  <p>{route.need === "snap_new" && request.controlled_test ? applicationState.detail : receipt
                     ? `${OUTCOME_LABELS[receipt.state]} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`
                     : snapDeliveryCheck
                       ? attemptRecorded ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry." : "Your decision to send the exact SNAP application is recorded. CaseLink must check delivery and any agency confirmation."
@@ -680,7 +681,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                   {!receipt && !snapDeliveryCheck && route.limitation && <p>{route.limitation}</p>}
                   <p>
                     <strong>Next:</strong>{" "}
-                    {receipt
+                    {route.need === "snap_new" && applicationState.testCompleted ? "No further test step recorded" : receipt
                       ? receiptNextStep(state)
                       : snapDeliveryCheck || route.nextActor === "caselink"
                       ? "CaseLink"

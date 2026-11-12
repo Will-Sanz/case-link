@@ -62,6 +62,144 @@ export type OperationHistory = {
   error: Error | null;
   reload: () => void;
 };
+export function recordedApplicationState(
+  operations: Pick<
+    RecordedOperation,
+    | "id"
+    | "program_id"
+    | "state"
+    | "request_version"
+    | "artifact_id"
+    | "protected_packet"
+    | "form"
+    | "need"
+    | "action"
+    | "evidence"
+  >[],
+  programId?: string,
+  currentVersion?: number,
+  need?: SupportNeed,
+  controlledTest = false,
+): {
+  label: string;
+  detail: string;
+  submitted: boolean;
+  hasAttempt: boolean;
+  currentVersionSubmitted?: boolean;
+  testCompleted?: boolean;
+  outcome?: "assistance_approved" | "support_received" | "declined";
+} {
+  const relevant = operations.filter(
+    (operation) =>
+      (!programId || operation.program_id === programId) &&
+      (!need || operation.need === need),
+  );
+  if (controlledTest) {
+    const completed = relevant.find(operation => operation.request_version === currentVersion && operation.state === "sent" && recordedReceipt(operation)?.source === "provider_api" && recordedReceipt(operation)?.reference.startsWith("sinch-emulation:"));
+    return { label: completed ? "Free emulator test completed · no agency filing" : "Fictional test record · no agency filing", detail: completed ? "The free emulator confirmed this fictional transmission. No agency filing occurred. Real-agency work is separate and is not confirmed by this test. No repeat Submit is needed." : "This record describes a fictional test only. It does not establish agency submission, eligibility approval or support received.", submitted: false, hasAttempt: relevant.some(operation => snapProtectedDeliveryAttempt(operation.state)), testCompleted: !!completed };
+  }
+  const latestDecision = relevant.flatMap((operation) => {
+    const receipt = recordedReceipt(operation);
+    return receipt && ["agency_submitted", "assistance_approved", "support_received", "declined"].includes(receipt.state) &&
+      (currentVersion === undefined || operation.request_version === currentVersion)
+      ? [receipt] : [];
+  }).sort((a, b) => Date.parse(b.agencyStatus?.observedAt ?? b.recordedAt) - Date.parse(a.agencyStatus?.observedAt ?? a.recordedAt))[0]?.state;
+  const outcome =
+    latestDecision === "assistance_approved" ||
+    latestDecision === "support_received" ||
+    latestDecision === "declined"
+      ? latestDecision
+      : undefined;
+  const submitted = relevant.filter(
+    (operation) => operation.state === "agency_submitted" && recordedReceipt(operation),
+  );
+  if (submitted.length) {
+    const earlierVersion =
+      currentVersion !== undefined &&
+      submitted.every(
+        (operation) => operation.request_version !== currentVersion,
+      );
+    return {
+      label: outcome ? OUTCOME_LABELS[outcome] : earlierVersion
+        ? "An earlier application version was submitted"
+        : "Application submission recorded",
+      detail: earlierVersion
+        ? "Your information has changed since the recorded submission. Activity & receipts keeps the exact application and any correction or follow-up evidence."
+        : "An agency submission is recorded. Open Activity & receipts for the exact evidence and who confirmed it.",
+      submitted: true,
+      hasAttempt: true,
+      currentVersionSubmitted: currentVersion !== undefined && !earlierVersion,
+      outcome,
+    };
+  }
+  if (
+    outcome === "assistance_approved" ||
+    outcome === "support_received" ||
+    outcome === "declined"
+  )
+    return {
+      label: OUTCOME_LABELS[outcome],
+      detail:
+        "Open Activity & receipts for the program’s decision or support received. An outcome record alone does not establish how an application was filed.",
+      submitted: false,
+      hasAttempt: true,
+      outcome,
+    };
+  const delivery = relevant.find(operation => (currentVersion === undefined || operation.request_version === currentVersion) && ["sent", "partner_received", "partner_accepted"].includes(operation.state) && recordedReceipt(operation));
+  if (delivery) return { label: delivery.state === "sent" ? "Transport acknowledgment recorded" : delivery.state === "partner_received" ? "Partner receipt recorded" : "Partner acceptance recorded", detail: "Delivery evidence is recorded. Agency submission, eligibility approval and support received require separate evidence. Open Activity & receipts for the source.", submitted: false, hasAttempt: true };
+  if (
+    relevant.some(
+      (operation) =>
+        [
+          "executing",
+          "delivery_unknown",
+          "sent",
+          "partner_received",
+          "partner_accepted",
+          "unresolved",
+          "agency_submitted",
+          "assistance_approved",
+          "support_received",
+          "declined",
+        ].includes(operation.state) &&
+        (operation.state !== "executing" ||
+          !["research", "prepare"].includes(operation.action ?? "")),
+    )
+  )
+    return {
+      label: "Agency submission not confirmed",
+      detail:
+        "A delivery or unresolved attempt is recorded. CaseLink must confirm the agency’s receipt before calling this a submitted application or trying again.",
+      submitted: false,
+      hasAttempt: true,
+    };
+  if (relevant.some(operation => operation.state === "prepared" && (currentVersion === undefined || operation.request_version === currentVersion) && protectedRecordedSnapPacket(operation)))
+    return { label: "SNAP application prepared", detail: "The exact application is prepared for your review. No application submission is recorded.", submitted: false, hasAttempt: false };
+  const forms = relevant.filter((operation) => operation.artifact_id);
+  return {
+    label: "No application submission recorded",
+    detail: forms.length
+      ? forms.every((operation) => operation.form?.preparation_only)
+        ? "An incomplete unsigned draft is saved. It is not a complete application and has not been submitted."
+        : "A prepared form is saved. Preparation is separate from sending an application."
+      : "Your support request is saved. Guidance and a support plan are separate from filling or sending an application.",
+    submitted: false,
+    hasAttempt: false,
+  };
+}
+
+export function currentApplicationState(request: SupportRequest, history: Pick<OperationHistory, "data" | "loading" | "error">, review?: unknown) {
+  const unknown = { submitted: false, hasAttempt: false };
+  if (history.error || !history.loading && !history.data) return { ...unknown, label: "Application records unavailable", detail: "We cannot confirm the latest application record. Check again before starting another attempt." };
+  if (history.loading) return { ...unknown, label: "Checking application records…", detail: "Checking saved operations and receipts." };
+  const snap = request.intake.needs.includes("snap_new");
+  const state = recordedApplicationState((history.data?.operations ?? []).filter(operation => !operation.request_id || operation.request_id === request.id), snap ? "snap-pa" : undefined, request.version, snap ? "snap_new" : request.intake.needs.length === 1 ? request.intake.needs[0] : undefined, request.controlled_test);
+  if (history.data?.historyLimited && !state.hasAttempt) return { ...state, label: "Earlier application history needs checking", detail: "An earlier submission or uncertain delivery may be outside this view. Check the full history before another attempt." };
+  if (!state.hasAttempt && currentSnapReview(request, review)?.snapSubmissionAuthorized) return { ...state, label: request.controlled_test ? "Fictional Submit decision recorded · no agency filing" : "Submit decision recorded", detail: "The decision to send your exact application is saved. Delivery and an agency confirmation are separate records." };
+  if (state.currentVersionSubmitted && !state.outcome && !history.data?.historyLimited) return { ...state, detail: "Submission confirmed · benefits decision pending. Open your recorded receipt for the exact application and who confirmed it." };
+  return state;
+}
+
 export function currentSnapDraft(request: SupportRequest, operations: readonly RecordedOperation[]) {
   if (!request.intake.needs.includes("snap_new") || request.status !== "active" || !(Date.parse(request.mandate.expiresAt) > Date.now())) return null;
   const current = operations.filter(operation => operation.artifact_id && operation.need === "snap_new" && operation.program_id === "snap-pa"
@@ -178,14 +316,10 @@ export function SupportActivity({
                   {getProgram(operation.program_id)?.name ?? "Named program"}
                 </strong>
                 <p className={styles.hint}>
-                  {request.controlled_test ? recordedReceipt(operation)?.reference.startsWith("sinch-emulation:") ? "Free emulator test completed · no agency filing" : "Fictional test record · no agency filing" : operation.state === "prepared" && protectedRecordedSnapPacket(operation)
-                    ? "SNAP application prepared · not submitted"
-                    : operation.state === "prepared" && operation.form?.preparation_only
-                    ? "Incomplete unsigned draft · not submitted"
-                    : OUTCOME_LABELS[operation.state as OutcomeState] ??
-                      "Needs verification"}{" "}
+                  {operation.need !== "snap_new" ? OUTCOME_LABELS[operation.state as OutcomeState] ?? "Needs verification" : operation.state === "prepared" && operation.form?.preparation_only && !request.controlled_test ? "Incomplete unsigned draft · not submitted" : recordedApplicationState([operation], undefined, request.controlled_test ? request.version : operation.request_version, undefined, request.controlled_test).label}{" "}
                   · {displayDate(operation.created_at)}
                 </p>
+                {operation.need === "snap_new" && <p className={styles.hint}>{operation.request_version === request.version ? "Current" : "Earlier"} application version {operation.request_version ?? "unknown"}. Evidence: {recordedReceipt(operation)?.source.replaceAll("_", " ") ?? "No verified receipt"}.</p>}
                 <a
                   className={styles.textLink}
                   href={`/api/parent/requests/${request.id}/operations/${operation.id}/export`}
