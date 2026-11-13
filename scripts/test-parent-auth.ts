@@ -11,13 +11,19 @@ import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { PDFDocument } from "pdf-lib";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
-import { SNAP_APPLICATION_NOTICE_VERSION } from "../src/lib/parent/constants";
+import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "../src/lib/parent/constants";
 import { assessSnapApplicationFields, SNAP_APPLICATION_SOURCE } from "../src/lib/parent/snap-application-fields";
 import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema, type SnapApplicationSnapshot } from "../src/lib/parent/snap-application-snapshot";
+import { WIC_APPLICATION_SOURCE } from "../src/lib/parent/wic-application-fields";
+import type { WicApplicationSnapshot } from "../src/lib/parent/wic-application-snapshot";
+import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE, PECO_SUBJECT_AUTHORITY_STATEMENT, PECO_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/peco-application-fields";
+import type { PecoApplicationSnapshot } from "../src/lib/parent/peco-application-snapshot";
 
 const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200";
 const checks: string[] = [];
 const snapAccessibility: { state: string; width: number; height: number; screenshot: string; overflow: boolean; violations: string[] }[] = [];
+const wicAccessibility: typeof snapAccessibility = [];
+const pecoAccessibility: typeof snapAccessibility = [];
 let stage = "local service configuration";
 function check(condition: unknown, label: string): asserts condition {
   assert.ok(condition, label);
@@ -1162,6 +1168,451 @@ async function main() {
         "All four SNAP-purpose controls are restored exactly and model-budget reservations are unchanged.");
     }
 
+    stage = "actual private WIC intake, owned history and correction";
+    const wicControls = (await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+    const wicBudgetBefore = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    const checkWicPage = async (state: string) => {
+      const viewport = first.page.viewportSize(), directory = "tmp/parent-verification/actual-auth";
+      mkdirSync(directory, { recursive: true });
+      try {
+        for (const [name, width, height] of [["phone", 320, 820], ["laptop", 1280, 900]] as const) {
+          await first.page.setViewportSize({ width, height });
+          await first.page.evaluate(() => document.fonts.ready.then(() => undefined));
+          const overflow = await first.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          if (state === "intake" || state === "correction") {
+            const flow = await first.page.getByRole("region", { name: "WIC private information notice", exact: true }).evaluate(notice => {
+              const paragraph = notice.querySelector("p");
+              if (!paragraph) return null;
+              const style = getComputedStyle(notice);
+              return { display: getComputedStyle(paragraph).display, width: paragraph.getBoundingClientRect().width,
+                available: notice.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) };
+            });
+            check(flow?.display === "block" && Math.abs(flow.width - flow.available) <= 2,
+              `The actual WIC ${state} notice keeps prose in normal paragraph flow across the available content width at ${width}px.`);
+          }
+          const axe = await new AxeBuilder({ page: first.page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+          const screenshot = `${directory}/wic-${state}-${name}.png`;
+          await first.page.screenshot({ path: screenshot, fullPage: true });
+          wicAccessibility.push({ state, width, height, screenshot, overflow, violations: axe.violations.map(item => item.id) });
+          check(!overflow, `The actual WIC ${state} has no horizontal page overflow at ${width}px.`);
+          check(axe.violations.length === 0, `The actual WIC ${state} has no automated WCAG A/AA violations at ${width}px (${axe.violations.map(item => `${item.id}: ${item.nodes.flatMap(node => node.target).join(", ")}`).join("; ") || "none"}).`);
+        }
+      } finally {
+        if (viewport) await first.page.setViewportSize(viewport);
+      }
+    };
+    try {
+      await db.query("update parent_private.processing_controls set wic_details_enabled=false where singleton");
+      await first.page.goto(`${origin}/get-support?need=wic_new`, { waitUntil: "networkidle" });
+      check(await first.page.getByLabel("Contact first name", { exact: true }).count() === 0 &&
+        await first.page.locator('a[href="https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist"]').count() > 0,
+      "The actual closed WIC purpose exposes official help without opening private contact or health fields.");
+      await db.query(`update parent_private.processing_controls set wic_details_enabled=true,
+        wic_details_approval_reference='isolated synthetic Auth WIC fixture',wic_details_approved_until=now()+interval '1 hour',wic_details_notice_version=$1 where singleton`, [WIC_APPLICATION_NOTICE_VERSION]);
+      await first.page.reload({ waitUntil: "networkidle" });
+      await first.page.getByLabel("Contact first name", { exact: true }).waitFor();
+      const routingReply = await first.page.request.get(`${origin}/api/parent/intake-defaults`);
+      const routingSource = (await routingReply.json()).zip;
+      check(routingReply.status() === 200 && routingSource?.value === "19104" &&
+        await first.page.getByLabel("Household ZIP code", { exact: true }).inputValue() === routingSource.value &&
+        await first.page.getByLabel("Contact postal ZIP code", { exact: true }).inputValue() === "",
+      "The actual WIC intake reuses known household routing without retyping or inferring the separate contact postal ZIP.");
+      await first.page.getByLabel("Preferred service language", { exact: true }).selectOption("en");
+      await first.page.getByLabel("WIC application status", { exact: true }).selectOption("new");
+      await first.page.getByLabel("Who is applying for WIC?", { exact: true }).selectOption("children");
+      for (const [label, value] of [["Contact first name", "AuthWicCanary"], ["Contact last name", "Parent"], ["Contact date of birth", "1990-01-01"],
+        ["Contact street address", "200 Synthetic Lane"], ["Contact city", "Philadelphia"], ["Contact postal ZIP code", "19147"],
+        ["Contact email address", "fictional@example.test"], ["Contact phone number", "215-555-0101"]])
+        await first.page.getByLabel(label, { exact: true }).fill(value);
+      await first.page.getByLabel("Contact county", { exact: true }).selectOption("Philadelphia");
+      await first.page.getByLabel("Preferred time for a WIC appointment", { exact: true }).selectOption("morning");
+      await first.page.getByRole("button", { name: "Add a child", exact: true }).click();
+      for (const [label, value] of [["Child 1 first name", "AuthWicChildCanary"], ["Child 1 last name", "Parent"], ["Child 1 date of birth", "2024-01-01"]])
+        await first.page.getByLabel(label, { exact: true }).fill(value);
+      check(await first.page.getByLabel("People in your household", { exact: true }).count() === 0 &&
+        await first.page.getByLabel("Household income before taxes ($)", { exact: true }).count() === 0 &&
+        await first.page.getByLabel("Mother’s WIC status", { exact: true }).count() === 0,
+      "The actual selected child WIC route groups its known questions without unrelated household-income or maternal questions.");
+      await first.page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+      await checkWicPage("intake");
+      await first.page.getByRole("button", { name: "Continue", exact: true }).click();
+      const wicConsent = first.page.getByRole("checkbox", { name: /I authorize/ });
+      check(await first.page.getByRole("checkbox").count() === 1 &&
+        (await wicConsent.evaluate(input => input.closest("label")?.textContent ?? "")).includes(WIC_SUBJECT_AUTHORITY_STATEMENT),
+      "The actual WIC start uses the existing single authorization checkbox with the declared authority for everyone named.");
+      await wicConsent.check();
+      const wicStarting = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+      await first.page.getByRole("button", { name: "Start getting support", exact: true }).click();
+      const wicStarted = await wicStarting;
+      check(wicStarted.status() === 201, "The actual grouped WIC intake and authorization atomically save the private request.");
+      const wicRequestId = (await wicStarted.json()).request.id as string;
+      const wicStartBody = wicStarted.request().postDataJSON();
+      const wicStartHeaders = { origin, "Idempotency-Key": wicStarted.request().headers()["idempotency-key"] };
+      check(wicStartBody.kind === "wic_application" && wicStartBody.noticeVersion === WIC_APPLICATION_NOTICE_VERSION &&
+        wicStartBody.subjectAuthorityDeclared === true && wicStartBody.reusedZip?.sourceRequestId === routingSource.sourceRequestId &&
+        !!wicStartHeaders["Idempotency-Key"] && wicStartBody.intake.householdSize === null && wicStartBody.intake.incomeAmount === null &&
+        wicStartBody.details.contact.zip === "19147" && wicStartBody.intake.zip === "19104",
+      "The real WIC start keeps explicit subject authority, private postal data and the unchanged ordinary routing source separate.");
+      await first.page.waitForURL(`${origin}/support/${wicRequestId}`);
+      const wicUrl = `${origin}/api/parent/requests/${wicRequestId}/wic-application`;
+      const readWic = async (revision?: string) => {
+        const response = await first.page.request.get(`${wicUrl}${revision ? `?revision=${revision}` : ""}`);
+        check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "Owned WIC revision reads succeed privately through the real web API.");
+        return (await response.json()).snapshot as WicApplicationSnapshot;
+      };
+      const wicState = async () => (await db.query(`select to_jsonb(r) request,to_jsonb(j) job,
+        (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]') from public.parent_events e where e.request_id=r.id) events,
+        (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
+        (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls
+        from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [wicRequestId])).rows[0];
+      const originalWic = await readWic(), originalWicState = await wicState();
+      assert.deepEqual(originalWic.details, wicStartBody.details);
+      assert.deepEqual(originalWic.source, WIC_APPLICATION_SOURCE);
+      check(originalWic.revision === 1 && originalWic.request_version === 2 && originalWicState.job.request_version === 2 &&
+        originalWic.consent_evidence.subjectAuthorityDeclared && originalWic.consent_evidence.actorId === first.id &&
+        !/AuthWicCanary|AuthWicChildCanary|1990-01-01|2024-01-01|19147/.test(JSON.stringify([originalWicState.request, originalWicState.job, originalWicState.events])),
+      "The actual committed WIC snapshot binds the owner declaration while private answers stay out of ordinary requests, jobs and events.");
+      const wicReplay = await first.page.request.post(`${origin}/api/parent/requests`, { headers: wicStartHeaders, data: wicStartBody });
+      check(wicReplay.status() === 201 && (await wicReplay.json()).request.id === wicRequestId, "An exact real web WIC start retry returns the existing private request.");
+      assert.deepEqual(await wicState(), originalWicState);
+      const ownWic = await rest(token, `parent_wic_application_details?request_id=eq.${wicRequestId}`);
+      check(ownWic.status === 200, "The issued owner Auth token reads the owned private WIC revision through actual PostgREST.");
+      assert.deepEqual(await ownWic.json(), [originalWic]);
+      const foreignWic = await rest(secondToken, `parent_wic_application_details?request_id=eq.${wicRequestId}`);
+      check(foreignWic.status === 200 && (await foreignWic.json()).length === 0 && (await second.page.request.get(wicUrl)).status() === 404,
+        "Another authenticated household cannot read private WIC history through PostgREST or the web API.");
+      const foreignWicSave = await rest(secondToken, "rpc/parent_save_wic_application_details", { p_request_id: wicRequestId,
+        p_expected_version: originalWic.request_version, p_details: originalWic.details, p_notice_version: WIC_APPLICATION_NOTICE_VERSION,
+        p_idempotency_key: randomUUID(), p_subject_authority_declared: true });
+      check(foreignWicSave.status === 403, "Another issued Auth token cannot correct the owner's WIC request.");
+      const wicDocument = await first.page.request.post(`${origin}/api/parent/requests/${wicRequestId}/documents`, {
+        headers: { origin }, multipart: { consent: "1", file: { name: "synthetic-wic.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-SYNTHETIC") } },
+      });
+      check(wicDocument.status() === 403 && (await db.query("select count(*)::int n from public.parent_documents where request_id=$1", [wicRequestId])).rows[0].n === 0,
+        "Even with private WIC answers enabled, the actual upload API does not open the ordinary document or AI-processing channel.");
+      assert.deepEqual(await wicState(), originalWicState);
+
+      stage = "actual WIC saved answers and immutable correction";
+      await showSection(first.page, "application-review");
+      await first.page.getByRole("button", { name: "Correct WIC answers", exact: true }).waitFor();
+      await checkWicPage("review");
+      await first.page.getByRole("button", { name: "Correct WIC answers", exact: true }).click();
+      const wicForm = first.page.getByRole("form", { name: "Correct WIC application answers", exact: true });
+      check(await wicForm.getByLabel("Contact first name", { exact: true }).inputValue() === "AuthWicCanary" &&
+        await wicForm.getByLabel("Contact postal ZIP code", { exact: true }).inputValue() === "19147" &&
+        await wicForm.getByRole("checkbox", { name: /I authorize/ }).count() === 0,
+      "The actual WIC editor reopens saved answers without retyping or another routine authority checkbox.");
+      await wicForm.getByLabel("Contact street address", { exact: true }).fill("201 Synthetic Lane");
+      await checkWicPage("correction");
+      const wicSaving = first.page.waitForResponse(response => response.url() === wicUrl && response.request().method() === "POST");
+      await wicForm.getByRole("button", { name: "Save WIC changes", exact: true }).click();
+      const wicSaved = await wicSaving;
+      check(wicSaved.status() === 201, "The actual WIC editor saves an in-scope correction without another approval step.");
+      const wicSaveBody = wicSaved.request().postDataJSON();
+      const wicSaveHeaders = { origin, "Idempotency-Key": wicSaved.request().headers()["idempotency-key"] };
+      const correctedWic = await readWic();
+      check(correctedWic.revision === 2 && correctedWic.request_version === originalWic.request_version + 1 &&
+        correctedWic.details.contact?.street === "201 Synthetic Lane", "A real WIC correction creates a new immutable revision and invalidates the preceding request version.");
+      assert.deepEqual({ ...correctedWic.provenance, "contact.street": originalWic.provenance["contact.street"] }, originalWic.provenance);
+      assert.deepEqual(await readWic(originalWic.id), originalWic);
+      const correctedWicState = await wicState();
+      const wicCorrectionReplay = await first.page.request.post(wicUrl, { headers: wicSaveHeaders, data: wicSaveBody });
+      check(wicCorrectionReplay.status() === 201 && (await wicCorrectionReplay.json()).snapshotId === correctedWic.id,
+        "The actual WIC correction API reconciles an exact retry without duplicating a private revision.");
+      assert.deepEqual(await wicState(), correctedWicState);
+
+      stage = "actual paused WIC correction and closed-purpose history";
+      await showSection(first.page, "application-controls");
+      const wicPausing = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests/${wicRequestId}` && response.request().method() === "POST");
+      await first.page.getByRole("button", { name: "Pause future work", exact: true }).click();
+      check((await wicPausing).status() === 200, "The actual WIC request can be paused through its standard control.");
+      const pausedWicState = await wicState();
+      await showSection(first.page, "application-review");
+      await first.page.getByRole("button", { name: "Correct WIC answers", exact: true }).click();
+      const pausedWicForm = first.page.getByRole("form", { name: "Correct WIC application answers", exact: true });
+      await pausedWicForm.getByLabel("Contact phone number", { exact: true }).fill("215-555-0102");
+      const pausedWicSaving = first.page.waitForResponse(response => response.url() === wicUrl && response.request().method() === "POST");
+      await pausedWicForm.getByRole("button", { name: "Save WIC changes", exact: true }).click();
+      check((await pausedWicSaving).status() === 201, "The actual paused WIC editor accepts a correction without resuming execution.");
+      const pausedWic = await readWic(), finalWicState = await wicState();
+      check(finalWicState.request.status === "paused" && finalWicState.job.state === "cancelled" &&
+        finalWicState.request.version === pausedWicState.request.version + 1 && pausedWic.details.contact?.phone === "215-555-0102" &&
+        finalWicState.operations === 0 && finalWicState.model_calls === 0,
+      "The corrected WIC request remains paused with no model call or provider operation.");
+      const wicExport = await first.page.request.get(`${origin}/api/parent/account/export`);
+      check(wicExport.status() === 200 && wicExport.headers()["cache-control"] === "private, no-store", "The actual owner export includes private WIC history without public caching.");
+      const exportedWic = (await wicExport.json()).requests.find((row: { id: string }) => row.id === wicRequestId);
+      const exportedWicRevisions = exportedWic?.wicApplicationDetails as WicApplicationSnapshot[];
+      check(exportedWicRevisions?.length === 3, "The actual owner export retains each original and corrected WIC revision.");
+      assert.deepEqual(exportedWicRevisions.find(row => row.id === originalWic.id), originalWic);
+      assert.deepEqual(exportedWicRevisions.find(row => row.id === correctedWic.id), correctedWic);
+      assert.deepEqual(exportedWicRevisions.find(row => row.id === pausedWic.id), pausedWic);
+      const foreignWicExport = await second.page.request.get(`${origin}/api/parent/account/export`);
+      check(foreignWicExport.status() === 200 && !(await foreignWicExport.text()).includes(wicRequestId), "Another household's actual export excludes this private WIC request.");
+      await db.query("update parent_private.processing_controls set wic_details_enabled=false where singleton");
+      assert.deepEqual(await readWic(), pausedWic);
+      const closedWicWrite = await first.page.request.post(wicUrl, { headers: { origin, "Idempotency-Key": randomUUID() },
+        data: { expectedVersion: finalWicState.request.version, details: pausedWic.details, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true } });
+      check(closedWicWrite.status() === 403, "Closing only WIC collection denies new private writes while the owner retains their saved history.");
+      await first.page.reload({ waitUntil: "networkidle" });
+      await showSection(first.page, "application-review");
+      const closedWicEditor = first.page.getByRole("button", { name: "Correct WIC answers", exact: true });
+      check(await closedWicEditor.count() === 0 || await closedWicEditor.isDisabled(), "The actual WIC history does not offer an enabled editor after collection closes.");
+      await checkWicPage("closed-history");
+    } finally {
+      await db.query(`update parent_private.processing_controls c set
+        (wic_details_enabled,wic_details_approval_reference,wic_details_approved_until,wic_details_notice_version)=
+        (select r.wic_details_enabled,r.wic_details_approval_reference,r.wic_details_approved_until,r.wic_details_notice_version
+        from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(wicControls)]);
+      assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, wicControls);
+      check((await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n === wicBudgetBefore,
+        "All four WIC-purpose controls are restored exactly and model-budget reservations are unchanged.");
+    }
+
+    stage = "actual private PECO intake, owned history and correction";
+    const pecoControls = (await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+    const pecoBudgetBefore = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    const choosePecoPreparation = async () => {
+      await first.page.getByLabel("Household ZIP code", { exact: true }).waitFor();
+      await first.page.getByRole("checkbox", { name: "PECO", exact: true }).check();
+      await first.page.getByLabel("Your authority for the selected utility accounts", { exact: true }).selectOption("self");
+      await first.page.getByLabel(/Prepare PECO CAP help for this electricity account/).check();
+    };
+    const checkPecoPage = async (state: string) => {
+      const viewport = first.page.viewportSize(), directory = "tmp/parent-verification/actual-auth";
+      mkdirSync(directory, { recursive: true });
+      try {
+        for (const [name, width, height] of [["phone", 320, 820], ["laptop", 1280, 900]] as const) {
+          await first.page.setViewportSize({ width, height });
+          await first.page.evaluate(() => document.fonts.ready.then(() => undefined));
+          const overflow = await first.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          if (state === "intake" || state === "correction") {
+            const flow = await first.page.getByRole("region", { name: "PECO private information notice", exact: true }).evaluate(notice => {
+              const paragraph = notice.querySelector("p");
+              if (!paragraph) return null;
+              const style = getComputedStyle(notice);
+              return { display: getComputedStyle(paragraph).display, width: paragraph.getBoundingClientRect().width,
+                available: notice.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) };
+            });
+            check(flow?.display === "block" && Math.abs(flow.width - flow.available) <= 2,
+              `The actual PECO ${state} notice keeps normal paragraph flow across the available content width at ${width}px.`);
+          }
+          const axe = await new AxeBuilder({ page: first.page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+          const screenshot = `${directory}/peco-${state}-${name}.png`;
+          await first.page.screenshot({ path: screenshot, fullPage: true });
+          pecoAccessibility.push({ state, width, height, screenshot, overflow, violations: axe.violations.map(item => item.id) });
+          check(!overflow, `The actual PECO ${state} has no horizontal page overflow at ${width}px.`);
+          check(axe.violations.length === 0, `The actual PECO ${state} has no automated WCAG A/AA violations at ${width}px (${axe.violations.map(item => item.id).join(", ") || "none"}).`);
+        }
+      } finally {
+        if (viewport) await first.page.setViewportSize(viewport);
+      }
+    };
+    try {
+      check(pecoControls.peco_details_enabled === false, "Private PECO collection is initially closed on the actual local runtime.");
+      const databaseNow = new Date((await db.query("select clock_timestamp() value")).rows[0].value).getTime();
+      check(databaseNow >= Date.parse(PECO_APPLICATION_SOURCE.sourceCheckedAt) && databaseNow < Date.parse(PECO_APPLICATION_SOURCE.verifiedUntil),
+        "The actual current UTC time falls within the reviewed PECO source window; the rehearsal does not invent an eligibility date.");
+      await first.page.clock.setSystemTime(new Date());
+      await first.page.goto(`${origin}/get-support?need=electricity`, { waitUntil: "networkidle" });
+      await choosePecoPreparation();
+      check(await first.page.getByLabel("Applicant first name", { exact: true }).count() === 0 &&
+        await first.page.getByLabel("PECO account number", { exact: true }).count() === 0 &&
+        await first.page.getByRole("link", { name: "Open official PECO help", exact: true }).count() > 0,
+      "The actual closed PECO purpose exposes official help without collecting private account or household answers.");
+      await db.query(`update parent_private.processing_controls set peco_details_enabled=true,
+        peco_details_approval_reference='isolated synthetic Auth PECO fixture',peco_details_approved_until=now()+interval '1 hour',peco_details_notice_version=$1 where singleton`, [PECO_APPLICATION_NOTICE_VERSION]);
+      await first.page.reload({ waitUntil: "networkidle" });
+      await choosePecoPreparation();
+      await first.page.getByLabel("Applicant first name", { exact: true }).waitFor();
+      const routingReply = await first.page.request.get(`${origin}/api/parent/intake-defaults`), routingSource = (await routingReply.json()).zip;
+      check(routingReply.status() === 200 && routingSource?.value === "19104" &&
+        await first.page.getByLabel("Household ZIP code", { exact: true }).inputValue() === routingSource.value &&
+        await first.page.getByLabel("PECO service ZIP code", { exact: true }).inputValue() === "",
+      "The actual PECO intake reuses current household routing without retyping or inferring the service-address ZIP.");
+      const pecoAuthorization = (await (await first.page.request.get(`${origin}/api/parent/authorization-window`)).json()).authorization.pecoApplication;
+      check(pecoAuthorization.collectionEnabled && pecoAuthorization.noticeVersion === PECO_APPLICATION_NOTICE_VERSION &&
+        Date.parse(pecoAuthorization.expiresAt) > Date.now() && Date.parse(pecoAuthorization.expiresAt) <= Date.parse(PECO_APPLICATION_SOURCE.verifiedUntil),
+      "The real web authorization window exposes the separately approved and source-bounded PECO deadline.");
+      await first.page.getByLabel("Preferred service language", { exact: true }).selectOption("en");
+      await first.page.getByLabel("What PECO CAP help is needed?", { exact: true }).selectOption("new_enrollment");
+      await first.page.getByLabel("Is this account already enrolled in CAP?", { exact: true }).selectOption("not_enrolled");
+      for (const [label, value] of [["Applicant first name", "AuthPecoCanary"], ["Applicant last name", "Parent"], ["Applicant date of birth", "1990-01-01"],
+        ["PECO account number", "9000000001"], ["PECO service street address", "300 Synthetic Lane"], ["PECO service city", "Philadelphia"],
+        ["PECO service ZIP code", "19147"], ["Home phone number", "215-555-0101"], ["Mobile phone number", "215-555-0102"]])
+        await first.page.getByLabel(label, { exact: true }).fill(value);
+      await first.page.getByLabel("PECO service state", { exact: true }).selectOption("PA");
+      await first.page.getByLabel("Applicant income sources", { exact: true }).selectOption("sources");
+      await first.page.getByLabel("Add applicant income source", { exact: true }).selectOption("employment");
+      await first.page.getByLabel("Add applicant income source", { exact: true }).selectOption("pension");
+      await first.page.getByRole("button", { name: "Add a household member", exact: true }).click();
+      for (const [label, value] of [["Household member 1 first name", "AuthPecoAdultCanary"], ["Household member 1 last name", "Parent"],
+        ["Household member 1 date of birth", "1988-01-01"], ["Household member 1 relationship to applicant", "Spouse"]])
+        await first.page.getByLabel(label, { exact: true }).fill(value);
+      await first.page.getByLabel("Household member 1 income sources", { exact: true }).selectOption("none");
+      await first.page.getByRole("button", { name: "Add a household member", exact: true }).click();
+      for (const [label, value] of [["Household member 2 first name", "AuthPecoChildCanary"], ["Household member 2 last name", "Parent"],
+        ["Household member 2 date of birth", "2020-01-01"], ["Household member 2 relationship to applicant", "Child"]])
+        await first.page.getByLabel(label, { exact: true }).fill(value);
+      await first.page.getByLabel("Is this the full household list?", { exact: true }).selectOption("true");
+      check(await first.page.getByLabel("Household member 2 income sources", { exact: true }).count() === 0 &&
+        await first.page.getByLabel("People in your household", { exact: true }).count() === 0 &&
+        await first.page.getByLabel("Household income before taxes ($)", { exact: true }).count() === 0,
+      "The actual PECO form groups private names and adult income inventories without asking a child or collecting irrelevant generic income amounts.");
+      await first.page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+      await checkPecoPage("intake");
+      await first.page.getByRole("button", { name: "Continue", exact: true }).click();
+      const pecoConsent = first.page.getByRole("checkbox", { name: /I authorize/ });
+      const pecoConsentText = await pecoConsent.evaluate(input => input.closest("label")?.textContent ?? "");
+      check(await first.page.getByRole("checkbox").count() === 1 && pecoConsentText.includes(PECO_SUBJECT_AUTHORITY_STATEMENT) && pecoConsentText.includes(PECO_ACCOUNT_AUTHORITY_STATEMENT),
+        "The actual PECO start uses one normal mandate checkbox containing both exact subject and account declarations.");
+      await pecoConsent.check();
+      const pecoStarting = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+      await first.page.getByRole("button", { name: "Start getting support", exact: true }).click();
+      const pecoStarted = await pecoStarting;
+      check(pecoStarted.status() === 201, "The actual grouped PECO intake and mandate atomically save the owned private request.");
+      const pecoRequestId = (await pecoStarted.json()).request.id as string, pecoStartBody = pecoStarted.request().postDataJSON();
+      const pecoStartHeaders = { origin, "Idempotency-Key": pecoStarted.request().headers()["idempotency-key"] };
+      check(pecoStartBody.kind === "peco_application" && pecoStartBody.noticeVersion === PECO_APPLICATION_NOTICE_VERSION &&
+        pecoStartBody.subjectAuthorityDeclared === true && pecoStartBody.accountAuthorityDeclared === true && !!pecoStartHeaders["Idempotency-Key"] &&
+        pecoStartBody.reusedZip?.sourceRequestId === routingSource.sourceRequestId && pecoStartBody.details.address.zip === "19147" && pecoStartBody.intake.zip === "19104" &&
+        pecoStartBody.intake.householdSize === null && pecoStartBody.intake.incomeAmount === null && pecoStartBody.intake.pregnantOrPostpartum === null &&
+        pecoStartBody.mandate.mode === "prepare_only" && !pecoStartBody.mandate.allowedData.includes("documents"),
+      "The real PECO start binds actual declarations while private values and the service ZIP remain separate from reused ordinary routing.");
+      await first.page.waitForURL(`${origin}/support/${pecoRequestId}`);
+      const pecoUrl = `${origin}/api/parent/requests/${pecoRequestId}/peco-application`;
+      const readPeco = async (revision?: string) => {
+        const response = await first.page.request.get(`${pecoUrl}${revision ? `?revision=${revision}` : ""}`);
+        check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "Owned PECO revision reads succeed privately through the real web API.");
+        return (await response.json()).snapshot as PecoApplicationSnapshot;
+      };
+      const pecoState = async () => (await db.query(`select to_jsonb(r) request,to_jsonb(j) job,
+        (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]') from public.parent_events e where e.request_id=r.id) events,
+        (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
+        (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls
+        from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [pecoRequestId])).rows[0];
+      const originalPeco = await readPeco(), originalPecoState = await pecoState();
+      assert.deepEqual(originalPeco.details, pecoStartBody.details); assert.deepEqual(originalPeco.source, PECO_APPLICATION_SOURCE);
+      check(originalPeco.revision === 1 && originalPeco.request_version === 2 && originalPecoState.job.request_version === 2 &&
+        originalPeco.consent_evidence.actorId === first.id && originalPeco.consent_evidence.subjectAuthorityDeclared && originalPeco.consent_evidence.accountAuthorityDeclared &&
+        originalPeco.details.applicant?.income?.sources.length === 2 && originalPeco.details.householdMembers?.[0].income?.state === "none" && !originalPeco.details.householdMembers?.[1].income &&
+        !/AuthPecoCanary|AuthPecoAdultCanary|AuthPecoChildCanary|9000000001|1990-01-01|1988-01-01|2020-01-01|19147/.test(JSON.stringify([originalPecoState.request, originalPecoState.job, originalPecoState.events])),
+      "The committed PECO revision binds exact people and account authority while private answers stay out of ordinary requests, jobs and events.");
+      const sourceDates = (await db.query("select intake_confirmed_at->'zip' value from public.parent_requests where id=$1", [routingSource.sourceRequestId])).rows[0].value;
+      check(originalPecoState.request.intake_confirmed_at.zip === sourceDates, "Reusing household routing preserves its actual original date instead of confirming it again for PECO.");
+      const pecoReplay = await first.page.request.post(`${origin}/api/parent/requests`, { headers: pecoStartHeaders, data: pecoStartBody });
+      check(pecoReplay.status() === 201 && (await pecoReplay.json()).request.id === pecoRequestId, "An exact real web PECO start retry returns the existing private request.");
+      assert.deepEqual(await pecoState(), originalPecoState);
+      const ownPeco = await rest(token, `parent_peco_application_details?request_id=eq.${pecoRequestId}`);
+      check(ownPeco.status === 200, "The issued owner Auth token reads the owned PECO revision through actual PostgREST."); assert.deepEqual(await ownPeco.json(), [originalPeco]);
+      const foreignPeco = await rest(secondToken, `parent_peco_application_details?request_id=eq.${pecoRequestId}`);
+      check(foreignPeco.status === 200 && (await foreignPeco.json()).length === 0 && (await second.page.request.get(pecoUrl)).status() === 404,
+        "Another issued Auth token cannot read PECO history through PostgREST or the web API.");
+      const foreignPecoSave = await rest(secondToken, "rpc/parent_save_peco_application_details", { p_request_id: pecoRequestId, p_expected_version: originalPeco.request_version,
+        p_details: originalPeco.details, p_notice_version: PECO_APPLICATION_NOTICE_VERSION, p_idempotency_key: randomUUID(), p_subject_authority_declared: true, p_account_authority_declared: true });
+      check(foreignPecoSave.status === 403, "Another household's issued Auth token cannot correct the exact private PECO account.");
+      const pecoDocument = await first.page.request.post(`${origin}/api/parent/requests/${pecoRequestId}/documents`, { headers: { origin },
+        multipart: { consent: "1", file: { name: "synthetic-peco.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-SYNTHETIC") } } });
+      const pecoDocuments = (await db.query(`select (select count(*)::int from public.parent_documents where request_id=$1) documents,
+        (select count(*)::int from storage.objects where bucket_id='parent-documents' and name like $2) objects`, [pecoRequestId, `${first.id}/${pecoRequestId}/%`])).rows[0];
+      check(pecoDocument.status() === 403 && pecoDocuments.documents === 0 && pecoDocuments.objects === 0,
+        "Even with PECO answers enabled, the real upload API creates no private document metadata or stored objects.");
+      assert.deepEqual(await pecoState(), originalPecoState);
+
+      stage = "actual PECO saved answers and immutable corrections";
+      await showSection(first.page, "application-review");
+      await first.page.getByRole("button", { name: "Correct PECO answers", exact: true }).waitFor();
+      await checkPecoPage("review");
+      await first.page.getByRole("button", { name: "Correct PECO answers", exact: true }).click();
+      const pecoForm = first.page.getByRole("form", { name: "Correct PECO application answers", exact: true });
+      check(await pecoForm.getByLabel("Applicant first name", { exact: true }).inputValue() === "AuthPecoCanary" &&
+        await pecoForm.getByLabel("PECO account number", { exact: true }).inputValue() === "9000000001" && await pecoForm.getByRole("checkbox").count() === 0,
+      "The real PECO editor reopens saved facts without retyping or another approval checkbox.");
+      await pecoForm.getByLabel("PECO service street address", { exact: true }).fill("301 Synthetic Lane");
+      await checkPecoPage("correction");
+      const pecoSaving = first.page.waitForResponse(response => response.url() === pecoUrl && response.request().method() === "POST");
+      await pecoForm.getByRole("button", { name: "Save PECO changes", exact: true }).click();
+      const pecoSaved = await pecoSaving;
+      check(pecoSaved.status() === 201, "The actual PECO editor saves an in-scope correction without another approval step.");
+      const pecoSaveBody = pecoSaved.request().postDataJSON(), pecoSaveHeaders = { origin, "Idempotency-Key": pecoSaved.request().headers()["idempotency-key"] };
+      const correctedPeco = await readPeco(), correctedPecoState = await pecoState();
+      check(correctedPeco.revision === 2 && correctedPeco.request_version === originalPeco.request_version + 1 && correctedPeco.details.address?.street === "301 Synthetic Lane" &&
+        pecoSaveBody.subjectAuthorityDeclared === true && pecoSaveBody.accountAuthorityDeclared === true,
+      "A genuine PECO save binds both declarations to its new immutable revision and invalidates superseded request work.");
+      assert.deepEqual({ ...correctedPeco.provenance, "address.street": originalPeco.provenance["address.street"] }, originalPeco.provenance);
+      assert.deepEqual(await readPeco(originalPeco.id), originalPeco);
+      const pecoCorrectionReplay = await first.page.request.post(pecoUrl, { headers: pecoSaveHeaders, data: pecoSaveBody });
+      check(pecoCorrectionReplay.status() === 201 && (await pecoCorrectionReplay.json()).snapshotId === correctedPeco.id,
+        "The real PECO correction API reconciles an exact retry without duplicating its private revision.");
+      assert.deepEqual(await pecoState(), correctedPecoState);
+      await first.page.reload({ waitUntil: "networkidle" });
+      await showSection(first.page, "application-review");
+      await first.page.getByRole("button", { name: "Correct PECO answers", exact: true }).click();
+      const accountForm = first.page.getByRole("form", { name: "Correct PECO application answers", exact: true });
+      await accountForm.getByLabel("PECO account number", { exact: true }).fill("9000000002");
+      const accountSaving = first.page.waitForResponse(response => response.url() === pecoUrl && response.request().method() === "POST");
+      await accountForm.getByRole("button", { name: "Save PECO changes", exact: true }).click();
+      check((await accountSaving).status() === 201, "The actual PECO editor can correct the account under a genuine new account declaration.");
+      const accountPeco = await readPeco(), accountPecoState = await pecoState();
+      check(accountPeco.revision === 3 && accountPeco.request_version === correctedPeco.request_version + 1 && accountPecoState.job.request_version === accountPeco.request_version &&
+        accountPeco.details.accountNumber === "9000000002" && accountPeco.consent_evidence.accountNumberSha256 !== correctedPeco.consent_evidence.accountNumberSha256,
+      "An exact account correction changes the immutable account binding and invalidates the old request version.");
+      assert.deepEqual({ ...accountPeco.provenance, accountNumber: correctedPeco.provenance.accountNumber }, correctedPeco.provenance);
+      check((await first.page.request.post(pecoUrl, { headers: pecoSaveHeaders, data: pecoSaveBody })).status() === 409,
+        "A superseded exact PECO save cannot revive the preceding account or preparation revision.");
+
+      stage = "actual paused PECO correction and closed-purpose history";
+      await first.page.reload({ waitUntil: "networkidle" });
+      await showSection(first.page, "application-controls");
+      const pecoPausing = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests/${pecoRequestId}` && response.request().method() === "POST");
+      await first.page.getByRole("button", { name: "Pause future work", exact: true }).click();
+      check((await pecoPausing).status() === 200, "The actual PECO request pauses through its existing request control.");
+      await first.page.getByRole("button", { name: "Resume support", exact: true }).waitFor();
+      const pausedPecoState = await pecoState();
+      await showSection(first.page, "application-review");
+      await first.page.getByRole("button", { name: "Correct PECO answers", exact: true }).click();
+      const pausedPecoForm = first.page.getByRole("form", { name: "Correct PECO application answers", exact: true });
+      await pausedPecoForm.getByLabel("Mobile phone number", { exact: true }).fill("215-555-0103");
+      const pausedPecoSaving = first.page.waitForResponse(response => response.url() === pecoUrl && response.request().method() === "POST");
+      await pausedPecoForm.getByRole("button", { name: "Save PECO changes", exact: true }).click();
+      check((await pausedPecoSaving).status() === 201, "The actual paused PECO editor saves corrections without resuming execution.");
+      const pausedPeco = await readPeco(), finalPecoState = await pecoState();
+      check(pausedPeco.revision === 4 && finalPecoState.request.status === "paused" && finalPecoState.job.state === "cancelled" &&
+        finalPecoState.request.version === pausedPecoState.request.version + 1 && pausedPeco.details.cellPhone === "215-555-0103" &&
+        finalPecoState.operations === 0 && finalPecoState.model_calls === 0,
+      "The corrected PECO request stays paused with no model call, provider operation or autonomous continuation.");
+      await db.query("update parent_private.processing_controls set peco_details_enabled=false where singleton");
+      assert.deepEqual(await readPeco(), pausedPeco);
+      const closedPecoWrite = await first.page.request.post(pecoUrl, { headers: { origin, "Idempotency-Key": randomUUID() },
+        data: { expectedVersion: finalPecoState.request.version, details: pausedPeco.details, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true, accountAuthorityDeclared: true } });
+      check(closedPecoWrite.status() === 403, "Closing only PECO collection blocks private writes while retained owner history remains readable.");
+      const pecoExport = await first.page.request.get(`${origin}/api/parent/account/export`);
+      check(pecoExport.status() === 200 && pecoExport.headers()["cache-control"] === "private, no-store", "The real owner export includes retained PECO history without public caching after its collection closes.");
+      const exportedPeco = (await pecoExport.json()).requests.find((row: { id: string }) => row.id === pecoRequestId)?.pecoApplicationDetails as PecoApplicationSnapshot[];
+      check(exportedPeco?.length === 4, "The real owner export retains all original, corrected-account and paused PECO revisions.");
+      for (const revision of [originalPeco, correctedPeco, accountPeco, pausedPeco]) assert.deepEqual(exportedPeco.find(row => row.id === revision.id), revision);
+      const foreignPecoExport = await second.page.request.get(`${origin}/api/parent/account/export`);
+      check(foreignPecoExport.status() === 200 && !(await foreignPecoExport.text()).includes(pecoRequestId), "Another household's real export excludes these private PECO revisions.");
+      const ownPecoHistory = await rest(token, `parent_peco_application_details?request_id=eq.${pecoRequestId}&order=revision.asc`);
+      check(ownPecoHistory.status === 200 && (await ownPecoHistory.json()).length === 4,
+        "The issued owner token retains access to all exact PECO revisions after private collection closes.");
+      await first.page.reload({ waitUntil: "networkidle" });
+      await showSection(first.page, "application-review");
+      const closedPecoEditor = first.page.getByRole("button", { name: "Correct PECO answers", exact: true });
+      check(await closedPecoEditor.count() === 0 || await closedPecoEditor.isDisabled(), "Closed PECO history does not offer an enabled private editor.");
+      check(await first.page.getByRole("heading", { name: "Your private PECO CAP answers", exact: true }).count() === 1,
+        "The closed PECO collection flag preserves the actual owned-answer checklist and retained history.");
+      await checkPecoPage("closed-history");
+    } finally {
+      await db.query(`update parent_private.processing_controls c set
+        (peco_details_enabled,peco_details_approval_reference,peco_details_approved_until,peco_details_notice_version)=
+        (select r.peco_details_enabled,r.peco_details_approval_reference,r.peco_details_approved_until,r.peco_details_notice_version
+        from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(pecoControls)]);
+      assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, pecoControls);
+      check((await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n === pecoBudgetBefore,
+        "All four PECO-purpose controls are restored exactly, the entire control row is unchanged and model-budget reservations are unchanged.");
+    }
+
     stage = "actual browser sign-out and retained-token denial";
     await first.page.goto(`${origin}/account`, { waitUntil: "networkidle" });
     await first.page
@@ -1389,12 +1840,16 @@ async function main() {
     assertions: [...new Set(checks)],
     rateLimitObserved,
     snapAccessibility,
+    wicAccessibility,
+    pecoAccessibility,
     limitations: [
       "Loopback HTTP cannot establish hosted Secure-cookie, domain, SMTP or redirect-allowlist behavior.",
       "Hosted shared-account migration, recovery/session coexistence and scheduled retention erasure require separate checks; the password case uses a synthetic school role only on the isolated parent service.",
       "Document parsing/extraction is not established by private PDF upload and Storage authorization.",
       "Grouped factual questions are explicitly seeded synthetic fixtures; the test does not establish AI question selection or partner execution.",
       "The full SNAP form check establishes owned nonprotected intake, atomic start, revision correction and export, not protected identifiers/signatures, worker preparation or a genuine provider submission.",
+      "The WIC form check establishes isolated private intake, correction and owned history, not provider submission, a booked appointment, enrollment or specialist assessment.",
+      "The PECO form check establishes isolated private preparation, correction, account binding and owned history, not a trusted renderer/income adapter, provider submission, CAP enrollment, a payment change or shutoff protection.",
       "No external application or model provider was called.",
     ],
   };

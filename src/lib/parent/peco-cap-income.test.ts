@@ -242,6 +242,25 @@ function shortConsent(input: PecoCapIncomeInput) {
 }
 
 describe("PECO income evidence preparation assessment", () => {
+  it("can assess income before form preparation while retaining a trusted snapshot reference when supplied", () => {
+    const input = fixture();
+    const before = assessPecoCapIncomeEvidence(input, now);
+    input.scope.preparationSnapshot = { id: "preparation-1", revision: 1, sha256: "c".repeat(64) };
+    expect(assessPecoCapIncomeEvidence(input, now)).toEqual(before);
+    expect(input.scope.preparationSnapshot).toEqual({ id: "preparation-1", revision: 1, sha256: "c".repeat(64) });
+  });
+
+  it.each([
+    { id: "", revision: 1, sha256: "c".repeat(64) },
+    { id: "preparation-1", revision: 0, sha256: "c".repeat(64) },
+    { id: "preparation-1", revision: 1, sha256: "not-a-digest" },
+    { id: "preparation-1", revision: 1, sha256: "c".repeat(64), verifiedByClient: true },
+  ])("rejects malformed preparation references without echoing supplied metadata", reference => {
+    const input = fixture();
+    Object.assign(input.scope, { preparationSnapshot: reference });
+    expect(() => assessPecoCapIncomeEvidence(input, now)).toThrow("The PECO income evidence could not be assessed from the supplied information.");
+  });
+
   it("selects exact originals from fresh scoped gross evidence without changing input or claiming submission/certification", () => {
     const input = fixture(), before = structuredClone(input);
     const result = assessPecoCapIncomeEvidence(input, now);

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { PDFDocument, PDFName, PDFString, StandardFonts, degrees, drawObject } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
-import { renderPecoCapIncomePreparationPacket, type PecoCapDraftInput } from "./peco-cap-draft";
+import { pecoCapPreparationSnapshotSchema, renderPecoCapIncomePreparationPacket, type PecoCapDraftInput, type PecoCapPreparationSnapshot } from "./peco-cap-draft";
 import type { PecoCapIncomeInput } from "./peco-cap-income";
 
 const template = readFileSync("tests/fixtures/parent/peco-cap-2026.pdf");
@@ -132,11 +132,151 @@ function income(bytes: Uint8Array): PecoCapIncomeInput {
   });
 }
 
+function preparation(facts: PecoCapIncomeInput, form: unknown = draft): PecoCapPreparationSnapshot {
+  const input = {
+    id: "preparation-1", revision: 1, binding: structuredClone(facts.scope.binding),
+    subjectIds: facts.household.people.map(person => person.subjectId),
+    confirmedAt: facts.household.verifiedAt, validUntil: facts.household.validUntil,
+    retentionUntil: facts.household.validUntil, details: form,
+  };
+  const parsed = pecoCapPreparationSnapshotSchema.safeParse(input);
+  const snapshot = parsed.success ? parsed.data : input;
+  facts.scope.preparationSnapshot = { id: input.id, revision: input.revision, sha256: hash(JSON.stringify(snapshot)) };
+  return snapshot as PecoCapPreparationSnapshot;
+}
+
+function addAdult(facts: PecoCapIncomeInput) {
+  facts.household.people.push({
+    ...structuredClone(facts.household.people[0]), subjectId: "adult-2",
+    inventory: { ...structuredClone(facts.household.people[0].inventory!), sources: [{ sourceId: "job-2", kind: "employment" }] },
+  });
+  facts.scope.incomeConsent.subjectIds.push("adult-2");
+  facts.documents[0].coverage.push({ ...facts.documents[0].coverage[0], subjectId: "adult-2", sourceId: "job-2" });
+  facts.bundles[0].sourceCoverage.push({ ...structuredClone(facts.bundles[0].sourceCoverage[0]), subjectId: "adult-2", sourceId: "job-2" });
+}
+
 async function render(bytes: Uint8Array, facts = income(bytes), form: unknown = draft, at = now) {
-  return renderPecoCapIncomePreparationPacket(template, form, facts, [{ documentId: "proof-1", bytes }], at);
+  return renderPecoCapIncomePreparationPacket(template, preparation(facts, form), facts, [{ documentId: "proof-1", bytes }], at);
 }
 
 describe("offline PECO standard-income preparation packet", () => {
+  it.each([
+    (form: PecoCapDraftInput) => { form.applicant = { ...form.applicant, firstName: "Different", lastName: "Person" }; },
+    (form: PecoCapDraftInput) => { form.applicant.dateOfBirth = "1988-09-20"; },
+    (form: PecoCapDraftInput) => { form.accountNumber = "9999999999"; },
+  ])("rejects substituted printed identity or account against the same trusted income source", async (mutate) => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    const snapshot = preparation(facts);
+    mutate(snapshot.details);
+    const result = await renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now)
+      .then(() => "created", (caught: Error) => caught.message);
+    expect(result).toBe(error);
+  });
+
+  it("binds a second adult's printed identity to the already recorded snapshot", async () => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    addAdult(facts);
+    const snapshot = preparation(facts, { ...draft, householdMembers: [{
+      ...draft.applicant, firstName: "Elena", dateOfBirth: "1989-04-15", relationship: "Sibling",
+    }] });
+    const original = await renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now);
+    snapshot.details.householdMembers[0] = {
+      ...snapshot.details.householdMembers[0], firstName: "Different", lastName: "Person", dateOfBirth: "1989-09-20",
+    };
+    const result = await renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now)
+      .then(() => "created", (caught: Error) => caught.message);
+    expect(result).toBe(error);
+    expect(original.manifest.preparationSnapshot).toEqual(facts.scope.preparationSnapshot);
+  });
+
+  it.each([
+    (facts: PecoCapIncomeInput) => { delete facts.scope.preparationSnapshot; },
+    (facts: PecoCapIncomeInput) => { facts.scope.preparationSnapshot!.id = "different"; },
+    (facts: PecoCapIncomeInput) => { facts.scope.preparationSnapshot!.revision++; },
+    (facts: PecoCapIncomeInput) => { facts.scope.preparationSnapshot!.sha256 = "0".repeat(64); },
+  ])("requires the trusted source's exact reference instead of a self-described snapshot", async (mutate) => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    const snapshot = preparation(facts);
+    mutate(facts);
+    await expect(renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now))
+      .rejects.toMatchObject({ message: error });
+  });
+
+  it.each([
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.binding.householdId = "other"; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.binding.requestId = "other"; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.binding.requestVersion++; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.binding.accountRef = "other"; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.subjectIds = ["different-adult"]; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.subjectIds.push("adult-1"); },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.subjectIds = []; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.confirmedAt = "2026-10-26T13:00:00Z"; },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.validUntil = now.toISOString(); },
+    (snapshot: PecoCapPreparationSnapshot) => { snapshot.retentionUntil = now.toISOString(); },
+  ])("rejects an internally inconsistent or expired trusted projection even with a matching digest", async (mutate) => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    const snapshot = preparation(facts);
+    mutate(snapshot);
+    facts.scope.preparationSnapshot!.sha256 = hash(JSON.stringify(snapshot));
+    await expect(renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now))
+      .rejects.toMatchObject({ message: error });
+  });
+
+  it("checks each person's age metadata rather than accepting the same total adult count", async () => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    addAdult(facts);
+    facts.household.people.push({ subjectId: "minor-1", adult: false, inventory: null });
+    const snapshot = preparation(facts, { ...draft, householdMembers: [
+      { ...draft.applicant, firstName: "Elena", dateOfBirth: "1989-04-15", relationship: "Sibling" },
+      { ...draft.applicant, dateOfBirth: "2017-01-01", relationship: "Child", incomeSource: "None" },
+    ] });
+    for (const subjectIds of [
+      ["adult-1", "minor-1", "adult-2"], ["adult-1", "adult-2", "adult-2"], ["adult-2", "adult-1", "minor-1"],
+    ]) {
+      snapshot.subjectIds = subjectIds;
+      facts.scope.preparationSnapshot!.sha256 = hash(JSON.stringify(snapshot));
+      await expect(renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now))
+        .rejects.toMatchObject({ message: error });
+    }
+  });
+
+  it("uses an authorized corrected snapshot and keeps the previous artifact reference unchanged", async () => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    const originalSnapshot = preparation(facts);
+    const original = await renderPecoCapIncomePreparationPacket(template, originalSnapshot, facts, [{ documentId: "proof-1", bytes }], now);
+    const corrected = structuredClone(facts);
+    for (const record of [corrected.scope, corrected.household, corrected.household.people[0].inventory!, ...corrected.documents, ...corrected.bundles])
+      record.binding.requestVersion = 3;
+    const snapshot = preparation(corrected, { ...draft, applicant: { ...draft.applicant, firstName: "María Elena" } });
+    snapshot.revision = 2;
+    corrected.scope.preparationSnapshot = { id: snapshot.id, revision: snapshot.revision, sha256: hash(JSON.stringify(snapshot)) };
+    await expect(renderPecoCapIncomePreparationPacket(template, originalSnapshot, corrected, [{ documentId: "proof-1", bytes }], now))
+      .rejects.toMatchObject({ message: error });
+    const result = await renderPecoCapIncomePreparationPacket(template, snapshot, corrected, [{ documentId: "proof-1", bytes }], now);
+    expect(result.manifest.preparationSnapshot).toEqual(corrected.scope.preparationSnapshot);
+    expect(result.manifest.formInputSha256).not.toBe(original.manifest.formInputSha256);
+    expect(original.manifest.preparationSnapshot).toEqual(facts.scope.preparationSnapshot);
+    expect(original.manifest.scope.requestVersion).toBe(2);
+  });
+
+  it.each(["validUntil", "retentionUntil"] as const)("keeps the original snapshot %s deadline when reused", async field => {
+    const bytes = await proof();
+    const facts = income(bytes);
+    const snapshot = preparation(facts);
+    snapshot[field] = "2026-10-26T13:00:00Z";
+    facts.scope.preparationSnapshot!.sha256 = hash(JSON.stringify(snapshot));
+    const result = await renderPecoCapIncomePreparationPacket(template, snapshot, facts, [{ documentId: "proof-1", bytes }], now);
+    expect(result.manifest.validUntil).toBe("2026-10-26T13:00:00.000Z");
+    expect(result.manifest.retentionUntil).toBe(result.manifest.validUntil);
+    expect(snapshot.confirmedAt).toBe("2026-10-26T10:00:00Z");
+  });
+
   it("binds unchanged originals, exact parsed form, source certification and final copied artifact", async () => {
     const bytes = await proof(2);
     const originalHash = hash(bytes);
@@ -230,7 +370,7 @@ describe("offline PECO standard-income preparation packet", () => {
         sha256: hash(second)
       }]
     });
-    const result = await renderPecoCapIncomePreparationPacket(template, draft, facts,
+    const result = await renderPecoCapIncomePreparationPacket(template, preparation(facts), facts,
       [{ documentId: "proof-2", bytes: second }, { documentId: "proof-1", bytes }], now);
     expect(result.manifest.pageCount).toBe(5);
     expect(result.manifest.originals).toEqual([
@@ -305,9 +445,9 @@ describe("offline PECO standard-income preparation packet", () => {
     const source = income(bytes);
     const sourceHash = hash(bytes);
     const at = new Date(now);
-    const form = structuredClone(draft);
+    const form = preparation(source);
     const pending = renderPecoCapIncomePreparationPacket(copy, form, source, [{ documentId: "proof-1", bytes }], at);
-    copy.fill(0); bytes.fill(0); source.scope.binding.requestVersion = 999; form.accountNumber = "changed"; at.setFullYear(2099);
+    copy.fill(0); bytes.fill(0); source.scope.binding.requestVersion = 999; form.details.accountNumber = "changed"; at.setFullYear(2099);
     const result = await pending;
     expect(result.manifest.scope.requestVersion).toBe(2);
     expect(result.manifest.originals[0].sourceSha256).toBe(sourceHash);
@@ -417,17 +557,19 @@ describe("offline PECO standard-income preparation packet", () => {
   it("rejects missing, extra, duplicate, changed bytes and private-channel metadata generically", async () => {
     const bytes = await proof();
     const supplied = { documentId: "proof-1", bytes };
+    const facts = income(bytes);
+    const snapshot = preparation(facts);
     for (const originals of [[], [supplied, supplied], [{ ...supplied, documentId: "wrong" }],
     [{ ...supplied, bytes: bytes.subarray(1) }], [supplied, { ...supplied, documentId: "extra" }],
     [{ ...supplied, privateFilename: "DO NOT ECHO" }]]) {
-      await expect(renderPecoCapIncomePreparationPacket(template, draft, income(bytes), originals, now))
+      await expect(renderPecoCapIncomePreparationPacket(template, snapshot, facts, originals, now))
         .rejects.toMatchObject({ message: error });
     }
     await expect(render(bytes, income(bytes), {
       ...draft,
       ssn: "DO NOT ECHO"
     })).rejects.toMatchObject({ message: error });
-    await expect(renderPecoCapIncomePreparationPacket(template.subarray(1), draft, income(bytes), [supplied], now))
+    await expect(renderPecoCapIncomePreparationPacket(template.subarray(1), snapshot, facts, [supplied], now))
       .rejects.toMatchObject({ message: error });
   });
 
@@ -447,7 +589,7 @@ describe("offline PECO standard-income preparation packet", () => {
       sourceId: "job-2",
       documentRefs: [{ documentId: "proof-2", sha256: hash(bytes) }]
     });
-    const result = await renderPecoCapIncomePreparationPacket(template, draft, facts,
+    const result = await renderPecoCapIncomePreparationPacket(template, preparation(facts), facts,
       [{ documentId: "proof-1", bytes }, { documentId: "proof-2", bytes }], now);
     expect(result.manifest.pageCount).toBe(3);
     expect(result.manifest.originals).toEqual([
@@ -455,7 +597,7 @@ describe("offline PECO standard-income preparation packet", () => {
       { documentId: "proof-2", sourceSha256: hash(bytes), pageCount: 1, outputStartPage: 3, outputEndPage: 3 },
     ]);
     facts.documents[1].expiresAt = "2026-10-26T13:00:00Z";
-    const earlier = await renderPecoCapIncomePreparationPacket(template, draft, facts,
+    const earlier = await renderPecoCapIncomePreparationPacket(template, preparation(facts), facts,
       [{ documentId: "proof-1", bytes }, { documentId: "proof-2", bytes }], now);
     expect(earlier.manifest.retentionUntil).toBe("2026-10-26T13:00:00.000Z");
   });
@@ -504,7 +646,8 @@ describe("offline PECO standard-income preparation packet", () => {
 
   it("refuses eleven supplied originals without expanding the operation limit", async () => {
     const bytes = await proof();
-    await expect(renderPecoCapIncomePreparationPacket(template, draft, income(bytes),
+    const facts = income(bytes);
+    await expect(renderPecoCapIncomePreparationPacket(template, preparation(facts), facts,
       Array.from({ length: 11 }, (_, i) => ({ documentId: `proof-${i}`, bytes })), now))
       .rejects.toMatchObject({ message: error });
   });
@@ -548,7 +691,7 @@ describe("offline PECO standard-income preparation packet", () => {
       sourceId: "job-2",
       documentRefs: [{ documentId: "proof-2", sha256: hash(second) }]
     });
-    const outcome = await renderPecoCapIncomePreparationPacket(template, draft, facts,
+    const outcome = await renderPecoCapIncomePreparationPacket(template, preparation(facts), facts,
       [{ documentId: "proof-1", bytes: first }, { documentId: "proof-2", bytes: second }], now)
       .then(() => "created", (caught: Error) => caught.message);
     expect(outcome).toBe(error);

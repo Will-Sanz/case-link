@@ -22,8 +22,10 @@ import type {
   SupportAction,
 } from "@/lib/parent/domain";
 import { getProgramsForNeeds, SNAP_NEW_APPLICATION_URL, supportsInitialServiceDelivery } from "@/lib/parent/programs";
-import { boundedParentApi, canCollectSnapApplication, ParentApiError, type ParentAuthorizationWindow } from "./api";
-import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
+import { boundedParentApi, canCollectSnapApplication, canCollectWicApplication, canCollectPecoApplication, ParentApiError, type ParentAuthorizationWindow } from "./api";
+import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "@/lib/parent/constants";
+import { wicApplicationFieldsValueSchema, type WicApplicationFields } from "@/lib/parent/wic-application-fields";
+import { PECO_APPLICATION_NOTICE_VERSION, PECO_ACCOUNT_AUTHORITY_STATEMENT, PECO_SUBJECT_AUTHORITY_STATEMENT, pecoApplicationFieldsValueSchema, type PecoApplicationFields } from "@/lib/parent/peco-application-fields";
 import { assessSnapApplicationFields, snapApplicationFieldsSchema, type SnapApplicationFields } from "@/lib/parent/snap-application-fields";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
@@ -31,6 +33,9 @@ import { UrgentHelp } from "./landing";
 import { FoodServices } from "./food-services";
 import { SnapApplicationFormFields } from "./snap-application-form";
 import { SnapApplicationNotice } from "./snap-application-review";
+import { WicApplicationNotice, WicApplicationFormFields } from "./wic-application-form";
+import { PecoApplicationNotice, PecoApplicationFormFields, PECO_HELP_URL } from "./peco-application-form";
+import { usePermissionWindow } from "./use-permission-window";
 import styles from "./parent.module.css";
 
 const foodNeeds: SupportNeed[] = [
@@ -43,6 +48,12 @@ const foodNeeds: SupportNeed[] = [
   "wic_continuing",
 ];
 const utilityNeeds: SupportNeed[] = ["electricity", "gas", "water"];
+const utilityProviderChoices = [
+  { id: "peco", need: "electricity", label: "PECO" }, { id: "pgw", need: "gas", label: "PGW" },
+  { id: "pwd", need: "water", label: "Philadelphia Water" }, { id: "other", need: null, label: "Another provider" },
+  { id: "unknown", need: null, label: "Not sure" },
+] as const;
+const incomeNeeds: SupportNeed[] = ["snap_new", "snap_renewal", "snap_pending", "snap_problem", ...utilityNeeds];
 export const initialIntake: SupportIntake = {
   needs: [],
   urgency: "soon",
@@ -59,7 +70,7 @@ export const initialIntake: SupportIntake = {
   contactPreference: "in_app",
   adultConfirmed: true,
 };
-const authorizationReply=z.object({authorization:z.object({issuedAt:z.iso.datetime({offset:true}),expiresAt:z.iso.datetime({offset:true}),snapApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable()}).optional()})});
+const authorizationReply=z.object({authorization:z.object({issuedAt:z.iso.datetime({offset:true}),expiresAt:z.iso.datetime({offset:true}),snapApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable()}).optional(),wicApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional(),pecoApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional()})});
 
 async function readAuthorizationWindow(signal: AbortSignal) {
   const result = authorizationReply.parse(await boundedParentApi("/authorization-window", {}, signal, new Date(Date.now() + 30_000).toISOString()));
@@ -73,6 +84,7 @@ export function buildMandate(
   mode: ServiceMandate["mode"],
   bookingPreference: ServiceMandate["bookingPreference"],
   expiresAt: string,
+  privatePecoPreparation = false,
 ): ServiceMandate {
   return {
     version: 1,
@@ -84,8 +96,8 @@ export function buildMandate(
         : ["research", "prepare", "share", "submit", "schedule", "follow_up"],
     allowedData: [
       "household",
-      "documents",
-      ...(intake.needs.some((need) => need !== "food_now")
+      ...(privatePecoPreparation || intake.needs.every(need => need === "wic_new" || need === "wic_continuing") ? [] : ["documents" as const]),
+      ...(intake.needs.some((need) => incomeNeeds.includes(need))
         ? ["income" as const]
         : []),
       ...(intake.needs.some((n) => utilityNeeds.includes(n))
@@ -125,9 +137,10 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const [reusedZip, setReusedZip] = useState<z.infer<typeof reusableZipSchema> | null>(null);
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
-    needs: foodNeeds.includes(initialNeed as SupportNeed)
+    needs: [...foodNeeds, ...utilityNeeds].includes(initialNeed as SupportNeed)
       ? [initialNeed as SupportNeed]
       : [],
+    ...(initialNeed === "wic_new" ? { accountAuthority: "self" as const } : {}),
   }));
   const [step, setStep] = useState(() => intake.needs.length ? 1 : 0);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
@@ -142,13 +155,20 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const [detailsReady, setDetailsReady] = useState(false);
   const [startUncertain, setStartUncertain] = useState(false);
   const [collectionBlocked, setCollectionBlocked] = useState(false);
+  const [wicDetails, setWicDetails] = useState<WicApplicationFields>({});
+  const [wicDetailsReady, setWicDetailsReady] = useState(false);
+  const [wicBlocked, setWicBlocked] = useState(false);
+  const [pecoPreparation, setPecoPreparation] = useState(false);
+  const [pecoDetails, setPecoDetails] = useState<PecoApplicationFields>({});
+  const [pecoDetailsReady, setPecoDetailsReady] = useState(false);
+  const [pecoBlocked, setPecoBlocked] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application"; details?: SnapApplicationFields; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION; reusedZip?: ReusedZipSource };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application"; details?: SnapApplicationFields | WicApplicationFields | PecoApplicationFields; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
-  const scope=JSON.stringify({intake,snapDetails,detailsReady,recipientIds,mode,booking,accepted,reusedZip});
+  const scope=JSON.stringify({intake,snapDetails,detailsReady,wicDetails,wicDetailsReady,pecoPreparation,pecoDetails,pecoDetailsReady,recipientIds,mode,booking,accepted,reusedZip});
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
   useLayoutEffect(()=>{
     const controller=new AbortController();work.current=controller;
@@ -174,17 +194,23 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   }, [snapSelected]);
   const directSnap = initialNeed === "snap_new" && step > 0 && snapSelected && intake.needs.length === 1;
   const fullSnap = snapSelected && canCollectSnapApplication(authorization.data) && !authorization.error && !collectionBlocked;
+  const wicOnly = intake.needs.length === 1 && intake.needs[0] === "wic_new";
+  const wicNeedsOnly = intake.needs.every(need => need === "wic_new" || need === "wic_continuing");
+  const wicWindowCurrent = usePermissionWindow(Date.parse(authorization.data?.authorization?.wicApplication?.expiresAt ?? ""));
+  const fullWic = wicOnly && wicWindowCurrent && canCollectWicApplication(authorization.data) && !authorization.error && !wicBlocked;
+  const selectedUtilities = intake.needs.filter(need => utilityNeeds.includes(need));
+  const pecoOnly = intake.needs.length === 1 && intake.needs[0] === "electricity" && intake.utilityProviders.length === 1 && intake.utilityProviders[0] === "peco";
+  const pecoWindowCurrent = usePermissionWindow(Date.parse(authorization.data?.authorization?.pecoApplication?.expiresAt ?? ""));
+  const fullPeco = pecoPreparation && pecoOnly && intake.accountAuthority !== "not_sure" && pecoWindowCurrent && canCollectPecoApplication(authorization.data) && !authorization.error && !pecoBlocked;
   const snapValues={...(intake.zip?{zip:intake.zip}:{}),...snapDetails};
-  const programs = getProgramsForNeeds(intake.needs).filter(program=>!fullSnap||program.id==='snap-pa'||
-    program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need)));
+  const programs = getProgramsForNeeds(intake.needs).filter(program=>(!fullSnap||program.id==='snap-pa'||
+    program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need))) && (!fullWic || program.id === "wic-pa") && (!pecoPreparation || program.id === "peco-cap"));
   const hasBenefits = intake.needs.some((need) =>
     [
       "snap_new",
       "snap_renewal",
       "snap_pending",
       "snap_problem",
-      "wic_new",
-      "wic_continuing",
     ].includes(need),
   );
   const connected = (id: string) =>
@@ -197,7 +223,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
             program.needs.some(need=>intake.needs.includes(need)&&supportsInitialServiceDelivery(need,action))),
         ),
     ) ?? false;
-  const fullAvailable = programs.some(
+  const fullAvailable = !pecoPreparation && programs.some(
     (p) => recipientIds.includes(p.id) && connected(p.id),
   );
   useEffect(() => {
@@ -219,6 +245,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     value: SupportIntake[K],
   ) {
     if (key === "zip") { zipDefaultConsumed.current = true; setReusedZip(null); }
+    if (key === "utilityProviders") { setPecoPreparation(false); setPecoDetails({}); setPecoDetailsReady(false); setAccepted(false); }
+    if (key === "accountAuthority") { setPecoDetailsReady(false); setAccepted(false); }
     setIntake((current) => ({ ...current, [key]: value }));
     setError(null);
     startAttempt.current = null;
@@ -227,16 +255,50 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     const needs = intake.needs.includes(need)
       ? intake.needs.filter((n) => n !== need)
       : [...intake.needs, need];
+    const utilityContextChanged = utilityNeeds.some(item => intake.needs.includes(item) !== needs.includes(item));
     setIntake((current) => ({
       ...current,
       needs,
-      ...(!needs.some((n) => n === "wic_new" || n === "wic_continuing")
-        ? { pregnantOrPostpartum: null, childrenUnderFive: null }
-        : {}),
+      pregnantOrPostpartum: null, childrenUnderFive: null,
+      ...(!needs.some(n => incomeNeeds.includes(n)) ? { householdSize: null, incomeAmount: null, incomeFrequency: "unknown" as const } : {}),
+      ...(!needs.some(n => utilityNeeds.includes(n)) ? { utilityProviders: [], shutoffDate: null, accountAuthority: "self" as const }
+        : utilityContextChanged ? { accountAuthority: "not_sure" as const, shutoffDate: null } : {}),
     }));
     setError(null);
     if (!needs.includes("snap_new")) { setSnapDetails({}); setDetailsReady(false); }
+    setWicDetails({}); setWicDetailsReady(false); setAccepted(false);
+    setPecoPreparation(false); setPecoDetails({}); setPecoDetailsReady(false);
     startAttempt.current = null;
+  }
+  function changeWicDetails(details: WicApplicationFields) {
+    setWicDetails(details); setWicDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
+  }
+  function changePecoDetails(details: PecoApplicationFields) {
+    setPecoDetails(details); setPecoDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
+  }
+  async function refreshPecoCollection() {
+    const controller = work.current;
+    if (!controller || controller.signal.aborted || running.current === controller) return;
+    running.current = controller; setPendingWork({ scope, controller }); setError(null);
+    try {
+      const latest = await readAuthorizationWindow(controller.signal);
+      if (controller.signal.aborted || work.current !== controller) return;
+      setPecoBlocked(!canCollectPecoApplication(latest)); authorization.reload();
+    } catch (failure) {
+      if (!controller.signal.aborted && work.current === controller) { setPecoBlocked(true); setError(failure instanceof Error ? failure : new Error("PECO preparation access could not be checked. Your draft remains on this page.")); }
+    } finally { if (running.current === controller) running.current = null; if (!controller.signal.aborted && work.current === controller) setPendingWork(null); }
+  }
+  async function refreshWicCollection() {
+    const controller = work.current;
+    if (!controller || controller.signal.aborted || running.current === controller) return;
+    running.current = controller; setPendingWork({ scope, controller }); setError(null);
+    try {
+      const latest = await readAuthorizationWindow(controller.signal);
+      if (controller.signal.aborted || work.current !== controller) return;
+      setWicBlocked(!canCollectWicApplication(latest)); authorization.reload();
+    } catch (failure) {
+      if (!controller.signal.aborted && work.current === controller) { setWicBlocked(true); setError(failure instanceof Error ? failure : new Error("WIC availability could not be checked. Your draft remains on this page.")); }
+    } finally { if (running.current === controller) running.current = null; if (!controller.signal.aborted && work.current === controller) setPendingWork(null); }
   }
   function changeSnapDetails(details: SnapApplicationFields) {
     zipDefaultConsumed.current = true; setReusedZip(null);
@@ -289,7 +351,19 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       return;
     }
     if (step === 1) {
-      if (snapSelected && authorization.loading) return;
+      if ((snapSelected || wicOnly || pecoPreparation) && authorization.loading) return;
+      if (pecoPreparation && !fullPeco) {
+        setError(new Error("Private PECO CAP preparation is unavailable or account authority is unresolved. Your draft remains on this page; check access and account authority or use official PECO help.")); return;
+      }
+      if (fullPeco && !pecoApplicationFieldsValueSchema.safeParse(pecoDetails).success) {
+        setError(new Error("Check the PECO account, names, dates, service address, phone numbers and income source lists. Unknown answers can stay blank.")); return;
+      }
+      if (wicOnly && Object.keys(wicDetails).length && !fullWic) {
+        setError(new Error("Private WIC collection is unavailable. Your answers remain on this page; check access again or use official WIC help.")); return;
+      }
+      if (fullWic && !wicApplicationFieldsValueSchema.safeParse(wicDetails).success) {
+        setError(new Error("Check the WIC names, dates, address and contact answers. Unknown answers may stay blank; use only the requested information.")); return;
+      }
       if (fullSnap) {
         try {validatedSnapDetails();} catch (err) {setError(err instanceof Error?err:new Error("Check your SNAP application answers."));heading.current?.focus();return;}
       }
@@ -313,6 +387,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       }
       setRecipientIds(programs.map((p) => p.id));
       setDetailsReady(fullSnap);
+      setWicDetailsReady(fullWic);
+      setPecoDetailsReady(fullPeco);
       setStep(2);
       return;
     }
@@ -329,12 +405,20 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       setError(new Error("Private SNAP application preparation is now available. Complete its applicable questions before authorizing this application."));
       return;
     }
+    if (fullWic && !wicDetailsReady && !startAttempt.current) {
+      setStep(1); setAccepted(false); setError(new Error("Private WIC preparation is now available. Read its notice and provide any known answers before authorizing this request.")); return;
+    }
+    if (pecoPreparation && !pecoDetailsReady && !startAttempt.current) {
+      setStep(1); setAccepted(false); setError(new Error("Read the PECO notice and provide known preparation answers before authorizing this request.")); return;
+    }
     const controller=work.current;
     if(!controller||controller.signal.aborted||running.current===controller)return;
     running.current=controller;setPendingWork({ scope, controller });
     let creationAttempted = false;
     let refreshedZip: z.infer<typeof reusableZipSchema> | null = null;
     try {
+      const retryingWic = startAttempt.current?.packet.kind === "wic_application";
+      const retryingPeco = startAttempt.current?.packet.kind === "peco_application";
       if (!startAttempt.current) {
         const window = await readAuthorizationWindow(controller.signal);
         if(controller.signal.aborted||work.current!==controller)return;
@@ -348,6 +432,22 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           authorization.reload();
           throw new Error("Private SNAP application collection is currently unavailable. Your answers remain on this page; nothing new has been saved. Official program help remains available.");
         }
+        if (wicOnly && !wicDetailsReady && canCollectWicApplication(window)) {
+          setWicBlocked(false); authorization.reload(); setStep(1); setAccepted(false);
+          setError(new Error("Private WIC preparation is now available. Read its notice and provide any known answers before authorizing this request.")); return;
+        }
+        if (wicDetailsReady && (!fullWic || !canCollectWicApplication(window))) {
+          setWicBlocked(true); authorization.reload();
+          throw new Error("Private WIC collection is unavailable. Your answers remain on this page; nothing new has been saved.");
+        }
+        if (pecoDetailsReady && (!fullPeco || !canCollectPecoApplication(window))) {
+          setPecoBlocked(true); authorization.reload();
+          throw new Error("Private PECO CAP collection is unavailable. Your answers remain on this page; nothing new has been saved.");
+        }
+        const peco = pecoDetailsReady ? pecoApplicationFieldsValueSchema.parse(pecoDetails) : undefined;
+        if (peco && (recipientIds.length !== 1 || recipientIds[0] !== "peco-cap")) throw new Error("Private PECO CAP answers can be saved only for the named PECO program.");
+        const wic = wicDetailsReady ? wicApplicationFieldsValueSchema.parse(wicDetails) : undefined;
+        if (wic && !recipientIds.includes("wic-pa")) throw new Error("Private WIC answers can be saved only for the named Pennsylvania WIC program.");
         const details=detailsReady?validatedSnapDetails():undefined;
         if (details && !recipientIds.includes("snap-pa")) throw new Error("SNAP application answers can be saved only for the named Pennsylvania SNAP program. Choose that program or return to change your support needs.");
         startAttempt.current = {
@@ -360,11 +460,30 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
               fullAvailable ? mode : "prepare_only",
               booking,
               window.authorization.expiresAt,
+              !!peco,
             ),
             ...(details?{kind:"snap_application" as const,details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}:{}),
+            ...(wic ? { kind: "wic_application" as const, details: wic, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true as const } : {}),
+            ...(peco ? { kind: "peco_application" as const, details: peco, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true as const, accountAuthorityDeclared: true as const } : {}),
             ...(!details && reusedZip ? { reusedZip: { sourceRequestId: reusedZip.sourceRequestId, sourceVersion: reusedZip.sourceVersion } } : {}),
           },
         };
+      }
+      if (retryingWic) {
+        const currentWindow = await readAuthorizationWindow(controller.signal);
+        if (controller.signal.aborted || work.current !== controller) return;
+        if (!canCollectWicApplication(currentWindow)) {
+          setWicBlocked(true); authorization.reload();
+          throw new Error("Private WIC access is unavailable. Your exact saved attempt and draft are kept; check access again before retrying it.");
+        }
+      }
+      if (retryingPeco) {
+        const currentWindow = await readAuthorizationWindow(controller.signal);
+        if (controller.signal.aborted || work.current !== controller) return;
+        if (!canCollectPecoApplication(currentWindow)) {
+          setPecoBlocked(true); authorization.reload();
+          throw new Error("Private PECO access is unavailable. Your exact saved attempt and draft are kept; check access again before retrying it.");
+        }
       }
       let response: unknown;
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -404,8 +523,11 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     } catch (err) {
       if(controller.signal.aborted||work.current!==controller)return;
       const status=err instanceof ParentApiError?err.status:0;
-      setStartUncertain(!!startAttempt.current && creationAttempted && (status<400||status>=500||status===409));
+      setStartUncertain(!!startAttempt.current && (startUncertain || creationAttempted &&
+        (status<400||status>=500||status===409 || (wicOnly || pecoPreparation) && (status===401||status===403))));
       if(snapSelected && (status===401||status===403)){setCollectionBlocked(true);authorization.reload();}
+      if(wicOnly && (status===401||status===403)){setWicBlocked(true);authorization.reload();}
+      if(pecoPreparation && (status===401||status===403)){setPecoBlocked(true);authorization.reload();}
       setError(
         err instanceof Error
           ? err
@@ -479,7 +601,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                 <p>
                   {
                     [
-                      "Choose the food support your household needs.",
+                      "Choose the food or utility support your household needs.",
                       fullSnap ? "Answer the questions that apply to you. CaseLink will use these answers to prepare your application; you can review and correct it afterward. Leave optional or uncertain answers blank." : "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
                       "These are the specific programs and limits for this request. No unknown recipients or open-ended permission.",
                     ][step]
@@ -537,6 +659,15 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                     </div>
                   </fieldset>
                   <fieldset className={styles.fieldset}>
+                    <legend className={styles.legend}>Utility bills & service</legend>
+                    <div className={`${styles.choices} ${styles.needChoices}`}>
+                      {utilityNeeds.map(need => <label className={styles.choice} key={need}>
+                        <input type="checkbox" checked={intake.needs.includes(need)} onChange={() => toggleNeed(need)}/>
+                        <span><strong>{NEED_LABELS[need]}</strong><small>Bill assistance, a shutoff notice or disconnected service</small></span>
+                      </label>)}
+                    </div>
+                  </fieldset>
+                  <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       How soon do you need help?
                     </legend>
@@ -546,7 +677,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                           {
                             value: "today",
                             label:
-                              "Today — food is running out",
+                              "Today — food is running out or utility service is at risk",
                           },
                           {
                             value: "soon",
@@ -625,6 +756,41 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                     </div>
                   </div>
                   </>}
+                  {wicOnly && authorization.loading ? <ParentLoading label="Checking WIC application availability"/> : fullWic ? <>
+                    <WicApplicationNotice/>
+                    <WicApplicationFormFields value={wicDetails} onChange={changeWicDetails} disabled={pending}/>
+                  </> : intake.needs.some(need => need === "wic_new" || need === "wic_continuing") ? <div className={styles.notice}><div>
+                    <p>Private WIC questions are not available for this request. {wicOnly ? "Your unsaved WIC answers, if any, remain on this page. You can save minimum routing information when no private draft is pending." : "Combined and continuing requests keep their separate routing; this does not start a new WIC pre-application."}</p>
+                    {wicOnly && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshWicCollection}>Check WIC availability again</button>}
+                    <a className={styles.textLink} href={getProgramsForNeeds(["wic_new"])[0].officialUrl}>Open official WIC help</a>
+                  </div></div> : null}
+                  {selectedUtilities.length > 0 && <fieldset className={styles.fieldset}>
+                    <legend className={styles.legend}>Utility routing</legend>
+                    <fieldset className={styles.fieldset}><legend className={styles.legend}>Utility providers</legend>
+                      <div className={styles.choices}>
+                        {utilityProviderChoices.filter(provider => !provider.need || intake.needs.includes(provider.need)).map(({ id, label }) => <label key={id} className={styles.choice}>
+                          <input type="checkbox" checked={intake.utilityProviders.includes(id)} onChange={() => change("utilityProviders", intake.utilityProviders.includes(id) ? intake.utilityProviders.filter(provider => provider !== id) : [...intake.utilityProviders.filter(provider => id !== "unknown" && provider !== "unknown"), id])}/><span>{label}</span>
+                        </label>)}
+                      </div>
+                    </fieldset>
+                    <div className={styles.field}><label htmlFor="support-utility-authority">Your authority for the selected utility accounts</label><select id="support-utility-authority" className={styles.select} value={intake.accountAuthority} onChange={event => change("accountAuthority", event.target.value as SupportIntake["accountAuthority"])}>
+                      <option value="not_sure">Not sure / unanswered</option><option value="self">I hold every selected account</option><option value="authorized_caregiver">I hold or have permission to help with every selected account</option></select></div>
+                    {selectedUtilities.length === 1 && <div className={styles.field}><label htmlFor="support-shutoff">Shutoff date, if on a notice</label><input id="support-shutoff" className={styles.input} type="date" value={intake.shutoffDate ?? ""} onChange={event => change("shutoffDate", event.target.value || null)}/></div>}
+                    <p className={styles.hint}>Use official utility help now if service is at risk. Saving a request does not stop a shutoff or restore service.</p>
+                    {pecoOnly && <label className={styles.checkbox}><input type="checkbox" checked={pecoPreparation} onChange={event => {
+                      setPecoPreparation(event.target.checked); setPecoDetails({}); setPecoDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
+                      if (event.target.checked) setIntake(current => ({ ...current, householdSize: null, incomeAmount: null, incomeFrequency: "unknown" }));
+                    }}/><span>Prepare PECO CAP help for this electricity account. Keep this a separate, preparation-only PECO request.</span></label>}
+                    {pecoOnly && !pecoPreparation && <p className={styles.hint}>Ordinary electricity help does not start a CAP application. Choose CAP preparation only if you want CaseLink to save its private answers.</p>}
+                    {selectedUtilities.length > 0 && !pecoOnly && <p className={styles.hint}>Private CAP preparation is available only as a separate electricity request for a named PECO account. This request keeps its selected utility needs.</p>}
+                  </fieldset>}
+                  {pecoPreparation && (authorization.loading ? <ParentLoading label="Checking PECO preparation availability"/> : fullPeco ? <>
+                    <PecoApplicationNotice/>
+                    <PecoApplicationFormFields value={pecoDetails} onChange={changePecoDetails} disabled={pending}/>
+                  </> : <div className={styles.notice}><div><p>Private PECO CAP preparation is not available or account authority is unresolved. Your unsaved answers remain on this page. Confirm your account authority and check access before entering private answers.</p>
+                    <button type="button" className={styles.secondary} disabled={pending} onClick={refreshPecoCollection}>Check PECO preparation access again</button>
+                    <a className={styles.textLink} href={PECO_HELP_URL}>Open official PECO help</a>
+                  </div></div>)}
                   {hasBenefits && !(snapSelected&&authorization.loading) && (!fullSnap || intake.needs.some(need=>need==='wic_new'||need==='wic_continuing')) ? (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
@@ -661,12 +827,6 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                             count.
                           </p>
                         </div>}
-                        {intake.needs.some(
-                          (need) =>
-                            need === "wic_new" || need === "wic_continuing",
-                        ) && (
-                          <p className={styles.hint}>Private WIC questions are not available here yet. You can use the official WIC service without sharing those details with CaseLink.</p>
-                        )}
                         {!fullSnap && <div className={styles.row}>
                           <div className={styles.field}>
                             <label htmlFor="income-amount">
@@ -788,7 +948,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                         : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly."}
                     </p>
                   </div>
-                  {fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' ? <p><strong>Pennsylvania SNAP</strong> is the named program for your application.</p> : <fieldset className={styles.fieldset}>
+                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || pecoDetailsReady && recipientIds.length === 1 && recipientIds[0] === 'peco-cap') ? <p><strong>{pecoDetailsReady ? "PECO CAP" : fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP"}</strong> is the named program for your {pecoDetailsReady ? "private CAP preparation" : fullWic ? "prepared WIC answers" : "application"}.</p> : <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       Named programs for this request
                     </legend>
@@ -895,14 +1055,13 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                       <div>
                         <h3>The information we can use</h3>
                         <p>
-                          {detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
-                          {intake.needs.some((need) => need !== "food_now")
+                          {pecoDetailsReady ? "Your private PECO CAP answers described in the PECO notice, your needs, utility and routing information" : wicDetailsReady ? "Your private WIC preparation answers described in the WIC notice, your needs and routing information" : detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
+                          {intake.needs.some((need) => incomeNeeds.includes(need))
                             ? ", income information when a named program requires it"
                             : ""}, only
-                          for this request. Any bills or notices you later
-                          choose to add can be used for this request and these
-                          named programs, after separate document-processing
-                          consent. No passwords, EBT PINs or signatures.
+                          for this request. {pecoDetailsReady ? "Private PECO document uploads are not connected. " : wicNeedsOnly ? "WIC document uploads are not available. " : <>Any bills or notices you later
+                          choose to add can be used for the verified needs and named programs, after separate document-processing
+                          consent. {intake.needs.some(need => need === "wic_new" || need === "wic_continuing") && "Do not upload WIC documents here. "}</>}No passwords, EBT PINs or signatures.
                         </p>
                       </div>
                     </div>
@@ -978,6 +1137,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                       for this request within these limits. I can stop future
                       work in My support.
                       {detailsReady && " I also agree to save and use my private SNAP application answers for this named program under the SNAP data notice."}
+                      {wicDetailsReady && ` I agree to save and use my private WIC answers for Pennsylvania WIC under the WIC notice. ${WIC_SUBJECT_AUTHORITY_STATEMENT}`}
+                      {pecoDetailsReady && ` I agree to save and use my private PECO CAP answers for PECO CAP under the PECO notice. ${PECO_SUBJECT_AUTHORITY_STATEMENT} ${PECO_ACCOUNT_AUTHORITY_STATEMENT}`}
                     </span>
                   </label>
                   <p className={styles.hint}>
@@ -1017,10 +1178,12 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                 <button
                   className={styles.button}
                   type="submit"
-                  disabled={pending || (step===1 && snapSelected && authorization.loading)}
+                  disabled={pending || (step===1 && (snapSelected || wicOnly || pecoPreparation) && authorization.loading)}
                 >
                   {pending
                     ? "Saving your request…"
+                    : wicOnly && startUncertain ? "Retry the same WIC request"
+                    : pecoPreparation && startUncertain ? "Retry the same PECO request"
                     : step === 2
                       ? "Start getting support"
                       : "Continue"}

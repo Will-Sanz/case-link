@@ -369,16 +369,21 @@ describe("one coherent upfront support intake", () => {
     expect(screen.queryByLabelText("Pregnant or postpartum?")).toBeNull();
     expect(screen.getByLabelText("Household ZIP code")).toBeTruthy();
   });
-  it.each(["utilities", "electricity", "gas", "water"])("does not offer or preselect unsupported utility service via %s", async (initialNeed) => {
+  it.each(["electricity", "gas", "water"])("routes an explicit %s need without silently opening private CAP preparation", async (initialNeed) => {
     render(<ParentIntake initialNeed={initialNeed} />);
+    await screen.findByLabelText("Household ZIP code");
+    expect(screen.getByRole("group", { name: "Utility routing" })).toBeTruthy();
+    expect(screen.getByLabelText("Shutoff date, if on a notice")).toBeTruthy();
+    expect(screen.queryByLabelText("PECO account number")).toBeNull();
+    expect(screen.queryByLabelText("Applicant first name")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    const selected = initialNeed === "electricity" ? /Electric bill/ : initialNeed === "gas" ? /Gas bill/ : /Water bill/;
+    expect((screen.getByRole("checkbox", { name: selected }) as HTMLInputElement).checked).toBe(true);
+  });
+  it("offers utility choices without inferring the bill type from the utilities entry", async () => {
+    render(<ParentIntake initialNeed="utilities"/>);
     await screen.findByRole("heading", { name: "What would help your household?" });
-    expect(screen.queryByRole("group", { name: "Utility bills" })).toBeNull();
-    expect(screen.queryByRole("checkbox", { name: /Electric bill|Gas bill|Water bill/ })).toBeNull();
-    fireEvent.click(screen.getByRole("checkbox", { name: /Food for now/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.queryByLabelText("PECO")).toBeNull();
-    expect(screen.queryByLabelText("Shutoff date on a notice, if known")).toBeNull();
-    expect(screen.queryByRole("group", { name: "Your utility information" })).toBeNull();
-    expect(screen.getByLabelText("Household ZIP code")).toBeTruthy();
+    for (const control of screen.getAllByRole("checkbox", { name: /Electric bill|Gas bill|Water bill/ })) expect((control as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByLabelText("PECO account number")).toBeNull();
   });
 });

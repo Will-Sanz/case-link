@@ -152,6 +152,18 @@ describe("complete parent data pagination", () => {
       details: { applicant: { firstName: "Sample" } },
       provenance: { "applicant.firstName": { source: "parent", asOf: "2026-11-03T12:00:00.000Z" } },
     }));
+    tables.parent_wic_application_details = Array.from({ length: 103 }, (_, index) => ({
+      id: id(index + 1), request_id: id(105), revision: index + 1,
+      details: { contact: { firstName: "WicExportCanary" } },
+      provenance: { "contact.firstName": { source: "parent", confirmedAt: "2026-11-13T19:00:00Z", asOf: "2026-11-13" } },
+      consent_evidence: { revision: index + 1, subjectAuthorityDeclared: true, subjects: ["contact"] },
+    }));
+    tables.parent_peco_application_details = Array.from({ length: 104 }, (_, index) => ({
+      id: id(index + 1), request_id: id(105), revision: index + 1,
+      details: { accountNumber: "9000000001", applicant: { firstName: "PecoExportCanary" } },
+      provenance: { accountNumber: { source: "parent", confirmedAt: "2026-11-13T20:06:00Z", asOf: "2026-11-13" } },
+      consent_evidence: { revision: index + 1, accountAuthorityDeclared: true, subjectAuthorityDeclared: true },
+    }));
     const exported = await exportParentInformation();
     expect(exported.requests).toHaveLength(105);
     const last = exported.requests.find((request) => request.id === id(105))!;
@@ -163,12 +175,29 @@ describe("complete parent data pagination", () => {
     expect(last.forms).toHaveLength(1);
     expect(last.assistant).toHaveLength(1);
     expect(last.snapApplicationDetails).toHaveLength(102);
+    expect(last.wicApplicationDetails).toHaveLength(103);
+    expect(last.pecoApplicationDetails).toHaveLength(104);
+    expect((last.pecoApplicationDetails as Row[]).at(-1)).toEqual(tables.parent_peco_application_details.at(-1));
+    expect((last.wicApplicationDetails as Row[]).at(-1)?.provenance).toEqual(tables.parent_wic_application_details.at(-1)?.provenance);
+    expect((last.wicApplicationDetails as Row[]).at(-1)?.consent_evidence).toEqual(tables.parent_wic_application_details.at(-1)?.consent_evidence);
     expect((last.snapApplicationDetails as Row[]).at(-1)?.provenance).toEqual(tables.parent_snap_application_details.at(-1)?.provenance);
     expect(maxPending).toBeLessThanOrEqual(2); // Only the established household/account pair runs together.
     expect(calls.filter((call) => call.table === "parent_events")).toHaveLength(
       3,
     );
     expect(calls.filter((call) => call.table === "parent_snap_application_details")).toHaveLength(2);
+    expect(calls.filter((call) => call.table === "parent_wic_application_details")).toHaveLength(2);
+    expect(calls.filter((call) => call.table === "parent_peco_application_details")).toHaveLength(2);
+  });
+  it("returns only the presence of private PECO history even when its current mandate has changed", async () => {
+    const request = { ...fixtureRequest(), id: id(1), mandate: { ...fixtureRequest().mandate, recipientIds: ["uesf-utilities"] } };
+    tables.parent_requests = [request];
+    tables.parent_peco_application_details = [{ id: id(2), request_id: id(1), details: { accountNumber: "9000000001", applicant: { firstName: "PrivateCanary" } } }];
+    const saved = await getSupportRequest(id(1));
+    expect(saved?.has_peco_application_details).toBe(true);
+    expect(JSON.stringify(saved)).not.toMatch(/9000000001|PrivateCanary/);
+    tables.parent_peco_application_details = [];
+    expect((await getSupportRequest(id(1)))?.has_peco_application_details).toBe(false);
   });
   it("shows the newest200 events chronologically and reports that earlier history exists", async () => {
     tables.parent_requests = [{ ...fixtureRequest(), id: id(1) }];

@@ -16,6 +16,12 @@ const binding=z.object({
   need: z.literal("electricity"),
   purpose: z.literal("income_preparation"),
 }).strict();
+export { binding as pecoCapIncomeBindingSchema };
+export const pecoCapPreparationReferenceSchema=z.object({
+  id,
+  revision: z.number().int().positive(),
+  sha256: hash,
+}).strict();
 const validation={
   binding,
   provenanceRef: id,
@@ -142,6 +148,8 @@ const bundle=z.object({
 const inputSchema=z.object({
   scope: z.object({
     binding,
+    // Recorded by the trusted projection; income readiness can precede a completed form snapshot.
+    preparationSnapshot: pecoCapPreparationReferenceSchema.optional(),
     applicantSubjectId: id,
     journey: z.enum(["new_enrollment","renewal","unknown"]),
     currentCapState: z.enum(["not_enrolled","enrolled","unknown"]),

@@ -288,6 +288,7 @@ export type SupportRequest = {
   next_run_at?: string | null;
   events?: SupportEvent[];
   events_truncated?: boolean;
+  has_peco_application_details?: boolean;
   account_changed_at?: Partial<Record<SupportNeed, string>>;
   intake_confirmed_at?: Partial<Record<keyof SupportIntake, string>>;
   intake_need_scoped_fields?: string[];

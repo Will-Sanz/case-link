@@ -39,6 +39,12 @@ export async function POST(request: Request, { params }: Context) {
     requireSameOrigin(request);
     const id = uuidSchema.parse((await params).id);
     const { supabase } = await requireParentSession();
+    const support = await getSupportRequest(id);
+    if (!support) return parentJson({ ok: false, error: "This support request is unavailable." }, 404);
+    if (support.intake.needs.every(need => need === "wic_new" || need === "wic_continuing"))
+      return parentJson({ ok: false, error: "WIC document processing is not available. Use official WIC help; your saved history remains available." }, 403);
+    if (support.has_peco_application_details)
+      return parentJson({ ok: false, error: "Private PECO document processing is not available. Your saved history remains available." }, 403);
     if (
       Number(request.headers.get("content-length") ?? 0) >
       MAX_DOCUMENT_BYTES + 32768

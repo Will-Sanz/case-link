@@ -20,11 +20,19 @@ import {
 } from "@/lib/parent/progress-data";
 import { SNAP_APPLICATION_NOTICE_VERSION, startSnapApplication } from "@/lib/parent/snap-application-data";
 import { snapApplicationFieldsValueSchema } from "@/lib/parent/snap-application-fields";
+import { WIC_APPLICATION_NOTICE_VERSION, startWicApplication, wicInitialIntakeSchema } from "@/lib/parent/wic-application-data";
+import { wicApplicationFieldsValueSchema } from "@/lib/parent/wic-application-fields";
+import { startPecoApplication, pecoInitialIntakeSchema } from "@/lib/parent/peco-application-data";
+import { pecoApplicationWriteSchema } from "@/lib/parent/peco-application-snapshot";
 
 const startSchema = z.union([
   z.object({ intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
   z.object({ kind: z.literal("snap_application"), intake: intakeSchema, mandate: mandateSchema,
     details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION) }).strict(),
+  z.object({ kind: z.literal("wic_application"), intake: wicInitialIntakeSchema, mandate: mandateSchema,
+    details: wicApplicationFieldsValueSchema, noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), reusedZip: reusedZipSourceSchema.optional() }).strict(),
+  pecoApplicationWriteSchema.omit({ expectedVersion: true }).extend({ kind: z.literal("peco_application"),
+    intake: pecoInitialIntakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
 ]);
 
 export async function GET() {
@@ -45,6 +53,12 @@ export async function POST(request: Request) {
     const input = await readParentJson(request, 65536);
     if (input && typeof input === "object" && "kind" in input && input.kind === "snap_application" &&
       !authorization.snapApplication?.collectionEnabled)
+      throw new Error("This request is unavailable, or its permission has changed.");
+    if (input && typeof input === "object" && "kind" in input && input.kind === "wic_application" &&
+      !authorization.wicApplication?.collectionEnabled)
+      throw new Error("This request is unavailable, or its permission has changed.");
+    if (input && typeof input === "object" && "kind" in input && input.kind === "peco_application" &&
+      !authorization.pecoApplication?.collectionEnabled)
       throw new Error("This request is unavailable, or its permission has changed.");
     const value = startSchema.parse(input);
     if (validateMandate(value.mandate, new Date(authorization.issuedAt)))
@@ -69,7 +83,12 @@ export async function POST(request: Request) {
       .uuid()
       .parse(request.headers.get("idempotency-key"));
     const id = "kind" in value
-      ? await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey)
+      ? value.kind === "peco_application"
+        ? await startPecoApplication(value.intake, value.mandate, { details: value.details, noticeVersion: value.noticeVersion,
+          subjectAuthorityDeclared: value.subjectAuthorityDeclared, accountAuthorityDeclared: value.accountAuthorityDeclared }, idempotencyKey, value.reusedZip)
+        : value.kind === "wic_application"
+        ? await startWicApplication(value.intake, value.mandate, value.details, value.noticeVersion, value.subjectAuthorityDeclared, idempotencyKey, value.reusedZip)
+        : await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey)
       : value.reusedZip
         ? await startSupportRequest(value.intake, value.mandate, idempotencyKey, value.reusedZip)
         : await startSupportRequest(value.intake, value.mandate, idempotencyKey);

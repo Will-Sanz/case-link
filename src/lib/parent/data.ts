@@ -171,6 +171,16 @@ export async function exportParentInformation() {
       "parent_snap_application_details",
       "id,request_id,revision,base_version,request_version,details,provenance,source,notice_version,created_at,idempotency_key,confirmed_paths",
     ],
+    [
+      "wicApplicationDetails",
+      "parent_wic_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key",
+    ],
+    [
+      "pecoApplicationDetails",
+      "parent_peco_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key",
+    ],
   ] as const;
   for (const [key, table, columns] of tables) {
     const rows = await allParentRows(supabase, table, columns);
@@ -198,7 +208,7 @@ export async function getSupportRequest(
     .maybeSingle();
   check(request.error);
   if (!request.data) return null;
-  const [events, documents] = await Promise.all([
+  const [events, documents, peco] = await Promise.all([
     supabase
       .from("parent_events")
       .select(eventColumns)
@@ -214,14 +224,17 @@ export async function getSupportRequest(
       .eq("request_id", id)
       .neq("status", "deletion_pending")
       .order("created_at", { ascending: false }),
+    supabase.from("parent_peco_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
   ]);
   check(events.error);
   check(documents.error);
+  check(peco.error);
   return {
     ...request.data,
     events: (events.data ?? []).slice(0, 200).reverse(),
     events_truncated: (events.data?.length ?? 0) > 200,
     documents: documents.data ?? [],
+    has_peco_application_details: !!peco.data,
   } as SupportRequest;
 }
 export async function startSupportRequest(

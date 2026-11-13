@@ -67,7 +67,7 @@ for case in json.loads((folder / "cases.json").read_text()):
         year, month, day = person["dateOfBirth"].split("-")
         assert region(first, (332, bottom, 397, top)) == f"{month}/{day}/{year}", "DOB moved or changed"
         assert region(first, (398, bottom, 467, top)) == ("SELF" if i == 0 else person["relationship"]), "Relationship moved or changed"
-        assert region(first, (468, bottom, 591, top)) == person["incomeSource"], "Income source moved or changed"
+        assert region(first, (468, bottom, 591, top)) == person.get("incomeSource", ""), "Income source moved or changed"
     for i, person in enumerate(people[5:]):
         page = document[2 + i // 22]
         bottom = 658 - (i % 22) * 28
@@ -78,7 +78,7 @@ for case in json.loads((folder / "cases.json").read_text()):
         assert continuation(37, 195) == expected_name, "Overflow name moved or changed"
         assert continuation(332, 397) == f"{month}/{day}/{year}", "Overflow DOB moved or changed"
         assert continuation(398, 467) == person["relationship"], "Overflow relationship moved or changed"
-        assert continuation(468, 591) == person["incomeSource"], "Overflow income source moved or changed"
+        assert continuation(468, 591) == person.get("incomeSource", ""), "Overflow income source moved or changed"
         assert not continuation(197, 331), "Overflow optional identifier populated"
     for box in [(60, 51, 75, 60), (59, 37, 74, 45), (60, 23, 74, 32),
                 (204, 21, 220, 31), (204, 35, 220, 45), (347, 36, 363, 45),
@@ -110,6 +110,23 @@ for case in json.loads((folder / "cases.json").read_text()):
             lambda pixel: 0 if pixel < 180 else 255, mode="1"
         ).save(folder / f"{case['name']}-{i + 1}-monochrome.png")
     assert len(reader.pages[1].get("/Annots", [])) == 1, "Official non-widget link lost or expanded"
+    if "projection" in case:
+        projection = case["projection"]
+        manifest, snapshot, context = projection["manifest"], projection["sourceSnapshot"], projection["context"]
+        digest = lambda data: hashlib.sha256(data).hexdigest()
+        encoded = lambda data: json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        assert context["kind"] == "fictional_offline_rehearsal", "Projection was not a fictional rehearsal"
+        assert projection["incomeProof"] == "not_assessed" and projection["submissionReady"] is False, "Draft claims proof or submission readiness"
+        assert manifest["sourceSnapshot"] == {"id": snapshot["id"], "revision": snapshot["revision"], "sha256": digest(encoded(snapshot))}, "Private source snapshot changed"
+        assert manifest["binding"] == context["binding"] == context["expectedSnapshot"]["binding"], "Projection scope changed"
+        assert manifest["artifactSha256"] == digest(path.read_bytes()) and manifest["templateSha256"] == digest(source_path.read_bytes()), "Projection artifact/source hash changed"
+        assert manifest["formInputSha256"] == digest(encoded(facts)), "Projected form values changed"
+        assert manifest["subjectIds"] == [snapshot["details"]["applicant"]["id"], *[person["id"] for person in snapshot["details"]["householdMembers"]]], "Projection subject identity changed"
+        assert manifest["confirmedAt"] == min([snapshot["created_at"], *[item["confirmedAt"] for item in snapshot["provenance"].values()]]), "Projection refreshed original field dates"
+        assert manifest["validUntil"] == manifest["retentionUntil"] == min(context["validUntil"], context["retentionUntil"], context["mandate"]["expiresAt"], context["grant"]["expiresAt"], context["collection"]["expiresAt"], snapshot["source"]["verifiedUntil"]), "Projection extended a deadline"
+        projected = {"id": snapshot["id"], "revision": snapshot["revision"], "binding": manifest["binding"], "subjectIds": manifest["subjectIds"], "confirmedAt": manifest["confirmedAt"], "validUntil": manifest["validUntil"], "retentionUntil": manifest["retentionUntil"], "details": facts}
+        assert manifest["preparationSnapshot"]["sha256"] == digest(encoded(projected)), "Projected reference does not bind printed values"
+        assert facts["applicant"]["incomeSource"] == "No income" and "incomeSource" not in facts["householdMembers"][0], "Fictional declared-none and blank-minor case lost"
     if "packet" in case:
         packet = case["packet"]
         manifest = packet["manifest"]
@@ -118,6 +135,12 @@ for case in json.loads((folder / "cases.json").read_text()):
         assert manifest["templateSha256"] == digest(source_path.read_bytes()), "Source digest changed"
         assert manifest["certificationTemplateSha256"] == digest(source_path.read_bytes()), "Certification source changed"
         assert manifest["kind"] == "unsigned_preparation_rehearsal", "Unexpected execution claim"
+        snapshot = packet["preparationSnapshot"]
+        assert manifest["preparationSnapshot"] == {
+            "id": snapshot["id"], "revision": snapshot["revision"],
+            "sha256": digest(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8")),
+        }, "Printed details lost their trusted snapshot binding"
+        assert snapshot["details"] == facts, "Printed facts differ from the referenced snapshot"
         assert manifest["pageCount"] == len(document), "Manifest total mismatch"
         expected_start = 2 + (max(0, len(people) - 5) + 21) // 22 + 1
         seen_ranges = {}

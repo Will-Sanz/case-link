@@ -706,6 +706,25 @@ describe("support detail", () => {
       version: 1,
     });
   });
+  it("keeps private PECO fields and documents out of ordinary corrections while preserving the shutoff date", async () => {
+    const request = fixture(); request.intake = { ...request.intake, utilityProviders: ["peco"], accountAuthority: "self", shutoffDate: "2026-11-15" };
+    request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt, true);
+    const fetcher = vi.fn(async (_url: string, init?: RequestInit) => response(init?.method === "POST" ? { ...request, version: 2, intake: { ...request.intake, zip: "19105" } } : request));
+    vi.stubGlobal("fetch", fetcher); render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);
+    fireEvent.click(await screen.findByText("Correct household or bill information"));
+    expect(screen.queryByLabelText("Household size")).toBeNull(); expect(screen.queryByLabelText("Income before taxes ($)")).toBeNull();
+    expect(screen.queryByLabelText("PECO account number")).toBeNull();
+    expect((screen.getByLabelText("Shutoff date, if on a notice") as HTMLInputElement).value).toBe("2026-11-15");
+    expect(screen.getByRole("link", { name: "Your PECO CAP answers" }).getAttribute("href")).toBe("#application-review");
+    fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19105" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save correction" })); await screen.findByText(/Your correction is saved/);
+    const body = JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body));
+    expect(body.intake).toMatchObject({ zip: "19105", shutoffDate: "2026-11-15", householdSize: null, incomeAmount: null });
+    expect(body.details).toBeUndefined();
+    await openSection(/Your documents/);
+    expect(screen.getByText(/Private PECO CAP document intake is not connected/)).toBeTruthy();
+    expect(screen.queryByLabelText(/Upload/)).toBeNull();
+  });
   it('preserves legacy private WIC answers read-only without silently clearing them for a ZIP correction',async()=>{
     const request=fixture();request.intake={...request.intake,needs:['wic_new'],childrenUnderFive:false,pregnantOrPostpartum:true};
     const fetch=vi.fn().mockResolvedValue(response(request));vi.stubGlobal('fetch',fetch);render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);

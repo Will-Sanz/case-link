@@ -115,6 +115,10 @@ export async function createParentSqlFixture(
   "20261108015124_parent_deletion_after_processing_closure.sql",
   "20261109182712_parent_pilot_account_scope.sql",
   "20261113182609_parent_reusable_routing_information.sql",
+  "20261113192838_parent_wic_private_application_details.sql",
+    "20261113200717_parent_peco_private_application_details.sql",
+    "20261113201714_parent_wic_document_boundary.sql",
+    "20261113204551_parent_peco_private_document_boundary.sql",
   ];
   try {
     for (const migration of migrations)
