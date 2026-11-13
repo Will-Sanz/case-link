@@ -1,5 +1,4 @@
 -- Reuse ordinary routing only. Private application answers keep their named purpose.
-begin;
 alter table public.parent_requests add column intake_reuse jsonb not null default '{}'
   check (jsonb_typeof(intake_reuse)='object' and pg_column_size(intake_reuse)<2000);
 
@@ -235,4 +234,3 @@ end $$;
 revoke execute on function parent_private.original_parent_claim_assistant(),parent_private.parent_claim_assistant()
   from public,anon,authenticated,service_role,parent_worker,parent_retention_worker,parent_storage_broker,parent_snap_finalizer;
 grant execute on function parent_private.parent_claim_assistant() to parent_worker;
-commit;
