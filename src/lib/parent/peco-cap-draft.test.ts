@@ -117,6 +117,14 @@ describe("unsigned PECO CAP preparation draft", () => {
       }, now),
     ).resolves.toBeInstanceOf(Uint8Array);
   });
+  it.each([undefined, ""])("leaves a genuinely unanswered minor income cell blank (%s)", async incomeSource => {
+    await expect(renderPecoCapPreparationDraft(template, { ...input, householdMembers: [{ ...input.householdMembers[0], incomeSource }] }, now)).resolves.toBeInstanceOf(Uint8Array);
+  });
+  it("uses the Pennsylvania birthday boundary before requiring an adult income cell", async () => {
+    const householdMembers = [{ ...input.householdMembers[0], dateOfBirth: "2008-10-27", incomeSource: undefined }];
+    await expect(renderPecoCapPreparationDraft(template, { ...input, householdMembers }, new Date("2026-10-27T02:00:00Z"))).resolves.toBeInstanceOf(Uint8Array);
+    await expect(renderPecoCapPreparationDraft(template, { ...input, householdMembers }, new Date("2026-10-27T04:00:00Z"))).rejects.toMatchObject({ message: genericError });
+  });
 
   it.each([
     { ...input, accountNumber: undefined },

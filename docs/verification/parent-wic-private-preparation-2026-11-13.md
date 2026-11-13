@@ -4,7 +4,7 @@ November 13, 2026. Implements the WIC information pieces of the [extension plan]
 
 ## Family flow and scope
 
-The separately gated, single Pennsylvania WIC initial route presents its notice before private inputs. It groups contact/address/birth-date questions, explicit new/reapplying/transfer status, mother/children selection and appointment preference. Relevant maternal and child branches follow the checked public form. Unknown answers stay blank; partial drafts are identified as partial. No invented names, household count, aggregate income, clinical eligibility thresholds, optional demographics, identifiers or signatures are collected.
+The separately gated, single Pennsylvania WIC initial route presents its notice before private inputs. It groups contact/address/birth-date questions, explicit new/reapplying/transfer status, mother/children selection and appointment preference. Relevant maternal and child branches follow the checked public form. Unknown answers stay blank; partial drafts are identified as partial. No invented names, household count, aggregate income, clinical eligibility thresholds, optional demographics, government identifiers or signatures are collected.
 
 Eligible ordinary household routing is reused with its original dates. Contact postal ZIP is independently supplied; routing is not proof of that postal address. An explicit same-person choice can reuse contact name and birth date for the mother, without inferring identity from similar names. Stable internal child IDs preserve correction provenance.
 

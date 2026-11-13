@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import sharp from "sharp";
 import type { PecoCapIncomeInput } from "../src/lib/parent/peco-cap-income";
+import { prepareFictionalPecoApplicationDraft, type FictionalPecoPreparationContext } from "../src/lib/parent/peco-application-preparation";
+import { PECO_ACCOUNT_AUTHORITY_STATEMENT, PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE, PECO_SUBJECT_AUTHORITY_STATEMENT, pecoApplicationLeaves, type PecoApplicationFields } from "../src/lib/parent/peco-application-fields";
+import { pecoApplicationSnapshotSchema } from "../src/lib/parent/peco-application-snapshot";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -147,6 +150,7 @@ async function main() {
     input: PecoCapDraftInput;
     pages: number;
     packet?: { manifest: unknown; preparationSnapshot: PecoCapPreparationSnapshot; originals: { documentId: string; filename: string }[] };
+    projection?: { manifest: unknown; sourceSnapshot: unknown; context: unknown; incomeProof: string; submissionReady: boolean };
   }[] = [
     { name: "peco-single", input: base, pages: 2 },
     {
@@ -258,6 +262,32 @@ async function main() {
       ],
     }
   });
+  const requestId = "11111111-1111-4111-8111-111111111111", snapshotId = "22222222-2222-4222-8222-222222222222";
+  const actorId = "33333333-3333-4333-8333-333333333333", applicantId = "44444444-4444-4444-8444-444444444444", childId = "55555555-5555-4555-8555-555555555555";
+  const privateDetails: PecoApplicationFields = { journey: "new_enrollment", currentCapState: "not_enrolled", householdComplete: true, accountNumber: base.accountNumber,
+    applicant: { id: applicantId, firstName: base.applicant.firstName, lastName: base.applicant.lastName, dateOfBirth: base.applicant.dateOfBirth, income: { state: "none", sources: [] } },
+    address: { ...base.address, state: "PA" }, householdMembers: [{ id: childId, firstName: "FictionalChild", lastName: "Rivera", dateOfBirth: "2020-01-01", relationship: "Child" }] };
+  const snapshot = pecoApplicationSnapshotSchema.parse({ id: snapshotId, request_id: requestId, revision: 1, base_version: 1, request_version: 2, details: privateDetails,
+    provenance: Object.fromEntries(Object.keys(pecoApplicationLeaves(privateDetails)).map(path => [path, { source: "parent", confirmedAt: "2026-11-13T20:07:00.000Z", asOf: "2026-11-13" }])),
+    source: PECO_APPLICATION_SOURCE, notice_version: PECO_APPLICATION_NOTICE_VERSION, created_at: "2026-11-13T20:08:00.000Z", idempotency_key: childId,
+    consent_evidence: { subjectAuthorityDeclared: true, subjectStatement: PECO_SUBJECT_AUTHORITY_STATEMENT, accountAuthorityDeclared: true, accountStatement: PECO_ACCOUNT_AUTHORITY_STATEMENT,
+      accountAuthority: "self", actorId, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, declaredAt: "2026-11-13T20:08:00.000Z", revision: 1,
+      detailsSha256: hash(JSON.stringify(privateDetails)), accountNumberSha256: hash(base.accountNumber), subjects: [`applicant.${applicantId}`, `householdMembers.${childId}`] } });
+  const binding = { requestId, householdId: "88888888-8888-4888-8888-888888888888", requestVersion: 2, accountRef: snapshotId,
+    programId: "peco-cap" as const, need: "electricity" as const, purpose: "income_preparation" as const };
+  const deadline = "2026-11-14T20:00:00.000Z";
+  const context: FictionalPecoPreparationContext = { kind: "fictional_offline_rehearsal", expectedSnapshot: { id: snapshot.id, revision: snapshot.revision, sha256: hash(JSON.stringify(snapshot)), binding }, binding,
+    actorId, accountAuthority: "self", accountNumberSha256: snapshot.consent_evidence.accountNumberSha256, requestState: "active",
+    mandate: { version: 1, mode: "prepare_only", recipientIds: ["peco-cap"], allowedActions: ["research", "prepare"], allowedData: ["household", "income", "utility"],
+      expiresAt: deadline, maxAttempts: 12, maxRecipients: 1, bookingPreference: "ask_me", accepted: true }, mandateRevoked: false,
+    grant: { expiresAt: deadline, revoked: false }, collection: { collectionEnabled: true, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, expiresAt: deadline }, validUntil: deadline, retentionUntil: deadline };
+  const projection = await prepareFictionalPecoApplicationDraft(template, snapshot, context, new Date("2026-11-13T20:10:00Z"));
+  if (!projection.bytes || !projection.manifest || !projection.formFieldsReady) throw new Error();
+  writeFileSync(resolve(directory, "peco-private-projection.pdf"), projection.bytes);
+  cases.push({ name: "peco-private-projection", pages: 2, input: { accountNumber: base.accountNumber,
+    applicant: { firstName: base.applicant.firstName, lastName: base.applicant.lastName, dateOfBirth: base.applicant.dateOfBirth, incomeSource: "No income" },
+    address: base.address, householdMembers: [{ firstName: "FictionalChild", lastName: "Rivera", dateOfBirth: "2020-01-01", relationship: "Child" }] },
+    projection: { manifest: projection.manifest, sourceSnapshot: snapshot, context, incomeProof: projection.incomeProof, submissionReady: projection.submissionReady } });
   writeFileSync(resolve(directory, "cases.json"), JSON.stringify(cases, null, 2));
   execFileSync(process.env.CASELINK_PYTHON_BIN ?? "python3", [
     resolve("scripts/verify-peco-cap-pdfs.py"), directory,

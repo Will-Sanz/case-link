@@ -32,7 +32,7 @@ const person = z
     lastName: text(80),
     middleInitial: text(2).optional(),
     dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    incomeSource: text().refine((value) => !/liheap/i.test(value)),
+    incomeSource: z.string().trim().max(160).refine((value) => !/[\u0000-\u001f\u007f-\u009f]/.test(value) && !/liheap/i.test(value)).optional(),
   })
   .strict();
 const inputSchema = z
@@ -140,7 +140,7 @@ function drawRow(
   );
   if (!printedSelf)
     drawBox(page, font, row.relationship, [400, y, 64, 21], 2);
-  drawBox(page, font, row.incomeSource, [470, y, 118, 21], 2);
+  if (row.incomeSource) drawBox(page, font, row.incomeSource, [470, y, 118, 21], 2);
 }
 
 /** Synthetic rehearsal only; no signing, government-identifier, persistence or transport channel. */
@@ -156,15 +156,19 @@ async function preparePecoCapDraft(
     throw new Error("The PECO CAP template differs from its reviewed source.");
   try {
     const data = inputSchema.parse(input);
-    const today = now.toISOString().slice(0, 10);
+    const today = agencyDate.format(now);
     const rows: Row[] = [
       { ...data.applicant, relationship: "SELF" },
       ...data.householdMembers,
     ];
-    for (const row of rows) validBirthDate(row.dateOfBirth, today);
+    for (const row of rows) {
+      validBirthDate(row.dateOfBirth, today);
+      const age = Number(today.slice(0, 4)) - Number(row.dateOfBirth.slice(0, 4)) - (today.slice(5) < row.dateOfBirth.slice(5) ? 1 : 0);
+      if (age >= 18 && !row.incomeSource) throw new Error("Required adult income information is missing.");
+    }
     const birth = data.applicant.dateOfBirth;
     const age =
-      now.getUTCFullYear() -
+      Number(today.slice(0, 4)) -
       Number(birth.slice(0, 4)) -
       (today.slice(5) < birth.slice(5) ? 1 : 0);
     if (age < 18 || (data.smsUpdates === true && !data.cellPhone))
