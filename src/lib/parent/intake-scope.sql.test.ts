@@ -211,6 +211,7 @@ describe.skipIf(!modulePath)("sticky exact-need intake scope against PostgreSQL 
   it("restricts all four uncertain legacy origins without changing their values or source dates", async () => {
     const legacy = await initialize();
     try {
+      await legacy.admin.query("drop trigger parent_reused_zip_change on public.parent_requests");
       await legacy.admin.query("alter table public.parent_requests drop column if exists intake_need_scoped_fields");
       const priorFunction = readFileSync("supabase/migrations/20261027141312_parent_intake_source_dates.sql", "utf8")
         .match(/create function parent_private\.record_intake_source_dates\(\)[\s\S]*?end \$\$;/)?.[0];

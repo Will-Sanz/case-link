@@ -172,6 +172,7 @@ describe.skipIf(!modulePath)("server-owned intake source dates against PostgreSQ
     const legacy = await initialize();
     try {
       // Recreate only the pre-migration shape in a separate in-memory database.
+      await legacy.admin.query("drop trigger if exists parent_reused_zip_change on public.parent_requests");
       await legacy.admin.query("drop trigger if exists parent_intake_source_dates on public.parent_requests");
       await legacy.admin.query("alter table public.parent_requests drop column if exists intake_confirmed_at");
       await legacy.admin.query("drop function if exists parent_private.record_intake_source_dates()");

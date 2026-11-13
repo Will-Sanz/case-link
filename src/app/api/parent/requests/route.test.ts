@@ -21,6 +21,16 @@ beforeEach(() => {
 });
 
 describe("existing request creation and atomic SNAP variant", () => {
+  it("checks reusable routing through the dedicated start boundary and rejects injected freshness", async () => {
+    const reusedZip = { sourceRequestId: key, sourceVersion: 2 };
+    expect((await POST(request({ ...legacy(), reusedZip }))).status).toBe(201);
+    expect(mocks.start).toHaveBeenCalledWith(legacy().intake, legacy().mandate, key, reusedZip);
+    expect((await POST(request({ ...legacy(), reusedZip: { ...reusedZip, confirmedAt: "2026-11-13T00:00:00Z" } }))).status).toBe(400);
+  });
+  it("separates a proved pre-creation source change from an uncertain creation result", async () => {
+    mocks.start.mockRejectedValueOnce(new Error("parent_reuse_source_changed"));
+    expect((await POST(request({ ...legacy(), reusedZip: { sourceRequestId: key, sourceVersion: 1 } }))).status).toBe(412);
+  });
   it("preserves ordinary request creation", async () => {
     mocks.window.mockResolvedValue({ issuedAt: "2026-10-25T16:00:00Z", expiresAt: "2026-11-24T16:00:00Z", snapApplication: { collectionEnabled: false, noticeVersion: null } });
     expect((await POST(request(legacy()))).status).toBe(201);

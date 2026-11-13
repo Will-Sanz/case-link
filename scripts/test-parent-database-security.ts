@@ -43,9 +43,11 @@ async function main() {
     ownerB = randomUUID(),
     staff = randomUUID(),
     unverified = randomUUID(),
-    trusted = randomUUID();
+    trusted = randomUUID(),
+    reuseOwner = randomUUID(),
+    completedReuseOwner = randomUUID();
   const schoolFamily = randomUUID();
-  const users = [ownerA, ownerB, staff, unverified, trusted];
+  const users = [ownerA, ownerB, staff, unverified, trusted, reuseOwner, completedReuseOwner];
   const fixtureStoragePaths = new Map<string, string>();
   const parentGroups = [
     "parent_worker",
@@ -2772,9 +2774,57 @@ async function main() {
         saved.facts.find((fact: { field: string }) => fact.field === "householdSize").value * 10);
       assertionCount++;
     }
-    console.log(
-      `Parent database security passed (${assertionCount} recorded assertions, plus bounded budget checks; concurrency ${fixture ? "not run" : "passed"}).`,
-    );
+    const reuseSource = await start(reuseOwner);
+    const savedZip = (await role("authenticated", reuseOwner, db => db.query("select public.parent_reusable_zip() value"))).rows[0].value;
+    assert.equal(savedZip.sourceRequestId, reuseSource); assertionCount++;
+    const reuseKey = randomUUID();
+    const reuseParameters = [JSON.stringify(intake), JSON.stringify(mandate), reuseKey, reuseSource, savedZip.sourceVersion];
+    const startReused = () => role("authenticated", reuseOwner, db => db.query("select public.parent_start_request_with_reused_zip($1,$2,$3,$4,$5) id", reuseParameters));
+    const reuseTarget = (await startReused()).rows[0].id;
+    assert.equal((await startReused()).rows[0].id, reuseTarget); assertionCount++;
+    const reused = (await admin.query("select intake_confirmed_at,intake_reuse from public.parent_requests where id=$1", [reuseTarget])).rows[0];
+    assert.equal(reused.intake_confirmed_at.zip, savedZip.confirmedAt); assertionCount++;
+    assert.equal(reused.intake_reuse.zip.expiresAt, savedZip.expiresAt); assertionCount++;
+    await denied(() => role("authenticated", ownerA, db => db.query("select public.parent_start_request_with_reused_zip($1,$2,$3,$4,$5)", [JSON.stringify(intake), JSON.stringify(mandate), randomUUID(), reuseSource, savedZip.sourceVersion])), "P0001");
+    if (!fixture) {
+      const concurrentKey = randomUUID();
+      const racingStart = role("authenticated", reuseOwner, db => db.query("select public.parent_start_request_with_reused_zip($1,$2,$3,$4,$5) id", [JSON.stringify(intake), JSON.stringify(mandate), concurrentKey, reuseSource, savedZip.sourceVersion]));
+      const racingCorrection = role("authenticated", reuseOwner, db => db.query("select public.parent_correct_request($1,$2,1)", [reuseSource, JSON.stringify({ ...intake, zip: "19103" })]));
+      const [created, corrected] = await Promise.allSettled([racingStart, racingCorrection]);
+      assert.equal(corrected.status, "fulfilled"); assertionCount++;
+      if (created.status === "fulfilled") {
+        assert.equal((await admin.query("select parent_private.current_intake_fields($1,'food_now')->>'zip' zip", [created.value.rows[0].id])).rows[0].zip, "19103"); assertionCount++;
+      } else { assert.equal(created.reason.code, "P0001", JSON.stringify({ code: created.reason.code, detail: created.reason.detail, where: created.reason.where })); assertionCount++; }
+      const pairedKey = randomUUID(), currentSource = (await role("authenticated", reuseOwner, db => db.query("select public.parent_reusable_zip() value"))).rows[0].value;
+      const sameStart = () => role("authenticated", reuseOwner, db => db.query("select public.parent_start_request_with_reused_zip($1,$2,$3,$4,$5) id", [JSON.stringify({ ...intake, zip: "19103" }), JSON.stringify(mandate), pairedKey, reuseSource, currentSource.sourceVersion]));
+      const paired = await Promise.all([sameStart(), sameStart()]);
+      assert.equal(paired[0].rows[0].id, paired[1].rows[0].id); assertionCount++;
+      const ordinaryRace = await Promise.allSettled([
+        start(reuseOwner, randomUUID(), { ...intake, zip: "19102" }),
+        role("authenticated", reuseOwner, db => db.query("select public.parent_correct_request($1,$2,2)", [reuseSource, JSON.stringify({ ...intake, zip: "19105" })])),
+      ]);
+      assert.equal(ordinaryRace.filter(result => result.status === "fulfilled").length, 2,
+        "An ordinary new source and an existing source correction must both complete without a deadlock."); assertionCount++;
+    }
+    await role("authenticated", reuseOwner, db => db.query("select public.parent_control_request($1,'cancel')", [reuseSource]));
+    const redacted = (await admin.query("select intake,intake_reuse,parent_private.current_intake_fields(id,'food_now') current from public.parent_requests where id=$1", [reuseTarget])).rows[0];
+    assert.equal(redacted.intake.zip, null); assertionCount++;
+    assert.equal(redacted.current.zip, undefined); assertionCount++;
+    assert.equal(redacted.intake_reuse.zip.invalidated, true); assertionCount++;
+    const completedSource = await start(completedReuseOwner);
+    for (const need of intake.needs)
+      await role("authenticated", completedReuseOwner, db => db.query("select public.parent_report_outcome($1,$2,'support_received','Fictional completed support')", [completedSource, need]));
+    await role("authenticated", completedReuseOwner, db => db.query("select public.parent_close_request($1,'completed','Fictional completed support','parent','Return for support when needed')", [completedSource]));
+    await admin.query("update public.parent_requests set mandate=jsonb_set(mandate,'{expiresAt}',to_jsonb(now()-interval '1 second')) where id=$1", [completedSource]);
+    const completedDefault = (await role("authenticated", completedReuseOwner, db => db.query("select public.parent_reusable_zip() value"))).rows[0].value;
+    assert.equal(completedDefault.sourceRequestId, completedSource); assertionCount++;
+    const completedTarget = (await role("authenticated", completedReuseOwner, db => db.query("select public.parent_start_request_with_reused_zip($1,$2,$3,$4,$5) id", [JSON.stringify(intake), JSON.stringify(mandate), randomUUID(), completedSource, completedDefault.sourceVersion]))).rows[0].id;
+    const completedProjection = (await admin.query("select parent_private.current_intake_fields($1,'food_now')->>'zip' zip,parent_private.current_grant($1,1) target_allowed,parent_private.current_grant($2,$3) old_allowed", [completedTarget, completedSource, completedDefault.sourceVersion])).rows[0];
+    assert.equal(completedProjection.zip, "19104"); assertionCount++;
+    assert.equal(completedProjection.target_allowed, true); assertionCount++;
+    assert.equal(completedProjection.old_allowed, false); assertionCount++;
+    console.log("Owned cross-request ZIP provenance, idempotency, withdrawal and isolation passed; native concurrent starts/correction checked when available.");
+    console.log(`Parent database security passed (${assertionCount} recorded assertions, plus bounded budget checks; concurrency ${fixture ? "not run" : "passed"}).`);
   } finally {
     try {
       for (const [path, bucket] of fixtureStoragePaths)

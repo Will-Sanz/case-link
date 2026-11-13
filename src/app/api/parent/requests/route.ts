@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { intakeSchema, mandateSchema } from "@/lib/parent/domain";
+import { intakeSchema, mandateSchema, reusedZipSourceSchema } from "@/lib/parent/domain";
 import {
   getSupportRequest,
   listSupportRequests,
@@ -22,7 +22,7 @@ import { SNAP_APPLICATION_NOTICE_VERSION, startSnapApplication } from "@/lib/par
 import { snapApplicationFieldsValueSchema } from "@/lib/parent/snap-application-fields";
 
 const startSchema = z.union([
-  z.object({ intake: intakeSchema, mandate: mandateSchema }).strict(),
+  z.object({ intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
   z.object({ kind: z.literal("snap_application"), intake: intakeSchema, mandate: mandateSchema,
     details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION) }).strict(),
 ]);
@@ -70,13 +70,17 @@ export async function POST(request: Request) {
       .parse(request.headers.get("idempotency-key"));
     const id = "kind" in value
       ? await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey)
-      : await startSupportRequest(value.intake, value.mandate, idempotencyKey);
+      : value.reusedZip
+        ? await startSupportRequest(value.intake, value.mandate, idempotencyKey, value.reusedZip)
+        : await startSupportRequest(value.intake, value.mandate, idempotencyKey);
     const [supportRequest, progress] = await Promise.all([
       getSupportRequest(id),
       getSupportProgress(id),
     ]);
     return parentJson({ ok: true, request: supportRequest, progress }, 201);
   } catch (error) {
+    if (error instanceof Error && error.message === "parent_reuse_source_changed")
+      return parentJson({ ok: false, error: "Saved routing information changed before this request was created." }, 412);
     return parentError(error instanceof z.ZodError ? new Error("parent_invalid_input") : error);
   }
 }

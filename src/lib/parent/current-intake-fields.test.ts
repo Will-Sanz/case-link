@@ -19,6 +19,21 @@ function request(overrides: Record<string, unknown> = {}): SupportRequest {
   } as SupportRequest;
 }
 
+describe("borrowed routing expiry", () => {
+  const source = { sourceRequestId: "11111111-1111-4111-8111-111111111111", confirmedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 86400000).toISOString() };
+  it.each([
+    { ...source, invalidated: true },
+    { ...source, expiresAt: now.toISOString() },
+    { ...source, confirmedAt: daysAgo(1) },
+    { ...source, expiresAt: "invalid" },
+  ])("does not reuse a withdrawn, expired or mismatched borrowed value: %j", saved => {
+    expect(currentIntakeFields(request({ intake_reuse: { zip: saved } }), now, "electricity").zip).toBeUndefined();
+  });
+  it("uses the original current borrowed source without refreshing it", () => {
+    expect(currentIntakeFields(request({ intake_reuse: { zip: source } }), now, "electricity").zip).toBe("19104");
+  });
+});
+
 function fact(field: string, value: unknown, overrides: Record<string, unknown> = {}) {
   return {
     need: "electricity",

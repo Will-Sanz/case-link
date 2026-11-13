@@ -13,7 +13,7 @@ import {
   Play,
   ShieldCheck,
 } from "iconoir-react";
-import { NEED_LABELS, OUTCOME_LABELS, intakeSchema } from "@/lib/parent/domain";
+import { NEED_LABELS, OUTCOME_LABELS, intakeSchema, storedIntakeSchema } from "@/lib/parent/domain";
 import type {
   NecessaryAction,
   SupportIntake,
@@ -181,7 +181,7 @@ function CorrectDetails({
         },controller.signal,new Date(Date.now()+30000).toISOString(),
       );
       if(controller.signal.aborted||work.current!==controller)return;
-      const result=z.object({request:z.object({id:z.uuid(),intake:intakeSchema,version:z.number().int().positive()})}).safeParse(response);
+      const result=z.object({request:z.object({id:z.uuid(),intake:storedIntakeSchema,version:z.number().int().positive()})}).safeParse(response);
       if(!result.success||result.data.request.id!==request.id||result.data.request.version<=baseVersion)throw new Error();
       setIntake(result.data.request.intake);
       setBaseVersion(result.data.request.version);
@@ -244,7 +244,7 @@ function CorrectDetails({
                 inputMode="numeric"
                 pattern="[0-9]{5}"
                 maxLength={5}
-                value={intake.zip}
+                value={intake.zip ?? ""}
                 onChange={(e) => change("zip", e.target.value)}
               />
             </div>
@@ -861,7 +861,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             <dl className={styles.factList}>
               <dt>Household ZIP</dt>
               <dd>
-                {request.intake.zip}
+                {request.intake.zip ?? "Current ZIP code needed"}
                 <small>You provided</small>
               </dd>
               <dt>Household size</dt>

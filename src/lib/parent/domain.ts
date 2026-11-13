@@ -34,7 +34,7 @@ export const storedIntakeSchema = z
       .max(10)
       .refine((v) => new Set(v).size === v.length, "Choose each need once."),
     urgency: z.enum(["today", "soon", "planning"]),
-    zip: z.string().regex(/^\d{5}$/, "Enter a five-digit ZIP code."),
+    zip: z.string().regex(/^\d{5}$/, "Enter a five-digit ZIP code.").nullable(),
     language: z.enum(["en", "es"]),
     householdSize: z.number().int().min(1).max(30).nullable(),
     childrenUnderFive: z.boolean().nullable(),
@@ -91,7 +91,9 @@ export const storedIntakeSchema = z
         });
     }
   });
-export const intakeSchema = storedIntakeSchema.superRefine((v, ctx) => {
+export const intakeSchema = storedIntakeSchema.safeExtend({
+  zip: z.string().regex(/^\d{5}$/, "Enter a five-digit ZIP code."),
+}).superRefine((v, ctx) => {
   for (const field of ["childrenUnderFive", "pregnantOrPostpartum"] as const)
     if (v[field] !== null) ctx.addIssue({
       code: "custom", path: [field],
@@ -99,6 +101,17 @@ export const intakeSchema = storedIntakeSchema.superRefine((v, ctx) => {
     });
 });
 export type SupportIntake = z.infer<typeof intakeSchema>;
+export type StoredSupportIntake = z.infer<typeof storedIntakeSchema>;
+export const reusedZipSourceSchema = z.object({
+  sourceRequestId: z.uuid(),
+  sourceVersion: z.number().int().positive(),
+}).strict();
+export type ReusedZipSource = z.infer<typeof reusedZipSourceSchema>;
+export const reusableZipSchema = reusedZipSourceSchema.extend({
+  value: z.string().regex(/^\d{5}$/),
+  confirmedAt: z.iso.datetime({ offset: true }),
+  expiresAt: z.iso.datetime({ offset: true }),
+}).strict();
 
 export const actionSchema = z.enum([
   "research",
@@ -255,7 +268,7 @@ export type SupportRequest = {
   id: string;
   household_id: string;
   status: "active" | "paused" | "cancelled" | "closed";
-  intake: SupportIntake;
+  intake: StoredSupportIntake;
   mandate: ServiceMandate;
   plan: SupportPlan | null;
   required_actions: NecessaryAction[];
@@ -278,6 +291,7 @@ export type SupportRequest = {
   account_changed_at?: Partial<Record<SupportNeed, string>>;
   intake_confirmed_at?: Partial<Record<keyof SupportIntake, string>>;
   intake_need_scoped_fields?: string[];
+  intake_reuse?: { zip?: { sourceRequestId: string; confirmedAt: string; expiresAt: string; invalidated?: boolean } };
   documents?: ParentDocument[];
 };
 export type ParentPreferences = {

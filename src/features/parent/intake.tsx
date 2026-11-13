@@ -12,11 +12,12 @@ import {
   Lock,
   ShieldCheck,
 } from "iconoir-react";
-import { NEED_LABELS, intakeSchema } from "@/lib/parent/domain";
+import { NEED_LABELS, intakeSchema, reusableZipSchema, type ReusedZipSource } from "@/lib/parent/domain";
 import type {
   ServiceMandate,
   ParentPreferences,
   SupportIntake,
+  StoredSupportIntake,
   SupportNeed,
   SupportAction,
 } from "@/lib/parent/domain";
@@ -67,7 +68,7 @@ async function readAuthorizationWindow(signal: AbortSignal) {
 }
 
 export function buildMandate(
-  intake: SupportIntake,
+  intake: StoredSupportIntake,
   recipientIds: string[],
   mode: ServiceMandate["mode"],
   bookingPreference: ServiceMandate["bookingPreference"],
@@ -120,6 +121,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     }[];
   }>("/capabilities");
   const authorization = useParentResource<ParentAuthorizationWindow>("/authorization-window");
+  const zipDefaultConsumed = useRef(false);
+  const [reusedZip, setReusedZip] = useState<z.infer<typeof reusableZipSchema> | null>(null);
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
     needs: foodNeeds.includes(initialNeed as SupportNeed)
@@ -142,10 +145,10 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application"; details?: SnapApplicationFields; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application"; details?: SnapApplicationFields; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION; reusedZip?: ReusedZipSource };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
-  const scope=JSON.stringify({intake,snapDetails,detailsReady,recipientIds,mode,booking,accepted});
+  const scope=JSON.stringify({intake,snapDetails,detailsReady,recipientIds,mode,booking,accepted,reusedZip});
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
   useLayoutEffect(()=>{
     const controller=new AbortController();work.current=controller;
@@ -153,6 +156,22 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   },[scope]);
   const router = useRouter();
   const snapSelected = intake.needs.includes("snap_new");
+  useEffect(() => {
+    if (snapSelected || zipDefaultConsumed.current) return;
+    const controller = new AbortController();
+    boundedParentApi("/intake-defaults", {}, controller.signal, new Date(Date.now() + 30_000).toISOString())
+      .then(value => {
+        if (controller.signal.aborted || zipDefaultConsumed.current) return;
+        const parsed = z.object({ zip: reusableZipSchema.nullable() }).safeParse(value);
+        const saved = parsed.success ? parsed.data.zip : null;
+        if (!saved || Date.parse(saved.expiresAt) <= Date.now() || Date.parse(saved.confirmedAt) > Date.now()) return;
+        zipDefaultConsumed.current = true;
+        setIntake(current => current.zip ? current : { ...current, zip: saved.value });
+        setReusedZip(saved);
+      })
+      .catch(() => { /* Saved defaults are optional; manual entry remains available. */ });
+    return () => controller.abort();
+  }, [snapSelected]);
   const directSnap = initialNeed === "snap_new" && step > 0 && snapSelected && intake.needs.length === 1;
   const fullSnap = snapSelected && canCollectSnapApplication(authorization.data) && !authorization.error && !collectionBlocked;
   const snapValues={...(intake.zip?{zip:intake.zip}:{}),...snapDetails};
@@ -199,6 +218,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     key: K,
     value: SupportIntake[K],
   ) {
+    if (key === "zip") { zipDefaultConsumed.current = true; setReusedZip(null); }
     setIntake((current) => ({ ...current, [key]: value }));
     setError(null);
     startAttempt.current = null;
@@ -219,6 +239,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     startAttempt.current = null;
   }
   function changeSnapDetails(details: SnapApplicationFields) {
+    zipDefaultConsumed.current = true; setReusedZip(null);
     setSnapDetails(details);setDetailsReady(false);setAccepted(false);setError(null);startAttempt.current=null;
     setIntake(current=>({...current,zip:details.zip??"",householdSize:details.household?.length??null,
       ...(details.language==='en'||details.language==='es'?{language:details.language}:{}),
@@ -311,6 +332,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     const controller=work.current;
     if(!controller||controller.signal.aborted||running.current===controller)return;
     running.current=controller;setPendingWork({ scope, controller });
+    let creationAttempted = false;
+    let refreshedZip: z.infer<typeof reusableZipSchema> | null = null;
     try {
       if (!startAttempt.current) {
         const window = await readAuthorizationWindow(controller.signal);
@@ -339,17 +362,40 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
               window.authorization.expiresAt,
             ),
             ...(details?{kind:"snap_application" as const,details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}:{}),
+            ...(!details && reusedZip ? { reusedZip: { sourceRequestId: reusedZip.sourceRequestId, sourceVersion: reusedZip.sourceVersion } } : {}),
           },
         };
       }
-      const response = await boundedParentApi(
-        "/requests",
-        {
-          method: "POST",
-          headers: { "Idempotency-Key": startAttempt.current.key },
-          body: JSON.stringify(startAttempt.current.packet),
-        },controller.signal,startAttempt.current.packet.mandate.expiresAt,
-      );
+      let response: unknown;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          creationAttempted = true;
+          response = await boundedParentApi("/requests", {
+            method: "POST",
+            headers: { "Idempotency-Key": startAttempt.current.key },
+            body: JSON.stringify(startAttempt.current.packet),
+          }, controller.signal, startAttempt.current.packet.mandate.expiresAt);
+          break;
+        } catch (failure) {
+          if (!(failure instanceof ParentApiError) || failure.status !== 412 || !startAttempt.current.packet.reusedZip) throw failure;
+          creationAttempted = false;
+          // This specific response proves no request was created; refresh once within the same mandate/key.
+          const latest = z.object({ zip: reusableZipSchema.nullable() }).parse(await boundedParentApi("/intake-defaults", {}, controller.signal, startAttempt.current.packet.mandate.expiresAt));
+          if (!latest.zip) {
+            zipDefaultConsumed.current = true;
+            refreshedZip = null;
+            startAttempt.current = null; setStartUncertain(false); setReusedZip(null);
+            setIntake(current => ({ ...current, zip: "" })); setStep(1);
+            throw new ParentApiError("A current household ZIP code is needed. Your other answers are kept.", 412);
+          }
+          if (attempt === 1) throw new ParentApiError("Saved routing information is still changing. Your answers are kept; try starting again shortly.", 412);
+          refreshedZip = latest.zip;
+          startAttempt.current.packet = { ...startAttempt.current.packet,
+            intake: { ...startAttempt.current.packet.intake, zip: latest.zip.value },
+            reusedZip: { sourceRequestId: latest.zip.sourceRequestId, sourceVersion: latest.zip.sourceVersion },
+          };
+        }
+      }
       if(controller.signal.aborted||work.current!==controller)return;
       const saved=z.object({request:z.object({id:z.uuid()})}).safeParse(response);
       if (!saved.success) throw new ParentApiError("The saved request could not be confirmed. Retry the same request before making changes.",0);
@@ -358,7 +404,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     } catch (err) {
       if(controller.signal.aborted||work.current!==controller)return;
       const status=err instanceof ParentApiError?err.status:0;
-      setStartUncertain(!!startAttempt.current && (status<400||status>=500||status===409));
+      setStartUncertain(!!startAttempt.current && creationAttempted && (status<400||status>=500||status===409));
       if(snapSelected && (status===401||status===403)){setCollectionBlocked(true);authorization.reload();}
       setError(
         err instanceof Error
@@ -366,6 +412,11 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           : new Error("We couldn’t save your request. Please try again."),
       );
     } finally {
+      if (refreshedZip && !controller.signal.aborted && work.current === controller) {
+        const zip = refreshedZip.value;
+        setIntake(current => ({ ...current, zip }));
+        setReusedZip(refreshedZip);
+      }
       if(running.current===controller)running.current=null;
       if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);
     }
@@ -547,6 +598,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                         Philadelphia is our first service area. We’ll explain
                         any coverage limits.
                       </p>
+                      {reusedZip && <p className={styles.hint}>We filled your ZIP code from your saved information, provided {new Date(reusedZip.confirmedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}. You can change it here. Reuse keeps its original date and expiry.</p>}
                     </div>
                     <div className={styles.field}>
                       <label htmlFor="support-language">

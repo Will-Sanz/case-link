@@ -14,6 +14,7 @@ import {
   registerParentDocument,
   resolveParentAction,
   startSupportRequest,
+  getReusableZip,
 } from "./data";
 import type { ServiceMandate, SupportIntake } from "./domain";
 const requestId = "11111111-1111-4111-8111-111111111111";
@@ -60,6 +61,20 @@ beforeEach(() => {
   mock.remove.mockResolvedValue({ data: [], error: null });
 });
 describe("parent data boundary", () => {
+  it("keeps reused routing server-owned and rejects malformed default responses without echoing them", async () => {
+    const source = { sourceRequestId: requestId, sourceVersion: 2 };
+    await startSupportRequest(intake, mandate, documentId, source);
+    expect(mock.rpc).toHaveBeenCalledWith("parent_start_request_with_reused_zip", {
+      p_intake: intake, p_mandate: mandate, p_idempotency_key: documentId,
+      p_source_request_id: requestId, p_source_version: 2,
+    });
+    mock.rpc.mockResolvedValue({ data: { value: "private-invalid-value" }, error: null });
+    await expect(getReusableZip()).rejects.toThrow("could not load saved routing information");
+    mock.rpc.mockResolvedValue({ data: null, error: null });
+    expect(await getReusableZip()).toBeNull();
+    mock.rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "parent_reuse_source_changed" } });
+    await expect(startSupportRequest(intake, mandate, documentId, source)).rejects.toThrow("parent_reuse_source_changed");
+  });
   it("validates exact intake and permission before dispatch and binds the start retry key", async () => {
     expect(await startSupportRequest(intake, mandate, documentId)).toBe(
       requestId,

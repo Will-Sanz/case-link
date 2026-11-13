@@ -11,7 +11,7 @@ export default function ParentPrivacyPage() {
     <article className={`${styles.container} ${styles.legal}`}>
       <p>Privacy & data policy</p>
       <h1>Your information. Your control.</h1>
-      <p>Last updated November 7, 2026 · Parent service</p>
+      <p>Last updated November 13, 2026 · Parent service</p>
       <div className={styles.notice}>
         Live personal-data processing is not open by default. Provider
         agreements, approved retention terms and operational privacy checks are
@@ -57,6 +57,23 @@ export default function ParentPrivacyPage() {
         only in its sign-in form. Use only the protected personal-entry step
         offered for the named program for required identifiers and signatures;
         never put them in chat or ordinary support fields.
+      </p>
+      <h2>Saved information across requests</h2>
+      <p>
+        When you start another request, we can fill your current household ZIP
+        code from an earlier request you own. Your new authorization covers its
+        use for the named programs, and you can edit it before starting. We keep
+        the original source and date; reuse does not make it newly confirmed or
+        extend its expiry. Changed information stops superseded work. Withdrawal,
+        deletion or expiry stops reuse and removes the reused current value.
+        Previously attempted packets and receipts keep their separate history
+        and retention rules.
+      </p>
+      <p>
+        This does not copy private SNAP application answers, identifiers,
+        signatures or a program-specific household or income definition into
+        another program. We ask only for information that is still needed for
+        the selected support and covered by its notice and permission.
       </p>
       <h2 id="snap-application">Private SNAP application details</h2>
       <p>
