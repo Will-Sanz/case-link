@@ -58,7 +58,7 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),clock_timestamp()+interval '1 hour')", [session, owner]);
     const s = { owner } as Scope;
-    const request = (await parent(s, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"] })), randomUUID()])).rows[0].id as string;
+    const request = (await parent(s, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()])).rows[0].id as string;
     const details = fixtureSnapApplication(new Date()), snapshot = (await parent(s, "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()])).rows[0].id as string;
     const version = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const hash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, version])).rows[0].hash as string;

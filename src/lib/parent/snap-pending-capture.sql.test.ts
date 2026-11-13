@@ -41,7 +41,7 @@ describe.skipIf(!modulePath)("durable exact SNAP capture on existing jobs (expli
     const s = { owner: randomUUID(), session: randomUUID(), packet: randomUUID() } as Scope;
     await q("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [s.owner, `${s.owner}@example.invalid`]);
     await q("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [s.session, s.owner]);
-    s.request = (await tx(() => role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"] })), randomUUID()], s)))[0].id as string;
+    s.request = (await tx(() => role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()], s)))[0].id as string;
     s.snapshot = (await tx(() => role("authenticated", "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [s.request, JSON.stringify(fixtureSnapApplication(new Date())), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], s)))[0].id as string;
     const j = (await q("select id,request_version from public.parent_jobs where request_id=$1", [s.request]))[0]; s.job = j.id as string; s.version = j.request_version as number;
     s.hash = ((await q("select parent_private.snap_application_binding($1,$2,$3) b", [s.request, s.version, s.snapshot]))[0].b as { snapshotHash: string }).snapshotHash;

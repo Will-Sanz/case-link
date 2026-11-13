@@ -49,7 +49,7 @@ describe.skipIf(!modulePath)(
             request,
             household,
             JSON.stringify(fixtureIntake()),
-            JSON.stringify(fixtureMandate()),
+            JSON.stringify(fixtureMandate({ expiresAt: new Date(Date.now() + 86400000).toISOString() })),
           ],
         );
         await asOwner();
@@ -354,7 +354,7 @@ describe.skipIf(!modulePath)(
             request,
             household,
             JSON.stringify(fixtureIntake()),
-            JSON.stringify(fixtureMandate()),
+            JSON.stringify(fixtureMandate({ expiresAt: new Date(Date.now() + 86400000).toISOString() })),
           ],
         );
         for (const [need, program] of [
@@ -422,7 +422,7 @@ describe.skipIf(!modulePath)(
               id,
               household,
               JSON.stringify(fixtureIntake()),
-              JSON.stringify(fixtureMandate()),
+              JSON.stringify(fixtureMandate({ expiresAt: new Date(Date.now() + 86400000).toISOString() })),
             ],
           );
         await admin.query(
