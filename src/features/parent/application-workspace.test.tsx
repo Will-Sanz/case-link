@@ -15,10 +15,12 @@ import { SupportActivity, type RecordedOperation } from "./support-activity";
 import { fixtureProtectedSnapOperation } from "@/lib/parent/test-fixtures";
 import type { SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { COMPASS_CAPTCHA, COMPASS_FAMILY_SAFETY } from "@/lib/parent/browser-policy";
+import { PECO_APPLICATION_SOURCE, PECO_APPLICATION_NOTICE_VERSION, PECO_SUBJECT_AUTHORITY_STATEMENT, PECO_ACCOUNT_AUTHORITY_STATEMENT } from "@/lib/parent/peco-application-fields";
 import {
   ApplicationWorkspace,
   recordedApplicationState,
   supportTitle,
+  isPecoPreparationRequest,
 } from "./application-workspace";
 
 const requestId = "11111111-1111-4111-8111-111111111111";
@@ -100,6 +102,65 @@ function renderWorkspace(request = fixture()) {
 }
 const finalReviewAction = { id: "snap-final-review", need: "snap_new" as const, reason: "submission_review" as const, field: "snap_final_submit", resolver: "parent" as const, title: "Review the exact SNAP application", explanation: "Review before choosing Submit." };
 describe("canonical application continuity", () => {
+  it("opens exact private PECO preparation in the checklist without claiming an application or provider session", async () => {
+    const request = fixture(); request.intake = { ...request.intake, needs: ["electricity"], utilityProviders: ["peco"], accountAuthority: "self" };
+    request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt, true);
+    mockApi(); renderWorkspace(request);
+    const checklist = screen.getByRole("navigation", { name: "Your application checklist" });
+    expect(within(checklist).queryByRole("link", { name: /Official website/ })).toBeNull();
+    fireEvent.click(within(checklist).getByRole("link", { name: /Your PECO CAP answers/ }));
+    expect(screen.getByRole("heading", { name: "Your private PECO CAP answers" }).closest("[data-workspace-panel]")?.id).toBe("application-review");
+    expect(document.querySelectorAll("#peco-application-review")).toHaveLength(1);
+    expect(screen.getByText(/Saving answers prepares this request/).textContent).toContain("protect against shutoff");
+    await screen.findByText(/saved PECO evidence needs a service check/);
+  });
+  it("keeps generic electricity or another mandate outside the private CAP workspace", () => {
+    const request = fixture(); request.intake = { ...request.intake, needs: ["electricity"], utilityProviders: ["peco"], accountAuthority: "self" };
+    request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt);
+    expect(isPecoPreparationRequest(request)).toBe(false);
+    request.mandate.allowedData = ["household", "income", "utility"];
+    expect(isPecoPreparationRequest(request)).toBe(true);
+    request.mandate.mode = "full"; expect(isPecoPreparationRequest(request)).toBe(false);
+    request.mandate.mode = "prepare_only"; request.mandate.recipientIds.push("uesf-utilities"); expect(isPecoPreparationRequest(request)).toBe(false);
+  });
+  it.each(["broader mandate", "different program", "cancelled request"])("keeps owned private PECO history reachable after a %s without granting editing", async change => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime("2026-11-13T20:10:00Z");
+    try {
+      const request = fixture(); request.has_peco_application_details = true;
+      request.intake = { ...request.intake, needs: ["electricity"], utilityProviders: ["peco"], accountAuthority: "self" };
+      request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt, true);
+      if (change === "broader mandate") request.mandate.mode = "full";
+      if (change === "different program") request.mandate.recipientIds = ["uesf-utilities"];
+      if (change === "cancelled request") request.status = "cancelled";
+      const snapshotId = "33333333-3333-4333-8333-333333333333", actorId = "44444444-4444-4444-8444-444444444444";
+      const snapshot = { id: snapshotId, request_id: request.id, revision: 1, base_version: 1, request_version: 1, details: {}, provenance: {}, source: PECO_APPLICATION_SOURCE,
+        notice_version: PECO_APPLICATION_NOTICE_VERSION, created_at: "2026-11-13T20:08:00Z", idempotency_key: snapshotId,
+        consent_evidence: { subjectAuthorityDeclared: true, subjectStatement: PECO_SUBJECT_AUTHORITY_STATEMENT, accountAuthorityDeclared: true, accountStatement: PECO_ACCOUNT_AUTHORITY_STATEMENT,
+          accountAuthority: "self", actorId, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, declaredAt: "2026-11-13T20:08:00Z", revision: 1, detailsSha256: "a".repeat(64), accountNumberSha256: null, subjects: [] } };
+      vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => url.includes("/peco-application") ? { snapshot } : url.includes("/authorization-window")
+        ? { authorization: { issuedAt: "2026-11-13T20:09:00Z", expiresAt: "2026-11-14T20:00:00Z", pecoApplication: { collectionEnabled: true, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-14T20:00:00Z" } } }
+        : { operations: [], historyLimited: false } })));
+      renderWorkspace(request);
+      fireEvent.click(within(screen.getByRole("navigation", { name: "Your application checklist" })).getByRole("link", { name: /Your PECO CAP answers/ }));
+      await screen.findByText(/Saved revision 1/);
+      expect(screen.getByText("Read privately saved PECO CAP answers")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Correct PECO answers|Add private PECO answers/ })).toBeNull();
+      expect(screen.queryByLabelText("PECO account number")).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+  it("opens the owned WIC answers in the existing checklist without inventing a provider browser", async () => {
+    const request = fixture();
+    request.intake.needs = ["wic_new"];
+    request.mandate = buildMandate(request.intake, ["wic-pa"], "prepare_only", "ask_me", request.mandate.expiresAt);
+    mockApi(); renderWorkspace(request);
+    const checklist = screen.getByRole("navigation", { name: "Your application checklist" });
+    expect(within(checklist).queryByRole("link", { name: /Official website/ })).toBeNull();
+    fireEvent.click(within(checklist).getByRole("link", { name: /Your WIC answers/ }));
+    expect(screen.getByRole("heading", { name: "Your private WIC answers" }).closest("[data-workspace-panel]")?.id).toBe("application-review");
+    expect(document.querySelectorAll("#wic-application-review")).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
+    await screen.findByText(/saved WIC evidence needs a service check/);
+  });
   it("places one current prepared draft directly after the overview and before all answer details", async () => {
     const request = fixture(), operation: RecordedOperation = { id: "draft", request_id: request.id, request_version: request.version, need: "snap_new", program_id: "snap-pa", action: "prepare", state: "prepared", artifact_id: "exact-form", form: { preparation_only: true }, created_at: request.created_at };
     mockApi(); const history = { data: { operations: [operation], historyLimited: false }, loading: false, error: null, reload: vi.fn() };

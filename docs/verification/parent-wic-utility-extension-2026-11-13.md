@@ -2,7 +2,9 @@
 
 November 13, 2026, America/New_York. This records the owner's requested expansion, current source/code assessment and next implementation pieces. It is not evidence of implemented WIC/utility execution, expanded processing permission or a family launch.
 
-**Subsequent implementation:** the [cross-request ordinary routing piece](parent-cross-request-routing-reuse-2026-11-13.md) is now implemented, independently reviewed and locally tested, including actual Auth/browser/native database evidence. The assessment below describes the preceding research state; it does not override that narrower checkpoint or enable WIC/utility execution.
+**Subsequent implementation:** [cross-request ordinary routing](parent-cross-request-routing-reuse-2026-11-13.md), [WIC private preparation](parent-wic-private-preparation-2026-11-13.md), [PECO private preparation](parent-peco-private-preparation-2026-11-13.md) and [PECO packet binding](parent-peco-preparation-binding-2026-11-13.md) are implemented, independently reviewed and locally tested. Those dated checkpoints describe current software and exact verification. The assessment below preserves the preceding research state; it does not override those narrower checkpoints or enable WIC/utility execution.
+
+The separate [WIC information/processor assessment](parent-wic-data-assessment-2026-11-13.md) records the minimal private inventory, actual raw-data boundaries, applicability reasoning, retention and activation dependencies. The default-off engineering implementation does not resolve those live operating facts.
 
 ## Owner direction and retained goal
 
@@ -17,7 +19,7 @@ Save and reuse relevant family-provided information within actual purpose, house
 - `src/features/parent/intake.tsx` begins a new request with blank household fields; account language/contact preferences are reused. There is no implemented cross-request family profile. `parent_households` is ownership linkage, not a complete reusable information store.
 - The ordinary transport registry is empty. Protected SNAP delivery uses an explicit separate connection. WIC delivery is deliberately blocked in `programs.ts`; `domain.ts` rejects private WIC intake fields. Neither restriction should be removed as a provider toggle.
 - PECO already has tested unsigned preparation and income-evidence assembly in `peco-cap-draft.ts` and `peco-cap-income.ts`. Its live information projection, accepted personal completion, delivery and outcome route remain separate work.
-- The November 10 [SNAP work log](parent-food-snap-work-log.md) records actual owner-UI test Submit, free Sinch emulator completion and scheduled reconciliation of the same delivery. It does not establish real agency filing, registration, approval or support received. Finish those retained SNAP boundaries without making unrelated engineering wait for an agency's decision cycle.
+- The November 10 local SNAP work log (retained in the owner workspace) records actual owner-UI test Submit, free Sinch emulator completion and scheduled reconciliation of the same delivery. It does not establish real agency filing, registration, approval or support received. Finish those retained SNAP boundaries without making unrelated engineering wait for an agency's decision cycle.
 
 ## Verified WIC route — November 13
 

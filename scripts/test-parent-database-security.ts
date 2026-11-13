@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 import { Client, Pool, type PoolClient } from "pg";
 import { createParentSqlFixture } from "./parent-sql-fixture";
 import type { ServiceMandate, SupportIntake } from "../src/lib/parent/domain";
-import { SNAP_APPLICATION_NOTICE_VERSION } from "../src/lib/parent/constants";
+import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "../src/lib/parent/constants";
 import { SNAP_APPLICATION_SOURCE } from "../src/lib/parent/snap-application-fields";
+import { WIC_APPLICATION_SOURCE } from "../src/lib/parent/wic-application-fields";
+import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE, PECO_SUBJECT_AUTHORITY_STATEMENT, PECO_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/peco-application-fields";
 
 async function main() {
   const connectionString =
@@ -275,7 +277,7 @@ async function main() {
   await admin.connect();
   try {
     const ready = await admin.query(
-      "select to_regclass('public.parent_requests') configured,to_regclass('public.parent_snap_application_details') snap_configured,to_regprocedure('public.parent_reaffirm_snap_application_details(uuid,integer,jsonb,text,uuid,text[])') snap_preview_configured",
+      "select to_regclass('public.parent_requests') configured,to_regclass('public.parent_snap_application_details') snap_configured,to_regprocedure('public.parent_reaffirm_snap_application_details(uuid,integer,jsonb,text,uuid,text[])') snap_preview_configured,to_regclass('public.parent_wic_application_details') wic_configured,to_regprocedure('public.parent_start_wic_application(jsonb,jsonb,jsonb,text,uuid,boolean,uuid,integer)') wic_start_configured,to_regclass('public.parent_peco_application_details') peco_configured,to_regprocedure('public.parent_start_peco_application(jsonb,jsonb,jsonb,text,uuid,boolean,boolean,uuid,integer)') peco_start_configured",
     );
     assert.ok(
       ready.rows[0].configured,
@@ -283,6 +285,10 @@ async function main() {
     );
     assert.ok(ready.rows[0].snap_configured && ready.rows[0].snap_preview_configured,
       "Apply the reviewed private SNAP details and preview migrations to the isolated test project first");
+    assert.ok(ready.rows[0].wic_configured && ready.rows[0].wic_start_configured,
+      "Apply the reviewed private WIC migration to the isolated test project first");
+    assert.ok(ready.rows[0].peco_configured && ready.rows[0].peco_start_configured,
+      "Apply the reviewed private PECO migration to the isolated test project first");
     if (!fixture) {
       originalControls = (
         await admin.query(
@@ -550,6 +556,262 @@ async function main() {
       }
     }
     console.log("Private SNAP native-role gate, atomic start, owned immutable revisions, replay, correction and cascade cleanup passed; purpose controls restored exactly.");
+
+    const wicControls = (await admin.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+    const wicBudgetBefore = (await admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    const wicKey = randomUUID();
+    const wicDetails = {
+      applicationType: "new", beneficiaries: "children", appointmentPreference: "morning",
+      contact: { firstName: "WIC-PRIVATE-CANARY", lastName: "Synthetic", street: "100 Fixture Street", city: "Philadelphia", county: "Philadelphia", dateOfBirth: "1990-01-01", email: "fictional@example.test", phone: "215-555-0101" },
+      children: [
+        { id: randomUUID(), firstName: "WIC-CHILD-CANARY", lastName: "Synthetic", dateOfBirth: "2024-01-01" },
+        { id: randomUUID(), firstName: "OtherChild", lastName: "Synthetic", dateOfBirth: "2023-01-01" },
+      ],
+    };
+    const wicArgs = [
+      JSON.stringify({ ...intake, needs: ["wic_new"], householdSize: null, incomeAmount: null, incomeFrequency: "unknown", utilityProviders: [] }),
+      JSON.stringify({ ...mandate, mode: "prepare_only", recipientIds: ["wic-pa"], allowedActions: ["research", "prepare"], allowedData: ["household"] }),
+      JSON.stringify(wicDetails), WIC_APPLICATION_NOTICE_VERSION, wicKey,
+    ];
+    const startWic = () => role("authenticated", ownerA, db => db.query("select public.parent_start_wic_application($1,$2,$3,$4,$5,true) id", wicArgs));
+    let wicRequest: string | undefined;
+    try {
+      await admin.query("update parent_private.processing_controls set wic_details_enabled=false where singleton");
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query("select public.parent_wic_application_collection() value"))).rows[0].value,
+        { collectionEnabled: false, noticeVersion: null, expiresAt: null }); assertionCount++;
+      await denied(startWic);
+      assert.equal((await admin.query("select count(*)::int n from public.parent_requests where start_key=$1", [wicKey])).rows[0].n, 0); assertionCount++;
+      await admin.query(`update parent_private.processing_controls set snap_details_enabled=true,
+        snap_details_approval_reference='isolated synthetic independent SNAP gate',snap_details_approved_until=now()+interval '1 hour',snap_details_notice_version=$1 where singleton`, [SNAP_APPLICATION_NOTICE_VERSION]);
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query("select (public.parent_snap_application_collection()->>'collectionEnabled')::boolean snap,(public.parent_wic_application_collection()->>'collectionEnabled')::boolean wic"))).rows[0],
+        { snap: true, wic: false }); assertionCount++;
+      await admin.query(`update parent_private.processing_controls set snap_details_enabled=false,wic_details_enabled=true,
+        wic_details_approval_reference='isolated synthetic WIC security fixture',wic_details_approved_until=now()+interval '1 hour',wic_details_notice_version=$1 where singleton`, [WIC_APPLICATION_NOTICE_VERSION]);
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query("select (public.parent_snap_application_collection()->>'collectionEnabled')::boolean snap,(public.parent_wic_application_collection()->>'collectionEnabled')::boolean wic"))).rows[0],
+        { snap: false, wic: true }); assertionCount++;
+      const wicCollection = (await role("authenticated", ownerA, db => db.query("select public.parent_wic_application_collection() value"))).rows[0].value;
+      const wicCollectionExpiry = (await admin.query("select least(approved_until,wic_details_approved_until,$1::timestamptz) expiry from parent_private.processing_controls where singleton", [WIC_APPLICATION_SOURCE.verifiedUntil])).rows[0].expiry;
+      assert.deepEqual({ ...wicCollection, expiresAt: new Date(wicCollection.expiresAt).toISOString() },
+        { collectionEnabled: true, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, expiresAt: new Date(wicCollectionExpiry).toISOString() }); assertionCount++;
+      await denied(() => role("authenticated", ownerA, db => db.query("select * from parent_private.processing_controls")));
+      const starts = fixture ? [await startWic(), await startWic()] : await Promise.all([startWic(), startWic()]);
+      wicRequest = starts[0].rows[0].id;
+      assert.equal(starts[1].rows[0].id, wicRequest); assertionCount++;
+      const original = (await role("authenticated", ownerA, db => db.query("select * from public.parent_wic_application_details where request_id=$1", [wicRequest]))).rows[0];
+      assert.deepEqual(original.details, wicDetails); assertionCount++;
+      assert.deepEqual(original.source, WIC_APPLICATION_SOURCE); assertionCount++;
+      assert.deepEqual({ actor: original.consent_evidence.actorId, statement: original.consent_evidence.statement, subjects: original.consent_evidence.subjects },
+        { actor: ownerA, statement: WIC_SUBJECT_AUTHORITY_STATEMENT, subjects: ["contact", ...wicDetails.children.map(child => `children.${child.id}`)] }); assertionCount++;
+      assert.equal((await admin.query("select consent_evidence->>'detailsSha256'=encode(sha256(convert_to(details::text,'UTF8')),'hex') bound from public.parent_wic_application_details where id=$1", [original.id])).rows[0].bound, true); assertionCount++;
+      const wicState = async () => (await admin.query(`select to_jsonb(r) request,
+        (select to_jsonb(j) from public.parent_jobs j where j.request_id=r.id) job,
+        (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from public.parent_events e where e.request_id=r.id) events
+        from public.parent_requests r where r.id=$1`, [wicRequest])).rows[0];
+      const originalState = await wicState();
+      assert.deepEqual([original.request_version, originalState.request.version, originalState.job.request_version], [2, 2, 2]); assertionCount++;
+      assert.equal((await startWic()).rows[0].id, wicRequest); assertionCount++;
+      assert.deepEqual(await wicState(), originalState); assertionCount++;
+      const reordered = { ...wicDetails, children: [...wicDetails.children].reverse() };
+      const saveWic = (details: unknown, version: number, key = randomUUID()) => role("authenticated", ownerA, db => db.query(
+        "select public.parent_save_wic_application_details($1,$2,$3,$4,$5,true) id", [wicRequest, version, JSON.stringify(details), WIC_APPLICATION_NOTICE_VERSION, key]));
+      const reorderedId = (await saveWic(reordered, 2)).rows[0].id;
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query("select provenance from public.parent_wic_application_details where id=$1", [reorderedId]))).rows[0].provenance,
+        original.provenance); assertionCount++;
+      const corrected = { ...reordered, contact: { ...wicDetails.contact, street: "101 Fixture Street" } };
+      const correctedId = (await saveWic(corrected, 2)).rows[0].id;
+      const correctedRow = (await role("authenticated", ownerA, db => db.query("select * from public.parent_wic_application_details where id=$1", [correctedId]))).rows[0];
+      assert.deepEqual({ ...correctedRow.provenance, "contact.street": original.provenance["contact.street"] }, original.provenance); assertionCount++;
+      await denied(() => saveWic(corrected, 2), "40001");
+      assert.ok(!/WIC-PRIVATE-CANARY|WIC-CHILD-CANARY|1990-01-01|2024-01-01|2023-01-01/.test(JSON.stringify(await wicState()))); assertionCount++;
+      for (const deniedRole of ["anon", "service_role", "parent_worker"] as const)
+        await denied(() => role(deniedRole, null, db => db.query("select * from public.parent_wic_application_details")));
+      for (const other of [ownerB, staff]) {
+        assert.equal((await role("authenticated", other, db => db.query("select count(*)::int n from public.parent_wic_application_details where request_id=$1", [wicRequest]))).rows[0].n, 0); assertionCount++;
+      }
+      await denied(() => role("authenticated", ownerB, db => db.query("select public.parent_save_wic_application_details($1,3,'{}',$2,$3,true)", [wicRequest, WIC_APPLICATION_NOTICE_VERSION, randomUUID()])));
+      await denied(() => role("authenticated", ownerA, db => db.query("select public.parent_save_wic_application_details($1,3,'{}',$2,$3,false)", [wicRequest, WIC_APPLICATION_NOTICE_VERSION, randomUUID()])));
+      await role("authenticated", ownerA, db => db.query("select public.parent_control_request($1,'pause')", [wicRequest]));
+      const paused = await wicState();
+      await saveWic({ ...corrected, appointmentPreference: "afternoon" }, paused.request.version);
+      const pausedCorrection = await wicState();
+      assert.deepEqual([pausedCorrection.request.status, pausedCorrection.job.state, pausedCorrection.request.version],
+        ["paused", "cancelled", paused.request.version + 1]); assertionCount++;
+      await admin.query("update parent_private.processing_controls set wic_details_enabled=false where singleton");
+      await denied(() => saveWic(corrected, pausedCorrection.request.version));
+      assert.equal((await role("authenticated", ownerA, db => db.query("select count(*)::int n from public.parent_wic_application_details where request_id=$1", [wicRequest]))).rows[0].n, 4); assertionCount++;
+      assert.deepEqual((await admin.query(`select (select count(*)::int from parent_private.model_call_reservations) reservations,
+        (select count(*)::int from parent_private.ai_calls where request_id=$1) model_calls,
+        (select count(*)::int from public.parent_operations where request_id=$1) operations`, [wicRequest])).rows[0],
+        { reservations: wicBudgetBefore, model_calls: 0, operations: 0 }); assertionCount++;
+    } finally {
+      try {
+        if (wicRequest) {
+          await admin.query("delete from public.parent_requests where id=$1 and household_id=(select id from public.parent_households where owner_id=$2)", [wicRequest, ownerA]);
+          assert.equal((await admin.query("select count(*)::int n from public.parent_wic_application_details where request_id=$1", [wicRequest])).rows[0].n, 0); assertionCount++;
+          assert.equal((await admin.query("select count(*)::int n from auth.users where id=$1", [ownerA])).rows[0].n, 1); assertionCount++;
+        }
+      } finally {
+        await admin.query(`update parent_private.processing_controls c set
+          (snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version,wic_details_enabled,wic_details_approval_reference,wic_details_approved_until,wic_details_notice_version)=
+          (select r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version,r.wic_details_enabled,r.wic_details_approval_reference,r.wic_details_approved_until,r.wic_details_notice_version
+          from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(wicControls)]);
+        assert.deepEqual((await admin.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, wicControls); assertionCount++;
+      }
+    }
+    console.log("Private WIC native-role gates, atomic start/replay, subject authority, stable provenance, paused correction and cascade cleanup passed; purpose controls restored exactly.");
+
+    const pecoControls = (await admin.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+    const pecoBudgetBefore = (await admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    const pecoKey = randomUUID();
+    const pecoIntake = { ...intake, needs: ["electricity"], householdSize: null, incomeAmount: null, incomeFrequency: "unknown", utilityProviders: ["peco"], shutoffDate: "2026-11-15" };
+    const pecoMandate = { ...mandate, mode: "prepare_only", recipientIds: ["peco-cap"], allowedActions: ["research", "prepare"], allowedData: ["household", "income", "utility"] };
+    const pecoDetails = {
+      journey: "new_enrollment", currentCapState: "not_enrolled", accountNumber: "9000000001", householdComplete: true,
+      applicant: { id: randomUUID(), firstName: "PECO-PRIVATE-CANARY", lastName: "Synthetic", dateOfBirth: "1990-01-01",
+        income: { state: "sources", sources: [{ id: randomUUID(), kind: "employment" }, { id: randomUUID(), kind: "pension" }] } },
+      address: { street: "100 Fixture Street", city: "Philadelphia", state: "PA", zip: "19147" },
+      householdMembers: [
+        { id: randomUUID(), firstName: "PECO-MEMBER-CANARY", lastName: "Synthetic", dateOfBirth: "2020-01-01", relationship: "Child" },
+        { id: randomUUID(), firstName: "OtherMember", lastName: "Synthetic", dateOfBirth: "1992-01-01", relationship: "Spouse" },
+      ],
+    };
+    const pecoArgs = [JSON.stringify(pecoIntake), JSON.stringify(pecoMandate), JSON.stringify(pecoDetails), PECO_APPLICATION_NOTICE_VERSION, pecoKey];
+    const startPeco = (subject = true, account = true) => role("authenticated", ownerA, db => db.query(
+      "select public.parent_start_peco_application($1,$2,$3,$4,$5,$6,$7) id", [...pecoArgs, subject, account]));
+    let pecoRequest: string | undefined;
+    try {
+      await admin.query("update parent_private.processing_controls set peco_details_enabled=false where singleton");
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query("select public.parent_peco_application_collection() value"))).rows[0].value,
+        { collectionEnabled: false, noticeVersion: null, expiresAt: null }); assertionCount++;
+      await denied(() => startPeco());
+      await admin.query(`update parent_private.processing_controls set snap_details_enabled=true,wic_details_enabled=true,
+        snap_details_approval_reference='isolated independent SNAP gate',snap_details_approved_until=now()+interval '1 hour',snap_details_notice_version=$1,
+        wic_details_approval_reference='isolated independent WIC gate',wic_details_approved_until=now()+interval '1 hour',wic_details_notice_version=$2 where singleton`,
+        [SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION]);
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query(`select
+        (public.parent_snap_application_collection()->>'collectionEnabled')::boolean snap,
+        (public.parent_wic_application_collection()->>'collectionEnabled')::boolean wic,
+        (public.parent_peco_application_collection()->>'collectionEnabled')::boolean peco`))).rows[0],
+        { snap: true, wic: true, peco: false }); assertionCount++;
+      await denied(() => startPeco());
+      assert.equal((await admin.query("select count(*)::int n from public.parent_requests where start_key=$1", [pecoKey])).rows[0].n, 0); assertionCount++;
+      await admin.query(`update parent_private.processing_controls set snap_details_enabled=false,wic_details_enabled=false,peco_details_enabled=true,
+        peco_details_approval_reference='isolated synthetic PECO security fixture',peco_details_approved_until=now()+interval '1 hour',peco_details_notice_version=$1 where singleton`, [PECO_APPLICATION_NOTICE_VERSION]);
+      assert.deepEqual((await role("authenticated", ownerA, db => db.query(`select
+        (public.parent_snap_application_collection()->>'collectionEnabled')::boolean snap,
+        (public.parent_wic_application_collection()->>'collectionEnabled')::boolean wic,
+        (public.parent_peco_application_collection()->>'collectionEnabled')::boolean peco`))).rows[0],
+        { snap: false, wic: false, peco: true }); assertionCount++;
+      const pecoCollection = (await role("authenticated", ownerA, db => db.query("select public.parent_peco_application_collection() value"))).rows[0].value;
+      const pecoExpiry = (await admin.query("select least(approved_until,peco_details_approved_until,$1::timestamptz) expiry from parent_private.processing_controls where singleton", [PECO_APPLICATION_SOURCE.verifiedUntil])).rows[0].expiry;
+      assert.deepEqual({ ...pecoCollection, expiresAt: new Date(pecoCollection.expiresAt).toISOString() },
+        { collectionEnabled: true, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, expiresAt: new Date(pecoExpiry).toISOString() }); assertionCount++;
+      await denied(() => role("authenticated", ownerA, db => db.query("select * from parent_private.processing_controls")));
+      await denied(() => startPeco(false, true));
+      await denied(() => startPeco(true, false));
+      for (const [route, permission, code] of [
+        [{ ...pecoIntake, needs: ["gas"] }, pecoMandate, "23514"],
+        [pecoIntake, { ...pecoMandate, recipientIds: ["pwd-tap"] }, "42501"],
+        [pecoIntake, { ...pecoMandate, allowedData: ["household", "utility"] }, "42501"],
+      ] as const) {
+        const rejectedKey = randomUUID();
+        await denied(() => role("authenticated", ownerA, db => db.query("select public.parent_start_peco_application($1,$2,$3,$4,$5,true,true)",
+          [JSON.stringify(route), JSON.stringify(permission), JSON.stringify(pecoDetails), PECO_APPLICATION_NOTICE_VERSION, rejectedKey])), code);
+        assert.equal((await admin.query("select count(*)::int n from public.parent_requests where start_key=$1", [rejectedKey])).rows[0].n, 0); assertionCount++;
+      }
+      const starts = fixture ? [await startPeco(), await startPeco()] : await Promise.all([startPeco(), startPeco()]);
+      pecoRequest = starts[0].rows[0].id;
+      assert.equal(starts[1].rows[0].id, pecoRequest); assertionCount++;
+      const readPeco = async (id?: string) => (await role("authenticated", ownerA, db => db.query(
+        `select * from public.parent_peco_application_details where request_id=$1${id ? " and id=$2" : ""} order by revision desc`, id ? [pecoRequest, id] : [pecoRequest]))).rows;
+      const pecoState = async () => (await admin.query(`select to_jsonb(r) request,
+        (select to_jsonb(j) from public.parent_jobs j where j.request_id=r.id) job,
+        (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from public.parent_events e where e.request_id=r.id) events
+        from public.parent_requests r where r.id=$1`, [pecoRequest])).rows[0];
+      const original = (await readPeco())[0], originalState = await pecoState();
+      assert.deepEqual(original.details, pecoDetails); assertionCount++;
+      assert.deepEqual(original.source, PECO_APPLICATION_SOURCE); assertionCount++;
+      assert.deepEqual([original.request_version, originalState.request.version, originalState.job.request_version], [2, 2, 2]); assertionCount++;
+      assert.deepEqual({ actor: original.consent_evidence.actorId, subject: original.consent_evidence.subjectStatement,
+        account: original.consent_evidence.accountStatement, authority: original.consent_evidence.accountAuthority,
+        subjectDeclared: original.consent_evidence.subjectAuthorityDeclared, accountDeclared: original.consent_evidence.accountAuthorityDeclared,
+        subjects: original.consent_evidence.subjects },
+        { actor: ownerA, subject: PECO_SUBJECT_AUTHORITY_STATEMENT, account: PECO_ACCOUNT_AUTHORITY_STATEMENT, authority: "self",
+          subjectDeclared: true, accountDeclared: true,
+          subjects: [`applicant.${pecoDetails.applicant.id}`, ...pecoDetails.householdMembers.map(person => `householdMembers.${person.id}`)] }); assertionCount++;
+      assert.equal((await admin.query(`select consent_evidence->>'detailsSha256'=encode(sha256(convert_to(details::text,'UTF8')),'hex')
+        and consent_evidence->>'accountNumberSha256'=encode(sha256(convert_to(details->>'accountNumber','UTF8')),'hex') bound
+        from public.parent_peco_application_details where id=$1`, [original.id])).rows[0].bound, true); assertionCount++;
+      assert.equal((await startPeco()).rows[0].id, pecoRequest); assertionCount++;
+      assert.deepEqual(await pecoState(), originalState); assertionCount++;
+      const savePeco = (details: unknown, version: number, key = randomUUID(), subject = true, account = true) => role("authenticated", ownerA, db => db.query(
+        "select public.parent_save_peco_application_details($1,$2,$3,$4,$5,$6,$7) id", [pecoRequest, version, JSON.stringify(details), PECO_APPLICATION_NOTICE_VERSION, key, subject, account]));
+      const reordered = { ...pecoDetails, applicant: { ...pecoDetails.applicant, income: { ...pecoDetails.applicant.income, sources: [...pecoDetails.applicant.income.sources].reverse() } },
+        householdMembers: [...pecoDetails.householdMembers].reverse() };
+      const reorderedId = (await savePeco(reordered, 2)).rows[0].id;
+      const reorderedRow = (await readPeco(reorderedId))[0];
+      assert.deepEqual(reorderedRow.provenance, original.provenance); assertionCount++;
+      assert.equal(reorderedRow.request_version, 2); assertionCount++;
+      const corrected = { ...reordered, accountNumber: "9000000002" }, correctionKey = randomUUID();
+      const correctedId = (await savePeco(corrected, 2, correctionKey)).rows[0].id, correctedRow = (await readPeco(correctedId))[0];
+      assert.deepEqual({ ...correctedRow.provenance, accountNumber: original.provenance.accountNumber }, original.provenance); assertionCount++;
+      assert.notEqual(correctedRow.consent_evidence.accountNumberSha256, original.consent_evidence.accountNumberSha256); assertionCount++;
+      assert.deepEqual([correctedRow.request_version, (await pecoState()).job.request_version], [3, 3]); assertionCount++;
+      assert.equal((await savePeco(corrected, 2, correctionKey)).rows[0].id, correctedId); assertionCount++;
+      assert.deepEqual((await readPeco(original.id))[0], original); assertionCount++;
+      await denied(() => savePeco(corrected, 2), "40001");
+      await denied(() => startPeco(), "40001");
+      await denied(() => savePeco(corrected, 3, randomUUID(), false, true));
+      await denied(() => savePeco(corrected, 3, randomUUID(), true, false));
+      await denied(() => admin.query("update public.parent_peco_application_details set details='{}' where id=$1", [original.id]), "23514");
+      for (const sql of ["insert into public.parent_peco_application_details select * from public.parent_peco_application_details where id=$1", "delete from public.parent_peco_application_details where id=$1"])
+        await denied(() => role("authenticated", ownerA, db => db.query(sql, [original.id])));
+      for (const deniedRole of ["anon", "service_role", "parent_worker", "parent_retention_worker", "parent_storage_broker"] as const) {
+        await denied(() => role(deniedRole, null, db => db.query("select * from public.parent_peco_application_details")));
+        await denied(() => role(deniedRole, null, db => db.query("select public.parent_peco_application_collection()")));
+        await denied(() => role(deniedRole, null, db => db.query("select public.parent_save_peco_application_details($1,3,'{}',$2,$3,true,true)", [pecoRequest, PECO_APPLICATION_NOTICE_VERSION, randomUUID()])));
+      }
+      for (const other of [ownerB, staff]) {
+        assert.equal((await role("authenticated", other, db => db.query("select count(*)::int n from public.parent_peco_application_details where request_id=$1", [pecoRequest]))).rows[0].n, 0); assertionCount++;
+        await denied(() => role("authenticated", other, db => db.query("select public.parent_save_peco_application_details($1,3,'{}',$2,$3,true,true)", [pecoRequest, PECO_APPLICATION_NOTICE_VERSION, randomUUID()])));
+      }
+      const pecoClaim = await claim(pecoRequest!);
+      assert.equal(pecoClaim.request.id, pecoRequest); assertionCount++;
+      assert.ok(!/PECO-PRIVATE-CANARY|PECO-MEMBER-CANARY|900000000[12]|1990-01-01|2020-01-01|1992-01-01/.test(JSON.stringify([await pecoState(), pecoClaim]))); assertionCount++;
+      await role("authenticated", ownerA, db => db.query("select public.parent_control_request($1,'pause')", [pecoRequest]));
+      const paused = await pecoState();
+      await savePeco({ ...corrected, homePhone: "215-555-0101" }, paused.request.version);
+      const pausedCorrection = await pecoState();
+      assert.deepEqual([pausedCorrection.request.status, pausedCorrection.job.state, pausedCorrection.request.version],
+        ["paused", "cancelled", paused.request.version + 1]); assertionCount++;
+      await admin.query("update parent_private.processing_controls set peco_details_enabled=false where singleton");
+      await denied(() => savePeco(corrected, pausedCorrection.request.version));
+      assert.equal((await readPeco()).length, 4); assertionCount++;
+      await role("authenticated", ownerA, db => db.query("select public.parent_control_request($1,'cancel')", [pecoRequest]));
+      await admin.query("update parent_private.processing_controls set peco_details_enabled=true where singleton");
+      const cancelledPeco = await pecoState();
+      await denied(() => savePeco(corrected, cancelledPeco.request.version));
+      assert.equal((await readPeco()).length, 4); assertionCount++;
+      assert.deepEqual((await admin.query(`select (select count(*)::int from parent_private.model_call_reservations) reservations,
+        (select count(*)::int from parent_private.ai_calls where request_id=$1) model_calls,
+        (select count(*)::int from public.parent_operations where request_id=$1) operations`, [pecoRequest])).rows[0],
+        { reservations: pecoBudgetBefore, model_calls: 0, operations: 0 }); assertionCount++;
+    } finally {
+      try {
+        if (pecoRequest) {
+          await admin.query("delete from public.parent_requests where id=$1 and household_id=(select id from public.parent_households where owner_id=$2)", [pecoRequest, ownerA]);
+          assert.equal((await admin.query("select count(*)::int n from public.parent_peco_application_details where request_id=$1", [pecoRequest])).rows[0].n, 0); assertionCount++;
+          assert.equal((await admin.query("select count(*)::int n from auth.users where id=$1", [ownerA])).rows[0].n, 1); assertionCount++;
+        }
+      } finally {
+        await admin.query(`update parent_private.processing_controls c set
+          (snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version,wic_details_enabled,wic_details_approval_reference,wic_details_approved_until,wic_details_notice_version,peco_details_enabled,peco_details_approval_reference,peco_details_approved_until,peco_details_notice_version)=
+          (select r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version,r.wic_details_enabled,r.wic_details_approval_reference,r.wic_details_approved_until,r.wic_details_notice_version,r.peco_details_enabled,r.peco_details_approval_reference,r.peco_details_approved_until,r.peco_details_notice_version
+          from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(pecoControls)]);
+        assert.deepEqual((await admin.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, pecoControls); assertionCount++;
+      }
+    }
+    console.log("Private PECO native-role gates, atomic start/replay, exact account/subject authority, stable provenance, paused correction and cascade cleanup passed; purpose controls restored exactly.");
 
     // Shared identities get a new, owned parent household, never a school role grant.
     await admin.query(
@@ -2894,7 +3156,7 @@ async function main() {
           const errors: unknown[] = [];
           try {
             await admin.query(
-              "update parent_private.processing_controls c set (enabled,approval_reference,approved_until,updated_at,existing_accounts_enabled,snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version)=(select r.enabled,r.approval_reference,r.approved_until,r.updated_at,r.existing_accounts_enabled,r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton",
+              "update parent_private.processing_controls c set (enabled,approval_reference,approved_until,updated_at,existing_accounts_enabled,snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version,wic_details_enabled,wic_details_approval_reference,wic_details_approved_until,wic_details_notice_version,peco_details_enabled,peco_details_approval_reference,peco_details_approved_until,peco_details_notice_version)=(select r.enabled,r.approval_reference,r.approved_until,r.updated_at,r.existing_accounts_enabled,r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version,r.wic_details_enabled,r.wic_details_approval_reference,r.wic_details_approved_until,r.wic_details_notice_version,r.peco_details_enabled,r.peco_details_approval_reference,r.peco_details_approved_until,r.peco_details_notice_version from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton",
               [JSON.stringify(originalControls)],
             );
           } catch (error) {

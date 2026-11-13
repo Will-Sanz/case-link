@@ -8,10 +8,12 @@ import { execFileSync } from "node:child_process";
 import {
   renderPecoCapPreparationDraft,
   renderPecoCapIncomePreparationPacket,
+  pecoCapPreparationSnapshotSchema,
   type PecoCapDraftInput,
+  type PecoCapPreparationSnapshot,
 } from "../src/lib/parent/peco-cap-draft";
 
-const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const hash = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 
 function income(bytes: Uint8Array): PecoCapIncomeInput {
   const binding: PecoCapIncomeInput["scope"]["binding"] = {
@@ -144,7 +146,7 @@ async function main() {
     name: string;
     input: PecoCapDraftInput;
     pages: number;
-    packet?: { manifest: unknown; originals: { documentId: string; filename: string }[] };
+    packet?: { manifest: unknown; preparationSnapshot: PecoCapPreparationSnapshot; originals: { documentId: string; filename: string }[] };
   }[] = [
     { name: "peco-single", input: base, pages: 2 },
     {
@@ -228,7 +230,15 @@ async function main() {
       sourceId, documentRefs: [{ documentId, sha256: hash(bytes) }],
     });
   }
-  const packet = await renderPecoCapIncomePreparationPacket(template, base, facts,
+  const preparationSnapshot = pecoCapPreparationSnapshotSchema.parse({
+    id: "preparation-1", revision: 1, binding: facts.scope.binding,
+    subjectIds: [facts.scope.applicantSubjectId], confirmedAt: facts.household.verifiedAt,
+    validUntil: facts.household.validUntil, retentionUntil: facts.household.validUntil, details: base,
+  });
+  facts.scope.preparationSnapshot = {
+    id: preparationSnapshot.id, revision: preparationSnapshot.revision, sha256: hash(JSON.stringify(preparationSnapshot)),
+  };
+  const packet = await renderPecoCapIncomePreparationPacket(template, preparationSnapshot, facts,
     [{ documentId: "proof-1", bytes: original }, { documentId: "proof-2", bytes: original },
     { documentId: "proof-3", bytes: otherOriginal }], now);
   writeFileSync(resolve(directory, "synthetic-income-original.pdf"), original);
@@ -240,6 +250,7 @@ async function main() {
     pages: 5,
     packet: {
       manifest: packet.manifest,
+      preparationSnapshot,
       originals: [
         { documentId: "proof-1", filename: "synthetic-income-original.pdf" },
         { documentId: "proof-2", filename: "synthetic-income-original.pdf" },

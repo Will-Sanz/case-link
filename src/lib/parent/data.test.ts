@@ -61,6 +61,18 @@ beforeEach(() => {
   mock.remove.mockResolvedValue({ data: [], error: null });
 });
 describe("parent data boundary", () => {
+  it("fails closed when owned private-history metadata cannot be checked", async () => {
+    mock.from.mockImplementation((table: string) => ({
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(),
+      maybeSingle: async () => table === "parent_requests" ? { data: { id: requestId }, error: null }
+        : { data: null, error: { code: "XX000", message: "PrivateMarkerCanary" } },
+      then(resolve: (value: { data: unknown[]; error: null }) => unknown) {
+        return Promise.resolve({ data: [], error: null }).then(resolve);
+      },
+    }));
+    await expect(getSupportRequest(requestId)).rejects.toThrow("CaseLink could not save or load this information. Please try again.");
+  });
   it("keeps reused routing server-owned and rejects malformed default responses without echoing them", async () => {
     const source = { sourceRequestId: requestId, sourceVersion: 2 };
     await startSupportRequest(intake, mandate, documentId, source);

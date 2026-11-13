@@ -1,17 +1,34 @@
 import { NEEDS } from "@/lib/parent/domain";
-import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
+import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
+import wicSource from "../../../data/verified-forms/wic-pa-preapplication-2026-11-13.json";
+import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE } from "@/lib/parent/peco-application-fields";
 
 export type ParentAuthorizationWindow = {
   authorization?: {
     issuedAt: string;
     expiresAt: string;
     snapApplication?: { collectionEnabled: boolean; noticeVersion: string | null };
+    wicApplication?: { collectionEnabled: boolean; noticeVersion: string | null; expiresAt: string | null };
+    pecoApplication?: { collectionEnabled: boolean; noticeVersion: string | null; expiresAt: string | null };
   };
 };
 
 export function canCollectSnapApplication(value: ParentAuthorizationWindow | null): boolean {
   return value?.authorization?.snapApplication?.collectionEnabled === true &&
     value.authorization.snapApplication.noticeVersion === SNAP_APPLICATION_NOTICE_VERSION;
+}
+
+export function canCollectWicApplication(value: ParentAuthorizationWindow | null): boolean {
+  const collection = value?.authorization?.wicApplication, now = Date.now();
+  return collection?.collectionEnabled === true && collection.noticeVersion === WIC_APPLICATION_NOTICE_VERSION &&
+    typeof collection.expiresAt === "string" && Date.parse(collection.expiresAt) > now && now >= Date.parse(wicSource.sourceCheckedAt) && now < Date.parse(wicSource.verifiedUntil);
+}
+
+export function canCollectPecoApplication(value: ParentAuthorizationWindow | null): boolean {
+  const collection = value?.authorization?.pecoApplication, now = Date.now();
+  return collection?.collectionEnabled === true && collection.noticeVersion === PECO_APPLICATION_NOTICE_VERSION &&
+    typeof collection.expiresAt === "string" && Date.parse(collection.expiresAt) > now &&
+    now >= Date.parse(PECO_APPLICATION_SOURCE.sourceCheckedAt) && now < Date.parse(PECO_APPLICATION_SOURCE.verifiedUntil);
 }
 
 export class ParentApiError extends Error {

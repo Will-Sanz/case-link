@@ -1280,6 +1280,8 @@
 }
 .disclosure summary {
   cursor: pointer;
+  min-height: 44px;
+  padding-block: 0.5rem;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-accent);

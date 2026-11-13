@@ -118,6 +118,12 @@ for case in json.loads((folder / "cases.json").read_text()):
         assert manifest["templateSha256"] == digest(source_path.read_bytes()), "Source digest changed"
         assert manifest["certificationTemplateSha256"] == digest(source_path.read_bytes()), "Certification source changed"
         assert manifest["kind"] == "unsigned_preparation_rehearsal", "Unexpected execution claim"
+        snapshot = packet["preparationSnapshot"]
+        assert manifest["preparationSnapshot"] == {
+            "id": snapshot["id"], "revision": snapshot["revision"],
+            "sha256": digest(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8")),
+        }, "Printed details lost their trusted snapshot binding"
+        assert snapshot["details"] == facts, "Printed facts differ from the referenced snapshot"
         assert manifest["pageCount"] == len(document), "Manifest total mismatch"
         expected_start = 2 + (max(0, len(people) - 5) + 21) // 22 + 1
         seen_ranges = {}

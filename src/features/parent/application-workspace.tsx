@@ -9,6 +9,8 @@ import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type S
 import { SnapSubmissionConfirmation } from "./snap-submission-confirmation";
 import { ApplicationBrowser } from "./application-browser";
 import { SnapApplicationReview } from "./snap-application-review";
+import { WicSavedApplication } from "./wic-saved-application";
+import { PecoSavedApplication } from "./peco-saved-application";
 import { SnapFinalReview } from "./snap-final-review";
 import styles from "./parent.module.css";
 import layout from "./application-workspace.module.css";
@@ -21,6 +23,13 @@ export function supportTitle(request: SupportRequest): string {
   if (need === "food_now") return "Food for your family";
   if (need?.startsWith("wic_")) return "Your WIC support";
   return "Your utility support";
+}
+
+export function isPecoPreparationRequest(request: SupportRequest): boolean {
+  return request.has_peco_application_details === true || request.intake.needs.length === 1 && request.intake.needs[0] === "electricity" &&
+    request.intake.utilityProviders.length === 1 && request.intake.utilityProviders[0] === "peco" &&
+    request.mandate.mode === "prepare_only" && request.mandate.recipientIds.length === 1 && request.mandate.recipientIds[0] === "peco-cap" &&
+    request.mandate.allowedData.length === 3 && ["household", "income", "utility"].every(kind => request.mandate.allowedData.includes(kind as "household" | "income" | "utility"));
 }
 
 export function recordedApplicationState(
@@ -197,6 +206,8 @@ export function ApplicationWorkspace({
   const needsVerification = verification.requestId === request.id && verification.needed;
   const { data, error, loading, reload } = history;
   const snap = request.intake.needs.includes("snap_new");
+  const wic = request.intake.needs.includes("wic_new");
+  const peco = isPecoPreparationRequest(request);
   const operations = data?.operations ?? [];
   const historyLimited = data?.historyLimited !== false;
   const ownedReview = snap ? currentSnapReview(request, snapReview) : null;
@@ -288,6 +299,10 @@ export function ApplicationWorkspace({
                 ? progress.summary
                 : application.submitted
                   ? "Check Activity & receipts for the actual agency record and any interview, document or follow-up requirement."
+                  : wic && !snap
+                    ? "Open Your WIC answers to read or correct private preparation. CaseLink still needs an accepted pre-application and appointment connection; nothing here confirms a booking or enrollment. Official WIC help remains available there."
+                  : peco
+                    ? "Open Your PECO CAP answers to read or correct private preparation. A saved draft does not apply for CAP, change payments or protect against shutoff. Official PECO help remains available there."
                   : historyLimited
                     ? "Earlier application and delivery records need checking before a new filing. The Official website section remains available."
                     : needsService
@@ -300,8 +315,10 @@ export function ApplicationWorkspace({
       detail: "Saved",
       done: true,
     },
+    ...(snap || wic || peco ? [
+      { id: "application-review", label: snap ? "Your application" : peco ? "Your PECO CAP answers" : "Your WIC answers", detail: reviewRequested && !reviewFinished ? "Review needed" : "Answers & preparation", done: false },
+    ] : []),
     ...(snap ? [
-      { id: "application-review", label: "Your application", detail: reviewRequested && !reviewFinished ? "Review needed" : "Answers & preparation", done: false },
       { id: "application-browser", label: "Official website", detail: needsVerification && !inactive ? "Needs you now" : "COMPASS connection", done: false },
     ] : []),
     {
@@ -489,6 +506,8 @@ export function ApplicationWorkspace({
         {draft && <SnapDraftReview key={`${request.id}:${request.version}:${draft.artifact_id}`} request={request} operation={draft}/>}
         {reviewRequested && <SnapFinalReview key={`${request.id}:${request.version}`} request={request} onChange={onChange} onReviewChange={onReviewChange}/>}
         {snap && <SnapApplicationReview key={`snap-answers:${request.id}`} request={request} onChange={onChange} answerRequest={snapAnswerRequest}/>}
+        {wic && <WicSavedApplication key={`wic-answers:${request.id}`} request={request} onChange={onChange}/>}
+        {peco && <PecoSavedApplication key={`peco-answers:${request.id}`} request={request} onChange={onChange}/>}
         </div>
         {snap && (
           <div className={layout.panel} data-workspace-panel="application-browser" hidden={activeSection !== "application-browser"}>

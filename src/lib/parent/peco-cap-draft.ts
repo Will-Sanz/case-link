@@ -14,7 +14,7 @@ import {
 } from "pdf-lib";
 import { z } from "zod";
 import { inspectDocument, MAX_DOCUMENT_BYTES } from "./documents";
-import { assessPecoCapIncomeEvidence, type PecoCapIncomeInput } from "./peco-cap-income";
+import { assessPecoCapIncomeEvidence, pecoCapIncomeBindingSchema, pecoCapPreparationReferenceSchema, type PecoCapIncomeInput } from "./peco-cap-income";
 
 export const PECO_CAP_TEMPLATE_SHA256 =
   "87d4a25f808eac9e79eaf49197bb38c1e375d22b18ce0533995eca81698099cc";
@@ -58,6 +58,17 @@ const inputSchema = z
   .strict();
 
 export type PecoCapDraftInput = z.infer<typeof inputSchema>;
+export const pecoCapPreparationSnapshotSchema = z.object({
+  id: pecoCapPreparationReferenceSchema.shape.id,
+  revision: pecoCapPreparationReferenceSchema.shape.revision,
+  binding: pecoCapIncomeBindingSchema,
+  subjectIds: z.array(pecoCapPreparationReferenceSchema.shape.id).min(1).max(100),
+  confirmedAt: z.iso.datetime({ offset: true }),
+  validUntil: z.iso.datetime({ offset: true }),
+  retentionUntil: z.iso.datetime({ offset: true }),
+  details: inputSchema,
+}).strict();
+export type PecoCapPreparationSnapshot = z.infer<typeof pecoCapPreparationSnapshotSchema>;
 type Person = z.infer<typeof person>;
 type Row = Person & { relationship: string };
 type Box = [number, number, number, number];
@@ -326,6 +337,7 @@ export type PecoCapIncomePreparationManifest = {
   applicantSubjectId: string;
   incomeConsentVersion: string;
   documentConsentVersion: string;
+  preparationSnapshot: z.infer<typeof pecoCapPreparationReferenceSchema>;
   formInputSha256: string;
   templateSha256: string;
   certificationTemplateSha256: string;
@@ -406,12 +418,12 @@ async function inspectStaticProof(bytes: Uint8Array) {
 
 /**
  * Offline synthetic formatter, not an intake, identifier-clearance, signing or transport channel.
- * The trusted metadata adapter must establish identity/subject projection; these hashes do not authenticate it.
+ * The trusted adapter records the expected snapshot reference; a caller-supplied hash cannot establish authority.
  * Static Letter proofs are this formatter's support limit, not a PECO evidence requirement.
  */
 export async function renderPecoCapIncomePreparationPacket(
   template: Uint8Array,
-  draftInput: unknown,
+  preparationSnapshot: unknown,
   incomeInput: PecoCapIncomeInput,
   originals: { documentId: string; bytes: Uint8Array }[],
   now: Date,
@@ -420,13 +432,21 @@ export async function renderPecoCapIncomePreparationPacket(
     const at = new Date(now);
     if (template.length !== 269140) throw new Error();
     const source = Uint8Array.from(template);
-    const data = inputSchema.parse(draftInput);
+    const snapshot = pecoCapPreparationSnapshotSchema.parse(preparationSnapshot);
+    const data = snapshot.details;
     const income = structuredClone(incomeInput);
     const supplied = originalSchema.parse(originals).map((original) => ({
       documentId: original.documentId, bytes: Uint8Array.from(original.bytes),
     }));
     const assessment = assessPecoCapIncomeEvidence(income, at);
     if (!assessment.preparationComplete || assessment.route !== "standard_proof" || !assessment.basis)
+      throw new Error();
+    const reference = { id: snapshot.id, revision: snapshot.revision, sha256: sha256(JSON.stringify(snapshot)) };
+    const expected = income.scope.preparationSnapshot;
+    if (!expected || expected.id !== reference.id || expected.revision !== reference.revision || expected.sha256 !== reference.sha256 ||
+      Object.entries(snapshot.binding).some(([key, value]) => income.scope.binding[key as keyof typeof snapshot.binding] !== value) ||
+      Date.parse(snapshot.confirmedAt) > at.getTime() ||
+      Date.parse(snapshot.validUntil) <= at.getTime() || Date.parse(snapshot.retentionUntil) <= at.getTime())
       throw new Error();
     const today = agencyDate.format(at);
     const formPeople = [data.applicant, ...data.householdMembers];
@@ -437,7 +457,9 @@ export async function renderPecoCapIncomePreparationPacket(
       return age >= 18;
     });
     if (!adultFlags[0] || formPeople.length !== income.household.people.length ||
-      adultFlags.filter(Boolean).length !== income.household.people.filter((person) => person.adult).length)
+      snapshot.subjectIds.length !== formPeople.length || new Set(snapshot.subjectIds).size !== snapshot.subjectIds.length ||
+      snapshot.subjectIds[0] !== income.scope.applicantSubjectId ||
+      snapshot.subjectIds.some((subjectId, index) => income.household.people.find(person => person.subjectId === subjectId)?.adult !== adultFlags[index]))
       throw new Error();
     const selected = assessment.selectedOriginals;
     if (!selected.length || selected.length > 10 || supplied.length !== selected.length ||
@@ -453,6 +475,7 @@ export async function renderPecoCapIncomePreparationPacket(
       income.scope.mandate.expiresAt, income.scope.grant.expiresAt,
       income.scope.incomeConsent.expiresAt, income.scope.documentConsent!.expiresAt,
       income.household.validUntil, bundle.validUntil,
+      snapshot.validUntil, snapshot.retentionUntil,
       ...income.household.people.filter((person) => person.adult || (person.inventory?.sources.length ?? 0) > 0)
         .map((person) => person.inventory!.validUntil),
     ].map(Date.parse);
@@ -503,6 +526,7 @@ export async function renderPecoCapIncomePreparationPacket(
         applicantSubjectId: income.scope.applicantSubjectId,
         incomeConsentVersion: income.scope.incomeConsent.version,
         documentConsentVersion: income.scope.documentConsent!.version,
+        preparationSnapshot: reference,
         formInputSha256: sha256(JSON.stringify(data)),
         templateSha256: PECO_CAP_TEMPLATE_SHA256,
         certificationTemplateSha256: PECO_CAP_TEMPLATE_SHA256,
