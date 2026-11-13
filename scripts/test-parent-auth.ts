@@ -218,11 +218,15 @@ async function main() {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   }
+  async function showSection(page: Page, section: string) {
+    await page.getByRole("navigation", { name: "Your application checklist" }).locator(`a[href="#${section}"]`).click();
+  }
   async function startFoodRequest(page: Page) {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
     await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
+    await page.getByLabel("Household ZIP code").fill("");
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -252,6 +256,7 @@ async function main() {
     );
     const id = (await start.json()).request.id as string;
     await page.waitForURL(`${origin}/support/${id}`);
+    await showSection(page, "application-controls");
     return id;
   }
 
@@ -373,6 +378,46 @@ async function main() {
         `The actual ${status} control updates durable permission in the database.`,
       );
     }
+    stage = "actual cross-request routing reuse without retyping";
+    const reusePage = await first.context.newPage();
+    const reuseSource = await startFoodRequest(reusePage);
+    const defaultsReply = await reusePage.request.get(`${origin}/api/parent/intake-defaults`);
+    const defaults = (await defaultsReply.json()).zip;
+    check(defaultsReply.status() === 200 && defaultsReply.headers()["cache-control"] === "private, no-store" &&
+      defaults?.sourceRequestId === reuseSource && defaults.value === "19104",
+    "Actual owned intake defaults return only current routing provenance with private no-store caching.");
+    await reusePage.goto(`${origin}/get-support?need=food_now`, { waitUntil: "networkidle" });
+    check(await reusePage.getByLabel("Household ZIP code").inputValue() === "19104" &&
+      await reusePage.getByText(/We filled your ZIP code/).isVisible(),
+    "The actual intake fills the current saved ZIP automatically and explains its original date without another approval.");
+    const reuseAccessibility = await new AxeBuilder({ page: reusePage }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    check(reuseAccessibility.violations.length === 0, "Actual saved-routing intake passes the accessibility scan.");
+    await reusePage.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+    await reusePage.getByRole("button", { name: "Continue", exact: true }).click();
+    await reusePage.getByRole("checkbox", { name: /I authorize research and preparation only/ }).check();
+    const reuseStarted = reusePage.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+    await reusePage.getByRole("button", { name: "Start getting support" }).click();
+    const reuseResponse = await reuseStarted;
+    check(reuseResponse.status() === 201, "One actual Start action creates the reused request through real Auth, Next and SQL.");
+    const reusedRequestId = (await reuseResponse.json()).request.id;
+    assert.deepEqual(reuseResponse.request().postDataJSON().reusedZip, { sourceRequestId: defaults.sourceRequestId, sourceVersion: defaults.sourceVersion });
+    const reusedRouting = (await db.query("select r.intake_confirmed_at,r.intake_reuse,j.request_version,r.version,j.state,(select count(*)::int from public.parent_operations o where o.request_id=r.id) operations from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1", [reusedRequestId])).rows[0];
+    check(reusedRouting.intake_confirmed_at.zip === defaults.confirmedAt && reusedRouting.intake_reuse.zip.expiresAt === defaults.expiresAt &&
+      reusedRouting.request_version === reusedRouting.version && reusedRouting.state === "queued" && reusedRouting.operations === 0,
+    "Actual reuse keeps original source dates/expiry and queues permitted preparation without a provider operation.");
+    await reusePage.goto(`${origin}/support/${reuseSource}`, { waitUntil: "networkidle" });
+    await showSection(reusePage, "application-controls");
+    await reusePage.getByRole("button", { name: "Cancel request & withdraw permission" }).click();
+    const withdrawn = reusePage.waitForResponse(response => response.url() === `${origin}/api/parent/requests/${reuseSource}` && response.request().method() === "POST");
+    await reusePage.getByRole("button", { name: "Yes, cancel this request" }).click();
+    check((await withdrawn).status() === 200, "Actual source withdrawal succeeds through the family control.");
+    const redactedRouting = (await db.query("select intake,intake_reuse,parent_private.current_intake_fields(id,'food_now') current from public.parent_requests where id=$1", [reusedRequestId])).rows[0];
+    check(redactedRouting.intake.zip === null && redactedRouting.intake_reuse.zip.invalidated === true && redactedRouting.current.zip === undefined,
+    "Source withdrawal removes the actual copied current ZIP and blocks further routing use without laundering its date.");
+    const redactedReply = await reusePage.request.get(`${origin}/api/parent/requests/${reusedRequestId}`);
+    check(redactedReply.status() === 200 && (await redactedReply.json()).request.intake.zip === null,
+      "The actual owned request API safely returns the redacted stored-intake state.");
+    await reusePage.close();
     stage = "actual browser save of synthetic grouped factual questions";
     const questions = [
       { id: "actual-bundle-zip", need: "food_now", field: "zip", reason: "missing_fact", title: "Current ZIP code", explanation: "Synthetic rehearsal question; this fixture is not an AI worker decision.", resolved: false },
@@ -385,6 +430,7 @@ async function main() {
     check(seeded.rowCount === 1, "Only this run's owned synthetic request receives the factual-question fixture.");
     const originalVersion = seeded.rows[0].version as number;
     await first.page.reload({ waitUntil: "networkidle" });
+    await showSection(first.page, "your-next-steps");
     const form = first.page.getByRole("form", { name: "Household questions" });
     await form.getByRole("region", { name: /Current ZIP code/ }).getByLabel("Your answer").fill("19103");
     await form.getByRole("region", { name: /Household size for this request/ }).getByLabel("Your answer").fill("4");
@@ -512,6 +558,7 @@ async function main() {
     await first.page.goto(`${origin}/support/${requestId}`, {
       waitUntil: "networkidle",
     });
+    await showSection(first.page, "application-documents");
     await first.page
       .getByText("Add a document or take a photo", { exact: true })
       .click();
@@ -779,6 +826,7 @@ async function main() {
     );
 
     stage = "actual outcome, preferences, exports and cancellation controls";
+    await showSection(first.page, "application-receipts");
     await first.page
       .getByText("Tell us about an outcome", { exact: true })
       .click();
@@ -950,6 +998,7 @@ async function main() {
         "The browser sends the explicit reviewed SNAP payload and a stable idempotency key.");
       await first.page.waitForURL(`${origin}/support/${snapRequestId}`);
       stage = "actual SNAP saved review and editable owned snapshot";
+      await showSection(first.page, "application-review");
       await first.page.getByRole("button", { name: "Correct application answers" }).waitFor();
       await checkSnapPage("review");
       const snapUrl = `${origin}/api/parent/requests/${snapRequestId}/snap-application`;
@@ -1046,7 +1095,8 @@ async function main() {
       assert.deepEqual(staleSnap.details, correctedSnap.details);
       assert.deepEqual(staleSnap.provenance, staleProvenance);
       await first.page.reload({ waitUntil: "networkidle" });
-      await first.page.getByRole("button", { name: "Answer SNAP application questions" }).click();
+      await showSection(first.page, "your-next-steps");
+      await first.page.getByRole("link", { name: "Answer SNAP application questions" }).click();
       const focusedForm = first.page.getByRole("form", { name: "Correct SNAP application answers" });
       await focusedForm.getByLabel("Your address", { exact: true }).waitFor();
       check(await focusedForm.locator("input,select").count() === 1 && await focusedForm.getByLabel("Your address", { exact: true }).inputValue() === staleSnap.details.address?.street &&
@@ -1359,6 +1409,11 @@ async function main() {
 }
 
 void main().catch((error: unknown) => {
+  mkdirSync("tmp/parent-verification/actual-auth", { recursive: true });
+  writeFileSync("tmp/parent-verification/actual-auth/failure.json", `${JSON.stringify({
+    checkedAt: new Date().toISOString(), mode: "actual-local-auth-browser-data-api", apiInterception: false,
+    failedStage: stage, completedAssertions: [...new Set(checks)],
+  }, null, 2)}\n`);
   const assertion =
     error instanceof assert.AssertionError ? ` ${error.message}` : "";
   const browserFailure =

@@ -1,7 +1,7 @@
 import {
   NEED_LABELS,
   type NecessaryAction,
-  type SupportIntake,
+  type StoredSupportIntake,
   type SupportNeed,
   type SupportPlan,
   type ServiceMandate,
@@ -95,7 +95,7 @@ export function buildSupportPlan(
   };
 }
 export function requiredActions(
-  intake: SupportIntake,
+  intake: StoredSupportIntake,
   mandate: ServiceMandate,
 ): NecessaryAction[] {
   const actions: NecessaryAction[] = [];

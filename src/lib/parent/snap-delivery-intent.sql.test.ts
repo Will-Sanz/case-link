@@ -51,7 +51,7 @@ describe.skipIf(!modulePath)("closed SNAP delivery SQL (synthetic Vault, non-PDF
     const owner = randomUUID(), session = randomUUID(); sessions.set(owner, session);
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [session, owner]);
-    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"] })), randomUUID()], owner)).rows[0].id as string;
+    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()], owner)).rows[0].id as string;
     const snapshot = (await role("authenticated", "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(fixtureSnapApplication(new Date())), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], owner)).rows[0].id as string;
     const version = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const snapshotHash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, version])).rows[0].hash as string;
@@ -128,7 +128,7 @@ describe.skipIf(!modulePath)("closed SNAP delivery SQL (synthetic Vault, non-PDF
   });
   it("does not expose delivery scheduling counts for an active job without the SNAP-new need", async () => {
     const s = await setup();
-    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["electricity"] })), JSON.stringify(fixtureMandate({ recipientIds: ["peco-cap"] })), randomUUID()], s.owner)).rows[0].id as string;
+    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["electricity"] })), JSON.stringify(fixtureMandate({ recipientIds: ["peco-cap"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()], s.owner)).rows[0].id as string;
     const job = await claim(request);
     await expect(role("parent_worker", "select parent_private.parent_get_snap_delivery_job_attempts($1,$2)", [job.jobId, job.leaseToken])).rejects.toMatchObject({ code: "42501" });
   });

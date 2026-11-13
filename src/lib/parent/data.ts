@@ -5,6 +5,9 @@ import { requireParentSession } from "./auth";
 import {
   intakeSchema,
   mandateSchema,
+  reusedZipSourceSchema,
+  reusableZipSchema,
+  type ReusedZipSource,
   type ParentDocument,
   type ParentPreferences,
   type ServiceMandate,
@@ -29,6 +32,9 @@ function check(error: unknown): void {
   if (!error) return;
   const code =
     typeof error === "object" && "code" in error ? error.code : undefined;
+  if (code === "P0001" && typeof error === "object" && error !== null &&
+    "message" in error && error.message === "parent_reuse_source_changed")
+    throw new Error("parent_reuse_source_changed");
   if (
     code === "P0001" &&
     typeof error === "object" &&
@@ -77,7 +83,7 @@ export async function getHousehold(): Promise<{
   };
 }
 const requestColumns =
-  "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts,account_changed_at,intake_confirmed_at,intake_need_scoped_fields";
+  "id,household_id,status,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts,account_changed_at,intake_confirmed_at,intake_need_scoped_fields,intake_reuse";
 const eventColumns = "id,request_id,kind,actor,summary,created_at,evidence";
 const documentColumns =
   "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at";
@@ -222,15 +228,27 @@ export async function startSupportRequest(
   intake: SupportIntake,
   mandate: ServiceMandate,
   idempotencyKey?: string,
+  reusedZip?: ReusedZipSource,
 ): Promise<string> {
   const { supabase } = await requireParentSession();
-  const { data, error } = await supabase.rpc("parent_start_request", {
+  const source = reusedZip ? reusedZipSourceSchema.parse(reusedZip) : null;
+  const { data, error } = await supabase.rpc(source ? "parent_start_request_with_reused_zip" : "parent_start_request", {
     p_intake: intakeSchema.parse(intake),
     p_mandate: mandateSchema.parse(mandate),
     p_idempotency_key: idempotencyKey ? uuid.parse(idempotencyKey) : null,
+    ...(source ? { p_source_request_id: source.sourceRequestId, p_source_version: source.sourceVersion } : {}),
   });
   check(error);
   return uuid.parse(data);
+}
+export async function getReusableZip() {
+  const { supabase } = await requireParentSession();
+  const { data, error } = await supabase.rpc("parent_reusable_zip");
+  check(error);
+  if (data === null) return null;
+  const parsed = reusableZipSchema.safeParse(data);
+  if (!parsed.success) throw new Error("CaseLink could not load saved routing information. Please try again.");
+  return parsed.data;
 }
 export async function controlSupportRequest(
   id: string,

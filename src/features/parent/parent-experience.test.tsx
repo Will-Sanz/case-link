@@ -362,6 +362,7 @@ describe("informed support start", () => {
         if (url.endsWith("/capabilities"))
           return jsonResponse({ ok: true, capabilities: [] });
         if (url.endsWith("/authorization-window")) return windows();
+        if (url.endsWith("/intake-defaults")) return jsonResponse({ ok: true, zip: null });
         attempts.push(options);
         if (attempts.length === 1)
           throw new Error("The connection was interrupted. Try again.");

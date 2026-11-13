@@ -42,6 +42,12 @@ export function currentIntakeFields(
     )
       return false;
     const dates = request.intake_confirmed_at ?? {};
+    if (field === "zip" && request.intake_reuse && Object.hasOwn(request.intake_reuse, "zip")) {
+      const source = request.intake_reuse.zip;
+      if (!source || source.invalidated || !current(source.confirmedAt) ||
+        !Number.isFinite(Date.parse(source.expiresAt)) || Date.parse(source.expiresAt) <= now.getTime() ||
+        source.confirmedAt !== dates.zip) return false;
+    }
     return current(Object.hasOwn(dates, field) ? dates[field] : request.created_at);
   };
   const valid = (field: string, value: unknown) =>
@@ -52,7 +58,7 @@ export function currentIntakeFields(
       version: request.version,
     }).success;
   if (request.mandate.allowedData.includes("household")) {
-    if (reusable("zip") && valid("zip", request.intake.zip))
+    if (typeof request.intake.zip === "string" && reusable("zip") && valid("zip", request.intake.zip))
       result.zip = request.intake.zip;
     if (
       request.intake.householdSize !== null && reusable("householdSize") &&
