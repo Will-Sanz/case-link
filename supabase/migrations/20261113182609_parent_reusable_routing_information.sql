@@ -2,6 +2,29 @@
 alter table public.parent_requests add column intake_reuse jsonb not null default '{}'
   check (jsonb_typeof(intake_reuse)='object' and pg_column_size(intake_reuse)<2000);
 
+-- Serialize household starts without blocking unchanged household foreign-key checks during propagation.
+create or replace function public.parent_start_request(p_intake jsonb,p_mandate jsonb,p_idempotency_key uuid default null) returns uuid
+language plpgsql security definer set search_path='' as $$
+declare v_household uuid; v_request uuid; v_existing public.parent_requests;
+begin
+  v_household:=public.parent_ensure_account();
+  perform parent_private.validate_intake(p_intake); perform parent_private.validate_mandate(p_mandate);
+  perform 1 from public.parent_households where id=v_household for no key update;
+  if p_idempotency_key is not null then
+    select * into v_existing from public.parent_requests where household_id=v_household and start_key=p_idempotency_key;
+    if found then
+      if v_existing.intake<>p_intake or v_existing.mandate<>p_mandate then raise exception 'start key already binds another request' using errcode='23514'; end if;
+      return v_existing.id;
+    end if;
+  end if;
+  if (select count(*) from public.parent_requests where household_id=v_household and status in ('active','paused'))>=12 then raise exception 'active request limit reached' using errcode='23514'; end if;
+  if p_intake->>'contactPreference'='email' then update public.parent_accounts set preferences=jsonb_set(preferences,'{contactPreference}','"email"') where id=auth.uid(); end if;
+  insert into public.parent_requests(household_id,start_key,intake,mandate) values(v_household,coalesce(p_idempotency_key,gen_random_uuid()),p_intake,p_mandate) returning id into v_request;
+  insert into public.parent_jobs(request_id,request_version) values(v_request,1);
+  insert into public.parent_events(request_id,kind,actor,summary,evidence) values(v_request,'request.started','parent','You asked CaseLink to start getting support.',jsonb_build_object('mandateVersion',1,'expiresAt',p_mandate->>'expiresAt'));
+  return v_request;
+end $$;
+
 create function parent_private.reusable_zip_source(p_source uuid,p_household uuid) returns jsonb
 language plpgsql stable set search_path='' as $$
 declare r public.parent_requests; confirmed timestamptz; expires timestamptz;
@@ -48,7 +71,7 @@ declare household uuid; candidate jsonb; existing public.parent_requests; reques
   start_hash text:=encode(sha256(convert_to(jsonb_build_array(p_intake,p_mandate,p_source_request_id,p_source_version)::text,'UTF8')),'hex');
 begin
   household:=public.parent_ensure_account();
-  perform 1 from public.parent_households where id=household for update;
+  perform 1 from public.parent_households where id=household for no key update;
   if p_idempotency_key is null then raise exception 'start key required' using errcode='23514'; end if;
   select * into existing from public.parent_requests where household_id=household and start_key=p_idempotency_key for update;
   if found then

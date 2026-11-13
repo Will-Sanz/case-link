@@ -45,9 +45,10 @@ async function main() {
     unverified = randomUUID(),
     trusted = randomUUID(),
     reuseOwner = randomUUID(),
+    lockedReuseOwner = randomUUID(),
     completedReuseOwner = randomUUID();
   const schoolFamily = randomUUID();
-  const users = [ownerA, ownerB, staff, unverified, trusted, reuseOwner, completedReuseOwner];
+  const users = [ownerA, ownerB, staff, unverified, trusted, reuseOwner, lockedReuseOwner, completedReuseOwner];
   const fixtureStoragePaths = new Map<string, string>();
   const parentGroups = [
     "parent_worker",
@@ -2803,8 +2804,57 @@ async function main() {
         start(reuseOwner, randomUUID(), { ...intake, zip: "19102" }),
         role("authenticated", reuseOwner, db => db.query("select public.parent_correct_request($1,$2,2)", [reuseSource, JSON.stringify({ ...intake, zip: "19105" })])),
       ]);
+      const ordinaryErrors = ordinaryRace.flatMap(result => result.status === "rejected" ? [{ code: result.reason.code, detail: result.reason.detail, where: result.reason.where }] : []);
       assert.equal(ordinaryRace.filter(result => result.status === "fulfilled").length, 2,
-        "An ordinary new source and an existing source correction must both complete without a deadlock."); assertionCount++;
+        `An ordinary new source and an existing source correction must both complete without a deadlock: ${JSON.stringify(ordinaryErrors)}.`); assertionCount++;
+
+      const lockedSource = await start(lockedReuseOwner);
+      const lockedTarget = (await role("authenticated", lockedReuseOwner, db => db.query(
+        "select public.parent_start_request_with_reused_zip($1,$2,$3,$4,1) id",
+        [JSON.stringify(intake), JSON.stringify(mandate), randomUUID(), lockedSource],
+      ))).rows[0].id;
+      const barrierPid = (await admin.query("select pg_backend_pid() id")).rows[0].id;
+      let correctionPid: number | undefined, startPid: number | undefined;
+      const waitForBarrier = async (pid: () => number | undefined, queuedBehind?: number) => {
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const actor = pid();
+          if (actor) {
+            const blockers: number[] = (await admin.query("select pg_blocking_pids($1) blockers", [actor])).rows[0].blockers;
+            if (blockers.includes(barrierPid) || queuedBehind !== undefined && blockers.includes(queuedBehind)) return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        throw new Error("The synthetic ZIP actor did not reach its bounded target-lock barrier.");
+      };
+      let correcting: Promise<unknown> | undefined, starting: Promise<unknown> | undefined;
+      let barrierError: unknown;
+      await admin.query("begin");
+      try {
+        // Queue correction first, then a start holding its real household lock: the old FOR UPDATE creates a foreign-key cycle.
+        await admin.query("select id from public.parent_requests where id=$1 for update", [lockedTarget]);
+        correcting = role("authenticated", lockedReuseOwner, async db => {
+          correctionPid = (await db.query("select pg_backend_pid() id")).rows[0].id;
+          return db.query("select public.parent_correct_request($1,$2,1)", [lockedSource, JSON.stringify({ ...intake, zip: "19105" })]);
+        });
+        await waitForBarrier(() => correctionPid);
+        starting = role("authenticated", lockedReuseOwner, async db => {
+          startPid = (await db.query("select pg_backend_pid() id")).rows[0].id;
+          return db.query("select public.parent_start_request($1,$2,$3) id", [JSON.stringify({ ...intake, zip: "19102" }), JSON.stringify(mandate), randomUUID()]);
+        });
+        await waitForBarrier(() => startPid, correctionPid);
+      } catch (failure) {
+        barrierError = failure;
+      } finally {
+        await admin.query("rollback");
+      }
+      const lockedRace = await Promise.allSettled([correcting, starting]);
+      if (barrierError) throw barrierError;
+      const lockedErrors = lockedRace.flatMap(result => result.status === "rejected" ? [{ code: result.reason.code, detail: result.reason.detail, where: result.reason.where }] : []);
+      assert.equal(lockedRace.filter(result => result.status === "fulfilled").length, 2,
+        `The ordered correction/start must preserve household serialization without blocking its unchanged foreign key: ${JSON.stringify(lockedErrors)}.`); assertionCount++;
+      const lockedState = (await admin.query("select intake,parent_private.current_intake_fields(id,'food_now') current from public.parent_requests where id=$1", [lockedTarget])).rows[0];
+      assert.equal(lockedState.intake.zip, null); assertionCount++;
+      assert.equal(lockedState.current.zip, undefined); assertionCount++;
     }
     await role("authenticated", reuseOwner, db => db.query("select public.parent_control_request($1,'cancel')", [reuseSource]));
     const redacted = (await admin.query("select intake,intake_reuse,parent_private.current_intake_fields(id,'food_now') current from public.parent_requests where id=$1", [reuseTarget])).rows[0];
