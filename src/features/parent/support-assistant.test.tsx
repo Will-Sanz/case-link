@@ -145,7 +145,7 @@ describe("request-connected assistant", () => {
     await screen.findByText("Recorded answer two.");
     expect(list.scrollTop).toBe(100);
   });
-  it("requires consent and blocks sensitive identifiers before a request leaves the page", async () => {
+  it("shows the processing notice before Send and blocks identifiers before a request leaves the page", async () => {
     const fetch = vi.fn().mockResolvedValue(json(conversation()));
     vi.stubGlobal("fetch", fetch);
     render(<SupportAssistant request={fixtureRequest()} />);
@@ -154,10 +154,10 @@ describe("request-connected assistant", () => {
     );
     fireEvent.change(question, { target: { value: "My SSN is 123-45-6789" } });
     const send = screen.getByRole("button", {
-      name: "Ask CaseLink",
+      name: "Send",
     }) as HTMLButtonElement;
-    expect(send.disabled).toBe(true);
-    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByText(/By sending, you agree/)).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
     fireEvent.click(send);
     expect((await screen.findByRole("alert")).textContent).toContain(
       "Remove personal identifiers",
@@ -181,13 +181,12 @@ describe("request-connected assistant", () => {
     fireEvent.change(question, {
       target: { value: "What do I need to do next?" },
     });
-    fireEvent.click(screen.getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: "Ask CaseLink" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("alert");
     expect((question as HTMLTextAreaElement).value).toBe(
       "What do I need to do next?",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Ask CaseLink" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(posts).toHaveLength(2));
     expect(posts[0].body).toBe(posts[1].body);
     expect(JSON.parse(String(posts[1].body))).toMatchObject({
@@ -232,7 +231,7 @@ describe("request-connected assistant", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "Ask CaseLink",
+          name: "Send",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);

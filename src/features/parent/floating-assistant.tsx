@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatBubble, Xmark } from "iconoir-react";
 import { CaseLinkMark } from "@/components/brand/caselink-mark";
 import { NEED_LABELS, type SupportRequest } from "@/lib/parent/domain";
-import { browserResponseSchema } from "@/lib/parent/browser-policy";
 import { SNAP_NEW_APPLICATION_URL } from "@/lib/parent/programs";
-import { displayDate, ParentApiError } from "./api";
+import { displayDate } from "./api";
 import { ServiceError } from "./feedback";
 import { SupportAssistant } from "./support-assistant";
 import { useParentResource } from "./use-parent-resource";
@@ -21,181 +20,45 @@ function requestLabel(request: SupportRequest) {
     : `${request.intake.needs.map((need) => NEED_LABELS[need]).join(" · ")} request`;
 }
 
-function RequestWebsiteStatus({
-  id,
-  onAction,
-}: {
-  id: string;
-  onAction: () => void;
-}) {
-  const { data, error } = useParentResource<unknown>(`/requests/${id}/browser`);
-  const parsed = browserResponseSchema.safeParse(data);
-  const record = !error && parsed.success ? parsed.data : null;
-  const session = record?.session;
-  const labels = {
-    starting: "Website connection starting",
-    running: "Website session active",
-    needs_parent: "Website session needs your attention",
-    blocked: "Website session blocked",
-    completed: "Website session finished",
-    failed: "Website session encountered a problem",
-    closed: "Website session closed",
-  };
-  return (
-    <aside
-      className={chatStyles.websiteStatus}
-      aria-label="Application website status"
-    >
-      <strong>Application website</strong>
-      <p>
-        {session
-          ? labels[session.status]
-          : record?.available
-            ? "No website session is recorded."
-            : "An active website connection cannot be confirmed."}
-      </p>
-      {session && (
-        <>
-          <p>{session.summary}</p>
-          <time dateTime={session.updatedAt}>
-            Last recorded {displayDate(session.updatedAt, true)}
-          </time>
-        </>
-      )}
-      <p className={styles.hint}>
-        This website record is separate from chat. It does not confirm an
-        application was submitted.
-      </p>
-      <Link
-        className={styles.textLink}
-        href={`/support/${id}#application-overview`}
-        onClick={onAction}
-      >
-        See application progress and website
-      </Link>
-    </aside>
-  );
-}
-
-function SavedRequestAssistant({
-  id,
-  onAction,
-  open,
-}: {
-  id: string;
-  onAction: () => void;
-  open: boolean;
-}) {
-  const { data, loading, error, reload } = useParentResource<{
-    request: SupportRequest;
-  }>(`/requests/${id}`);
-  const [contextRevision, setContextRevision] = useState(0);
-  const refreshContext = useCallback(() => {
-    reload();
-    setContextRevision((value) => value + 1);
-  }, [reload]);
+function SavedRequestAssistant({ id, onAction }: { id: string; onAction: () => void }) {
+  const { data, loading, error, reload } = useParentResource<{ request: SupportRequest }>(`/requests/${id}`);
   return (
     <>
       {loading && <p role="status">Loading this request…</p>}
-      {error && (
-        <>
-          <ServiceError
-            error={error}
-            retry={reload}
-            returnTo={`/support/${id}`}
-          />
-          {error instanceof ParentApiError &&
-            [401, 403, 404].includes(error.status) && (
-              <GeneralHelp onAction={onAction} />
-            )}
-        </>
-      )}
+      {error && <ServiceError error={error} retry={reload} returnTo={`/support/${id}`} />}
       {data && !error && (
-        <>
-          <p className={chatStyles.context}>
-            About: <strong>{requestLabel(data.request)}</strong>
-            <Link href={`/support/${id}`} onClick={onAction}>
-              View progress
-            </Link>
-          </p>
-          {open && data.request.intake.needs.includes("snap_new") && (
-            <RequestWebsiteStatus
-              key={`${id}:${data.request.version}:${data.request.updated_at}:${contextRevision}`}
-              id={id}
-              onAction={onAction}
-            />
-          )}
-          <SupportAssistant
-            key={id}
-            request={data.request}
-            onAction={onAction}
-            onAnswer={refreshContext}
-            onRefresh={refreshContext}
-          />
-        </>
+        <SupportAssistant key={id} request={data.request} onAction={onAction} onAnswer={reload} onRefresh={reload} />
       )}
     </>
   );
 }
 
-function SavedRequestPicker({
-  onAction,
-  open,
-}: {
-  onAction: () => void;
-  open: boolean;
-}) {
-  const { data, loading, error, reload } = useParentResource<{
-    requests: SupportRequest[];
-  }>("/requests");
-  const [selectedId, setSelectedId] = useState("");
-  const selected =
-    data?.requests.length === 1
-      ? data.requests[0]
-      : data?.requests.find((request) => request.id === selectedId);
+function SavedRequestPicker({ onAction, initialRequestId }: { onAction: () => void; initialRequestId?: string }) {
+  const { data, loading, error, reload } = useParentResource<{ requests: SupportRequest[] }>("/requests");
+  const [selectedId, setSelectedId] = useState(initialRequestId ?? "");
+  const selected = data?.requests.find((request) => request.id === selectedId)
+    ?? (!selectedId && data?.requests.length === 1 ? data.requests[0] : undefined);
   return (
     <>
       {loading && <p role="status">Loading your saved requests…</p>}
       {error && <ServiceError error={error} retry={reload} />}
-      {data && !error && (
+      {data && !error && (data.requests.length ? (
         <>
-          {data.requests.length > 1 && (
-            <div className={styles.field}>
-              <label htmlFor="chat-request">
-                Which request can we help with?
-              </label>
-              <select
-                id="chat-request"
-                className={styles.select}
-                value={selected?.id ?? ""}
-                onChange={(event) => setSelectedId(event.target.value)}
-              >
-                <option value="">Choose a saved request</option>
-                {data.requests.map((request) => (
-                  <option key={request.id} value={request.id}>
-                    {requestLabel(request)} ·{" "}
-                    {displayDate(request.created_at, true)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {selected ? (
-            <SavedRequestAssistant
-              key={selected.id}
-              id={selected.id}
-              onAction={onAction}
-              open={open}
-            />
-          ) : data.requests.length ? (
-            <p className={chatStyles.intro}>
-              Choose a request so answers use the right saved information.
-            </p>
-          ) : (
-            <GeneralHelp savedEmpty onAction={onAction} />
-          )}
+          <div className={styles.field}>
+            <label htmlFor="chat-request">Which request can we help with?</label>
+            <select id="chat-request" className={styles.select} value={selected?.id ?? ""}
+              onChange={(event) => setSelectedId(event.target.value)}>
+              <option value="">Choose a saved request</option>
+              {data.requests.map((request) => (
+                <option key={request.id} value={request.id}>
+                  {requestLabel(request)} · {displayDate(request.created_at, true)}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selected && <SavedRequestAssistant key={selected.id} id={selected.id} onAction={onAction} />}
         </>
-      )}
+      ) : <GeneralHelp savedEmpty onAction={onAction} />)}
     </>
   );
 }
@@ -380,14 +243,8 @@ export function FloatingAssistant({ signedIn }: { signedIn: boolean }) {
         </header>
         <div className={chatStyles.body} key={`${signedIn}:${pathname}`}>
           {opened &&
-            (requestId ? (
-              <SavedRequestAssistant
-                id={requestId}
-                onAction={close}
-                open={open}
-              />
-            ) : signedIn && pathname === "/my-support" ? (
-              <SavedRequestPicker onAction={close} open={open} />
+            (signedIn ? (
+              <SavedRequestPicker onAction={close} initialRequestId={requestId} />
             ) : (
               <GeneralHelp
                 intake={pathname === "/get-support"}
