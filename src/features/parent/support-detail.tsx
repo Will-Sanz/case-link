@@ -533,10 +533,6 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           </span>
         )}
       </div>
-      {request.controlled_test && <aside className={`${styles.notice} ${styles.space}`} aria-label="Fictional signing and fax test">
-        <strong>Fictional signing and fax test</strong>
-        <p>This example uses test marks and Sinch’s free fax emulator. No application is sent to DHS or another real recipient. Any delivery result below describes the test only.</p>
-      </aside>}
       {notice && (
         <p className={`${styles.success} ${styles.space}`} role="status">
           {notice}

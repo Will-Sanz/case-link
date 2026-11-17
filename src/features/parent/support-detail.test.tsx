@@ -81,6 +81,16 @@ async function refreshSupport() {
 }
 
 describe("support detail", () => {
+  it("keeps a saved test request free of the prominent test banner and emulator header badge", async () => {
+    const request = { ...fixture(), controlled_test: true };
+    request.intake.needs = ["snap_new"];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
+    render(<SupportDetail requestId={request.id}/>);
+    const title = await screen.findByRole("heading", { name: "Your SNAP application" });
+    await waitFor(() => expect(within(title.parentElement!).getByText("Application saved")).toBeTruthy());
+    expect(screen.queryByRole("complementary", { name: "Fictional signing and fax test" })).toBeNull();
+    expect(within(title.parentElement!).queryByText(/emulator|fictional/i)).toBeNull();
+  });
   it("preserves the ordinary non-SNAP request header", async () => {
     const request = fixture(); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(request)));
     render(<SupportDetail requestId={request.id}/>);

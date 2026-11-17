@@ -195,9 +195,9 @@ export function currentApplicationState(request: SupportRequest, history: Pick<O
   const snap = request.intake.needs.includes("snap_new");
   const state = recordedApplicationState((history.data?.operations ?? []).filter(operation => !operation.request_id || operation.request_id === request.id), snap ? "snap-pa" : undefined, request.version, snap ? "snap_new" : request.intake.needs.length === 1 ? request.intake.needs[0] : undefined, request.controlled_test);
   if (history.data?.historyLimited && !state.hasAttempt) return { ...state, label: "Earlier application history needs checking", detail: "An earlier submission or uncertain delivery may be outside this view. Check the full history before another attempt." };
-  if (!state.hasAttempt && currentSnapReview(request, review)?.snapSubmissionAuthorized) return { ...state, label: request.controlled_test ? "Fictional Submit decision recorded · no agency filing" : "Submit decision recorded", detail: "The decision to send your exact application is saved. Delivery and an agency confirmation are separate records." };
+  if (!state.hasAttempt && currentSnapReview(request, review)?.snapSubmissionAuthorized) return { ...state, label: "Submit decision recorded", detail: "The decision to send your exact application is saved. Delivery and an agency confirmation are separate records." };
   if (state.currentVersionSubmitted && !state.outcome && !history.data?.historyLimited) return { ...state, detail: "Submission confirmed · benefits decision pending. Open your recorded receipt for the exact application and who confirmed it." };
-  return state;
+  return request.controlled_test ? { ...state, label: "Application saved", detail: "No agency submission is recorded. Open Activity & receipts for the history of this application." } : state;
 }
 
 export function currentSnapDraft(request: SupportRequest, operations: readonly RecordedOperation[]) {
