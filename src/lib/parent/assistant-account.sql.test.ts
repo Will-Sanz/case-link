@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import { createParentSqlFixture } from "../../../scripts/parent-sql-fixture";
@@ -9,7 +8,6 @@ it.skipIf(!modulePath)("claims only current preferences for the selected request
   const { admin } = await createParentSqlFixture(modulePath!);
   const owner = randomUUID(), other = randomUUID(), household = randomUUID(), otherHousehold = randomUUID(), request = randomUUID(), otherRequest = randomUUID(), session = randomUUID();
   try {
-    await admin.query(readFileSync("supabase/migrations/20261117184500_parent_assistant_account_context.sql", "utf8"));
     await admin.query("update parent_private.processing_controls set enabled=true,approval_reference='synthetic assistant account context',approved_until=now()+interval '1 day'");
     await admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,'owner@example.invalid',now()),($2,'other@example.invalid',now())", [owner, other]);
     await admin.query("insert into auth.sessions(id,user_id,not_after) values($1,$2,now()+interval '1 hour')", [session, owner]);

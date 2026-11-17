@@ -243,7 +243,7 @@ export function FloatingAssistant({ signedIn }: { signedIn: boolean }) {
         </header>
         <div className={chatStyles.body} key={`${signedIn}:${pathname}`}>
           {opened &&
-            (signedIn ? (
+            (signedIn || requestId ? (
               <SavedRequestPicker onAction={close} initialRequestId={requestId} />
             ) : (
               <GeneralHelp
