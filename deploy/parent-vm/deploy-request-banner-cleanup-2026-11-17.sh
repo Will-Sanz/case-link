@@ -43,7 +43,9 @@ PY
 curl --fail --location --max-time 90 --silent --show-error https://codeload.github.com/Will-Sanz/case-link/tar.gz/5128d3933ceca03919c519feb84106e5a39b1393 -o "$work/source.tgz"
 mkdir "$release"
 tar -xzf "$work/source.tgz" --strip-components=1 -C "$release"
-ln -s "$base/node_modules" "$release/node_modules"
+cp -a --reflink=auto "$(readlink -f "$base/node_modules")" "$release/node_modules"
+test "$(readlink -f "$release/node_modules")" = "$release/node_modules"
+test -f "$release/node_modules/next/package.json"
 python3 - <<'PY'
 import os,pathlib,hashlib
 r=pathlib.Path(os.environ['CASELINK_BANNER_RELEASE']);b=pathlib.Path(os.environ['CASELINK_BANNER_BASE'])
