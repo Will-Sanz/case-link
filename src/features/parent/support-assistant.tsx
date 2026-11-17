@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowRight, ChatBubble, Lock, Refresh } from "iconoir-react";
+import { ArrowRight, ChatBubble, Refresh } from "iconoir-react";
 import {
   assistantQuestionSchema,
   type ParentAssistantConversation,
@@ -12,12 +12,6 @@ import { ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import styles from "./parent.module.css";
 import chatStyles from "./floating-assistant.module.css";
-
-const suggestions = [
-  "What’s happening with my request?",
-  "What do I need to do next?",
-  "Has an application been sent?",
-];
 
 export function SupportAssistant({
   request,
@@ -34,14 +28,12 @@ export function SupportAssistant({
   const { data, error, loading, reload, reloadIfIdle } =
     useParentResource<ParentAssistantConversation>(path);
   const [question, setQuestion] = useState("");
-  const [consented, setConsented] = useState(false);
   const [pending, setPending] = useState(false);
   const [sendError, setSendError] = useState("");
   const [notice, setNotice] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
   const attempt = useRef<{ question: string; key: string } | null>(null);
-  const questionField = useRef<HTMLTextAreaElement>(null);
   const conversation = useRef<HTMLOListElement>(null);
   const followLatest = useRef(true);
   const latestMessage = data?.messages?.at(-1);
@@ -81,13 +73,11 @@ export function SupportAssistant({
     const parsed = assistantQuestionSchema.safeParse({
       question: text,
       idempotencyKey,
-      consented,
+      consented: true,
     });
     if (!parsed.success) {
       setSendError(
-        !consented
-          ? "Agree to the AI processing notice before sending your question."
-          : (parsed.error.issues[0]?.message ?? "Check your question."),
+        parsed.error.issues[0]?.message ?? "Check your question.",
       );
       return;
     }
@@ -154,10 +144,6 @@ export function SupportAssistant({
           Refresh
         </button>
       </div>
-      <p className={chatStyles.intro}>
-        Ask about your progress or next step. Chat does not submit applications
-        or change your answers.
-      </p>
       {loading && (
         <p role="status" className={styles.hint}>
           Loading your conversation…
@@ -296,33 +282,15 @@ export function SupportAssistant({
         </p>
       )}
       <form className={chatStyles.form} onSubmit={submit}>
-        {!data?.messages?.length && (
-          <div className={styles.suggestions} aria-label="Question suggestions">
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                className={styles.suggestion}
-                onClick={() => {
-                  setQuestion(suggestion);
-                  setSendError("");
-                  questionField.current?.focus();
-                }}
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        )}
         <div className={styles.field}>
           <label htmlFor="assistant-question">
             Your question about this request
           </label>
           <textarea
             id="assistant-question"
-            ref={questionField}
             className={`${styles.textarea} ${chatStyles.composer}`}
-            rows={2}
+            rows={3}
+            placeholder="Ask a question about this request…"
             required
             maxLength={2000}
             value={question}
@@ -334,38 +302,21 @@ export function SupportAssistant({
             disabled={pending}
           />
           <p id="assistant-privacy" className={styles.hint}>
-            Keep identity details, account numbers, passwords and PINs out of
-            chat. Required identity information belongs in a protected
-            application field.
+            By sending, you agree to use your question, saved account preferences and relevant request details with OpenAI to answer.
+            Keep identity numbers, passwords and PINs out of chat.
           </p>
         </div>
-        <label className={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={consented}
-            onChange={(event) => setConsented(event.target.checked)}
-          />
-          <span>
-            Use my question and relevant saved request details with OpenAI to
-            answer.
-          </span>
-        </label>
         <div className={styles.between}>
-          <span className={`${styles.hint} ${styles.inline}`}>
-            <Lock width={16} height={16} aria-hidden="true" />
-            Only your request’s context
-          </span>
           <button
             className={styles.button}
             disabled={
               pending ||
               !data?.available ||
               !!error ||
-              !consented ||
               !question.trim()
             }
           >
-            {pending ? "Saving question…" : "Ask CaseLink"}
+            {pending ? "Sending…" : "Send"}
             <ArrowRight width={17} height={17} aria-hidden="true" />
           </button>
         </div>

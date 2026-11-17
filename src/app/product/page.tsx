@@ -6,6 +6,8 @@ import { ProductPageContent } from "@/features/marketing/product-page-content";
 import { getSessionUser } from "@/lib/auth/session";
 import { ParentShell } from "@/features/parent/parent-shell";
 import { UrgentHelp } from "@/features/parent/landing";
+import { getParentSession } from "@/lib/parent/auth";
+import { isParentConfigured } from "@/lib/parent/config";
 import styles from "@/features/parent/parent.module.css";
 export const metadata: Metadata = {
   title: "How CaseLink works",
@@ -27,8 +29,12 @@ export default async function ProductPage() {
       </PublicSiteShell>
     );
   }
+  let signedIn = false;
+  if (isParentConfigured()) {
+    try { signedIn = Boolean(await getParentSession()); } catch { /* Preserve public access when authentication is unavailable. */ }
+  }
   return (
-    <ParentShell>
+    <ParentShell signedIn={signedIn}>
       <div className={`${styles.container} ${styles.infoPage}`}>
         <header className={styles.infoIntro}>
             <h1>
