@@ -45,12 +45,13 @@ async function show() {
 }
 
 describe("current support-list progress", () => {
-  it("shows the same exact emulator milestone and retains cancellation separately", async () => {
+  it("shows the saved application without repeated test labels and retains cancellation separately", async () => {
     const value = fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"] }), controlled_test: true, status: "cancelled" });
     const review = fixtureProtectedSnapOperation();
     const fetch = vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => url.includes("/operations?") ? { ok: true, historyLimited: false, operations: [{ id: review.operationId, request_id: value.id, request_version: value.version, need: "snap_new", program_id: "snap-pa", action: "submit", artifact_id: null, protected_packet: review.packet.protectedSnapPacket, state: "sent", created_at: value.updated_at, evidence: { source: "provider_api", reference: "sinch-emulation:fixture", recordedAt: value.updated_at } }] } : url.includes("/snap-submission?") ? { ok: true, review: null } : { ok: true, requests: [value], progress: { [value.id]: { state: "waiting", summary: "Recorded background wait" } } } }));
     vi.stubGlobal("fetch", fetch); await open();
-    expect(screen.getByText("Cancelled · Free emulator test completed · no agency filing")).toBeTruthy();
+    expect(screen.getByText("Cancelled · Application saved")).toBeTruthy();
+    expect(screen.queryByText(/Free emulator test completed/)).toBeNull();
     expect(screen.queryByText("Waiting for the next step")).toBeNull();
     expect(fetch.mock.calls).toHaveLength(3);
   });
