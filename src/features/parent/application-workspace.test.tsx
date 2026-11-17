@@ -108,8 +108,9 @@ describe("canonical application continuity", () => {
     const operation: RecordedOperation = { id: review.operationId, request_id: request.id, request_version: request.version, need: "snap_new", program_id: "snap-pa", action: "submit", state: "sent", artifact_id: null, protected_packet: review.packet.protectedSnapPacket, created_at: request.updated_at, evidence: { source: "provider_api", reference: "sinch-emulation:fictional", recordedAt: request.updated_at } };
     mockApi();
     render(<ApplicationWorkspace request={request} snapReview={review} history={{ data: { operations: [operation], historyLimited: false }, loading: false, error: null, reload: vi.fn() }}>{null}</ApplicationWorkspace>);
-    expect(overview().getByText("Free emulator test completed · no agency filing")).toBeTruthy();
-    expect(overview().getAllByText(/The free emulator confirmed this fictional transmission/).length).toBeGreaterThan(0);
+    expect(overview().getByText("Application saved")).toBeTruthy();
+    expect(screen.queryByText("Free emulator test completed · no agency filing")).toBeNull();
+    expect(overview().getAllByText(/No agency submission is recorded/).length).toBeGreaterThan(0);
     expect(overview().queryByText(/confirm its result before any retry/)).toBeNull();
   });
   it("places one current prepared draft directly after the overview and before all answer details", async () => {

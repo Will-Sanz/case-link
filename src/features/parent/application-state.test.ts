@@ -6,9 +6,9 @@ const operation: RecordedOperation = { id: "test", request_id: request.id, reque
 const history = (ops = [operation]) => ({ data: { operations: ops, historyLimited: false }, loading: false, error: null });
 describe("one evidence-backed application projection", () => {
   it("requires current-version verified transport evidence for fictional completion", () => {
-    expect(currentApplicationState(request, history()).label).toBe("Free emulator test completed · no agency filing");
+    expect(currentApplicationState(request, history())).toMatchObject({ label: "Application saved", testCompleted: true, submitted: false });
     for (const change of [{ request_version: 0 }, { request_id: "other" }, { state: "prepared" }, { evidence: { ...operation.evidence, source: "parent_reported" } }, { evidence: null }]) {
-      expect(currentApplicationState(request, history([{ ...operation, ...change }])).label).not.toContain("completed");
+      expect(currentApplicationState(request, history([{ ...operation, ...change }]))).not.toMatchObject({ testCompleted: true });
     }
   });
   it.each([{ loading: true, error: null, label: "Checking application records…" }, { loading: false, error: new Error("offline"), label: "Application records unavailable" }])("never overrides unavailable evidence with cached emulator completion: $label", ({ label, ...state }) => {
