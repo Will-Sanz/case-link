@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createS3Storage, s3StorageCredentialsSchema } from "../src/lib/parent/storage-s3";
 import { connectedParentServiceAllowed } from "../src/lib/parent/connected-service";
+import { hostedParentServiceAllowed } from "../src/lib/parent/hosted-service";
 import {
   canonicalProjectOrigin,
   parentProjectIsolationIssues,
@@ -20,7 +21,12 @@ async function main() {
   if (maintained) {
     z.literal("1").parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED);
     z.string().trim().min(1).max(500).parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE);
-    maintenanceUntil = Date.parse(z.iso.datetime({ offset: true }).parse(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL));
+    const until = env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL;
+    if (until === "ongoing") {
+      if (env.CASELINK_PARENT_HOSTED_APPROVED_UNTIL !== "ongoing" || !connectionString || !projectUrl || !hostedParentServiceAllowed(env, connectionString, projectUrl, "http://127.0.0.1:3310"))
+        throw new Error("Ongoing maintenance requires the approved hosted service.");
+      maintenanceUntil = Date.now() + 60_000;
+    } else maintenanceUntil = Date.parse(z.iso.datetime({ offset: true }).parse(until));
     if (maintenanceUntil <= Date.now() || storageKey !== undefined)
       throw new Error("Maintenance needs current approval and no project API credential.");
   }

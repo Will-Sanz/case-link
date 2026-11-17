@@ -105,6 +105,31 @@ const packetRetention = (counts: unknown[], options: Options = {}) => localReten
   CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE: "Synthetic offline maintenance approval only", ...options.env,
 } });
 
+const ongoingHosted = {
+  CASELINK_ENVIRONMENT: "production", CASELINK_PARENT_ACCOUNT_MODE: "existing", NEXT_PUBLIC_SITE_URL: "https://www.thecaselink.com",
+  CASELINK_PARENT_RETENTION_APPROVED: "1", CASELINK_PARENT_HOSTED_APPROVED: "1", CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE: "Owner-approved ongoing service",
+  CASELINK_PARENT_HOSTED_APPROVED_UNTIL: "ongoing", CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: "ongoing",
+  CASELINK_PARENT_RETENTION_DATABASE_URL: "postgresql://caselink_retention:synthetic@db.approved.supabase.co/postgres?sslmode=verify-full",
+  CASELINK_PARENT_RETENTION_SUPABASE_URL: "https://approved.supabase.co", CASELINK_SCHOOL_SUPABASE_URL: "https://approved.supabase.co",
+  CASELINK_PARENT_PRODUCTION_SUPABASE_URL: "https://approved.supabase.co", CASELINK_PARENT_CONNECTED_APPROVED: undefined, VERCEL: undefined, VERCEL_ENV: undefined,
+};
+it("runs ongoing hosted retention without extending document retention or receiving a storage credential", async () => {
+  const result = await packetRetention([1, 0], { env: ongoingHosted, principal: { ...principal(), rolname: "caselink_retention" } });
+  expect(result.stdout).toBe("Retention completed: 1 protected packets erased.\n"); expect(result.stderr).toBe("");
+  expect(mocks.storage).not.toHaveBeenCalled(); expect(mocks.destroy).toHaveBeenCalledOnce();
+});
+it.each([{ CASELINK_PARENT_HOSTED_APPROVED: "0" }, { CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE: " " }, { CASELINK_PARENT_HOSTED_APPROVED_UNTIL: undefined }, { CASELINK_PARENT_HOSTED_APPROVED_UNTIL: "2099-01-01T00:00:00Z" }])(
+  "rejects ongoing retention without valid hosted authority %#", async delta => {
+    await packetRetention([], { env: { ...ongoingHosted, ...delta } });
+    expect(process.exitCode).toBe(1); expect(mocks.client).not.toHaveBeenCalled();
+  },
+);
+it("keeps each ongoing maintenance invocation bounded to one minute", async () => {
+  vi.useFakeTimers(); await packetRetention([], { env: ongoingHosted, principal: { ...principal(), rolname: "caselink_retention" }, hangAt: "purge", wait: false });
+  await vi.advanceTimersByTimeAsync(60000); await vi.waitFor(() => expect(process.exitCode).toBe(1));
+  expect(mocks.destroy).toHaveBeenCalledOnce(); expect(vi.getTimerCount()).toBe(0);
+});
+
 it("purges protected packets first and reports only aggregate counts",async()=>{
   const result=await localRetention([100,100,3]);
   expect(result.queries.filter(sql=>sql.includes("parent_purge_snap_final_packets"))).toHaveLength(3);

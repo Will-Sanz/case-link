@@ -1,7 +1,7 @@
 import { isIP } from "node:net";
 import { canonicalProjectOrigin, isLoopbackHost } from "./project-origin";
 
-/** The single-host pilot keeps its private broker on loopback; database authority stays independent. */
+/** Hosted services keep their private broker on loopback; database authority stays independent. */
 export function hostedParentServiceAllowed(
   env: Record<string, string | undefined>, databaseUrl: string, projectUrl: string, brokerOrigin: string,
   now = Date.now(),
@@ -18,7 +18,7 @@ export function hostedParentServiceAllowed(
       && env.CASELINK_PARENT_HOSTED_APPROVED === "1"
       && (env.CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE?.trim().length ?? 0) > 0
       && (env.CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE?.length ?? 0) <= 1000
-      && Number.isFinite(now) && until > now
+      && Number.isFinite(now) && (env.CASELINK_PARENT_HOSTED_APPROVED_UNTIL === "ongoing" || until > now)
       && project === env.CASELINK_SCHOOL_SUPABASE_URL && project === env.CASELINK_PARENT_PRODUCTION_SUPABASE_URL
       && brokerOrigin === "http://127.0.0.1:3310"
       && ["postgres:", "postgresql:"].includes(db.protocol) && db.hostname === `db.${ref}.supabase.co`
