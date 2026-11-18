@@ -120,7 +120,7 @@ export function safeReturnPath(value: string | undefined): string {
     extra.length === 0 &&
     (need === undefined ||
       (path === "/get-support" &&
-        (["food", "utilities", ...NEEDS] as readonly string[]).includes(need)))
+        (["food", "utilities", "all", ...NEEDS] as readonly string[]).includes(need)))
   ) ? value : "/my-support";
 }
 

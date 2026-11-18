@@ -31,6 +31,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("connected City food listings", () => {
+  it("keeps the reviewed fridge distinct from a reservation, stock or delivery-only listing", () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch); render(<FoodSites />);
+    fireEvent.click(screen.getByText("More food options and a no-paperwork fridge"));
+    expect(screen.getByText(/2901 W. Hunting Park Avenue/)).toBeTruthy();
+    expect(screen.getByText(/stock is unknown and nothing is reserved/)).toBeTruthy();
+    expect(screen.getByText(/Other fridges can have different hours/)).toBeTruthy();
+    expect(screen.getByText(/Some finder locations offer delivery only/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Read Share’s fridge access instructions" }).getAttribute("href")).toBe("https://www.sharefoodprogram.org/community-fridges/");
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("keeps a long directory compact while making every returned location available", async () => {
     vi.stubGlobal(
       "fetch",

@@ -279,6 +279,7 @@ try {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
+    await page.getByText("I already know which program I need", { exact: true }).click();
     await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await page.getByRole("checkbox", { name: /Food for now/ }).check();

@@ -7,5 +7,5 @@ export default async function GetSupportPage({
   searchParams: Promise<{ need?: string }>;
 }) {
   const { need } = await searchParams;
-  return <ParentIntake initialNeed={need} />;
+  return <ParentIntake initialNeed={need ?? "food"} />;
 }

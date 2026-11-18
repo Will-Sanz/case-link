@@ -496,7 +496,7 @@
   margin-top: 1rem;
 }
 .resourceSearch .field {
-  flex: 1;
+  flex: 1 1 12rem;
 }
 .resourceResults {
   margin-top: 1rem;

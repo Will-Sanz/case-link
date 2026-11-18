@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { ArrowRight } from "iconoir-react";
 import { UrgentHelp } from "./landing";
+import { FoodAssessment } from "./food-assessment";
+import { FoodSites } from "./food-sites";
 import styles from "./parent.module.css";
 
 export function FoodServices() {
   return (
     <div className={styles.container}>
+      <FoodAssessment />
+      <FoodSites />
+      <details className={styles.disclosure}>
+        <summary>I already know which program I need</summary>
       <div className={styles.pageTop}>
         <div>
-          <h1>Choose the food support you need.</h1>
+          <h2>Choose the food support you need.</h2>
           <p>
             Groceries or meals now, a new application, and help with existing
             benefits are different services. You choose where to start.
@@ -29,7 +35,7 @@ export function FoodServices() {
             </Link>
           </div>
           <a className={styles.secondary} href="https://www.phila.gov/food/">
-            Find food now <ArrowRight width={18} height={18} aria-hidden="true" />
+            Open City food finder <ArrowRight width={18} height={18} aria-hidden="true" />
           </a>
         </section>
         <section className={styles.serviceOption} aria-labelledby="snap-new-title">
@@ -70,8 +76,9 @@ export function FoodServices() {
           </div>
         </section>
       </div>
+      </details>
       <p className={styles.space}>
-        <Link className={styles.textLink} href="/get-support">
+        <Link className={styles.textLink} href="/get-support?need=all">
           Not sure, or need more than one kind of support? See all support options.
         </Link>
       </p>

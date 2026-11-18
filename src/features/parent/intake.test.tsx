@@ -268,7 +268,7 @@ describe("one coherent upfront support intake", () => {
     expect(screen.getByRole("link", { name: "Check a pending application" }).getAttribute("href")).toBe("/get-support?need=snap_pending");
     expect(screen.getByRole("link", { name: "Renew SNAP" }).getAttribute("href")).toBe("/get-support?need=snap_renewal");
     expect(screen.getByRole("link", { name: "Apply for WIC" }).getAttribute("href")).toBe("/get-support?need=wic_new");
-    expect(screen.getByRole("link", { name: /Not sure, or need more than one/ }).getAttribute("href")).toBe("/get-support");
+    expect(screen.getByRole("link", { name: /Not sure, or need more than one/ }).getAttribute("href")).toBe("/get-support?need=all");
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByLabelText("Household ZIP code")).toBeNull();
     expect(fetch).not.toHaveBeenCalled();

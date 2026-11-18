@@ -240,6 +240,7 @@ async function main() {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
+    await page.getByText("I already know which program I need", { exact: true }).click();
     await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
     await page.getByLabel("Household ZIP code").fill("");
     await page.getByLabel("Household ZIP code").fill("19104");
@@ -497,9 +498,10 @@ async function main() {
         storedBundle.version > originalVersion && storedBundle.request_version === storedBundle.version && storedBundle.job_state === "queued" && storedBundle.operations === 0,
       "Both fixture questions resolve with the matching current queued job version and no provider operation.",
     );
+    const replayedBundle = await first.page.request.post(requestUrl, { headers: { origin }, data: bundleBody! });
     check(
-      (await first.page.request.post(requestUrl, { headers: { origin }, data: bundleBody! })).status() === 409,
-      "Replaying the completed browser bundle's old version is rejected by the actual web API.",
+      replayedBundle.status() === 409,
+      `Replaying the completed browser bundle's old version is rejected by the actual web API (HTTP ${replayedBundle.status()}).`,
     );
     const snapshotSql = "select to_jsonb(r) request,to_jsonb(j) job,(select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from public.parent_events e where e.request_id=r.id) events from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1";
     const beforeInvalid = (await db.query(snapshotSql, [requestId])).rows[0];

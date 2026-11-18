@@ -195,9 +195,9 @@ try {
     for (const [label, path] of [
       ["home", "/"],
       ["food-services", "/get-support?need=food"],
-      ["intake", "/get-support"],
+      ["intake", "/get-support?need=all"],
       ["snap-intake", "/get-support?need=snap_new"],
-      ["permission", "/get-support"],
+      ["permission", "/get-support?need=all"],
       ["support", "/my-support"],
       ["detail", `/support/${request.id}`],
       ["snap-detail", `/support/${request.id}`],
