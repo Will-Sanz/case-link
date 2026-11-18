@@ -1,3 +1,4 @@
+import { SPANISH_ASSISTANT_COPY } from "./assistant-copy";
 import { spanishWic } from "./wic-locale";
 import { SNAP_SPANISH_COPY } from "./snap-copy";
 export type ParentLocale = "en" | "es";
@@ -21,6 +22,7 @@ export function parentText(locale: ParentLocale, english: string): string {
 
 // shortcut: Translate remaining family surfaces before advertising a full Spanish journey.
 const spanish = {
+  ...SPANISH_ASSISTANT_COPY,
   ...spanishWic,
   "Enter a ZIP code with five digits.": "Ingrese un código postal de cinco dígitos.",
   "Enter a whole number of people from 1 to 30.": "Ingrese una cantidad entera de personas de 1 a 30.",

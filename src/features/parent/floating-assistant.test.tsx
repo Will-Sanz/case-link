@@ -3,9 +3,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { fixtureRequest } from "@/lib/parent/test-fixtures";
 import { FloatingAssistant } from "./floating-assistant";
+import { ParentLocaleProvider } from "./parent-locale";
 let pathname = "/my-support";
 let mobile = false;
-vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ refresh() {} }) }));
 const first = fixtureRequest({ intake: { ...fixtureRequest().intake, needs: ["snap_new"] } });
 const second = fixtureRequest({ id: "a430cc02-d8d4-46cc-9900-5b397758fb16", intake: { ...fixtureRequest().intake, needs: ["water"] } });
 const conversation = { messages: [], available: true, unavailableReason: null, historyLimited: false };
@@ -21,6 +22,15 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const open = () => fireEvent.click(screen.getByRole("button", { name: "Ask CaseLink for assistance" }));
+it("offers Spanish account request selection without changing service language or loading context before opening", async () => {
+  const fetch = stubRequests();
+  render(<ParentLocaleProvider initialLocale="es"><FloatingAssistant signedIn /></ParentLocaleProvider>);
+  expect(fetch).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Pedir ayuda a CaseLink" }));
+  fireEvent.change(await screen.findByLabelText("¿Con qué solicitud necesita ayuda?"), { target: { value: first.id } });
+  expect(await screen.findByText(/Su solicitud de SNAP ·/, { selector: "p" })).toBeTruthy();
+  expect(first.intake.language).toBe("en");
+});
 function stubRequests(requests = [first, second]) {
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") return json({ ok: true, id: "accepted" });
@@ -84,6 +94,14 @@ it("keeps a sole request selectable and preserves the draft after minimizing", a
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Ask CaseLink for assistance" }));
   open(); expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("What happens next?");
   expect(screen.getByRole("combobox")).toBeTruthy();
+});
+it("lets the family hide the floating button without losing an unfinished question", async () => {
+  stubRequests([first]); render(<FloatingAssistant signedIn />); open();
+  fireEvent.change(await screen.findByRole("textbox"), { target: { value: "Keep this unfinished question" } });
+  fireEvent.click(screen.getByRole("button", { name: "Hide floating button" }));
+  expect(screen.queryByRole("button", { name: "Ask CaseLink for assistance" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show CaseLink assistant" }));
+  expect((await screen.findByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep this unfinished question");
 });
 it("preserves modal cancellation and keyboard focus on a phone", async () => {
   mobile = true; stubRequests([first]);

@@ -83,6 +83,7 @@
   background: var(--color-accent-soft);
 }
 .body {
+  min-width: 0;
   min-height: 0;
   flex: 1;
   padding: 1rem;
@@ -115,9 +116,47 @@
   font-size: var(--text-sm);
 }
 .assistant .conversation {
+  grid-template-columns: minmax(0, 1fr);
   max-height: min(20rem, 40dvh);
   overflow-y: auto;
   margin-top: 0.75rem !important;
+}
+.assistant .conversation li > :first-child {
+  margin-left: 0;
+  padding: 0.5rem;
+}
+.original {
+  margin-top: 0.5rem;
+  border-left: 2px solid var(--color-rule);
+  padding-left: 0.5rem;
+}
+.original summary {
+  cursor: pointer;
+  color: var(--color-accent);
+}
+.restore {
+  transition: none;
+  margin: 1rem;
+  max-width: calc(100% - 2rem);
+  flex-wrap: wrap;
+  overflow-wrap: normal;
+}
+.recovery > div,
+.assistant .message {
+  padding: 12px;
+  min-width: 0;
+}
+.recovery > div {
+  flex-direction: column;
+}
+.recovery h2 {
+  font-size: var(--text-md);
+}
+.recovery a {
+  max-width: 100%;
+  flex-wrap: wrap;
+  padding-inline: 12px;
+  overflow-wrap: normal;
 }
 .form {
   display: grid;
@@ -166,14 +205,31 @@
     background: rgb(21 32 79 / 35%);
   }
   .body {
-    padding: 0.75rem;
+    padding: 12px;
   }
   .header {
-    padding: 0.75rem;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 44px;
+    gap: 0.5rem;
+    padding: 12px;
+  }
+  .header > :first-child {
+    width: 40px;
+    height: 40px;
+  }
+  .header > div {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+  .close {
+    grid-column: 3;
+    grid-row: 1;
   }
 }
 @media print {
   .launcher,
+  .restore,
   .window {
     display: none !important;
   }

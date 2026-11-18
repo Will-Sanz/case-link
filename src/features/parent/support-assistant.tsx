@@ -7,9 +7,11 @@ import {
 } from "@/lib/parent/assistant-contract";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { PROGRAMS } from "@/lib/parent/programs";
+import { assistantIntroDisplay, assistantParagraphDisplay, assistantSourceDisplay } from "@/lib/parent/assistant-display";
 import { displayDate, parentApi } from "./api";
 import { ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 import chatStyles from "./floating-assistant.module.css";
 
@@ -24,12 +26,14 @@ export function SupportAssistant({
   onAnswer?: () => void;
   onRefresh?: () => void;
 }) {
+  const { t, locale } = useParentLocale();
   const path = `/requests/${request.id}/assistant`;
   const { data, error, loading, reload, reloadIfIdle } =
     useParentResource<ParentAssistantConversation>(path);
   const [question, setQuestion] = useState("");
   const [pending, setPending] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [retryQuestion, setRetryQuestion] = useState(false);
   const [notice, setNotice] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
@@ -64,6 +68,7 @@ export function SupportAssistant({
     event.preventDefault();
     setNotice("");
     setSendError("");
+    setRetryQuestion(false);
     if (!data?.available || error || pending) return;
     const text = question.trim();
     const idempotencyKey =
@@ -77,7 +82,7 @@ export function SupportAssistant({
     });
     if (!parsed.success) {
       setSendError(
-        parsed.error.issues[0]?.message ?? "Check your question.",
+        parsed.error.issues.find(issue => issue.code === "custom")?.message ?? "Enter a question using 1 to 2,000 characters.",
       );
       return;
     }
@@ -94,6 +99,7 @@ export function SupportAssistant({
       setNotice("Your question is saved. Its answer will appear here.");
       reload();
     } catch (err) {
+      setRetryQuestion(true);
       setSendError(
         err instanceof Error
           ? err.message
@@ -124,54 +130,52 @@ export function SupportAssistant({
   }
   return (
     <section
+      lang={locale}
       className={chatStyles.assistant}
-      aria-label="Ask about your saved request"
+      aria-label={t("Ask about your saved request")}
     >
       <div className={styles.between}>
         <h2 className={chatStyles.sectionTitle}>
           <ChatBubble width={22} height={22} aria-hidden="true" />
-          Your conversation
-        </h2>
+          {t("Your conversation")}</h2>
         <button
           className={styles.quiet}
           onClick={() => {
             reload();
             onRefresh?.();
           }}
-          aria-label="Refresh assistant conversation"
+          aria-label={t("Refresh assistant conversation")}
         >
           <Refresh width={16} height={16} aria-hidden="true" />
-          Refresh
-        </button>
+          {t("Refresh")}</button>
       </div>
       {loading && (
         <p role="status" className={styles.hint}>
-          Loading your conversation…
-        </p>
+          {t("Loading your conversation…")}</p>
       )}
       {error && (
-        <ServiceError
+        <div className={chatStyles.recovery}><ServiceError
           error={error}
           retry={reload}
           returnTo={`/support/${request.id}`}
-        />
+        /></div>
       )}
       {data && !data.available && (
-        <p className={styles.notice} role="status">
-          {data.unavailableReason ??
-            "The assistant is unavailable. Your recorded progress and direct program options remain below."}
+        <p className={`${styles.notice} ${chatStyles.message}`} role="status" lang={data.unavailableReason && t(data.unavailableReason) === data.unavailableReason ? "" : locale}>
+          {t(data.unavailableReason ??
+            "The assistant is unavailable. Your recorded progress and direct program options remain below.")}
         </p>
       )}
       {cancelError && (
-        <p className={styles.error} role="alert">
-          {cancelError}
+        <p className={`${styles.error} ${chatStyles.message}`} role="alert" lang={t(cancelError) === cancelError ? "" : locale}>
+          {t(cancelError)}
         </p>
       )}
       {!!data?.messages?.length && (
         <ol
           ref={conversation}
           className={`${styles.conversation} ${chatStyles.conversation}`}
-          aria-label="Conversation about this request"
+          aria-label={t("Conversation about this request")}
           tabIndex={0}
           onScroll={(event) => {
             const list = event.currentTarget;
@@ -182,20 +186,26 @@ export function SupportAssistant({
           {data.messages.map((message) => (
             <li key={message.id}>
               <div className={styles.questionBubble}>
-                <strong>You</strong>
-                <p>{message.question}</p>
+                <strong>{t("You")}</strong>
+                <p lang="">{message.question}</p>
                 <time dateTime={message.created_at}>
-                  {displayDate(message.created_at, true)}
+                  {displayDate(message.created_at, true, locale)}
                 </time>
               </div>
               <div className={styles.answerBubble}>
-                <strong>CaseLink AI</strong>
+                <strong>{t("CaseLink AI")}</strong>
                 {message.status === "answered" && message.answer ? (
                   <>
-                    <p>{message.answer.intro}</p>
-                    {message.answer.paragraphs.map((paragraph, index) => (
+                    <p lang={assistantIntroDisplay(message.answer.intro, locale).language}>{assistantIntroDisplay(message.answer.intro, locale).text}</p>
+                    {message.answer.paragraphs.map((paragraph, index) => {
+                      const display = assistantParagraphDisplay(paragraph, locale);
+                      const source = assistantSourceDisplay(paragraph.sourceLabel, locale);
+                      return (
                       <div key={index} className={styles.answerParagraph}>
-                        <p>{paragraph.text}</p>
+                        {display.original?.language === "en" && <p className={styles.hint}>{t("CaseLink explanation in Spanish")}</p>}
+                        <p>{display.parts.map((part, partIndex) => <span key={partIndex} lang={part.language}>{part.text}</span>)}</p>
+                        {locale === "es" && !display.translated && <p className={styles.hint}>{t("This saved text is shown in its original language.")}</p>}
+                        {display.original && <details className={chatStyles.original}><summary>{t(display.original.language === "en" ? "Original English source text" : "Original saved text")}</summary><p lang={display.original.language}>{display.original.text}</p></details>}
                         <p className={styles.answerSource}>
                           {paragraph.sourceUrl &&
                           PROGRAMS.some(
@@ -207,17 +217,17 @@ export function SupportAssistant({
                               className={styles.textLink}
                               href={paragraph.sourceUrl}
                             >
-                              {paragraph.sourceLabel}
+                              <span lang={source.language}>{source.text}</span>
                             </a>
                           ) : (
-                            paragraph.sourceLabel
+                            <span lang={source.language}>{source.text}</span>
                           )}
                           {paragraph.recordedAt && (
-                            <> · {displayDate(paragraph.recordedAt, true)}</>
+                            <> · {displayDate(paragraph.recordedAt, true, locale)}</>
                           )}
                         </p>
                       </div>
-                    ))}
+                    ); })}
                     {message.answer.actionIds.map((id) => {
                       const action = request.required_actions.find(
                         (item) =>
@@ -233,27 +243,27 @@ export function SupportAssistant({
                           href={`/support/${request.id}#step-${encodeURIComponent(id)}`}
                           onClick={onAction}
                         >
-                          Go to your step: {action.title}
+                          {t("Go to your step:")}{" "}<span lang="">{action.title}</span>
                         </a>
                       ) : null;
                     })}
                     <time dateTime={message.updated_at}>
-                      Answer recorded {displayDate(message.updated_at, true)}
+                      {t("Answer recorded")}{" "}{displayDate(message.updated_at, true, locale)}
                     </time>
                   </>
                 ) : message.status === "failed" ? (
-                  <p className={styles.error}>
-                    {message.error ??
-                      "This question could not be answered. Check the recorded progress or try asking again."}
+                  <p className={`${styles.error} ${chatStyles.message}`} lang={message.error && t(message.error) === message.error ? "" : locale}>
+                    {t(message.error ??
+                      "This question could not be answered. Check the recorded progress or try asking again.")}
                   </p>
                 ) : (
                   <>
                     <p className={styles.hint} role="status">
-                      {message.status === "running"
+                      {t(message.status === "running"
                         ? "Reading the saved information for your answer…"
                         : data.available
                           ? "Question saved. Waiting for the assistant to begin."
-                          : "Question saved; an active assistant connection cannot be confirmed."}
+                          : "Question saved; an active assistant connection cannot be confirmed.")}
                     </p>
                     <button
                       type="button"
@@ -261,9 +271,9 @@ export function SupportAssistant({
                       disabled={cancelling !== null}
                       onClick={() => cancelQuestion(message.id)}
                     >
-                      {cancelling === message.id
+                      {t(cancelling === message.id
                         ? "Stopping answer…"
-                        : "Cancel question"}
+                        : "Cancel question")}
                     </button>
                   </>
                 )}
@@ -274,37 +284,34 @@ export function SupportAssistant({
       )}
       {data?.historyLimited && (
         <p className={styles.hint}>
-          Showing your latest 40 questions. Your{" "}
+          {t("Showing your latest 40 questions. Your")}{" "}
           <a className={styles.textLink} href="/api/parent/account/export">
-            information download
-          </a>{" "}
-          includes retained earlier messages.
-        </p>
+            {t("information download")}</a>{" "}
+          {t("includes retained earlier messages.")}</p>
       )}
       <form className={chatStyles.form} onSubmit={submit}>
         <div className={styles.field}>
           <label htmlFor="assistant-question">
-            Your question about this request
-          </label>
+            {t("Your question about this request")}</label>
           <textarea
             id="assistant-question"
             className={`${styles.textarea} ${chatStyles.composer}`}
             rows={3}
-            placeholder="Ask a question about this request…"
+            placeholder={t("Ask a question about this request…")}
             required
             maxLength={2000}
             value={question}
             onChange={(event) => {
               setQuestion(event.target.value);
               setSendError("");
+              setRetryQuestion(false);
             }}
             aria-describedby="assistant-privacy"
             disabled={pending}
           />
           <p id="assistant-privacy" className={styles.hint}>
-            By sending, you agree to use your question, saved account preferences and relevant request details with OpenAI to answer.
-            Keep identity numbers, passwords and PINs out of chat.
-          </p>
+            {t("By sending, you agree to use your question, saved account preferences and relevant request details with OpenAI to answer. Keep identity numbers, passwords and PINs out of chat.")}</p>
+          <p className={styles.hint}>{t("Changing the screen language does not change your saved service language. Program language services must be confirmed.")}</p>
         </div>
         <div className={styles.between}>
           <button
@@ -316,20 +323,21 @@ export function SupportAssistant({
               !question.trim()
             }
           >
-            {pending ? "Sending…" : "Send"}
+            {t(pending ? "Sending…" : retryQuestion ? "Retry the same question" : "Send")}
             <ArrowRight width={17} height={17} aria-hidden="true" />
           </button>
         </div>
         {notice && (
-          <p className={styles.success} role="status">
-            {notice}
+          <p className={`${styles.success} ${chatStyles.message}`} role="status">
+            {t(notice)}
           </p>
         )}
         {sendError && (
-          <p className={styles.error} role="alert">
-            {sendError}
+          <p className={`${styles.error} ${chatStyles.message}`} role="alert" lang={t(sendError) === sendError ? "" : locale}>
+            {t(sendError)}
           </p>
         )}
+        {sendError && retryQuestion && <p className={styles.hint}>{t("Your draft is kept here. If the connection is available, retry the same question.")}</p>}
       </form>
     </section>
   );

@@ -10,6 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ParentAssistantConversation } from "@/lib/parent/assistant-contract";
 import { fixtureRequest } from "@/lib/parent/test-fixtures";
 import { SupportAssistant } from "./support-assistant";
+import { ParentLocaleProvider, ParentLanguageSelector } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
 
 const conversation = (
   overrides: Partial<ParentAssistantConversation> = {},
@@ -31,6 +33,17 @@ afterEach(() => {
 });
 
 describe("request-connected assistant", () => {
+  it("renders an older grounded saved answer in Spanish and switches back without changing its values or service preference", async () => {
+    const request = fixtureRequest();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(conversation({ messages: [{ id: "legacy", question: "¿Cuál es mi código?", status: "answered", answer: { intro: "Here is the latest recorded information for your request.", paragraphs: [{ text: "Your saved household ZIP code is 19104.", sourceLabel: "Your intake", recordedAt: "2026-10-26T16:00:00Z" }], actionIds: [] }, error: null, created_at: "2026-10-26T16:00:00Z", updated_at: "2026-10-26T16:01:00Z" }] }))));
+    render(<ParentLocaleProvider initialLocale="es"><ParentLanguageSelector/><SupportAssistant request={request}/></ParentLocaleProvider>);
+    expect((await screen.findByText("19104", { exact: true })).closest("p")?.textContent).toBe("El código postal guardado de su hogar es 19104.");
+    expect(screen.getByRole("textbox", { name: "Su pregunta sobre esta solicitud" })).toBeTruthy();
+    expect(screen.getByText("¿Cuál es mi código?").getAttribute("lang")).toBe("");
+    fireEvent.change(screen.getByRole("combobox", { name: /Idioma de pantalla/ }), { target: { value: "en" } });
+    expect(screen.getByText("Your saved household ZIP code is 19104.")).toBeTruthy();
+    expect(request.intake.language).toBe("en");
+  });
   it("refreshes current request steps when a completed answer arrives", async () => {
     const onAnswer = vi.fn();
     vi.stubGlobal(
@@ -186,7 +199,7 @@ describe("request-connected assistant", () => {
     expect((question as HTMLTextAreaElement).value).toBe(
       "What do I need to do next?",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry the same question" }));
     await waitFor(() => expect(posts).toHaveLength(2));
     expect(posts[0].body).toBe(posts[1].body);
     expect(JSON.parse(String(posts[1].body))).toMatchObject({
@@ -197,6 +210,24 @@ describe("request-connected assistant", () => {
       "Your question is saved. Its answer will appear here.",
     );
     expect((question as HTMLTextAreaElement).value).toBe("");
+  });
+  it("keeps an uncertain Spanish question and its exact save key through a screen-language change", async () => {
+    const posts: string[] = [], request = fixtureRequest();
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method !== "POST") return json(conversation());
+      posts.push(String(init.body)); if (posts.length === 1) throw new Error("SYNTHETIC original connection error");
+      return json({ ok: true, id: "accepted" });
+    }));
+    render(<ParentLocaleProvider initialLocale="es"><ParentLanguageSelector/><SupportAssistant request={request}/></ParentLocaleProvider>);
+    const input = await screen.findByRole("textbox", { name: "Su pregunta sobre esta solicitud" });
+    fireEvent.change(input, { target: { value: "¿Qué paso sigue?" } }); fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect((await screen.findByRole("alert")).getAttribute("lang")).toBe("es");
+    expect(screen.getByRole("alert").textContent).not.toContain("SYNTHETIC");
+    expect(screen.getByRole("button", { name: "Reintentar la misma pregunta" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: /Idioma de pantalla/ }), { target: { value: "en" } });
+    fireEvent.click(screen.getByRole("button", { name: "Retry the same question" }));
+    await screen.findByText("Your question is saved. Its answer will appear here.");
+    expect(posts).toHaveLength(2); expect(posts[1]).toBe(posts[0]); expect(JSON.parse(posts[1])).not.toHaveProperty("language"); expect(request.intake.language).toBe("en");
   });
   it("shows worker unavailability without pretending a queued question is being answered", async () => {
     vi.stubGlobal(
