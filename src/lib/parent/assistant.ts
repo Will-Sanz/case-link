@@ -26,6 +26,7 @@ export type AssistantFact = ParentAssistantAnswer["paragraphs"][number] & {
 };
 export type AssistantSnapshot = {
   request: SupportRequest;
+  account?: unknown;
   progress?: { summary: string; updatedAt?: string };
   runtime: { planningReady: boolean; assistantReady: boolean };
   operations: {
@@ -49,6 +50,14 @@ const safeText = (value: unknown): value is string =>
   value.length > 0 &&
   value.length <= 1500 &&
   !hasExcludedAssistantInformation(value);
+
+const accountContextSchema = z.object({
+  language: z.enum(["en", "es"]),
+  contactPreference: z.enum(["in_app", "email"]),
+  quietHoursStart: z.number().int().min(0).max(23),
+  quietHoursEnd: z.number().int().min(0).max(23),
+  updatedAt: z.iso.datetime({ offset: true }),
+}).strict();
 
 /** A model can choose supported evidence; it cannot manufacture wording, receipt status, recipients or actions. */
 export function buildAssistantFacts(
@@ -85,6 +94,15 @@ export function buildAssistantFacts(
     closed:
       "This support request is closed. Asking a question does not reopen it or start another application.",
   };
+  const account = accountContextSchema.safeParse(snapshot.account);
+  if (account.success && Date.parse(account.data.updatedAt) <= now.getTime()) {
+    const preferences = account.data;
+    add("account-language", `Your saved account service language is ${preferences.language === "es" ? "Spanish" : "English"}.`, "Your account preferences", preferences.updatedAt);
+    add("account-updates", preferences.contactPreference === "email"
+      ? "Your account preference is email and My support updates. Email delivery still requires a verified, connected channel."
+      : "Your account preference is to receive updates only in My support.", "Your account preferences", preferences.updatedAt);
+    add("account-quiet-hours", `Your saved quiet hours for routine updates are from ${preferences.quietHoursStart}:00 to ${preferences.quietHoursEnd}:00. Urgent service guidance remains available in My support.`, "Your account preferences", preferences.updatedAt);
+  }
   add(
     "request-status",
     statusText[request.status],
@@ -522,6 +540,7 @@ export async function runOneParentAssistantTurn(options: {
       leaseToken: z.uuid(),
       question: z.string().max(2000),
       request: z.record(z.string(), z.unknown()),
+      account: z.unknown().optional(),
       operations: z.array(z.record(z.string(), z.unknown())),
       reports: z.array(z.record(z.string(), z.unknown())),
       documents: z.array(z.record(z.string(), z.unknown())),

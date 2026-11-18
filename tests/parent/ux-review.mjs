@@ -94,6 +94,8 @@ try {
             },
           },
         };
+      else if (url.pathname === "/api/parent/requests" && method === "GET")
+        body = { ok: true, requests: [activeRequest] };
       else if (url.pathname.endsWith("/authorization-window"))
         body = {
           ok: true,
@@ -348,11 +350,9 @@ try {
       "A draft about this request",
       "Minimizing must preserve the unsent draft.",
     );
-    assert.equal(
-      await chat.getByRole("checkbox").isChecked(),
-      false,
-      "Opening chat must never authorize AI processing automatically.",
-    );
+    assert.equal(await chat.getByRole("checkbox").count(), 0);
+    await chat.getByText(/By sending, you agree/).waitFor();
+    assert.equal(await chat.getByRole("combobox").inputValue(), request.id);
     if (width < 600) {
       await chat.getByRole("button", { name: "Minimize chat" }).focus();
       await page.keyboard.press("Shift+Tab");
@@ -385,14 +385,7 @@ try {
     await page
       .getByLabel("Your question about this request")
       .fill("What happens next?");
-    await page
-      .getByLabel(
-        /Use my question and relevant saved request details with OpenAI/,
-      )
-      .check();
-    await page
-      .getByRole("button", { name: "Ask CaseLink", exact: true })
-      .click();
+    await chat.getByRole("button", { name: "Send", exact: true }).click();
     await page
       .getByText("Question saved. Waiting for the assistant to begin.")
       .waitFor();
