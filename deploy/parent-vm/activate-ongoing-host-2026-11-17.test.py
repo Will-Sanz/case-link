@@ -30,6 +30,21 @@ class ExistingHostActivation(unittest.TestCase):
         with self.assertRaises(AssertionError):
             operator.ongoing_profile({**self.profile('sender'), 'sendingApproved': True}, 'sender')
 
+    def test_rollback_backup_can_be_reused_only_if_exact_and_private(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'profile.json'
+            path.write_bytes(b'original')
+            path.chmod(0o600)
+            metadata = path.stat()
+            backup = operator.backup_private(path, b'original', metadata)
+            self.assertEqual(operator.backup_private(path, b'original', metadata), backup)
+            with self.assertRaises(AssertionError):
+                operator.backup_private(path, b'changed', metadata)
+            self.assertEqual(backup.read_bytes(), b'original')
+            backup.chmod(0o644)
+            with self.assertRaises(AssertionError):
+                operator.backup_private(path, b'original', metadata)
+
     def test_atomic_private_replacement_preserves_owner_and_rejects_symlinks(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'profile.json'
