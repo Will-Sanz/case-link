@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { assessFoodSupport, foodAssessmentSchema, type FoodAssessmentAnswers, type FoodRecommendation } from "@/lib/parent/food-assessment";
+import { assessFoodSupport, foodAssessmentSchema, type FoodAssessmentAnswers, type FoodAssessmentHandoff, type FoodRecommendation } from "@/lib/parent/food-assessment";
 import styles from "./parent.module.css";
 
 const copy = {
   en: {
-    title: "Let's find food support that works for your family.", intro: "Answer a few short questions. You do not need to know any program names. These choices stay on this page; nothing starts until you authorize a specific request.",
+    title: "Let's find food support that works for your family.", intro: "Answer a few short questions. You do not need to know any program names. Your choices stay in this tab. When you continue, CaseLink checks them for your signed-in account before you authorize a specific request.",
     immediate: "Need food today?", direct: "Find food now", directNote: "No account needed. A listing does not confirm food in stock or a reservation.",
     enough: "Do you have enough food for today and tomorrow?", yes: "Yes", no: "No", unknown: "I'm not sure", select: "Choose an answer",
     history: "Do you get help paying for groceries, sometimes called SNAP or food stamps, or have you received it before?", never: "No, and I have not applied", applied: "I applied and am waiting", receiving: "I receive it now, or received it before",
@@ -19,7 +19,7 @@ const copy = {
     control: "Nothing has started. Each link opens that path's facts and exact permission. Other options remain proposed; choosing one does not start the others.", change: "Change my answers", english: "These guided questions are available in Spanish. The following account and application screens currently remain in English.",
   },
   es: {
-    title: "Busquemos apoyo alimentario para su familia.", intro: "Responda unas preguntas breves. No necesita conocer los nombres de los programas. Sus respuestas permanecen en esta página; nada comienza hasta que autorice una solicitud específica.",
+    title: "Busquemos apoyo alimentario para su familia.", intro: "Responda unas preguntas breves. No necesita conocer los nombres de los programas. Sus respuestas permanecen en esta pestaña. Al continuar, CaseLink comprueba las opciones para su cuenta antes de que autorice una solicitud específica.",
     immediate: "¿Necesita comida hoy?", direct: "Buscar comida ahora", directNote: "No necesita una cuenta. Un lugar en la lista no confirma que haya comida disponible ni una reserva.",
     enough: "¿Tiene suficiente comida para hoy y mañana?", yes: "Sí", no: "No", unknown: "No estoy seguro/a", select: "Elija una respuesta",
     history: "¿Recibe ayuda para comprar alimentos, a veces llamada SNAP o cupones de alimentos, o la recibió antes?", never: "No, y no he presentado una solicitud", applied: "Presenté una solicitud y estoy esperando", receiving: "La recibo ahora o la recibí antes",
@@ -32,10 +32,11 @@ const copy = {
   },
 } as const;
 
-export function FoodAssessment() {
-  const [language, setLanguage] = useState<"en" | "es">("en");
-  const [answers, setAnswers] = useState({ foodForTwoDays: "", benefitHistory: "", existingIssue: null } as { foodForTwoDays: string; benefitHistory: string; existingIssue: string | null });
-  const [paths, setPaths] = useState<FoodRecommendation[] | null>(null);
+export function FoodAssessment({ initial, onChoose }: { initial?: FoodAssessmentHandoff; onChoose?: (value: FoodAssessmentHandoff) => void }) {
+  const [language, setLanguage] = useState<"en" | "es">(initial?.language ?? "en");
+  const [languageChosen, setLanguageChosen] = useState(initial?.languageChosen ?? false);
+  const [answers, setAnswers] = useState(initial?.answers ?? { foodForTwoDays: "", benefitHistory: "", existingIssue: null } as { foodForTwoDays: string; benefitHistory: string; existingIssue: string | null });
+  const [paths, setPaths] = useState<FoodRecommendation[] | null>(initial ? assessFoodSupport(initial.answers) : null);
   const resultTitle = useRef<HTMLHeadingElement>(null);
   const firstAnswer = useRef<HTMLSelectElement>(null);
   const c = copy[language];
@@ -49,7 +50,8 @@ export function FoodAssessment() {
   const reason = (path: FoodRecommendation) => ({ immediate: c.immediateReason, new: c.new, pending: c.pending, renewal: c.renewalReason, problem: c.problem })[path.reason];
   return <section lang={language} aria-labelledby="food-assessment-title" className={styles.section}>
     <label className={styles.label} htmlFor="food-guide-language">Language / Idioma</label>
-    <select id="food-guide-language" className={styles.select} value={language} onChange={event => setLanguage(event.target.value as "en" | "es")}><option value="en">English</option><option value="es">Español</option></select>
+    <select id="food-guide-language" className={styles.select} value={language} onChange={event => { setLanguage(event.target.value as "en" | "es"); setLanguageChosen(true); }}><option value="en">English</option><option value="es">Español</option></select>
+    <p className={styles.hint}>{language === "es" ? "Su selección también indica el idioma de servicio que prefiere para esta solicitud; no confirma la disponibilidad de un intérprete." : "Your selection also sets your preferred service language for this request; it does not confirm interpreter availability."}</p>
     <h1 id="food-assessment-title">{c.title}</h1><p>{c.intro}</p>
     <aside className={styles.notice} aria-label={c.immediate}><div><h2>{c.immediate}</h2><a className={styles.textLink} href="https://www.phila.gov/food/">{c.direct}</a><p>{c.directNote}</p></div></aside>
     {paths === null ? <form className={styles.form} onSubmit={submit}>
@@ -70,7 +72,7 @@ export function FoodAssessment() {
       <h2 id="food-guide-results" tabIndex={-1} ref={resultTitle}>{c.results}</h2>
       {answers.benefitHistory === "not_sure" && <p>{c.unknownResult}</p>}
       {!paths.length && answers.benefitHistory !== "not_sure" && <p>{c.empty}</p>}
-      {paths.map(path => <section key={path.need} className={styles.serviceOption}><div><h3>{c.titles[path.need as keyof typeof c.titles]}</h3><p>{reason(path)}</p><Link className={styles.textLink} href={`/get-support?need=${path.need}`}>{c.titles[path.need as keyof typeof c.titles]}</Link></div></section>)}
+      {paths.map(path => <section key={path.need} className={styles.serviceOption}><div><h3>{c.titles[path.need as keyof typeof c.titles]}</h3><p>{reason(path)}</p>{onChoose ? <button type="button" className={styles.secondary} onClick={() => onChoose({ need: path.need, answers: foodAssessmentSchema.parse(answers), language, languageChosen })}>{c.titles[path.need as keyof typeof c.titles]}</button> : <Link className={styles.textLink} href={`/get-support?need=${path.need}`}>{c.titles[path.need as keyof typeof c.titles]}</Link>}</div></section>)}
       <p>{c.control}</p><button className={styles.secondary} onClick={() => { setPaths(null); requestAnimationFrame(() => firstAnswer.current?.focus()); }}>{c.change}</button>
     </div>}
     {language === "es" && <p className={styles.notice}>{c.english}</p>}

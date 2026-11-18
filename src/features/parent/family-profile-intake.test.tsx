@@ -8,6 +8,8 @@ import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION } from 
 import { PECO_APPLICATION_NOTICE_VERSION } from "@/lib/parent/peco-application-fields";
 import { PGW_APPLICATION_NOTICE_VERSION } from "@/lib/parent/pgw-application-fields";
 import { WATER_APPLICATION_NOTICE_VERSION } from "@/lib/parent/water-application-fields";
+import { assessFoodSupport } from "@/lib/parent/food-assessment";
+import { getProgramsForNeeds } from "@/lib/parent/programs";
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 const now = new Date("2026-11-17T18:00:00Z"), personId = "11111111-1111-4111-8111-111111111111", childId = "22222222-2222-4222-8222-222222222222", requestId = "33333333-3333-4333-8333-333333333333";
@@ -33,6 +35,8 @@ function api(profile: () => unknown | Promise<unknown> = saved) {
       pgwApplication: { collectionEnabled: true, noticeVersion: PGW_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" },
       waterApplication: { collectionEnabled: true, noticeVersion: WATER_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" } } });
     if (url.endsWith("/intake-defaults")) return reply({ zip: null });
+    if (url.endsWith("/food-assessment")) return reply({ ownerId: personId, candidates: assessFoodSupport(JSON.parse(String(init?.body)).answers).map(path => ({ ...path,
+      programs: getProgramsForNeeds([path.need]).map(program => ({ programId: program.id, actions: [] })) })) });
     if (url.endsWith("/requests") && init?.method === "POST") return reply({ request: { id: requestId } });
     return reply({ capabilities: [] });
   }); vi.stubGlobal("fetch", fetcher); return fetcher;
@@ -62,6 +66,22 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now)
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("saved family information in actual application intake", () => {
+  it("keeps explicit guided language while reusing other original-dated SNAP profile facts", async () => {
+    const fetcher = api(); render(<ParentIntake initialNeed="food"/>);
+    fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: "es" } });
+    fireEvent.change(screen.getByLabelText(/suficiente comida/), { target: { value: "no" } });
+    fireEvent.change(screen.getByLabelText(/ayuda para comprar/), { target: { value: "never" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar SNAP" }));
+    await waitFor(() => expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Saved"));
+    expect((document.querySelector('[data-snap-path="language"]') as HTMLSelectElement).value).toBe("es");
+    await completeSnapQuestions(); await authorize();
+    await waitFor(() => expect(navigation.push).toHaveBeenCalled());
+    const packet = JSON.parse(String(fetcher.mock.calls.find(([url, init]) => url.endsWith("/requests") && init?.method === "POST")![1]!.body));
+    expect(packet.intake).toMatchObject({ language: "es", urgency: "today" }); expect(packet.details.language).toBe("es");
+    expect(packet.familyProfileSource.fields.some((field: { applicationPath: string }) => field.applicationPath === "language")).toBe(false);
+    expect(packet.familyProfileSource.fields.some((field: { applicationPath: string }) => field.applicationPath === "applicant.firstName")).toBe(true);
+  });
   it("does not fetch private family details for ordinary food routing", async () => {
     const fetcher = api(); render(<ParentIntake initialNeed="food_now"/>); await screen.findByLabelText("Household ZIP code");
     expect(fetcher.mock.calls.some(([url]) => url.endsWith("/family-profile"))).toBe(false);

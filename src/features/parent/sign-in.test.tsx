@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ParentSignIn } from "./sign-in";
+import { ParentApiError } from "./api";
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -64,6 +65,31 @@ describe("pending sign-in fields", () => {
 
 
 describe("deletion sign-in purpose", () => {
+  it("requires deletion authentication after an inline account-check failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetchMock);
+    const complete = vi.fn().mockRejectedValue(new Error("Synthetic account check unavailable"));
+    const { rerender } = render(<ParentSignIn onSignedIn={complete}/>);
+    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "existing@example.test" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" })); await screen.findByRole("alert");
+    rerender(<ParentSignIn deletionOnly onSignedIn={complete}/>);
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/account?delete=1"));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).action).toBe("sign_in_for_deletion");
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+  it("requires authentication again when the inline owner check rejects the session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetchMock);
+    const complete = vi.fn().mockRejectedValue(new ParentApiError("Sign in again.", 401));
+    render(<ParentSignIn onSignedIn={complete}/>);
+    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "existing@example.test" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" })); await screen.findByRole("alert");
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry account check" })).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
   it("uses password-only deletion authentication and an exact deletion return, preserving original-site recovery", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetchMock);
     render(<ParentSignIn deletionOnly returnTo="https://attacker.example.test" existingAccountRecovery recoveryHref="https://original.example.test/forgot-password" />);

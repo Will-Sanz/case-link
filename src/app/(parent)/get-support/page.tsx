@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { ParentIntake } from "@/features/parent/intake";
+import { canonicalProjectOrigin } from "@/lib/parent/project-origin";
+import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
 export const metadata: Metadata = { title: "Get support" };
 export default async function GetSupportPage({
   searchParams,
@@ -7,5 +9,9 @@ export default async function GetSupportPage({
   searchParams: Promise<{ need?: string }>;
 }) {
   const { need } = await searchParams;
-  return <ParentIntake initialNeed={need ?? "food"} />;
+  const existing = process.env.CASELINK_PARENT_ACCOUNT_MODE === "existing";
+  const recovery = canonicalProjectOrigin(process.env.CASELINK_PARENT_RECOVERY_SITE_URL);
+  return <ParentIntake initialNeed={need ?? "food"} signInOptions={{ existingAccountRecovery: existing,
+    recoveryHref: existing && recovery?.startsWith("https://") ? `${recovery}/forgot-password` : undefined,
+    emailCodeAvailable: parentEmailCodeEnabled(process.env) }}/>;
 }

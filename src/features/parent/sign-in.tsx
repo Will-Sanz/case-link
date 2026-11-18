@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Lock, Mail } from "iconoir-react";
 import { AUTH_LINK_ERROR_MESSAGE } from "@/lib/auth/safe-client-auth-message";
-import { parentApi, safeReturnPath } from "./api";
+import { parentApi, ParentApiError, safeReturnPath } from "./api";
 import styles from "./parent.module.css";
 
 const subscribeReady = () => () => {};
@@ -17,6 +17,7 @@ export function ParentSignIn({
   recoveryHref = "/forgot-password",
   emailCodeAvailable = true,
   authNotice,
+  onSignedIn,
 }: {
   returnTo?: string;
   deletionOnly?: boolean;
@@ -24,6 +25,7 @@ export function ParentSignIn({
   recoveryHref?: string;
   emailCodeAvailable?: boolean;
   authNotice?: "password-reset-success" | "auth-link-error";
+  onSignedIn?: () => void | Promise<void>;
 }) {
   const router = useRouter();
   const allowEmailCode = emailCodeAvailable && !deletionOnly;
@@ -34,6 +36,7 @@ export function ParentSignIn({
   const [token, setToken] = useState("");
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState(
     authNotice === "auth-link-error" ? AUTH_LINK_ERROR_MESSAGE : "",
   );
@@ -41,6 +44,7 @@ export function ParentSignIn({
   const codeInput = useRef<HTMLInputElement>(null);
   const effectiveMethod = deletionOnly ? "password" : method;
   const codeSent = !deletionOnly && sent;
+  const accountCheckOnly = signedIn && !deletionOnly && !!onSignedIn;
   useEffect(() => {
     if (codeSent) codeInput.current?.focus();
   }, [codeSent]);
@@ -50,7 +54,7 @@ export function ParentSignIn({
     setPending(true);
     setError("");
     try {
-      await parentApi("/auth", {
+      if (!accountCheckOnly) await parentApi("/auth", {
         method: "POST",
         body: JSON.stringify(
           effectiveMethod === "password"
@@ -60,14 +64,17 @@ export function ParentSignIn({
               : { action: "send_code", email },
         ),
       });
-      if (effectiveMethod === "password" || codeSent) {
+      if (accountCheckOnly || effectiveMethod === "password" || codeSent) {
         setPassword("");
-        router.replace(deletionOnly ? "/account?delete=1" : safeReturnPath(returnTo));
+        setToken("");
+        if (onSignedIn && !deletionOnly) { setSignedIn(true); await onSignedIn(); }
+        else router.replace(deletionOnly ? "/account?delete=1" : safeReturnPath(returnTo));
         router.refresh();
       } else {
         setSent(true);
       }
     } catch (err) {
+      if (err instanceof ParentApiError && [401, 403].includes(err.status)) setSignedIn(false);
       setError(
         err instanceof Error
           ? err.message
@@ -122,10 +129,10 @@ export function ParentSignIn({
       <section className={styles.surface} aria-labelledby="signin-title">
         <div className={styles.formHeader}>
           <h2 id="signin-title">
-            {codeSent ? "Check your email" : deletionOnly ? "Sign in to manage deletion" : "Welcome to CaseLink"}
+            {accountCheckOnly ? "Check your account access" : codeSent ? "Check your email" : deletionOnly ? "Sign in to manage deletion" : "Welcome to CaseLink"}
           </h2>
           <p>
-            {codeSent ? (
+            {accountCheckOnly ? "You are signed in. Recheck access to continue with the answers kept in this tab." : codeSent ? (
               <>
                 Enter the code sent to <strong>{email}</strong>. It may take a
                 moment to arrive.
@@ -139,7 +146,7 @@ export function ParentSignIn({
         </div>
         {deletionOnly && <p className={styles.hint}>This sign-in checks access to your existing parent-support data for deletion. It does not create an account, reopen support work or authorize new collection.</p>}
         <form className={styles.form} onSubmit={submit}>
-          {!codeSent ? (
+          {!accountCheckOnly && (!codeSent ? (
             <div className={styles.field}>
               <label htmlFor="parent-email">Your email address</label>
               <input
@@ -182,8 +189,8 @@ export function ParentSignIn({
                 Use the newest code. Never share it with anyone.
               </p>
             </div>
-          )}
-          {effectiveMethod === "password" && (
+          ))}
+          {!accountCheckOnly && effectiveMethod === "password" && (
             <div className={styles.field}>
               <label htmlFor="parent-password">Password</label>
               <input
@@ -211,10 +218,10 @@ export function ParentSignIn({
           )}
           {error && (
             <div className={styles.error} role="alert">
-              {error}{" "}
+              <p>{error}{" "}
               <Link className={styles.textLink} href="/support/help">
                 See direct support options
-              </Link>
+              </Link></p>
             </div>
           )}
           {authNotice === "password-reset-success" && (
@@ -233,10 +240,10 @@ export function ParentSignIn({
             type="submit"
           >
             {pending
-              ? effectiveMethod === "password" || codeSent
+              ? accountCheckOnly ? "Checking your account…" : effectiveMethod === "password" || codeSent
                 ? "Signing you in…"
                 : "Sending your code…"
-              : effectiveMethod === "password" || codeSent
+              : accountCheckOnly ? "Retry account check" : effectiveMethod === "password" || codeSent
                 ? "Sign in"
                 : "Email me a code"}{" "}
             {effectiveMethod === "password" || codeSent ? (
@@ -246,7 +253,7 @@ export function ParentSignIn({
             )}
           </button>
         </form>
-        {allowEmailCode && (
+        {!accountCheckOnly && allowEmailCode && (
           <button
             className={`${styles.quiet} ${styles.space}`}
             disabled={!ready || pending}
@@ -264,7 +271,7 @@ export function ParentSignIn({
               : "Use my CaseLink password"}
           </button>
         )}
-        {codeSent && (
+        {!accountCheckOnly && codeSent && (
           <div className={`${styles.inline} ${styles.space}`}>
             <button
               className={styles.quiet}

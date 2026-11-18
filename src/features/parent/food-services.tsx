@@ -3,12 +3,13 @@ import { ArrowRight } from "iconoir-react";
 import { UrgentHelp } from "./landing";
 import { FoodAssessment } from "./food-assessment";
 import { FoodSites } from "./food-sites";
+import type { FoodAssessmentHandoff } from "@/lib/parent/food-assessment";
 import styles from "./parent.module.css";
 
-export function FoodServices() {
+export function FoodServices({ initial, onChoose }: { initial?: FoodAssessmentHandoff; onChoose?: (value: FoodAssessmentHandoff) => void }) {
   return (
     <div className={styles.container}>
-      <FoodAssessment />
+      <FoodAssessment initial={initial} onChoose={onChoose}/>
       <FoodSites />
       <details className={styles.disclosure}>
         <summary>I already know which program I need</summary>

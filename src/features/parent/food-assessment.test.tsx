@@ -7,6 +7,15 @@ beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 function answer(label: RegExp, value: string) { fireEvent.change(screen.getByLabelText(label), { target: { value } }); }
 describe("public guided food entry", () => {
+  it("hands the exact current answers and explicit language to the typed form without navigation or persistence", () => {
+    const onChoose = vi.fn(); render(<FoodAssessment onChoose={onChoose}/>);
+    fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: "es" } });
+    answer(/suficiente comida/, "not_sure"); answer(/ayuda para comprar/, "applied");
+    fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
+    fireEvent.click(screen.getByRole("button", { name: "Consultar una solicitud pendiente" }));
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ need: "snap_pending", answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null }, language: "es", languageChosen: true });
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("moves keyboard focus to results and back to the first answer when editing", async () => {
     render(<FoodAssessment />); answer(/enough food/, "no"); answer(/help paying/, "applied");
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));

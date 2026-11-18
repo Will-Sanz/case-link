@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SupportNeed } from "./domain";
+import { actionSchema } from "./domain";
 
 // Reviewed routing questions; these answers make no eligibility or award decision.
 export const foodAssessmentQuestionReasons = {
@@ -17,7 +17,23 @@ export const foodAssessmentSchema = z.object({
     context.addIssue({ code: "custom", path: ["existingIssue"], message: "Choose the question for your current benefit history." });
 });
 export type FoodAssessmentAnswers = z.infer<typeof foodAssessmentSchema>;
-export type FoodRecommendation = { need: SupportNeed; reason: "immediate" | "new" | "pending" | "renewal" | "problem" };
+const recommendationSchema = z.object({
+  need: z.enum(["food_now", "snap_new", "snap_pending", "snap_renewal", "snap_problem"]),
+  reason: z.enum(["immediate", "new", "pending", "renewal", "problem"]),
+}).strict();
+export type FoodRecommendation = z.infer<typeof recommendationSchema>;
+export const foodAssessmentInputSchema = z.object({ answers: foodAssessmentSchema, language: z.enum(["en", "es"]) }).strict();
+export const foodAssessmentHandoffSchema = foodAssessmentInputSchema.extend({ need: recommendationSchema.shape.need, languageChosen: z.boolean() }).superRefine((value, context) => {
+  if (!assessFoodSupport(value.answers).some(path => path.need === value.need))
+    context.addIssue({ code: "custom", path: ["need"], message: "Choose a current proposed food path." });
+});
+export type FoodAssessmentHandoff = z.infer<typeof foodAssessmentHandoffSchema>;
+export const foodAssessmentReplySchema = z.object({
+  ownerId: z.uuid(),
+  candidates: z.array(recommendationSchema.extend({ programs: z.array(z.object({
+    programId: z.string().min(1).max(60), actions: z.array(actionSchema).max(6),
+  }).strict()).max(10) })).max(5),
+});
 
 /** Proposed paths only. Exact facts and the existing named mandate still precede any start. */
 export function assessFoodSupport(input: unknown): FoodRecommendation[] {

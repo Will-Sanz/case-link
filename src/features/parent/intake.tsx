@@ -35,6 +35,8 @@ import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { UrgentHelp } from "./landing";
 import { FoodServices } from "./food-services";
+import { foodAssessmentHandoffSchema, foodAssessmentReplySchema, type FoodAssessmentHandoff } from "@/lib/parent/food-assessment";
+import { ParentSignIn } from "./sign-in";
 import { SnapApplicationFormFields } from "./snap-application-form";
 import { SnapApplicationNotice } from "./snap-application-review";
 import { WicApplicationNotice, WicApplicationFormFields } from "./wic-application-form";
@@ -142,15 +144,26 @@ export function buildMandate(
   };
 }
 
-export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
+export type ParentIntakeSignInOptions = { existingAccountRecovery?: boolean; recoveryHref?: string; emailCodeAvailable?: boolean };
+export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: string; signInOptions?: ParentIntakeSignInOptions }) {
+  const [guide, setGuide] = useState<{ handoff: FoodAssessmentHandoff; editing: boolean } | null>(null);
+  const [guideOwnerChanged, setGuideOwnerChanged] = useState(false);
+  const guidePanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (guide && !guide.editing) guidePanel.current?.querySelector<HTMLElement>("#food-guide-results")?.focus();
+  }, [guide]);
   return initialNeed === "food" ? (
-    <FoodServices />
+    <><div ref={guidePanel} hidden={guide?.editing}><FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/></div>
+      {guideOwnerChanged && <p role="status">Your sign-in changed. The earlier answers were cleared; begin with your current household.</p>}
+      {guide && <div hidden={!guide.editing}><ParentIntakeForm key={guide.handoff.need} active={guide.editing} initialNeed={guide.handoff.need} handoff={guide.handoff} signInOptions={signInOptions}
+      onFoodBack={() => setGuide({ ...guide, editing: false })}
+      onFoodOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }}/></div>}</>
   ) : (
     <ParentIntakeForm key={initialNeed ?? "all"} initialNeed={initialNeed} />
   );
 }
 
-function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
+function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged, signInOptions, active = true }: { initialNeed?: string; handoff?: FoodAssessmentHandoff; onFoodBack?: () => void; onFoodOwnerChanged?: () => void; signInOptions?: ParentIntakeSignInOptions; active?: boolean }) {
   const session = useParentResource<{
     account: { id?: string; email: string; preferences?: ParentPreferences };
   }>("/account");
@@ -168,7 +181,14 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const [familyAccess, setFamilyAccess] = useState<"ready" | "checking" | "changed" | "unavailable">("ready");
   const familyOwnerCheck = useRef<{ controller: AbortController; promise: Promise<void> } | null>(null);
   const familyProfileRequested = useRef(false), familyProfileWork = useRef<AbortController | null>(null);
-  const languageChosen = useRef(false);
+  const languageChosen = useRef(handoff?.languageChosen ?? false);
+  const explicitLanguage = useRef<"en" | "es" | null>(handoff?.languageChosen ? handoff.language : null);
+  const guideOwner = useRef<string | null>(null);
+  const [guideSignIn, setGuideSignIn] = useState(false);
+  const [guideTimingChosen, setGuideTimingChosen] = useState(handoff?.answers.foodForTwoDays === "no");
+  const guideTimingManual = useRef(false);
+  const [previousGuide, setPreviousGuide] = useState(handoff);
+  const [guideCheck, setGuideCheck] = useState<z.infer<typeof foodAssessmentReplySchema> | null>(null);
   useEffect(() => () => { familyProfileWork.current?.abort(); familyOwnerCheck.current?.controller.abort(); }, []);
   const familyApplied = useRef(new Set<FamilyProfileApplicationProgram>());
   const familyTarget = useRef<{ program: FamilyProfileApplicationProgram; accountAuthority: SupportIntake["accountAuthority"] } | null>(null);
@@ -186,6 +206,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       ? [initialNeed as SupportNeed]
       : [],
     ...(initialNeed === "wic_new" ? { accountAuthority: "self" as const } : {}),
+    ...(handoff?.languageChosen ? { language: handoff.language } : {}),
+    ...(handoff?.answers.foodForTwoDays === "no" ? { urgency: "today" as const } : {}),
   }));
   const [step, setStep] = useState(() => intake.needs.length ? 1 : 0);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
@@ -196,7 +218,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const [accepted, setAccepted] = useState(false);
   const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [snapDetails, setSnapDetails] = useState<SnapApplicationFields>({});
+  const [snapDetails, setSnapDetails] = useState<SnapApplicationFields>(handoff?.languageChosen ? { language: handoff.language } : {});
   const [detailsReady, setDetailsReady] = useState(false);
   const [startUncertain, setStartUncertain] = useState(false);
   const [collectionBlocked, setCollectionBlocked] = useState(false);
@@ -213,13 +235,60 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
-  const scope=JSON.stringify({intake,snapDetails,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip});
+  const scope=JSON.stringify({intake,snapDetails,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip,handoff});
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
   useLayoutEffect(()=>{
     const controller=new AbortController();work.current=controller;
     return()=>{controller.abort();if(work.current===controller)work.current=null;};
   },[scope]);
   const router = useRouter();
+  if (previousGuide !== handoff) {
+    setPreviousGuide(handoff);
+    if (handoff && previousGuide && handoff.languageChosen && (handoff.language !== previousGuide.language || !previousGuide.languageChosen)) {
+      explicitLanguage.current = handoff.language; languageChosen.current = true;
+      setIntake(current => ({ ...current, language: handoff.language }));
+      setSnapDetails(current => ({ ...current, language: handoff.language })); setAccepted(false); setGuideCheck(null);
+    }
+    if (handoff && previousGuide && !guideTimingManual.current && handoff.answers.foodForTwoDays !== previousGuide.answers.foodForTwoDays) {
+      setGuideTimingChosen(handoff.answers.foodForTwoDays === "no");
+      if (handoff.answers.foodForTwoDays === "no") setIntake(current => ({ ...current, urgency: "today" }));
+    }
+  }
+  useEffect(() => {
+    if (!handoff) return;
+    const current = z.uuid().safeParse(session.data?.account.id);
+    if (!current.success) return;
+    if (guideOwner.current && guideOwner.current !== current.data.toLowerCase()) onFoodOwnerChanged?.();
+    else guideOwner.current ??= current.data.toLowerCase();
+  }, [handoff, session.data?.account.id, onFoodOwnerChanged]);
+  async function checkGuideOwner(signal: AbortSignal, deadline: string) {
+    const account = z.object({ account: z.object({ id: z.uuid() }) }).parse(await boundedParentApi("/account", {}, signal, deadline));
+    signal.throwIfAborted();
+    if (guideOwner.current && account.account.id.toLowerCase() !== guideOwner.current) {
+      onFoodOwnerChanged?.(); throw new ParentApiError("Your sign-in changed. Earlier answers cannot be used for another household.", 412);
+    }
+    guideOwner.current ??= account.account.id.toLowerCase();
+  }
+  async function checkFoodAssessment(signal: AbortSignal, deadline: string) {
+    if (!handoff) return;
+    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify({ answers: handoff.answers, language: intake.language }) }, signal, deadline));
+    signal.throwIfAborted();
+    if (!guideOwner.current || result.ownerId.toLowerCase() !== guideOwner.current) {
+      onFoodOwnerChanged?.(); throw new ParentApiError("Your sign-in changed. Earlier answers cannot be used for another household.", 412);
+    }
+    if (!result.candidates.some(candidate => candidate.need === handoff.need)) throw new ParentApiError("These proposed options changed. Return to the food questions to choose a current path.", 412);
+    setGuideCheck(result);
+  }
+  useEffect(() => {
+    if (!handoff) return;
+    const controller = new AbortController();
+    const check = () => { if (!guideOwner.current) return; void checkGuideOwner(controller.signal, new Date(Date.now() + 30_000).toISOString()).catch(failure => {
+      if (!controller.signal.aborted && failure instanceof ParentApiError && [401, 403].includes(failure.status)) { setGuideSignIn(true); session.reload(); }
+    }); };
+    const returned = (event: PageTransitionEvent) => { if (event.persisted) check(); };
+    window.addEventListener("focus", check); window.addEventListener("online", check); window.addEventListener("pageshow", returned);
+    return () => { controller.abort(); window.removeEventListener("focus", check); window.removeEventListener("online", check); window.removeEventListener("pageshow", returned); };
+  });
   const snapSelected = intake.needs.includes("snap_new");
   useEffect(() => {
     if (snapSelected || zipDefaultConsumed.current) return;
@@ -308,7 +377,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     setFamilyFilled(current => ({ ...current, [program]: projection.fields.length > 0 }));
     if (!projection.fields.length) return;
     if (program === "snap-pa") {
-      const details = projection.details as SnapApplicationFields; setSnapDetails(details);
+      const details = { ...projection.details, ...(explicitLanguage.current ? { language: explicitLanguage.current } : {}) } as SnapApplicationFields; setSnapDetails(details);
       if (details.language) languageChosen.current = true;
       setIntake(current => ({ ...current, ...(details.zip && !current.zip ? { zip: details.zip } : {}),
         ...(details.language === "en" || details.language === "es" ? { language: details.language } : {}) }));
@@ -349,7 +418,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     ].includes(need),
   );
   const connected = (id: string) =>
-    connections.data?.capabilities?.some(
+    handoff && guideCheck ? guideCheck.candidates.find(candidate => candidate.need === handoff.need)?.programs.some(program => program.programId === id && program.actions.some(action => ["share", "submit", "schedule"].includes(action))) ?? false : connections.data?.capabilities?.some(
       (connection) =>
         connection.programId === id &&
         connection.enabled &&
@@ -361,9 +430,10 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const fullAvailable = !utilityPreparation && programs.some(
     (p) => recipientIds.includes(p.id) && connected(p.id),
   );
+  const formReady = !session.loading && !session.error && !guideSignIn && familyAccess === "ready";
   useEffect(() => {
-    heading.current?.focus();
-  }, [step]);
+    if (active && formReady) heading.current?.focus();
+  }, [step, active, formReady]);
   useEffect(() => {
     if (session.data?.account.preferences && !preferencesApplied.current) {
       preferencesApplied.current = true;
@@ -379,7 +449,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     key: K,
     value: SupportIntake[K],
   ) {
-    if (key === "language") languageChosen.current = true;
+    if (key === "language") { languageChosen.current = true; explicitLanguage.current = value as "en" | "es"; }
     if (key === "zip") { zipDefaultConsumed.current = true; setReusedZip(null); }
     if (key === "utilityProviders") { setUtilityPreparation(null); setUtilityDetails({}); setUtilityDetailsReady(false); setAccepted(false); }
     if (key === "accountAuthority") { setUtilityDetailsReady(false); setAccepted(false); }
@@ -510,6 +580,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   }
   function changeSnapDetails(details: SnapApplicationFields) {
     familyDraftChanged.current.snap = true; languageChosen.current = true;
+    if (details.language === "en" || details.language === "es") explicitLanguage.current = details.language;
     zipDefaultConsumed.current = true; setReusedZip(null);
     setSnapDetails(details);setDetailsReady(false);setAccepted(false);setError(null);startAttempt.current=null;
     setIntake(current=>({...current,zip:details.zip??"",householdSize:details.household?.length??null,
@@ -560,6 +631,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       return;
     }
     if (step === 1) {
+      if (handoff && !guideTimingChosen) { setError(new Error("Choose when to prioritize this request. An unknown food answer does not set a deadline.")); return; }
       if ((snapSelected || wicOnly || utilityPreparation) && authorization.loading) return;
       if (utilityPreparation && !fullUtility) {
         setError(new Error(`Private ${utilityConfig?.label ?? "utility"} preparation is unavailable or account authority is unresolved. Your draft remains on this page; check access and account authority or use official ${utilityConfig?.short ?? "utility"} help.`)); return;
@@ -593,6 +665,20 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           ),
         );
         return;
+      }
+      if (handoff) {
+        const controller = work.current;
+        if (!controller || controller.signal.aborted || running.current === controller) return;
+        running.current = controller; setPendingWork({ scope, controller });
+        try { await checkFoodAssessment(controller.signal, new Date(Date.now() + 30_000).toISOString()); }
+        catch (failure) {
+          if (!controller.signal.aborted && work.current === controller) {
+            if (failure instanceof ParentApiError && [401, 403].includes(failure.status)) { setGuideSignIn(true); session.reload(); }
+            setError(failure instanceof Error ? failure : new Error("Food options could not be checked. Your answers remain on this page."));
+          }
+          return;
+        } finally { if (running.current === controller) running.current = null; if (!controller.signal.aborted && work.current === controller) setPendingWork(null); }
+        if (controller.signal.aborted || work.current !== controller) return;
       }
       setRecipientIds(programs.map((p) => p.id));
       setDetailsReady(fullSnap);
@@ -630,9 +716,12 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     try {
       await ensureFamilyOwner();
       if (controller.signal.aborted || work.current !== controller) return;
+      if (handoff && startAttempt.current) await checkGuideOwner(controller.signal, startAttempt.current.packet.mandate.expiresAt);
       const retryingWic = startAttempt.current?.packet.kind === "wic_application";
       const retryingUtility = ["peco_application", "pgw_application", "water_application"].includes(startAttempt.current?.packet.kind ?? "");
       if (!startAttempt.current) {
+        if (handoff) await checkFoodAssessment(controller.signal, new Date(Date.now() + 30_000).toISOString());
+        if (controller.signal.aborted || work.current !== controller) return;
         const window = await readAuthorizationWindow(controller.signal);
         if(controller.signal.aborted||work.current!==controller)return;
         if (snapSelected && !detailsReady && canCollectSnapApplication(window)) {
@@ -779,6 +868,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     } catch (err) {
       if(controller.signal.aborted||work.current!==controller)return;
       const status=err instanceof ParentApiError?err.status:0;
+      if(handoff && (status===401||status===403)){setGuideSignIn(true);session.reload();}
       setStartUncertain(!!startAttempt.current && (startUncertain || creationAttempted &&
         (status<400||status>=500||status===409 || (wicOnly || !!utilityPreparation) && (status===401||status===403))));
       if(snapSelected && (status===401||status===403)){setCollectionBlocked(true);authorization.reload();}
@@ -822,6 +912,12 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       {session.loading ? (
         <ParentLoading label="Checking secure access" />
       ) : familyAccess === "changed" ? <section className={styles.surface}><h2>Your sign-in changed</h2><p>This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>Start a fresh request</a></section>
+      : handoff && (guideSignIn || session.error instanceof ParentApiError && [401, 403].includes(session.error.status)) ? <ParentSignIn {...signInOptions} onSignedIn={async () => {
+        const controller = work.current;
+        if (!controller || controller.signal.aborted) throw new Error("The request changed. Return to the food questions before continuing.");
+        await checkGuideOwner(controller.signal, new Date(Date.now() + 30_000).toISOString());
+        if (!controller.signal.aborted) { setGuideSignIn(false); setError(null); session.reload(); }
+      }}/>
       : session.error ? (
         <ServiceError
           error={session.error}
@@ -833,6 +929,14 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           {familyAccess === "checking" && <ParentLoading label="Checking secure access"/>}
           {familyAccess === "unavailable" && <section className={styles.surface}><h2>We could not recheck your saved family information</h2><p>Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>Recheck secure access</button></section>}
           <div hidden={familyAccess !== "ready"}>
+          {handoff && step === 1 && <fieldset className={styles.fieldset} disabled={pending || startUncertain}>
+            <legend className={styles.legend}>When should CaseLink prioritize this request?</legend>
+            <p className={styles.hint}>{handoff.answers.foodForTwoDays === "no" ? "You said there is not enough food for today and tomorrow. Today is the proposed priority; you can change it." : "Your earlier answer does not establish a deadline. Choose the timing that works for this request."}</p>
+            <label htmlFor="guided-food-timing">Request timing</label><select id="guided-food-timing" className={styles.select} value={guideTimingChosen ? intake.urgency : ""} onChange={event => { guideTimingManual.current = true; setGuideTimingChosen(true); change("urgency", event.target.value as SupportIntake["urgency"]); }} required>
+              <option value="">Choose a priority</option><option value="today">Today</option><option value="soon">Soon</option><option value="planning">Planning ahead</option>
+            </select>
+          </fieldset>}
+          {handoff && step === 2 && guideCheck && <p className={styles.hint}>Food options checked for this account. {guideCheck.candidates.find(candidate => candidate.need === handoff.need)?.programs.some(program => program.actions.some(action => ["share", "submit", "schedule"].includes(action))) ? "Any connected action still needs the exact permission below and a current service check." : "No connected sending or booking action was confirmed for this path. The permission below describes preparation; official help stays available."} Other proposed food paths have not started.</p>}
           <ol className={styles.progress} aria-label="Support request steps">
             {(directSnap ? ["Application details", "Your permission"] : ["Your needs", "Household details", "Your permission"]).map(
               (label, index) => {
@@ -1448,6 +1552,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                     type="button"
                     className={styles.quiet}
                     onClick={() => {
+                      if (handoff && step === 1) { onFoodBack?.(); return; }
                       if (step === 2 && familyProfile) {
                         const program: FamilyProfileApplicationProgram | undefined = fullSnap ? "snap-pa" : fullWic ? "wic-pa" : fullUtility ? utilityConfig?.programId : undefined;
                         if (program) seedFamilyProfile(familyProfile, program, intake.accountAuthority);
