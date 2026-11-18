@@ -76,6 +76,23 @@ def replace_private(path, contents, metadata):
             os.unlink(name)
 
 
+
+def backup_private(path, contents, metadata):
+    backup = path.with_name('profile.before-ongoing-20261117.json')
+    if backup.exists():
+        assert not backup.is_symlink() and backup.stat().st_nlink == 1
+        assert backup.stat().st_mode & 0o777 == 0o600 and backup.stat().st_uid == metadata.st_uid
+        assert backup.read_bytes() == contents, 'Existing rollback profile changed'
+    else:
+        with open(backup, 'xb') as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            os.fchown(stream.fileno(), metadata.st_uid, metadata.st_gid)
+            stream.write(contents)
+            stream.flush()
+            os.fsync(stream.fileno())
+    return backup
+
+
 def stage():
     assert os.getuid() == 0, 'Run as the existing VM administrator'
     assert shutil.disk_usage('/opt/caselink').free > 3_000_000_000, 'Insufficient staging space'
@@ -148,9 +165,7 @@ def activate():
         for role in ROLES:
             p = profile_path(role); assert not p.is_symlink(); raw = p.read_bytes(); metadata = p.stat()
             assert hashlib.sha256(raw).hexdigest() == snapshot[role]['hash'], 'Concurrent profile change'
-            backup = p.with_name('profile.before-ongoing-20261117.json')
-            with open(backup, 'xb') as stream:
-                os.fchmod(stream.fileno(), 0o600); os.fchown(stream.fileno(), metadata.st_uid, metadata.st_gid); stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+            backup_private(p, raw, metadata)
             value = ongoing_profile(json.loads(raw), role)
             replace_private(p, json.dumps(value).encode(), metadata)
             changed.append(role)
@@ -163,7 +178,9 @@ def activate():
             override.parent.mkdir(parents=True, exist_ok=True); assert not override.exists()
             override.write_text('[Service]\nWorkingDirectory=' + str(target(role)) + '\n'); override.chmod(0o644); overrides.append(override)
         run(['systemctl', 'daemon-reload'])
-        run(['systemctl', 'reset-failed', *[unit(r) for r in ROLES if r != 'sender'], *services])
+        for service in [unit(r) for r in ('web', 'frontdoor', 'broker', 'review', 'worker')] + services:
+            if run(['systemctl', 'show', service, '-p', 'ActiveState', '--value']) == 'failed':
+                run(['systemctl', 'reset-failed', service])
         run(['systemctl', 'restart', unit('web'), unit('frontdoor')])
         run(['systemctl', 'start', unit('broker'), unit('review'), unit('worker')])
         run(['systemctl', 'start', *timers])
