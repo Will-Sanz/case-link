@@ -20,7 +20,7 @@ const evaluatedRequest = {
 } as const;
 /** Bump the guard version for assessed projection/validation changes; changing any dispatched setting changes this binding. */
 export const FOOD_DESCRIPTION_EVALUATION_BINDING = {
-  contract: "food-description-2026-11-18.v1", projectionValidatorVersion: "food-description-guards-2026-11-18.v3", projectSelection: "exact approved project, private heartbeat and OpenAI-Project header", request: evaluatedRequest, transport: evaluatedTransport,
+  contract: "food-description-2026-11-18.v1", projectionValidatorVersion: "food-description-guards-2026-11-18.v4", projectSelection: "exact approved project, private heartbeat and OpenAI-Project header", request: evaluatedRequest, transport: evaluatedTransport,
   programs: PROGRAMS.filter(program => ["philly-food", "share-community-fridge-19129", "snap-pa", "uesf-benefits"].includes(program.id)),
 } as const;
 export const FOOD_DESCRIPTION_FINGERPRINT = createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex");
