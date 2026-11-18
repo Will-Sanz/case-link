@@ -49,7 +49,7 @@ def profile_path(role):
 
 def ongoing_profile(value, role):
     assert value['service'] == role, 'Profile service changed'
-    assert value['publicOrigin'] == 'https://www.thecaselink.com', 'Public origin changed'
+    assert value['publicOrigin'] == ('https://pilot.thecaselink.com' if role == 'sender' else 'https://www.thecaselink.com'), 'Public origin changed'
     assert value['projectOrigin'] == 'https://zpfypkizsapvsxeykmdq.supabase.co', 'Project changed'
     assert value['enabled'] is (role != 'sender'), 'Service enablement changed'
     if role == 'sender':
@@ -79,7 +79,6 @@ def replace_private(path, contents, metadata):
 def stage():
     assert os.getuid() == 0, 'Run as the existing VM administrator'
     assert shutil.disk_usage('/opt/caselink').free > 3_000_000_000, 'Insufficient staging space'
-    WORK.mkdir(mode=0o755)
     snapshot = {}
     for role in ROLES:
         p = profile_path(role)
@@ -90,6 +89,8 @@ def stage():
         base = Path(run(['systemctl', 'show', unit(role), '-p', 'WorkingDirectory', '--value'])).resolve()
         assert base == Path('/opt/caselink/releases') / BASES[key], 'Installed release changed'
         snapshot[role] = {'hash': sha(p), 'base': str(base)}
+    assert not WORK.exists() or not any(WORK.iterdir()), 'Staging directory is not empty'
+    WORK.mkdir(mode=0o755, exist_ok=True)
     for f, (_, expected) in FILES.items():
         dst = WORK / 'source' / f
         dst.parent.mkdir(parents=True, exist_ok=True)
