@@ -13,7 +13,7 @@ spec.loader.exec_module(operator)
 class ExistingHostActivation(unittest.TestCase):
     def profile(self, role):
         expiry = '2000-01-01T00:00:00Z' if role == 'sender' else '2027-11-08T05:00:00Z' if role in ('web', 'frontdoor') else '2026-11-17T21:07:45Z' if role == 'worker' else '2026-11-11T05:00:00Z'
-        return {'service': role, 'publicOrigin': 'https://www.thecaselink.com', 'projectOrigin': 'https://zpfypkizsapvsxeykmdq.supabase.co', 'enabled': role != 'sender', 'approvedUntil': expiry, 'approvalReference': 'old', 'sendingApproved': False, 'credential': 'synthetic-private-value', 'recipient': 'existing'}
+        return {'service': role, 'publicOrigin': 'https://pilot.thecaselink.com' if role == 'sender' else 'https://www.thecaselink.com', 'projectOrigin': 'https://zpfypkizsapvsxeykmdq.supabase.co', 'enabled': role != 'sender', 'approvedUntil': expiry, 'approvalReference': 'old', 'sendingApproved': False, 'credential': 'synthetic-private-value', 'recipient': 'existing'}
 
     def test_only_operating_metadata_changes_for_all_eight_existing_roles(self):
         for role in operator.ROLES:
