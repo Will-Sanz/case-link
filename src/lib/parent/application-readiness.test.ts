@@ -284,4 +284,13 @@ describe("honest application labels", () => {
     expect(supportRouteLabel(route, [{ ...operation, state: "declined",
       receipt: { ...receipt, state: "declined" } }, sent])).toBe("Declined");
   });
+  it("keeps the newer observed decision when an older pending notice is recorded later", () => {
+    const reference = "Current synthetic decision";
+    const approved = { programId: route.programId, need: route.need, state: "assistance_approved",
+      receipt: { state: "assistance_approved", source: "agency_receipt", reference, recordedAt: "2026-11-03T13:01:00Z",
+        agencyStatus: { reference, observedAt: "2026-11-03T13:00:00Z", documents: [{ name: "Approval notice" }] } } };
+    const pending = { ...approved, state: "agency_submitted", receipt: { ...approved.receipt, state: "agency_submitted", recordedAt: "2026-11-03T15:00:00Z",
+      agencyStatus: { reference, observedAt: "2026-11-03T10:00:00Z", waitingForDecision: true } } };
+    expect(supportRouteLabel(route, [approved, pending])).toBe("Assistance approved");
+  });
 });

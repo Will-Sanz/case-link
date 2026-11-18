@@ -176,7 +176,7 @@ export function supportRouteReceipt(
     const receipt = receiptSchema.safeParse(operation.receipt);
     return receipt.success && receipt.data.state === operation.state && receipt.data.reference.trim()
       ? [receipt.data] : [];
-  }).sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt));
+  }).sort((a, b) => Date.parse(b.agencyStatus?.observedAt ?? b.recordedAt) - Date.parse(a.agencyStatus?.observedAt ?? a.recordedAt));
   const decision = receipts.find((receipt) =>
     ["agency_submitted", "assistance_approved", "support_received", "declined"].includes(receipt.state));
   const strongest = decision ?? receipts.sort((a, b) =>

@@ -651,7 +651,7 @@ export async function runSupportService(input: {
               receiptSchema.safeParse(operation.receipt).success &&
               getProgram(operation.programId)?.needs.includes(route.need),
           )
-          .sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt));
+          .sort((a, b) => Date.parse(a.receipt?.agencyStatus?.observedAt ?? a.updatedAt) - Date.parse(b.receipt?.agencyStatus?.observedAt ?? b.updatedAt));
         const programs = new Map<string, SupportRoute>();
         for (const operation of history) {
           const program = getProgram(operation.programId)!;
@@ -679,7 +679,8 @@ export async function runSupportService(input: {
           (!previous ||
             (outcomeOrder[previous.state] ?? -1) < 2 ||
             (outcomeOrder[strongest.state] ?? -1) >=
-              (outcomeOrder[previous.state] ?? -1))
+              (outcomeOrder[previous.state] ?? -1) ||
+            (previous.state !== "support_received" && programs.get(previous.programId)?.state === "declined"))
         )
           restored = strongest;
         return restored;
@@ -1063,25 +1064,26 @@ export async function runSupportService(input: {
       const progress = outcomeOrder[route.state] ?? 0;
       let action: SupportAction | null = null;
       let capability: ServiceCapability | null = null;
+      let followUpSource: ServiceOperation | undefined;
       if (request.mandate.mode === "prepare_only" && progress >= 2) {
         await record(route);
         plan.routes[index] = route;
         continue;
       }
       if (progress >= 2) {
-        const last = history
+        followUpSource = history
           .filter(
             (operation) =>
               operation.receipt &&
               receiptSchema.safeParse(operation.receipt).success,
           )
           .sort((a, b) => Date.parse(b.receipt?.agencyStatus?.observedAt ?? b.updatedAt) - Date.parse(a.receipt?.agencyStatus?.observedAt ?? a.updatedAt))[0];
-        const due = last
-          ? Date.parse(last.receipt?.agencyStatus?.observedAt ?? last.updatedAt) +
+        const due = followUpSource
+          ? Date.parse(followUpSource.receipt?.agencyStatus?.observedAt ?? followUpSource.updatedAt) +
             (request.intake.urgency === "today" ? 3600000 : 86400000)
           : NaN;
         capability = await ports.capability(route.programId, "follow_up");
-        if (!last || !Number.isFinite(due)) {
+        if (!followUpSource || !Number.isFinite(due)) {
           addAction(
             route,
             "execution_issue",
@@ -1228,9 +1230,7 @@ export async function runSupportService(input: {
           ),
         );
       if (action === "follow_up") {
-        const last = history
-          .filter((operation) => operation.receipt)
-          .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+        const last = followUpSource!;
         packet = { statusReference: last.receipt!.reference };
         followUpCycle = `${last.id}:${last.updatedAt}`;
       } else if (!canonical) {

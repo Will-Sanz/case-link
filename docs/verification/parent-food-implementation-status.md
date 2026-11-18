@@ -83,3 +83,11 @@ The complete hosted-process fixture now includes its actual `tokens.css` startup
 Protected-page dynamic request/input/version URL components now use native percent encoding. Two actual-browser adversarial DOM-metadata regressions failed before the repair and pass afterward; all18 protected-page cases pass, including independent browser/privacy/recovery/accessibility checks. Normal and separate simplicity review found no remaining actionable finding. Actual GitHub CodeQL clearance is still required; no alert was dismissed or check bypassed.
 
 On published `f5164d0`, GitHub `database-security` completed successfully, including real isolated DB/Auth/restore/legacy/profile/protected/parent-chat/PDF checks. The parent-native job still failed the unchanged409 replay contract after its DB/build checks succeeded; the next source records the actual HTTP status for diagnosis. No green whole/native-release claim is made.
+
+## F3 attributed status and follow-up ordering repair
+
+Delayed notice ingestion no longer outranks the actual agency observation time in receipt display or worker-plan restoration. Follow-up uses the same validated observed operation for its due time, case reference and stable retry identity. A genuinely newer denial for the previous program now replaces its stale submitted/approved plan; actual support received, unrelated-recipient success and a stronger authorized alternative remain preserved. Existing source/mandate/Submit/execution and unknown-delivery guards are unchanged.
+
+The three original ordering regressions failed before the fixes. Independent review found the adjacent saved-plan/new-denial gap; its three failure cases also failed before repair, while three preservation cases pass before/after.437 cases across readiness/service/execution/policy/worker/detail callers now pass; typecheck/scoped lint/whitespace pass. Independent normal review reverified123 direct cases and cleared the repaired slice. Separate simplicity review found no further justified deletion; using one follow-up source removes the contradictory second selection.
+
+This is controlled software orchestration evidence. No provider channel, status permission, real agency receipt, model call or food outcome was created. F3 accepted-route/full lifecycle remains externally blocked as recorded above.

@@ -333,6 +333,32 @@ describe("new SNAP final Submit orchestration", () => {
     const result = await runSupportService({ ...input, operations: observations });
     expect(input.ports.execute).not.toHaveBeenCalled(); expect(result.nextRunAt).toBe("2026-10-25T16:30:00.000Z");
   });
+  it("keeps the newest observed reference and retry key when an older notice arrives after follow-up is due", async () => {
+    const input = finalSnapFixture();
+    const observations = [
+      { id: "current-observation", reference: "Current synthetic case", observedAt: "2026-10-25T13:00:00Z", ingestedAt: "2026-10-25T13:01:00Z" },
+      { id: "delayed-old-observation", reference: "Old synthetic case", observedAt: "2026-10-24T10:00:00Z", ingestedAt: "2026-10-25T15:00:00Z" },
+    ].map(({ id, reference, observedAt, ingestedAt }) => ({ ...acknowledged(input.request, "agency_submitted", ingestedAt), id, need: "snap_new" as const, programId: "snap-pa",
+      receipt: { ...receipt("agency_submitted", observedAt), reference, agencyStatus: { reference, observedAt, waitingForDecision: true as const } } }));
+    input.request.plan = buildSupportPlan(input.request, fixtureNow); input.request.plan.routes[0].state = "agency_submitted";
+    await runSupportService({ ...input, operations: observations });
+    const first = vi.mocked(input.ports.execute).mock.calls[0][0];
+    expect(first).toMatchObject({ action: "follow_up", packet: { statusReference: "Current synthetic case" } });
+    observations[1].updatedAt = "2026-10-25T15:30:00Z";
+    await runSupportService({ ...input, operations: observations });
+    expect(vi.mocked(input.ports.execute).mock.calls[1][0].idempotencyKey).toBe(first.idempotencyKey);
+  });
+  it("restores a newer observed approval despite a delayed older denial", async () => {
+    const input = finalSnapFixture();
+    const observations = [
+      { id: "current-approval", state: "assistance_approved" as const, observedAt: "2026-10-25T13:00:00Z", ingestedAt: "2026-10-25T13:01:00Z" },
+      { id: "delayed-old-denial", state: "declined" as const, observedAt: "2026-10-24T10:00:00Z", ingestedAt: "2026-10-25T15:00:00Z" },
+    ].map(({ id, state, observedAt, ingestedAt }) => ({ ...acknowledged(input.request, state, ingestedAt), id, need: "snap_new" as const, programId: "snap-pa",
+      receipt: { ...receipt(state, ingestedAt), reference: id, agencyStatus: { reference: id, observedAt, documents: [{ name: "Synthetic decision notice" }] } } }));
+    input.request.plan = buildSupportPlan(input.request, fixtureNow); input.request.plan.routes[0].state = "agency_submitted";
+    const result = await runSupportService({ ...input, operations: observations });
+    expect(result.plan.routes[0].state).toBe("assistance_approved");
+  });
 
   it("keeps an incomplete private preview in preparation even with an unrelated true authorization", async () => {
     const input = finalSnapFixture(); await runSupportService(input);
@@ -1502,6 +1528,41 @@ describe("operation identity and correction recovery", () => {
 });
 
 describe("complete history and raw-document cleanup", () => {
+  it.each(["agency_submitted", "assistance_approved"] as const)("applies the same program's newer denial after saved %s progress", async state => {
+    const input = finalSnapFixture();
+    input.request.plan = buildSupportPlan(input.request, fixtureNow); input.request.plan.routes[0].state = state;
+    const observations = [
+      { id: "earlier-approval", state: "assistance_approved" as const, observedAt: "2026-10-25T10:00:00Z" },
+      { id: "current-denial", state: "declined" as const, observedAt: "2026-10-25T13:00:00Z" },
+    ].map(({ id, state, observedAt }) => ({ ...acknowledged(input.request, state, observedAt), id, need: "snap_new" as const, programId: "snap-pa",
+      receipt: { ...receipt(state, observedAt), agencyStatus: { reference: id, observedAt, documents: [{ name: "Synthetic decision" }] } } }));
+    const result = await runSupportService({ ...input, operations: observations });
+    expect(result.plan.routes[0].state).toBe("unresolved");
+    expect(result.nextTrigger).toBe("route_review_required");
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
+  it("keeps the stronger authorized alternative when the previously approved program declines", async () => {
+    const request = singleUtilityRequest(); request.mandate.recipientIds.push("uesf-utilities");
+    request.plan = buildSupportPlan(request, fixtureNow, { electricity: "peco-cap" }); request.plan.routes[0].state = "assistance_approved";
+    const input = setup(request), alternative = { ...acknowledged(request, "agency_submitted"), id: "known-alternative", programId: "uesf-utilities" };
+    const result = await runSupportService({ ...input, operations: [acknowledged(request, "declined"), alternative] });
+    expect(result.plan.routes[0]).toMatchObject({ programId: "uesf-utilities", state: "agency_submitted" });
+    expect(vi.mocked(input.ports.execute).mock.calls[0][0]).toMatchObject({ programId: "uesf-utilities", action: "follow_up" });
+  });
+  it.each(["assistance_approved", "support_received"] as const)("keeps saved %s when another recipient declines", async state => {
+    const request = singleUtilityRequest(); request.mandate.recipientIds.push("uesf-utilities");
+    request.plan = buildSupportPlan(request, fixtureNow, { electricity: "peco-cap" }); request.plan.routes[0].state = state;
+    const input = setup(request), other = { ...acknowledged(request, "declined"), programId: "uesf-utilities" };
+    const result = await runSupportService({ ...input, operations: [other] });
+    expect(result.plan.routes[0]).toMatchObject({ programId: "peco-cap", state });
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
+  it("keeps actual saved support received despite a later same-program denial", async () => {
+    const request = singleUtilityRequest(); request.plan = buildSupportPlan(request, fixtureNow); request.plan.routes[0].state = "support_received";
+    const input = setup(request), result = await runSupportService({ ...input, operations: [acknowledged(request, "declined")] });
+    expect(result.plan.routes[0].state).toBe("support_received");
+    expect(input.ports.execute).not.toHaveBeenCalled();
+  });
   it("does not try either previously declined recipient again", async () => {
     const request = singleUtilityRequest();
     request.mandate.recipientIds.push("uesf-utilities");
