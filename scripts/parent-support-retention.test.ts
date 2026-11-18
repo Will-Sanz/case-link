@@ -60,7 +60,7 @@ const principal = () => ({ rolname: "synthetic_retention", rolcanlogin: true, ro
   rolcreaterole: false, rolcreatedb: false, rolreplication: false, member: true, can_set: true, admin_option: false,
   broader_membership: false, group_membership: false, group_login: false, group_inherit: false, group_super: false,
   group_bypassrls: false, group_createrole: false, group_createdb: false, group_replication: false });
-type Options = { env?: Record<string, string | undefined>; principal?: Record<string, unknown> | null; wait?: boolean; utilityCounts?: unknown[]; utilityPreparedCounts?: unknown[]; profileCounts?: unknown[];
+type Options = { env?: Record<string, string | undefined>; principal?: Record<string, unknown> | null; wait?: boolean; utilityCounts?: unknown[]; utilityPreparedCounts?: unknown[]; profileCounts?: unknown[]; descriptionCounts?: unknown[];
   hangAt?: "connect" | "purge" | "end"; errorAt?: "connect" | "purge"; batch?: unknown; purgeReply?: Promise<unknown> };
 async function localRetention(counts: unknown[], options: Options = {}) {
   vi.resetModules();
@@ -74,7 +74,7 @@ async function localRetention(counts: unknown[], options: Options = {}) {
     CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL:undefined,CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE:undefined,
     ...options.env,
   }))vi.stubEnv(key,value);
-  let next=0, nextUtility=0, nextPrepared=0, nextProfile=0;
+  let next=0, nextUtility=0, nextPrepared=0, nextProfile=0, nextDescription=0;
   mocks.storage.mockReturnValue({});
   mocks.s3.mockReturnValue({ remove: mocks.remove, destroy: mocks.s3Destroy });
   if(options.hangAt==="connect")mocks.connect.mockImplementation(()=>new Promise(()=>{}));
@@ -94,6 +94,7 @@ async function localRetention(counts: unknown[], options: Options = {}) {
     if(sql.includes("parent_purge_utility_protected_inputs")) return {rows:[{removed:options.utilityCounts?.[nextUtility++]??0}]};
     if(sql.includes("parent_purge_utility_prepared_artifacts")) return {rows:[{removed:options.utilityPreparedCounts?.[nextPrepared++]??0}]};
     if(sql.includes("parent_purge_family_profiles")) return {rows:[{removed:options.profileCounts?.[nextProfile++]??0}]};
+    if(sql.includes("parent_purge_food_descriptions")) return {rows:[{removed:options.descriptionCounts?.[nextDescription++]??0}]};
     if(sql.includes("parent_claim_cleanup")){const batch=claimed?null:options.batch??null;claimed=true;return{rows:[{batch}]};}
     if(sql.includes("parent_finish_cleanup"))return{rows:[]};
     throw new Error("Unexpected synthetic retention query");
@@ -142,6 +143,29 @@ it("erases expired family profiles in a SQL-only bounded invocation without Stor
 it.each(["PRIVATE_PROFILE_COUNT", -1, 101])("rejects invalid profile cleanup result %j without logging content", async count => {
   const result = await packetRetention([], { profileCounts: [count], env: { CASELINK_PARENT_RETENTION_MODE: "family-profiles" } });
   expect(process.exitCode).toBe(1); expect(result.stdout).toBe(""); expect(result.stderr).not.toContain("PRIVATE_PROFILE_COUNT");
+});
+
+it("purges description content and metadata in SQL-only mode without Storage or ordinary cleanup", async () => {
+  const result = await packetRetention([], { descriptionCounts: [200, 3], env: { CASELINK_PARENT_RETENTION_MODE: "food-descriptions" } });
+  expect(result.stdout).toBe("Retention completed: 203 description content/metadata records erased.\n");
+  expect(result.stderr).toBe(""); expect(result.queries.filter(sql => sql.includes("parent_purge_food_descriptions"))).toHaveLength(2);
+  expect(result.queries.some(sql => /parent_purge_(snap|utility|family)|parent_claim_cleanup/.test(sql))).toBe(false);
+  expect(mocks.storage).not.toHaveBeenCalled(); expect(mocks.s3).not.toHaveBeenCalled();
+});
+it("bounds description cleanup to ten batches after protected erasures and before ordinary cleanup", async () => {
+  const result = await localRetention([0], { descriptionCounts: Array(11).fill(200) });
+  const first = result.queries.findIndex(sql => sql.includes("parent_purge_food_descriptions"));
+  expect(result.queries.findLastIndex(sql => sql.includes("parent_purge_family_profiles"))).toBeLessThan(first);
+  expect(result.queries.filter(sql => sql.includes("parent_purge_food_descriptions"))).toHaveLength(10);
+  expect(result.queries.findLastIndex(sql => sql.includes("parent_purge_food_descriptions"))).toBeLessThan(result.queries.findIndex(sql => sql.includes("parent_claim_cleanup")));
+  expect(result.stdout).toContain("0 private objects and 0 parent memberships erased."); expect(result.stderr).toBe("");
+});
+it.each([-1, 201, "PRIVATE_DESCRIPTION_COUNT"])("rejects malformed description purge count %j without claiming ordinary erasure", async count => {
+  const result = await localRetention([0], { descriptionCounts: [count] });
+  expect(process.exitCode).toBe(1); expect(result.stdout).toBe("");
+  expect(result.queries.some(sql => sql.includes("parent_claim_cleanup"))).toBe(false);
+  expect(mocks.remove).not.toHaveBeenCalled(); expect(result.stderr).not.toContain("PRIVATE_DESCRIPTION_COUNT");
+  expect(result.stderr).toBe("Parent retention failed. Pending erasures remain eligible for safe retry; inspect the protected runtime.\n");
 });
 
 it("purges protected packets first and reports only aggregate counts",async()=>{

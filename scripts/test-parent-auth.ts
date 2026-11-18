@@ -1488,7 +1488,7 @@ async function main() {
         && sourceAfterCorrection.operations === 0 && sourceAfterCorrection.model_calls === 0,
       "Source-only correction makes a new immutable revision/current version while preserving every unchanged fact and date.");
       check(JSON.stringify(await readSnap(spanishOriginal.id, spanishId)) === JSON.stringify(spanishOriginal), "The original Spanish revision remains exactly intact after source correction.");
-      check((await first.page.request.get(spanishCopyUrl)).status() === 409, "Superseded source-bound preparation bytes cannot be downloaded as the current application.");
+      check((await first.page.request.get(spanishCopyUrl)).status() === 403, "The superseded source scope is unavailable before any prepared bytes are loaded.");
       const sourceCorrectionRetry = await first.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": correctionKey }, data: sourceCorrection });
       check(sourceCorrectionRetry.status() === 201 && JSON.stringify(await snapState(spanishId)) === JSON.stringify(sourceAfterCorrection), "Exact actual source correction retry changes no snapshot, job, grant or timestamp.");
       const changedCorrection = await first.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": correctionKey }, data: { ...sourceCorrection, documentTemplateId: SNAP_ES_TEMPLATE_ID } });
