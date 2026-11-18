@@ -104,7 +104,16 @@ export function isPublicFoodAccessRequest(request: {
   intake: { needs: readonly string[] };
   mandate: { recipientIds: readonly string[]; allowedActions: readonly string[]; allowedData: readonly string[] };
 }): boolean {
-  return request.intake.needs.length === 1 && request.intake.needs[0] === "food_now"
+  return request.intake.needs.length === 1 && hasPublicFoodAccessSubpath(request);
+}
+
+export function hasPublicFoodAccessSubpath(request: {
+  intake: { needs: readonly string[] };
+  mandate: { recipientIds: readonly string[]; allowedActions: readonly string[]; allowedData: readonly string[] };
+}): boolean {
+  return request.intake.needs.includes("food_now") && request.intake.needs.length <= 2
+    && new Set(request.intake.needs).size === request.intake.needs.length
+    && request.intake.needs.every(need => ["food_now","snap_new","snap_renewal","snap_pending","snap_problem"].includes(need))
     && request.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM)
     && request.mandate.allowedActions.includes("prepare") && request.mandate.allowedData.includes("household");
 }

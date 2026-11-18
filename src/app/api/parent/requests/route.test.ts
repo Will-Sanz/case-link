@@ -38,6 +38,12 @@ beforeEach(() => {
 });
 
 describe("existing request creation and atomic SNAP variant", () => {
+  it("starts complementary food and SNAP once through the existing private atomic boundary and key", async () => {
+    const value = { ...snap(), intake: fixtureIntake({ needs: ["food_now", "snap_new"] }), mandate: fixtureMandate({ recipientIds: ["philly-food", "snap-pa"] }) };
+    expect((await POST(request(value))).status).toBe(201);
+    expect(mocks.startSnap).toHaveBeenCalledExactlyOnceWith(value.intake, value.mandate, value.details, value.noticeVersion, key);
+    expect(mocks.start).not.toHaveBeenCalled(); expect(mocks.startWic).not.toHaveBeenCalled();
+  });
   it("accepts actual source-backed SNAP projection for 30 people and 100 income rows beyond 64 KB", async () => {
     const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
     const person = (n: number) => ({ id: id(n), firstName: "a".repeat(80), lastName: "b".repeat(80), middleInitial: "AB", dateOfBirth: "1980-01-01", ...(n === 1 ? {} : { relationship: "r".repeat(40) }) });

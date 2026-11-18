@@ -17,7 +17,8 @@ const copy = {
     new: "Consider a new SNAP application for help paying for groceries. The program decides eligibility.", renewalReason: "Work on the renewal for the benefit you already receive.", problem: "Clarify the existing benefit issue. A new application may not be the right next step.", immediateReason: "Explore groceries or meals now while any longer benefit work continues.",
     titles: { food_now: "Food for now", snap_new: "Apply for SNAP", snap_pending: "Check a pending application", snap_renewal: "Renew SNAP", snap_problem: "Help with SNAP benefits" },
     unknownResult: "Your benefit history is still unknown. You can use direct food help and read the program choices below without guessing or starting a new application.", empty: "No new benefit action is proposed from these answers. Direct food help and the program choices below remain available.",
-    control: "Nothing has started. Each link opens that path's facts and exact permission. Other options remain proposed; choosing one does not start the others.", change: "Change my answers", english: "These questions and sign-in screens are available in Spanish. Some application screens and program materials remain in English.",
+    both: "Continue with both options", together: "Food for now and your SNAP next step can be included in one request. You can also choose just one.",
+    control: "Nothing has started. Continue to review the named programs and exact permission for your selected options. Unselected options stay proposed.", change: "Change my answers", english: "These questions and sign-in screens are available in Spanish. Some application screens and program materials remain in English.",
   },
   es: {
     title: "Busquemos apoyo alimentario para su familia.", intro: "Responda unas preguntas breves. No necesita conocer los nombres de los programas. Sus respuestas permanecen en esta pestaña. Al continuar, CaseLink comprueba las opciones para su cuenta antes de que autorice una solicitud específica.",
@@ -29,7 +30,8 @@ const copy = {
     new: "Considere solicitar SNAP para ayudar a pagar los alimentos. El programa determina la elegibilidad.", renewalReason: "Continúe con la renovación de los beneficios que ya recibe.", problem: "Aclare el problema con sus beneficios actuales. Una nueva solicitud puede no ser el paso adecuado.", immediateReason: "Busque alimentos o comidas ahora mientras continúa cualquier trámite de beneficios.",
     titles: { food_now: "Comida para ahora", snap_new: "Solicitar SNAP", snap_pending: "Consultar una solicitud pendiente", snap_renewal: "Renovar SNAP", snap_problem: "Ayuda con los beneficios de SNAP" },
     unknownResult: "Aún no sabemos si recibe beneficios. Puede buscar comida directamente y leer las opciones de programas sin adivinar ni iniciar una nueva solicitud.", empty: "Estas respuestas no indican que deba iniciar un nuevo trámite de beneficios. La ayuda alimentaria directa y las opciones de programas siguen disponibles.",
-    control: "Nada ha comenzado. Cada enlace abre los datos y el permiso específico de esa opción. Las demás opciones siguen siendo propuestas; elegir una no inicia las otras.", change: "Cambiar mis respuestas", english: "Estas preguntas y las pantallas de inicio de sesión están disponibles en español. Algunas pantallas de solicitud y materiales de los programas siguen en inglés.",
+    both: "Continuar con ambas opciones", together: "La comida para ahora y el próximo paso de SNAP pueden incluirse en una sola solicitud de apoyo. También puede elegir solo una opción.",
+    control: "Nada ha comenzado. Continúe para revisar los programas nombrados y el permiso específico para las opciones que eligió. Las opciones no seleccionadas siguen siendo propuestas.", change: "Cambiar mis respuestas", english: "Estas preguntas y las pantallas de inicio de sesión están disponibles en español. Algunas pantallas de solicitud y materiales de los programas siguen en inglés.",
   },
 } as const;
 
@@ -69,7 +71,8 @@ export function FoodAssessment({ initial, onChoose }: { initial?: FoodAssessment
       <h2 id="food-guide-results" tabIndex={-1} ref={resultTitle}>{c.results}</h2>
       {answers.benefitHistory === "not_sure" && <p>{c.unknownResult}</p>}
       {!paths.length && answers.benefitHistory !== "not_sure" && <p>{c.empty}</p>}
-      {paths.map(path => <section key={path.need} className={styles.serviceOption}><div><h3>{c.titles[path.need as keyof typeof c.titles]}</h3><p>{reason(path)}</p>{onChoose ? <button type="button" className={styles.secondary} onClick={() => onChoose({ need: path.need, answers: foodAssessmentSchema.parse(answers) })}>{c.titles[path.need as keyof typeof c.titles]}</button> : <Link className={styles.textLink} href={`/get-support?need=${path.need}`}>{c.titles[path.need as keyof typeof c.titles]}</Link>}</div></section>)}
+      {onChoose && paths.length === 2 && <div className={styles.space}><p>{c.together}</p><button type="button" className={styles.button} onClick={() => onChoose({ needs: paths.map(path => path.need), answers: foodAssessmentSchema.parse(answers) })}>{c.both}</button></div>}
+      {paths.map(path => <section key={path.need} className={styles.serviceOption}><div><h3>{c.titles[path.need as keyof typeof c.titles]}</h3><p>{reason(path)}</p>{onChoose ? <button type="button" className={styles.secondary} onClick={() => onChoose({ needs: [path.need], answers: foodAssessmentSchema.parse(answers) })}>{c.titles[path.need as keyof typeof c.titles]}</button> : <Link className={styles.textLink} href={`/get-support?need=${path.need}`}>{c.titles[path.need as keyof typeof c.titles]}</Link>}</div></section>)}
       <p>{c.control}</p><button className={styles.secondary} onClick={() => { setPaths(null); requestAnimationFrame(() => firstAnswer.current?.focus()); }}>{c.change}</button>
     </div>}
     {language === "es" && <p className={styles.notice}>{c.english}</p>}

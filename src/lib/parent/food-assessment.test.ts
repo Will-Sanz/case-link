@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import { assessFoodSupport, foodAssessmentQuestionReasons, foodAssessmentHandoffSchema } from "./food-assessment";
 
 describe("reviewed food assessment routing", () => {
+  it("keeps one compatible SNAP journey with food and returns canonical distinct selected needs", () => {
+    const answers = { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null };
+    expect(foodAssessmentHandoffSchema.parse({ answers, needs: ["snap_pending", "food_now"] }).needs).toEqual(["food_now", "snap_pending"]);
+    for (const needs of [[], ["food_now", "food_now"], ["snap_new", "snap_pending"], ["wic_new", "food_now"], ["snap_renewal"]])
+      expect(foodAssessmentHandoffSchema.safeParse({ answers, needs }).success).toBe(false);
+  });
   it("binds a tab handoff only to a path justified by the current answers", () => {
     const input = { answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null } };
-    expect(foodAssessmentHandoffSchema.parse({ ...input, need: "snap_pending" }).need).toBe("snap_pending");
-    expect(foodAssessmentHandoffSchema.safeParse({ ...input, need: "snap_new" }).success).toBe(false);
-    expect(foodAssessmentHandoffSchema.safeParse({ ...input, need: "wic_new" }).success).toBe(false);
+    expect(foodAssessmentHandoffSchema.parse({ ...input, needs: ["snap_pending"] }).needs).toEqual(["snap_pending"]);
+    expect(foodAssessmentHandoffSchema.safeParse({ ...input, needs: ["snap_new"] }).success).toBe(false);
+    expect(foodAssessmentHandoffSchema.safeParse({ ...input, needs: ["wic_new"] }).success).toBe(false);
   });
   it.each(["no", "not_sure"])("keeps immediate food independent when food for two days is %s", foodForTwoDays => {
     expect(assessFoodSupport({ foodForTwoDays, benefitHistory: "applied", existingIssue: null })).toEqual([

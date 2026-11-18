@@ -125,6 +125,20 @@ describe.skipIf(!modulePath)("atomic fixed programme reuse of owned family basic
     const untouched = program === "snap-pa" ? "applicant.lastName" : "contact.lastName";
     expect((latest.provenance as Record<string, unknown>)[untouched]).toEqual((original.provenance as Record<string, unknown>)[untouched]);
   });
+  it("updates compatible SNAP answers in a combined food request while retaining its mandate and original snapshot", async () => {
+    const value = await input("snap-pa");
+    value.intake.needs = ["food_now", "snap_new"];
+    value.mandate.recipientIds = ["philly-food", "snap-pa"];
+    value.mandate.maxRecipients = 2;
+    const id = await start(value), original = await snapshot(value, id), savedProfile = await profile();
+    await query("select public.parent_save_family_profile($1,1,$2,$3,true,true,'{}',$4)", [owner, JSON.stringify({ ...savedProfile.details, primaryPerson: { ...savedProfile.details.primaryPerson, firstName: "Corrected" } }), FAMILY_PROFILE_NOTICE_VERSION, randomUUID()]);
+    const latest = await snapshot(value, id);
+    expect(latest.details).toMatchObject({ applicant: { firstName: "Corrected" } });
+    expect(latest.provenance["applicant.lastName"]).toEqual(original.provenance["applicant.lastName"]);
+    const request = (await fixture.admin.query("select intake,mandate,parent_private.current_grant(id,version) allowed from public.parent_requests where id=$1", [id])).rows[0];
+    expect(request).toMatchObject({ intake: { needs: ["food_now", "snap_new"] }, mandate: value.mandate, allowed: true });
+    expect((await fixture.admin.query("select * from public.parent_snap_application_details where id=$1", [original.id])).rows[0]).toEqual(original);
+  });
   it("updates a known same-as-home WIC routing ZIP without touching a separate manual application answer", async () => {
     const first = await profile(), details = { ...first.details, mailingAddressSameAsHome: true }; delete details.mailingAddress;
     await query("select public.parent_save_family_profile($1,1,$2,$3,true,true,'{}',$4)", [owner, JSON.stringify(details), FAMILY_PROFILE_NOTICE_VERSION, randomUUID()]);

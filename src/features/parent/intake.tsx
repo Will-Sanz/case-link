@@ -152,10 +152,11 @@ export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: str
   useEffect(() => {
     if (guide && !guide.editing) guidePanel.current?.querySelector<HTMLElement>("#food-guide-results")?.focus();
   }, [guide]);
+  const guideNeed = guide?.handoff.needs.find(need => need !== "food_now") ?? guide?.handoff.needs[0];
   return initialNeed === "food" ? (
     <><div ref={guidePanel} hidden={guide?.editing}><FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/></div>
       {guideOwnerChanged && <p role="status">Your sign-in changed. The earlier answers were cleared; begin with your current household.</p>}
-      {guide && <div hidden={!guide.editing}><ParentIntakeForm key={guide.handoff.need} active={guide.editing} initialNeed={guide.handoff.need} handoff={guide.handoff} signInOptions={signInOptions}
+      {guide && <div hidden={!guide.editing}><ParentIntakeForm key={guideNeed} active={guide.editing} initialNeed={guideNeed} handoff={guide.handoff} signInOptions={signInOptions}
       onFoodBack={() => setGuide({ ...guide, editing: false })}
       onFoodOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }}/></div>}</>
   ) : (
@@ -202,9 +203,9 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const [reusedZip, setReusedZip] = useState<z.infer<typeof reusableZipSchema> | null>(null);
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
-    needs: [...foodNeeds, ...utilityNeeds].includes(initialNeed as SupportNeed)
+    needs: handoff?.needs ?? ([...foodNeeds, ...utilityNeeds].includes(initialNeed as SupportNeed)
       ? [initialNeed as SupportNeed]
-      : [],
+      : []),
     ...(initialNeed === "wic_new" ? { accountAuthority: "self" as const } : {}),
     ...(handoff?.answers.foodForTwoDays === "no" ? { urgency: "today" as const } : {}),
   }));
@@ -243,6 +244,13 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const router = useRouter();
   if (previousGuide !== handoff) {
     setPreviousGuide(handoff);
+    if (handoff && previousGuide) {
+      setGuideCheck(null);
+      if (handoff.needs.join(",") !== previousGuide.needs.join(",")) {
+        setIntake(current => ({ ...current, needs: handoff.needs }));
+        setAccepted(false);
+      }
+    }
     if (handoff && previousGuide && !guideTimingManual.current && handoff.answers.foodForTwoDays !== previousGuide.answers.foodForTwoDays) {
       setGuideTimingChosen(handoff.answers.foodForTwoDays === "no");
       if (handoff.answers.foodForTwoDays === "no") setIntake(current => ({ ...current, urgency: "today" }));
@@ -265,12 +273,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   }
   async function checkFoodAssessment(signal: AbortSignal, deadline: string) {
     if (!handoff) return;
-    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify({ answers: handoff.answers }) }, signal, deadline));
+    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify({ answers: handoff.answers, needs: handoff.needs }) }, signal, deadline));
     signal.throwIfAborted();
     if (!guideOwner.current || result.ownerId.toLowerCase() !== guideOwner.current) {
       onFoodOwnerChanged?.(); throw new ParentApiError("Your sign-in changed. Earlier answers cannot be used for another household.", 412);
     }
-    if (!result.candidates.some(candidate => candidate.need === handoff.need)) throw new ParentApiError("These proposed options changed. Return to the food questions to choose a current path.", 412);
+    if (handoff.needs.some(need => !result.candidates.some(candidate => candidate.need === need))) throw new ParentApiError("These proposed options changed. Return to the food questions to choose current paths.", 412);
     setGuideCheck(result);
   }
   useEffect(() => {
@@ -412,7 +420,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     ].includes(need),
   );
   const connected = (id: string) =>
-    handoff && guideCheck ? guideCheck.candidates.find(candidate => candidate.need === handoff.need)?.programs.some(program => program.programId === id && program.actions.some(action => ["share", "submit", "schedule"].includes(action))) ?? false : connections.data?.capabilities?.some(
+    handoff && guideCheck ? guideCheck.candidates.some(candidate => handoff.needs.includes(candidate.need) && candidate.programs.some(program => program.programId === id && program.actions.some(action => supportsInitialServiceDelivery(candidate.need, action)))) : connections.data?.capabilities?.some(
       (connection) =>
         connection.programId === id &&
         connection.enabled &&
@@ -930,7 +938,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
               <option value="">Choose a priority</option><option value="today">Today</option><option value="soon">Soon</option><option value="planning">Planning ahead</option>
             </select>
           </fieldset>}
-          {handoff && step === 2 && guideCheck && <p className={styles.hint}>Food options checked for this account. {guideCheck.candidates.find(candidate => candidate.need === handoff.need)?.programs.some(program => program.actions.some(action => ["share", "submit", "schedule"].includes(action))) ? "Any connected action still needs the exact permission below and a current service check." : "No connected sending or booking action was confirmed for this path. The permission below describes preparation; official help stays available."} Other proposed food paths have not started.</p>}
+          {handoff && step === 2 && guideCheck && <p className={styles.hint}>Food options checked for this account. {guideCheck.candidates.some(candidate => candidate.programs.some(program => program.actions.some(action => supportsInitialServiceDelivery(candidate.need, action)))) ? "Any connected action still needs the exact permission below and a current service check." : "No connected sending or booking action was confirmed for these options. The permission below describes preparation; official help stays available."} Unselected food options have not started.</p>}
           <ol className={styles.progress} aria-label="Support request steps">
             {(directSnap ? ["Application details", "Your permission"] : ["Your needs", "Household details", "Your permission"]).map(
               (label, index) => {
@@ -1539,7 +1547,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                 </fieldset>
               )}
               {error && <ServiceError error={error} />}
-              {startUncertain && <p className={styles.notice}>The save result has not been confirmed. Retry the same request before changing answers or starting another request. <Link className={styles.textLink} href="/my-support">Check My support for the saved request</Link>.</p>}
+              {startUncertain && <p className={styles.notice}><span>The save result has not been confirmed. Retry the same request before changing answers or starting another request. <Link className={styles.textLink} href="/my-support">Check My support for the saved request</Link>.</span></p>}
               <div className={styles.formFooter}>
                 {step > 0 ? (
                   <button

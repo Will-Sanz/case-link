@@ -230,7 +230,7 @@ describe.skipIf(!modulePath)("owned public food access through the real leased s
     expect(await job(id)).toMatchObject({ state: "queued", request_version: stale.version, lease_token: null });
     expect((await read(id)).status).toBe("active"); await work(); expect((await read(id)).status).toBe("closed");
   });
-  it("does not close or model-free claim combined sibling work after a food report", async () => {
+  it("continues the public food subpath without closing or executing its combined SNAP sibling", async () => {
     const id = await start(true), request = await read(id);
     const claim = (await query("parent_worker", "select parent_private.parent_claim_job(120) value")).rows[0].value;
     const plan = buildSupportPlan(request,new Date(),{ food_now: SHARE_FOOD_ACCESS_PROGRAM });
@@ -238,9 +238,9 @@ describe.skipIf(!modulePath)("owned public food access through the real leased s
     plan.routes[0].foodAccess = foodAccessPlanSchema.parse({ ...body, planHash:createHash("sha256").update(JSON.stringify(body)).digest("hex") });
     await query("parent_worker", "select parent_private.parent_save_job_plan($1,$2,$3,$4,'[]',null,'parent','parent_action_completed')", [claim.jobId,claim.leaseToken,request.version,JSON.stringify(plan)]);
     await report(id,"received_enough_food");
-    expect((await work()).result).toEqual({ state:"idle" });
+    expect((await work()).result).toEqual({ state:"saved" });
     const current = await read(id); expect(current.status).toBe("active"); expect(current.version).toBe(request.version);
     expect(current.plan!.routes.find(route=>route.need==="snap_new")).toEqual(plan.routes.find(route=>route.need==="snap_new"));
-    expect((await job(id)).state).toBe("queued");
+    expect((await job(id)).state).toBe("waiting");
   });
 });

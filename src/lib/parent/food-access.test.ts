@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   bindFoodAccessReport, buildFoodAccessPlanBody, foodAccessPlanBodySchema, foodAccessPlanSchema,
   foodAccessReportInputSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM, SHARE_FOOD_ACCESS_SITE,
+  hasPublicFoodAccessSubpath, isPublicFoodAccessRequest,
 } from "./food-access";
 
 const requestId = "abcdefab-cdef-4abc-8def-abcdefabcdef", reportKey = "11111111-1111-4111-8111-111111111111";
@@ -15,6 +16,21 @@ function plan() {
 const report = () => ({ expectedVersion: 2, siteId: SHARE_FOOD_ACCESS_SITE.id, planHash: plan().planHash,
   reportKey, result: "received_enough_food" as const });
 const metadata = () => ({ eventId, reportedAt: "2026-11-18T12:05:00Z" });
+
+describe("bounded public food subpath dispatch",()=>{
+  const mandate={ recipientIds:[SHARE_FOOD_ACCESS_PROGRAM,"snap-pa"],allowedActions:["research","prepare"],allowedData:["household"] };
+  it.each(["snap_new","snap_renewal","snap_pending","snap_problem"])("accepts one %s companion without treating the whole request as public-only",need=>{
+    const request={ intake:{ needs:["food_now",need] },mandate };
+    expect(hasPublicFoodAccessSubpath(request)).toBe(true);expect(isPublicFoodAccessRequest(request)).toBe(false);
+    expect(isPublicFoodAccessRequest({ ...request,intake:{ needs:["food_now"] } })).toBe(true);
+  });
+  it.each([["snap_new"],["food_now","wic_new"],["food_now","electricity"],["food_now","snap_new","snap_pending"],["food_now","food_now"]].map(needs=>({ needs })))("does not expand the selected scope to $needs",({ needs })=>{
+    expect(hasPublicFoodAccessSubpath({ intake:{ needs },mandate })).toBe(false);
+  });
+  it.each([{ recipientIds:["philly-food"] },{ allowedActions:["research"] },{ allowedData:["income"] }])("keeps the original named preparation/data gates %#",change=>{
+    expect(hasPublicFoodAccessSubpath({ intake:{ needs:["food_now","snap_new"] },mandate:{ ...mandate,...change } })).toBe(false);
+  });
+});
 
 describe("source-bound Share public food access contract", () => {
   it("prepares only dated public walk-up instructions, distinct from the City check, stock or a reservation", () => {

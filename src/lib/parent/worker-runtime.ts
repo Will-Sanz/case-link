@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { foodAccessReportSchema, isPublicFoodAccessRequest, SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
+import { foodAccessReportSchema, hasPublicFoodAccessSubpath, isPublicFoodAccessRequest, SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
 import { findShareFoodAccessObservation } from "./food-sites-core";
 import { coordinateSupport, type CoordinatorResult } from "./coordinator";
 import {
@@ -22,7 +22,7 @@ import {
   type SupportRequest,
 } from "./domain";
 import { executeSupportOperation, type ExecutablePacket } from "./execution";
-import { buildSupportPlan } from "./planning";
+import { buildSupportPlan, requiredActions } from "./planning";
 import { fillVerifiedForm, type VerifiedFormContract } from "./forms";
 import { receiptSchema } from "./policy";
 import { sameSnapProtectedPacket, sameSnapProtectedOperationBinding, snapProtectedOperationSchema, snapProtectedReferenceSchema, type SnapProtectedOperation } from "./snap-protected-operation";
@@ -44,6 +44,7 @@ import {
   type ServiceOperation,
   type ServicePorts,
   type ServiceProposedOperation,
+  type ServiceResult,
 } from "./service";
 
 export type WorkerDatabase = {
@@ -384,6 +385,7 @@ export async function runOneParentJob(
   if (!claimed.rows[0]?.job) return { state: "idle" };
   const job = claimSchema.parse(claimed.rows[0].job),
     request = job.request as unknown as SupportRequest;
+  const mixedPublicFood = request.intake.needs.length > 1 && hasPublicFoodAccessSubpath(request);
   const utilityProgram: UtilityPreparationProgram | undefined = request.intake.needs.length === 1
     ? request.intake.needs[0] === "electricity" && request.has_peco_application_details ? "peco-cap"
       : request.intake.needs[0] === "gas" && request.has_pgw_application_details ? "pgw-crp"
@@ -512,15 +514,19 @@ export async function runOneParentJob(
       ? [canonical] : [];
   });
   const continuation = continuations.length > 0;
+  const recordedProtectedSnap=operations.some(operation=>operation.protectedSnap && operation.protectedSnap.requestId===request.id
+    && ["prepared","executing","delivery_unknown"].includes(operation.state));
+  let protectedSnapUnavailable=recordedProtectedSnap && (!options.protectedSnapSubmission || !continuation);
   let deliveryJobAttempts: number | undefined;
   if (continuation && options.protectedSnapSubmission) try {
     deliveryJobAttempts = z.number().int().min(1).max(48).parse(await rpc(
       "select parent_private.parent_get_snap_delivery_job_attempts($1,$2) as value", [job.jobId, job.leaseToken]));
   } catch { /* Missing current scheduling authority must not promise an automatic retry. */ }
   let continuationPass = continuation;
-  const serviceRequest: SupportRequest = continuation ? { ...request,
-    intake: { ...request.intake, needs: ["snap_new"] }, required_actions: request.required_actions.filter(action => action.need === "snap_new"),
-    plan: request.plan ? { ...request.plan, routes: request.plan.routes.filter(route => route.need === "snap_new") } : null,
+  const serviceNeeds = continuation ? ["snap_new"] as SupportNeed[] : mixedPublicFood ? request.intake.needs.filter(need => need !== "food_now") : request.intake.needs;
+  const serviceRequest: SupportRequest = continuation || mixedPublicFood ? { ...request,
+    intake: { ...request.intake, needs: serviceNeeds }, required_actions: request.required_actions.filter(action => serviceNeeds.includes(action.need)),
+    plan: request.plan ? { ...request.plan, routes: request.plan.routes.filter(route => serviceNeeds.includes(route.need)) } : null,
   } : request;
   if (pendingCapture && !continuation) {
     const original = pendingCapture;
@@ -669,10 +675,16 @@ export async function runOneParentJob(
       template_hash: z.literal(SNAP_DRAFT_CONTRACT.sha256), preparation_only: z.literal(true), status: z.literal("stored"), expires_at: iso,
     }).nullable(),
   }).strict();
+  let snapPreviewUnavailable=false;
   const snapPreview = async () => {
     await lease();
-    const raw = await rpc("select parent_private.parent_get_snap_application_preparation($1,$2,$3) as value",
-      [job.jobId, job.leaseToken, request.version]);
+    let raw:unknown;
+    try { raw=await rpc("select parent_private.parent_get_snap_application_preparation($1,$2,$3) as value",
+      [job.jobId, job.leaseToken, request.version]); }
+    catch(error) {
+      if(error && typeof error==="object" && "code" in error && (error.code==="42501" || error.code==="23514"))snapPreviewUnavailable=true;
+      throw error;
+    }
     if (raw == null) return null;
     const state = snapPreviewSchema.parse(raw), template = state.template;
     if (state.snapshot.request_id !== request.id || template.id !== SNAP_PREVIEW_TEMPLATE_ID ||
@@ -720,6 +732,9 @@ export async function runOneParentJob(
         action,
       ]),
     );
+    if(recordedProtectedSnap && programId==="snap-pa" && (action==="submit" || action==="follow_up")
+      && (!raw.enabled || !raw.actions.includes(action) || !raw.permissionReference || !raw.permissionExpiresAt
+        || Date.parse(raw.permissionExpiresAt)<=now().getTime() || !raw.dataCategories.includes("household")))protectedSnapUnavailable=true;
     return {
       ...raw,
       // This private port reconciles its exact fax attempt; it does not register an agency-status transport.
@@ -1228,7 +1243,24 @@ export async function runOneParentJob(
   try {
     const foodReport = request.intake.needs.includes("food_now") && request.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM)
       ? foodAccessReportSchema.nullable().parse(await rpc("select parent_private.parent_get_food_access_report($1,$2) as value", [job.jobId, job.leaseToken])) : null;
-    const result = await runSupportService({
+    const publicFood = mixedPublicFood ? await runSupportService({
+      request: { ...request,
+        intake: { ...request.intake, needs:["food_now"],householdSize:null,childrenUnderFive:null,pregnantOrPostpartum:null,
+          incomeAmount:null,incomeFrequency:"unknown",utilityProviders:[],shutoffDate:null,accountAuthority:"not_sure" },
+        mandate: { ...request.mandate,recipientIds:request.mandate.recipientIds.filter(id=>getProgram(id)?.needs.includes("food_now")),
+          allowedActions:request.mandate.allowedActions.filter(action=>action==="research" || action==="prepare"),allowedData:["household"] },
+        facts:request.facts?.filter(fact=>fact.need==="food_now" && fact.field==="zip"),documents:[],events:[],
+        required_actions:request.required_actions.filter(action=>action.need==="food_now"),
+        plan:request.plan ? { ...request.plan,routes:request.plan.routes.filter(route=>route.need==="food_now") } : null },
+      documents:[],operations:operations.filter(operation=>operation.need==="food_now"),foodAccessReport:foodReport,now:now(),ports,
+    }) : null;
+    const driverIssues=publicFood ? serviceNeeds.map(need=>({ id:`benefit-driver-${need}`,need,reason:"execution_issue" as const,resolver:"operator" as const,
+      field:"benefit_service_wait",title:"SNAP work is waiting for a service check",
+      explanation:"Public food work can continue. CaseLink needs an available authorized benefit service before taking another SNAP action; no new application or receipt is confirmed." })) : [];
+    let result: ServiceResult;
+    try {
+      if (publicFood && !continuation && (options.continuationOnly || !options.apiKey)) throw new DocumentProcessingError("configuration_unavailable");
+      result = await runSupportService({
       request: serviceRequest,
       documents: continuation || utilityProgram || isPublicFoodAccessRequest(request) ? [] : job.documents.map(normalizeDocument),
       foodAccessReport: foodReport,
@@ -1238,8 +1270,34 @@ export async function runOneParentJob(
       ...(snapCapture && !continuation ? { snapCapture } : {}),
       now: now(),
       ports,
-    });
-    const otherNeeds = request.intake.needs.filter(need => need !== "snap_new");
+    }); } catch (error) {
+      if (!publicFood) throw error;
+      const plan=buildSupportPlan(serviceRequest,now());
+      plan.routes=plan.routes.map(route=>serviceRequest.plan?.routes.find(previous=>previous.need===route.need
+        && (!request.account_changed_at?.[route.need] || Date.parse(serviceRequest.plan!.generatedAt)>=Date.parse(request.account_changed_at[route.need]!)))
+        ?? (route.programId ? { ...route,state:"checking",nextActor:"caselink",summary:"This benefit path is waiting for a CaseLink service check. Food work continues independently.",
+          steps:["CaseLink will retry the benefit service; no new application or receipt is confirmed."],limitation:"The benefit service is unavailable for this turn." } : route));
+      const knownUnavailable=options.continuationOnly || !options.apiKey || error instanceof Error && error.message==="ai_budget_exhausted"
+        || error instanceof DocumentProcessingError && error.code==="configuration_unavailable";
+      const retry=now().getTime()+300_000, retryAt=!knownUnavailable && retry<Date.parse(request.mandate.expiresAt) ? new Date(retry).toISOString() : null;
+      const permissionActions=requiredActions(serviceRequest.intake,serviceRequest.mandate).filter(action=>action.reason==="expanded_permission"
+        && !serviceRequest.required_actions.some(existing=>existing.id===action.id));
+      result={ plan,requiredActions:[...serviceRequest.required_actions.filter(action=>!action.id.startsWith("benefit-driver-") && (action.id!=="protected-snap-service" || recordedProtectedSnap)),
+        ...permissionActions,
+        ...driverIssues.map(issue=>knownUnavailable ? issue : { ...issue,field:undefined })],
+        nextRunAt:retryAt,nextActor:retryAt ? "caselink" : "operator",nextTrigger:retryAt ? "scheduled_follow_up" : "provider_capability_enabled",
+        events:[],modelCalls:0,inputTokens:0,outputTokens:0 };
+    }
+    if(publicFood && snapPreviewUnavailable) {
+      result.requiredActions=[...result.requiredActions.filter(action=>!action.id.startsWith("benefit-driver-")),...driverIssues];
+      result.nextRunAt=null;result.nextActor="operator";result.nextTrigger="provider_capability_enabled";
+    }
+    if(publicFood && protectedSnapUnavailable) {
+      result.requiredActions.push({ id:"protected-snap-service",need:"snap_new",reason:"execution_issue",resolver:"operator",field:"protected_snap_service_wait",
+        title:"Prepared SNAP work is waiting",explanation:"The exact saved work resumes only when its current permission, required personal acts and protected service allow it. No new review or repeat submission is authorized. Food work continues independently." });
+      result.nextRunAt=null;result.nextActor="operator";result.nextTrigger="provider_capability_enabled";
+    }
+    const otherNeeds = request.intake.needs.filter(need => need !== "snap_new" && (!mixedPublicFood || need !== "food_now"));
     if (continuation && otherNeeds.length) {
       let otherRoutes = (request.plan?.routes ?? []).filter(route => route.need !== "snap_new");
       let otherActions = request.required_actions.filter(action => action.need !== "snap_new");
@@ -1276,6 +1334,17 @@ export async function runOneParentJob(
         result.nextActor = "caselink";
       }
       if (result.requiredActions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent"))) result.nextActor = "parent";
+    }
+    if (publicFood) {
+      result.plan.routes=request.intake.needs.flatMap(need=>(need==="food_now" ? publicFood.plan.routes : result.plan.routes).filter(route=>route.need===need));
+      result.requiredActions=request.intake.needs.flatMap(need=>(need==="food_now" ? publicFood.requiredActions : result.requiredActions).filter(action=>action.need===need));
+      result.events.push(...publicFood.events);
+      if (publicFood.nextRunAt && (!result.nextRunAt || Date.parse(publicFood.nextRunAt)<Date.parse(result.nextRunAt))) {
+        result.nextRunAt=publicFood.nextRunAt;result.nextActor=publicFood.nextActor;result.nextTrigger=publicFood.nextTrigger;
+      } else if (!result.nextRunAt && publicFood.nextActor) {
+        result.nextActor=publicFood.nextActor;result.nextTrigger=publicFood.nextTrigger;
+      }
+      if (publicFood.nextActor==="parent" || result.requiredActions.some(action=>!action.resolved && (!action.resolver || action.resolver==="parent"))) result.nextActor="parent";
     }
     if (deliveryJobAttempts === 48 && result.nextRunAt) {
       result.nextRunAt = null;

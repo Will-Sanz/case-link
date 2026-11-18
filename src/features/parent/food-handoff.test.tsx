@@ -22,7 +22,7 @@ function api(options: { assessment?: (body: unknown) => unknown | Promise<unknow
     if (url.endsWith("/food-assessment")) {
       const body = JSON.parse(String(init?.body));
       if (options.assessment) return reply(await options.assessment(body));
-      return reply({ ownerId: state.owner, candidates: assessFoodSupport(body.answers).map(path => ({ ...path,
+      return reply({ ownerId: state.owner, candidates: assessFoodSupport(body.answers).filter(path => body.needs.includes(path.need)).map(path => ({ ...path,
         programs: getProgramsForNeeds([path.need]).map(program => ({ programId: program.id, actions: [] })) })) });
     }
     if (url.endsWith("/requests") && init?.method === "POST") return options.post ? options.post(init) : reply({ request: { id: "33333333-3333-4333-8333-333333333333" } });
@@ -30,12 +30,12 @@ function api(options: { assessment?: (body: unknown) => unknown | Promise<unknow
   });
   vi.stubGlobal("fetch", fetcher); return { fetcher, state };
 }
-async function choose({ enough = "no", language = "en" }: { enough?: string; language?: "en" | "es" } = {}) {
+async function choose({ enough = "no", language = "en", both = false }: { enough?: string; language?: "en" | "es"; both?: boolean } = {}) {
   if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
   fireEvent.change(screen.getByLabelText(/enough food|suficiente comida/), { target: { value: enough } });
   fireEvent.change(screen.getByLabelText(/help paying|ayuda para comprar/), { target: { value: "applied" } });
   fireEvent.click(screen.getByRole("button", { name: language === "es" ? "Ver mis opciones" : "See my options" }));
-  fireEvent.click(screen.getByRole("button", { name: language === "es" ? "Consultar una solicitud pendiente" : "Check a pending application" }));
+  fireEvent.click(screen.getByRole("button", { name: both ? language === "es" ? "Continuar con ambas opciones" : "Continue with both options" : language === "es" ? "Consultar una solicitud pendiente" : "Check a pending application" }));
 }
 async function facts() {
   fireEvent.change(await screen.findByLabelText("Household ZIP code"), { target: { value: "19104" } });
@@ -70,7 +70,7 @@ describe("guided food handoff into the owned typed request", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check a pending application" }));
     expect((screen.getByLabelText("Household ZIP code") as HTMLInputElement).value).toBe("19104");
     expect((screen.getByLabelText("Request timing") as HTMLSelectElement).value).toBe("soon");
-    await permission(); expect(screen.getByText(/Other proposed food paths have not started/)).toBeTruthy();
+    await permission(); expect(screen.getByText(/Unselected food options have not started/)).toBeTruthy();
   });
   it("rejects a stale language response instead of opening permission for old choices", async () => {
     let release!: (value: unknown) => void;
@@ -101,18 +101,28 @@ describe("guided food handoff into the owned typed request", () => {
     expect((screen.getByLabelText(/enough food/) as HTMLSelectElement).value).toBe("");
     expect(fetcher.mock.calls.some(([url, init]) => url.endsWith("/requests") && init?.method === "POST")).toBe(false);
   });
-  it("reconciles an uncertain start with its exact body and key without rerunning assessment", async () => {
+  it("reconciles a combined uncertain start with its complete exact body and key without rerunning assessment", async () => {
     let first = true; const { fetcher } = api({ post: () => { if (first) { first = false; throw new Error("lost acknowledgement"); } return reply({ request: { id: owner } }); } });
-    renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose({ both: true }); await facts(); await permission();
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await screen.findByText(/save result has not been confirmed/);
+    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     const checks = fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment")).length;
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
     expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
+    expect(JSON.parse(String(posts[0][1]?.body))).toMatchObject({ intake: { needs: ["food_now", "snap_pending"] }, mandate: { recipientIds: expect.arrayContaining(["philly-food", "snap-pa"]) } });
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment"))).toHaveLength(checks);
+  });
+  it("requires every selected sibling to survive the account preflight", async () => {
+    const { fetcher } = api({ assessment: () => ({ ownerId: owner, candidates: [{ need: "food_now", reason: "immediate", programs: [] }] }) });
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose({ both: true }); await facts();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByText(/These proposed options changed/);
+    expect(screen.queryByRole("checkbox", { name: /I authorize/ })).toBeNull();
+    expect(fetcher.mock.calls.some(([url, init]) => url.endsWith("/requests") && init?.method === "POST")).toBe(false);
   });
   it("keeps guide answers through existing inline sign-in with the original recovery settings", async () => {
     api({ signedIn: false }); renderGuide(<ParentIntake initialNeed="food" signInOptions={{ existingAccountRecovery: true, recoveryHref: "https://original.example.invalid/forgot-password", emailCodeAvailable: false }}/>);

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createParentSqlFixture } from "../../../scripts/parent-sql-fixture";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "./constants";
 import { fixtureIntake, fixtureMandate, fixtureSnapApplication } from "./test-fixtures";
+import { runOneParentJob, type WorkerRuntimeOptions } from "./worker-runtime";
 
 const modulePath = process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
 const directVersion = "pa600fs-direct-completion-2026-11-05.v1", legacyVersion = "pa600fs-final-content-2026-11-04.v1";
@@ -49,7 +50,7 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
         verified_until=excluded.verified_until,snap_direct_completion_version=excluded.snap_direct_completion_version,snap_direct_completion_evidence_reference=excluded.snap_direct_completion_evidence_reference`,
     [acts, direct ? directVersion : null, direct ? "synthetic method decision only; no provider acceptance" : null]);
   }
-  async function setup(): Promise<Scope> {
+  async function setup(mixed = false): Promise<Scope> {
     await capability(); const owner = randomUUID(), session = randomUUID(); sessions.set(owner, session);
     await fixture.admin.query(`update parent_private.processing_controls set enabled=true,approval_reference='synthetic route fixture only',approved_until=clock_timestamp()+interval '1 day',
       snap_details_enabled=true,snap_details_approval_reference='synthetic only',snap_details_approved_until=clock_timestamp()+interval '1 day',snap_details_notice_version=$1,
@@ -58,7 +59,7 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),clock_timestamp()+interval '1 hour')", [session, owner]);
     const s = { owner } as Scope;
-    const request = (await parent(s, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()])).rows[0].id as string;
+    const request = (await parent(s, "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: mixed ? ["food_now","snap_new"] : ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: mixed ? ["snap-pa","share-community-fridge-19129"] : ["snap-pa"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()])).rows[0].id as string;
     const details = fixtureSnapApplication(new Date()), snapshot = (await parent(s, "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()])).rows[0].id as string;
     const version = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const hash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, version])).rows[0].hash as string;
@@ -175,13 +176,56 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
   });
   describe("continuation-only worker claims", () => {
     const park = () => fixture.admin.query("update public.parent_jobs set state='waiting',run_at='infinity',lease_token=null,lease_until=null");
-    async function ready(authorized = true) {
-      const scope = await setup(); await authorize(scope); const receipt = await stage(scope);
+    async function ready(authorized = true, mixed = false) {
+      const scope = await setup(mixed); await authorize(scope); const receipt = await stage(scope);
       const operationId = (await prepare(scope, receipt.verificationId)).rows[0].id as string;
       if (authorized) await submit(scope, operationId);
       return { ...scope, operationId };
     }
     const claim = () => call("parent_worker", "select parent_private.parent_claim_job(300,true) job");
+    it.each(["prepared","delivery_unknown"])("resumes a parked mixed %s operation without a model key or available model budget",async state=>{
+      await park();const scope=await ready(true,true);let sends=0,reconciles=0;
+      const options:WorkerRuntimeOptions={ database:{ query:(sql,values)=>call("parent_worker",sql,values) },continuationOnly:true,
+        brokerOrigin:"http://127.0.0.1:3310",brokerSecret:"synthetic-only-no-live-secret-32-characters",supabaseOrigin:"http://127.0.0.1:55321",
+        fetcher:async input=>{const url=new URL(String(input));expect(url.origin).toBe("https://services.arcgis.com");expect(url.searchParams.get("where")).toBe("objectid=122");
+          return Response.json({ features:[{ attributes:{ objectid:122,site_name:"Share Community Fridge",address:"2901 W Hunting Park Ave",zip_code:"19129",status:"Active",category_type:"Community Fridge" } }] }); } };
+      if(state==="delivery_unknown"){
+        await fixture.admin.query(`insert into parent_private.provider_capabilities(program_id,action,enabled,transport_verified,requires_form,permission_version,permission_reference,allowed_fields,field_categories,required_acts,verified_until)
+          values('snap-pa','follow_up',true,true,false,'synthetic-route-v1','synthetic metadata follow-up permission',array['statusReference'],'{"statusReference":"household"}','{}',now()+interval '1 hour')
+          on conflict(program_id,action) do update set enabled=true,transport_verified=true,requires_form=false,permission_version=excluded.permission_version,permission_reference=excluded.permission_reference,
+            allowed_fields=excluded.allowed_fields,field_categories=excluded.field_categories,required_acts=excluded.required_acts,verified_until=excluded.verified_until`);
+        options.protectedSnapSubmission={ execute:async()=>{throw new Error("synthetic interrupted acknowledgement");},reconcile:async()=>null };
+      }
+      expect(await runOneParentJob(options)).toEqual({ state:"saved" });
+      if(state==="delivery_unknown"){
+        options.protectedSnapSubmission=undefined;
+        // Advance only the existing scheduled check; the operation and authority remain unchanged.
+        await fixture.admin.query("update public.parent_jobs set run_at=now() where request_id=$1",[scope.request]);
+        expect(await runOneParentJob(options)).toEqual({ state:"saved" });
+      }
+      const before=(await fixture.admin.query("select to_jsonb(j) value from public.parent_jobs j where request_id=$1",[scope.request])).rows[0].value;
+      expect(before.run_at).toBe("infinity");expect((await fixture.admin.query("select state from public.parent_operations where id=$1",[scope.operationId])).rows[0].state).toBe(state);
+      await fixture.admin.query("insert into parent_private.model_call_reservations default values");
+      await fixture.admin.query("update parent_private.processing_controls set model_call_limit=1,model_budget_started_at=now()-interval '1 minute'");
+      const reservations=(await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+      for(let index=0;index<4;index++)expect(await runOneParentJob(options)).toEqual({ state:"idle" });
+      options.protectedSnapSubmission={ execute:async()=>{sends++;return { operationId:scope.operationId,packetId:scope.packet,contentSha256:digest,
+        receipt:{ state:"sent",source:"provider_api",reference:"synthetic exact dispatch receipt",recordedAt:new Date().toISOString() } }; },
+        reconcile:async()=>{reconciles++;return { operationId:scope.operationId,packetId:scope.packet,contentSha256:digest,
+          receipt:{ state:"agency_submitted",source:"agency_receipt",reference:"synthetic exact reconciliation receipt",recordedAt:new Date().toISOString() } }; } };
+      if(state==="prepared"){
+        await fixture.admin.query("update parent_private.processing_controls set snap_protected_enabled=false");
+        for(let index=0;index<4;index++)expect(await runOneParentJob(options)).toEqual({ state:"idle" });
+        await fixture.admin.query("update parent_private.processing_controls set snap_protected_enabled=true");
+      }
+      expect(await runOneParentJob(options)).toEqual({ state:"saved" });
+      expect(sends).toBe(state==="prepared" ? 1 : 0);expect(reconciles).toBe(state==="delivery_unknown" ? 1 : 0);
+      expect((await fixture.admin.query("select state from public.parent_operations where id=$1",[scope.operationId])).rows[0].state).toBe(state==="prepared" ? "sent" : "agency_submitted");
+      expect((await fixture.admin.query("select attempts from public.parent_jobs where request_id=$1",[scope.request])).rows[0].attempts).toBe(before.attempts+1);
+      expect((await fixture.admin.query("select count(*)::int n from parent_private.ai_calls where request_id=$1",[scope.request])).rows[0].n).toBe(0);
+      expect((await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n).toBe(reservations);
+      await fixture.admin.query("update parent_private.processing_controls set model_call_limit=null,model_budget_started_at=null");
+    });
     it("claims exact authorized SNAP work without consuming an older unrelated job", async () => {
       await park(); const unrelated = await setup(), current = await ready();
       await fixture.admin.query("update public.parent_jobs set run_at=now()-interval '1 hour' where request_id=$1", [unrelated.request]);

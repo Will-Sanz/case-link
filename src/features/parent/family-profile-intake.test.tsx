@@ -36,8 +36,11 @@ function api(profile: () => unknown | Promise<unknown> = saved) {
       pgwApplication: { collectionEnabled: true, noticeVersion: PGW_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" },
       waterApplication: { collectionEnabled: true, noticeVersion: WATER_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" } } });
     if (url.endsWith("/intake-defaults")) return reply({ zip: null });
-    if (url.endsWith("/food-assessment")) return reply({ ownerId: personId, candidates: assessFoodSupport(JSON.parse(String(init?.body)).answers).map(path => ({ ...path,
-      programs: getProgramsForNeeds([path.need]).map(program => ({ programId: program.id, actions: [] })) })) });
+    if (url.endsWith("/food-assessment")) {
+      const body = JSON.parse(String(init?.body));
+      return reply({ ownerId: personId, candidates: assessFoodSupport(body.answers).filter(path => body.needs.includes(path.need)).map(path => ({ ...path,
+        programs: getProgramsForNeeds([path.need]).map(program => ({ programId: program.id, actions: [] })) })) });
+    }
     if (url.endsWith("/requests") && init?.method === "POST") return reply({ request: { id: requestId } });
     return reply({ capabilities: [] });
   }); vi.stubGlobal("fetch", fetcher); return fetcher;
@@ -67,6 +70,44 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now)
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("saved family information in actual application intake", () => {
+  it("retains private SNAP answers and profile links through food changes and an exact unknown combined start retry", async () => {
+    const fetcher = api(); render(<ParentLocaleProvider initialLocale="en"><ParentIntake initialNeed="food"/></ParentLocaleProvider>);
+    fireEvent.change(screen.getByLabelText(/enough food/), { target: { value: "no" } });
+    fireEvent.change(screen.getByLabelText(/help paying/), { target: { value: "never" } });
+    fireEvent.click(screen.getByRole("button", { name: "See my options" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply for SNAP" }));
+    await waitFor(() => expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Saved"));
+    fireEvent.change(screen.getByLabelText("Your first name"), { target: { value: "Manual" } });
+    await completeSnapQuestions();
+    for (const name of ["Continue with both options", "Apply for SNAP", "Continue with both options"]) {
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      fireEvent.click(screen.getByRole("button", { name }));
+      expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Manual");
+      expect((document.querySelector('[data-snap-path="income.hasIncome"]') as HTMLSelectElement).value).toBe("no");
+      expect((screen.getByLabelText("Are you a U.S. citizen?") as HTMLSelectElement).value).toBe("yes");
+    }
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/family-profile"))).toHaveLength(1);
+    let first = true; const previousFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const result = await previousFetch(url, init);
+      if (url.endsWith("/requests") && init?.method === "POST" && first) { first = false; throw new Error("lost acknowledgement"); }
+      return result;
+    }));
+    await authorize(); await screen.findByText(/save result has not been confirmed/);
+    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
+    const checks = fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment")).length;
+    fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalled());
+    const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
+    expect(posts).toHaveLength(2);
+    expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment"))).toHaveLength(checks);
+    const packet = JSON.parse(String(posts[0][1]!.body));
+    expect(packet).toMatchObject({ kind: "snap_application", intake: { needs: ["food_now", "snap_new"] }, details: { applicant: { firstName: "Manual" } },
+      mandate: { recipientIds: expect.arrayContaining(["philly-food", "snap-pa"]) } });
+    expect(packet.familyProfileSource.fields).toContainEqual({ applicationPath: `household.${personId}.dateOfBirth`, profilePaths: ["primaryPerson.dateOfBirth"] });
+    expect(packet.familyProfileSource.fields.some((field: { applicationPath: string }) => field.applicationPath === "applicant.firstName")).toBe(false);
+  });
   it("keeps screen language separate and preserves a manual service-language correction during SNAP profile reuse", async () => {
     const fetcher = api(); render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header><ParentIntake initialNeed="food"/></ParentLocaleProvider>);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });

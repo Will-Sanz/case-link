@@ -33,6 +33,7 @@ import type { SnapSenderCarrier } from "./snap-sender-carrier";
 import { fixtureUtilityProtectedOperation } from "./utility-preparation-test-fixtures";
 import type { UtilityProtectedOperation } from "./utility-protected-operation";
 import type { SnapProtectedSubmissionPort } from "./snap-protected-submission-port";
+import { SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
 
 const jobId = "d1b9b24b-591f-4917-8d8c-46273f5ffbc7",
   leaseToken = "f2027908-9548-4b72-8657-4014ea7e8145",
@@ -983,6 +984,31 @@ describe("synthetic reference-only protected SNAP worker", () => {
     test.state.claim.request.plan = buildSupportPlan(test.state.claim.request, fixtureNow);
     return test;
   }
+  it.each([{ sourceConflict:false,senderAvailable:true },{ sourceConflict:true,senderAvailable:true },{ sourceConflict:false,senderAvailable:false }])("continues food independently of protected SNAP model/sender availability: %j",async({ sourceConflict,senderAvailable })=>{
+    const test=protectedSetup(), now=new Date("2026-11-18T12:00:00Z");
+    test.state.claim.request.intake=fixtureIntake({ needs:["snap_new","food_now"],zip:"19129",utilityProviders:[] });
+    test.state.claim.request.created_at=now.toISOString();test.state.claim.request.mandate.recipientIds=["snap-pa",SHARE_FOOD_ACCESS_PROGRAM];
+    test.state.claim.request.mandate.expiresAt=new Date(now.getTime()+3600000).toISOString();
+    test.state.leaseExpiresAt=new Date(now.getTime()+300000).toISOString();test.options.now=()=>now;
+    Object.assign(test.raw,{ state:"delivery_unknown",protectedPacketCurrent:false,snapSubmissionAuthorized:false });
+    test.port.reconcile.mockResolvedValue({ ...test.result,receipt:{ ...receipt,state:"agency_submitted",source:"agency_receipt",recordedAt:now.toISOString() } });
+    delete test.options.apiKey;test.options.continuationOnly=true;
+    if(!senderAvailable)delete test.options.protectedSnapSubmission;
+    test.fetcher.mockImplementation(async input=>{
+      const url=new URL(String(input));expect(url.origin).toBe("https://services.arcgis.com");expect(url.searchParams.get("where")).toBe("objectid=122");
+      return Response.json({ features:[{ attributes:{ objectid:122,site_name:"Share Community Fridge",address:"2901 W Hunting Park Ave",zip_code:"19129",status:"Active",category_type:sourceConflict ? "School Meal Site" : "Food Site" } }] });
+    });
+    expect(await runOneParentJob(test.options)).toEqual({ state:"saved" });
+    const plan=JSON.parse(String(test.state.saved[0][3]));expect(plan.routes.map((route:{ need:string })=>route.need)).toEqual(["snap_new","food_now"]);
+    if(senderAvailable)expect(plan.routes[0].state).toBe("agency_submitted");
+    else {
+      expect(plan.routes[0].state).not.toBe("agency_submitted");
+      expect(JSON.parse(String(test.state.saved[0][4]))).toContainEqual(expect.objectContaining({ need:"snap_new",reason:"execution_issue" }));
+    }
+    expect(plan.routes[1].state).toBe(sourceConflict ? "unresolved" : "prepared");
+    expect(test.port.reconcile).toHaveBeenCalledTimes(senderAvailable ? 1 : 0);expect(test.port.execute).not.toHaveBeenCalled();expect(test.execute).not.toHaveBeenCalled();
+    expect(test.fetcher).toHaveBeenCalledOnce();expect(test.database.query.mock.calls.some(([sql])=>sql.includes("parent_reserve_ai_call"))).toBe(false);
+  });
   it("resumes independent work when the driver returns without repeating SNAP submission", async () => {
     const test = mixedSetup(), apiKey = test.options.apiKey;
     Object.assign(test.raw, { state: "delivery_unknown", protectedPacketCurrent: false, snapSubmissionAuthorized: false });
@@ -1442,5 +1468,56 @@ describe("durable private utility preparation", () => {
     expect(normalizeWorkerOperation(row)?.protectedUtility).toEqual(test.canonical);
     expect(() => normalizeWorkerOperation({ ...row, action: "submit" })).toThrow();
     expect(() => normalizeWorkerOperation({ ...row, packet: { ...row.packet, rawAccount: "PRIVATE_CANARY" } })).toThrow();
+  });
+});
+
+
+describe("independent public food and SNAP work under one lease",()=>{
+  const now=new Date("2026-11-18T12:00:00Z");
+  function mixedFood(){
+    const test=setup();
+    test.state.claim.request=fixtureRequest({ created_at:now.toISOString(),updated_at:now.toISOString(),
+      intake:fixtureIntake({ needs:["food_now","snap_pending"],zip:"19129",incomeAmount:777777,incomeFrequency:"monthly",utilityProviders:[] }),
+      mandate:fixtureMandate({ mode:"prepare_only",recipientIds:[SHARE_FOOD_ACCESS_PROGRAM,"snap-pa"],allowedActions:["research","prepare"],allowedData:["household","income","documents"],expiresAt:new Date(now.getTime()+3600000).toISOString() }) });
+    test.state.leaseExpiresAt=new Date(now.getTime()+300000).toISOString();test.options.now=()=>now;
+    test.state.claim.request.plan=buildSupportPlan(test.state.claim.request,now);
+    test.state.claim.request.required_actions=[{ id:"snap-only-question",need:"snap_pending",reason:"personal_step",title:"Synthetic SNAP personal step",explanation:"Private SNAP canary",field:"statusReference" }];
+    test.fetcher.mockImplementation(async input=>{ const url=new URL(String(input));expect(url.origin).toBe("https://services.arcgis.com");expect(url.searchParams.get("where")).toBe("objectid=122");
+      return Response.json({ features:[{ attributes:{ objectid:122,site_name:"Share Community Fridge",address:"2901 W Hunting Park Ave",zip_code:"19129",status:"Active",category_type:"Food Site" } }] }); });
+    test.options.coordinate=vi.fn(async input=>{ await input.beforeCall?.();return { plan:buildSupportPlan(input.request,now),requiredActions:[],modelCalls:1,inputTokens:10,outputTokens:10 }; });
+    return test;
+  }
+  it.each(["no key","broker offline","model outage","budget exhausted"])("preserves saved SNAP work and prepares food through %s",async failure=>{
+    const test=mixedFood(), before=structuredClone(test.state.claim.request), oldSnap=before.plan!.routes[1];
+    if(failure==="no key")delete test.options.apiKey;
+    if(failure==="broker offline")test.options.continuationOnly=true;
+    if(failure==="model outage")vi.mocked(test.options.coordinate!).mockRejectedValue(new Error("PRIVATE_MODEL_CANARY"));
+    if(failure==="budget exhausted")test.state.budget=false;
+    expect(await runOneParentJob(test.options)).toEqual({ state:"saved" });
+    const plan=JSON.parse(String(test.state.saved[0][3]));
+    expect(plan.routes.map((route:{ need:string })=>route.need)).toEqual(["food_now","snap_pending"]);
+    expect(plan.routes[0]).toMatchObject({ state:"prepared",foodAccess:{ site:{ stock:"unknown" } } });
+    expect(plan.routes[1]).toEqual(oldSnap);
+    expect(JSON.parse(String(test.state.saved[0][4]))).toEqual([...before.required_actions,expect.objectContaining({ id:"benefit-driver-snap_pending",resolver:"operator",reason:"execution_issue" })]);
+    expect(test.state.saved[0][5]).toBe(failure==="model outage" ? new Date(now.getTime()+300000).toISOString() : null);
+    expect(test.state.claim.request).toEqual(before);expect(test.execute).not.toHaveBeenCalled();expect(test.state.prepared).toEqual([]);
+    expect(test.fetcher).toHaveBeenCalledOnce();expect(String(test.fetcher.mock.calls[0][0])).not.toContain("777777");
+    expect(JSON.stringify(plan.routes[0])).not.toMatch(/Private SNAP canary|"(?:incomeAmount|documentIds)"\s*:|:\s*(?:777777|"777777")(?=[,}])/);
+    if(failure==="no key" || failure==="broker offline")expect(test.options.coordinate).not.toHaveBeenCalled();
+  });
+  it("passes only SNAP work to the model and restores original selected order",async()=>{
+    const test=mixedFood();test.state.claim.request.intake.needs=["snap_pending","food_now"];
+    expect(await runOneParentJob(test.options)).toEqual({ state:"saved" });
+    expect(vi.mocked(test.options.coordinate!).mock.calls[0][0].request.intake.needs).toEqual(["snap_pending"]);
+    const plan=JSON.parse(String(test.state.saved[0][3]));expect(plan.routes.map((route:{ need:string })=>route.need)).toEqual(["snap_pending","food_now"]);
+    expect(plan.routes[1].foodAccess).toBeTruthy();expect(test.fetcher).toHaveBeenCalledOnce();
+  });
+  it("does not open private documents while only the public subpath can run",async()=>{
+    const test=mixedFood();uploadFixture(test);
+    Object.assign(test.state.claim.documents[0],{ expires_at:new Date(now.getTime()+3600000).toISOString(),created_at:now.toISOString() });
+    delete test.options.apiKey;test.options.continuationOnly=true;
+    expect(await runOneParentJob(test.options)).toEqual({ state:"saved" });
+    expect(test.options.processDocument).not.toHaveBeenCalled();expect(test.fetcher).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(test.state.saved[0][3])).routes[0].foodAccess).toBeTruthy();
   });
 });

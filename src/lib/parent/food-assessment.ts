@@ -22,11 +22,18 @@ const recommendationSchema = z.object({
   reason: z.enum(["immediate", "new", "pending", "renewal", "problem"]),
 }).strict();
 export type FoodRecommendation = z.infer<typeof recommendationSchema>;
-export const foodAssessmentInputSchema = z.object({ answers: foodAssessmentSchema }).strict();
-export const foodAssessmentHandoffSchema = foodAssessmentInputSchema.extend({ need: recommendationSchema.shape.need }).superRefine((value, context) => {
-  if (!assessFoodSupport(value.answers).some(path => path.need === value.need))
-    context.addIssue({ code: "custom", path: ["need"], message: "Choose a current proposed food path." });
+export const foodAssessmentInputSchema = z.object({
+  answers: foodAssessmentSchema,
+  needs: z.array(recommendationSchema.shape.need).min(1).max(2).superRefine((needs, context) => {
+    if (new Set(needs).size !== needs.length || needs.filter(need => need !== "food_now").length > 1)
+      context.addIssue({ code: "custom", message: "Choose food for now and at most one current SNAP journey." });
+  }).transform(needs => recommendationSchema.shape.need.options.filter(need => needs.includes(need))),
+}).strict().superRefine((value, context) => {
+  const candidates = assessFoodSupport(value.answers);
+  if (value.needs.some(need => !candidates.some(path => path.need === need)))
+    context.addIssue({ code: "custom", path: ["needs"], message: "Choose current proposed food paths." });
 });
+export const foodAssessmentHandoffSchema = foodAssessmentInputSchema;
 export type FoodAssessmentHandoff = z.infer<typeof foodAssessmentHandoffSchema>;
 export const foodAssessmentReplySchema = z.object({
   ownerId: z.uuid(),

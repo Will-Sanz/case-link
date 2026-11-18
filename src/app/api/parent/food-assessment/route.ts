@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const parsed = capabilitiesSchema.safeParse(connections.data);
     if (connections.error || !parsed.success) return parentJson({ ok: false, error: "Current food connections could not be checked. Your answers remain on this page; try again or use the direct program options." }, 503);
     const capabilities = parsed.data, now = new Date();
-    return parentJson({ ok: true, ownerId: user.id, candidates: assessFoodSupport(input.answers).map(path => ({
+    return parentJson({ ok: true, ownerId: user.id, candidates: assessFoodSupport(input.answers).filter(path => input.needs.includes(path.need)).map(path => ({
       ...path, programs: getProgramsForNeeds([path.need]).map(program => ({
         programId: program.id,
         actions: !programRoutingIssue(program, undefined, now)

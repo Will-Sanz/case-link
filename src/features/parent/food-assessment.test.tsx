@@ -11,13 +11,22 @@ beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 function answer(label: RegExp, value: string) { fireEvent.change(screen.getByLabelText(label), { target: { value } }); }
 describe("public guided food entry", () => {
+  it.each(["en", "es"] as const)("offers both compatible food and pending SNAP paths in one handoff in %s", language => {
+    const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose} />);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } });
+    answer(/enough food|suficiente comida/, "no"); answer(/help paying|ayuda para comprar/, "applied");
+    fireEvent.click(screen.getByRole("button", { name: language === "en" ? "See my options" : "Ver mis opciones" }));
+    fireEvent.click(screen.getByRole("button", { name: language === "en" ? "Continue with both options" : "Continuar con ambas opciones" }));
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ needs: ["food_now", "snap_pending"], answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null } });
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("hands only the exact current answers to the typed form without navigation or persistence", () => {
     const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose}/>);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     answer(/suficiente comida/, "not_sure"); answer(/ayuda para comprar/, "applied");
     fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
     fireEvent.click(screen.getByRole("button", { name: "Consultar una solicitud pendiente" }));
-    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ need: "snap_pending", answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null } });
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ needs: ["snap_pending"], answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null } });
     expect(fetch).not.toHaveBeenCalled();
   });
   it("moves keyboard focus to results and back to the first answer when editing", async () => {
