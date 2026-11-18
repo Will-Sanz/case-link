@@ -1,0 +1,160 @@
+import { z } from "zod";
+import { hasExcludedAssistantInformation } from "./assistant-contract";
+import { actionSchema, needSchema, outcomeSchema } from "./domain";
+import { assessFoodSupport, foodAssessmentQuestionReasons, foodAssessmentSchema, type FoodAssessmentAnswers, type FoodRecommendation } from "./food-assessment";
+import { getProgramsForNeeds, programRoutingIssue, supportsInitialServiceDelivery } from "./programs";
+
+// Unwired contract only. Passing these guards is not permission to collect prose or call a processor.
+export const foodDescriptionNeedSchema = needSchema.extract(["food_now", "snap_new", "snap_pending", "snap_renewal", "snap_problem"]);
+const programId = z.enum(["philly-food", "share-community-fridge-19129", "snap-pa", "uesf-benefits"]);
+const questionId = z.enum(Object.keys(foodAssessmentQuestionReasons) as (keyof typeof foodAssessmentQuestionReasons)[]);
+const timestamp = z.iso.datetime({ offset: true });
+const revision = z.number().int().positive().max(2147483647);
+const unique = <T,>(values: T[]) => new Set(values).size === values.length;
+const reasons: Record<z.infer<typeof foodDescriptionNeedSchema>, FoodRecommendation["reason"]> = {
+  food_now: "immediate", snap_new: "new", snap_pending: "pending", snap_renewal: "renewal", snap_problem: "problem",
+};
+
+/** Defense in depth, including known English/Spanish exclusions; it cannot certify arbitrary text safe. */
+export function hasExcludedFoodDescriptionInformation(value: string): boolean {
+  const text = value.normalize("NFKD").replace(/\p{M}|[\u200B-\u200D\u2060\uFEFF]/gu, "");
+  return hasExcludedAssistantInformation(text)
+    || /\b(?:contrasena|clave|pin|seguro social|numero de cuenta|fecha de nacimiento|password|passcode|signature|firma)\b/i.test(text)
+    || /\b(?:pregnan\w*|embaraz\w*|postpartum|posparto|breastfeed\w*|lactan\w*|medical|medic[oa]s?|diagnos\w*|diabet\w*)\b/i.test(text)
+    || /\b(?:my name is|me llamo|mi nombre es|my child.{0,30}(?:named|born)|mi hij[oa].{0,30}(?:llama|nacio))\b/i.test(text)
+    || /\b(?:full text|texto completo|private.{0,30}document|documento privado)\b/i.test(text)
+    || /\b(?:peco|pgw|utility|electricity|water|gas|luz|agua)\b.{0,80}\b(?:account|bill|owe|shutoff|cuenta|factura|debo|corte)\b/i.test(text)
+    || /[$€£]\s*\d|\b\d{4}-\d{2}-\d{2}\b/.test(text);
+}
+export const foodDescriptionInputSchema = z.object({
+  description: z.string().max(500).trim().min(1).refine(value => !/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value) && !hasExcludedFoodDescriptionInformation(value), "parent_food_description_private_input"),
+  screenLocale: z.enum(["en", "es"]),
+}).strict();
+export type FoodDescriptionInput = z.infer<typeof foodDescriptionInputSchema>;
+const provenance = {
+  source: z.enum(["parent_typed", "family_profile"]), confirmedAt: timestamp, expiresAt: timestamp,
+  descriptionUsePermitted: z.boolean().optional(),
+};
+const factsSchema = z.object({
+  foodForTwoDays: z.object({ value: foodAssessmentSchema.shape.foodForTwoDays, ...provenance }).strict().optional(),
+  benefitHistory: z.object({ value: foodAssessmentSchema.shape.benefitHistory, ...provenance }).strict().optional(),
+  existingIssue: z.object({ value: foodAssessmentSchema.shape.existingIssue.unwrap(), ...provenance }).strict().optional(),
+  zip: z.object({ value: z.string().regex(/^\d{5}$/), ...provenance }).strict().optional(),
+}).strict();
+const historySchema = z.object({
+  ownerId: z.uuid(), requestId: z.uuid(), requestVersion: revision,
+  requestStatus: z.enum(["active", "paused", "cancelled", "closed"]),
+  need: foodDescriptionNeedSchema.exclude(["food_now"]), state: outcomeSchema, current: z.boolean(),
+}).strict();
+/** Trusted, owned server context, never a public request body. Actual permission/DB checks remain required. */
+export const foodDescriptionContextSchema = z.object({
+  expectedOwnerId: z.uuid(), ownerId: z.uuid(), expectedRevision: revision, revision,
+  catalogVersion: z.string().regex(/^[a-zA-Z0-9._:-]{1,100}$/), capabilityVersion: z.string().regex(/^[a-zA-Z0-9._:-]{1,100}$/),
+  facts: factsSchema, history: z.array(historySchema).max(20),
+  programIds: z.array(programId).max(4).refine(unique),
+  capabilities: z.array(z.object({ programId, enabled: z.boolean(), actions: z.array(actionSchema).max(6).refine(unique) }).strict()).max(4)
+    .refine(values => unique(values.map(value => value.programId))),
+  excludedNeedIds: z.array(foodDescriptionNeedSchema).max(5).refine(unique),
+}).strict();
+export type FoodDescriptionContext = z.infer<typeof foodDescriptionContextSchema>;
+const spanSchema = z.object({ start: z.number().int().nonnegative().max(499), end: z.number().int().positive().max(500), text: z.string().min(1).max(500) }).strict();
+const assertionSchema = z.discriminatedUnion("questionId", [
+  z.object({ questionId: z.literal("foodForTwoDays"), value: foodAssessmentSchema.shape.foodForTwoDays, span: spanSchema }).strict(),
+  z.object({ questionId: z.literal("benefitHistory"), value: foodAssessmentSchema.shape.benefitHistory, span: spanSchema }).strict(),
+  z.object({ questionId: z.literal("existingIssue"), value: foodAssessmentSchema.shape.existingIssue.unwrap(), span: spanSchema }).strict(),
+]);
+export const foodDescriptionSelectionSchema = z.object({
+  needIds: z.array(foodDescriptionNeedSchema).max(5).refine(unique),
+  selections: z.array(z.object({ need: foodDescriptionNeedSchema, programId, reason: z.enum(["immediate", "new", "pending", "renewal", "problem"]) }).strict()).max(10)
+    .refine(values => unique(values.map(value => `${value.need}:${value.programId}`))),
+  assertions: z.array(assertionSchema).max(3).refine(values => unique(values.map(value => value.questionId))),
+  exclusions: z.array(z.object({ need: foodDescriptionNeedSchema, span: spanSchema }).strict()).max(5).refine(values => unique(values.map(value => value.need))),
+  questionIds: z.array(questionId).max(3).refine(unique),
+  outOfScope: z.enum(["wic", "utilities", "other"]).nullable(),
+}).strict();
+
+function currentFacts(facts: FoodDescriptionContext["facts"], now: Date) {
+  return Object.fromEntries(Object.entries(facts).filter(([, fact]) => Date.parse(fact.confirmedAt) <= now.getTime()
+    && Date.parse(fact.expiresAt) > now.getTime()
+    && (fact.source !== "family_profile" || fact.descriptionUsePermitted === true))) as FoodDescriptionContext["facts"];
+}
+function checkedContext(value: unknown, now: Date) {
+  const context = foodDescriptionContextSchema.parse(value);
+  if (!Number.isFinite(now.getTime()) || context.ownerId !== context.expectedOwnerId || context.revision !== context.expectedRevision
+    || context.history.some(item => item.ownerId !== context.ownerId)) throw new Error("parent_food_description_changed");
+  return context;
+}
+
+/** Only this minimized value may eventually become model input; no IDs, raw history, URLs or private profile fields. */
+export function buildFoodDescriptionProjection(input: unknown, trustedContext: unknown, now: Date) {
+  const description = foodDescriptionInputSchema.parse(input), context = checkedContext(trustedContext, now);
+  const facts = currentFacts(context.facts, now), zip = facts.zip?.value;
+  const candidates = foodDescriptionNeedSchema.options.flatMap(need => getProgramsForNeeds([need])
+    .filter(program => context.programIds.includes(program.id as z.infer<typeof programId>) && !programRoutingIssue(program, zip, now))
+    .map(program => ({ need, programId: program.id as z.infer<typeof programId>, sourceCheckedAt: program.sourceCheckedAt,
+      actions: context.capabilities.filter(capability => capability.programId === program.id && capability.enabled)
+        .flatMap(capability => capability.actions).filter(action => supportsInitialServiceDelivery(need, action)).sort() })));
+  return {
+    ...description, revision: context.revision, catalogVersion: context.catalogVersion, capabilityVersion: context.capabilityVersion,
+    routingFacts: facts,
+    ownedFoodHistory: context.history.filter(item => item.current).map(({ need, state, current }) => ({ need, state, current }))
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    candidates, questionReasons: foodAssessmentQuestionReasons, excludedNeedIds: context.excludedNeedIds,
+  };
+}
+export type FoodDescriptionProjection = ReturnType<typeof buildFoodDescriptionProjection>;
+
+/** Span checks anchor an interpretation, not its semantic quality. That requires the still-unapproved measured evaluation. */
+export function validateFoodDescriptionSelection(input: {
+  projection: FoodDescriptionProjection; selection: unknown; currentContext: unknown; now: Date;
+}) {
+  const { projection, now } = input, context = checkedContext(input.currentContext, now);
+  const current = buildFoodDescriptionProjection({ description: projection.description, screenLocale: projection.screenLocale }, context, now);
+  if (JSON.stringify(projection) !== JSON.stringify(current)) throw new Error("parent_food_description_changed");
+  const selection = foodDescriptionSelectionSchema.parse(input.selection);
+  const invalid = () => { throw new Error("parent_food_description_unverified_selection"); };
+  for (const { span } of [...selection.assertions, ...selection.exclusions])
+    if (span.end <= span.start || span.end > projection.description.length || projection.description.slice(span.start, span.end) !== span.text) invalid();
+  const facts = { ...current.routingFacts }, conflicts: (keyof FoodAssessmentAnswers)[] = [];
+  const values: Partial<FoodAssessmentAnswers> = Object.fromEntries(Object.entries(facts).filter(([field]) => field !== "zip").map(([field, fact]) => [field, fact.value]));
+  for (const assertion of selection.assertions) {
+    const field = assertion.questionId;
+    if (values[field] !== undefined) {
+      if (values[field] !== assertion.value) conflicts.push(field);
+    } else Object.assign(values, { [field]: assertion.value });
+  }
+  if (values.benefitHistory !== "receiving" && selection.assertions.some(value => value.questionId === "existingIssue")) invalid();
+  const excludedNeedIds = [...new Set([...context.excludedNeedIds, ...selection.exclusions.map(value => value.need)])];
+  const answers: FoodAssessmentAnswers = { foodForTwoDays: values.foodForTwoDays ?? "not_sure",
+    benefitHistory: values.benefitHistory ?? "not_sure", existingIssue: values.benefitHistory === "receiving" ? values.existingIssue ?? "not_sure" : null };
+  const benefitWanted = foodDescriptionNeedSchema.options.some(need => need !== "food_now" && !excludedNeedIds.includes(need))
+    && (values.benefitHistory !== undefined || selection.needIds.some(need => need !== "food_now") || selection.questionIds.includes("benefitHistory"));
+  const history = context.history.filter(item => item.current), active = history.filter(item => ["active", "paused"].includes(item.requestStatus));
+  const existingRequestIds = benefitWanted ? [...new Set(active.map(item => item.requestId))] : [];
+  const duplicateBlocked = history.some(item => !["checking", "prepared", "withdrawn"].includes(item.state)) || active.length > 0;
+  const allowedNeeds = assessFoodSupport(answers).map(value => value.need).filter(need => !excludedNeedIds.includes(need) && !(need === "snap_new" && duplicateBlocked));
+  const needIds = allowedNeeds.filter(need => need !== "food_now" || values.foodForTwoDays !== undefined || selection.needIds.includes(need));
+  // An existing application takes precedence over a requested duplicate; never revive its prior permission.
+  if (selection.needIds.some(need => !allowedNeeds.includes(need) && !(need === "snap_new" && duplicateBlocked))) invalid();
+  for (const item of selection.selections)
+    if (!selection.needIds.includes(item.need) || item.reason !== reasons[item.need]
+      || !current.candidates.some(candidate => candidate.need === item.need && candidate.programId === item.programId)) invalid();
+  const questions: z.infer<typeof questionId>[] = [];
+  if (!existingRequestIds.length) {
+    if (values.foodForTwoDays === undefined && !excludedNeedIds.includes("food_now")) questions.push("foodForTwoDays");
+    if (values.benefitHistory === undefined && foodDescriptionNeedSchema.options.some(need => need !== "food_now" && !excludedNeedIds.includes(need))) questions.push("benefitHistory");
+    if (values.benefitHistory === "receiving" && values.existingIssue === undefined) questions.push("existingIssue");
+    if (selection.needIds.includes("snap_new") && duplicateBlocked && !questions.includes("benefitHistory")) questions.push("benefitHistory");
+  }
+  if (selection.questionIds.some(id => !questions.includes(id))) invalid();
+  const candidates = current.candidates.filter(candidate => needIds.includes(candidate.need));
+  return {
+    state: existingRequestIds.length ? "open_existing" as const : questions.length ? "needs_clarification" as const : candidates.length ? "proposal" as const : "manual" as const,
+    proposedAnswers: answers, originalFacts: facts, assertions: selection.assertions, conflicts,
+    needIds, candidates, selections: selection.selections.filter(item => needIds.includes(item.need)),
+    questionIds: questions, existingRequestIds, excludedNeedIds, outOfScope: selection.outOfScope,
+    proposedUrgency: answers.foodForTwoDays === "no" ? "today" as const : null,
+    requiresTypedTiming: answers.foodForTwoDays !== "no", duplicateApplicationBlocked: duplicateBlocked,
+    executionGranted: false as const,
+  };
+}
