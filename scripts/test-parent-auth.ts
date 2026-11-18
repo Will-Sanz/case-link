@@ -22,6 +22,10 @@ import { PGW_APPLICATION_NOTICE_VERSION, PGW_APPLICATION_SOURCE, PGW_SUBJECT_AUT
 import { pgwApplicationSnapshotSchema } from "../src/lib/parent/pgw-application-snapshot";
 import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE, WATER_SUBJECT_AUTHORITY_STATEMENT, WATER_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/water-application-fields";
 import { waterApplicationSnapshotSchema } from "../src/lib/parent/water-application-snapshot";
+import { foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM } from "../src/lib/parent/food-access";
+import { fixtureIntake, fixtureMandate } from "../src/lib/parent/test-fixtures";
+import type { SupportRequest } from "../src/lib/parent/domain";
+import { runOneParentJob } from "../src/lib/parent/worker-runtime";
 import { assertSyntheticParentAuthTargets, beginParentTestApproval } from "./parent-test-approval";
 
 const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200";
@@ -362,6 +366,122 @@ async function main() {
       (await rest(token, "rpc/ensure_app_user", {})).status === 403,
       "A real parent identity cannot provision a legacy school role through a direct RPC.",
     );
+
+    stage = "actual owned public food request before other queued work";
+    check((await db.query("select count(*)::int n from public.parent_requests")).rows[0].n === 0,
+      "The public food rehearsal starts before any other request can be claimed by its worker.");
+    const foodBudgetBefore = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    const foodWindowReply = await first.page.request.get(`${origin}/api/parent/authorization-window`);
+    check(foodWindowReply.status() === 200, "The public food mandate uses the actual server authorization deadline.");
+    const foodDeadline = (await foodWindowReply.json()).authorization.expiresAt as string;
+    const foodStarting = await first.page.request.post(`${origin}/api/parent/requests`, {
+      headers: { origin, "Idempotency-Key": randomUUID() },
+      data: {
+        intake: fixtureIntake({ needs: ["food_now"], zip: "19129", householdSize: null, utilityProviders: [], accountAuthority: "not_sure" }),
+        mandate: fixtureMandate({ mode: "prepare_only", recipientIds: [SHARE_FOOD_ACCESS_PROGRAM],
+          allowedActions: ["research", "prepare"], allowedData: ["household"], maxRecipients: 1,
+          bookingPreference: "ask_me", expiresAt: foodDeadline }),
+      },
+    });
+    check(foodStarting.status() === 201, "The real owned API creates one preparation-only Share food request.");
+    const foodRequestId = (await foodStarting.json()).request.id as string;
+    const foodUrl = `${origin}/api/parent/requests/${foodRequestId}`;
+    check((await db.query("select count(*)::int n from public.parent_requests r join public.parent_households h on h.id=r.household_id where r.id=$1 and h.owner_id=$2", [foodRequestId, first.id])).rows[0].n === 1,
+      "The native food request belongs only to the enrolled parent household.");
+    async function readFoodRequest() {
+      const response = await first.page.request.get(foodUrl);
+      check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store",
+        "The actual owned HTTP API returns the public food plan privately.");
+      const request = (await response.json()).request as SupportRequest;
+      check(request.id === foodRequestId, "The food-plan response remains bound to this owned request.");
+      return request;
+    }
+    const foodState = async () => (await db.query(`select r.version,r.status,r.closed_reason,r.next_actor,r.next_trigger,r.next_run_at,r.updated_at request_updated_at,
+      j.state job_state,j.request_version,j.run_at,j.updated_at job_updated_at,
+      (select count(*)::int from public.parent_events e where e.request_id=r.id and e.kind='parent.outcome_reported') reports,
+      (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
+      (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls,
+      (select count(*)::int from parent_private.model_call_reservations) model_reservations
+      from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [foodRequestId])).rows[0];
+    const foodViewer = await first.context.newPage();
+    const foodPage = await foodViewer.goto(`${origin}/support/${foodRequestId}`, { waitUntil: "networkidle" });
+    check(foodPage?.status() === 200, "The enrolled parent can open the actual owned food request viewer.");
+    await foodViewer.close();
+    check(foodViewer.isClosed(), "The owned request viewer closes before its durable food continuation runs.");
+    const foodWorker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
+    try {
+      await foodWorker.connect();
+      await foodWorker.query("set role parent_worker");
+      check((await foodWorker.query("select current_user as role")).rows[0].role === "parent_worker",
+        "The native public food continuation runs under the actual restricted parent_worker role.");
+      let cityChecks = 0;
+      async function foodTurn() {
+        const before = cityChecks;
+        const result = await runOneParentJob({
+          database: { query: async (sql, values) => {
+            const result = await foodWorker.query(sql, values);
+            if (sql.includes("parent_claim_job(")) check(result.rows[0]?.job?.request?.id === foodRequestId,
+              "The isolated continuation claims only this run's owned public food request.");
+            return result;
+          } },
+          continuationOnly: true,
+          brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "isolated-public-food-fixture-no-real-broker", supabaseOrigin: local.API_URL,
+          fetcher: async (input, init) => {
+            const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+            check(url.origin === "https://services.arcgis.com" && url.pathname === "/fLeGjb7u4uXqeF9q/arcgis/rest/services/free_meal_sites/FeatureServer/0/query"
+              && url.searchParams.get("where") === "objectid=122" && (init?.method ?? "GET") === "GET",
+            "The worker's only fetch is the fixed synthetic City122 public-record check; no broker, provider or model can be contacted.");
+            cityChecks++;
+            return Response.json({ features: [{ attributes: { objectid: 122, site_name: "Share Community Fridge", address: "2901 W Hunting Park Ave",
+              zip_code: "19129", status: "Active", category_type: "Food Site", temporary_closure: null, seasonally_closed: null } }] });
+          },
+        });
+        check(result.state === "saved" && cityChecks === before + 1,
+          "A no-key native continuation saves one food turn using only the explicit City fixture.");
+      }
+      stage = "native food preparation without the request viewer";
+      await foodTurn();
+      const preparedFood = await readFoodRequest();
+      const firstFoodPlan = foodAccessPlanSchema.parse(preparedFood.plan?.routes.find(route => route.need === "food_now")?.foodAccess);
+      check(preparedFood.status === "active" && firstFoodPlan.requestId === foodRequestId && firstFoodPlan.requestVersion === preparedFood.version
+        && firstFoodPlan.state === "prepared" && firstFoodPlan.site.stock === "unknown" && firstFoodPlan.site.reservation === "none",
+      "Actual leased work prepares owned public directions with unknown stock and no reservation after the viewer closes.");
+      stage = "actual food failure report and exact acknowledgement replay";
+      const noFoodBody = JSON.stringify({ action: "food_visit", expectedVersion: preparedFood.version, siteId: firstFoodPlan.site.id,
+        planHash: firstFoodPlan.planHash, reportKey: randomUUID(), result: "no_food" });
+      const noFoodReply = await first.page.request.post(`${foodUrl}/outcome`, { headers: { origin, "Content-Type": "application/json" }, data: noFoodBody });
+      check(noFoodReply.status() === 200, "The actual owned API records a site-bound no-food report.");
+      const noFoodReport = foodAccessReportSchema.parse((await noFoodReply.json()).report), beforeFoodReplay = await foodState();
+      const replayFoodReply = await first.page.request.post(`${foodUrl}/outcome`, { headers: { origin, "Content-Type": "application/json" }, data: noFoodBody });
+      check(replayFoodReply.status() === 200, "The actual food-report API accepts an exact retry of the original body and key.");
+      const replayFoodReport = foodAccessReportSchema.parse((await replayFoodReply.json()).report);
+      check(JSON.stringify(replayFoodReport) === JSON.stringify(noFoodReport) && beforeFoodReplay.reports === 1
+        && JSON.stringify(await foodState()) === JSON.stringify(beforeFoodReplay),
+      "Exact replay preserves the same food event/time and database state without a duplicate report or job wake.");
+      stage = "native continuation retains the unmet food need";
+      await foodTurn();
+      const unmetFood = await readFoodRequest(), unmetFoodState = await foodState();
+      const unmetRoute = unmetFood.plan?.routes.find(route => route.need === "food_now");
+      check(unmetFood.status === "active" && unmetFood.version === preparedFood.version && unmetFoodState.request_version === preparedFood.version
+        && unmetRoute?.state === "unresolved" && unmetRoute.foodAccessReport?.eventId === noFoodReport.eventId,
+      "The actual failure continuation keeps the owned need active and unresolved at its unchanged request/job version.");
+      const currentFoodPlan = foodAccessPlanSchema.parse(unmetRoute.foodAccess);
+      stage = "actual attributed enough-food report and scoped completion";
+      const receivedFoodReply = await first.page.request.post(`${foodUrl}/outcome`, { headers: { origin }, data: {
+        action: "food_visit", expectedVersion: unmetFood.version, siteId: currentFoodPlan.site.id,
+        planHash: currentFoodPlan.planHash, reportKey: randomUUID(), result: "received_enough_food",
+      } });
+      check(receivedFoodReply.status() === 200, "The actual API records the later synthetic enough-food report against the current plan.");
+      const receivedFood = foodAccessReportSchema.parse((await receivedFoodReply.json()).report);
+      await foodTurn();
+      const completedFood = await readFoodRequest(), completedFoodState = await foodState();
+      check(completedFood.status === "closed" && completedFoodState.closed_reason === "completed" && completedFoodState.job_state === "cancelled"
+        && receivedFood.attribution === "parent_reported" && completedFood.plan?.routes[0].foodAccessReport?.eventId === receivedFood.eventId
+        && completedFoodState.reports === 2 && (await db.query("select count(*)::int n from public.parent_requests where id<>$1", [foodRequestId])).rows[0].n === 0,
+      "The attributed enough-food report completes only this synthetic request and retains both distinct visit reports.");
+      check(completedFoodState.operations === 0 && completedFoodState.model_calls === 0 && completedFoodState.model_reservations === foodBudgetBefore,
+        "The complete native public food lifecycle creates no provider operation, request model call or model-budget reservation.");
+    } finally { await foodWorker.end(); }
 
     stage = "real data ownership and a preparation-only support request";
     await first.page.clock.setFixedTime(new Date(Date.now() + 2 * 86400000));
@@ -2124,6 +2244,7 @@ async function main() {
       "Hosted shared-account migration, recovery/session coexistence and scheduled retention erasure require separate checks; the password case uses a synthetic school role only on the isolated parent service.",
       "Document parsing/extraction is not established by private PDF upload and Storage authorization.",
       "Grouped factual questions are explicitly seeded synthetic fixtures; the test does not establish AI question selection or partner execution.",
+      "The public food lifecycle uses actual local Auth/API/SQL and a restricted worker, with an explicit City-response fixture and synthetic family reports. It does not establish current stock, physical access, actual collection or provider confirmation.",
       "The full SNAP form check establishes owned nonprotected intake, atomic start, revision correction and export, not protected identifiers/signatures, worker preparation or a genuine provider submission.",
       "The WIC form check establishes isolated private intake, correction and owned history, not provider submission, a booked appointment, enrollment or specialist assessment.",
       "The PECO form check establishes isolated private preparation, correction, account binding and owned history, not a trusted renderer/income adapter, provider submission, CAP enrollment, a payment change or shutoff protection.",
