@@ -1495,8 +1495,9 @@ async function main() {
       check(changedCorrection.status() === 409 && JSON.stringify(await snapState(spanishId)) === JSON.stringify(sourceAfterCorrection), "Reusing the source-correction key for a different variant conflicts without changing retained work.");
       const foreignCorrection = await second.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": randomUUID() }, data: { ...sourceCorrection, expectedVersion: selectedEnglish.request_version } });
       check(foreignCorrection.status() === 403, "An actual foreign session cannot change another household's selected document source.");
-      const stoppedSpanish = await first.page.request.post(`${spanishUrl}/control`, { headers: { origin }, data: { action: "cancel" } });
-      check(stoppedSpanish.status() === 200 && (await db.query("select state from public.parent_jobs where request_id=$1", [spanishId])).rows[0].state === "cancelled",
+      const stoppedSpanish = await first.page.request.post(spanishUrl, { headers: { origin }, data: { action: "cancel" } });
+      check(stoppedSpanish.status() === 200 && (await stoppedSpanish.json()).request.status === "cancelled"
+        && (await db.query("select state from public.parent_jobs where request_id=$1", [spanishId])).rows[0].state === "cancelled",
         "The known synthetic Spanish request is cancelled through actual owner control before subsequent worker fixtures.");
       stage = "actual mixed private SNAP, family reuse and lost start acknowledgement";
       await db.query(`update parent_private.processing_controls set family_profile_enabled=true,
