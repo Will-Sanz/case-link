@@ -499,9 +499,20 @@ async function main() {
       "Both fixture questions resolve with the matching current queued job version and no provider operation.",
     );
     const replayedBundle = await first.page.request.post(requestUrl, { headers: { origin }, data: bundleBody! });
+    let replayDiagnostic = "";
+    if (replayedBundle.status() !== 409) {
+      const webError = await replayedBundle.json().catch(() => null);
+      const directReplay = await fetchWithTimeout(`${local.API_URL}/rest/v1/rpc/parent_answer_facts`, {
+        method: "POST", redirect: "error", headers: { apikey: local.ANON_KEY, authorization: `Bearer ${await accessToken(first.context)}`, "content-type": "application/json" },
+        body: JSON.stringify({ p_request_id: requestId, p_answers: bundleBody!.answers, p_expected_version: bundleBody!.version }),
+      });
+      const directError = await directReplay.json().catch(() => null);
+      const sqlState = typeof directError?.code === "string" && /^[0-9A-Z]{5}$/.test(directError.code) ? directError.code : "unavailable";
+      replayDiagnostic = `; originRejected=${webError?.error === "Open CaseLink directly and try again."}; directSQLState=${sqlState}`;
+    }
     check(
       replayedBundle.status() === 409,
-      `Replaying the completed browser bundle's old version is rejected by the actual web API (HTTP ${replayedBundle.status()}).`,
+      `Replaying the completed browser bundle's old version is rejected by the actual web API (HTTP ${replayedBundle.status()}${replayDiagnostic}).`,
     );
     const snapshotSql = "select to_jsonb(r) request,to_jsonb(j) job,(select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from public.parent_events e where e.request_id=r.id) events from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1";
     const beforeInvalid = (await db.query(snapshotSql, [requestId])).rows[0];
