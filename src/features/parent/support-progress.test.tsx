@@ -56,6 +56,22 @@ describe("recorded support progress", () => {
       screen.getByText(/saved request does not mean an application was sent/),
     ).toBeTruthy();
   });
+  it("makes an unscheduled wait explicit and updates it when a check is scheduled", () => {
+    const { rerender } = render(
+      <SupportProgressPanel progress={progress("waiting")} onRefresh={vi.fn()} />,
+    );
+    expect(screen.getByText(/No automatic check is currently scheduled/)).toBeTruthy();
+    expect(screen.queryByText(/Next check scheduled for/)).toBeNull();
+    rerender(<SupportProgressPanel progress={{ ...progress("waiting"), nextRunAt: "2026-10-26T16:05:00.000Z" }} onRefresh={vi.fn()} />);
+    expect(screen.queryByText(/No automatic check is currently scheduled/)).toBeNull();
+    expect(screen.getByText(/Next check scheduled for/)).toBeTruthy();
+  });
+  it.each(["queued", "running", "needs_parent", "paused", "cancelled", "closed", "failed", "service_offline"] as const)(
+    "does not describe %s as an unscheduled wait", (state) => {
+      render(<SupportProgressPanel progress={progress(state)} onRefresh={vi.fn()} />);
+      expect(screen.queryByText(/No automatic check is currently scheduled/)).toBeNull();
+    },
+  );
   it("does not treat an unavailable worker heartbeat as proof that all work has stopped", () => {
     render(
       <SupportProgressPanel

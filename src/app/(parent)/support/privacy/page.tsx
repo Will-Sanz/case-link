@@ -187,6 +187,15 @@ export default function ParentPrivacyPage() {
         Household details, uploaded content and AI prompts must not be copied
         into ordinary analytics, public links or notification previews.
       </p>
+      <p>
+        Ask CaseLink uses the question you send, your saved account preferences
+        and relevant information from the request you select with OpenAI to
+        answer. This includes permitted household facts, recorded progress and
+        next steps. It does not include raw identity numbers, passwords or
+        uploaded application documents. Sending a question records your
+        agreement to this use; it does not submit an application or change your
+        service permission.
+      </p>
       <h2 id="documents">Bills, notices & AI processing</h2>
       <p>
         You must agree to document storage and processing before uploading or

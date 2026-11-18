@@ -4,6 +4,16 @@
 
 The most promising route is the existing citizen/guest application with a genuine provider-verification handoff, followed by independently verified filing and status access. A family does **not** need to register as a Community Partner. The separate current Pennsylvania application tracker also provides a potential status route without a COMPASS login or SSN when the application number is available. Browser assistance and data storage still need their own permission, isolation and tested resumption evidence.
 
+## November 7 tracker inspection update
+
+The root agent inspected the real [public tracker](https://trackmybenefits.pa.gov/) in a fresh hidden normal in-app browser. The form rendered. Its first/last-name inputs have a 50-character limit; birth date has a 10-character limit and displays `MM/DD/YYYY`. Clicking the visible **COMPASS application number** and **ZIP code** labels exposed `compassVerificationValue` (text, name `verificationValue`, maximum 20 characters) and `zipInput` (text, name `additionalValue`, maximum 5 characters, pattern `[0-9]*`). The initial radio IDs were `compassAppId` and `zip`; setting the radio directly did not update the page, while clicking its visible label did. The form has an own-information/authorized-lookup acknowledgement and a Continue submit button. No applicant value was entered, acknowledgement accepted or lookup sent. The application-number help says the number identifies an application and is available from the COMPASS account or application confirmation notice.
+
+An independent fresh headless inspection returned HTTP 200 but only the skip link, without form controls. Its two listed script paths returned HTML instead of JavaScript through that environment; one bounded direct GET of the observed main-bundle URL also returned `text/html` (2,230 bytes). These observations describe those access paths, **not a universal tracker outage**. The positive normal-browser evidence supersedes the earlier conclusion that the public form itself was uninspectable. Local diagnostic records remain under `tmp/parent-verification/snap-public-tracker-inspection-2026-11-07-v2/`; no household data was used.
+
+The smallest candidate integration is an isolated ordinary-browser lookup using a genuinely verified **COMPASS application number**, already permitted head-of-household name/birth date and ZIP, with current request ownership and specific `follow_up` authority checked before each action. A generic receipt reference or Sinch fax ID is not an application number. The [official tracker guidance](https://www.pa.gov/services/dhs/track-your-liheap-medicaid-snap-and-tanf-applications) describes application status, appointments and possible missing documents; it does not establish this software's permission, the actual matched-result layout or a public API. A last-four-SSN alternative would require its own verified purpose, protected channel and consent and is not needed for the application-number branch.
+
+No matched result, result parser, agency reference retrieval, automated polling or operational agency-status connector is verified. The existing registered general transport map is empty; the Sinch carrier checks fax transport only, and the scoped partner/operator route records honestly attributed reports. The new receipt next-step fields can preserve genuine future evidence but do not obtain it. The public tracker covers four programs, so any future result extraction must admit only the SNAP evidence authorized for this request and exclude unrelated benefit details. Keep the connector unregistered until its actual runtime, permitted use and genuine SNAP result can be verified with an authorized case or agency-approved test route.
+
 ## Verified provider facts
 
 | Topic | Verified public evidence | Implementation implication |
@@ -35,3 +45,21 @@ The two official `.pptx` sources were fetched directly from the links on the DHS
 4. **Preserve minimum-filing alternatives.** Keep official application access available while full automation is blocked. A reviewed paper/fax route may be a separate completion path, but it needs its own real signature, delivery, receipt and follow-up rehearsal. Do not silently substitute an operator or exported PDF for the promised autonomous completion.
 
 **Piece-completion evidence:** public sources and limitations above are recorded; no source establishes that the whole COMPASS connection works. Independent review and live verification must precede enabling any new external capability. Protected identity capture, applicant trials, actual filing and agency-status retrieval were not performed.
+
+
+### November 8 — accepted completion and retention evidence recheck
+
+The current [7 CFR273.2(c)(7)](https://www.ecfr.gov/current/title-7/subtitle-B/chapter-II/subchapter-C/part-273/subpart-A/section-273.2) includes handwritten signatures transmitted by fax/electronic transmission; electronic-signature acceptance is a state option. The [Pennsylvania electronic-signature policy effective October5,2026](https://www.pa.gov/content/dam/copapwp-pagov/en/oa/documents/policies/it-policies/electronic%20signature%20policy.pdf) replaces the2025 version and requires agency-documented systems, authorized signature types and applicable controls. This general policy does not establish DHS acceptance of CaseLink touchscreen capture. Current targeted PA/OIM searches supplied no narrower applicable approval; unrelated Homeland Security, other-state SNAP and WIC-vendor rules do not close that gap. The previously timed-out handbook fetch was not retried unchanged. No agency was contacted and no government application was created.
+
+[Sinch retention documentation](https://developers.sinch.com/docs/fax/api-reference/fax/section/deletion-and-data-retention) states13months for logs/media when storage is enabled. Current existing-service readback verifies inbound/outbound document storage disabled and retries0; the public statement does not specify every temporary copy or metadata lifetime with storage off. No zero-retention claim or completed contract assessment follows from that switch.
+
+
+### 2026-11-08 11:45 AM EST — authorized DHS inquiry-thread reply check
+
+The owner expressly approved reading that inquiry thread only. Background Zoho session verified will@mail.thecaselink.com and the November5,11:26PM outgoing subject, Guidance on permitted SNAP assistance and COMPASS verification, addressed to RA-PWCOMPASSCP@pa.gov. The thread contained only the original outgoing inquiry. Zoho's subject-only email search returned one result, the same sent message; no incoming reply was visible. The Include Spam/trash control was disabled, so this does not assert those folders were searched. No other message body was opened, no attachment was downloaded, and no reply/new message/account/provider action was performed. The temporary hidden tab was closed.
+
+No method-specific guidance, approved testing route or intake mapping was received in the inspected thread.
+
+### November9 overnight — same authorized inquiry thread
+
+The temporary hidden Zoho tab restored the exact November5,11:26PM inquiry to RA-PWCOMPASSCP@pa.gov. Its thread still showed only that outgoing message; no incoming answer appeared there. An attempted quoted subject expression was treated as a literal Contains search and is not evidence of mailbox-wide absence. No other message body, attachment, reply or outgoing message was accessed/sent. The temporary tab was closed. Accepted personal completion, actual intake mapping, an approved test case and agency confirmation remain unresolved; the mail provider's old Delivered label is unchanged transport evidence only.

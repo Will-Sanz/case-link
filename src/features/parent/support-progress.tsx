@@ -75,6 +75,12 @@ export function SupportProgressPanel({
               .
             </p>
           )}
+          {progress?.state === "waiting" && !progress.nextRunAt && (
+            <p>
+              No automatic check is currently scheduled. Check recorded activity
+              for the next step.
+            </p>
+          )}
           {progress?.canContinueAfterClosing && (
             <p>You can leave this page. Authorized work can continue.</p>
           )}

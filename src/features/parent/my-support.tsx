@@ -138,15 +138,7 @@ export function MySupport() {
           </Link>
         </div>
       )}
-      <div className={`${styles.trustLine} ${styles.space}`}>
-        <Clock width={22} height={22} aria-hidden="true" />
-        <div>
-          <strong>Know what’s happening.</strong> Each request shows whether
-          work is running, waiting or needs you. Signing out protects this
-          device; it doesn’t cancel your permission. A saved request is
-          different from an application sent to a program.
-        </div>
-      </div>
+
     </div>
   );
 }

@@ -61,4 +61,3 @@ begin
       p_notice_version,p_idempotency_key) returning id into v_id;
   return v_id;
 end $$;
-

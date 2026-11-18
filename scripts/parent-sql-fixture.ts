@@ -130,6 +130,7 @@ export async function createParentSqlFixture(
     "20261114014202_parent_pgw_identifier_replacement.sql",
     "20261117175206_parent_family_profile.sql",
     "20261117175622_parent_family_profile_application_reuse.sql",
+    "20261117184500_parent_assistant_account_context.sql",
     "20261117185443_parent_ordinary_private_text_guard.sql",
   ];
   try {

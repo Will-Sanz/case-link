@@ -33,6 +33,24 @@ const response = (selected: unknown) =>
   });
 
 describe("request-grounded parent assistant", () => {
+  it("includes validated owner preferences alongside the selected request in model context", async () => {
+    const account = { language: "es", contactPreference: "email", quietHoursStart: 20, quietHoursEnd: 8, updatedAt: "2026-10-25T16:00:00Z" };
+    const fetcher = vi.fn(async () => response({ intro: "status", factIds: ["account-language", "account-updates", "household-size"], actionIds: [] })) as typeof fetch;
+    const result = await answerParentQuestion({ snapshot: snapshot({ account }), question: "What are my account preferences and household details?", apiKey: "synthetic-key", now: fixtureNow, fetcher, beforeCall: async () => {} });
+    const input = JSON.parse(JSON.parse(String(vi.mocked(fetcher).mock.calls[0][1]?.body)).input[0].content);
+    expect(input.facts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "account-language", text: expect.stringContaining("Spanish") }),
+      expect.objectContaining({ id: "account-updates", text: expect.stringContaining("requires a verified") }),
+      expect.objectContaining({ id: "account-quiet-hours", text: expect.stringContaining("20:00 to 8:00") }),
+      expect.objectContaining({ id: "household-size" }),
+    ]));
+    expect(result.answer.paragraphs.some(p => p.sourceLabel === "Your account preferences")).toBe(true);
+    for (const invalid of [{ ...account, language: "unverified" }, { ...account, quietHoursStart: 24 }, { ...account, email: "secret@example.invalid" }, { ...account, updatedAt: "2099-01-01T00:00:00Z" }]) {
+      expect(buildAssistantFacts(snapshot({ account: invalid }), fixtureNow).facts.some(f => f.id.startsWith("account-"))).toBe(false);
+    }
+    expect(JSON.stringify(input)).not.toContain("household_id");
+    expect(JSON.stringify(input)).not.toContain("secret@example.invalid");
+  });
   it("can answer from owned legacy records without sending private WIC answers to the model or erasing them", async () => {
     const request = fixtureRequest(); request.intake.needs = ["wic_continuing"];
     request.intake.childrenUnderFive = true; request.intake.pregnantOrPostpartum = false; request.mandate.recipientIds = ["wic-pa"];

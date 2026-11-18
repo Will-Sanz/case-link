@@ -19,6 +19,17 @@ describe("hosted single-service profiles", () => {
   it("rejects different production projects, provider secrets in web and expired operating authority", () => {
     for (const delta of [{ projectOrigin: "https://other.supabase.co" }, { OPENAI_API_KEY: "synthetic" }, { approvedUntil: "2026-11-07T12:00:00Z" }]) expect(() => parseHostedProfile({ ...web, ...delta }, now)).toThrow();
   });
+  it("requires explicit ongoing authority and keeps all per-service permissions", () => {
+    const later = Date.parse("2030-01-01T00:00:00Z");
+    const profile = parseHostedProfile({ ...web, approvedUntil: null }, later);
+    expect(hostedChildEnvironment(profile).CASELINK_PARENT_HOSTED_APPROVED_UNTIL).toBe("ongoing");
+    expect(hostedWebFingerprint(profile)).toBe(hostedWebFingerprint(parseHostedProfile(web, now)));
+    for (const delta of [{ approvedUntil: undefined }, { approvalReference: " " }, { enabled: false }, { realDataApproved: false }])
+      expect(() => parseHostedProfile({ ...web, approvedUntil: null, ...delta }, later)).toThrow();
+    expect(() => parseHostedProfile({ ...base, approvedUntil: null, service: "review", databaseUrl, publicKey: web.publicKey }, later)).toThrow();
+    expect(hostedChildEnvironment(parseHostedProfile({ ...base, approvedUntil: null, service: "retention", databaseUrl }, later))
+      .CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL).toBe("ongoing");
+  });
   it("requires separate collection permission for the protected finalizer", () => {
     const input = { ...base, service: "review", databaseUrl, publicKey: web.publicKey };
     expect(() => parseHostedProfile(input, now)).toThrow();
@@ -66,6 +77,12 @@ describe("hosted single-service profiles", () => {
     vi.useFakeTimers(); vi.setSystemTime(now); const stop = vi.fn();
     const cancel = stopAtHostedDeadline(new Date(now + 31 * 86400000).toISOString(), stop);
     vi.advanceTimersByTime(31 * 86400000 - 1); expect(stop).not.toHaveBeenCalled(); vi.advanceTimersByTime(1); expect(stop).toHaveBeenCalledTimes(1); cancel();
+  });
+  it("does not schedule a shutdown for an ongoing service", () => {
+    vi.useFakeTimers(); vi.setSystemTime(now); const stop = vi.fn();
+    const cancel = stopAtHostedDeadline(null, stop);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(365 * 86400000); expect(stop).not.toHaveBeenCalled(); cancel();
   });
   it("cancels expiry checks on shutdown and immediately stops expired authority", () => {
     vi.useFakeTimers(); vi.setSystemTime(now); const stop = vi.fn(); const cancel = stopAtHostedDeadline(new Date(now + 1000).toISOString(), stop); cancel();

@@ -227,4 +227,3 @@ end $$;
 revoke execute on function parent_private.water_details_collection_enabled(),parent_private.immutable_water_details(),parent_private.validate_water_details(jsonb),parent_private.water_detail_leaves(jsonb,text) from public,anon,authenticated,service_role,parent_worker,parent_retention_worker,parent_storage_broker;
 revoke execute on function public.parent_save_water_application_details(uuid,integer,jsonb,text,uuid,boolean,boolean),public.parent_start_water_application(jsonb,jsonb,jsonb,text,uuid,boolean,boolean,uuid,integer),public.parent_water_application_collection() from public,anon,service_role,parent_worker,parent_retention_worker,parent_storage_broker;
 grant execute on function public.parent_save_water_application_details(uuid,integer,jsonb,text,uuid,boolean,boolean),public.parent_start_water_application(jsonb,jsonb,jsonb,text,uuid,boolean,boolean,uuid,integer),public.parent_water_application_collection() to authenticated;
-
