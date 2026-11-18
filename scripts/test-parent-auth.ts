@@ -240,12 +240,30 @@ async function main() {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
-    await page.getByText("I already know which program I need", { exact: true }).click();
-    await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
+    await page.getByLabel(/enough food for today and tomorrow/).selectOption("no");
+    await page.getByLabel(/help paying for groceries/).selectOption("applied");
+    await page.getByRole("button", { name: "See my options", exact: true }).click();
+    await page.getByRole("button", { name: "Food for now", exact: true }).click();
+    await page.getByLabel("Household ZIP code").waitFor();
+    check(await page.getByLabel("Request timing").inputValue() === "today" &&
+      page.url() === `${origin}/get-support?need=food`,
+    "The actual guided shortage proposes today's priority without putting household answers in the URL.");
     await page.getByLabel("Household ZIP code").fill("");
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Food for now", exact: true }).click();
+    check(await page.getByLabel("Household ZIP code").inputValue() === "19104" &&
+      await page.getByRole("checkbox", { name: /I’m 18 or older/ }).isChecked(),
+    "Returning to the actual guide and chosen path preserves the typed request draft.");
+    const assessed = page.waitForResponse(response => response.url() === `${origin}/api/parent/food-assessment` && response.request().method() === "POST");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const assessment = await assessed;
+    const options = await assessment.json();
+    check(assessment.status() === 200 && assessment.headers()["cache-control"] === "private, no-store" &&
+      JSON.stringify(options.candidates.map((candidate: { need: string }) => candidate.need)) === JSON.stringify(["food_now", "snap_pending"]),
+    "The real authenticated web and Data API recompute the food paths before the exact mandate, without starting the proposed SNAP sibling.");
+    await page.getByText("We can prepare. Applications are not connected yet.", { exact: true }).waitFor();
     check(
       await page
         .getByText("We can prepare. Applications are not connected yet.", {
@@ -270,6 +288,10 @@ async function main() {
       start.status() === 201,
       `The actual three-step intake and Start button record a bounded preparation-only request (HTTP ${start.status()}).`,
     );
+    const startBody = start.request().postDataJSON();
+    check(JSON.stringify(startBody.intake.needs) === JSON.stringify(["food_now"]) &&
+      startBody.intake.urgency === "today" && !Object.hasOwn(startBody, "answers"),
+    "The guided start freezes only the chosen typed food request; raw assessment answers and unchosen paths are not persisted as request data.");
     const id = (await start.json()).request.id as string;
     await page.waitForURL(`${origin}/support/${id}`);
     await showSection(page, "application-controls");
@@ -499,20 +521,9 @@ async function main() {
       "Both fixture questions resolve with the matching current queued job version and no provider operation.",
     );
     const replayedBundle = await first.page.request.post(requestUrl, { headers: { origin }, data: bundleBody! });
-    let replayDiagnostic = "";
-    if (replayedBundle.status() !== 409) {
-      const webError = await replayedBundle.json().catch(() => null);
-      const directReplay = await fetchWithTimeout(`${local.API_URL}/rest/v1/rpc/parent_answer_facts`, {
-        method: "POST", redirect: "error", headers: { apikey: local.ANON_KEY, authorization: `Bearer ${await accessToken(first.context)}`, "content-type": "application/json" },
-        body: JSON.stringify({ p_request_id: requestId, p_answers: bundleBody!.answers, p_expected_version: bundleBody!.version }),
-      });
-      const directError = await directReplay.json().catch(() => null);
-      const sqlState = typeof directError?.code === "string" && /^[0-9A-Z]{5}$/.test(directError.code) ? directError.code : "unavailable";
-      replayDiagnostic = `; originRejected=${webError?.error === "Open CaseLink directly and try again."}; directSQLState=${sqlState}`;
-    }
     check(
       replayedBundle.status() === 409,
-      `Replaying the completed browser bundle's old version is rejected by the actual web API (HTTP ${replayedBundle.status()}${replayDiagnostic}).`,
+      `Replaying the completed browser bundle's old version is rejected by the actual web API (HTTP ${replayedBundle.status()}).`,
     );
     const snapshotSql = "select to_jsonb(r) request,to_jsonb(j) job,(select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from public.parent_events e where e.request_id=r.id) events from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1";
     const beforeInvalid = (await db.query(snapshotSql, [requestId])).rows[0];
@@ -1352,10 +1363,12 @@ async function main() {
       const wicPausing = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests/${wicRequestId}` && response.request().method() === "POST");
       await first.page.getByRole("button", { name: "Pause future work", exact: true }).click();
       check((await wicPausing).status() === 200, "The actual WIC request can be paused through its standard control.");
+      await first.page.getByRole("button", { name: "Resume support", exact: true }).waitFor();
       const pausedWicState = await wicState();
       await showSection(first.page, "application-review");
       await first.page.getByRole("button", { name: "Correct WIC answers", exact: true }).click();
       const pausedWicForm = first.page.getByRole("form", { name: "Correct WIC application answers", exact: true });
+      stage = "editing the actual current paused WIC revision";
       await pausedWicForm.getByLabel("Contact phone number", { exact: true }).fill("215-555-0102");
       const pausedWicSaving = first.page.waitForResponse(response => response.url() === wicUrl && response.request().method() === "POST");
       await pausedWicForm.getByRole("button", { name: "Save WIC changes", exact: true }).click();
