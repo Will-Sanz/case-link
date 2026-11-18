@@ -2,7 +2,7 @@
 import { Fragment, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import type { SupportRequest } from "@/lib/parent/domain";
-import { wicApplicationFieldsValueSchema, type WicApplicationFields } from "@/lib/parent/wic-application-fields";
+import { wicApplicationFieldsValueSchema, wicApplicationLeaves, type WicApplicationFields } from "@/lib/parent/wic-application-fields";
 import { wicApplicationSnapshotSchema } from "@/lib/parent/wic-application-snapshot";
 import { WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "@/lib/parent/constants";
 import { boundedParentApi, canCollectWicApplication, displayDate, ParentApiError, type ParentAuthorizationWindow } from "./api";
@@ -39,6 +39,7 @@ function PrivateAnswers({ value }: { value: WicApplicationFields }) {
 
 export function WicSavedApplication({ request, onChange }: { request: SupportRequest; onChange?: () => void }) {
   const [read, setRead] = useState(0);
+  const [confirmation, setConfirmation] = useState<{ scope: string; paths: string[] }>({ scope: "", paths: [] });
   const saved = useParentResource<unknown>(`/requests/${request.id}/wic-application?requestVersion=${request.version}&read=${read}`);
   const collection = useParentResource<ParentAuthorizationWindow>(`/authorization-window?wicRequestVersion=${request.version}`);
   const form = useRef<HTMLFormElement>(null);
@@ -56,8 +57,17 @@ export function WicSavedApplication({ request, onChange }: { request: SupportReq
     onSaved: () => { setRead(current => current + 1); onChange?.(); }, onAccessDenied: collection.reload });
   const { draft, error, message, blocked, uncertain, conflict, pending, permitted, editingCurrent } = editor;
   const family = useSavedFamilyProfile({ request, program: "wic-pa", snapshotId: record?.id, permitted, onOwnerChanged: editor.reset });
-  async function edit() { const value = await family.load(record?.details ?? {}); if (value) editor.begin(value); }
-  async function refreshFamily() { if (uncertain) return; if (draft) { const value = await family.load(draft.value); if (value) editor.change(value); } else await edit(); }
+  const confirmationScope = JSON.stringify([request.id, request.version, record?.id]);
+  const originalLeaves = wicApplicationLeaves(record?.details ?? {}), draftLeaves = wicApplicationLeaves(draft?.value ?? {});
+  const eligiblePaths = family.unavailablePaths.filter(path => typeof draftLeaves[path] === "string" && draftLeaves[path] === originalLeaves[path]);
+  const confirmedPaths = confirmation.scope === confirmationScope ? confirmation.paths.filter(path => eligiblePaths.includes(path)) : [];
+  function change(value: WicApplicationFields) {
+    const next = wicApplicationLeaves(value);
+    setConfirmation({ scope: confirmationScope, paths: confirmedPaths.filter(path => draftLeaves[path] === next[path]) });
+    editor.change(value);
+  }
+  async function edit() { const value = await family.load(record?.details ?? {}); if (value) { setConfirmation({ scope: confirmationScope, paths: [] }); editor.begin(value); } }
+  async function refreshFamily() { if (uncertain) return; if (draft) { const value = await family.load(draft.value); if (value) change(value); } else await edit(); }
   useLayoutEffect(() => { if (editingCurrent && permitted) (form.current?.querySelector<HTMLElement>("input,select,textarea") ?? form.current?.querySelector<HTMLElement>("button"))?.focus(); }, [draft?.snapshotId, editingCurrent, permitted]);
   async function checkAccess() {
     await editor.checkAccess(async signal => {
@@ -73,7 +83,7 @@ export function WicSavedApplication({ request, onChange }: { request: SupportReq
       const details = wicApplicationFieldsValueSchema.safeParse(value);
       if (!details.success) throw new ParentApiError("Check the WIC names, dates, address and contact answers. Unknown answers can stay blank.", 400);
       const familyProfileSource = await family.source(details.data, signal);
-      return { expectedVersion, details: details.data, ...(familyProfileSource ? { familyProfileSource } : {}), noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true };
+      return { expectedVersion, details: details.data, ...(familyProfileSource ? { familyProfileSource } : {}), noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true, ...(confirmedPaths.length ? { confirmedPaths } : {}) };
     });
   }
   return <section id="wic-application-review" className={styles.section} aria-labelledby="wic-application-title">
@@ -89,7 +99,16 @@ export function WicSavedApplication({ request, onChange }: { request: SupportReq
       {draft && permitted && editingCurrent ? <form ref={form} className={styles.form} aria-label="Correct WIC application answers" onSubmit={submit}>
         <WicApplicationNotice/>
         <SavedFamilyProfileNotice reuse={family} refresh={refreshFamily} disabled={pending || uncertain || conflict || family.loading || family.blocked}/>
-        <WicApplicationFormFields value={draft.value} disabled={pending || uncertain || conflict || family.loading || family.blocked} idPrefix="saved-wic" onChange={editor.change}/>
+        <WicApplicationFormFields value={draft.value} disabled={pending || uncertain || conflict || family.loading || family.blocked} idPrefix="saved-wic" onChange={change}/>
+        {eligiblePaths.length > 0 && <fieldset className={styles.fieldset} disabled={pending || uncertain || conflict || family.loading || family.blocked}>
+          <legend className={styles.legend}>Confirm only answers that are still correct</legend>
+          <p className={styles.hint}>These answers no longer have a current saved family source. Correct a changed answer above, or confirm an unchanged answer below. Saving records your declaration for this WIC request today. Other answers and your family profile stay unchanged.</p>
+          {eligiblePaths.map(path => {
+            const parts = path.split("."), child = parts[0] === "children" ? draft.value.children?.findIndex(person => person.id === parts[1]) : undefined;
+            const label = `${child !== undefined ? `Child ${child + 1}` : parts[0] === "contact" ? "Contact" : "Mother"} ${parts.at(-1) === "zip" ? "postal ZIP" : contactLabels[parts.at(-1)! as keyof typeof contactLabels]?.toLowerCase() ?? parts.at(-1)}`;
+            return <label key={path} className={styles.checkbox}><input type="checkbox" checked={confirmedPaths.includes(path)} onChange={event => setConfirmation({ scope: confirmationScope, paths: event.target.checked ? [...confirmedPaths, path] : confirmedPaths.filter(current => current !== path) })}/><span>Still correct for this WIC request today: {label}<br/>{String(draftLeaves[path])}</span></label>;
+          })}
+        </fieldset>}
         <p>{WIC_SUBJECT_AUTHORITY_STATEMENT}</p>
         <p className={styles.hint}>Choosing Save WIC changes makes this declaration for the people in this revision. It saves a partial draft when answers are missing. Your WIC request remains {request.status === "paused" ? "paused" : "subject to its current permission"}; no provider submission is authorized by this save.</p>
         {uncertain && <p className={styles.notice}>The save result is unconfirmed. Retry the same save before editing or creating another revision.</p>}

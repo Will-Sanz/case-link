@@ -59,7 +59,17 @@ describe("owned saved food application family sources", () => {
     const { state } = api(); state.read = { ...state.read, profile: null };
     const { result } = setup(); let value; await act(async () => { value = await result.current.load(original); });
     expect(value).toEqual(original); expect(result.current.notice).toMatch(/earlier saved values keep their original dates/);
+    expect(result.current.unavailablePaths).toEqual(bindings.map(field => field.applicationPath));
     await expect(result.current.source(original, new AbortController().signal)).resolves.toBeUndefined();
+  });
+  it("does not offer application reaffirmation solely because profile collection closed", async () => {
+    const fields = [{ applicationPath: "contact.firstName", profilePaths: ["primaryPerson.firstName"] }], { state } = api(fields);
+    state.read = read({ primaryPerson: { id: person, firstName: "CurrentCanary" } });
+    state.read.collection = { ...state.read.collection, collectionEnabled: false, noticeVersion: null, expiresAt: null };
+    const { result } = setup("wic-pa"), saved: WicApplicationFields = { contact: { firstName: "CurrentCanary" } };
+    await act(async () => { expect(await result.current.load(saved)).toEqual(saved); });
+    expect(result.current.unavailablePaths).toEqual([]);
+    await expect(result.current.source(saved, new AbortController().signal)).resolves.toBeUndefined();
   });
   it("cannot turn expired automatic values into fresh typed values even when GET redacts them without a revision bump", async () => {
     const { state } = api(), { result } = setup(); let value!: SnapApplicationFields;

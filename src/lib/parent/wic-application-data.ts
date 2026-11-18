@@ -15,7 +15,7 @@ export const wicInitialIntakeSchema = intakeSchema.superRefine((value, context) 
 export { wicApplicationWriteSchema, wicApplicationSnapshotSchema } from "./wic-application-snapshot";
 export type { WicApplicationSnapshot } from "./wic-application-snapshot";
 import { wicApplicationWriteSchema, wicApplicationSnapshotSchema, type WicApplicationSnapshot } from "./wic-application-snapshot";
-const columns = "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key";
+const columns = "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key,confirmed_paths";
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
   if (!result.success) throw new Error("parent_invalid_input");
@@ -54,6 +54,7 @@ export async function saveWicApplicationDetails(requestId: string, input: unknow
     p_request_id: requestId, p_expected_version: value.expectedVersion, p_details: value.details,
     p_notice_version: value.noticeVersion, p_idempotency_key: idempotencyKey,
     p_subject_authority_declared: value.subjectAuthorityDeclared,
+    ...(value.confirmedPaths?.length ? { p_confirmed_paths: value.confirmedPaths } : {}),
   });
   check(error);
   return parse(z.uuid(), data);

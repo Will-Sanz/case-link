@@ -176,7 +176,7 @@ export async function exportParentInformation() {
     [
       "wicApplicationDetails",
       "parent_wic_application_details",
-      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key,confirmed_paths",
     ],
     [
       "pecoApplicationDetails",

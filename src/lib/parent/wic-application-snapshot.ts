@@ -8,7 +8,12 @@ export const wicApplicationWriteSchema = z.object({
   expectedVersion: z.number().int().positive(), details: wicApplicationFieldsValueSchema,
   noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION),
   subjectAuthorityDeclared: z.literal(true),
-}).strict();
+  confirmedPaths: z.array(z.string().min(1).max(200)).max(1000).refine(paths => new Set(paths).size === paths.length).optional(),
+}).strict().superRefine((value, context) => {
+  const leaves = wicApplicationLeaves(value.details);
+  if (value.confirmedPaths?.some(path => typeof leaves[path] !== "string"))
+    context.addIssue({ code: "custom", path: ["confirmedPaths"], message: "Confirm only an existing WIC application answer." });
+});
 export const wicApplicationSnapshotSchema = z.object({
   id: z.uuid(), request_id: z.uuid(), revision: z.number().int().positive(), base_version: z.number().int().positive(), request_version: z.number().int().positive(),
   details: wicApplicationFieldsValueSchema,
@@ -21,10 +26,11 @@ export const wicApplicationSnapshotSchema = z.object({
     noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), declaredAt: z.iso.datetime({ offset: true }),
     revision: z.number().int().positive(), detailsSha256: z.string().regex(/^[a-f0-9]{64}$/), subjects: z.array(z.string().max(50)).max(32),
   }).strict(),
+  confirmed_paths: z.array(z.string().min(1).max(200)).max(1000).refine(paths => new Set(paths).size === paths.length).optional(),
   notice_version: z.literal(WIC_APPLICATION_NOTICE_VERSION), created_at: z.iso.datetime({ offset: true }), idempotency_key: z.uuid(),
 }).strict().superRefine((snapshot, context) => {
   const leaves = wicApplicationLeaves(snapshot.details);
-  if (snapshot.request_version < snapshot.base_version || snapshot.consent_evidence.revision !== snapshot.revision ||
+  if (snapshot.confirmed_paths?.some(path => typeof leaves[path] !== "string") || snapshot.request_version < snapshot.base_version || snapshot.consent_evidence.revision !== snapshot.revision ||
     Date.parse(snapshot.consent_evidence.declaredAt) > Date.parse(snapshot.created_at) ||
     Object.keys(leaves).length !== Object.keys(snapshot.provenance).length ||
     Object.keys(leaves).some(path => !Object.hasOwn(snapshot.provenance, path)) ||

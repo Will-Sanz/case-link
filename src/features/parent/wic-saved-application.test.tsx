@@ -52,6 +52,55 @@ describe("owned WIC saved answers", () => {
     expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
+  function clearedFamily(post?: (init: RequestInit) => unknown) {
+    const fields = [
+      { applicationPath: "contact.firstName", profilePaths: ["primaryPerson.firstName"] },
+      { applicationPath: "contact.lastName", profilePaths: ["primaryPerson.lastName"] },
+      { applicationPath: `children.${childId}.firstName`, profilePaths: [`members.${childId}.firstName`] },
+    ], base = api(post);
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/family-profile-source?")) return response({ fields });
+      if (url.endsWith("/account")) return response({ account: { id: actorId } });
+      if (url.endsWith("/family-profile")) return response({ ownerId: actorId, revision: 2, lastMutationKey: snapshotId,
+        collection: { collectionEnabled: true, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION, expiresAt: "2026-11-20T20:00:00Z", retentionDays: 45 }, profile: null });
+      return base(url, init);
+    }); vi.stubGlobal("fetch", fetcher); return fetcher;
+  }
+  it("does not infer application confirmations from opening or saving unchanged cleared-profile answers", async () => {
+    const fetcher = clearedFamily(); render(<WicSavedApplication request={support()}/>); await edit();
+    const confirmation = await screen.findByRole("checkbox", { name: /^Still correct for this WIC request today: Contact first name/ });
+    expect((confirmation as HTMLInputElement).checked).toBe(false);
+    expect((await axe.run(document.body, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Save WIC changes" })); await screen.findByText(/Your private WIC answers are saved/);
+    expect(JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body)).confirmedPaths).toBeUndefined();
+  });
+  it("records only individually selected WIC declarations and freezes exact interrupted-save recovery", async () => {
+    let first = true; const fetcher = clearedFamily(() => { if (first) { first = false; throw new Error("lost acknowledgement"); } return response({ snapshotId }); });
+    render(<WicSavedApplication request={support()}/>); await edit();
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^Still correct for this WIC request today: Contact first name/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Still correct for this WIC request today: Child 1 first name/ }));
+    expect(screen.queryByRole("checkbox", { name: /routing ZIP/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save WIC changes" }));
+    const retry = await screen.findByRole("button", { name: "Retry the same WIC save" });
+    expect(screen.getByRole("checkbox", { name: /^Still correct for this WIC request today: Contact last name/ }).matches(":disabled")).toBe(true);
+    fireEvent.click(retry); await screen.findByText(/Your private WIC answers are saved/);
+    const posts = fetcher.mock.calls.filter(([, init]) => init?.method === "POST"); expect(posts).toHaveLength(2);
+    expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
+    expect(JSON.parse(String(posts[0][1]?.body)).confirmedPaths).toEqual(["contact.firstName", `children.${childId}.firstName`]);
+    expect(JSON.parse(String(posts[0][1]?.body)).familyProfileSource).toBeUndefined();
+  });
+  it("removes a selected declaration when its answer changes or its child is removed", async () => {
+    const fetcher = clearedFamily(); render(<WicSavedApplication request={support()}/>); await edit();
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^Still correct for this WIC request today: Contact first name/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Still correct for this WIC request today: Child 1 first name/ }));
+    fireEvent.change(screen.getByLabelText("Contact first name"), { target: { value: "ChangedCanary" } });
+    expect(screen.queryByRole("checkbox", { name: /today: Contact first name/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Remove child 1" }));
+    expect(screen.queryByRole("checkbox", { name: /today: Child/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save WIC changes" })); await screen.findByText(/Your private WIC answers are saved/);
+    expect(JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body)).confirmedPaths).toBeUndefined();
+  });
+
   it("refreshes changed linked child facts after a known-no-write preflight without losing manual WIC answers", async () => {
     const fields = [{ applicationPath: `children.${childId}.firstName`, profilePaths: [`members.${childId}.firstName`] }];
     let revision = 2, name = "ProfileChild";

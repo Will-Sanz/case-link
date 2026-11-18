@@ -56,6 +56,14 @@ describe("separate WIC private data boundary", () => {
     });
     expect(mocks.from).not.toHaveBeenCalled();
   });
+  it("forwards only the explicitly selected application confirmation paths", async () => {
+    await saveWicApplicationDetails(requestId, { ...input(), confirmedPaths: ["contact.firstName"] }, key);
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("parent_save_application_with_family_profile", expect.objectContaining({ p_confirmed_paths: ["contact.firstName"] }));
+  });
+  it.each([["contact.firstName", "contact.firstName"], ["contact"], ["intake.zip"], ["mother.firstName"], [""]])("rejects invalid field confirmations before Auth: %j", async (...confirmedPaths) => {
+    await expect(saveWicApplicationDetails(requestId, { ...input(), confirmedPaths }, key)).rejects.toThrow("parent_invalid_input");
+    expect(mocks.session).not.toHaveBeenCalled();
+  });
   it.each([
     { noticeVersion: "snap-application-details-2026-11-03.v1" }, { expectedVersion: 0 }, { details: { kind: "synthetic_rehearsal" } },
     { details: { contact: { zip: "invalid" } } }, { details: { contact: { firstName: "password=private" } } },

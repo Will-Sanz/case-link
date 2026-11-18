@@ -22,6 +22,7 @@ const canReuse = (read: FamilyProfileRead) => read.collection.collectionEnabled 
 export function useSavedFamilyProfile({ request, program, snapshotId, permitted, onOwnerChanged }: { request: SupportRequest; program: Program; snapshotId?: string; permitted: boolean; onOwnerChanged: () => void }) {
   const scope = JSON.stringify([request.id, request.version, snapshotId, permitted, request.status, request.mandate]), controller = useRef<AbortController | null>(null);
   const owner = useRef<string | null>(null), entry = useRef<Entry | null>(null), running = useRef(false), ownerChanged = useRef(onOwnerChanged);
+  const [unavailable, setUnavailable] = useState<{ scope: string; paths: string[] }>({ scope: "", paths: [] });
   const [loadingScope, setLoadingScope] = useState<string | null>(null), [closed, setClosed] = useState<"owner" | "access" | null>(null), [notice, setNotice] = useState("");
   useLayoutEffect(() => { ownerChanged.current = onOwnerChanged; });
   useLayoutEffect(() => { const work = new AbortController(); controller.current = work; running.current = false; return () => work.abort(); }, [scope]);
@@ -59,7 +60,7 @@ export function useSavedFamilyProfile({ request, program, snapshotId, permitted,
         const next = structuredClone(value), previous = entry.current?.scope === scope ? entry.current : null;
         for (const field of previous?.projection.fields ?? []) if (sameFamilyProfileApplicationValue(familyProfileApplicationValue(value, field.applicationPath), familyProfileApplicationValue(previous!.projection.details, field.applicationPath), field.applicationPath))
           replaceFamilyProfileApplicationValue(next, field.applicationPath, familyProfileApplicationValue(previous!.base, field.applicationPath));
-        entry.current = null; setClosed(null); setNotice(""); return next;
+        entry.current = null; setClosed(null); setUnavailable({ scope, paths: [] }); setNotice(""); return next;
       }
       const [account, response] = await Promise.all([boundedParentApi("/account", {}, work.signal, deadline), boundedParentApi("/family-profile", {}, work.signal, deadline)]);
       work.signal.throwIfAborted();
@@ -80,6 +81,8 @@ export function useSavedFamilyProfile({ request, program, snapshotId, permitted,
         replaceFamilyProfileApplicationValue(next, field.applicationPath, familyProfileApplicationValue(current ? projection.details : base, field.applicationPath));
       }
       entry.current = { scope, read, fields, options, base, projection }; setClosed(null);
+      setUnavailable({ scope, paths: fields.filter(field => !projection.fields.some(current => sameField(field, current)) &&
+        (canReuse(read) || !read.profile || field.profilePaths.some(path => !Object.hasOwn(read.profile!.provenance, path)))).map(field => field.applicationPath) });
       setNotice(projection.fields.length < fields.length ? "Some linked family answers are expired, cleared or unavailable. Their earlier saved values keep their original dates. Correct only affected answers; unchanged old answers cannot restart queued work." : "Current linked answers were filled from your saved family information. Your programme-specific answers stay unchanged, and reuse keeps its original dates.");
       return next;
     } catch (failure) {
@@ -116,7 +119,8 @@ export function useSavedFamilyProfile({ request, program, snapshotId, permitted,
       throw new ParentApiError("Saved family information needs a fresh check. Your manual changes remain on this page; refresh linked family answers before saving.", 412);
     }
   }
-  return { loading: loadingScope === scope, blocked: !!closed, canReload: closed === "access", notice, load, source };
+  const unavailablePaths = !closed && unavailable.scope === scope ? unavailable.paths : [];
+  return { loading: loadingScope === scope, blocked: !!closed, canReload: closed === "access", notice, unavailablePaths, load, source };
 }
 
 export function SavedFamilyProfileNotice({ reuse, refresh, disabled }: { reuse: Pick<ReturnType<typeof useSavedFamilyProfile>, "notice" | "loading" | "blocked" | "canReload">; refresh: () => void; disabled: boolean }) {
