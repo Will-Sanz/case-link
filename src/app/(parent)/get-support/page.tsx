@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { ParentIntake } from "@/features/parent/intake";
 import { canonicalProjectOrigin } from "@/lib/parent/project-origin";
 import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
-export const metadata: Metadata = { title: "Get support" };
+import { readParentLocale } from "@/lib/parent/locale-server";
+import { parentText } from "@/lib/parent/locale";
+export async function generateMetadata(): Promise<Metadata> { return { title: parentText(await readParentLocale(), "Get support") }; }
 export default async function GetSupportPage({
   searchParams,
 }: {

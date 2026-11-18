@@ -238,6 +238,12 @@ export default function ParentPrivacyPage() {
       </p>
       <h2>Cookies, messages & technical information</h2>
       <p>
+        When you choose a screen language, a cookie remembers English or Spanish
+        in this browser for up to 90 days. It contains no household facts and
+        does not change your program contact language or service permission.
+        Clearing this cookie removes that browser preference.
+      </p>
+      <p>
         Necessary cookies keep you signed in and protect your session. Hosting,
         authentication and security services also process request times, IP
         addresses and related network information. We do not add advertising or

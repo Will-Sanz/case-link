@@ -1,4 +1,6 @@
 "use client";
+import { useParentLocale } from "@/features/parent/parent-locale";
+import { parentRecoveryHref } from "@/lib/parent/locale";
 
 import { clearLocalActionDrafts } from "@/lib/domain/plan/local-action-draft";
 
@@ -13,6 +15,7 @@ import { PASSWORD_REQUIREMENTS, passwordMeetsPolicy } from "@/lib/auth/password-
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function ResetPasswordForm() {
+  const { t, locale, provided } = useParentLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
@@ -72,7 +75,8 @@ export function ResetPasswordForm() {
     clearLocalActionDrafts();
     const { error: signOutError } = await createSupabaseBrowserClient().auth.signOut({ scope: "global" });
     if (signOutError) throw signOutError;
-    router.replace(changed ? "/login?message=password-reset-success" : "/login");
+    const next = changed ? "/login?message=password-reset-success" : "/login";
+    router.replace(provided ? parentRecoveryHref(next, locale) : next);
     router.refresh();
   }
 
@@ -145,36 +149,36 @@ export function ResetPasswordForm() {
     }
   }
 
-  if (status === "checking") return <p role="status" className="text-sm text-[var(--public-ink-muted)]">Checking your link…</p>;
+  if (status === "checking") return <p role="status" className="text-sm text-[var(--public-ink-muted)]">{t("Checking your link…")}</p>;
   if (status === "invalid") return (
     <div className="space-y-4">
-      <p className={alertErrorClass} role="alert">{error ?? "This reset link is invalid or expired. Request a new password reset email to continue."}</p>
-      <div className="flex justify-center"><Link href="/forgot-password" className="font-medium text-[var(--public-accent)] underline-offset-2 hover:underline">Request a new reset link</Link></div>
+      <p className={alertErrorClass} role="alert">{t(error ?? "This reset link is invalid or expired. Request a new password reset email to continue.")}</p>
+      <div className="flex justify-center"><Link href="/forgot-password" className="font-medium text-[var(--public-accent)] underline-offset-2 hover:underline">{t("Request a new reset link")}</Link></div>
     </div>
   );
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {error ? <p className={alertErrorClass} role="alert">{error}</p> : null}
-      {info ? <p className={alertInfoClass} role="status">{info}</p> : null}
-      {passwordUpdated ? <p role="status">Your password is updated. Finish signing out, then sign in with your new password.</p> : <>
+      {error ? <p className={alertErrorClass} role="alert">{t(error)}</p> : null}
+      {info ? <p className={alertInfoClass} role="status">{t(info)}</p> : null}
+      {passwordUpdated ? <p role="status">{t("Your password is updated. Finish signing out, then sign in with your new password.")}</p> : <>
         <div>
-          <Label htmlFor="reset-password">New password</Label>
+          <Label htmlFor="reset-password">{t("New password")}</Label>
           <Input id="reset-password" name="password" type="password" autoComplete="new-password" required minLength={14} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1" aria-describedby="password-requirements" />
-          <p id="password-requirements" className="mt-1 text-xs text-[var(--public-ink-3)]">{PASSWORD_REQUIREMENTS}</p>
+          <p id="password-requirements" className="mt-1 text-xs text-[var(--public-ink-3)]">{t(PASSWORD_REQUIREMENTS)}</p>
         </div>
         <div>
-          <Label htmlFor="reset-confirm-password">Confirm new password</Label>
+          <Label htmlFor="reset-confirm-password">{t("Confirm new password")}</Label>
           <Input id="reset-confirm-password" name="confirmPassword" type="password" autoComplete="new-password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1" />
         </div>
         {needsVerification ? <div className="space-y-2">
-          <Button type="button" variant="outline" disabled={pending} onClick={() => void sendVerificationCode()}>Send verification code</Button>
-          <Label htmlFor="password-verification">Verification code</Label>
+          <Button type="button" variant="outline" style={{ whiteSpace: "normal" }} disabled={pending} onClick={() => void sendVerificationCode()}>{t("Send verification code")}</Button>
+          <Label htmlFor="password-verification">{t("Verification code")}</Label>
           <Input id="password-verification" name="nonce" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={nonce} onChange={(e) => setNonce(e.target.value)} />
         </div> : null}
       </>}
-      <Button type="submit" className="w-full" disabled={pending}>{pending ? "Please wait…" : passwordUpdated ? "Finish signing out" : "Update password"}</Button>
-      <Button type="button" variant="outline" disabled={pending} className="w-full" onClick={() => void cancelReset()}>Cancel and return to sign in</Button>
+      <Button type="submit" className="w-full" style={{ whiteSpace: "normal" }} disabled={pending}>{pending ? t("Please wait…") : passwordUpdated ? t("Finish signing out") : t("Update password")}</Button>
+      <Button type="button" variant="outline" disabled={pending} className="w-full" style={{ whiteSpace: "normal" }} onClick={() => void cancelReset()}>{t("Cancel and return to sign in")}</Button>
     </form>
   );
 }

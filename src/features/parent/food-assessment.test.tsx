@@ -1,31 +1,35 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
+import type { ReactNode } from "react";
 import { FoodAssessment } from "./food-assessment";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+const renderGuide = (children: ReactNode) => render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header>{children}</ParentLocaleProvider>);
 beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 function answer(label: RegExp, value: string) { fireEvent.change(screen.getByLabelText(label), { target: { value } }); }
 describe("public guided food entry", () => {
-  it("hands the exact current answers and explicit language to the typed form without navigation or persistence", () => {
-    const onChoose = vi.fn(); render(<FoodAssessment onChoose={onChoose}/>);
-    fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: "es" } });
+  it("hands only the exact current answers to the typed form without navigation or persistence", () => {
+    const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose}/>);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     answer(/suficiente comida/, "not_sure"); answer(/ayuda para comprar/, "applied");
     fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
     fireEvent.click(screen.getByRole("button", { name: "Consultar una solicitud pendiente" }));
-    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ need: "snap_pending", answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null }, language: "es", languageChosen: true });
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ need: "snap_pending", answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null } });
     expect(fetch).not.toHaveBeenCalled();
   });
   it("moves keyboard focus to results and back to the first answer when editing", async () => {
-    render(<FoodAssessment />); answer(/enough food/, "no"); answer(/help paying/, "applied");
+    renderGuide(<FoodAssessment />); answer(/enough food/, "no"); answer(/help paying/, "applied");
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Your proposed next steps" })));
     fireEvent.click(screen.getByRole("button", { name: "Change my answers" }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/enough food/)));
   });
   it.each(["en", "es"])("lets someone whose benefits ended answer honestly in %s", language => {
-    render(<FoodAssessment />);
-    fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: language } });
+    renderGuide(<FoodAssessment />);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } });
     expect(screen.getByRole("option", { name: language === "en" ? /received it before/ : /la recibí antes/ })).toBeTruthy();
     answer(language === "en" ? /enough food/ : /suficiente comida/, "yes");
     answer(language === "en" ? /help paying/ : /ayuda para comprar/, "receiving");
@@ -36,7 +40,7 @@ describe("public guided food entry", () => {
   });
 
   it("offers urgent help without account access and routes a waiting family without another application", () => {
-    render(<FoodAssessment />);
+    renderGuide(<FoodAssessment />);
     expect(screen.getByRole("link", { name: "Find food now" }).getAttribute("href")).toBe("https://www.phila.gov/food/");
     answer(/enough food/, "no"); answer(/help paying/, "applied");
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
@@ -47,7 +51,7 @@ describe("public guided food entry", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
   it("clears the old branch after a correction, retains unrelated answers and treats unknown as unknown", () => {
-    render(<FoodAssessment />);
+    renderGuide(<FoodAssessment />);
     answer(/enough food/, "no"); answer(/help paying/, "receiving"); answer(/What has happened/, "renewal");
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     expect(screen.getByRole("link", { name: "Renew SNAP" })).toBeTruthy();
@@ -61,13 +65,13 @@ describe("public guided food entry", () => {
     expect(screen.getByText(/benefit history is still unknown/)).toBeTruthy();
   });
   it("keeps Spanish routing understandable and discloses the downstream language limit", () => {
-    render(<FoodAssessment />);
-    fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: "es" } });
+    renderGuide(<FoodAssessment />);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     expect(screen.getByRole("heading", { name: "Busquemos apoyo alimentario para su familia." }).closest("section")?.lang).toBe("es");
     answer(/suficiente comida/, "yes"); answer(/ayuda para comprar/, "receiving"); answer(/Qué ha ocurrido/, "stopped");
     fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
     expect(screen.getByRole("link", { name: "Ayuda con los beneficios de SNAP" }).getAttribute("href")).toBe("/get-support?need=snap_problem");
-    expect(screen.getByText(/pantallas de cuenta y solicitud todavía están en inglés/)).toBeTruthy();
+    expect(screen.getByText(/pantallas de solicitud y materiales de los programas siguen en inglés/)).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
   });
 });

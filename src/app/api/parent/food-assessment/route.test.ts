@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/lib/parent/auth", () => ({ requireParentSession: mocks.session }));
 import { POST } from "./route";
 const owner = "11111111-1111-4111-8111-111111111111";
-const input = { answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null }, language: "es" };
+const input = { answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null } };
 function request(body: unknown = input, origin = "https://case.invalid") {
   return new Request("https://case.invalid/api/parent/food-assessment", { method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }

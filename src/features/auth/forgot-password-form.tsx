@@ -1,4 +1,6 @@
 "use client";
+import { useParentLocale } from "@/features/parent/parent-locale";
+import { parentRecoveryHref } from "@/lib/parent/locale";
 
 import Link from "next/link";
 import { useRef, useState } from "react";
@@ -12,6 +14,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ForgotPasswordForm() {
+  const { t, locale, provided } = useParentLocale();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function ForgotPasswordForm() {
     try {
       const supabase = createSupabaseBrowserClient();
       const baseUrl = getBrowserPublicSiteOrigin();
-      const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent("/reset-password?mode=recovery")}`;
+      const redirectTo = `${baseUrl}/auth/callback${provided ? `?ui=${locale}&` : "?"}next=${encodeURIComponent(provided ? parentRecoveryHref("/reset-password?mode=recovery", locale) : "/reset-password?mode=recovery")}`;
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo,
       });
@@ -59,16 +62,16 @@ export function ForgotPasswordForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       {error ? (
         <p className={alertErrorClass} role="alert">
-          {error}
+          {t(error)}
         </p>
       ) : null}
       {info ? (
         <p className={alertInfoClass} role="status">
-          {info}
+          {t(info)}
         </p>
       ) : null}
       <div>
-        <Label htmlFor="forgot-email">Email</Label>
+        <Label htmlFor="forgot-email">{t("Email")}</Label>
         <Input
           id="forgot-email"
           name="email"
@@ -80,17 +83,16 @@ export function ForgotPasswordForm() {
           className="mt-1"
         />
       </div>
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Sending reset link…" : "Send reset link"}
+      <Button type="submit" className="w-full" style={{ whiteSpace: "normal" }} disabled={pending}>
+        {pending ? t("Sending reset link…") : t("Send reset link")}
       </Button>
       <p className="text-center text-sm text-[var(--public-ink-muted)]">
-        Remembered your password?{" "}
+        {t("Remembered your password?")}{" "}
         <Link
           href="/login"
           className="font-medium text-[var(--public-accent)] underline-offset-2 hover:text-[var(--public-accent-hover)] hover:underline"
         >
-          Back to sign in
-        </Link>
+          {t("Back to sign in")}</Link>
       </p>
     </form>
   );

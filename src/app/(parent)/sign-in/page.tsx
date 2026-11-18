@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { ParentSignIn } from "@/features/parent/sign-in";
 import { canonicalProjectOrigin } from "@/lib/parent/project-origin";
 import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
-export const metadata: Metadata = { title: "Sign in" };
+import { readParentLocale } from "@/lib/parent/locale-server";
+import { parentText } from "@/lib/parent/locale";
+export async function generateMetadata(): Promise<Metadata> { return { title: parentText(await readParentLocale(), "Sign in") }; }
 export default async function SignInPage({
   searchParams,
 }: {

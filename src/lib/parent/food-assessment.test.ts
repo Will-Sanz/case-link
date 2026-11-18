@@ -3,7 +3,7 @@ import { assessFoodSupport, foodAssessmentQuestionReasons, foodAssessmentHandoff
 
 describe("reviewed food assessment routing", () => {
   it("binds a tab handoff only to a path justified by the current answers", () => {
-    const input = { answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null }, language: "es", languageChosen: true };
+    const input = { answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null } };
     expect(foodAssessmentHandoffSchema.parse({ ...input, need: "snap_pending" }).need).toBe("snap_pending");
     expect(foodAssessmentHandoffSchema.safeParse({ ...input, need: "snap_new" }).success).toBe(false);
     expect(foodAssessmentHandoffSchema.safeParse({ ...input, need: "wic_new" }).success).toBe(false);

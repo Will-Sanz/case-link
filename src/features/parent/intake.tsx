@@ -181,8 +181,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const [familyAccess, setFamilyAccess] = useState<"ready" | "checking" | "changed" | "unavailable">("ready");
   const familyOwnerCheck = useRef<{ controller: AbortController; promise: Promise<void> } | null>(null);
   const familyProfileRequested = useRef(false), familyProfileWork = useRef<AbortController | null>(null);
-  const languageChosen = useRef(handoff?.languageChosen ?? false);
-  const explicitLanguage = useRef<"en" | "es" | null>(handoff?.languageChosen ? handoff.language : null);
+  const languageChosen = useRef(false);
+  const explicitLanguage = useRef<"en" | "es" | null>(null);
   const guideOwner = useRef<string | null>(null);
   const [guideSignIn, setGuideSignIn] = useState(false);
   const [guideTimingChosen, setGuideTimingChosen] = useState(handoff?.answers.foodForTwoDays === "no");
@@ -206,7 +206,6 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       ? [initialNeed as SupportNeed]
       : [],
     ...(initialNeed === "wic_new" ? { accountAuthority: "self" as const } : {}),
-    ...(handoff?.languageChosen ? { language: handoff.language } : {}),
     ...(handoff?.answers.foodForTwoDays === "no" ? { urgency: "today" as const } : {}),
   }));
   const [step, setStep] = useState(() => intake.needs.length ? 1 : 0);
@@ -218,7 +217,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const [accepted, setAccepted] = useState(false);
   const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [snapDetails, setSnapDetails] = useState<SnapApplicationFields>(handoff?.languageChosen ? { language: handoff.language } : {});
+  const [snapDetails, setSnapDetails] = useState<SnapApplicationFields>({});
   const [detailsReady, setDetailsReady] = useState(false);
   const [startUncertain, setStartUncertain] = useState(false);
   const [collectionBlocked, setCollectionBlocked] = useState(false);
@@ -244,11 +243,6 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const router = useRouter();
   if (previousGuide !== handoff) {
     setPreviousGuide(handoff);
-    if (handoff && previousGuide && handoff.languageChosen && (handoff.language !== previousGuide.language || !previousGuide.languageChosen)) {
-      explicitLanguage.current = handoff.language; languageChosen.current = true;
-      setIntake(current => ({ ...current, language: handoff.language }));
-      setSnapDetails(current => ({ ...current, language: handoff.language })); setAccepted(false); setGuideCheck(null);
-    }
     if (handoff && previousGuide && !guideTimingManual.current && handoff.answers.foodForTwoDays !== previousGuide.answers.foodForTwoDays) {
       setGuideTimingChosen(handoff.answers.foodForTwoDays === "no");
       if (handoff.answers.foodForTwoDays === "no") setIntake(current => ({ ...current, urgency: "today" }));
@@ -271,7 +265,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   }
   async function checkFoodAssessment(signal: AbortSignal, deadline: string) {
     if (!handoff) return;
-    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify({ answers: handoff.answers, language: intake.language }) }, signal, deadline));
+    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify({ answers: handoff.answers }) }, signal, deadline));
     signal.throwIfAborted();
     if (!guideOwner.current || result.ownerId.toLowerCase() !== guideOwner.current) {
       onFoodOwnerChanged?.(); throw new ParentApiError("Your sign-in changed. Earlier answers cannot be used for another household.", 412);

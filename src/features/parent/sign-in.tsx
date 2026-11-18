@@ -1,4 +1,6 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
+import { parentRecoveryHref } from "@/lib/parent/locale";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -27,6 +29,7 @@ export function ParentSignIn({
   authNotice?: "password-reset-success" | "auth-link-error";
   onSignedIn?: () => void | Promise<void>;
 }) {
+  const { t, locale, provided } = useParentLocale();
   const router = useRouter();
   const allowEmailCode = emailCodeAvailable && !deletionOnly;
   const ready = useSyncExternalStore(subscribeReady, () => true, () => false);
@@ -106,49 +109,41 @@ export function ParentSignIn({
     }
   }
   return (
-    <div className={`${styles.container} ${styles.authGrid}`}>
+    <div lang={locale} className={`${styles.container} ${styles.authGrid}`}>
       <div className={styles.authAside}>
         <h1>
-          A simpler way
-          <br />
-          to find support.
-        </h1>
+          {t("A simpler way")}<br />
+          {t("to find support.")}</h1>
         <p>
-          Your CaseLink account brings your support together. Sign in with the
-          email and password you already use
-          {allowEmailCode ? ", or get a secure email code." : "."}
+          {t("Your CaseLink account brings your support together. Sign in with the email and password you already use")}{allowEmailCode ? t(", or get a secure email code.") : "."}
         </p>
         <div className={styles.trustLine}>
           <Lock width={22} height={22} aria-hidden="true" />
           <div>
-            <strong>A private place for your household</strong>Use an email only
-            you can access. On a shared device, sign out when you’re finished.
-          </div>
+            <strong>{t("A private place for your household")}</strong>{t("Use an email only you can access. On a shared device, sign out when you’re finished.")}</div>
         </div>
       </div>
       <section className={styles.surface} aria-labelledby="signin-title">
         <div className={styles.formHeader}>
           <h2 id="signin-title">
-            {accountCheckOnly ? "Check your account access" : codeSent ? "Check your email" : deletionOnly ? "Sign in to manage deletion" : "Welcome to CaseLink"}
+            {accountCheckOnly ? t("Check your account access") : codeSent ? t("Check your email") : deletionOnly ? t("Sign in to manage deletion") : t("Welcome to CaseLink")}
           </h2>
           <p>
-            {accountCheckOnly ? "You are signed in. Recheck access to continue with the answers kept in this tab." : codeSent ? (
+            {accountCheckOnly ? t("You are signed in. Recheck access to continue with the answers kept in this tab.") : codeSent ? (
               <>
-                Enter the code sent to <strong>{email}</strong>. It may take a
-                moment to arrive.
-              </>
+                {t("Enter the code sent to")}{" "}<strong>{email}</strong>{t(". It may take a moment to arrive.")}</>
             ) : effectiveMethod === "password" ? (
-              "Use your existing CaseLink email and password."
+              t("Use your existing CaseLink email and password.")
             ) : (
-              "New here or need a code? We’ll email you a secure sign-in code."
+              t("New here or need a code? We’ll email you a secure sign-in code.")
             )}
           </p>
         </div>
-        {deletionOnly && <p className={styles.hint}>This sign-in checks access to your existing parent-support data for deletion. It does not create an account, reopen support work or authorize new collection.</p>}
+        {deletionOnly && <p className={styles.hint}>{t("This sign-in checks access to your existing parent-support data for deletion. It does not create an account, reopen support work or authorize new collection.")}</p>}
         <form className={styles.form} onSubmit={submit}>
           {!accountCheckOnly && (!codeSent ? (
             <div className={styles.field}>
-              <label htmlFor="parent-email">Your email address</label>
+              <label htmlFor="parent-email">{t("Your email address")}</label>
               <input
                 id="parent-email"
                 className={styles.input}
@@ -163,13 +158,11 @@ export function ParentSignIn({
                 aria-describedby="email-help"
               />
               <p id="email-help" className={styles.hint}>
-                We use this to verify your account. Support updates follow your
-                notification choices.
-              </p>
+                {t("We use this to verify your account. Support updates follow your notification choices.")}</p>
             </div>
           ) : (
             <div className={styles.field}>
-              <label htmlFor="parent-token">Email code</label>
+              <label htmlFor="parent-token">{t("Email code")}</label>
               <input
                 ref={codeInput}
                 id="parent-token"
@@ -186,13 +179,12 @@ export function ParentSignIn({
                 aria-describedby="code-help"
               />
               <p id="code-help" className={styles.hint}>
-                Use the newest code. Never share it with anyone.
-              </p>
+                {t("Use the newest code. Never share it with anyone.")}</p>
             </div>
           ))}
           {!accountCheckOnly && effectiveMethod === "password" && (
             <div className={styles.field}>
-              <label htmlFor="parent-password">Password</label>
+              <label htmlFor="parent-password">{t("Password")}</label>
               <input
                 id="parent-password"
                 className={styles.input}
@@ -206,33 +198,29 @@ export function ParentSignIn({
               />
               {existingAccountRecovery && (
                 <p className={styles.hint}>
-                  <Link className={styles.textLink} href={recoveryHref}>
-                    Forgot your password?
-                  </Link>{" "}
+                  <Link className={styles.textLink} href={provided ? parentRecoveryHref(recoveryHref, locale) : recoveryHref}>
+                    {t("Forgot your password?")}</Link>{" "}
                   {recoveryHref === "/forgot-password"
-                    ? "Reset your existing CaseLink password to sign in with it."
-                    : "Reset on the existing CaseLink site, then return here to sign in."}
+                    ? t("Reset your existing CaseLink password to sign in with it.")
+                    : t("Reset on the existing CaseLink site, then return here to sign in.")}
                 </p>
               )}
             </div>
           )}
           {error && (
             <div className={styles.error} role="alert">
-              <p>{error}{" "}
+              <p><span lang={t(error) === error ? "en" : locale}>{t(error)}</span>{" "}
               <Link className={styles.textLink} href="/support/help">
-                See direct support options
-              </Link></p>
+                {t("See direct support options")}</Link></p>
             </div>
           )}
           {authNotice === "password-reset-success" && (
             <p className={styles.success} role="status">
-              Your password is updated. Sign in with your new password.
-            </p>
+              {t("Your password is updated. Sign in with your new password.")}</p>
           )}
           {resent && allowEmailCode && (
             <p className={styles.success} role="status">
-              A new code is on its way. Check your spam folder, too.
-            </p>
+              {t("A new code is on its way. Check your spam folder, too.")}</p>
           )}
           <button
             className={`${styles.button} ${styles.full}`}
@@ -240,12 +228,12 @@ export function ParentSignIn({
             type="submit"
           >
             {pending
-              ? accountCheckOnly ? "Checking your account…" : effectiveMethod === "password" || codeSent
-                ? "Signing you in…"
-                : "Sending your code…"
-              : accountCheckOnly ? "Retry account check" : effectiveMethod === "password" || codeSent
-                ? "Sign in"
-                : "Email me a code"}{" "}
+              ? accountCheckOnly ? t("Checking your account…") : effectiveMethod === "password" || codeSent
+                ? t("Signing you in…")
+                : t("Sending your code…")
+              : accountCheckOnly ? t("Retry account check") : effectiveMethod === "password" || codeSent
+                ? t("Sign in")
+                : t("Email me a code")}{" "}
             {effectiveMethod === "password" || codeSent ? (
               <ArrowRight width={19} height={19} aria-hidden="true" />
             ) : (
@@ -267,8 +255,8 @@ export function ParentSignIn({
             }}
           >
             {effectiveMethod === "password"
-              ? "Use an email code instead"
-              : "Use my CaseLink password"}
+              ? t("Use an email code instead")
+              : t("Use my CaseLink password")}
           </button>
         )}
         {!accountCheckOnly && codeSent && (
@@ -278,8 +266,7 @@ export function ParentSignIn({
               disabled={!ready || pending}
               onClick={resend}
             >
-              Send a new code
-            </button>
+              {t("Send a new code")}</button>
             <button
               className={styles.quiet}
               disabled={!ready || pending}
@@ -290,21 +277,17 @@ export function ParentSignIn({
                 setResent(false);
               }}
             >
-              Use a different email
-            </button>
+              {t("Use a different email")}</button>
           </div>
         )}
         {!deletionOnly && <p className={`${styles.hint} ${styles.space}`}>
-          By continuing, you agree to our{" "}
+          {t("By continuing, you agree to our")}{" "}
           <Link className={styles.textLink} href="/support/terms">
-            terms
-          </Link>
-          . Read how we handle your information in our{" "}
+            {t("terms")}</Link>
+          {t(". Read how we handle your information in our")}{" "}
           <Link className={styles.textLink} href="/support/privacy">
-            privacy notice
-          </Link>
-          . Signing in does not authorize sharing or applications.
-        </p>}
+            {t("privacy notice")}</Link>
+          {t(". Signing in does not authorize sharing or applications.")}</p>}
       </section>
     </div>
   );

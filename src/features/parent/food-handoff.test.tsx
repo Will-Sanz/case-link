@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
+import type { ReactNode } from "react";
 import { ParentIntake } from "./intake";
 import { assessFoodSupport } from "@/lib/parent/food-assessment";
 import { getProgramsForNeeds } from "@/lib/parent/programs";
 import axe from "axe-core";
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
+const renderGuide = (children: ReactNode) => render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header>{children}</ParentLocaleProvider>);
 const owner = "11111111-1111-4111-8111-111111111111", other = "22222222-2222-4222-8222-222222222222";
 const reply = (value: unknown, status = 200) => ({ ok: status < 400, status, json: async () => value });
 function api(options: { assessment?: (body: unknown) => unknown | Promise<unknown>; post?: (init: RequestInit) => unknown; signedIn?: boolean } = {}) {
@@ -28,7 +31,7 @@ function api(options: { assessment?: (body: unknown) => unknown | Promise<unknow
   vi.stubGlobal("fetch", fetcher); return { fetcher, state };
 }
 async function choose({ enough = "no", language = "en" }: { enough?: string; language?: "en" | "es" } = {}) {
-  if (language === "es") fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: "es" } });
+  if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
   fireEvent.change(screen.getByLabelText(/enough food|suficiente comida/), { target: { value: enough } });
   fireEvent.change(screen.getByLabelText(/help paying|ayuda para comprar/), { target: { value: "applied" } });
   fireEvent.click(screen.getByRole("button", { name: language === "es" ? "Ver mis opciones" : "See my options" }));
@@ -45,20 +48,20 @@ async function permission() {
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("guided food handoff into the owned typed request", () => {
-  it("carries a declared shortage and explicit Spanish preference without inventing another SNAP application", async () => {
-    const { fetcher } = api(); render(<main><ParentIntake initialNeed="food"/></main>); await choose({ language: "es" }); await facts();
+  it("carries a declared shortage and Spanish interface without changing service language without inventing another SNAP application", async () => {
+    const { fetcher } = api(); renderGuide(<main><ParentIntake initialNeed="food"/></main>); await choose({ language: "es" }); await facts();
     expect((screen.getByLabelText("Request timing") as HTMLSelectElement).value).toBe("today");
-    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("es");
+    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("en");
     expect(screen.getByText(/Today is the proposed priority/)).toBeTruthy();
     expect((await axe.run(document.body, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
     await permission(); fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const packet = JSON.parse(String(fetcher.mock.calls.find(([url, init]) => url.endsWith("/requests") && init?.method === "POST")![1]!.body));
-    expect(packet.intake).toMatchObject({ needs: ["snap_pending"], urgency: "today", language: "es" });
+    expect(packet.intake).toMatchObject({ needs: ["snap_pending"], urgency: "today", language: "en" });
     expect(packet.mandate.mode).toBe("prepare_only"); expect(packet.answers).toBeUndefined();
   });
   it("leaves unknown timing unresolved until a real choice and preserves typed facts on Back", async () => {
-    api(); render(<ParentIntake initialNeed="food"/>); await choose({ enough: "not_sure" }); await facts();
+    api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose({ enough: "not_sure" }); await facts();
     expect((screen.getByLabelText("Request timing") as HTMLSelectElement).value).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByText(/An unknown food answer does not set a deadline/)).toBeTruthy();
@@ -72,7 +75,7 @@ describe("guided food handoff into the owned typed request", () => {
   it("rejects a stale language response instead of opening permission for old choices", async () => {
     let release!: (value: unknown) => void;
     const { fetcher } = api({ assessment: () => new Promise(resolve => { release = resolve; }) });
-    render(<ParentIntake initialNeed="food"/>); await choose(); await facts();
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(release).toBeTypeOf("function"));
     fireEvent.change(screen.getByLabelText("Preferred service language"), { target: { value: "es" } });
@@ -82,7 +85,7 @@ describe("guided food handoff into the owned typed request", () => {
   });
   it("preserves answers and direct alternatives when deterministic preflight cannot connect", async () => {
     const { fetcher } = api({ assessment: async () => { throw new Error("source unavailable"); } });
-    render(<ParentIntake initialNeed="food"/>); await choose(); await facts();
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("link", { name: "See direct support options" })).toBeTruthy();
     expect((screen.getByLabelText("Household ZIP code") as HTMLInputElement).value).toBe("19104");
@@ -91,7 +94,7 @@ describe("guided food handoff into the owned typed request", () => {
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
   });
   it("clears the earlier household when account ownership changes without a profile", async () => {
-    const { state, fetcher } = api(); render(<ParentIntake initialNeed="food"/>); await choose(); await facts();
+    const { state, fetcher } = api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts();
     state.owner = other; fireEvent(window, new Event("focus"));
     expect(await screen.findByText(/earlier answers were cleared/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
@@ -100,9 +103,10 @@ describe("guided food handoff into the owned typed request", () => {
   });
   it("reconciles an uncertain start with its exact body and key without rerunning assessment", async () => {
     let first = true; const { fetcher } = api({ post: () => { if (first) { first = false; throw new Error("lost acknowledgement"); } return reply({ request: { id: owner } }); } });
-    render(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await screen.findByText(/save result has not been confirmed/);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     const checks = fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment")).length;
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
@@ -111,15 +115,15 @@ describe("guided food handoff into the owned typed request", () => {
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment"))).toHaveLength(checks);
   });
   it("keeps guide answers through existing inline sign-in with the original recovery settings", async () => {
-    api({ signedIn: false }); render(<ParentIntake initialNeed="food" signInOptions={{ existingAccountRecovery: true, recoveryHref: "https://original.example.invalid/forgot-password", emailCodeAvailable: false }}/>);
-    await choose({ language: "es" }); await screen.findByLabelText("Password");
+    api({ signedIn: false }); renderGuide(<ParentIntake initialNeed="food" signInOptions={{ existingAccountRecovery: true, recoveryHref: "https://original.example.invalid/forgot-password", emailCodeAvailable: false }}/>);
+    await choose({ language: "es" }); await screen.findByLabelText(/Password|Contraseña/);
     expect(screen.queryByRole("button", { name: "Use an email code instead" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Forgot your password?" }).getAttribute("href")).toBe("https://original.example.invalid/forgot-password");
-    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "existing@example.invalid" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(screen.getByRole("link", { name: /Forgot your password|Olvidó su contraseña/ }).getAttribute("href")).toBe("https://original.example.invalid/forgot-password?ui=es");
+    fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "existing@example.invalid" } });
+    fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
     await screen.findByLabelText("Household ZIP code");
-    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("es");
+    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("en");
     expect((screen.getByLabelText("Request timing") as HTMLSelectElement).value).toBe("today");
     expect(navigation.replace).not.toHaveBeenCalled();
   });
@@ -127,12 +131,12 @@ describe("guided food handoff into the owned typed request", () => {
 
 describe("guided food recovery and keyboard handoff", () => {
   it("focuses the household heading once secure access finishes loading", async () => {
-    api(); render(<ParentIntake initialNeed="food"/>); await choose();
+    api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose();
     const heading = await screen.findByRole("heading", { name: "Your household details, in one place" });
     await waitFor(() => expect(document.activeElement).toBe(heading));
   });
   it("moves focus back to proposed paths and into the retained form", async () => {
-    api(); render(<ParentIntake initialNeed="food"/>); await choose(); await facts();
+    api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts();
     const back = screen.getByRole("button", { name: "Back" }); back.focus(); fireEvent.click(back);
     const results = screen.getByRole("heading", { name: "Your proposed next steps" });
     await waitFor(() => expect(document.activeElement).toBe(results));
@@ -141,47 +145,48 @@ describe("guided food recovery and keyboard handoff", () => {
     expect((screen.getByLabelText("Household ZIP code") as HTMLInputElement).value).toBe("19104");
   });
   it("keeps inline recovery and permission when authentication expires at final preflight", async () => {
-    const { state, fetcher } = api(); render(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
+    const { state, fetcher } = api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
     const previous = globalThis.fetch;
     vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => url.endsWith("/food-assessment") && !state.signedIn
       ? Promise.resolve(reply({ error: "Sign in again to continue." }, 401)) : previous(url, init)));
     state.signedIn = false; fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
-    await screen.findByLabelText("Password");
+    await screen.findByLabelText(/Password|Contraseña/);
     expect(screen.queryByRole("link", { name: "Sign in to continue" })).toBeNull();
     expect(fetcher.mock.calls.some(([url, init]) => url.endsWith("/requests") && init?.method === "POST")).toBe(false);
-    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "fixture@example.invalid" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "fixture@example.invalid" } });
+    fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
     expect((await screen.findByRole("checkbox", { name: /I authorize/ }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
   });
   it("shows a failed post-sign-in owner check and retries it without repeating authentication", async () => {
-    const { fetcher } = api({ signedIn: false }); render(<ParentIntake initialNeed="food"/>); await choose({ language: "es" }); await screen.findByLabelText("Password");
+    const { fetcher } = api({ signedIn: false }); renderGuide(<ParentIntake initialNeed="food"/>); await choose({ language: "es" }); await screen.findByLabelText(/Password|Contraseña/);
     let unavailable = true;
     const previous = globalThis.fetch;
     vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => url.endsWith("/account") && unavailable
       ? Promise.resolve(reply({ error: "Synthetic account recheck unavailable" }, 503)) : previous(url, init)));
-    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "fixture@example.invalid" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "fixture@example.invalid" } });
+    fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
     expect(await screen.findByRole("alert")).toBeTruthy();
-    unavailable = false; fireEvent.click(screen.getByRole("button", { name: "Retry account check" }));
+    unavailable = false; fireEvent.click(screen.getByRole("button", { name: /Retry account check|Reintentar la comprobación/ }));
     await screen.findByLabelText("Household ZIP code");
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/auth"))).toHaveLength(1);
-    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("es");
+    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("en");
     expect(navigation.replace).not.toHaveBeenCalled();
   });
   it("preserves an unknown start's exact packet through inline authentication recovery", async () => {
     let first = true;
     const { state, fetcher } = api({ post: () => { if (first) { first = false; throw new Error("lost acknowledgement"); } return reply({ request: { id: owner } }); } });
-    render(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" })); await screen.findByText(/save result has not been confirmed/);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     const checks = fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment")).length;
-    state.signedIn = false; fireEvent.click(screen.getByRole("button", { name: "Start getting support" })); await screen.findByLabelText("Password");
-    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "fixture@example.invalid" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    state.signedIn = false; fireEvent.click(screen.getByRole("button", { name: "Start getting support" })); await screen.findByLabelText(/Password|Contraseña/);
+    fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "fixture@example.invalid" } });
+    fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Start getting support" })); await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
     expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);

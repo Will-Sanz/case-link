@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
+import { readParentLocale } from "@/lib/parent/locale-server";
+import { ParentLocaleProvider } from "@/features/parent/parent-locale";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -18,15 +20,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const parent = process.env.CASELINK_PRODUCT === "parent";
+  const locale = parent ? await readParentLocale() : "en";
   return (
-    <html lang="en" className={`${GeistSans.variable} h-full`}>
+    <html lang={locale} className={`${GeistSans.variable} h-full`}>
       <body className="flex min-h-full flex-col font-sans antialiased">
-        {children}
+        {parent ? <ParentLocaleProvider initialLocale={locale}>{children}</ParentLocaleProvider> : children}
       </body>
     </html>
   );

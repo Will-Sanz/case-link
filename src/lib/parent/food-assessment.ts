@@ -22,8 +22,8 @@ const recommendationSchema = z.object({
   reason: z.enum(["immediate", "new", "pending", "renewal", "problem"]),
 }).strict();
 export type FoodRecommendation = z.infer<typeof recommendationSchema>;
-export const foodAssessmentInputSchema = z.object({ answers: foodAssessmentSchema, language: z.enum(["en", "es"]) }).strict();
-export const foodAssessmentHandoffSchema = foodAssessmentInputSchema.extend({ need: recommendationSchema.shape.need, languageChosen: z.boolean() }).superRefine((value, context) => {
+export const foodAssessmentInputSchema = z.object({ answers: foodAssessmentSchema }).strict();
+export const foodAssessmentHandoffSchema = foodAssessmentInputSchema.extend({ need: recommendationSchema.shape.need }).superRefine((value, context) => {
   if (!assessFoodSupport(value.answers).some(path => path.need === value.need))
     context.addIssue({ code: "custom", path: ["need"], message: "Choose a current proposed food path." });
 });

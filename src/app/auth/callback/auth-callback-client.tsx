@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "@/features/parent/parent-locale";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 let inFlight: Promise<string> | null = null;
 
 export function AuthCallbackClient() {
+  const { t } = useParentLocale();
   const router = useRouter();
   const capturedUrl = useRef<URL | null>(null);
   const [status, setStatus] = useState<"initial" | "confirm" | "exchange">("initial");
@@ -45,11 +47,11 @@ export function AuthCallbackClient() {
 
   if (status === "confirm") return (
     <div className="max-w-sm space-y-4 text-center">
-      <h1 className="text-xl font-semibold">Continue to your account</h1>
-      <p className="text-sm text-[var(--public-ink-muted)]">Continue to set or reset your CaseLink password. This link can be used once.</p>
-      <Button onClick={() => setStatus("exchange")}>Continue to password setup</Button>
+      <h1 className="text-xl font-semibold">{t("Continue to your account")}</h1>
+      <p className="text-sm text-[var(--public-ink-muted)]">{t("Continue to set or reset your CaseLink password. This link can be used once.")}</p>
+      <Button onClick={() => setStatus("exchange")}>{t("Continue to password setup")}</Button>
     </div>
   );
 
-  return <p className="text-center text-sm text-[var(--public-ink-muted)]" role="status">Confirming sign-in…</p>;
+  return <p className="text-center text-sm text-[var(--public-ink-muted)]" role="status">{t("Confirming sign-in…")}</p>;
 }

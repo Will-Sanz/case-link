@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +14,7 @@ const supportLinks = [
 ];
 
 export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
+  const { t } = useParentLocale();
   const pathname = usePathname();
   const menu = useRef<HTMLDetailsElement>(null);
   const links = signedIn
@@ -28,7 +30,7 @@ export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
   const closeMenu = () => menu.current?.removeAttribute("open");
   return (
     <>
-      <nav className={styles.navigation} aria-label="Main navigation">
+      <nav className={styles.navigation} aria-label={t("Main navigation")}>
         {links.map((link) => (
           <Link
             key={link.href}
@@ -36,7 +38,7 @@ export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
             href={link.href}
             aria-current={active(link.href) ? "page" : undefined}
           >
-            {link.label}
+            {t(link.label)}
           </Link>
         ))}
         <Link
@@ -44,12 +46,12 @@ export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
           href={accountPath}
           aria-current={pathname === accountPath ? "page" : undefined}
         >
-          {signedIn ? "Your account" : "Sign in"}
+          {signedIn ? t("Your account") : t("Sign in")}
         </Link>
       </nav>
       <details ref={menu} className={styles.mobileNav}>
-        <summary>Menu</summary>
-        <nav aria-label="Mobile navigation">
+        <summary>{t("Menu")}</summary>
+        <nav aria-label={t("Mobile navigation")}>
           {links.map((link) => (
             <Link
               key={link.href}
@@ -58,7 +60,7 @@ export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
               aria-current={active(link.href) ? "page" : undefined}
               onClick={closeMenu}
             >
-              {link.label}
+              {t(link.label)}
             </Link>
           ))}
           <Link
@@ -67,7 +69,7 @@ export function ParentNavigation({ signedIn }: { signedIn: boolean }) {
             aria-current={pathname === accountPath ? "page" : undefined}
             onClick={closeMenu}
           >
-            {signedIn ? "Your account" : "Sign in"}
+            {signedIn ? t("Your account") : t("Sign in")}
           </Link>
         </nav>
       </details>

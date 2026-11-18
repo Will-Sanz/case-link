@@ -8,6 +8,7 @@ import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION } from 
 import { PECO_APPLICATION_NOTICE_VERSION } from "@/lib/parent/peco-application-fields";
 import { PGW_APPLICATION_NOTICE_VERSION } from "@/lib/parent/pgw-application-fields";
 import { WATER_APPLICATION_NOTICE_VERSION } from "@/lib/parent/water-application-fields";
+import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
 import { assessFoodSupport } from "@/lib/parent/food-assessment";
 import { getProgramsForNeeds } from "@/lib/parent/programs";
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
@@ -66,15 +67,16 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now)
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("saved family information in actual application intake", () => {
-  it("keeps explicit guided language while reusing other original-dated SNAP profile facts", async () => {
-    const fetcher = api(); render(<ParentIntake initialNeed="food"/>);
-    fireEvent.change(screen.getByLabelText("Language / Idioma"), { target: { value: "es" } });
+  it("keeps screen language separate and preserves a manual service-language correction during SNAP profile reuse", async () => {
+    const fetcher = api(); render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header><ParentIntake initialNeed="food"/></ParentLocaleProvider>);
+    fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     fireEvent.change(screen.getByLabelText(/suficiente comida/), { target: { value: "no" } });
     fireEvent.change(screen.getByLabelText(/ayuda para comprar/), { target: { value: "never" } });
     fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
     fireEvent.click(screen.getByRole("button", { name: "Solicitar SNAP" }));
     await waitFor(() => expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Saved"));
-    expect((document.querySelector('[data-snap-path="language"]') as HTMLSelectElement).value).toBe("es");
+    expect((document.querySelector('[data-snap-path="language"]') as HTMLSelectElement).value).toBe("en");
+    fireEvent.change(document.querySelector('[data-snap-path="language"]')!, { target: { value: "es" } });
     await completeSnapQuestions(); await authorize();
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const packet = JSON.parse(String(fetcher.mock.calls.find(([url, init]) => url.endsWith("/requests") && init?.method === "POST")![1]!.body));

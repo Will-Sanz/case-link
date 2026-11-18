@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginForm } from "./login-form";
 import { ForgotPasswordForm } from "./forgot-password-form";
 import { ResetPasswordForm } from "./reset-password-form";
+import { ParentLocaleProvider } from "@/features/parent/parent-locale";
 
 const m = vi.hoisted(() => ({ signIn: vi.fn(), reset: vi.fn(), update: vi.fn(), session: vi.fn(), signOut: vi.fn(), reauthenticate: vi.fn(), router: { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }, params: new URLSearchParams("mode=recovery") }));
 vi.mock("next/navigation", () => ({ useRouter: () => m.router, useSearchParams: () => m.params }));
@@ -18,6 +19,31 @@ beforeEach(() => {
 });
 
 describe("auth form recovery", () => {
+  it("carries the Spanish interface choice through the fixed recovery callback without changing the email action", async () => {
+    m.reset.mockResolvedValue({ error: null });
+    render(<ParentLocaleProvider initialLocale="es"><ForgotPasswordForm /></ParentLocaleProvider>);
+    fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: " PARENT@example.test " } });
+    fireEvent.submit(screen.getByRole("button", { name: "Enviar enlace de restablecimiento" }).closest("form")!);
+    expect((await screen.findByRole("status")).textContent).toContain("Si existe una cuenta");
+    const [email, options] = m.reset.mock.calls[0];
+    expect(email).toBe("parent@example.test");
+    const callback = new URL(options.redirectTo);
+    expect(callback.origin).toBe("https://school.example");
+    expect(callback.pathname).toBe("/auth/callback");
+    expect(callback.searchParams.get("ui")).toBe("es");
+    expect(callback.searchParams.get("next")).toBe("/reset-password?mode=recovery&ui=es");
+  });
+  it("keeps the global sign-out boundary and Spanish destination after a password update", async () => {
+    m.update.mockResolvedValue({ error: null });
+    render(<ParentLocaleProvider initialLocale="es"><ResetPasswordForm /></ParentLocaleProvider>);
+    fireEvent.change(await screen.findByLabelText("Contraseña nueva"), { target: { value: "Synthetic-test-password1!" } });
+    fireEvent.change(screen.getByLabelText("Confirmar contraseña nueva"), { target: { value: "Synthetic-test-password1!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar contraseña" }));
+    await waitFor(() => expect(m.router.replace).toHaveBeenCalledWith("/login?message=password-reset-success&ui=es"));
+    expect(m.update).toHaveBeenCalledWith({ password: "Synthetic-test-password1!" });
+    expect(m.signOut).toHaveBeenCalledWith({ scope: "global" });
+    expect(m.signOut.mock.invocationCallOrder[0]).toBeLessThan(m.router.replace.mock.invocationCallOrder[0]);
+  });
   it("retains normalized email/password for retry after a thrown login failure", async () => {
     m.signIn.mockRejectedValueOnce(new Error("private provider detail")).mockResolvedValueOnce({ error: null });
     render(<LoginForm />);
