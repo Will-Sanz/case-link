@@ -570,7 +570,7 @@ async function main() {
         const claims = await Promise.all([foodWorker, racingWorker].map(client => client.query("select parent_private.parent_claim_job(15,true,false,false) job")));
         const admitted = claims.map(reply => reply.rows[0].job).filter(Boolean);
         check(admitted.length === 1 && admitted[0].request.id === mixedId && claims.filter(reply => reply.rows[0].job === null).length === 1,
-          "Two actual restricted database connections admit only one lease for the same combined request.");
+          `Two actual restricted database connections admit only one lease for the same combined request (admitted=${admitted.length}, empty=${claims.filter(reply => reply.rows[0].job === null).length}, expected=${admitted.filter(job => job.request.id === mixedId).length}).`);
         racedLease = admitted[0];
       } finally { await racingWorker.end(); }
       await delay(15_100);
