@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), from: vi.fn(),
 vi.mock("./auth", () => ({ requireParentSession: mocks.session }));
 import { applySupportUpdate, getSupportUpdateContext } from "./support-update-data";
 import { parentError } from "./http";
+import { supportUpdateSchema } from "./support-update";
 const id = fixtureRequest().id, key = "22222222-2222-4222-8222-222222222222", ownerId = "33333333-3333-4333-8333-333333333333";
 const receipt = { id: key, key, requestId: id, action: "replace_mandate", baseVersion: 1, resultVersion: 2, recordedAt: "2026-11-18T12:00:00Z" };
 beforeEach(() => {
@@ -29,10 +30,20 @@ it("does not quote another deadline when an owned receipt already exists", async
 });
 it("uses only the existing authoritative timing RPC for a new quote, and preserves readback if it is unavailable", async () => {
   mocks.rpc.mockResolvedValueOnce({ data: { issuedAt: "2026-11-18T12:00:00Z", expiresAt: "2026-12-18T12:00:00Z" }, error: null });
-  expect(await getSupportUpdateContext(id, key)).toEqual({ ownerId, receipt: null, issuedAt: "2026-11-18T12:00:00Z", expiresAt: "2026-12-18T12:00:00Z" });
+  expect(await getSupportUpdateContext(id, key)).toEqual({ ownerId, receipt: null, issuedAt: "2026-11-18T12:00:00.000Z", expiresAt: "2026-12-18T12:00:00.000Z" });
   expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("parent_authorization_window");
   mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: "42501" } });
   expect(await getSupportUpdateContext(id, key)).toEqual({ ownerId, receipt: null, issuedAt: null, expiresAt: null });
+});
+it("canonicalizes the database offset deadline for the unchanged mandate schema, independently of the browser clock", async () => {
+  const issuedAt = "2026-11-18T14:00:00.123456+02:00", expiresAt = "2026-12-18T14:00:00.123456+02:00";
+  mocks.rpc.mockResolvedValueOnce({ data: { issuedAt, expiresAt }, error: null });
+  const quoted = await getSupportUpdateContext(id, key);
+  expect(quoted.issuedAt).toBe("2026-11-18T12:00:00.123Z");
+  expect(quoted.expiresAt).toBe("2026-12-18T12:00:00.123Z");
+  expect(Date.parse(quoted.expiresAt!)).toBeLessThanOrEqual(Date.parse(expiresAt));
+  expect(supportUpdateSchema.safeParse({ action: "replace_mandate", version: 1, mandate: fixtureMandate({ expiresAt }) }).success).toBe(false);
+  expect(supportUpdateSchema.safeParse({ action: "replace_mandate", version: 1, mandate: fixtureMandate({ expiresAt: quoted.expiresAt! }) }).success).toBe(true);
 });
 it("fails closed on history/session failures rather than treating them as an absent receipt", async () => {
   mocks.query.maybeSingle.mockResolvedValueOnce({ data: null, error: { message: "private" } });

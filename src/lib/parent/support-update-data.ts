@@ -44,6 +44,6 @@ export async function getSupportUpdateContext(id: string, key: string) {
   const timing = await supabase.rpc("parent_authorization_window");
   const window = z.object({ issuedAt: z.iso.datetime({ offset: true }), expiresAt: z.iso.datetime({ offset: true }) }).strict().safeParse(timing.data);
   return { ownerId: user.id, receipt: null,
-    expiresAt: !timing.error && window.success ? window.data.expiresAt : null,
-    issuedAt: !timing.error && window.success ? window.data.issuedAt : null };
+    expiresAt: !timing.error && window.success ? new Date(window.data.expiresAt).toISOString() : null,
+    issuedAt: !timing.error && window.success ? new Date(window.data.issuedAt).toISOString() : null };
 }
