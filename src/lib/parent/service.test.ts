@@ -118,6 +118,32 @@ describe("public Share access preparation without provider work", () => {
     expect(result.requiredActions).toEqual([expect.objectContaining({ reason:"execution_issue",resolver:"operator" })]);
     expect(test.ports.execute).not.toHaveBeenCalled();
   });
+  it("autonomously checks and saves public directory observations after a failed food report", async () => {
+    const test = publicSetup(), first = await runSupportService(test), access = first.plan.routes[0].foodAccess!;
+    const report = bindFoodAccessReport(access, { expectedVersion: 1, siteId: access.site.id, planHash: access.planHash, reportKey: fixtureRequest().id, result: "no_food" },
+      { eventId: fixtureRequest().id, reportedAt: "2026-11-18T12:05:00Z" });
+    const directory = vi.fn(async () => ({ sites: [{ id: 148, name: "Original City-listed fridge", address: "Original source address", zip: "19129", category: "Food Site", phoneNumber: null, website: null, hours: [], serviceAreaNotes: null }],
+      sourceUrl: "https://www.phila.gov/food/", checkedAt: "2026-11-18T12:06:00Z", availability: "city_listed_unconfirmed" as const, moreSitesAvailable: false }));
+    Object.assign(test.ports, { foodAccessDirectorySites: directory });
+    const result = await runSupportService({ ...test, foodAccessReport: report });
+    expect(directory).toHaveBeenCalledExactlyOnceWith("19129");
+    expect(result.plan.routes[0]).toMatchObject({ state: "unresolved", foodAccessAlternatives: { state: "listed", sourceReport: report,
+      checkedAt: "2026-11-18T12:06:00Z", sites: [{ id: 148, name: "Original City-listed fridge" }] } });
+    expect(test.ports.execute).not.toHaveBeenCalled(); expect(test.ports.prepareOperation).not.toHaveBeenCalled();
+  });
+  it.each(["retry", "attempt_limit", "permission_expiry", "source_review_expiry"])("bounds a temporary public-directory failure by existing scheduling authority: %s", async kind => {
+    const test = publicSetup(), first = await runSupportService(test), access = first.plan.routes[0].foodAccess!;
+    const report = bindFoodAccessReport(access, { expectedVersion: 1, siteId: access.site.id, planHash: access.planHash, reportKey: fixtureRequest().id, result: "no_food" },
+      { eventId: fixtureRequest().id, reportedAt: test.now.toISOString() });
+    Object.assign(test.ports, { foodAccessDirectorySites: vi.fn(async () => { throw new Error("temporary directory outage"); }) });
+    if (kind === "permission_expiry") test.request.mandate.expiresAt = new Date(test.now.getTime() + 60000).toISOString();
+    if (kind === "source_review_expiry") { test.now = new Date("2026-12-16T23:58:00Z"); test.request.intake_confirmed_at = { zip: test.now.toISOString() }; test.request.mandate.expiresAt = "2026-12-20T00:00:00Z"; }
+    const result = await runSupportService({ ...test, foodAccessReport: report, jobAttempts: kind === "attempt_limit" ? 5 : 2 });
+    expect(result.plan.routes[0].foodAccessAlternatives?.state).toBe("unavailable");
+    expect(result.nextRunAt).toBe(kind === "retry" ? new Date(test.now.getTime() + 300000).toISOString() : null);
+    expect(result.nextActor).toBe(kind === "retry" ? "caselink" : "operator");
+    expect(test.ports.execute).not.toHaveBeenCalled();
+  });
   it("does not recommend walk-up instructions when current source evidence conflicts",async()=>{
     const test=publicSetup(); test.ports.foodAccessCityObservation=vi.fn(async()=>({ recordId:122 as const,state:"closed" as const,checkedAt:test.now.toISOString() }));
     const route=(await runSupportService(test)).plan.routes[0];

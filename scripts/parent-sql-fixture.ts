@@ -146,6 +146,8 @@ export async function createParentSqlFixture(
     "20261118121854_parent_job_claim_recheck.sql",
     "20261118164420_parent_food_description_cache_usage.sql",
     "20261118185641_parent_preserve_snap_review_continuation.sql",
+    "20261118192225_parent_food_directory_report_binding.sql",
+    "20261118194631_parent_food_directory_bounded_retry.sql",
   ];
   try {
     const last = throughMigration ? migrations.indexOf(throughMigration) : migrations.length - 1;

@@ -19,6 +19,7 @@ import { buildSupportPlan } from "../src/lib/parent/planning";
 import { parentExportText } from "../src/lib/parent/export-copy";
 import { NEEDS, NEED_LABELS } from "../src/lib/parent/domain";
 import { bindFoodAccessReport, buildFoodAccessPlanBody, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM } from "../src/lib/parent/food-access";
+import { buildFoodAccessAlternatives } from "../src/lib/parent/food-access-alternatives";
 
 async function main() {
   const directory = resolve("tmp/parent-verification/pdfs");
@@ -136,6 +137,29 @@ async function main() {
     const name = `food-access-${result}-es`;
     writeFileSync(resolve(directory, `${name}.pdf`), await renderParentSummary({ ...foodRequest, plan: { ...foodRequest.plan!, routes: foodRequest.plan!.routes.map(route => ({ ...route, state: report.outcome, foodAccessReport: report })) } }, "es"));
     cases.push({ name, locale: "es", minimumPages: 1, required: [expected, "Su necesidad de alimentos sigue sin resolverse", "No hay ninguna reserva"] });
+  }
+  // Current saved directory observations are separate from the immutable original site/report.
+  const directoryNow = new Date(), directoryAt = directoryNow.toISOString();
+  const directoryRequest = { ...foodRequest, intake_confirmed_at: { zip: directoryAt },
+    mandate: { ...foodRequest.mandate, expiresAt: new Date(directoryNow.getTime() + 86400000).toISOString() } };
+  const directoryReport = bindFoodAccessReport(food, { expectedVersion: 2, siteId: food.site.id, planHash: food.planHash,
+    reportKey: "33333333-3333-4333-8333-333333333333", result: "need_another_way" }, { eventId: "44444444-4444-4444-8444-444444444444", reportedAt: foodAt });
+  const directoryObservation = buildFoodAccessAlternatives({ request: directoryRequest, report: directoryReport, zip: "19129", now: directoryNow, result: {
+    sites: [148, 149, 150].map(id => ({ id, name: `Original City listing ${id}: María, niña y pingüino`, address: `${id} Original City address`, zip: "19129", category: "Food Site",
+      phoneNumber: "+1 (215) 555-0101", website: "https://example.invalid/source-food",
+      hours: (["mon", "tues", "wed", "thurs", "fri", "sat", "sun"] as const).map(day => ({ day, windows: ["9am–2pm"], notes: "Original City hours; stock unknown." })),
+      serviceAreaNotes: "Original City service note. No delivery or physical-access confirmation." })),
+    sourceUrl: "https://www.phila.gov/food/", checkedAt: directoryAt, availability: "city_listed_unconfirmed", moreSitesAvailable: true } });
+  for (const locale of ["en", "es"] as const) {
+    const name = `food-directory-observations-${locale}`;
+    writeFileSync(resolve(directory, `${name}.pdf`), await renderParentSummary({ ...directoryRequest, plan: { ...foodRequest.plan!, routes: foodRequest.plan!.routes.map(route => ({
+      ...route, state: directoryReport.outcome, summary: "CaseLink checked other public City listings. These directory entries do not confirm usable food.",
+      foodAccessReport: directoryReport, foodAccessAlternatives: directoryObservation,
+    })) } }, locale));
+    cases.push({ name, locale, minimumPages: 2, required: ["Original City listing 148: María, niña y pingüino", "Original City listing 150: María, niña y pingüino", "9am–2pm", directoryAt, "https://www.phila.gov/food/",
+      locale === "es" ? "Otros lugares consultados para esta solicitud" : "Other City listings checked for this request",
+      locale === "es" ? "no alimentos confirmados ni una reserva" : "not confirmed food or a reservation",
+      locale === "es" ? "no verifica entregas" : "do not verify delivery"] });
   }
   const operation: RecordedPacket = {
     id: "b72df7ef-922d-43ee-9825-55e209e5b47d",

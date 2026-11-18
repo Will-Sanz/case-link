@@ -41,6 +41,8 @@ import type { UtilityProtectedPreparationResult } from "./utility-preparation-po
 import { isUtilityPreparationMandate, type UtilityPreparationProgram } from "./utility-preparation-scope";
 import type { SnapCaptureProgress } from "./snap-capture-progress";
 import { snapTransportFailureSchema } from "./snap-protected-submission-port";
+import { buildFoodAccessAlternatives, reusableFoodAccessAlternatives } from "./food-access-alternatives";
+import { FOOD_DIRECTORY_CACHE_SECONDS, type FoodSiteResult } from "./food-sites-core";
 import { buildFoodAccessPlanBody, foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM, type FoodAccessCityObservation, type FoodAccessReport } from "./food-access";
 
 export type ServiceReceipt = z.infer<typeof receiptSchema>;
@@ -137,6 +139,7 @@ export type ServiceEvent = {
 };
 export type ServicePorts = {
   foodAccessCityObservation?(): Promise<FoodAccessCityObservation>;
+  foodAccessDirectorySites?(zip: string): Promise<FoodSiteResult>;
   coordinate(request: SupportRequest): Promise<CoordinatorResult>;
   extractDocument(document: ServiceDocument): Promise<{
     facts: unknown;
@@ -823,23 +826,52 @@ export async function runSupportService(input: {
         const access = foodAccessPlanSchema.parse({ ...body, planHash: digest(body) });
         const parsed = foodAccessReportSchema.safeParse(input.foodAccessReport);
         const report = parsed.success && parsed.data.requestId === request.id ? parsed.data : undefined;
-        route = { ...route, foodAccess: access, ...(report ? { foodAccessReport: report } : {}),
+        let alternatives;
+        let directoryRetryScheduled = false;
+        if (report?.outcome === "unresolved") {
+          const previous = request.plan?.routes.find(value => value.need === "food_now")?.foodAccessAlternatives;
+          alternatives = reusableFoodAccessAlternatives(previous, request, report, now);
+          if (!alternatives) {
+            try {
+              const result = await ports.foodAccessDirectorySites?.(zip) ?? null;
+              alternatives = buildFoodAccessAlternatives({ request, report, zip, result, now });
+            } catch {
+              alternatives = buildFoodAccessAlternatives({ request, report, zip, result: null, now });
+            }
+          }
+        }
+        const attempts = input.jobAttempts;
+        if (alternatives?.state === "unavailable" && typeof attempts === "number" && Number.isInteger(attempts) && attempts >= 1 && attempts < 5) {
+          // Reuse the existing transient-failure bound; do not retry within the reader's300-second cache window.
+          const retry = new Date(now.getTime() + FOOD_DIRECTORY_CACHE_SECONDS * 1000);
+          if (retry.getTime() < expiry && currentIntakeFields(request, retry, "food_now").zip === zip && programRoutingIssue(program, zip, retry) === null) {
+            nextRuns.push(retry.getTime()); directoryRetryScheduled = true;
+          }
+        }
+        delete route.foodAccessAlternatives;
+        route = { ...route, foodAccess: access, ...(report ? { foodAccessReport: report } : {}), ...(alternatives ? { foodAccessAlternatives: alternatives } : {}),
           state: report?.outcome ?? access.state,
           nextActor: report?.outcome === "support_received" ? "caselink" : access.state === "prepared" && !report ? "parent" : "caselink",
           summary: report?.outcome === "support_received" ? "You reported receiving enough food at Share's community fridge. This is your report, not provider confirmation."
-            : access.state === "unresolved" ? "Source information needs checking before recommending this walk-up route."
+            : alternatives?.state === "listed" ? "CaseLink checked other public City listings. These directory entries do not confirm usable food."
+              : alternatives?.state === "empty" ? "CaseLink checked the City directory; no other matching entries were returned. The food need remains open."
+              : alternatives?.state === "unavailable" ? "CaseLink could not check the City directory. The food need remains open; this is a service issue."
+              : access.state === "unresolved" ? "Source information needs checking before recommending this walk-up route."
               : report ? "Your reported visit did not meet the immediate food need. Another usable option is not confirmed."
                 : "Public walk-up instructions are prepared. Food depends on donations; stock is unknown and nothing is reserved.",
           steps: report?.outcome === "support_received" ? ["Your food report is recorded with family attribution. Other needs keep their own progress."]
-            : access.state === "unresolved" || report ? ["The immediate food need remains open. Check the current City listings for unconfirmed alternatives or use the direct support options in Help.", "Another exact access route needs checking; a listing does not confirm usable food."]
+            : report ? [alternatives?.state === "listed" ? "CaseLink saved the directory check below. Stock, eligibility and practical access remain unconfirmed." : "CaseLink still needs a usable food option. This service issue does not require you to repeat household information.",
+                ...(report.result === "need_another_way" ? ["A different way to obtain food is still needed. These walk-up directory entries do not verify delivery or access."] : []),
+                "Another exact access route needs checking; a listing does not confirm usable food."]
+            : access.state === "unresolved" ? ["The immediate food need remains open. Use direct support options in Help while CaseLink checks the source."]
             : ["Share Community Fridge & Pantry: 2901 W Hunting Park Ave, Philadelphia, PA 19129, between Lots A and B.",
             "Share's reviewed guidance describes 24-hour access without paperwork. Current stock and physical access are unconfirmed.",
             "Collect food yourself or with a trusted helper if practical. Tell CaseLink what happened or if another way is needed."],
           limitation: access.blockedReason ? "Current source evidence needs checking before recommending this walk-up route. The food need remains open."
             : report?.outcome === "unresolved" ? "You still need food. Current City listings and the help page remain available; another usable location has not been confirmed."
               : "No food is reserved, no delivery is arranged, and no household information has been sent to Share." };
-        if (access.state === "unresolved" || report?.outcome === "unresolved")
-          addAction(route, "execution_issue", "CaseLink needs to check the next food option", "The food need remains open. Another exact service contract or practical access option needs checking; City listings are unconfirmed and the help page does not promise a staffed callback.");
+        if (!directoryRetryScheduled && (access.state === "unresolved" || report?.outcome === "unresolved"))
+          addAction(route, "execution_issue", "CaseLink needs to verify a usable food option", "The food need remains open. CaseLink must verify another practical access option; saved City listings are unconfirmed and do not establish food availability or delivery.");
         plan.routes[index] = route; await record(route); continue;
       }
       if (input.utilityPreparation?.programId === route.programId) {

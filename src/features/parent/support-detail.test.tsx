@@ -413,7 +413,7 @@ describe("support detail", () => {
     expect(fetch.mock.calls.filter(([url]) => url.includes("/food-sites?")).map(([url]) => url))
       .toEqual(["/api/parent/food-sites?zip=19104"]);
   });
-  it("renders the saved site plan before unconfirmed City discovery and preserves site attribution in activity", async () => {
+  it("shows the saved failed-site report and owned service check without a viewer-triggered directory search, preserving activity attribution", async () => {
     const request = fixture(), at = "2026-11-18T12:00:00Z"; vi.setSystemTime(new Date(at));
     request.intake.needs = ["food_now", "snap_new"]; request.intake.zip = "19129";
     request.mandate.recipientIds = [SHARE_FOOD_ACCESS_PROGRAM, "snap-pa"];
@@ -431,8 +431,10 @@ describe("support detail", () => {
       ? { ok: true, status: 200, json: async () => ({ sites: [], checkedAt: at, moreSitesAvailable: false }) } : response(request)));
     render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
     const saved = await screen.findByRole("heading", { name: "Your food need remains open" });
-    const directory = screen.getByRole("heading", { name: "Food locations near your ZIP" });
+    const directory = screen.getByRole("heading", { name: "Other City listings checked for this request" });
     expect(saved.compareDocumentPosition(directory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Food locations near your ZIP" })).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("/food-sites?"))).toBe(false);
     expect(within(saved.closest("section")!).getByText(/Food access report: I could not access this location/)).toBeTruthy();
     await openSection(/Activity & receipts/);
     const activity = screen.getByRole("heading", { name: "Activity & receipts" }).closest("section")!;

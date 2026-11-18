@@ -650,8 +650,8 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           className={`${styles.surface} ${foodRoute ? styles.foodPrograms : ""} ${workspace.section}`}
           tabIndex={-1}
         >
-        {foodRoute && <FoodAccess request={request} plan={foodRoute.foodAccess} report={foodRoute.foodAccessReport} onChange={reload} readError={error} />}
-        {request.intake.needs.includes("food_now") && (
+        {foodRoute && <FoodAccess request={request} plan={foodRoute.foodAccess} report={foodRoute.foodAccessReport} alternatives={foodRoute.foodAccessAlternatives} onChange={reload} readError={error} />}
+        {request.intake.needs.includes("food_now") && foodRoute?.foodAccessReport?.outcome !== "unresolved" && (
           <FoodSites zip={currentIntakeFields(request, new Date(), "food_now").zip} />
         )}
           <h2>Program progress</h2>

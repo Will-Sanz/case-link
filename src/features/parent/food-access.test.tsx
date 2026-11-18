@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildFoodAccessAlternatives } from "@/lib/parent/food-access-alternatives";
 import { bindFoodAccessReport, buildFoodAccessPlanBody, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM, type FoodAccessPlan, type FoodAccessReport } from "@/lib/parent/food-access";
 import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test-fixtures";
 import { FoodAccess, FoodAccessReportSummary } from "./food-access";
@@ -28,6 +29,45 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now)
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("saved public food access plan and report", () => {
+  it.each(["en", "es"] as const)("renders the saved owned directory check without fetching or presenting confirmed food (%s)", locale => {
+    const current = request(), source = plan(current), report = recorded(source, JSON.stringify({ expectedVersion: current.version, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "22222222-2222-4222-8222-222222222222", result: "no_food" }));
+    const alternatives = buildFoodAccessAlternatives({ request: current, report, zip: "19129", now,
+      result: { sites: [{ id: 148, name: "Nombre original ñ <script>", address: "Source address", zip: "19129", category: "Food Site", phoneNumber: null, website: null, hours: [], serviceAreaNotes: "Original source note" }],
+        sourceUrl: "https://www.phila.gov/food/", checkedAt: reportAt, availability: "city_listed_unconfirmed", moreSitesAvailable: false } });
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    render(<ParentLocaleProvider initialLocale={locale}><FoodAccess request={current} plan={source} report={report} alternatives={alternatives} onChange={vi.fn()} /></ParentLocaleProvider>);
+    expect(screen.getByRole("heading", { name: locale === "es" ? "Otros lugares consultados para esta solicitud" : "Other City listings checked for this request" })).toBeTruthy();
+    expect(screen.getByText("Nombre original ñ <script>").lang).toBe(""); expect(document.querySelector("script")).toBeNull();
+    expect(screen.getByText(locale === "es" ? "Estos son lugares del directorio, no alimentos confirmados ni una reserva. El servicio aún necesita verificar una opción que le sirva." : "These are directory entries, not confirmed food or a reservation. CaseLink still needs to verify a usable option.")).toBeTruthy();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(["positive", "closed", "version", "report", "expired_zip", "read_error"])("hides a saved directory observation after %s changes", kind => {
+    const current = request(), source = plan(current), report = recorded(source, JSON.stringify({ expectedVersion: current.version, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "22222222-2222-4222-8222-222222222222", result: "no_food" }));
+    const alternatives = buildFoodAccessAlternatives({ request: current, report, zip: "19129", now, result: null });
+    if (kind === "positive") Object.assign(report, { result: "received_enough_food", outcome: "support_received" });
+    if (kind === "closed") { current.status = "closed"; current.closed_reason = "completed"; current.version++; }
+    if (kind === "version") current.version++;
+    if (kind === "report") report.eventId = "33333333-3333-4333-8333-333333333333";
+    if (kind === "expired_zip") current.intake_confirmed_at = { zip: "2026-08-01T12:00:00Z" };
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    render(<FoodAccess request={current} plan={source} report={report} alternatives={alternatives} onChange={vi.fn()} readError={kind === "read_error" ? new Error("Owned read unavailable") : null} />);
+    expect(screen.queryByText("The City directory check was unavailable. This remains a CaseLink service issue.")).toBeNull();
+    if (kind === "closed") expect(screen.queryByRole("heading", { name: "Other City listings checked for this request" })).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(["empty", "unavailable"] as const)("explains a saved %s check and an unresolved practical constraint without asking new facts", state => {
+    const current = request(), source = plan(current), report = recorded(source, JSON.stringify({ expectedVersion: current.version, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "22222222-2222-4222-8222-222222222222", result: "need_another_way" }));
+    const alternatives = buildFoodAccessAlternatives({ request: current, report, zip: "19129", now, result: state === "unavailable" ? null : {
+      sites: [], sourceUrl: "https://www.phila.gov/food/", checkedAt: reportAt, availability: "city_listed_unconfirmed", moreSitesAvailable: false } });
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    render(<FoodAccess request={current} plan={source} report={report} alternatives={alternatives} onChange={vi.fn()} />);
+    expect(screen.getByText(state === "empty" ? "The City check returned no other matching entries. This does not mean no food help exists." : "The City directory check was unavailable. This remains a CaseLink service issue.")).toBeTruthy();
+    expect(screen.getByText("You still need another way to obtain food. These listings do not verify delivery, a helper or physical access.")).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull(); expect(fetcher).not.toHaveBeenCalled();
+  });
   it("shows Spanish guidance and attributed reports while preserving the named site, source and exact report body", async () => {
     const source = plan(), changed = vi.fn();
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));

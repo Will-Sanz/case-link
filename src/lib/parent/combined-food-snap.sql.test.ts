@@ -60,6 +60,9 @@ describe.skipIf(!modulePath)("combined public food and one SNAP journey through 
       brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "isolated-synthetic-broker-secret-32-characters", supabaseOrigin: "http://127.0.0.1:55321",
       fetcher: async input => {
         const url = new URL(String(input)); expect(url.origin).toBe("https://services.arcgis.com");
+        if (url.searchParams.get("where") === "zip_code='19129' AND status='Active'") return Response.json({ features: [{ attributes: {
+          ...source, objectid: 148, site_name: "Original City alternate", address: "3507 Original City address", category_type: "Food Site",
+        } }] });
         expect(url.searchParams.get("where")).toBe("objectid=122"); publicCalls++;
         await options.beforePublicReply?.();
         return Response.json({ features: [{ attributes: options.cityConflict ? { ...source,category_type:"School Meal Site" } : source }] });
@@ -103,6 +106,12 @@ describe.skipIf(!modulePath)("combined public food and one SNAP journey through 
     await fixture.admin.query("update public.parent_jobs set state='queued',run_at=now() where request_id=$1",[id]);
     expect((await work()).result).toEqual({ state:"saved" });current=await read(id);
     expect(current.plan!.routes[1]).toEqual(snap);expect(current.facts).toEqual(before.facts);expect(current.version).toBe(before.version);
+    const failed = await report(id, "need_another_way");
+    expect((await work()).result).toEqual({ state: "saved" }); current = await read(id);
+    expect(current.plan!.routes[0].foodAccessAlternatives).toMatchObject({ state: "listed", sourceReport: failed, sites: [{ id: 148 }] });
+    expect(JSON.stringify(current.plan!.routes[0].foodAccessAlternatives)).not.toMatch(/Private Canary|1 Synthetic Street|"(?:income|incomeAmount|incomeFrequency)"\s*:|:\s*(?:345|"345")(?=[,}])/);
+    expect(current.plan!.routes[1]).toEqual(snap); expect(current.facts).toEqual(before.facts); expect(current.version).toBe(before.version);
+    expect(current.status).toBe("active"); expect(current.required_actions).toContainEqual(action);
     expect((await fixture.admin.query("select to_jsonb(s) value from public.parent_snap_application_details s where request_id=$1",[id])).rows).toEqual(snapshot);
     expect((await fixture.admin.query("select count(*)::int n from parent_private.ai_calls where request_id=$1",[id])).rows[0].n).toBe(0);
   });

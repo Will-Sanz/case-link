@@ -7,6 +7,8 @@ import {
   foodAccessPlanSchema, foodAccessReportInputSchema, foodAccessReportSchema,
   SHARE_FOOD_ACCESS_PROGRAM, SHARE_FOOD_ACCESS_SITE, SHARE_FOOD_ACCESS_SOURCE, type FoodAccessReport,
 } from "@/lib/parent/food-access";
+import { currentFoodAccessAlternatives } from "@/lib/parent/food-access-alternatives";
+import { FoodSiteEntries } from "./food-sites";
 import { boundedParentApi, displayDate, ParentApiError } from "./api";
 import { ServiceError } from "./feedback";
 import { useParentLocale } from "./parent-locale";
@@ -46,8 +48,8 @@ export function FoodAccessReportSummary({ report: value, requestId }: { report: 
   </div>;
 }
 
-export function FoodAccess({ request, plan: value, report: reportValue, onChange, readError }: {
-  request: SupportRequest; plan: unknown; report?: unknown; onChange: () => void; readError?: Error | null;
+export function FoodAccess({ request, plan: value, report: reportValue, alternatives: alternativesValue, onChange, readError }: {
+  request: SupportRequest; plan: unknown; report?: unknown; alternatives?: unknown; onChange: () => void; readError?: Error | null;
 }) {
   const { t, locale } = useParentLocale();
   const parsed = foodAccessPlanSchema.safeParse(value);
@@ -84,6 +86,7 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
     && request.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM)
     && request.mandate.allowedActions.includes("prepare") && request.mandate.allowedData.includes("household");
   const received = latest?.outcome === "support_received", failed = latest?.outcome === "unresolved";
+  const alternatives = !readError && currentFoodAccessAlternatives(alternativesValue, request, latest);
   const canRetry = uncertain && attempt?.requestId === request.id && !readError;
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -127,7 +130,7 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
       <p>{t(plan.site.location)}</p>
       <p>{t(plan.site.publishedHours)} {t(plan.site.paperwork)}</p>
       <p>{t("Food depends on donations. Stock is unknown and nothing is reserved. You or a helper would need to collect food in person.")}</p>
-    </> : !received && <p>{t(failed ? "The reported visit did not meet your immediate food need. Check the current City listings below for other unconfirmed options." : "CaseLink needs to check the source information before recommending a walk-up visit. Use the current City listings below or direct support options.")}</p>}
+    </> : !received && <p>{t(failed ? "The reported visit did not meet your immediate food need. CaseLink must check another practical option; nothing is reserved." : "CaseLink needs to check the source information before recommending a walk-up visit. Use the current City listings below or direct support options.")}</p>}
     <p className={styles.hint}>{t("Share guidance reviewed")} {displayDate(plan.source.reviewedOn, false, locale)}. {t("Delivery, language service and physical-access arrangements are not verified.")}</p>
     {plan.cityObservation && <p className={styles.hint}>{t("City directory checked")} {displayDate(plan.cityObservation.checkedAt, true, locale)}. {t("A directory check does not confirm stock or access.")}</p>}
     <div className={`${styles.serviceLinks} ${styles.space}`}>
@@ -135,6 +138,18 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
       <a className={styles.textLink} href={plan.source.cityUrl}>{t("Open the City’s full food finder")}</a>
       <Link className={styles.textLink} href="/support/help">{t("See direct support options")}</Link>
     </div>
+    {failed && current && request.status === "active" && <section className={styles.space} aria-labelledby="food-directory-check-title">
+      <h3 id="food-directory-check-title">{t("Other City listings checked for this request")}</h3>
+      {alternatives ? <>
+        <p className={styles.hint}>{t("Recorded City directory check")} {displayDate(alternatives.checkedAt, true, locale)} · {alternatives.queriedZip}</p>
+        <p>{t("These are directory entries, not confirmed food or a reservation. CaseLink still needs to verify a usable option.")}</p>
+        {alternatives.sites.length > 0 && <p className={styles.hint}>{t("Location names and notes appear as published by the source.")}</p>}
+        {alternatives.state === "listed" ? <FoodSiteEntries id="food-access-directory-results" sites={alternatives.sites} /> :
+          <p>{t(alternatives.state === "empty" ? "The City check returned no other matching entries. This does not mean no food help exists." : "The City directory check was unavailable. This remains a CaseLink service issue.")}</p>}
+        {latest.result === "need_another_way" && <p className={styles.notice}>{t("You still need another way to obtain food. These listings do not verify delivery, a helper or physical access.")}</p>}
+        {alternatives.moreSitesAvailable && <p className={styles.hint}>{t("The City has additional listings beyond this saved check.")}</p>}
+      </> : <p className={styles.notice}>{t("CaseLink still needs to check public listings for this report. Your food need remains open.")}</p>}
+    </section>}
     {latest && <FoodAccessReportSummary report={latest} requestId={request.id} />}
     {factualCorrection && <p className={styles.notice}>{t("This request stays closed and no work has restarted. A correction updates your factual report only. Start a new request with current permission if you need further food support.")}</p>}
     {received && <p className={styles.success}>{t("You reported enough food for this immediate need. Other support requests keep their own progress.")}</p>}

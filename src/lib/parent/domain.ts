@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { FoodAccessPlan, FoodAccessReport } from "./food-access";
+import type { FoodAccessAlternatives } from "./food-access-alternatives";
 
 export const NEEDS = [
   "food_now",
@@ -240,6 +241,7 @@ export type SupportRoute = {
   limitation: string | null;
   foodAccess?: FoodAccessPlan;
   foodAccessReport?: FoodAccessReport;
+  foodAccessAlternatives?: FoodAccessAlternatives;
 };
 export type SupportPlan = {
   version: 1;

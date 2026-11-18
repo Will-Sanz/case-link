@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { foodAccessReportSchema, hasPublicFoodAccessSubpath, isPublicFoodAccessRequest, SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
-import { findShareFoodAccessObservation } from "./food-sites-core";
+import { findFoodSites, findShareFoodAccessObservation } from "./food-sites-core";
 import { coordinateSupport, type CoordinatorResult } from "./coordinator";
 import {
   DocumentProcessingError,
@@ -165,6 +165,7 @@ const capabilitySchema = z
 const claimSchema = z.object({
   jobId: z.uuid(),
   leaseToken: z.uuid(),
+  attempts: z.number().int().min(1).max(48).optional(),
   request: z
     .object({
       id: z.uuid(),
@@ -780,6 +781,7 @@ export async function runOneParentJob(
   };
   const ports: ServicePorts = {
     foodAccessCityObservation: () => findShareFoodAccessObservation(fetcher),
+    foodAccessDirectorySites: zip => findFoodSites(zip, fetcher),
     coordinate: async (request) => {
       if (isPublicFoodAccessRequest(request)) return { plan: buildSupportPlan(request, now()), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
       if (utilityProgram) return { plan: buildSupportPlan(request, now(), { [request.intake.needs[0]]: utilityProgram }), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
@@ -1255,7 +1257,7 @@ export async function runOneParentJob(
         facts:request.facts?.filter(fact=>fact.need==="food_now" && fact.field==="zip"),documents:[],events:[],
         required_actions:request.required_actions.filter(action=>action.need==="food_now"),
         plan:request.plan ? { ...request.plan,routes:request.plan.routes.filter(route=>route.need==="food_now") } : null },
-      documents:[],operations:operations.filter(operation=>operation.need==="food_now"),foodAccessReport:foodReport,now:now(),ports,
+      documents:[],operations:operations.filter(operation=>operation.need==="food_now"),foodAccessReport:foodReport,jobAttempts:job.attempts,now:now(),ports,
     }) : null;
     const driverIssues=publicFood ? serviceNeeds.map(need=>({ id:`benefit-driver-${need}`,need,reason:"execution_issue" as const,resolver:"operator" as const,
       field:"benefit_service_wait",title:"SNAP work is waiting for a service check",
@@ -1269,7 +1271,7 @@ export async function runOneParentJob(
       foodAccessReport: foodReport,
       ...(utilityPreparation ? { utilityPreparation } : {}),
       operations,
-      jobAttempts: deliveryJobAttempts,
+      jobAttempts: isPublicFoodAccessRequest(serviceRequest) ? job.attempts : deliveryJobAttempts,
       ...(snapCapture && !continuation ? { snapCapture } : {}),
       now: now(),
       ports,

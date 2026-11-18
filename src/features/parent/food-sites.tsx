@@ -1,40 +1,18 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, MapPin } from "iconoir-react";
+import { foodSiteDayLabels } from "@/lib/parent/food-access-alternatives";
 import type { FoodSiteResult } from "@/lib/parent/food-sites";
 import { displayDate } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
-
-const dayLabels = {
-  mon: "Monday",
-  tues: "Tuesday",
-  wed: "Wednesday",
-  thurs: "Thursday",
-  fri: "Friday",
-  sat: "Saturday",
-  sun: "Sunday",
-};
-
-function FoodSiteResults({ zip }: { zip: string }) {
-  const { locale, t } = useParentLocale();
-  const [expanded, setExpanded] = useState(false);
-  const { data, error, loading, reload } = useParentResource<FoodSiteResult>(
-    `/food-sites?zip=${encodeURIComponent(zip)}`,
-  );
-  if (loading)
-    return <ParentLoading label="Checking the City’s food listings" />;
-  if (error) return <ServiceError error={error} retry={reload} />;
-  if (!data) return null;
+export function FoodSiteEntries({ sites, id }: { sites: FoodSiteResult["sites"]; id: string }) {
+  const { t } = useParentLocale();
   return (
-    <>
-      <p className={styles.hint}>{t("City listings for {zip} · checked {date}. This is a directory check, not confirmation from a location.").replace("{zip}", zip).replace("{date}", displayDate(data.checkedAt, true, locale))}</p>
-      {data.sites.length > 0 && <p className={styles.hint}>{t("Location names and notes appear as published by the source.")}</p>}
-      {data.sites.length ? (
-        <ul className={styles.resourceList} id="food-location-results">
-          {data.sites.slice(0, expanded ? undefined : 3).map((site) => (
+        <ul className={`${styles.resourceList} ${styles.foodSites}`} id={id}>
+          {sites.map((site) => (
             <li key={site.id}>
               <h3 lang="">{site.name}</h3>
               {site.category && (
@@ -64,7 +42,7 @@ function FoodSiteResults({ zip }: { zip: string }) {
                     <dl className={styles.hoursList}>
                       {site.hours.map((hours) => (
                         <div key={hours.day}>
-                          <dt>{t(dayLabels[hours.day])}</dt>
+                          <dt>{t(foodSiteDayLabels[hours.day])}</dt>
                           <dd lang="">
                             {hours.windows.join(", ")}
                             {hours.notes && (
@@ -84,6 +62,25 @@ function FoodSiteResults({ zip }: { zip: string }) {
             </li>
           ))}
         </ul>
+  );
+}
+
+function FoodSiteResults({ zip }: { zip: string }) {
+  const { locale, t } = useParentLocale();
+  const [expanded, setExpanded] = useState(false);
+  const { data, error, loading, reload } = useParentResource<FoodSiteResult>(
+    `/food-sites?zip=${encodeURIComponent(zip)}`,
+  );
+  if (loading)
+    return <ParentLoading label="Checking the City’s food listings" />;
+  if (error) return <ServiceError error={error} retry={reload} />;
+  if (!data) return null;
+  return (
+    <>
+      <p className={styles.hint}>{t("City listings for {zip} · checked {date}. This is a directory check, not confirmation from a location.").replace("{zip}", zip).replace("{date}", displayDate(data.checkedAt, true, locale))}</p>
+      {data.sites.length > 0 && <p className={styles.hint}>{t("Location names and notes appear as published by the source.")}</p>}
+      {data.sites.length ? (
+        <FoodSiteEntries id="food-location-results" sites={data.sites.slice(0, expanded ? undefined : 3)} />
       ) : (
         <p className={styles.small}>{t("No current City listings were returned for {zip}. Nearby help may still be available. Check the City finder for other locations.").replace("{zip}", zip)}</p>
       )}

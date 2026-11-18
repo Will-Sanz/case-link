@@ -4,6 +4,7 @@ import type { ParentAssistantAnswer } from "./assistant-contract";
 import { NEED_LABELS, OUTCOME_LABELS, intakeSchema } from "./domain";
 import { parentText, type ParentLocale } from "./locale";
 import { PROGRAMS } from "./programs";
+import { SHARE_FOOD_ACCESS_SOURCE } from "./food-access";
 
 export type AssistantDisplayPart = { text: string; language: ParentLocale | "" };
 export type AssistantParagraphDisplay = { parts: AssistantDisplayPart[]; original?: AssistantDisplayPart; translated: boolean };
@@ -76,7 +77,7 @@ const operationCopy: Record<string, [string, string]> = {
   "the saved outcome remains unresolved. No approval or support received is established by this status.": ["Saved unresolved status", "el resultado guardado sigue sin resolverse. Este estado no demuestra aprobación ni apoyo recibido."],
 };
 const receiptSources = ["provider api", "authenticated partner", "agency receipt", "operator confirmed"];
-const sourceLabels = new Set([...Object.keys(staticFacts), "Your intake", "Current recorded work status", "Saved follow-up schedule", "Your saved answer", "Official program information", "Official program guidance", "Recorded delivery uncertainty", "Saved preparation record", "Saved unresolved status", "Parent-reported outcome", "Saved document status", "Your current necessary step", ...receiptSources.map(source => `Recorded ${source} evidence`)]);
+const sourceLabels = new Set([...Object.keys(staticFacts), "Your intake", "Current recorded work status", "Saved follow-up schedule", "Your saved answer", "Official program information", "Official program guidance", "Recorded delivery uncertainty", "Saved preparation record", "Saved unresolved status", "Parent-reported outcome", "Saved document status", "Your current necessary step", "Recorded City directory check, unconfirmed", ...receiptSources.map(source => `Recorded ${source} evidence`)]);
 const introductions = new Set([
   "Here is the latest recorded information for your request.",
   "Here is what needs to happen next, based on your saved request.",
@@ -105,6 +106,14 @@ export function assistantParagraphDisplay(paragraph: Paragraph, locale: ParentLo
     ...(keepOriginal ? { original: original(text) } : {}), translated: true,
   });
   if (Object.hasOwn(staticFacts, source) && Object.hasOwn(staticFacts[source], text)) return translated(staticFacts[source][text]);
+  if (source === "Recorded City directory check, unconfirmed" && paragraph.sourceUrl === SHARE_FOOD_ACCESS_SOURCE.cityUrl) {
+    const m = match(/^CaseLink recorded a public City directory check for ZIP (191\d{2}) at (\S+)\. ([1-3]) unconfirmed entries are saved in the request\. Stock, eligibility and practical access are not confirmed; the food need remains open\.$/);
+    if (m && z.iso.datetime({ offset: true }).safeParse(m[2]).success) return translated("CaseLink registró una consulta del directorio municipal para el código postal {zip}, con fecha de {date}. Resultados del directorio guardados sin confirmar: {count}. Las existencias, los requisitos y el acceso práctico no están confirmados. La necesidad de alimentos sigue abierta.", { zip: original(m[1]), date: original(m[2]), count: original(m[3]) });
+    if (text === "CaseLink checked the public City directory and no other matching entries were returned. This does not establish that no food help exists; the food need remains open.")
+      return translated("CaseLink consultó el directorio municipal y no aparecieron otros lugares que coincidieran. Esto no demuestra que no haya ayuda alimentaria. La necesidad de alimentos sigue abierta.");
+    if (text === "CaseLink could not check the City directory. The food need remains open and this is a service issue.")
+      return translated("CaseLink no pudo consultar el directorio municipal. La necesidad de alimentos sigue abierta; el servicio debe resolver este problema.");
+  }
   if (source === "Your account preferences") {
     let m = match(/^Your saved account service language is (Spanish|English)\.$/);
     if (m) return translated(`El idioma de servicio guardado en su cuenta es ${m[1] === "Spanish" ? "español" : "inglés"}.`, {}, true);

@@ -1,3 +1,4 @@
+import { currentFoodAccessAlternatives } from "./food-access-alternatives";
 import { z } from "zod";
 import { ANSWER_FIELDS, factAnswerSchema } from "./answers";
 import {
@@ -125,6 +126,13 @@ export function buildAssistantFacts(
     "Your intake",
     request.updated_at,
   );
+  const foodRoute = request.plan?.routes.find(route => route.need === "food_now");
+  const directory = foodRoute && currentFoodAccessAlternatives(foodRoute.foodAccessAlternatives, request, foodRoute.foodAccessReport, now);
+  if (directory) add("food-directory-check",
+    directory.state === "listed" ? `CaseLink recorded a public City directory check for ZIP ${directory.queriedZip} at ${directory.checkedAt}. ${directory.sites.length} unconfirmed entries are saved in the request. Stock, eligibility and practical access are not confirmed; the food need remains open.`
+      : directory.state === "empty" ? "CaseLink checked the public City directory and no other matching entries were returned. This does not establish that no food help exists; the food need remains open."
+        : "CaseLink could not check the City directory. The food need remains open and this is a service issue.",
+    "Recorded City directory check, unconfirmed", directory.checkedAt, directory.sourceUrl);
   add(
     "permission",
     mandate.mode === "prepare_only"

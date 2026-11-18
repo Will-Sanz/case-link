@@ -12,6 +12,7 @@ import { parentExportText } from "./export-copy";
 import { supportRouteLabel } from "./application-readiness";
 import { getProgram } from "./programs";
 import { finalizePlanPdf } from "../domain/plan/finalize-plan-pdf";
+import { currentFoodAccessAlternatives, foodSiteDayLabels } from "./food-access-alternatives";
 import { foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_SITE, SHARE_FOOD_ACCESS_SOURCE, type FoodAccessReport } from "./food-access";
 const foodReportLabels: Record<FoodAccessReport["result"], string> = {
   received_enough_food: "Collected enough food for this immediate need",
@@ -67,6 +68,7 @@ export function ParentSummaryDocument({
           const food = parsed.success && parsed.data.requestId === request.id ? parsed.data : null;
           const parsedReport = foodAccessReportSchema.safeParse(route.foodAccessReport);
           const foodReport = parsedReport.success && parsedReport.data.requestId === request.id ? parsedReport.data : null;
+          const alternatives = currentFoodAccessAlternatives(route.foodAccessAlternatives, request, foodReport);
           return <View key={route.need} style={styles.route}>
             <Text style={styles.label} minPresenceAhead={28}>
               {t(NEED_LABELS[route.need])} · {t(supportRouteLabel(route))}
@@ -81,9 +83,25 @@ export function ParentSummaryDocument({
               <Text style={styles.small}>{t("Share access instructions")}: {food.source.operatorUrl}</Text>
               {foodReport && <>
                 <Text>{t("Parent reported:")} {t(foodReportLabels[foodReport.result])}.</Text>
-                <Text>{t(foodReport.outcome === "unresolved" ? "Your food need remains open. Check current City listings for other unconfirmed options." : "This food outcome is attributed to your report. Other requested needs keep their own progress.")}</Text>
+                <Text>{t(foodReport.outcome === "unresolved" ? "Your food need remains open. CaseLink needs to check a practical next access option." : "This food outcome is attributed to your report. Other requested needs keep their own progress.")}</Text>
               </>}
             </>}
+            {alternatives && <View>
+              <Text style={styles.label} minPresenceAhead={28}>{t("Other City listings checked for this request")}</Text>
+              <Text>{t("Recorded City directory check")}: {alternatives.checkedAt} · {alternatives.queriedZip}</Text>
+              <Text>{t("These are directory entries, not confirmed food or a reservation. CaseLink still needs to verify a usable option.")}</Text>
+              {alternatives.sites.map(site => <View key={site.id}>
+                <Text style={styles.label} minPresenceAhead={28}>{site.name}</Text>
+                <Text>{site.address}, {site.zip} · {site.category}</Text>
+                {site.phoneNumber && <Text>{site.phoneNumber}</Text>}{site.website && <Text>{site.website}</Text>}
+                {site.hours.map(hours => <Text key={hours.day}>{t(foodSiteDayLabels[hours.day])}: {hours.windows.join(", ")}{hours.notes ? ` · ${hours.notes}` : ""}</Text>)}
+                {site.serviceAreaNotes && <Text>{site.name}: {site.serviceAreaNotes}</Text>}
+              </View>)}
+              {alternatives.state !== "listed" && <Text>{t(alternatives.state === "empty" ? "The City check returned no other matching entries. This does not mean no food help exists." : "The City directory check was unavailable. This remains a CaseLink service issue.")}</Text>}
+              {alternatives.sourceReport.result === "need_another_way" && <Text>{t("You still need another way to obtain food. These listings do not verify delivery, a helper or physical access.")}</Text>}
+              {alternatives.moreSitesAvailable && <Text>{t("The City has additional listings beyond this saved check.")}</Text>}
+              <Text style={styles.small}>{alternatives.sourceUrl}</Text>
+            </View>}
             {route.limitation && <Text>{t(route.limitation)}</Text>}
             {route.steps.map((step, i) => (
               <Text key={i}>• {t(step)}</Text>

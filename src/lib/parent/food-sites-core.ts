@@ -3,6 +3,7 @@ import { readBoundedBody } from "./http";
 import { SHARE_FOOD_ACCESS_SOURCE, type FoodAccessCityObservation } from "./food-access";
 
 export const FOOD_SOURCE_URL = "https://www.phila.gov/food/";
+export const FOOD_DIRECTORY_CACHE_SECONDS = 300;
 const endpoint =
   "https://services.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services/free_meal_sites/FeatureServer/0/query";
 const days = ["mon", "tues", "wed", "thurs", "fri", "sat", "sun"] as const;
@@ -87,7 +88,7 @@ async function readFoodSites(zip: string, fetcher: typeof fetch, selectedRecordI
   const response = await fetcher(url, {
     signal: AbortSignal.timeout(10000),
     redirect: "error",
-    next: { revalidate: 300 },
+    next: { revalidate: FOOD_DIRECTORY_CACHE_SECONDS },
   });
   if (!response.ok) throw new Error("food_directory_unavailable");
   const data = z
