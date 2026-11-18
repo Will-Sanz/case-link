@@ -1,4 +1,5 @@
 import type { SupportAction, SupportNeed } from "./domain";
+import { SHARE_FOOD_ACCESS_PROGRAM, SHARE_FOOD_ACCESS_SOURCE } from "./food-access";
 
 /** These journeys have no verified initial operation; a program's new-application capability cannot stand in for one. */
 export function supportsInitialServiceDelivery(need: SupportNeed, action: SupportAction): boolean {
@@ -41,6 +42,17 @@ export const PROGRAMS: SupportProgram[] = [
     officialUrl: "https://www.phila.gov/food/",
     personalSteps: ["Confirm a practical pickup or delivery arrangement."],
   }),
+  {
+    ...program({
+      id: SHARE_FOOD_ACCESS_PROGRAM,
+      name: "Share Community Fridge · Hunting Park",
+      needs: ["food_now"],
+      description: "Prepare public walk-up instructions for Share's community fridge at 2901 W Hunting Park Ave, 19129. Food depends on donations; stock is unknown and nothing is reserved.",
+      officialUrl: SHARE_FOOD_ACCESS_SOURCE.operatorUrl,
+      personalSteps: ["Collect food yourself or with a trusted helper if practical. Tell CaseLink if food was unavailable or another access method is needed."],
+    }),
+    sourceCheckedAt: SHARE_FOOD_ACCESS_SOURCE.reviewedOn,
+  },
   program({
     id: "snap-pa",
     name: "Pennsylvania SNAP",

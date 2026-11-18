@@ -8,6 +8,7 @@ import {
   type SupportRequest,
 } from "./domain";
 import { currentIntakeFields } from "./current-intake-fields";
+import { SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
 import {
   getProgramsForNeeds,
   getProgram,
@@ -24,8 +25,11 @@ export function buildSupportPlan(
     const candidates = getProgramsForNeeds([need]).filter((p) =>
       mandate.recipientIds.includes(p.id),
     );
+    const zip = currentIntakeFields(request, now, need).zip;
     const selected =
-      candidates.find((p) => p.id === selections[need]) ?? candidates[0];
+      candidates.find((p) => p.id === selections[need])
+      ?? (need === "food_now" && zip === "19129" ? candidates.find(p => p.id === SHARE_FOOD_ACCESS_PROGRAM) : undefined)
+      ?? candidates[0];
     if (!selected)
       return {
         need,
@@ -46,7 +50,6 @@ export function buildSupportPlan(
       "snap_problem",
       "wic_continuing",
     ].includes(need);
-    const zip = currentIntakeFields(request, now, need).zip;
     const routingIssue = programRoutingIssue(selected, zip, now);
     if (routingIssue)
       return {
@@ -73,11 +76,13 @@ export function buildSupportPlan(
       officialUrl: selected.officialUrl,
       sourceUrl: selected.sourceUrl,
       steps: [
-        existing
+        need === "food_now" ? "Check the actual public food access instructions. A directory listing does not confirm food available or reserved."
+        : existing
           ? "Continue the existing benefit journey; do not start a duplicate application."
           : "Check the exact required application fields and reuse the household information already saved.",
         ...selected.personalSteps,
-        "Check an actual receipt and follow the outcome; opening a link is not submission.",
+        need === "food_now" ? "Tell CaseLink what food you received or if the option did not work. Only an attributed report establishes an outcome."
+          : "Check an actual receipt and follow the outcome; opening a link is not submission.",
       ],
       limitation:
         (zip === undefined ? "Service-area coverage is not confirmed. Current routing details must be checked before a new service action. " : "") + (mandate.mode === "prepare_only"

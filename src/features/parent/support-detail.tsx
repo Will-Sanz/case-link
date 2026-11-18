@@ -28,6 +28,7 @@ import { SupportDocuments } from "./support-documents";
 import { SupportActivity, currentProtectedSnapAttempt, currentSnapReview, isSnapFinalReviewAction, recordedReceipt, type RecordedOperation } from "./support-activity";
 import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { FoodSites } from "./food-sites";
+import { FoodAccess, FoodAccessReportSummary } from "./food-access";
 import { SupportPartners } from "./support-partners";
 import { NecessaryAnswer } from "./necessary-answer";
 import { NecessaryAnswers, isFactualQuestion } from "./necessary-answers";
@@ -471,6 +472,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
     );
   const inactive = ["cancelled", "closed"].includes(request.status);
   const acceptingActions = request.status === "active";
+  const foodRoute = request.plan?.routes.find(route => route.need === "food_now" && route.foodAccess);
   const currentOperations = history.error
     ? []
     : (history.data?.operations ?? [])
@@ -641,6 +643,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           className={`${styles.surface} ${workspace.section}`}
           tabIndex={-1}
         >
+        {foodRoute && <FoodAccess request={request} plan={foodRoute.foodAccess} report={foodRoute.foodAccessReport} onChange={reload} readError={error} />}
         {request.intake.needs.includes("food_now") && (
           <FoodSites zip={currentIntakeFields(request, new Date(), "food_now").zip} />
         )}
@@ -790,6 +793,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                           {typeof event.evidence?.reference === "string" && (
                             <p>{event.evidence.reference}</p>
                           )}
+                          {event.evidence?.foodAccessReport && <FoodAccessReportSummary report={event.evidence.foodAccessReport} requestId={request.id} />}
                         </>
                       )}
                     <p>

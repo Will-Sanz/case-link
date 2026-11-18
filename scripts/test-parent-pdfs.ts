@@ -17,6 +17,7 @@ import {
 } from "../src/lib/parent/test-fixtures";
 import { buildSupportPlan } from "../src/lib/parent/planning";
 import { NEEDS, NEED_LABELS } from "../src/lib/parent/domain";
+import { bindFoodAccessReport, buildFoodAccessPlanBody, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM } from "../src/lib/parent/food-access";
 
 async function main() {
   const directory = resolve("tmp/parent-verification/pdfs");
@@ -74,6 +75,44 @@ async function main() {
     ],
     minimumPages: 2,
   });
+  const foodAt = "2026-11-18T12:00:00Z";
+  const foodBody = buildFoodAccessPlanBody({ requestId: request.id, requestVersion: 2, generatedAt: foodAt, sourceReviewCurrent: true,
+    cityObservation: { recordId: 122, checkedAt: foodAt, state: "listed_unconfirmed" } });
+  const food = { ...foodBody, planHash: createHash("sha256").update(JSON.stringify(foodBody)).digest("hex") };
+  const foodRequest = fixtureRequest({ version: 2, created_at: foodAt, updated_at: foodAt,
+    intake: fixtureIntake({ needs: ["food_now"], zip: "19129", householdSize: null, incomeAmount: null }),
+    mandate: fixtureMandate({ mode: "prepare_only", recipientIds: [SHARE_FOOD_ACCESS_PROGRAM], allowedActions: ["research", "prepare"],
+      allowedData: ["household"], expiresAt: "2026-11-25T12:00:00Z" }),
+    plan: { version: 1, generatedAt: foodAt, model: null, summary: "Dated public food access instructions.", routes: [{
+      need: "food_now", programId: SHARE_FOOD_ACCESS_PROGRAM, title: food.site.name, summary: "Public food access plan; stock is unknown.",
+      state: "prepared", nextActor: "parent", officialUrl: food.source.operatorUrl, sourceUrl: food.source.operatorUrl,
+      steps: [], limitation: "Nothing has been reserved or sent to the operator.", foodAccess: food,
+    }] }, events: [] });
+  writeFileSync(resolve(directory, "food-access-prepared.pdf"), await renderParentSummary(foodRequest));
+  cases.push({ name: "food-access-prepared", minimumPages: 1, required: [food.site.name, "2901 W Hunting Park Ave", "Stock unknown",
+    "Nothing is reserved", "Share guidance reviewed 2026-11-17", "City directory checked 2026-11-18"] });
+  for (const result of ["no_food", "received_enough_food"] as const) {
+    const report = bindFoodAccessReport(food, { expectedVersion: 2, siteId: food.site.id, planHash: food.planHash,
+      reportKey: "33333333-3333-4333-8333-333333333333", result }, { eventId: "44444444-4444-4444-8444-444444444444", reportedAt: "2026-11-18T12:05:00Z" });
+    const name = result === "no_food" ? "food-access-unmet" : "food-access-received";
+    const value = { ...foodRequest, plan: { ...foodRequest.plan!, routes: foodRequest.plan!.routes.map(route => ({ ...route, state: report.outcome, foodAccessReport: report })) },
+      events: [{ id: report.eventId, request_id: foodRequest.id, kind: "parent.outcome_reported", actor: "parent", created_at: report.reportedAt,
+        summary: "You reported a food access result.", evidence: { need: "food_now", outcome: report.outcome, attribution: "parent_reported",
+          reference: "Share Food Program Community Fridge & Pantry, public guidance reviewed 2026-11-17.", foodAccessReport: report } }] };
+    writeFileSync(resolve(directory, `${name}.pdf`), await renderParentSummary(value));
+    cases.push({ name, minimumPages: 1, required: [food.site.name, "Parent reported outcome:", "Share has not confirmed this report.",
+      ...(result === "no_food" ? ["No food was available", "Your food need remains open"] : ["Collected enough food for this immediate need", "Support received"]) ] });
+    if (result === "received_enough_food") {
+      const correction=foodAccessReportSchema.parse({ ...report,expectedVersion:3,reportKey:"55555555-5555-4555-8555-555555555555",eventId:"66666666-6666-4666-8666-666666666666",reportedAt:"2026-11-18T12:10:00Z",result:"no_food",outcome:"unresolved" });
+      const corrected={ ...value,version:3,status:"closed" as const,closed_reason:"completed",
+        plan:{ ...value.plan,routes:value.plan.routes.map(route=>({ ...route,state:correction.outcome,foodAccessReport:correction,
+          summary:"You corrected your food report. This request remains closed; no future work has restarted." })) },
+        events:[...value.events,{ id:correction.eventId,request_id:foodRequest.id,kind:"parent.outcome_reported",actor:"parent",created_at:correction.reportedAt,
+          summary:"You corrected your factual food report.",evidence:{ need:"food_now",outcome:correction.outcome,attribution:"parent_reported",foodAccessReport:correction } }] };
+      writeFileSync(resolve(directory,"food-access-corrected-closed.pdf"),await renderParentSummary(corrected));
+      cases.push({ name:"food-access-corrected-closed",minimumPages:1,required:["This request remains closed","no future work has restarted","No food was available","Your food need remains open","Collected enough food for this immediate need"] });
+    }
+  }
   const operation: RecordedPacket = {
     id: "b72df7ef-922d-43ee-9825-55e209e5b47d",
     request_id: request.id,

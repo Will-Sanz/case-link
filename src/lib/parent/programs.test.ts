@@ -5,6 +5,7 @@ import {
   programRoutingIssue,
   SNAP_NEW_APPLICATION_URL,
 } from "./programs";
+import { SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
 import { fixtureNow } from "./test-fixtures";
 
 describe("verified SNAP public application entry", () => {
@@ -42,6 +43,11 @@ describe("verified SNAP public application entry", () => {
 });
 
 describe("source review before current service-area facts are available", () => {
+  it("names the Share walk-up program separately without changing old City-finder permission or claiming transport", () => {
+    expect(getProgram(SHARE_FOOD_ACCESS_PROGRAM)).toMatchObject({ needs: ["food_now"], sourceCheckedAt: "2026-11-17", execution: "not_configured" });
+    expect(getProgram("philly-food")).toMatchObject({ name: "Philadelphia food and meal finder", officialUrl: "https://www.phila.gov/food/" });
+    expect(getProgram(SHARE_FOOD_ACCESS_PROGRAM)!.description).toContain("stock is unknown");
+  });
   it("permits source review and preparation without inventing a ZIP or a coverage decision", () => {
     expect(programRoutingIssue(getProgram("peco-cap")!, undefined, fixtureNow)).toBeNull();
   });

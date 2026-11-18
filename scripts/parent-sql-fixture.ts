@@ -136,6 +136,7 @@ export async function createParentSqlFixture(
     "20261118035851_parent_wic_application_reaffirmation.sql",
     "20261118043549_parent_job_plan_agency_observation_order.sql",
     "20261118043758_parent_business_conflict_http_status.sql",
+    "20261118050422_parent_public_food_access.sql",
   ];
   try {
     const last = throughMigration ? migrations.indexOf(throughMigration) : migrations.length - 1;

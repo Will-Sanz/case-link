@@ -35,8 +35,8 @@ export async function runParentWorkerService(
       }
     }
     await database.query(
-      "select parent_private.parent_record_worker_health($1,$2)",
-      [planningReady, Boolean(apiKey)],
+      "select parent_private.parent_record_worker_health($1,$2,$3)",
+      [planningReady, Boolean(apiKey), true],
     );
   };
   await reportHealth();
@@ -55,8 +55,7 @@ export async function runParentWorkerService(
   try {
     do {
       if (signal?.aborted || healthFailed) break;
-      if (planningReady || options.protectedSnapSubmission || options.protectedUtilityPreparation)
-        await runOneParentJob({ ...options, continuationOnly: !planningReady });
+      await runOneParentJob({ ...options, continuationOnly: !planningReady });
       if (signal?.aborted || healthFailed) break;
       if (apiKey)
         await runOneParentAssistantTurn({
@@ -81,7 +80,7 @@ export async function runParentWorkerService(
     if (timer) clearInterval(timer);
     await heartbeat;
     await database
-      .query("select parent_private.parent_record_worker_health(false,false)")
+      .query("select parent_private.parent_record_worker_health(false,false,false)")
       .catch(() => {});
   }
 }

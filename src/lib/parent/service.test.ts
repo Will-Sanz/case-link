@@ -22,6 +22,7 @@ import {
 } from "./service";
 import type { ExtractedFacts } from "./documents";
 import type { SupportRequest } from "./domain";
+import { bindFoodAccessReport, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
 import { factAnswerSchema } from "./answers";
 
 const receipt = (
@@ -93,6 +94,39 @@ function setup(request = fixtureRequest()) {
     now: fixtureNow,
   };
 }
+describe("public Share access preparation without provider work", () => {
+  function publicSetup() {
+    const at="2026-11-18T12:00:00Z";
+    const test=setup(fixtureRequest({ created_at:at,intake_confirmed_at:{ zip:at },
+      intake:fixtureIntake({ needs:["food_now"],zip:"19129",householdSize:null,incomeAmount:null,incomeFrequency:"unknown",utilityProviders:[] }),
+      mandate:fixtureMandate({ recipientIds:[SHARE_FOOD_ACCESS_PROGRAM],mode:"prepare_only",allowedActions:["research","prepare"],allowedData:["household"],expiresAt:"2026-11-25T12:00:00Z" }) }));
+    test.now=new Date(at); test.ports.foodAccessCityObservation=vi.fn(async()=>({ recordId:122 as const,state:"listed_unconfirmed" as const,checkedAt:at }));
+    return test;
+  }
+  it("prepares only public instructions without application/private facts, a fake receipt or a routine confirmation",async()=>{
+    const test=publicSetup(), result=await runSupportService(test);
+    expect(result.plan.routes[0]).toMatchObject({ state:"prepared",nextActor:"parent",foodAccess:{ site:{ stock:"unknown",reservation:"none" } } });
+    expect(result.requiredActions).toEqual([]); expect(result.nextActor).toBe("parent");
+    for (const action of [test.ports.execute,test.ports.prepareOperation,test.ports.capability,test.ports.fillForm,test.ports.extractDocument]) expect(action).not.toHaveBeenCalled();
+  });
+  it("retains a failed site report, unmet need and current public alternatives without asking for household facts",async()=>{
+    const test=publicSetup(), first=await runSupportService(test), access=first.plan.routes[0].foodAccess!;
+    const report=bindFoodAccessReport(access,{ expectedVersion:1,siteId:access.site.id,planHash:access.planHash,reportKey:fixtureRequest().id,result:"no_food" },{ eventId:fixtureRequest().id,reportedAt:"2026-11-18T12:05:00Z" });
+    const result=await runSupportService({ ...test,foodAccessReport:report });
+    expect(result.plan.routes[0]).toMatchObject({ state:"unresolved",foodAccessReport:foodAccessReportSchema.parse(report) });
+    expect(result.plan.routes[0].limitation).toContain("another usable location has not been confirmed");
+    expect(result.requiredActions).toEqual([expect.objectContaining({ reason:"execution_issue",resolver:"operator" })]);
+    expect(test.ports.execute).not.toHaveBeenCalled();
+  });
+  it("does not recommend walk-up instructions when current source evidence conflicts",async()=>{
+    const test=publicSetup(); test.ports.foodAccessCityObservation=vi.fn(async()=>({ recordId:122 as const,state:"closed" as const,checkedAt:test.now.toISOString() }));
+    const route=(await runSupportService(test)).plan.routes[0];
+    expect(route).toMatchObject({ state:"unresolved",foodAccess:{ blockedReason:"source_conflict" } });
+    expect(route.steps.join(" ")).not.toMatch(/24-hour|Collect food yourself/);
+    expect(test.ports.execute).not.toHaveBeenCalled();
+  });
+});
+
 describe("service adoption of the exact protected SNAP operation", () => {
   function protectedSetup(authorized = false) {
     const test = setup(fixtureRequest({ intake: fixtureIntake({ needs: ["snap_new"], zip: "19000" }), mandate: fixtureMandate({ recipientIds: ["snap-pa"] }) }));

@@ -1,4 +1,4 @@
-import { reportParentOutcome, closeParentRequest } from "@/lib/parent/activity";
+import { reportParentOutcome, reportParentFoodVisit, closeParentRequest } from "@/lib/parent/activity";
 import {
   parentError,
   parentJson,
@@ -14,6 +14,10 @@ export async function POST(
     requireSameOrigin(request);
     const id = uuidSchema.parse((await params).id);
     const value = (await readParentJson(request)) as Record<string, unknown>;
+    if (value?.action === "food_visit") {
+      const { action: _, ...input } = value; void _;
+      return parentJson({ ok: true, report: await reportParentFoodVisit(id, input) });
+    }
     if (value?.action === "close") {
       const { action: _, ...input } = value;
       void _;

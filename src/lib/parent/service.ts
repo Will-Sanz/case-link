@@ -41,6 +41,7 @@ import type { UtilityProtectedPreparationResult } from "./utility-preparation-po
 import { isUtilityPreparationMandate, type UtilityPreparationProgram } from "./utility-preparation-scope";
 import type { SnapCaptureProgress } from "./snap-capture-progress";
 import { snapTransportFailureSchema } from "./snap-protected-submission-port";
+import { buildFoodAccessPlanBody, foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM, type FoodAccessCityObservation, type FoodAccessReport } from "./food-access";
 
 export type ServiceReceipt = z.infer<typeof receiptSchema>;
 export type ServiceDocument = ParentDocument & {
@@ -135,6 +136,7 @@ export type ServiceEvent = {
   receipt?: ServiceReceipt;
 };
 export type ServicePorts = {
+  foodAccessCityObservation?(): Promise<FoodAccessCityObservation>;
   coordinate(request: SupportRequest): Promise<CoordinatorResult>;
   extractDocument(document: ServiceDocument): Promise<{
     facts: unknown;
@@ -437,6 +439,7 @@ export async function runSupportService(input: {
   snapCapture?: { state: SnapCaptureProgress["state"]; reason: SnapCaptureProgress["reason"]; retryAt?: string };
   utilityPreparation?: { programId: UtilityPreparationProgram; state: UtilityProtectedPreparationResult["state"]; retryAt?: string };
   jobAttempts?: number;
+  foodAccessReport?: FoodAccessReport | null;
   now: Date;
   ports: ServicePorts;
 }): Promise<ServiceResult> {
@@ -802,6 +805,42 @@ export async function runSupportService(input: {
         );
         plan.routes[index] = route;
         continue;
+      }
+      if (route.need === "food_now" && program.id === SHARE_FOOD_ACCESS_PROGRAM) {
+        const zip = currentIntakeFields(request, now, "food_now").zip;
+        if (!request.mandate.allowedActions.includes("prepare") || !request.mandate.allowedData.includes("household")) {
+          addAction(route, "expanded_permission", "Review permission for the public food plan", "Preparing this named route needs permission to use household routing information for preparation.", "parent");
+          plan.routes[index] = route; continue;
+        }
+        if (!zip) {
+          addAction(route, "missing_fact", "What is your current household ZIP code?", "CaseLink uses a current ZIP to check its service area. Share's public fridge does not require household paperwork.", "parent", "zip");
+          plan.routes[index] = route; continue;
+        }
+        const city = await ports.foodAccessCityObservation?.() ?? { recordId: 122 as const, checkedAt: now.toISOString(), state: "unavailable" as const };
+        const body = buildFoodAccessPlanBody({ requestId: request.id, requestVersion: request.version,
+          generatedAt: new Date(Math.max(now.getTime(), Date.parse(city.checkedAt))).toISOString(),
+          sourceReviewCurrent: programRoutingIssue(program, zip, now) === null, cityObservation: city });
+        const access = foodAccessPlanSchema.parse({ ...body, planHash: digest(body) });
+        const parsed = foodAccessReportSchema.safeParse(input.foodAccessReport);
+        const report = parsed.success && parsed.data.requestId === request.id ? parsed.data : undefined;
+        route = { ...route, foodAccess: access, ...(report ? { foodAccessReport: report } : {}),
+          state: report?.outcome ?? access.state,
+          nextActor: report?.outcome === "support_received" ? "caselink" : access.state === "prepared" && !report ? "parent" : "caselink",
+          summary: report?.outcome === "support_received" ? "You reported receiving enough food at Share's community fridge. This is your report, not provider confirmation."
+            : access.state === "unresolved" ? "Source information needs checking before recommending this walk-up route."
+              : report ? "Your reported visit did not meet the immediate food need. Another usable option is not confirmed."
+                : "Public walk-up instructions are prepared. Food depends on donations; stock is unknown and nothing is reserved.",
+          steps: report?.outcome === "support_received" ? ["Your food report is recorded with family attribution. Other needs keep their own progress."]
+            : access.state === "unresolved" || report ? ["The immediate food need remains open. Check the current City listings for unconfirmed alternatives or use the direct support options in Help.", "Another exact access route needs checking; a listing does not confirm usable food."]
+            : ["Share Community Fridge & Pantry: 2901 W Hunting Park Ave, Philadelphia, PA 19129, between Lots A and B.",
+            "Share's reviewed guidance describes 24-hour access without paperwork. Current stock and physical access are unconfirmed.",
+            "Collect food yourself or with a trusted helper if practical. Tell CaseLink what happened or if another way is needed."],
+          limitation: access.blockedReason ? "Current source evidence needs checking before recommending this walk-up route. The food need remains open."
+            : report?.outcome === "unresolved" ? "You still need food. Current City listings and the help page remain available; another usable location has not been confirmed."
+              : "No food is reserved, no delivery is arranged, and no household information has been sent to Share." };
+        if (access.state === "unresolved" || report?.outcome === "unresolved")
+          addAction(route, "execution_issue", "CaseLink needs to check the next food option", "The food need remains open. Another exact service contract or practical access option needs checking; City listings are unconfirmed and the help page does not promise a staffed callback.");
+        plan.routes[index] = route; await record(route); continue;
       }
       if (input.utilityPreparation?.programId === route.programId) {
         for (let actionIndex = actions.length - 1; actionIndex >= 0; actionIndex--)
@@ -1561,7 +1600,7 @@ export async function runSupportService(input: {
   const parentNeeded = actions.some(
     (action) =>
       !action.resolved && (!action.resolver || action.resolver === "parent"),
-  );
+  ) || plan.routes.some(route => route.foodAccess && route.state === "prepared");
   const operatorNeeded = actions.some(
     (action) => !action.resolved && action.resolver === "operator" && action.id !== captureRetryActionId && !reconciliationActionIds.has(action.id),
   );

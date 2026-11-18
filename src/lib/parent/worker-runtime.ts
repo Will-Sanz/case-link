@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { foodAccessReportSchema, isPublicFoodAccessRequest, SHARE_FOOD_ACCESS_PROGRAM } from "./food-access";
+import { findShareFoodAccessObservation } from "./food-sites-core";
 import { coordinateSupport, type CoordinatorResult } from "./coordinator";
 import {
   DocumentProcessingError,
@@ -374,10 +376,10 @@ export async function runOneParentJob(
   if (!brokerOrigin || !supabaseOrigin || options.brokerSecret.length < 32)
     throw new Error("isolated_worker_configuration_required");
   const claimed = await db.query(
-    options.continuationOnly ? options.protectedUtilityPreparation
-      ? "select parent_private.parent_claim_job($1,$2,$3,$4) as job" : "select parent_private.parent_claim_job($1,$2) as job"
+    options.continuationOnly
+      ? "select parent_private.parent_claim_job($1,$2,$3,$4) as job"
       : "select parent_private.parent_claim_job($1) as job",
-    options.continuationOnly ? options.protectedUtilityPreparation ? [300, true, Boolean(options.protectedSnapSubmission), true] : [300, true] : [300],
+    options.continuationOnly ? [300, true, Boolean(options.protectedSnapSubmission), Boolean(options.protectedUtilityPreparation)] : [300],
   );
   if (!claimed.rows[0]?.job) return { state: "idle" };
   const job = claimSchema.parse(claimed.rows[0].job),
@@ -759,7 +761,9 @@ export async function runOneParentJob(
     );
   };
   const ports: ServicePorts = {
+    foodAccessCityObservation: () => findShareFoodAccessObservation(fetcher),
     coordinate: async (request) => {
+      if (isPublicFoodAccessRequest(request)) return { plan: buildSupportPlan(request, now()), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
       if (utilityProgram) return { plan: buildSupportPlan(request, now(), { [request.intake.needs[0]]: utilityProgram }), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
       if (continuationPass) return { plan: buildSupportPlan(request, now(), { snap_new: "snap-pa" }), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
       if (options.continuationOnly || !options.apiKey)
@@ -1222,9 +1226,12 @@ export async function runOneParentJob(
     },
   };
   try {
+    const foodReport = request.intake.needs.includes("food_now") && request.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM)
+      ? foodAccessReportSchema.nullable().parse(await rpc("select parent_private.parent_get_food_access_report($1,$2) as value", [job.jobId, job.leaseToken])) : null;
     const result = await runSupportService({
       request: serviceRequest,
-      documents: continuation || utilityProgram ? [] : job.documents.map(normalizeDocument),
+      documents: continuation || utilityProgram || isPublicFoodAccessRequest(request) ? [] : job.documents.map(normalizeDocument),
+      foodAccessReport: foodReport,
       ...(utilityPreparation ? { utilityPreparation } : {}),
       operations,
       jobAttempts: deliveryJobAttempts,

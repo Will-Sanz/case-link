@@ -10,6 +10,14 @@ import { NEED_LABELS, OUTCOME_LABELS, type SupportRequest } from "./domain";
 import { supportRouteLabel } from "./application-readiness";
 import { getProgram } from "./programs";
 import { finalizePlanPdf } from "../domain/plan/finalize-plan-pdf";
+import { foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_SITE, SHARE_FOOD_ACCESS_SOURCE, type FoodAccessReport } from "./food-access";
+const foodReportLabels: Record<FoodAccessReport["result"], string> = {
+  received_enough_food: "Collected enough food for this immediate need",
+  some_food_still_needed: "Collected some food and still needs help",
+  no_food: "No food was available",
+  could_not_access: "Could not access this location",
+  need_another_way: "Needs another way to get food",
+};
 const styles = StyleSheet.create({
   page: {
     padding: 42,
@@ -44,13 +52,28 @@ export function ParentSummaryDocument({
           {request.intake.needs.map((n) => NEED_LABELS[n]).join(" / ")}
         </Text>
         <Text style={styles.section}>What is happening</Text>
-        {request.plan?.routes.map((route) => (
-          <View key={route.need} style={styles.route} wrap={false}>
+        {request.plan?.routes.map((route) => {
+          const parsed = foodAccessPlanSchema.safeParse(route.foodAccess);
+          const food = parsed.success && parsed.data.requestId === request.id ? parsed.data : null;
+          const parsedReport = foodAccessReportSchema.safeParse(route.foodAccessReport);
+          const foodReport = parsedReport.success && parsedReport.data.requestId === request.id ? parsedReport.data : null;
+          return <View key={route.need} style={styles.route} wrap={!food ? false : undefined}>
             <Text style={styles.label}>
               {NEED_LABELS[route.need]} · {supportRouteLabel(route)}
             </Text>
             <Text>{route.title}</Text>
             <Text>{route.summary}</Text>
+            {food && <>
+              <Text>{food.site.name} · {food.site.address}</Text>
+              {food.state === "prepared" && !foodReport && <Text>{food.site.location} {food.site.publishedHours} {food.site.paperwork}</Text>}
+              <Text>Stock unknown. Nothing is reserved. Delivery, language service and physical-access arrangements are not verified.</Text>
+              <Text>Share guidance reviewed {food.source.reviewedOn}.{food.cityObservation ? ` City directory checked ${food.cityObservation.checkedAt}; this is not confirmation from the location.` : ""}</Text>
+              <Text style={styles.small}>Share access instructions: {food.source.operatorUrl}</Text>
+              {foodReport && <>
+                <Text>Parent reported: {foodReportLabels[foodReport.result]}.</Text>
+                <Text>{foodReport.outcome === "unresolved" ? "Your food need remains open. Check current City listings for other unconfirmed options." : "This food outcome is attributed to your report. Other requested needs keep their own progress."}</Text>
+              </>}
+            </>}
             {route.limitation && <Text>{route.limitation}</Text>}
             {route.steps.map((step, i) => (
               <Text key={i}>• {step}</Text>
@@ -58,8 +81,8 @@ export function ParentSummaryDocument({
             <Text style={styles.small}>
               Official information: {route.sourceUrl}
             </Text>
-          </View>
-        ))}
+          </View>;
+        })}
         {!request.plan && (
           <Text>
             Your saved request is waiting for preparation. No application or
@@ -75,8 +98,10 @@ export function ParentSummaryDocument({
           pause or cancel future work in CaseLink.
         </Text>
         <Text style={styles.section}>Activity and evidence</Text>
-        {(request.events ?? []).map((event) => (
-          <View key={event.id} style={{ marginBottom: 7 }} wrap={false}>
+        {(request.events ?? []).map((event) => {
+          const parsed = foodAccessReportSchema.safeParse(event.evidence?.foodAccessReport);
+          const foodReport = event.actor === "parent" && event.kind === "parent.outcome_reported" && parsed.success && parsed.data.requestId === request.id ? parsed.data : null;
+          return <View key={event.id} style={{ marginBottom: 7 }} wrap={false}>
             <Text>
               {event.created_at.slice(0, 10)} · {event.actor}
             </Text>
@@ -99,10 +124,15 @@ export function ParentSummaryDocument({
                   {typeof event.evidence?.reference === "string" && (
                     <Text>{event.evidence.reference}</Text>
                   )}
+                  {foodReport && <>
+                    <Text>Food access report: {foodReportLabels[foodReport.result]}</Text>
+                    <Text>{SHARE_FOOD_ACCESS_SITE.name} · {SHARE_FOOD_ACCESS_SITE.address}</Text>
+                    <Text>Parent reported {foodReport.reportedAt}. Share guidance reviewed {SHARE_FOOD_ACCESS_SOURCE.reviewedOn}. Share has not confirmed this report.</Text>
+                  </>}
                 </>
               )}
-          </View>
-        ))}
+          </View>;
+        })}
         {request.events_truncated && (
           <Text style={styles.small}>
             Showing the latest 200 updates. Download your information from your

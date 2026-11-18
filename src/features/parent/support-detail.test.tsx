@@ -18,6 +18,7 @@ import { fixtureNow, fixtureProtectedSnapOperation } from "@/lib/parent/test-fix
 import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
 import { SNAP_APPLICATION_SOURCE } from "@/lib/parent/snap-application-fields";
 import { snapApplicationLeaves } from "@/lib/parent/snap-application-snapshot";
+import { bindFoodAccessReport, buildFoodAccessPlanBody, SHARE_FOOD_ACCESS_PROGRAM } from "@/lib/parent/food-access";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -410,6 +411,33 @@ describe("support detail", () => {
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.includes("/food-sites?"))).toBe(true));
     expect(fetch.mock.calls.filter(([url]) => url.includes("/food-sites?")).map(([url]) => url))
       .toEqual(["/api/parent/food-sites?zip=19104"]);
+  });
+  it("renders the saved site plan before unconfirmed City discovery and preserves site attribution in activity", async () => {
+    const request = fixture(), at = "2026-11-18T12:00:00Z"; vi.setSystemTime(new Date(at));
+    request.intake.needs = ["food_now", "snap_new"]; request.intake.zip = "19129";
+    request.mandate.recipientIds = [SHARE_FOOD_ACCESS_PROGRAM, "snap-pa"];
+    const food = { ...buildFoodAccessPlanBody({ requestId, requestVersion: request.version, generatedAt: at, sourceReviewCurrent: true }), planHash: "a".repeat(64) };
+    const report = bindFoodAccessReport(food, { expectedVersion: request.version, siteId: food.site.id, planHash: food.planHash,
+      reportKey: "33333333-3333-4333-8333-333333333333", result: "could_not_access" }, { eventId: "44444444-4444-4444-8444-444444444444", reportedAt: "2026-11-18T12:05:00Z" });
+    request.plan = { version: 1, summary: "Source-bound food access", generatedAt: at, model: null, routes: [{
+      need: "food_now", programId: SHARE_FOOD_ACCESS_PROGRAM, title: food.site.name, summary: "Your need remains open.", state: "unresolved",
+      nextActor: "parent", officialUrl: food.source.operatorUrl, sourceUrl: food.source.operatorUrl, steps: [], limitation: null,
+      foodAccess: food, foodAccessReport: report,
+    }] };
+    request.events = [{ id: report.eventId, request_id: requestId, kind: "parent.outcome_reported", actor: "parent", created_at: report.reportedAt,
+      summary: "You reported a food access result.", evidence: { outcome: "unresolved", attribution: "parent_reported", foodAccessReport: report } }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.includes("/food-sites?")
+      ? { ok: true, status: 200, json: async () => ({ sites: [], checkedAt: at, moreSitesAvailable: false }) } : response(request)));
+    render(<SupportDetail requestId={requestId} />); await openSection(/Program progress/);
+    const saved = await screen.findByRole("heading", { name: "Your food need remains open" });
+    const directory = screen.getByRole("heading", { name: "Food locations near your ZIP" });
+    expect(saved.compareDocumentPosition(directory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(saved.closest("section")!).getByText(/Food access report: I could not access this location/)).toBeTruthy();
+    await openSection(/Activity & receipts/);
+    const activity = screen.getByRole("heading", { name: "Activity & receipts" }).closest("section")!;
+    expect(within(activity).getByText(/Food access report: I could not access this location/)).toBeTruthy();
+    expect(within(activity).getByText(/Share has not confirmed it/)).toBeTruthy();
+    expect(screen.getByText("Reported outcome: Still unresolved")).toBeTruthy();
   });
   it.each(["other_need", "expired", "excluded"])("keeps manual food lookup available without querying a %s saved ZIP", async (source) => {
     const request = fixture();

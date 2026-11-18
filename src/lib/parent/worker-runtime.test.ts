@@ -949,13 +949,13 @@ describe("synthetic reference-only protected SNAP worker", () => {
   it("uses the continuation-only database claim before reading any job", async () => {
     const test = protectedSetup(); test.options.continuationOnly = true; delete test.options.apiKey;
     expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
-    expect(test.database.query).toHaveBeenNthCalledWith(1, "select parent_private.parent_claim_job($1,$2) as job", [300, true]);
+    expect(test.database.query).toHaveBeenNthCalledWith(1, "select parent_private.parent_claim_job($1,$2,$3,$4) as job", [300, true, true, false]);
   });
   it("stays idle without touching queued work when the continuation claim finds no eligible operation", async () => {
     const test = protectedSetup(); test.options.continuationOnly = true; delete test.options.apiKey;
     test.database.query.mockResolvedValueOnce({ rows: [{ job: null }] });
     expect(await runOneParentJob(test.options)).toEqual({ state: "idle" });
-    expect(test.database.query).toHaveBeenCalledExactlyOnceWith("select parent_private.parent_claim_job($1,$2) as job", [300, true]);
+    expect(test.database.query).toHaveBeenCalledExactlyOnceWith("select parent_private.parent_claim_job($1,$2,$3,$4) as job", [300, true, true, false]);
     expect(test.port.execute).not.toHaveBeenCalled(); expect(test.fetcher).not.toHaveBeenCalled();
   });
   it("defers a newly due follow-up after reconciling an aged protected receipt", async () => {

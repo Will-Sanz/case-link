@@ -27,30 +27,30 @@ it("reports only actual configured services and clears readiness when it stops",
   );
   expect(input.database.query).toHaveBeenNthCalledWith(
     1,
-    "select parent_private.parent_record_worker_health($1,$2)",
-    [true, true],
+    "select parent_private.parent_record_worker_health($1,$2,$3)",
+    [true, true, true],
   );
   expect(mocks.plan).toHaveBeenCalledTimes(1);
   expect(mocks.assistant).toHaveBeenCalledTimes(1);
   expect(mocks.plan.mock.invocationCallOrder[0]).toBeLessThan(mocks.assistant.mock.invocationCallOrder[0]);
   expect(input.database.query).toHaveBeenLastCalledWith(
-    "select parent_private.parent_record_worker_health(false,false)",
+    "select parent_private.parent_record_worker_health(false,false,false)",
   );
 });
-it("does not execute planning with an unavailable broker or any model work without a key", async () => {
+it("claims only bounded continuations with an unavailable broker and performs no model work without a key", async () => {
   const input = options();
   input.fetcher.mockRejectedValue(new Error("offline"));
   await runParentWorkerService(input);
   expect(input.database.query).toHaveBeenNthCalledWith(
     1,
-    "select parent_private.parent_record_worker_health($1,$2)",
-    [false, true],
+    "select parent_private.parent_record_worker_health($1,$2,$3)",
+    [false, true, true],
   );
-  expect(mocks.plan).not.toHaveBeenCalled();
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true }));
   expect(mocks.assistant).toHaveBeenCalledTimes(1);
   vi.clearAllMocks();
   await runParentWorkerService({ ...input, apiKey: undefined });
-  expect(mocks.plan).not.toHaveBeenCalled();
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, apiKey: undefined }));
   expect(mocks.assistant).not.toHaveBeenCalled();
   expect(input.fetcher).not.toHaveBeenCalled();
 });
@@ -70,11 +70,11 @@ it("continues authorized work independently of page polling until stopped", asyn
     await running;
     expect(mocks.plan.mock.calls.length).toBeGreaterThan(1);
     expect(input.database.query).toHaveBeenCalledWith(
-      "select parent_private.parent_record_worker_health($1,$2)",
-      [true, true],
+      "select parent_private.parent_record_worker_health($1,$2,$3)",
+      [true, true, true],
     );
     expect(input.database.query).toHaveBeenLastCalledWith(
-      "select parent_private.parent_record_worker_health(false,false)",
+      "select parent_private.parent_record_worker_health(false,false,false)",
     );
   } finally {
     stop.abort();

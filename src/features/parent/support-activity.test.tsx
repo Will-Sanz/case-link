@@ -5,11 +5,44 @@ import { fixtureProtectedSnapOperation, fixtureRequest } from "@/lib/parent/test
 import type { SupportRequest } from "@/lib/parent/domain";
 import { fixtureUtilityProtectedOperation } from "@/lib/parent/utility-preparation-test-fixtures";
 import { SupportActivity, SnapDraftReview, currentSnapDraft, currentSnapReview, type RecordedOperation } from "./support-activity";
+import { buildFoodAccessPlanBody, SHARE_FOOD_ACCESS_PROGRAM } from "@/lib/parent/food-access";
 
 const reviewPdf = vi.hoisted(() => vi.fn());
 vi.mock("./snap-review-pdf", () => ({ SnapReviewPdf: (props: unknown) => { reviewPdf(props); return <div role="region" aria-label="Exact draft preview"/>; } }));
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-06T22:00:00Z")); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+it.each([false,true])("asks the typed food question once while preserving the generic sibling form: combined=%s",combined=>{
+  const request=fixtureRequest();request.intake.needs=combined ? ["food_now","snap_new"] : ["food_now"];
+  request.mandate.recipientIds=[SHARE_FOOD_ACCESS_PROGRAM,...(combined ? ["snap-pa"] : [])];
+  const body=buildFoodAccessPlanBody({ requestId:request.id,requestVersion:request.version,generatedAt:"2026-11-18T12:00:00Z",sourceReviewCurrent:true });
+  request.plan={ version:1,summary:"Public food plan",generatedAt:body.generatedAt,model:null,routes:[{ need:"food_now",programId:SHARE_FOOD_ACCESS_PROGRAM,title:"Share",summary:"Prepared",state:"prepared",nextActor:"parent",officialUrl:body.source.operatorUrl,sourceUrl:body.source.operatorUrl,steps:[],limitation:null,foodAccess:{ ...body,planHash:"a".repeat(64) } }] };
+  render(<SupportActivity request={request} onChange={vi.fn()} history={{ data:{ operations:[],historyLimited:false },loading:false,error:null,reload:vi.fn() }}/>);
+  if(!combined) expect(screen.queryByText("Tell us about an outcome")).toBeNull();
+  else expect(Array.from((screen.getByLabelText("Which support?") as HTMLSelectElement).options).map(option=>option.value)).toEqual(["snap_new"]);
+});
+it.each([
+  { zip:"19129",withCity:true,typed:true },
+  { zip:"19104",withCity:false,typed:true },
+  { zip:"19104",withCity:true,typed:false },
+])("keeps the generic question aligned with the selected public path before a first plan: %j",({ zip,withCity,typed })=>{
+  const request=fixtureRequest();request.intake.needs=["food_now"];request.intake.zip=zip;
+  request.mandate.recipientIds=[SHARE_FOOD_ACCESS_PROGRAM,...(withCity ? ["philly-food"] : [])];
+  render(<SupportActivity request={request} onChange={vi.fn()} history={{ data:{ operations:[],historyLimited:false },loading:false,error:null,reload:vi.fn() }}/>);
+  expect(screen.queryByText("Tell us about an outcome") === null).toBe(typed);
+});
+it("does not silently move an in-progress generic food report to a sibling when the typed path arrives",()=>{
+  const request=fixtureRequest();request.intake.needs=["food_now","snap_new"];
+  const history={ data:{ operations:[],historyLimited:false },loading:false,error:null,reload:vi.fn() };
+  const view=render(<SupportActivity request={request} onChange={vi.fn()} history={history}/>);
+  fireEvent.change(screen.getByLabelText("What did you receive or hear, and when?"),{ target:{ value:"My unfinished food report" } });
+  const body=buildFoodAccessPlanBody({ requestId:request.id,requestVersion:request.version,generatedAt:"2026-11-18T12:00:00Z",sourceReviewCurrent:true });
+  const typed={ ...request,mandate:{ ...request.mandate,recipientIds:[SHARE_FOOD_ACCESS_PROGRAM,"snap-pa"] },plan:{ version:1 as const,summary:"Food",generatedAt:body.generatedAt,model:null,routes:[{ need:"food_now" as const,programId:SHARE_FOOD_ACCESS_PROGRAM,title:"Share",summary:"Food",state:"prepared" as const,nextActor:"parent" as const,officialUrl:body.source.operatorUrl,sourceUrl:body.source.operatorUrl,steps:[],limitation:null,foodAccess:{ ...body,planHash:"a".repeat(64) } }] } };
+  view.rerender(<SupportActivity request={typed} onChange={vi.fn()} history={history}/>);
+  expect((screen.getByLabelText("Which support?") as HTMLSelectElement).value).toBe("");
+  expect((screen.getByLabelText("What did you receive or hear, and when?") as HTMLTextAreaElement).value).toBe("My unfinished food report");
+  expect((screen.getByRole("button",{ name:"Save my report" }) as HTMLButtonElement).disabled).toBe(true);
+});
 
 describe("recorded form downloads", () => {
   it.each(["active", "paused"] as const)("keeps water LOCAL TEST and permits recorded private inspection while %s", async status => {

@@ -17,6 +17,8 @@ import { ParentLoading, ServiceError } from "./feedback";
 import { SnapReviewPdf } from "./snap-review-pdf";
 import styles from "./parent.module.css";
 import { usePermissionWindow } from "./use-permission-window";
+import { hasTypedFoodAccessPath } from "@/lib/parent/food-access";
+import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
 export type RecordedOperation = {
   id: string;
   request_id?: string;
@@ -147,21 +149,25 @@ export function SupportActivity({
   history: OperationHistory;
 }) {
   const { data, error, reload } = history;
-  const [need, setNeed] = useState(request.intake.needs[0]),
+  const typedFood = hasTypedFoodAccessPath(request,currentIntakeFields(request,new Date(),"food_now").zip);
+  const reportableNeeds = request.intake.needs.filter(need => need !== "food_now" || !typedFood);
+  const [need, setNeed] = useState(reportableNeeds[0] ?? request.intake.needs[0]),
     [outcome, setOutcome] = useState("support_received"),
     [reference, setReference] = useState("");
   const [pending, setPending] = useState(false),
     [message, setMessage] = useState(""),
     [reportError, setReportError] = useState("");
+  const reportNeed = reportableNeeds.includes(need) ? need : undefined;
   async function report(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!reportNeed) return;
     setPending(true);
     setMessage("");
     setReportError("");
     try {
       await parentApi(`/requests/${request.id}/outcome`, {
         method: "POST",
-        body: JSON.stringify({ need, outcome, reference }),
+        body: JSON.stringify({ need: reportNeed, outcome, reference }),
       });
       setMessage(
         "Your report is saved as information from you. It does not replace a program’s recorded receipt or decision.",
@@ -246,7 +252,7 @@ export function SupportActivity({
           </button>
         </div>
       )}
-      <details className={styles.disclosure}>
+      {reportableNeeds.length > 0 && <details className={styles.disclosure}>
         <summary>Tell us about an outcome</summary>
         <div>
           <p className={styles.hint}>
@@ -259,10 +265,11 @@ export function SupportActivity({
               <select
                 id="report-need"
                 className={styles.select}
-                value={need}
+                value={reportNeed ?? ""}
                 onChange={(e) => setNeed(e.target.value as typeof need)}
               >
-                {request.intake.needs.map((n) => (
+                {!reportNeed && <option value="">Choose support</option>}
+                {reportableNeeds.map((n) => (
                   <option key={n} value={n}>
                     {NEED_LABELS[n]}
                   </option>
@@ -300,7 +307,7 @@ export function SupportActivity({
                 onChange={(e) => setReference(e.target.value)}
               />
             </div>
-            <button type="submit" className={styles.button} disabled={pending}>
+            <button type="submit" className={styles.button} disabled={pending || !reportNeed}>
               {pending ? "Saving…" : "Save my report"}
             </button>
             {message && (
@@ -315,7 +322,7 @@ export function SupportActivity({
             )}
           </form>
         </div>
-      </details>
+      </details>}
     </>
   );
 }

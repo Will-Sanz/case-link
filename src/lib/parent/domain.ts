@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { FoodAccessPlan, FoodAccessReport } from "./food-access";
 
 export const NEEDS = [
   "food_now",
@@ -237,6 +238,8 @@ export type SupportRoute = {
   sourceUrl: string;
   steps: string[];
   limitation: string | null;
+  foodAccess?: FoodAccessPlan;
+  foodAccessReport?: FoodAccessReport;
 };
 export type SupportPlan = {
   version: 1;
@@ -268,6 +271,7 @@ export type SupportRequest = {
   id: string;
   household_id: string;
   status: "active" | "paused" | "cancelled" | "closed";
+  closed_reason?: string | null;
   intake: StoredSupportIntake;
   mandate: ServiceMandate;
   plan: SupportPlan | null;

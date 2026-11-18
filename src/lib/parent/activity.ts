@@ -5,7 +5,25 @@ import { needSchema } from "./domain";
 import { agencyStatusSchema, receiptSchema } from "./policy";
 import { snapProtectedReferenceSchema } from "./snap-protected-operation";
 import { utilityPreparedReferenceSchema } from "./utility-protected-operation";
+import { foodAccessReportInputSchema, foodAccessReportSchema } from "./food-access";
 const uuid = z.uuid();
+export async function reportParentFoodVisit(requestId: string, input: unknown) {
+  const id = uuid.parse(requestId).toLowerCase(), value = foodAccessReportInputSchema.parse(input);
+  const { supabase } = await requireParentSession();
+  let reply;
+  try {
+    reply = await supabase.rpc("parent_report_food_visit", { p_request_id: id, p_expected_version: value.expectedVersion,
+      p_site_id: value.siteId, p_plan_hash: value.planHash, p_report_key: value.reportKey, p_result: value.result });
+  } catch { throw new Error("CaseLink could not confirm the saved food report. Retry the same report."); }
+  if (reply.error?.code === "PT409" || reply.error?.code === "40001") throw new Error("This request changed. Reload the current food plan before reporting.");
+  if (reply.error?.code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
+  if (reply.error?.code === "23514") throw new Error("parent_invalid_input");
+  const parsed = foodAccessReportSchema.safeParse(reply.data);
+  if (reply.error || !parsed.success || parsed.data.requestId !== id
+    || Object.entries(value).some(([key, entry]) => parsed.data[key as keyof typeof value] !== entry))
+    throw new Error("CaseLink could not confirm the saved food report. Retry the same report.");
+  return parsed.data;
+}
 export async function listRequestOperations(requestId: string) {
   const ownedRequestId = uuid.parse(requestId).toLowerCase();
   const { supabase } = await requireParentSession();
