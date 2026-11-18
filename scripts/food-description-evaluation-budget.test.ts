@@ -1,0 +1,155 @@
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import {spawn}from"node:child_process";
+import{once}from"node:events";
+import{pathToFileURL}from"node:url";
+import{resolve}from"node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildFoodDescriptionProjection } from "../src/lib/parent/food-description";
+import { FOOD_DESCRIPTION_EVALUATION_BINDING, FOOD_DESCRIPTION_FINGERPRINT, foodDescriptionUsage } from "../src/lib/parent/food-description-runtime";
+import { DESCRIPTION_EVAL_LIMITS, FOOD_DESCRIPTION_CORPUS_SHA, descriptionEvaluationAccounting, foodDescriptionMeasuredNanoDollars, withFoodDescriptionEvaluationBudget } from "./food-description-evaluation-budget";
+const roots: string[] = [], now = () => new Date("2026-11-18T16:00:00Z");
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+function setup() {
+  const root = mkdtempSync(join(tmpdir(), "description-budget-")); roots.push(root);
+  const dir = join(root, "approved-run");
+  const approval = { purpose: "optional_food_description_synthetic_evaluation_v1", syntheticOnly: true, approvalReference: "SYNTHETIC TEST ONLY",
+    approvedUntil: "2026-11-18T23:00:00Z", processorReference: "synthetic", noticeRetentionReference: "synthetic", billingReference: "synthetic",
+    projectId: "proj_synthetic", projectMetadataReference: "synthetic Standard global", approvedResponseModelId: "gpt-6.1-sol", region: "global", serviceTier: "default",
+    fingerprint: FOOD_DESCRIPTION_FINGERPRINT, corpusSha256: FOOD_DESCRIPTION_CORPUS_SHA, adapterSha256: "a".repeat(64), rateCardDate: "2026-11-18",
+    maximumCalls: 80, maximumCountRequests: 80, maximumInputTokens: 8000, maximumOutputTokens: 1500, maximumNanoDollars: 5_000_000_000, runDirectory: dir };
+  const context = { expectedOwnerId: "00000000-0000-4000-8000-000000000001", ownerId: "00000000-0000-4000-8000-000000000001", expectedRevision: 1, revision: 1,
+    catalogVersion: FOOD_DESCRIPTION_FINGERPRINT, capabilityVersion: "synthetic-v1", facts: {}, history: [], programIds: ["philly-food", "snap-pa"], capabilities: [], excludedNeedIds: [] };
+  const projection = buildFoodDescriptionProjection({ description: "Food tomorrow", screenLocale: "en" }, context, now());
+  const body = { ...FOOD_DESCRIPTION_EVALUATION_BINDING.request, input: [{ role: "user", content: JSON.stringify(projection) }] };
+  const init = { method: "POST", redirect: "error" as const, headers: { "Authorization": "Bearer synthetic", "Content-Type": "application/json", "OpenAI-Project": "proj_synthetic" }, body: JSON.stringify(body) };
+  const data = { model: "gpt-6.1-sol", service_tier: "default", status: "completed", id: "resp_synthetic", usage: { input_tokens: 100, output_tokens: 40, total_tokens: 140,
+    input_tokens_details: { cached_tokens: 20, cache_write_tokens: 50, cache_write_tokens_details: { ttl_30m_tokens: 20, ttl_12h_tokens: 30 } }, output_tokens_details: { reasoning_tokens: 10 } } };
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => String(url).endsWith("/input_tokens") ? Response.json({ object: "response.input_tokens", input_tokens: 100 }) : Response.json(data));
+  return { dir, approval, init, body, data, fetcher, options: { approval, apiKey: "synthetic", now, fetcher } };
+}
+const endpoint = "https://api.openai.com/v1/responses";
+describe("one approved persistent optional-description spending run", () => {
+  it("flushes immutable reservation before count and dispatch, counts the exact supported fields, and preserves complete subset cost", async () => {
+    const s = setup(), original = s.fetcher.getMockImplementation()!;
+    s.fetcher.mockImplementation(async (url, init) => {
+      const files = readdirSync(s.dir);
+      expect(files).toContain("attempt-001-intent.json"); expect(files).toContain("run.lock");
+      const outside=readdirSync(dirname(s.dir));
+      const reservation=outside.find(name=>name.endsWith('-attempt-001-intent.json'))!;
+      expect(JSON.parse(readFileSync(join(dirname(s.dir),reservation),'utf8'))).toMatchObject({attempt:1,caseId:'description-test-en',turn:1,reservedNanoDollars:55_000_000});
+      if (String(url).endsWith("/input_tokens")) {
+        expect(outside.some(name=>name.endsWith('-attempt-001-count-dispatch.json'))).toBe(true);
+        const counted = JSON.parse(String(init?.body));
+        expect(counted).toEqual({ model: s.body.model, input: s.body.input, instructions: s.body.instructions, reasoning: s.body.reasoning, text: s.body.text });
+        for (const key of ["store", "max_output_tokens", "service_tier"]) expect(counted).not.toHaveProperty(key);
+        expect(files).not.toContain("attempt-001-dispatch.json");
+      } else { expect(files).toContain("attempt-001-dispatch.json"); expect(outside.some(name=>name.endsWith('-attempt-001-dispatch.json'))).toBe(true); }
+      return original(url, init);
+    });
+    await withFoodDescriptionEvaluationBudget(s.options, async budget => { await budget.fetch("description-test-en", 1)(endpoint, s.init); expect(budget.attempts()).toBe(1); });
+    expect(s.fetcher).toHaveBeenCalledTimes(2);
+    const observation = JSON.parse(readFileSync(join(s.dir, "attempt-001-observation.json"), "utf8"));
+    expect(observation.measuredNanoDollars).toBe(662000);
+    expect(readFileSync(join(s.dir, "approval.json"), "utf8")).not.toContain('Bearer synthetic');
+    expect(DESCRIPTION_EVAL_LIMITS.reservationNanoDollars * 80).toBe(4_400_000_000);
+    await withFoodDescriptionEvaluationBudget(s.options, async budget => { await expect(budget.fetch("description-test-en", 1)(endpoint, s.init)).rejects.toThrow(); });
+    expect(s.fetcher).toHaveBeenCalledTimes(2);
+  });
+  it.each(["timeout", "count oversized", "count incomplete", "missing usage", "wrong model", "wrong tier", "output oversized", "incomplete"])("keeps %s permanently unknown without retry or refund", async kind => {
+    const s = setup();
+    if (kind === "timeout") s.fetcher.mockRejectedValue(new Error("synthetic unknown"));
+    else if (kind.startsWith("count")) s.fetcher.mockResolvedValue(Response.json(kind === "count oversized" ? { object: "response.input_tokens", input_tokens: 8001 } : { input_tokens: 100 }));
+    else {
+      const reply = { ...s.data, ...(kind === "wrong model" ? { model: "gpt-6.2-sol" } : kind === "wrong tier" ? { service_tier: "priority" } : kind === "incomplete" ? { status: "incomplete" } : {}),
+        usage: kind === "missing usage" ? null : kind === "output oversized" ? { ...s.data.usage, output_tokens: 1501, total_tokens: 1601 } : s.data.usage };
+      s.fetcher.mockImplementation(async url => String(url).endsWith("/input_tokens") ? Response.json({ object: "response.input_tokens", input_tokens: 100 }) : Response.json(reply));
+    }
+    await expect(withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-test-en", 1)(endpoint, s.init))).rejects.toThrow();
+    const calls = s.fetcher.mock.calls.length; expect(readdirSync(s.dir)).toContain("halted.json");
+    await expect(withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-test-en", 1)(endpoint, s.init))).rejects.toThrow();
+    expect(s.fetcher).toHaveBeenCalledTimes(calls); expect(JSON.parse(readFileSync(join(s.dir, "attempt-001-intent.json"), "utf8")).reservedNanoDollars).toBe(55_000_000);
+  });
+  it("rejects current authority/settings/headers before any HTTP or reservation", async () => {
+    for (const field of [{ approvedUntil: now().toISOString() }, { fingerprint: "changed" }, { region: "eu" }, { maximumNanoDollars: 0 }, { syntheticOnly: false }]) {
+      const s = setup(); await expect(withFoodDescriptionEvaluationBudget({ ...s.options, approval: { ...s.approval, ...field } }, async () => {})).rejects.toThrow(); expect(s.fetcher).not.toHaveBeenCalled();
+    }
+    for (const change of [{ headers: { ...setup().init.headers, "OpenAI-Project": "proj_other" } }, { body: JSON.stringify({ ...setup().body, max_output_tokens: 1600 }) }, { redirect: "follow" }]) {
+      const s = setup(); await expect(withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-test-en", 1)(endpoint, { ...s.init, ...change } as RequestInit))).rejects.toThrow(); expect(s.fetcher).not.toHaveBeenCalled(); expect(readdirSync(s.dir).some(name => name.includes("intent"))).toBe(false);
+    }
+  });
+  it("holds one exclusive run lock across HTTP, and rejects a changed config or crash-held lock", async () => {
+    const s = setup(); let release!: () => void, started!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; }), ready = new Promise<void>(resolve => { started = resolve; });
+    const original = s.fetcher.getMockImplementation()!; s.fetcher.mockImplementation(async (url, init) => { if (String(url).endsWith("/input_tokens")) { started(); await waiting; } return original(url, init); });
+    const first = withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-test-en", 1)(endpoint, s.init)); await ready;
+    await expect(withFoodDescriptionEvaluationBudget(s.options, async () => {})).rejects.toThrow(); release(); await first;
+    await expect(withFoodDescriptionEvaluationBudget({ ...s.options, approval: { ...s.approval, approvalReference: "changed" } }, async () => {})).rejects.toThrow();
+    writeFileSync(join(s.dir, "run.lock"), "", { mode: 0o600, flag: "wx" });
+    await expect(withFoodDescriptionEvaluationBudget(s.options, async () => {})).rejects.toThrow(); expect(s.fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("bounds each batch at16 and all restarts at80 reserved generation/count pairs", async () => {
+    const s = setup();
+    for (let batch = 0; batch < 5; batch++) await withFoodDescriptionEvaluationBudget(s.options, async budget => {
+      for (let i = 0; i < 16; i++) await budget.fetch(`description-test-${batch}-${i}-en`, 1)(endpoint, s.init);
+      await expect(budget.fetch(`description-test-extra-${batch}-en`, 1)(endpoint, s.init)).rejects.toThrow();
+    });
+    await withFoodDescriptionEvaluationBudget(s.options, async budget => { expect(budget.attempts()).toBe(80); await expect(budget.fetch("description-last-en", 1)(endpoint, s.init)).rejects.toThrow(); });
+    expect(s.fetcher).toHaveBeenCalledTimes(160);
+    expect(readdirSync(s.dir).filter(name => name.endsWith("-intent.json"))).toHaveLength(80);
+  });
+  it("does not double charge cached writes or reasoning and never prices missing usage as zero", () => {
+    const s = setup(); expect(foodDescriptionMeasuredNanoDollars(foodDescriptionUsage(s.data))).toBe(662000);
+    expect(() => foodDescriptionMeasuredNanoDollars(foodDescriptionUsage({ usage: null }))).toThrow();
+  });
+  it("does not let a fetch capability escape its exclusive approved run",async()=>{
+    const s=setup();const escaped=await withFoodDescriptionEvaluationBudget(s.options,async budget=>budget.fetch("description-test-en",1));
+    await expect(escaped(endpoint,s.init)).rejects.toThrow();expect(s.fetcher).not.toHaveBeenCalled();
+  });
+
+  it("does not refund the approved budget after its payload directory is deleted or renamed",async()=>{
+    const s=setup();await withFoodDescriptionEvaluationBudget(s.options,b=>b.fetch("description-test-en",1)(endpoint,s.init));
+    rmSync(s.dir,{recursive:true});
+    await expect(withFoodDescriptionEvaluationBudget(s.options,async()=>{})).rejects.toThrow();
+    await expect(withFoodDescriptionEvaluationBudget({...s.options,approval:{...s.approval,runDirectory:s.dir+"-new"}},async()=>{})).rejects.toThrow();
+    expect(s.fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['last','all'])("does not refund or redispatch after %s inner attempt files are lost",async kind=>{
+    const s=setup();await withFoodDescriptionEvaluationBudget(s.options,async budget=>{await budget.fetch('description-first-en',1)(endpoint,s.init);await budget.fetch('description-last-en',1)(endpoint,s.init);});
+    for(const name of readdirSync(s.dir))if(kind==='all'?name.startsWith('attempt-'):name.startsWith('attempt-002-'))rmSync(join(s.dir,name));
+    await expect(withFoodDescriptionEvaluationBudget(s.options,b=>b.fetch('description-last-en',1)(endpoint,s.init))).rejects.toThrow();
+    expect(s.fetcher).toHaveBeenCalledTimes(4);
+    expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:2,reservedNanoDollars:110_000_000,costComplete:false});
+  });
+
+  it.each(['count-dispatch','count','dispatch','observation','response'])("blocks recovery after completed %s evidence is lost",async suffix=>{
+    const s=setup();await withFoodDescriptionEvaluationBudget(s.options,b=>b.fetch('description-test-en',1)(endpoint,s.init));
+    const path=join(s.dir,`attempt-001-${suffix}.json`);expect(readdirSync(s.dir)).toContain(`attempt-001-${suffix}.json`);rmSync(path);
+    await expect(withFoodDescriptionEvaluationBudget(s.options,b=>b.fetch('description-next-en',1)(endpoint,s.init))).rejects.toThrow();
+    expect(s.fetcher).toHaveBeenCalledTimes(2);expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:1,reservedNanoDollars:55_000_000,costComplete:false});
+  });
+
+  it('never reports a zero charge or resumes when outside reservation evidence is missing but its inner charge survives',async()=>{
+    const s=setup();await withFoodDescriptionEvaluationBudget(s.options,b=>b.fetch('description-test-en',1)(endpoint,s.init));
+    const name=readdirSync(dirname(s.dir)).find(file=>file.endsWith('-attempt-001-intent.json'))!;rmSync(join(dirname(s.dir),name));
+    expect(()=>descriptionEvaluationAccounting(s.dir)).toThrow();
+    await expect(withFoodDescriptionEvaluationBudget(s.options,b=>b.fetch('description-next-en',1)(endpoint,s.init))).rejects.toThrow();expect(s.fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds the final actual filesystem slot against a separate Node process",async()=>{
+    const s=setup();for(let batch=0;batch<5;batch++)await withFoodDescriptionEvaluationBudget(s.options,async budget=>{for(let i=0;i<(batch===4?15:16);i++)await budget.fetch(`description-before-${batch}-${i}-en`,1)(endpoint,s.init);});
+    const moduleUrl=pathToFileURL(resolve("scripts/food-description-evaluation-budget.ts")).href;
+    const code=`const loaded=await import(process.env.TEST_MODULE);const api=loaded.withFoodDescriptionEvaluationBudget?loaded:loaded.default;const release=new Promise(r=>process.once('message',r));await api.withFoodDescriptionEvaluationBudget({approval:JSON.parse(process.env.TEST_APPROVAL),apiKey:'synthetic',now:()=>new Date('2026-11-18T16:00:00Z'),fetcher:async url=>Response.json(String(url).endsWith('/input_tokens')?{object:'response.input_tokens',input_tokens:100}:JSON.parse(process.env.TEST_RESPONSE))},async budget=>{process.send('locked');await release;await budget.fetch('description-final-child-en',1)('https://api.openai.com/v1/responses',JSON.parse(process.env.TEST_INIT));});process.disconnect();`;
+    const child=spawn(process.execPath,["--import","tsx","--input-type=module","-e",code],{cwd:process.cwd(),env:{PATH:process.env.PATH,NODE_ENV:"test",TEST_MODULE:moduleUrl,TEST_APPROVAL:JSON.stringify(s.approval),TEST_RESPONSE:JSON.stringify(s.data),TEST_INIT:JSON.stringify(s.init)},stdio:["ignore","ignore","pipe","ipc"]});
+    const exited=once(child,"exit");
+    try{
+      await Promise.race([once(child,"message"),exited.then(()=>{throw new Error("Synthetic child exited before acquiring the lock");})]);await expect(withFoodDescriptionEvaluationBudget(s.options,async()=>{})).rejects.toThrow();child.send("release");
+      expect((await exited)[0]).toBe(0);
+      await withFoodDescriptionEvaluationBudget(s.options,async budget=>{expect(budget.attempts()).toBe(80);await expect(budget.fetch("description-too-late-en",1)(endpoint,s.init)).rejects.toThrow();});
+      expect(s.fetcher).toHaveBeenCalledTimes(158);
+    }finally{if(child.exitCode===null)child.kill();}
+  },10000);
+
+});
