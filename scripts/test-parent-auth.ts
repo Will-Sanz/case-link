@@ -1,8 +1,8 @@
 /** Actual local Auth, email, browser and Data API checks. One labeled lost ACK follows a real server write; no remote targets. */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type BrowserContext, type Page, type Request as BrowserRequest, type APIResponse, type Route } from "@playwright/test";
@@ -14,6 +14,8 @@ import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
 import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "../src/lib/parent/constants";
 import { assessSnapApplicationFields, SNAP_APPLICATION_SOURCE } from "../src/lib/parent/snap-application-fields";
 import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema, type SnapApplicationSnapshot } from "../src/lib/parent/snap-application-snapshot";
+import { SNAP_EN_TEMPLATE_ID, SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "../src/lib/parent/snap-form-source";
+import { renderSnapSigningCopy } from "../src/lib/parent/snap-signing-copy";
 import { WIC_APPLICATION_SOURCE } from "../src/lib/parent/wic-application-fields";
 import type { WicApplicationSnapshot } from "../src/lib/parent/wic-application-snapshot";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE, PECO_SUBJECT_AUTHORITY_STATEMENT, PECO_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/peco-application-fields";
@@ -1442,6 +1444,60 @@ async function main() {
       assert.deepEqual(await readSnap(originalSnap.id), originalSnap);
       assert.deepEqual(await readSnap(correctedSnap.id), correctedSnap);
       assert.deepEqual(await readSnap(staleSnap.id), staleSnap);
+      stage = "actual explicit Spanish SNAP source and immutable correction";
+      const spanishKey = randomUUID(), spanishBody = { ...structuredClone(snapStartBody), documentTemplateId: SNAP_ES_TEMPLATE_ID,
+        details: { ...snapStartBody.details, language: "en" } };
+      const spanishStart = await first.page.request.post(`${origin}/api/parent/requests`, { headers: { origin, "Idempotency-Key": spanishKey }, data: spanishBody });
+      check(spanishStart.status() === 201, "The actual owned SNAP API accepts an explicit fixed Spanish document source.");
+      const spanishId = (await spanishStart.json()).request.id as string, spanishUrl = `${origin}/api/parent/requests/${spanishId}`;
+      const spanishOriginal = await readSnap(undefined, spanishId), spanishBeforeReplay = await snapState(spanishId);
+      check(Object.entries(SNAP_SPANISH_APPLICATION_SOURCE).every(([key, value]) => spanishOriginal.source[key as keyof typeof spanishOriginal.source] === value)
+        && spanishOriginal.details.language === "en", "Actual Spanish source selection records the complete pinned tuple independently of English program contact language.");
+      check((await db.query("select count(*)::int n from parent_private.provider_capabilities where snap_spanish_completion_validator_version is not null or snap_spanish_completion_evidence_reference is not null or snap_spanish_completion_verified_until is not null")).rows[0].n === 0,
+        "The actual Spanish preparation does not install or activate any protected Spanish provider evidence.");
+      const invalidSpanishKey = randomUUID(), invalidSpanish = await first.page.request.post(`${origin}/api/parent/requests`, {
+        headers: { origin, "Idempotency-Key": invalidSpanishKey }, data: { ...spanishBody, documentTemplateId: "../../private" } });
+      check(invalidSpanish.status() === 400 && (await db.query("select count(*)::int n from public.parent_requests where start_key=$1", [invalidSpanishKey])).rows[0].n === 0,
+        "The actual API rejects an arbitrary source path before creating any request or job.");
+      const spanishReplay = await first.page.request.post(`${origin}/api/parent/requests`, { headers: { origin, "Idempotency-Key": spanishKey }, data: spanishBody });
+      check(spanishReplay.status() === 201 && (await spanishReplay.json()).request.id === spanishId && JSON.stringify(await snapState(spanishId)) === JSON.stringify(spanishBeforeReplay),
+        "An exact real Spanish start retry keeps one request, immutable snapshot and job without changing dates.");
+      const differentSource = await first.page.request.post(`${origin}/api/parent/requests`, { headers: { origin, "Idempotency-Key": spanishKey }, data: { ...spanishBody, documentTemplateId: SNAP_EN_TEMPLATE_ID } });
+      check(differentSource.status() === 409, "The actual same start key cannot silently select the other document source.");
+      const spanishCopyUrl = `${spanishUrl}/snap-signing-copy?expectedVersion=${spanishOriginal.request_version}&snapshotId=${spanishOriginal.id}`;
+      const spanishCopy = await first.page.request.get(spanishCopyUrl);
+      check(spanishCopy.status() === 200 && spanishCopy.headers()["cache-control"] === "private, no-store", "The actual owned Spanish signing-copy download is private and nonprotected.");
+      const spanishBytes = await spanishCopy.body(), renderedSpanish = await renderSnapSigningCopy(readFileSync("data/verified-forms/snap-pa600fs-es-2019.pdf"), spanishOriginal.details, new Date(spanishOriginal.created_at), SNAP_ES_TEMPLATE_ID);
+      check(!!renderedSpanish.bytes && spanishBytes.equals(Buffer.from(renderedSpanish.bytes)), "Actual downloaded Spanish bytes equal the source-bound renderer at the immutable preparation time.");
+      const spanishPdf = await PDFDocument.load(spanishBytes);
+      check(spanishPdf.getPageCount() === 12 && /solicitud|campos/i.test(spanishPdf.getTitle() ?? ""), "The actual Spanish download retains all twelve original pages and Spanish preparation metadata.");
+      const spanishCopyRetry = await first.page.request.get(spanishCopyUrl);
+      check(spanishCopyRetry.status() === 200 && createHash("sha256").update(await spanishCopyRetry.body()).digest("hex") === createHash("sha256").update(spanishBytes).digest("hex"),
+        "Actual repeated Spanish download preserves identical bytes without new personal acts or model work.");
+      const foreignSpanish = await second.page.request.get(`${spanishUrl}/snap-application`), foreignSpanishCopy = await second.page.request.get(spanishCopyUrl);
+      check(foreignSpanish.status() === 404 && foreignSpanishCopy.status() === 403, "Actual foreign sessions cannot read the selected Spanish snapshot or its prepared bytes.");
+      const correctionKey = randomUUID(), sourceCorrection = { expectedVersion: spanishOriginal.request_version, details: spanishOriginal.details,
+        noticeVersion: SNAP_APPLICATION_NOTICE_VERSION, documentTemplateId: SNAP_EN_TEMPLATE_ID };
+      const spanishCorrection = await first.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": correctionKey }, data: sourceCorrection });
+      check(spanishCorrection.status() === 201, "The actual owned correction can change only the selected document source.");
+      const selectedEnglish = await readSnap(undefined, spanishId), sourceAfterCorrection = await snapState(spanishId);
+      check(selectedEnglish.source.templateId === SNAP_EN_TEMPLATE_ID && selectedEnglish.revision === spanishOriginal.revision + 1
+        && selectedEnglish.request_version === spanishOriginal.request_version + 1 && JSON.stringify(selectedEnglish.details) === JSON.stringify(spanishOriginal.details)
+        && JSON.stringify(selectedEnglish.provenance) === JSON.stringify(spanishOriginal.provenance)
+        && sourceAfterCorrection.job.request_version === selectedEnglish.request_version && sourceAfterCorrection.job.state === "queued"
+        && sourceAfterCorrection.operations === 0 && sourceAfterCorrection.model_calls === 0,
+      "Source-only correction makes a new immutable revision/current version while preserving every unchanged fact and date.");
+      check(JSON.stringify(await readSnap(spanishOriginal.id, spanishId)) === JSON.stringify(spanishOriginal), "The original Spanish revision remains exactly intact after source correction.");
+      check((await first.page.request.get(spanishCopyUrl)).status() === 409, "Superseded source-bound preparation bytes cannot be downloaded as the current application.");
+      const sourceCorrectionRetry = await first.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": correctionKey }, data: sourceCorrection });
+      check(sourceCorrectionRetry.status() === 201 && JSON.stringify(await snapState(spanishId)) === JSON.stringify(sourceAfterCorrection), "Exact actual source correction retry changes no snapshot, job, grant or timestamp.");
+      const changedCorrection = await first.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": correctionKey }, data: { ...sourceCorrection, documentTemplateId: SNAP_ES_TEMPLATE_ID } });
+      check(changedCorrection.status() === 409 && JSON.stringify(await snapState(spanishId)) === JSON.stringify(sourceAfterCorrection), "Reusing the source-correction key for a different variant conflicts without changing retained work.");
+      const foreignCorrection = await second.page.request.post(`${spanishUrl}/snap-application`, { headers: { origin, "Idempotency-Key": randomUUID() }, data: { ...sourceCorrection, expectedVersion: selectedEnglish.request_version } });
+      check(foreignCorrection.status() === 403, "An actual foreign session cannot change another household's selected document source.");
+      const stoppedSpanish = await first.page.request.post(`${spanishUrl}/control`, { headers: { origin }, data: { action: "cancel" } });
+      check(stoppedSpanish.status() === 200 && (await db.query("select state from public.parent_jobs where request_id=$1", [spanishId])).rows[0].state === "cancelled",
+        "The known synthetic Spanish request is cancelled through actual owner control before subsequent worker fixtures.");
       stage = "actual mixed private SNAP, family reuse and lost start acknowledgement";
       await db.query(`update parent_private.processing_controls set family_profile_enabled=true,
         family_profile_approval_reference='isolated synthetic Auth family-profile fixture',family_profile_approved_until=now()+interval '1 hour',family_profile_notice_version=$1 where singleton`,
