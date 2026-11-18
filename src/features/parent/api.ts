@@ -99,8 +99,9 @@ export async function parentApi<T>(
   return body;
 }
 
-export async function boundedParentApi(path: string, init: RequestInit, owner: AbortSignal, expiry: string): Promise<unknown> {
-  const remaining = Math.min(30_000, Date.parse(expiry) - Date.now());
+export async function boundedParentApi(path: string, init: RequestInit, owner: AbortSignal, expiry: string, maxWaitMs = 30_000): Promise<unknown> {
+  if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || maxWaitMs > 120_000) throw new Error();
+  const remaining = Math.min(maxWaitMs, Date.parse(expiry) - Date.now());
   if (!Number.isFinite(remaining) || remaining <= 0 || owner.aborted) throw new Error();
   const deadline = new AbortController(), signal = AbortSignal.any([owner, deadline.signal]);
   let rejectAbort!: (error: Error) => void;

@@ -1,5 +1,6 @@
 import { foodDescriptionArchiveSchema } from "./food-description-draft";
 import "server-only";
+import { documentUploadKeySchema, documentUploadRecordSchema, documentUploadRegistrationSchema, type DocumentUploadRecord } from "./document-upload";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireParentSession } from "./auth";
@@ -9,7 +10,6 @@ import {
   reusedZipSourceSchema,
   reusableZipSchema,
   type ReusedZipSource,
-  type ParentDocument,
   type ParentPreferences,
   type ServiceMandate,
   type SupportIntake,
@@ -241,7 +241,7 @@ export async function getSupportRequest(
     supabase
       .from("parent_documents")
       .select(
-        "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at",
+        "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at,upload_confirmed_at,upload_key",
       )
       .eq("request_id", id)
       .neq("status", "deletion_pending")
@@ -337,25 +337,62 @@ const documentSchema = z
       .regex(/^[^\p{Cc}/\\]+$/u),
     mediaType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
     sizeBytes: z.number().int().min(1).max(10485760),
-    pageCount: z.number().int().min(1).max(5).nullable(),
+    pageCount: z.null(),
     consentVersion: z.literal(DOCUMENT_CONSENT_VERSION),
+    uploadKey: documentUploadKeySchema,
+    uploadSha256: z.string().regex(/^[0-9a-f]{64}$/),
   })
   .strict();
 export async function registerParentDocument(
   input: z.infer<typeof documentSchema>,
-): Promise<ParentDocument & { object_path: string }> {
+): Promise<{ document: DocumentUploadRecord; existing: boolean }> {
   const value = documentSchema.parse(input);
   const { supabase } = await requireParentSession();
   const { data, error } = await supabase.rpc("parent_register_document", {
-    p_request_id: value.requestId,
-    p_filename: value.filename,
-    p_media_type: value.mediaType,
-    p_size_bytes: value.sizeBytes,
-    p_page_count: value.pageCount,
-    p_consent_version: value.consentVersion,
+    p_request_id: value.requestId, p_filename: value.filename, p_media_type: value.mediaType,
+    p_size_bytes: value.sizeBytes, p_page_count: value.pageCount, p_consent_version: value.consentVersion,
+    p_upload_key: value.uploadKey, p_upload_sha256: value.uploadSha256,
   });
+  if (error?.code === "PT409" || error?.code === "40001") throw new Error("parent_document_upload_changed");
   check(error);
-  return data as ParentDocument & { object_path: string };
+  const parsed = documentUploadRegistrationSchema.safeParse(data);
+  if (!parsed.success || parsed.data.document.request_id.toLowerCase() !== value.requestId.toLowerCase() ||
+    parsed.data.document.upload_key !== value.uploadKey || parsed.data.document.upload_sha256 !== value.uploadSha256)
+    throw new Error("CaseLink could not confirm this upload. Please check its status before trying again.");
+  return parsed.data;
+}
+async function readOwnedDocumentUpload(requestId: string, field: "id" | "upload_key", value: string): Promise<DocumentUploadRecord | null> {
+  const request = uuid.parse(requestId), identifier = uuid.parse(value).toLowerCase();
+  const { supabase } = await requireParentSession();
+  const { data, error } = await supabase.from("parent_documents")
+    .select("id,request_id,filename,media_type,size_bytes,status,expires_at,created_at,upload_confirmed_at,upload_key,object_path,upload_sha256,consent_version,consented_at")
+    .eq("request_id", request).eq(field, identifier).maybeSingle();
+  check(error);
+  if (!data) return null;
+  const parsed = documentUploadRecordSchema.safeParse(data);
+  if (!parsed.success || parsed.data.request_id.toLowerCase() !== request.toLowerCase() || parsed.data[field]?.toLowerCase() !== identifier)
+    throw new Error("CaseLink could not confirm this upload. Please check its status before trying again.");
+  return parsed.data;
+}
+export async function getParentDocumentUpload(requestId: string, key: string): Promise<DocumentUploadRecord | null> {
+  const uploadKey = documentUploadKeySchema.parse(key);
+  const keyed = await readOwnedDocumentUpload(requestId, "upload_key", uploadKey);
+  if (keyed) return keyed;
+  const legacy = await readOwnedDocumentUpload(requestId, "id", uploadKey);
+  return legacy?.upload_key === null ? legacy : null;
+}
+export async function getParentDocumentUploadById(requestId: string, documentId: string): Promise<DocumentUploadRecord | null> {
+  return readOwnedDocumentUpload(requestId, "id", documentId);
+}
+/** A non-confirmed response still requires current request/record checks before any immutable transfer. */
+export async function tryConfirmParentDocumentUpload(requestId: string, documentId: string): Promise<boolean> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_confirm_document_upload", {
+    p_request_id: uuid.parse(requestId), p_document_id: uuid.parse(documentId),
+  });
+  if (error?.code === "42501" && error.message === "private upload has not been confirmed") return false;
+  check(error);
+  return true;
 }
 export async function confirmParentDocumentUpload(
   requestId: string,

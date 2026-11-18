@@ -15,6 +15,8 @@ import {
   resolveParentAction,
   startSupportRequest,
   getReusableZip,
+  getParentDocumentUpload,
+  tryConfirmParentDocumentUpload,
 } from "./data";
 import type { ServiceMandate, SupportIntake } from "./domain";
 const requestId = "11111111-1111-4111-8111-111111111111";
@@ -143,14 +145,19 @@ describe("parent data boundary", () => {
       filename: "bill.pdf",
       mediaType: "application/pdf" as const,
       sizeBytes: 400,
-      pageCount: 1,
+      pageCount: null,
+      uploadKey: "33333333-3333-4333-8333-333333333333",
+      uploadSha256: "a".repeat(64),
       consentVersion: "2026-10-25" as const,
     };
     mock.rpc.mockResolvedValue({
-      data: { id: documentId, object_path: `owner/${requestId}/${documentId}` },
+      data: { existing: false, document: { id: documentId, request_id: requestId, object_path: `owner/${requestId}/${documentId}`,
+        filename: valid.filename, media_type: valid.mediaType, size_bytes: valid.sizeBytes, status: "uploaded",
+        upload_key: valid.uploadKey, upload_sha256: valid.uploadSha256, upload_confirmed_at: null,
+        consent_version: valid.consentVersion, consented_at: "2026-11-18T12:00:00Z", created_at: "2026-11-18T12:00:00Z", expires_at: "2026-11-25T12:00:00Z" } },
       error: null,
     });
-    expect((await registerParentDocument(valid)).id).toBe(documentId);
+    expect((await registerParentDocument(valid)).document.id).toBe(documentId);
     mock.rpc.mockClear();
     for (const invalid of [
       { ...valid, filename: "../bill.pdf" },
@@ -175,6 +182,22 @@ describe("parent data boundary", () => {
       confirmParentDocumentUpload(requestId, "not-a-document-id"),
     ).rejects.toThrow();
     expect(mock.rpc).not.toHaveBeenCalled();
+  });
+  it("permits a retry only for the exact missing-byte response and keeps every other permission error closed", async () => {
+    mock.rpc.mockResolvedValueOnce({ error: { code: "42501", message: "private upload has not been confirmed" } });
+    expect(await tryConfirmParentDocumentUpload(requestId, documentId)).toBe(false);
+    mock.rpc.mockResolvedValueOnce({ error: { code: "42501", message: "request unavailable" } });
+    await expect(tryConfirmParentDocumentUpload(requestId, documentId)).rejects.toThrow("permission has changed");
+    mock.rpc.mockResolvedValueOnce({ error: { code: "XX000", message: "private upload has not been confirmed" } });
+    await expect(tryConfirmParentDocumentUpload(requestId, documentId)).rejects.toThrow();
+  });
+  it("reads upload status through both owned request and immutable attempt keys", async () => {
+    const builder = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({data: null, error: null}) };
+    mock.from.mockReturnValue(builder);
+    const key = "33333333-3333-4333-8333-333333333333";
+    expect(await getParentDocumentUpload(requestId, key)).toBeNull();
+    expect(mock.from).toHaveBeenCalledWith("parent_documents");
+    expect(builder.eq.mock.calls).toEqual([["request_id",requestId],["upload_key",key],["request_id",requestId],["id",key]]);
   });
   it("revokes document use through the audited RPC and leaves physical erasure to retention", async () => {
     mock.rpc.mockResolvedValue({

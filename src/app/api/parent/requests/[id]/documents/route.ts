@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
+import { documentCaptureError, documentUploadKeySchema, documentUploadReceipt } from "@/lib/parent/document-upload";
 import { requireParentSession } from "@/lib/parent/auth";
 import {
-  deleteParentDocument,
   getSupportRequest,
   registerParentDocument,
   confirmParentDocumentUpload,
+  getParentDocumentUpload,
+  tryConfirmParentDocumentUpload,
   PARENT_DOCUMENT_BUCKET,
 } from "@/lib/parent/data";
 import {
@@ -19,8 +22,14 @@ import {
   uuidSchema,
 } from "@/lib/parent/http";
 type Context = { params: Promise<{ id: string }> };
-export async function GET(_: Request, { params }: Context) {
+export async function GET(input: Request, { params }: Context) {
   try {
+    const id = uuidSchema.parse((await params).id), key = new URL(input.url).searchParams.get("uploadKey");
+    if (key !== null) {
+      const document = await getParentDocumentUpload(id, documentUploadKeySchema.parse(key));
+      return document ? parentJson({ ok: true, receipt: documentUploadReceipt(document) })
+        : parentJson({ ok: false, error: "This upload is unavailable." }, 404);
+    }
     const request = await getSupportRequest(
       uuidSchema.parse((await params).id),
     );
@@ -41,12 +50,11 @@ export async function POST(request: Request, { params }: Context) {
     const { supabase } = await requireParentSession();
     const support = await getSupportRequest(id);
     if (!support) return parentJson({ ok: false, error: "This support request is unavailable." }, 404);
-    if (support.intake.needs.every(need => need === "wic_new" || need === "wic_continuing"))
-      return parentJson({ ok: false, error: "WIC document processing is not available. Use official WIC help; your saved history remains available." }, 403);
-    if (support.has_peco_application_details)
-      return parentJson({ ok: false, error: "Private PECO document processing is not available. Your saved history remains available." }, 403);
-    if (support.has_pgw_application_details || support.has_water_application_details)
-      return parentJson({ ok: false, error: "Use this request's protected utility document path. Your saved history remains available." }, 403);
+    const issue = documentCaptureError(support);
+    if (issue) return parentJson({ ok: false, error: issue }, 403);
+    const attemptKey = documentUploadKeySchema.safeParse(request.headers.get("idempotency-key"));
+    if (!attemptKey.success) return parentJson({ ok: false, error: "Reload this page and check your document list before trying another upload." }, 400);
+    const uploadKey = attemptKey.data;
     if (
       Number(request.headers.get("content-length") ?? 0) >
       MAX_DOCUMENT_BYTES + 32768
@@ -90,34 +98,46 @@ export async function POST(request: Request, { params }: Context) {
         400,
       );
     }
-    const document = await registerParentDocument({
-      requestId: id,
-      filename: file.name,
-      mediaType,
-      pageCount: null,
-      sizeBytes: file.size,
-      consentVersion: DOCUMENT_CONSENT_VERSION,
+    const registration = await registerParentDocument({
+      requestId: id, filename: file.name, mediaType, pageCount: null, sizeBytes: file.size,
+      consentVersion: DOCUMENT_CONSENT_VERSION, uploadKey,
+      uploadSha256: createHash("sha256").update(bytes).digest("hex"),
     });
-    const upload = await supabase.storage
-      .from(PARENT_DOCUMENT_BUCKET)
-      .upload(document.object_path, bytes, {
-        contentType: mediaType,
-        upsert: false,
-      });
-    if (upload.error) {
-      await deleteParentDocument(id, document.id);
-      throw upload.error;
+    const document = registration.document;
+    const result = async (failure?: unknown) => {
+      const latest = await getParentDocumentUpload(id, uploadKey);
+      if (!latest) throw new Error("This request is unavailable, or its permission has changed.");
+      const receipt = documentUploadReceipt(latest);
+      if (receipt.state === "confirmed") return parentJson({ ok: true, receipt, document: receipt.document }, 201);
+      if (receipt.state === "expired" || receipt.state === "removed")
+        return parentJson({ ok: false, error: "This upload expired or was removed. Choose the file again only if it is still needed.", receipt }, 410);
+      if (failure instanceof Error && failure.message.startsWith("This request is unavailable")) return parentError(failure);
+      return parentJson({ ok: false, error: "The upload result is not confirmed. Check its status before sending another copy.", receipt }, 503);
+    };
+    const initial = documentUploadReceipt(document);
+    if (initial.state !== "pending") return result();
+    if (registration.existing) {
+      try { if (await tryConfirmParentDocumentUpload(id, document.id)) return result(); }
+      catch (error) { return result(error); }
+      const current = await getSupportRequest(id);
+      if (!current) throw new Error("This request is unavailable, or its permission has changed.");
+      const changed = documentCaptureError(current);
+      if (changed) return parentJson({ ok: false, error: changed }, 403);
     }
     try {
+      const upload = await supabase.storage.from(PARENT_DOCUMENT_BUCKET).upload(document.object_path, bytes, { contentType: mediaType, upsert: false });
+      if (upload.error) throw upload.error;
       await confirmParentDocumentUpload(id, document.id);
     } catch (error) {
-      await deleteParentDocument(id, document.id);
-      throw error;
+      // A failed acknowledgement may follow a successful immutable write. Reconcile before another copy or deletion.
+      try { await tryConfirmParentDocumentUpload(id, document.id); }
+      catch { /* The owned record below remains the source of truth; unknown outcomes retain their original quarantine. */ }
+      return result(error);
     }
-    const { object_path: _, ...safeDocument } = document;
-    void _;
-    return parentJson({ ok: true, document: safeDocument }, 201);
+    return result();
   } catch (error) {
+    if (error instanceof Error && error.message === "parent_document_upload_changed")
+      return parentJson({ ok: false, error: "This file differs from the saved upload attempt. Check the existing upload before choosing another file." }, 409);
     return parentError(error);
   }
 }

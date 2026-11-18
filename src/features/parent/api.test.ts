@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { canCollectPecoApplication, canCollectPgwApplication, canCollectWaterApplication, type ParentAuthorizationWindow } from "./api";
+import { boundedParentApi, ParentApiError, canCollectPecoApplication, canCollectPgwApplication, canCollectWaterApplication, type ParentAuthorizationWindow } from "./api";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE } from "@/lib/parent/peco-application-fields";
 import { PGW_APPLICATION_NOTICE_VERSION, PGW_APPLICATION_SOURCE } from "@/lib/parent/pgw-application-fields";
 import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE } from "@/lib/parent/water-application-fields";
@@ -45,4 +45,15 @@ it.each([
   for (const at of [Date.parse(option.source.sourceCheckedAt) - 1, Date.parse(option.source.verifiedUntil)]) {
     vi.setSystemTime(new Date(at)); expect(option.canCollect(input)).toBe(false);
   }
+});
+
+afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
+it.each([0,-1,NaN,Infinity,120001])("rejects an invalid upload/read deadline %s before any network request",async limit=>{
+  const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);await expect(boundedParentApi("/requests/owned/documents",{},new AbortController().signal,new Date(Date.now()+120000).toISOString(),limit)).rejects.toThrow();expect(fetcher).not.toHaveBeenCalled();
+});
+it("preserves the default30second read bound and never extends an earlier purpose deadline",async()=>{
+  vi.useFakeTimers();const fetcher=vi.fn().mockImplementation(()=>new Promise(()=>{}));vi.stubGlobal("fetch",fetcher);
+  const first=boundedParentApi("/requests/owned/documents",{},new AbortController().signal,new Date(Date.now()+120000).toISOString()).catch(error=>error);
+  await vi.advanceTimersByTimeAsync(29999);expect((fetcher.mock.calls[0][1].signal as AbortSignal).aborted).toBe(false);await vi.advanceTimersByTimeAsync(1);expect(await first).toBeInstanceOf(ParentApiError);
+  const second=boundedParentApi("/requests/owned/documents",{},new AbortController().signal,new Date(Date.now()+5000).toISOString(),120000).catch(error=>error);await vi.advanceTimersByTimeAsync(5000);expect(await second).toBeInstanceOf(ParentApiError);
 });

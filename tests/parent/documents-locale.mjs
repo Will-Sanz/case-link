@@ -65,12 +65,16 @@ try {
         if (uploadMode === 'unknown') return json({ ok: false, error: unknownMessage }, 503);
         await new Promise(resolve => { releaseUpload = resolve; });
         documents = [...documents, recordedDocument('44444444-4444-4444-8444-444444444444', 'Foto de José.png', 'processing')];
-        return json({ ok: true }, 201);
+        const uploadedDocument = documents.at(-1);
+        return json({ ok: true, receipt: { state: 'confirmed', document: { ...uploadedDocument,
+          upload_key: route.request().headers()['idempotency-key'], upload_confirmed_at: new Date().toISOString(),
+        } } }, 201);
       }
       if (path.startsWith(`/api/parent/requests/${requestId}/documents/`) && method === 'DELETE') {
         const id = path.split('/').at(-1); assert.ok(documents.some(document => document.id === id));
         mutations.push({ method, id }); documents = documents.filter(document => document.id !== id); return json({ ok: true });
       }
+      if (path === `/api/parent/requests/${requestId}/documents` && new URL(route.request().url()).searchParams.has('uploadKey')) return json({ ok: false, error: 'This upload is unavailable.' }, 404);
       assert.equal(method, 'GET', 'Only explicit synthetic document writes are allowed by this browser fixture.');
       if (path === `/api/parent/requests/${requestId}/operations`) return json({ operations: [], historyLimited: false });
       if (path === `/api/parent/requests/${requestId}`) return json({ request: request(), progress });

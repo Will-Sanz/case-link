@@ -51,7 +51,9 @@ it("keeps the upload size guard and actionable Spanish error without sending the
 });
 
 it("changes only display copy while preserving the exact consented upload and success callback", async () => {
-  const fetcher = vi.fn().mockResolvedValue(Response.json({ ok: true })); vi.stubGlobal("fetch", fetcher);
+  const fetcher = vi.fn().mockImplementation(async (_url, init) => Response.json({ ok: true, receipt: { state: "confirmed", document: {
+    ...document, upload_key: new Headers(init.headers).get("Idempotency-Key"), upload_confirmed_at: "2026-11-11T02:30:01Z",
+  } } })); vi.stubGlobal("fetch", fetcher);
   const changed = vi.fn(); show([], false, changed); consent();
   const file = new File(["synthetic bytes"], "Aviso de José.pdf", { type: "application/pdf" });
   fireEvent.change(screen.getByLabelText("Elegir una factura o un aviso"), { target: { files: [file] } });

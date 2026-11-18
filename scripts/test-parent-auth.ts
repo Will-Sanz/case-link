@@ -866,7 +866,7 @@ async function main() {
     };
     const documentsUrl = `${origin}/api/parent/requests/${requestId}/documents`;
     const noConsent = await first.page.request.post(documentsUrl, {
-      headers: { origin },
+      headers: { origin, "Idempotency-Key": randomUUID() },
       multipart: { consent: "0", file },
     });
     check(
@@ -939,6 +939,34 @@ async function main() {
         Buffer.from(await ownerDownload.data.arrayBuffer()).equals(pdfBytes),
       "The parent can read their own exact private PDF bytes through actual Storage authorization.",
     );
+    stage = "actual immutable upload receipt and exact retry";
+    const uploadKey = uploadResponse.request().headers()["idempotency-key"];
+    check(typeof uploadKey === "string" && /^[0-9a-f-]{36}$/.test(uploadKey), "The actual upload UI supplies one stable attempt key.");
+    const uploadState = async () => (await db.query(
+      "select to_jsonb(d) document,r.version,(select count(*)::int from public.parent_documents where request_id=r.id) documents,(select count(*)::int from storage.objects where bucket_id='parent-documents' and name=d.object_path) objects,(select count(*)::int from public.parent_events where request_id=r.id and kind='document.upload_confirmed' and evidence->>'documentId'=d.id::text) confirmations from public.parent_documents d join public.parent_requests r on r.id=d.request_id where d.id=$1",
+      [document.id],
+    )).rows[0];
+    const savedUpload = await uploadState();
+    const receiptResponse = await first.page.request.get(`${documentsUrl}?uploadKey=${uploadKey}`);
+    const receiptBody = await receiptResponse.json();
+    check(receiptResponse.status() === 200 && receiptBody.receipt?.state === "confirmed" && receiptBody.receipt.document.id === document.id &&
+      receiptBody.receipt.document.upload_key === uploadKey && receiptBody.receipt.document.object_path === undefined && receiptBody.receipt.document.upload_sha256 === undefined,
+    "The actual owned receipt reconciles the saved upload without exposing its private path or attempt hash.");
+    const exactUpload = await first.page.request.post(documentsUrl, { headers: { origin, "Idempotency-Key": uploadKey }, multipart: { consent: "1", file } });
+    check(exactUpload.status() === 201 && (await exactUpload.json()).receipt?.document.id === document.id, "An exact actual HTTP retry acknowledges the original immutable upload.");
+    assert.deepEqual(await uploadState(), savedUpload);
+    const changedPdfBytes = Buffer.from(pdfBytes);
+    changedPdfBytes[7] = changedPdfBytes[7] === 0x37 ? 0x36 : 0x37;
+    const changedUpload = await first.page.request.post(documentsUrl, {
+      headers: { origin, "Idempotency-Key": uploadKey }, multipart: { consent: "1", file: { ...file, buffer: changedPdfBytes } },
+    });
+    check(changedUpload.status() === 409, "A changed actual file body cannot reuse the committed upload key.");
+    assert.deepEqual(await uploadState(), savedUpload);
+    check((await first.page.request.post(documentsUrl, { headers: { origin }, multipart: { consent: "1", file } })).status() === 400,
+      "An obsolete web upload without a stable key cannot silently create a fresh attempt.");
+    assert.deepEqual(await uploadState(), savedUpload);
+    check(savedUpload.objects === 1 && savedUpload.confirmations === 1, "Receipt reads, exact retry and rejected changes leave one object and one confirmation with original dates and request version.");
+
     const reused = await browser.newContext({ baseURL: origin });
     contexts.push(reused);
     const replay = await reused.request.post(`${origin}/api/parent/auth`, {
@@ -1052,6 +1080,11 @@ async function main() {
       "The web API refuses deletion of another household's private document.",
     );
 
+    check((await second.page.request.get(`${documentsUrl}?uploadKey=${uploadKey}`)).status() === 404 &&
+      (await second.page.request.post(`${documentsUrl}/${document.id}`, { headers: { origin }, data: { uploadKey } })).status() === 404,
+    "Actual owned receipt and confirmation routes reveal no other household's upload.");
+    assert.deepEqual(await uploadState(), savedUpload);
+
     stage = "actual document deletion and queued-version invalidation";
     const deleted = first.page.waitForResponse(
       (response) =>
@@ -1100,6 +1133,13 @@ async function main() {
       "Actual Auth can register a second consented synthetic pending upload.",
     );
     const pendingDocument = await pending.json();
+    const legacyIdentity = async () => (await db.query(
+      "select id,request_id,filename,media_type,size_bytes,object_path,upload_key,upload_sha256,consent_version,consented_at,created_at,expires_at from public.parent_documents where id=$1", [pendingDocument.id],
+    )).rows[0];
+    const legacyOriginal = await legacyIdentity();
+    const missingLegacy = await first.page.request.post(`${documentsUrl}/${pendingDocument.id}`, { headers: { origin }, data: { uploadKey: pendingDocument.id } });
+    check(missingLegacy.status() === 202 && (await missingLegacy.json()).receipt?.state === "pending", "A real legacy upload with missing bytes stays pending instead of inventing completion.");
+    assert.deepEqual(await legacyIdentity(), legacyOriginal);
     const pendingUpload = await ownerStorage.storage
       .from("parent-documents")
       .upload(pendingDocument.object_path, pdfBytes, {
@@ -1117,6 +1157,10 @@ async function main() {
       pendingDownload.error && !pendingDownload.data,
       "Actual Storage prevents the owner from reading an unconfirmed upload.",
     );
+    const legacyConfirmed = await first.page.request.post(`${documentsUrl}/${pendingDocument.id}`, { headers: { origin }, data: { uploadKey: pendingDocument.id } });
+    check(legacyConfirmed.status() === 200 && (await legacyConfirmed.json()).receipt?.state === "confirmed", "The real owned legacy recovery route confirms already stored bytes without another upload.");
+    assert.deepEqual(await legacyIdentity(), legacyOriginal);
+    check(legacyOriginal.upload_key === null && legacyOriginal.upload_sha256 === null, "Legacy confirmation preserves null physical bindings and original identity, consent and expiry.");
     check(
       (
         await rest(token, "rpc/parent_confirm_document_upload", {
@@ -1142,6 +1186,40 @@ async function main() {
       ).status() === 200,
       "The confirmed synthetic pending-upload fixture can be revoked through the actual web API.",
     );
+
+    stage = "actual missing-byte legacy upload adoption";
+    const legacyMissing = await rest(token, "rpc/parent_register_document", {
+      p_request_id: requestId, p_filename: "synthetic-legacy-missing.pdf", p_media_type: "application/pdf",
+      p_size_bytes: pdfBytes.length, p_page_count: null, p_consent_version: "2026-10-25",
+    });
+    check(legacyMissing.status === 200, "The original six-argument native registration remains available for retained legacy uploads.");
+    const legacyMissingDocument = await legacyMissing.json();
+    const adoptionState = async () => (await db.query(
+      "select to_jsonb(d)-array['upload_key','upload_sha256','upload_confirmed_at'] document,d.upload_key,d.upload_sha256,d.upload_confirmed_at,r.version,(select count(*)::int from public.parent_documents where request_id=r.id) documents,(select count(*)::int from storage.objects where bucket_id='parent-documents' and name=d.object_path) objects,(select count(*)::int from public.parent_events where request_id=r.id and kind='document.upload_confirmed' and evidence->>'documentId'=d.id::text) confirmations from public.parent_documents d join public.parent_requests r on r.id=d.request_id where d.id=$1",
+      [legacyMissingDocument.id],
+    )).rows[0];
+    const beforeAdoption = await adoptionState();
+    check(beforeAdoption.objects === 0 && beforeAdoption.upload_key === null && beforeAdoption.upload_confirmed_at === null,
+      "The legacy recovery fixture has one genuine owned row and no stored object or completion.");
+    const missingReceipt = await first.page.request.post(`${documentsUrl}/${legacyMissingDocument.id}`, { headers: { origin }, data: { uploadKey: legacyMissingDocument.id } });
+    check(missingReceipt.status() === 202 && (await missingReceipt.json()).receipt?.state === "pending", "The actual missing-byte legacy check asks for the original file and does not create another document.");
+    assert.deepEqual(await adoptionState(), beforeAdoption);
+    const legacyFile = { ...file, name: legacyMissingDocument.filename };
+    const adopted = await first.page.request.post(documentsUrl, { headers: { origin, "Idempotency-Key": legacyMissingDocument.id }, multipart: { consent: "1", file: legacyFile } });
+    check(adopted.status() === 201 && (await adopted.json()).receipt?.document.id === legacyMissingDocument.id,
+      "The exact original file resumes the actual legacy row instead of registering another upload.");
+    const afterAdoption = await adoptionState();
+    assert.deepEqual(afterAdoption.document, beforeAdoption.document);
+    check(afterAdoption.upload_key === legacyMissingDocument.id && afterAdoption.upload_sha256 === createHash("sha256").update(pdfBytes).digest("hex") &&
+      afterAdoption.upload_confirmed_at && afterAdoption.documents === beforeAdoption.documents && afterAdoption.objects === 1 && afterAdoption.confirmations === 1 && afterAdoption.version === beforeAdoption.version + 1,
+    "Native legacy adoption pins one HTTP attempt while preserving identity, original consent/expiry, row count and one confirmed Storage write.");
+    const adoptedBytes = await ownerStorage.storage.from("parent-documents").download(legacyMissingDocument.object_path);
+    check(!adoptedBytes.error && adoptedBytes.data && Buffer.from(await adoptedBytes.data.arrayBuffer()).equals(pdfBytes), "The resumed legacy object contains the exact original bytes through actual owned Storage.");
+    const adoptedReplay = await first.page.request.post(documentsUrl, { headers: { origin, "Idempotency-Key": legacyMissingDocument.id }, multipart: { consent: "1", file: legacyFile } });
+    check(adoptedReplay.status() === 201 && (await adoptedReplay.json()).receipt?.document.id === legacyMissingDocument.id, "Actual adopted-legacy replay acknowledges the same document.");
+    assert.deepEqual(await adoptionState(), afterAdoption);
+    check((await first.page.request.delete(`${documentsUrl}/${legacyMissingDocument.id}`, { headers: { origin } })).status() === 200,
+      "The additional synthetic legacy recovery document is revoked before later workflow checks.");
 
     stage = "actual outcome, preferences, exports and cancellation controls";
     await showSection(first.page, "application-receipts");

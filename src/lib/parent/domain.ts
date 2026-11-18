@@ -266,6 +266,8 @@ export type ParentDocument = {
   status: string;
   expires_at: string;
   created_at: string;
+  upload_confirmed_at?: string | null;
+  upload_key?: string | null;
 };
 export type SupportRequest = {
   id: string;

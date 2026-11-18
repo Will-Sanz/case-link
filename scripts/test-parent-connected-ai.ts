@@ -297,7 +297,7 @@ async function main() {
     const upload = await context.request.post(
       `${origin}/api/parent/requests/${id}/documents`,
       {
-        headers: { Origin: origin },
+        headers: { Origin: origin, "Idempotency-Key": randomUUID() },
         multipart: {
           consent: "1",
           file: {

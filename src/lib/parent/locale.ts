@@ -19,6 +19,7 @@ export function parentText(locale: ParentLocale, english: string): string {
 
 // shortcut: Entry, Auth, progress, documents and food access copy; complete the remaining consumers before advertising a full Spanish journey.
 const spanish = {
+  "The original upload was already saved. No new file was added.": "La carga original ya estaba guardada. No se añadió ningún archivo nuevo.",
   "Sign out": "Cerrar sesión",
   "Saving…": "Guardando…",
   "Return home": "Volver al inicio",
