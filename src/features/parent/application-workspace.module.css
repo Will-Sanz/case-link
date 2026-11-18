@@ -284,7 +284,7 @@
 }
 @media (max-width: 850px) {
   .caseHeader {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr);
     gap: 0.5rem;
     padding: 0.5rem 1rem;
   }
@@ -297,7 +297,9 @@
     display: none;
   }
   .caseHeader > span {
-    max-width: 8rem;
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
   }
   .workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -335,6 +337,7 @@
   }
   .content {
     flex: 1;
+    overflow: visible;
     padding: 1.25rem 1.25rem 6rem;
   }
 }

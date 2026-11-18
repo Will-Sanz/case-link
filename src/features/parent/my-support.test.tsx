@@ -5,6 +5,8 @@ import { fixtureRequest } from "@/lib/parent/test-fixtures";
 import type { SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { MySupport } from "./my-support";
+import { ParentLocaleProvider } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("./family-profile", () => ({ FamilyProfileWelcome: () => null }));
 
 const request = fixtureRequest();
@@ -46,6 +48,42 @@ async function show() {
 }
 
 describe("current support-list progress", () => {
+  it("keeps prototype-named recorded text as a string instead of crashing the Spanish list", async () => {
+    const result = response("queued");
+    const json = await result.json();
+    json.progress[request.id].summary = "__proto__";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ...result, json: async () => json }));
+    await act(async () => { render(<ParentLocaleProvider initialLocale="es"><MySupport /></ParentLocaleProvider>); });
+    expect(screen.getByText("__proto__").getAttribute("lang")).toBe("en");
+  });
+  it("shows Spanish list labels and dates while retaining unknown original summaries in English", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response("queued")));
+    await act(async () => { render(<ParentLocaleProvider initialLocale="es"><MySupport /></ParentLocaleProvider>); });
+    expect(screen.getByRole("heading", { name: "Mi apoyo" }).closest("[lang]")?.getAttribute("lang")).toBe("es");
+    expect(screen.getByText("En espera de comenzar")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Actualizar el estado del apoyo" })).toBeTruthy();
+    expect(screen.getByText(/Actualizado/).textContent).toContain("oct");
+    expect(screen.getByText("Recorded queued progress").getAttribute("lang")).toBe("en");
+    expect(screen.getByRole("link", { name: /Ver apoyo/ }).getAttribute("href")).toBe(`/support/${request.id}`);
+  });
+  it("translates known recorded summaries without changing the saved request or starting work", async () => {
+    const result = response("closed", [{ ...request, status: "closed" }]);
+    const json = await result.json();
+    json.progress[request.id].summary = "This request is closed. Check the recorded outcomes below.";
+    const fetcher = vi.fn().mockResolvedValue({ ...result, json: async () => json });
+    vi.stubGlobal("fetch", fetcher);
+    await act(async () => { render(<ParentLocaleProvider initialLocale="es"><MySupport /></ParentLocaleProvider>); });
+    expect(screen.getByText("Esta solicitud está cerrada. Consulte los resultados registrados abajo.").getAttribute("lang")).toBe("es");
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher.mock.calls[0][1].method).toBeUndefined();
+    expect(json.requests[0].intake).toEqual(request.intake);
+  });
+  it("offers a Spanish empty state without implying an application has started", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response("closed", [])));
+    await act(async () => { render(<ParentLocaleProvider initialLocale="es"><MySupport /></ParentLocaleProvider>); });
+    expect(screen.getByRole("heading", { name: "Sus próximos pasos pueden empezar aquí" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Buscar apoyo para mi familia" }).getAttribute("href")).toBe("/get-support");
+  });
   it("does not restart a slow outstanding refresh on a visibility event before its deadline", async () => {
     let finish!: (value: ReturnType<typeof response>) => void;
     const fetch = vi.fn().mockResolvedValueOnce(response("queued")).mockImplementationOnce(

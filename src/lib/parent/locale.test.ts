@@ -11,6 +11,10 @@ describe("parent interface locale without service facts", () => {
     expect(parentText("es", "Sign in")).toBe("Iniciar sesión");
     expect(parentText("es", "Terms of service")).toBe("Términos del servicio");
   });
+  it.each(["__proto__", "constructor", "toString", "hasOwnProperty", "Original recorded evidence"])("preserves unknown recorded text as text: %s", value => {
+    expect(parentText("es", value)).toBe(value);
+    expect(typeof parentText("es", value)).toBe("string");
+  });
   it("carries only an interface enum without changing the original recovery origin or callback destination", () => {
     const href = parentRecoveryHref("https://original.example.invalid/forgot-password", "es");
     expect(href).toBe("https://original.example.invalid/forgot-password?ui=es");

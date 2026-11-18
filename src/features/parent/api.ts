@@ -1,4 +1,5 @@
 import { NEEDS } from "@/lib/parent/domain";
+import { parentText, type ParentLocale } from "@/lib/parent/locale";
 import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
 import wicSource from "../../../data/verified-forms/wic-pa-preapplication-2026-11-13.json";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE } from "@/lib/parent/peco-application-fields";
@@ -124,13 +125,13 @@ export function safeReturnPath(value: string | undefined): string {
   ) ? value : "/my-support";
 }
 
-export function displayDate(value: string, includeTime = false): string {
+export function displayDate(value: string, includeTime = false, locale: ParentLocale = "en"): string {
   const date = new Date(
     /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00Z` : value,
   );
   return Number.isNaN(date.getTime())
-    ? "Date unavailable"
-    : new Intl.DateTimeFormat("en-US", {
+    ? parentText(locale, "Date unavailable")
+    : new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",

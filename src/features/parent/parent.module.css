@@ -96,6 +96,7 @@
   margin: auto;
   min-height: 56px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -105,6 +106,13 @@
   display: inline-flex;
   align-items: center;
   text-decoration: none;
+  flex-shrink: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.brand > span {
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 .navigation {
   display: flex;
@@ -1388,6 +1396,16 @@
   }
 }
 @media (max-width: 760px) {
+  .progressPanel {
+    padding: 1rem;
+  }
+  .progressHeading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .progressPanel .progressFooter > button {
+    flex-wrap: wrap;
+    padding-inline: 0.35rem;
+  }
   .headerInner {
     min-height: 56px;
     padding: 0.5rem 1.25rem;
@@ -1651,6 +1669,15 @@
 }
 .shell:has([data-case-workspace]) .footer {
   display: none;
+}
+@media (max-width: 850px) {
+  .shell:has([data-case-workspace]) {
+    height: auto;
+    min-height: 100dvh;
+  }
+  .shell:has([data-case-workspace]) .main {
+    overflow: visible;
+  }
 }
 @media print {
   .shell:has([data-case-workspace]),

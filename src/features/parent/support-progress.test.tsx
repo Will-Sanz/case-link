@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { PROGRESS_LABELS, SupportProgressPanel } from "./support-progress";
+import { ParentLocaleProvider } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 afterEach(cleanup);
 const progress = (state: SupportProgress["state"]): SupportProgress => ({
@@ -14,6 +16,21 @@ const progress = (state: SupportProgress["state"]): SupportProgress => ({
 });
 
 describe("recorded support progress", () => {
+  it("translates the recorded next actor and Eastern schedule without inventing continuation", () => {
+    render(<ParentLocaleProvider initialLocale="es"><SupportProgressPanel progress={{ ...progress("waiting"),
+      summary: "Waiting for the next recorded program update. Check the activity below for what was actually sent.",
+      nextRunAt: "2026-11-18T02:30:00Z" }} onRefresh={vi.fn()} /></ParentLocaleProvider>);
+    expect(screen.getByRole("heading", { name: "En espera del próximo paso" })).toBeTruthy();
+    expect(screen.getByText("Esperando la próxima actualización registrada del programa. Consulte la actividad abajo para ver qué se envió realmente.").getAttribute("lang")).toBe("es");
+    expect(screen.getByText(/^17 nov 2026, 9:30 p\. ?m\.$/).getAttribute("datetime")).toBe("2026-11-18T02:30:00Z");
+    expect(screen.queryByText(/Puede salir de esta página/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Actualizar el progreso del apoyo" })).toBeTruthy();
+  });
+  it("keeps unrecognized original service evidence explicitly English", () => {
+    render(<ParentLocaleProvider initialLocale="es"><SupportProgressPanel progress={progress("waiting")} onRefresh={vi.fn()} /></ParentLocaleProvider>);
+    expect(screen.getByText("Recorded service state.").getAttribute("lang")).toBe("en");
+    expect(screen.getByText("No hay ninguna comprobación automática programada actualmente. Consulte la actividad registrada para ver el próximo paso.")).toBeTruthy();
+  });
   it.each(Object.keys(PROGRESS_LABELS) as SupportProgress["state"][])(
     "shows %s without inventing completion or a percentage",
     (state) => {

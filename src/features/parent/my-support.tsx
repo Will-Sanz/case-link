@@ -10,6 +10,7 @@ import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { ProgressBadge } from "./support-progress";
 import { FamilyProfileWelcome } from "./family-profile";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 export function requestStatus(request: SupportRequest): string {
@@ -29,6 +30,7 @@ export function requestStatus(request: SupportRequest): string {
 }
 
 export function MySupport() {
+  const { locale, t } = useParentLocale();
   const { data, error, loading, reload, reloadIfIdle } = useParentResource<{
     requests: SupportRequest[];
     progress?: Record<string, SupportProgress>;
@@ -49,34 +51,36 @@ export function MySupport() {
     };
   }, [hasOpenRequests, reloadIfIdle]);
   return (
-    <div className={styles.container}>
+    <div lang={locale} className={styles.container}>
       <div className={styles.pageTop}>
         <div>
-          <h1>My support</h1>
+          <h1>{t("My support")}</h1>
           <p>
-            A clear view of what’s happening, what comes next, and anything that
-            needs you.
+            {t("A clear view of what’s happening, what comes next, and anything that needs you.")}
           </p>
         </div>
         <div className={styles.inline}>
-          <button className={styles.quiet} onClick={reload} aria-label="Refresh support status">
+          <button className={styles.quiet} onClick={reload} aria-label={t("Refresh support status")}>
             <Refresh width={17} height={17} aria-hidden="true" />
-            Refresh status
+            {t("Refresh status")}
           </button>
           <Link className={styles.button} href="/get-support">
-            Get more support{" "}
+            {t("Get more support")}{" "}
             <ArrowRight width={18} height={18} aria-hidden="true" />
           </Link>
         </div>
       </div>
-      {data && !error && <FamilyProfileWelcome/>}
+      {data && !error && <div lang="en"><FamilyProfileWelcome/></div>}
       {loading ? (
         <ParentLoading />
       ) : error ? (
         <ServiceError error={error} retry={reload} />
       ) : data?.requests.length ? (
         <ul className={styles.list}>
-          {data.requests.map((request) => (
+          {data.requests.map((request) => {
+            const summary = data.progress?.[request.id]?.summary ?? request.plan?.summary ??
+              "Your request is saved. Application progress and your next step will appear here.";
+            return (
             <li key={request.id}>
               <Link
                 className={styles.requestCard}
@@ -85,7 +89,7 @@ export function MySupport() {
                 <div className={styles.between}>
                   <h2>
                     {request.intake.needs
-                      .map((need) => NEED_LABELS[need])
+                      .map((need) => t(NEED_LABELS[need]))
                       .join(" · ")}
                   </h2>
                   {data.progress?.[request.id] ? (
@@ -94,46 +98,43 @@ export function MySupport() {
                     <span
                       className={`${styles.badge} ${request.required_actions.some((a) => !a.resolved && (!a.resolver || a.resolver === "parent")) ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
                     >
-                      {requestStatus(request)}
+                      {t(requestStatus(request))}
                     </span>
                   )}
                 </div>
-                <p>
-                  {data.progress?.[request.id]?.summary ??
-                    request.plan?.summary ??
-                    "Your request is saved. Application progress and your next step will appear here."}
+                <p lang={t(summary) === summary ? "en" : locale}>
+                  {t(summary)}
                 </p>
                 <div className={styles.requestMeta}>
                   <span className={styles.inline}>
                     <Clock width={15} height={15} aria-hidden="true" />
-                    Updated {displayDate(request.updated_at)}
+                    {t("Updated")} <time dateTime={request.updated_at}>{displayDate(request.updated_at, false, locale)}</time>
                   </span>
                   <span>
                     {request.mandate.mode === "prepare_only"
-                      ? "Preparation only"
-                      : "Permitted steps authorized"}
+                      ? t("Preparation only")
+                      : t("Permitted steps authorized")}
                   </span>
                   <span className={`${styles.textLink} ${styles.inline}`}>
-                    View support{" "}
+                    {t("View support")}{" "}
                     <ArrowRight width={15} height={15} aria-hidden="true" />
                   </span>
                 </div>
               </Link>
             </li>
-          ))}
+          ); })}
         </ul>
       ) : (
         <div className={styles.empty}>
           <div className={styles.emptyIcon}>
             <Folder width={28} height={28} aria-hidden="true" />
           </div>
-          <h2>Your next steps can start here</h2>
+          <h2>{t("Your next steps can start here")}</h2>
           <p>
-            Request food or utility support, and we’ll keep your information and
-            progress together in one place.
+            {t("Request food or utility support, and we’ll keep your information and progress together in one place.")}
           </p>
           <Link className={styles.button} href="/get-support">
-            Find support for my family{" "}
+            {t("Find support for my family")}{" "}
             <ArrowRight width={18} height={18} aria-hidden="true" />
           </Link>
         </div>
