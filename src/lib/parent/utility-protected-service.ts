@@ -121,7 +121,7 @@ export function createUtilityProtectedHandler(input: unknown, trusted: { prepare
           p_purpose: authorization.purpose, p_targets: authorization.targets, p_media_type: authorization.mediaType, p_byte_length: authorization.byteLength,
           p_notice_version: authorization.noticeVersion, p_consent_accepted: true, p_subject_authority_declared: true, p_account_authority_declared: true,
           ...(authorization.replacesInputId ? { p_replaces_input_id: authorization.replacesInputId } : {}) });
-        if (result.error) return response(unavailable, result.error.code === "40001" ? 409 : 403);
+        if (result.error) return response(unavailable, result.error.code === "40001" || result.error.code === "PT409" ? 409 : 403);
         const reference = utilityProtectedInputReferenceSchema.parse(result.data); if (reference.ownerId !== session.user.id || reference.requestId !== requestId || reference.inputId !== authorization.inputId || reference.requestVersion !== expectedVersion) return response(unavailable, 403);
         await current(); return response(reference, 201);
       }

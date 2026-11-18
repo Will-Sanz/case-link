@@ -46,7 +46,7 @@ function check(error: unknown): void {
     throw new Error(
       "This request has reached its document limit. Remove an unused document or enter the information manually.",
     );
-  if (code === "40001")
+  if (code === "40001" || code === "PT409")
     throw new Error(
       "This request changed. Reload it before saving your update.",
     );

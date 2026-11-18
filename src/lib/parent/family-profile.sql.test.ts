@@ -48,12 +48,12 @@ describe.skipIf(!modulePath)("family profile actual PostgreSQL owner, expiry and
   });
   it("binds immutable retry keys and optimistic revisions; clear cannot resurrect an old exact save", async () => {
     await enable(); const key = randomUUID(); expect(await save(details(), 0, key)).toBe(1); expect(await save(details(), 0, key)).toBe(1);
-    await expect(save({ ...details(), contact: { phone: "215-555-0101" } }, 0, key)).rejects.toMatchObject({ code: "40001" });
-    await expect(save(details(), 0)).rejects.toMatchObject({ code: "40001" });
+    await expect(save({ ...details(), contact: { phone: "215-555-0101" } }, 0, key)).rejects.toMatchObject({ code: "PT409" });
+    await expect(save(details(), 0)).rejects.toMatchObject({ code: "PT409" });
     const clearKey = randomUUID(); expect((await query("select public.parent_clear_family_profile($1,1,$2) revision", [owner, clearKey])).rows[0].revision).toBe(2);
-    await expect(save(details(), 0, key)).rejects.toMatchObject({ code: "40001" }); expect(await read()).toMatchObject({ revision: 2, profile: null, lastMutationKey: clearKey });
+    await expect(save(details(), 0, key)).rejects.toMatchObject({ code: "PT409" }); expect(await read()).toMatchObject({ revision: 2, profile: null, lastMutationKey: clearKey });
     expect((await query("select public.parent_clear_family_profile($1,1,$2) revision", [owner, clearKey])).rows[0].revision).toBe(2);
-    await save(details(), 2); await expect(query("select public.parent_clear_family_profile($1,1,$2)", [owner, clearKey])).rejects.toMatchObject({ code: "40001" });
+    await save(details(), 2); await expect(query("select public.parent_clear_family_profile($1,1,$2)", [owner, clearKey])).rejects.toMatchObject({ code: "PT409" });
   });
   it("preserves each original field date across reads, unchanged saves, array reorder and new request starts", async () => {
     await enable(); const first = randomUUID(), second = randomUUID(), source1 = randomUUID(), source2 = randomUUID();
@@ -89,7 +89,7 @@ describe.skipIf(!modulePath)("family profile actual PostgreSQL owner, expiry and
     expect(state).toMatchObject({ status: "paused", version: 2, state: "cancelled" });
     expect((await fixture.admin.query("select parent_private.family_profile_reuse_allowed($1,2) allowed", [id])).rows[0].allowed).toBe(false);
     expect((await fixture.admin.query("select count(*)::int n from parent_private.family_profile_request_sources where request_id=$1", [id])).rows[0].n).toBe(2);
-    await expect(bind(id, 1)).rejects.toMatchObject({ code: "40001" });
+    await expect(bind(id, 1)).rejects.toMatchObject({ code: "PT409" });
   });
   it("rejects SQL NULL and JSON null mappings at the private binding port", async () => {
     await enable(); await save(); const id = await request();

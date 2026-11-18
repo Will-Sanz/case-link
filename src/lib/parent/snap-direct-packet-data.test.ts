@@ -107,14 +107,14 @@ describe("linked direct SNAP packet metadata SDK", () => {
     mocks.session.mockRejectedValue(new AuthenticationRequiredError()); mocks.rpc.mockResolvedValue({ data: null, error: null });
     await expect(getCurrentSnapDirectPacketAuthorization(requestId, currentScope())).rejects.toBeInstanceOf(AuthenticationRequiredError); expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it("maps a competing candidate conflict to reload, never retrying or constructing a fresh intent", async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: "40001", message: "PRIVATE-COMPETITOR-CANARY" } });
+  it.each(["40001", "PT409"])("maps a competing candidate %s conflict to reload, never retrying or constructing a fresh intent", async code => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "PRIVATE-COMPETITOR-CANARY" } });
     const error = await authorizeSnapDirectPacket(requestId, { ...input(), packetId: acquisitionId }).catch(error => error as Error);
     expect((error as Error).message).toMatch(/^This request changed/); expect((error as Error).message).not.toContain("PRIVATE-"); expect(parentError(error).status).toBe(409); expect(mocks.rpc).toHaveBeenCalledTimes(1);
     mocks.rpc.mockResolvedValue({ data: result(), error: null }); expect(await getCurrentSnapDirectPacketAuthorization(requestId, currentScope())).toEqual(result());
     expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["parent_authorize_snap_direct_packet", "parent_get_snap_current_direct_packet"]);
   });
-  it.each(["42501", "40001", "08006"])("does not turn discovery SQL %s denial or uncertainty into NULL", async code => {
+  it.each(["42501", "40001", "PT409", "08006"])("does not turn discovery SQL %s denial or uncertainty into NULL", async code => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "PRIVATE-SQL-CANARY" } });
     await expect(getCurrentSnapDirectPacketAuthorization(requestId, currentScope())).rejects.toBeInstanceOf(Error); expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });

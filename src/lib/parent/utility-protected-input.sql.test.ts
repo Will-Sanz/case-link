@@ -79,7 +79,7 @@ describe.skipIf(!modulePath)("utility protected input PostgreSQL boundaries (exp
     const replacement = (await authorizePgw(s, next, old)).rows[0].value;
     expect(replacement).toMatchObject({ inputId: next, state: "authorized" }); expect(await readPgw(s, old)).toHaveProperty("value", "FICTIONAL-PGW-OLD");
     expect((await authorizePgw(s, next, old)).rows[0].value).toEqual(replacement);
-    await expect(authorizePgw(s, next)).rejects.toMatchObject({ code: "40001" });
+    await expect(authorizePgw(s, next)).rejects.toMatchObject({ code: "PT409" });
     await tx(() => seal(s, next, identifierBytes("FICTIONAL-PGW-NEW")));
     expect(await readPgw(s, next)).toHaveProperty("value", "FICTIONAL-PGW-NEW");
     await expect(readPgw(s, old)).rejects.toMatchObject({ code: "42501" });
@@ -99,18 +99,18 @@ describe.skipIf(!modulePath)("utility protected input PostgreSQL boundaries (exp
     const s = await setupPgw(), old = randomUUID(), first = randomUUID(), second = randomUUID(); await authorizePgw(s, old); await tx(() => seal(s, old, identifierBytes()));
     await authorizePgw(s, first, old); await authorizePgw(s, second, old);
     await tx(() => seal(s, first, identifierBytes("FICTIONAL-PGW-NEW")));
-    await expect(tx(() => seal(s, second, identifierBytes("FICTIONAL-PGW-ALT")))).rejects.toMatchObject({ code: "40001" });
+    await expect(tx(() => seal(s, second, identifierBytes("FICTIONAL-PGW-ALT")))).rejects.toMatchObject({ code: "PT409" });
     expect((await fixture.admin.query("select count(*)::int n from parent_private.utility_protected_inputs where input_id=$1", [second])).rows[0].n).toBe(0);
     expect(await readPgw(s, first)).toHaveProperty("value", "FICTIONAL-PGW-NEW");
-    await expect(authorizePgw(s, second, old)).rejects.toMatchObject({ code: "40001" });
+    await expect(authorizePgw(s, second, old)).rejects.toMatchObject({ code: "PT409" });
   });
   it("blocks competing initial captures, customer identity collection, foreign targets and replacement-intent changes", async () => {
     const s = await setupPgw(), old = randomUUID(), parallel = randomUUID(); await authorizePgw(s, old); await authorizePgw(s, parallel); await tx(() => seal(s, old, identifierBytes()));
-    await expect(tx(() => seal(s, parallel, identifierBytes("FICTIONAL-PGW-ALT")))).rejects.toMatchObject({ code: "40001" });
-    await expect(authorizePgw(s, randomUUID())).rejects.toMatchObject({ code: "40001" });
+    await expect(tx(() => seal(s, parallel, identifierBytes("FICTIONAL-PGW-ALT")))).rejects.toMatchObject({ code: "PT409" });
+    await expect(authorizePgw(s, randomUUID())).rejects.toMatchObject({ code: "PT409" });
     await expect(authorizePgw(s, randomUUID(), old, [{ subjectId: s.customer, sourceId: null, field: "pgw_household_identifier" }])).rejects.toMatchObject({ code: "42501" });
     const next = randomUUID(); await authorizePgw(s, next, old);
-    await expect(authorizePgw(s, next, randomUUID())).rejects.toMatchObject({ code: "40001" });
+    await expect(authorizePgw(s, next, randomUUID())).rejects.toMatchObject({ code: "PT409" });
     await expect(authorizePgw(s, randomUUID(), old, [{ subjectId: randomUUID(), sourceId: null, field: "pgw_household_identifier" }])).rejects.toMatchObject({ code: "42501" });
     for (const name of ["authenticated", "anon", "service_role", "parent_worker", "parent_utility_protected", "parent_retention_worker"])
       await expect(tx(() => role(s, name, "select * from parent_private.utility_identifier_capture_intents"))).rejects.toMatchObject({ code: "42501" });
@@ -263,7 +263,7 @@ describe.skipIf(!modulePath)("utility protected input PostgreSQL boundaries (exp
     const first = randomUUID(); await authorizeWater(first, "account_access", accountBytes("900000001").length, "water_access_code"); const original = await capture(first, "900000001");
     const second = randomUUID(); await authorizeWater(second, "account_access", accountBytes("900000001").length, "water_access_code"); expect(await capture(second, "900000001")).toEqual(original);
     expect((await fixture.admin.query("select count(*)::int n from parent_private.utility_protected_account_keys where owner_id=$1", [s.owner])).rows[0].n).toBe(1);
-    const changed = randomUUID(); await authorizeWater(changed, "account_access", accountBytes("900000002").length, "water_access_code"); await expect(capture(changed, "900000002")).rejects.toMatchObject({ code: "40001" });
+    const changed = randomUUID(); await authorizeWater(changed, "account_access", accountBytes("900000002").length, "water_access_code"); await expect(capture(changed, "900000002")).rejects.toMatchObject({ code: "PT409" });
     expect((await fixture.admin.query("select count(*)::int n from parent_private.utility_protected_inputs where input_id=$1", [changed])).rows[0].n).toBe(0);
     const proof = randomUUID(), authorization = (await authorizeWater(proof, "income_proof", payload.length, "income")).rows[0].value;
     expect(authorization).toMatchObject({ accountReference: original.account });

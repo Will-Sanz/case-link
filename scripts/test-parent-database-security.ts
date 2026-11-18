@@ -518,10 +518,10 @@ async function main() {
       assert.deepEqual(current.details, corrected);
       assert.deepEqual({ ...current.provenance, "address.street": original.provenance["address.street"] }, original.provenance);
       assert.equal((await correctSnap()).rows[0].id, correctedId);
-      await denied(startSnap, "40001");
+      await denied(startSnap, "PT409");
       await denied(() => role("authenticated", ownerA, (db) => db.query(
         "select public.parent_save_snap_application_details($1,2,$2,$3,$4)", [snapRequest, JSON.stringify(corrected), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()],
-      )), "40001");
+      )), "PT409");
       assert.ok(!JSON.stringify(await snapState()).includes("SNAP-PRIVATE-CANARY"));
       assertionCount += 14;
       const stale = { ...current.provenance, "address.street": { source: "parent", confirmedAt: "2026-01-01T12:00:00Z", asOf: "2026-01-01" } };
@@ -621,7 +621,7 @@ async function main() {
       const correctedId = (await saveWic(corrected, 2)).rows[0].id;
       const correctedRow = (await role("authenticated", ownerA, db => db.query("select * from public.parent_wic_application_details where id=$1", [correctedId]))).rows[0];
       assert.deepEqual({ ...correctedRow.provenance, "contact.street": original.provenance["contact.street"] }, original.provenance); assertionCount++;
-      await denied(() => saveWic(corrected, 2), "40001");
+      await denied(() => saveWic(corrected, 2), "PT409");
       assert.ok(!/WIC-PRIVATE-CANARY|WIC-CHILD-CANARY|1990-01-01|2024-01-01|2023-01-01/.test(JSON.stringify(await wicState()))); assertionCount++;
       for (const deniedRole of ["anon", "service_role", "parent_worker"] as const)
         await denied(() => role(deniedRole, null, db => db.query("select * from public.parent_wic_application_details")));
@@ -759,8 +759,8 @@ async function main() {
       assert.deepEqual([correctedRow.request_version, (await pecoState()).job.request_version], [3, 3]); assertionCount++;
       assert.equal((await savePeco(corrected, 2, correctionKey)).rows[0].id, correctedId); assertionCount++;
       assert.deepEqual((await readPeco(original.id))[0], original); assertionCount++;
-      await denied(() => savePeco(corrected, 2), "40001");
-      await denied(() => startPeco(), "40001");
+      await denied(() => savePeco(corrected, 2), "PT409");
+      await denied(() => startPeco(), "PT409");
       await denied(() => savePeco(corrected, 3, randomUUID(), false, true));
       await denied(() => savePeco(corrected, 3, randomUUID(), true, false));
       await denied(() => admin.query("update public.parent_peco_application_details set details='{}' where id=$1", [original.id]), "23514");
@@ -1053,7 +1053,7 @@ async function main() {
             JSON.stringify(intake),
           ]),
         ),
-      "40001",
+      "PT409",
     );
     assert.equal(
       (
@@ -1802,7 +1802,7 @@ async function main() {
             JSON.stringify(intake),
           ]),
         ),
-      "40001",
+      "PT409",
     );
     const currentJob = await claim(correctionRequest);
     await admin.query("begin");
@@ -2368,7 +2368,7 @@ async function main() {
             [resumeRequest],
           ),
         ),
-      "40001",
+      "PT409",
     );
     await role("authenticated", ownerB, (db) =>
       db.query(
@@ -3006,7 +3006,7 @@ async function main() {
     assertionCount++;
     await denied(() => role("authenticated", ownerA, (db) => db.query(
       "select public.parent_answer_facts($1,$2,1)", [bundledRequest, JSON.stringify(bundle)],
-    )), "40001");
+    )), "PT409");
     await denied(() => role("authenticated", ownerA, (db) => db.query(
       "select public.parent_answer_facts($1,$2,3)", [bundledRequest, JSON.stringify([
         { need: "food_now", field: "zip", value: "19102" },
@@ -3028,7 +3028,7 @@ async function main() {
       assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
       assertionCount++;
       const rejected = attempts.find((attempt) => attempt.status === "rejected");
-      assert.equal(rejected?.status === "rejected" ? rejected.reason.code : null, "40001");
+      assert.equal(rejected?.status === "rejected" ? rejected.reason.code : null, "PT409");
       assertionCount++;
       const saved = (await admin.query("select facts,version from public.parent_requests where id=$1", [concurrentRequest])).rows[0];
       assert.equal(saved.version, 3);

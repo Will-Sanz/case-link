@@ -67,7 +67,7 @@ describe.skipIf(!modulePath)("atomic fixed programme reuse of owned family basic
     expect(after.id).toBe(savedId); expect(after.request_version).toBe(3);
     for (const path of Object.keys(before.provenance as object)) expect((after.provenance as Record<string, unknown>)[path]).toEqual((before.provenance as Record<string, unknown>)[path]);
     expect(await save(value, id, 2, null, key)).toBe(savedId);
-    await expect(save(value, id, 2, value.source, key)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(value, id, 2, value.source, key)).rejects.toMatchObject({ code: "PT409" });
     expect((await fixture.admin.query("select count(*)::int n from parent_private.family_profile_request_sources where request_id=$1 and request_version=2", [id])).rows[0].n).toBeGreaterThan(0);
   });
   it.each(["snap-pa", "wic-pa"] as const)("acknowledges the exact already committed %s save after its profile changed without writing again", async program => {
@@ -111,7 +111,7 @@ describe.skipIf(!modulePath)("atomic fixed programme reuse of owned family basic
     expect(await save(refreshed, id, 3, refreshed.source, key)).toBe(savedId);
     expect(await start(value)).toBe(id);
     const changedAttempt = structuredClone(value); (changedAttempt.details as { applicant: { firstName: string } }).applicant.firstName = "Different packet";
-    await expect(start(changedAttempt)).rejects.toMatchObject({ code: "40001" });
+    await expect(start(changedAttempt)).rejects.toMatchObject({ code: "PT409" });
   });
   it.each(["snap-pa", "wic-pa"] as const)("updates compatible bound %s answers during the owned profile correction without opening a viewer", async program => {
     const value = await input(program), id = await start(value), original = await snapshot(value, id), savedProfile = await profile();

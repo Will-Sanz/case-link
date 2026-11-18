@@ -12,7 +12,7 @@ async function mutate(
 ): Promise<void> {
   const { supabase } = await requireParentSession();
   const { error } = await supabase.rpc(name, parameters);
-  if (error?.code === "40001")
+  if (error?.code === "40001" || error?.code === "PT409")
     throw new Error(
       "This request changed. Reload it before saving your update.",
     );

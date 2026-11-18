@@ -23,7 +23,7 @@ async function call(action: () => PromiseLike<{ data: unknown; error: { code?: s
   if (!result || typeof result !== "object") throw new Error(unconfirmed);
   if (result.error?.code === "42501") throw new Error(unavailable);
   if (result.error?.code === "23514") throw new Error("parent_invalid_input");
-  if (result.error?.code === "40001") throw new Error("This request changed. Reload the saved packet metadata before continuing.");
+  if (result.error?.code === "40001" || result.error?.code === "PT409") throw new Error("This request changed. Reload the saved packet metadata before continuing.");
   if (result.error) throw new Error(unconfirmed);
   return result.data;
 }

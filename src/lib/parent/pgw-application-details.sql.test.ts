@@ -165,7 +165,7 @@ describe.skipIf(!modulePath)("closed PGW private preparation against PostgreSQL"
     expect(await save(request, value, 1, key)).toBe(id); expect(await state(request)).toEqual(before);
     const reordered = { ...value, customer: { ...value.customer!, income: { ...value.customer!.income!, sources: [...value.customer!.income!.sources].reverse() } } };
     await save(request, reordered, 2); expect((await read(request))[0].provenance).toEqual(original.provenance); expect(await state(request)).toEqual(before);
-    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "PT409" });
     await save(request, { ...value, accountNumber: "9000000002" }, 2);
     const corrected = (await read(request))[0]; expect((await state(request)).version).toBe(3);
     expect(corrected.consent_evidence.accountNumberSha256).not.toBe(original.consent_evidence.accountNumberSha256);

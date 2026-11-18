@@ -101,7 +101,7 @@ describe.skipIf(!modulePath)("owned water reference preparation in PostgreSQL", 
     expect(await save(request, value, 1, key)).toBe(id);
     await save(request, { ...value, applicant: { ...value.applicant, income: { ...value.applicant.income, sources: [...value.applicant.income.sources].reverse() } } }, 2);
     expect((await read(request))[0].provenance).toEqual(original.provenance); expect(await state(request)).toEqual(before);
-    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "PT409" });
     await query("select public.parent_control_request($1,'pause')", [request]); const paused = await state(request);
     await save(request, { ...value, propertyAddress: "101 Synthetic Lane" }, paused.request.version);
     const after = await state(request); expect(after.request.status).toBe("paused"); expect(after.job.state).toBe("cancelled"); expect(after.request.version).toBe(paused.request.version + 1);

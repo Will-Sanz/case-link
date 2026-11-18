@@ -175,7 +175,7 @@ describe.skipIf(!modulePath)("private utility preparation artifacts against Post
   it("reconciles exact bytes/key once, preserves original expiry, and rejects a new file under the same preparation identity", async () => {
     const s = await setup(), first = await prepare(s); vi.setSystemTime(new Date(at.getTime() + 10000));
     s.spec.expiresAt = "2026-11-13T22:45:00Z"; expect(await prepare(s)).toEqual(first);
-    s.spec.contentSha256 = "f".repeat(64); await expect(prepare(s)).rejects.toMatchObject({ code: "40001" });
+    s.spec.contentSha256 = "f".repeat(64); await expect(prepare(s)).rejects.toMatchObject({ code: "PT409" });
     expect((await fixture.admin.query("select id from parent_private.utility_prepared_artifacts where request_id=$1", [s.request])).rows).toHaveLength(1);
   });
   it("finds actual current preparation metadata before unknown-response retry and never grants this private lookup to an ordinary worker", async () => {

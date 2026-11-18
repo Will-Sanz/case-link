@@ -51,7 +51,7 @@ describe("owned water reference preparation data", () => {
     await expect(startWaterApplication({ ...intake(), ...override } as ReturnType<typeof intake>, mandate(), { details: {}, noticeVersion: notice, subjectAuthorityDeclared: true, accountAuthorityDeclared: true }, key)).rejects.toThrow("parent_invalid_input");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it.each([["40001", "This request changed"], ["42501", "This request is unavailable"], ["23514", "parent_invalid_input"], ["XX000", "CaseLink could not save or load"]])("sanitizes database %s errors", async (code, expected) => {
+  it.each([["40001", "This request changed"], ["PT409", "This request changed"], ["42501", "This request is unavailable"], ["23514", "parent_invalid_input"], ["XX000", "CaseLink could not save or load"]])("sanitizes database %s errors", async (code, expected) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "WaterPrivateCanary", details: "123456789" } });
     await expect(saveWaterApplicationDetails(requestId, input(), key)).rejects.toThrow(expected);
   });

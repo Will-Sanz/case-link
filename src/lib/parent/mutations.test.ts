@@ -62,6 +62,7 @@ describe("atomic factual answer mutation", () => {
   });
   it.each([
     ["40001", "This request changed. Reload it before saving your update."],
+    ["PT409", "This request changed. Reload it before saving your update."],
     ["42501", "This request is unavailable, or its permission has changed."],
   ])("preserves the safe %s error for an atomic bundle failure", async (code, message) => {
     mocks.rpc.mockResolvedValueOnce({ error: { code, message: "private database canary" } });

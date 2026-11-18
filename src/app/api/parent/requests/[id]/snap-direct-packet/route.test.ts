@@ -108,7 +108,7 @@ describe("linked direct SNAP packet metadata HTTP route", () => {
     mocks.rpc.mockResolvedValue({ data, error: null }); const response = await GET(get(currentQuery), context()); expect(response.status).toBe(500); expect((await response.json()).ok).toBe(false);
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("PRIVATE-");
   });
-  it.each([["42501", 403], ["40001", 409], ["08006", 500]] as const)("keeps discovery %s failures distinct from no registered intent", async (code, status) => {
+  it.each([["42501", 403], ["40001", 409], ["PT409", 409], ["08006", 500]] as const)("keeps discovery %s failures distinct from no registered intent", async (code, status) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "PRIVATE-SQL-CANARY" } }); const response = await GET(get(currentQuery), context()); expect(response.status).toBe(status); expect((await response.json()).ok).toBe(false); expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
   it("returns 409 for a competing write and allows only an explicit metadata reload afterward", async () => {

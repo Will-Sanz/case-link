@@ -208,14 +208,14 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
   });
   it.each([contentHash, "f".repeat(64)])("rejects a competing packet UUID at the same version even for digest %s", async digest => {
     const s = await setup(), before = (await discover(s)).rows[0].value;
-    await expect(authorizePacket(s, randomUUID(), digest)).rejects.toMatchObject({ code: "40001" });
+    await expect(authorizePacket(s, randomUUID(), digest)).rejects.toMatchObject({ code: "PT409" });
     expect((await authorizePacket(s)).rows[0].value).toEqual(before); expect((await discover(s)).rows[0].value).toEqual(before);
     expect((await fixture.admin.query("select count(*)::int n from parent_private.snap_final_packet_authorizations where request_id=$1 and acquisition_authorization_id is not null", [s.request])).rows[0].n).toBe(1);
   });
   it("preserves a stored binary selection instead of reserving a competing direct file", async () => {
     const s = await setup(300, fixtureSnapApplication(new Date()), false); await stage(s, false);
     await call("authenticated", "select public.parent_authorize_snap_direct_acquisition($1,$2,$3,$4,$5,'synthetic-policy-1','synthetic-retention-1',$6,true,date_trunc('milliseconds',clock_timestamp()+interval '4 minutes'))", [s.request, s.version, s.snapshot, s.snapshotHash, s.acquisition, fixtureSnapApplication().household!.filter(person => person.requestingSnap).map(person => person.id)], s.owner);
-    await expect(authorizePacket(s, randomUUID())).rejects.toMatchObject({ code: "40001" });
+    await expect(authorizePacket(s, randomUUID())).rejects.toMatchObject({ code: "PT409" });
     expect((await capture(s)).rows[0].value).toMatchObject({ packetId: s.packet, state: "pending" });
   });
   it("fails the actual unique-index migration on ambiguous history instead of choosing or deleting an intent", async () => {
@@ -243,7 +243,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
     const permission = (await call("authenticated", "select public.parent_get_snap_direct_acquisition($1,$2,$3,$4) value", [s.request, s.version, s.snapshot, s.snapshotHash], s.owner)).rows[0].value;
     if (order === "seal_first") await stage(s);
     const version = (await replace(s)).rows[0].version as number;
-    expect((await replace(s)).rows[0].version).toBe(version); await expect(replace(s, randomUUID())).rejects.toMatchObject({ code: "40001" });
+    expect((await replace(s)).rows[0].version).toBe(version); await expect(replace(s, randomUUID())).rejects.toMatchObject({ code: "PT409" });
     if (order === "correction_first") await expect(stage(s)).rejects.toMatchObject({ code: "42501" });
     await expect(discover(s)).rejects.toMatchObject({ code: "42501" });
     const next = { ...s, version, packet: randomUUID() }, registered = (await authorizePacket(next)).rows[0].value; next.authorization = registered.intent.authorizationId;
@@ -261,7 +261,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
     const acquisition = randomUUID(), subjects = fixtureSnapApplication().household!.filter(person => person.requestingSnap).map(person => person.id);
     const permission = (await call("authenticated", "select public.parent_authorize_snap_direct_acquisition($1,$2,$3,$4,$5,'synthetic-policy-1','synthetic-retention-1',$6,true,date_trunc('milliseconds',clock_timestamp()+interval '4 minutes')) value", [s.request, s.version, s.snapshot, s.snapshotHash, acquisition, subjects], s.owner)).rows[0].value;
     expect(Date.parse(permission.consentedAt)).toBeGreaterThanOrEqual(Date.parse(original.consentedAt)); expect(permission.acquisitionId).toBe(acquisition);
-    await expect(authorizePacket({ ...s, acquisition }, randomUUID())).rejects.toMatchObject({ code: "40001" });
+    await expect(authorizePacket({ ...s, acquisition }, randomUUID())).rejects.toMatchObject({ code: "PT409" });
     const version = (await replace(s)).rows[0].version as number, next = { ...s, version, acquisition, packet: randomUUID() };
     expect((await discover(next)).rows[0].value).toBeNull();
     const registered = (await authorizePacket(next)).rows[0].value;

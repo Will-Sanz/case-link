@@ -257,7 +257,7 @@ describe.skipIf(!modulePath)("atomic parent factual-answer bundles", () => {
     if (state === "stale") await answer(id, "gas", "amountDue", 70);
     if (state === "cancelled") await query("authenticated", "select public.parent_control_request($1,'cancel')", [id]);
     const before = await snapshot(id);
-    await expect(save(id, [zip, size], state === "null_version" ? null as unknown as number : 1)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(id, [zip, size], state === "null_version" ? null as unknown as number : 1)).rejects.toMatchObject({ code: "PT409" });
     expect(await snapshot(id)).toEqual(before);
   });
 

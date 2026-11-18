@@ -162,7 +162,7 @@ describe.skipIf(!modulePath)("default-off private WIC revisions against PostgreS
     expect(await save(request, value, 1, key)).toBe(id); expect(await state(request)).toEqual(before);
     const reordered = { ...value, children: [...value.children].reverse() };
     await save(request, reordered, 2); expect((await read(request))[0].provenance).toEqual(original.provenance); expect(await state(request)).toEqual(before);
-    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "PT409" });
     await save(request, { ...reordered, contact: { ...value.contact, street: "2 Synthetic Lane" } }, 2);
     const current = (await read(request))[0];
     expect({ ...current.provenance, "contact.street": original.provenance["contact.street"] }).toEqual(original.provenance);
@@ -189,7 +189,7 @@ describe.skipIf(!modulePath)("default-off private WIC revisions against PostgreS
     expect(current.intake_confirmed_at.zip).toEqual(original.intake_confirmed_at.zip);
     expect(current.intake_reuse.zip.sourceRequestId).toBe(source);
     expect(JSON.stringify(saved)).not.toMatch(/"zip"|postalZip|19104/);
-    await expect(query(sql, [...args.slice(0, 5), source, 2])).rejects.toMatchObject({ code: "40001" });
+    await expect(query(sql, [...args.slice(0, 5), source, 2])).rejects.toMatchObject({ code: "PT409" });
     const failedKey = randomUUID();
     await expect(query(sql, [args[0], args[1], JSON.stringify({ contact: { zip: "invalid" } }), notice, failedKey, source, 1])).rejects.toMatchObject({ code: "23514" });
     expect((await fixture.admin.query("select id from public.parent_requests where start_key=$1", [failedKey])).rows).toEqual([]);

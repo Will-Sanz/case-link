@@ -25,7 +25,7 @@ function check(error: unknown) {
   if (!error) return;
   const code = typeof error === "object" && "code" in error ? error.code : undefined;
   if (code === "P0001" && typeof error === "object" && error && "message" in error && error.message === "parent_family_profile_source_changed") throw new Error("parent_family_profile_source_changed");
-  if (code === "40001") throw new Error("This request changed. Reload it before saving your update.");
+  if (code === "40001" || code === "PT409") throw new Error("This request changed. Reload it before saving your update.");
   if (code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
   if (code === "23514" || code === "22023") throw new Error("parent_invalid_input");
   if (code === "P0001" && typeof error === "object" && error && "message" in error && error.message === "parent_reuse_source_changed")

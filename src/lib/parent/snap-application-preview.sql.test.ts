@@ -172,8 +172,8 @@ describe.skipIf(!modulePath)("leased private SNAP previews against PostgreSQL", 
     expect({ ...original.provenance, "address.street": provenance["address.street"] }).toEqual(provenance);
     expect(original.provenance["address.street"].asOf).not.toBe("2026-01-01");
     expect((await query("authenticated", sql, args, s.owner)).rows[0].id).toBe(id); expect((await read()).rows[0]).toEqual(original);
-    await expect(query("authenticated", "select public.parent_save_snap_application_details($1,2,$2,$3,$4)", args.slice(0, 4), s.owner)).rejects.toMatchObject({ code: "40001" });
-    await expect(query("authenticated", sql, [...args.slice(0, 4), ["zip"]], s.owner)).rejects.toMatchObject({ code: "40001" });
+    await expect(query("authenticated", "select public.parent_save_snap_application_details($1,2,$2,$3,$4)", args.slice(0, 4), s.owner)).rejects.toMatchObject({ code: "PT409" });
+    await expect(query("authenticated", sql, [...args.slice(0, 4), ["zip"]], s.owner)).rejects.toMatchObject({ code: "PT409" });
     await expect(query("authenticated", "select public.parent_reaffirm_snap_application_details($1,3,$2,$3,$4,$5)", [s.request, JSON.stringify(s.details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID(), ["address.street"]], s.owner)).rejects.toMatchObject({ code: "23514" });
   });
   it.each(["zip", "ssn", "household.11111111-1111-4111-8111-111111111111.id", "unknown.field"])("rejects a fresh, protected or unknown reaffirmation path: %s", async path => {

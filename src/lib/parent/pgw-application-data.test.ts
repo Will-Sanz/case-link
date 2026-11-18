@@ -44,7 +44,7 @@ describe("owned private PGW preparation data", () => {
     await expect(savePgwApplicationDetails(requestId, { ...input(), ...override }, key)).rejects.toThrow("parent_invalid_input");
     expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.session).not.toHaveBeenCalled();
   });
-  it.each([["40001", "private", "This request changed"], ["42501", "private", "This request is unavailable"], ["23514", "private", "parent_invalid_input"],
+  it.each([["40001", "private", "This request changed"], ["PT409", "private", "This request changed"], ["42501", "private", "This request is unavailable"], ["23514", "private", "parent_invalid_input"],
     ["XX000", "PgwPrivateCanary", "CaseLink could not save or load"], ["P0001", "parent_reuse_source_changed", "parent_reuse_source_changed"]])("maps %s without leaking private database text", async (code, message, expected) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message, details: "PgwPrivateCanary" } });
     await expect(savePgwApplicationDetails(requestId, input(), key)).rejects.toThrow(expected);

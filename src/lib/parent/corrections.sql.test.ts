@@ -247,7 +247,7 @@ describe.skipIf(!modulePath)(
             requestId,
             JSON.stringify((await read()).intake),
           ]),
-        ).rejects.toMatchObject({ code: "40001" });
+        ).rejects.toMatchObject({ code: "PT409" });
       } finally {
         await db.end();
       }

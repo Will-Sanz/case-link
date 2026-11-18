@@ -28,6 +28,8 @@ describe("family profile server-only data", () => {
   });
   it("denies an owner swap before clear and sanitizes SQL error details", async () => {
     mocks.identity.mockResolvedValue({ ownerId: key, status: "active" }); await expect(clearFamilyProfile({ expectedOwnerId: owner, expectedRevision: 1 }, key)).rejects.toThrow("unavailable"); expect(mocks.rpc).not.toHaveBeenCalled();
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: "40001", message: "PRIVATE-CANARY" } }); await expect(saveFamilyProfile(write, key)).rejects.toThrow("This request changed");
+    for (const code of ["40001", "PT409"]) {
+      mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "PRIVATE-CANARY" } }); await expect(saveFamilyProfile(write, key)).rejects.toThrow("This request changed");
+    }
   });
 });

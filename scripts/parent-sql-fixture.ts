@@ -15,6 +15,7 @@ type EmbeddedPostgres = {
 /** PostgreSQL semantics only: this does not emulate Supabase Auth, Storage or concurrent connections. */
 export async function createParentSqlFixture(
   modulePath: string,
+  throughMigration?: string,
 ): Promise<{ admin: Client; pool: Pool; version: string }> {
   if (!isAbsolute(modulePath))
     throw new Error(
@@ -134,9 +135,12 @@ export async function createParentSqlFixture(
     "20261117185443_parent_ordinary_private_text_guard.sql",
     "20261118035851_parent_wic_application_reaffirmation.sql",
     "20261118043549_parent_job_plan_agency_observation_order.sql",
+    "20261118043758_parent_business_conflict_http_status.sql",
   ];
   try {
-    for (const migration of migrations)
+    const last = throughMigration ? migrations.indexOf(throughMigration) : migrations.length - 1;
+    if (last < 0) throw new Error("The requested parent fixture migration was not found.");
+    for (const migration of migrations.slice(0, last + 1))
       await db.exec(readFileSync(`supabase/migrations/${migration}`, "utf8"));
   } catch (error) {
     await db.close();

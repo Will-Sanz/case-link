@@ -70,7 +70,7 @@ describe("private SNAP details data boundary", () => {
     expect(mocks.session).not.toHaveBeenCalled();
   });
   it.each([
-    ["40001", "This request changed"], ["42501", "This request is unavailable"], ["23514", "parent_invalid_input"], ["XX000", "CaseLink could not save or load"],
+    ["40001", "This request changed"], ["PT409", "This request changed"], ["42501", "This request is unavailable"], ["23514", "parent_invalid_input"], ["XX000", "CaseLink could not save or load"],
   ])("maps database %s without leaking provider error details", async (code, message) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "private value 123-45-6789", details: "private" } });
     await expect(saveSnapApplicationDetails(requestId, { expectedVersion: 3, details: {}, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION }, key)).rejects.toThrow(message);

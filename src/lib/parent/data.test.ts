@@ -105,10 +105,10 @@ describe("parent data boundary", () => {
     ).rejects.toThrow();
     expect(mock.rpc).not.toHaveBeenCalled();
   });
-  it("preserves optimistic version checking and does not expose database details", async () => {
+  it.each(["40001", "PT409"])("preserves %s optimistic version checking and does not expose database details", async code => {
     mock.rpc.mockResolvedValue({
       data: null,
-      error: { code: "40001", message: "database-sensitive-detail" },
+      error: { code, message: "database-sensitive-detail" },
     });
     await expect(correctSupportRequest(requestId, intake, 3)).rejects.toThrow(
       "Reload",

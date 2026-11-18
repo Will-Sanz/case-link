@@ -155,13 +155,13 @@ describe.skipIf(!modulePath)("private SNAP application snapshots against Postgre
     const before = await state(request), original = (await read(request))[0];
     expect(await save(request, value, 1, key)).toBe(id);
     expect(await state(request)).toEqual(before); expect(await read(request)).toEqual([original]);
-    await expect(save(request, { ...value, county: "Other" }, 1, key)).rejects.toMatchObject({ code: "40001" });
-    await expect(save(request, value, 1)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(request, { ...value, county: "Other" }, 1, key)).rejects.toMatchObject({ code: "PT409" });
+    await expect(save(request, value, 1)).rejects.toMatchObject({ code: "PT409" });
     const noOpKey = randomUUID(), noOp = await save(request, value, 2, noOpKey);
     expect(noOp).not.toBe(id); expect(await state(request)).toEqual(before);
     expect((await read(request))[0].provenance).toEqual(original.provenance);
-    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "40001" });
-    await expect(save(request, { ...value, county: "Other" }, 2, noOpKey)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(request, value, 1, key)).rejects.toMatchObject({ code: "PT409" });
+    await expect(save(request, { ...value, county: "Other" }, 2, noOpKey)).rejects.toMatchObject({ code: "PT409" });
   });
   it("preserves stable per-field evidence through row reorder and changes only a corrected field", async () => {
     const request = await start(), value = details();
@@ -222,9 +222,9 @@ describe.skipIf(!modulePath)("private SNAP application snapshots against Postgre
     expect((await read(request))[0]).toMatchObject({ idempotency_key: key, request_version: 2 });
     const before = await state(request);
     expect((await query(sql, args)).rows[0].id).toBe(request); expect(await state(request)).toEqual(before);
-    await expect(query(sql, [...args.slice(0, 2), JSON.stringify({ ...value, county: "Other" }), notice, key])).rejects.toMatchObject({ code: "40001" });
+    await expect(query(sql, [...args.slice(0, 2), JSON.stringify({ ...value, county: "Other" }), notice, key])).rejects.toMatchObject({ code: "PT409" });
     await save(request, { ...value, county: "Other" }, 2);
-    await expect(query(sql, args)).rejects.toMatchObject({ code: "40001" });
+    await expect(query(sql, args)).rejects.toMatchObject({ code: "PT409" });
   });
   it("rolls back the initial request and queued job if the details or permission fail", async () => {
     const key = randomUUID(), m = mandate();

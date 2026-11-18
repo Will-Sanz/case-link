@@ -69,7 +69,7 @@ describe.skipIf(!modulePath)("explicit WIC application-only reaffirmation", () =
     await fixture.admin.query("update public.parent_requests set version=version+1 where id=$1", [value.id]);
     await fixture.admin.query("update parent_private.processing_controls set family_profile_enabled=false,wic_details_enabled=false");
     expect(await save(value, base, confirmed, key)).toBe(id); expect(await saved(value.id)).toEqual(original);
-    await expect(save(value, base, confirmed.slice(1), key)).rejects.toMatchObject({ code: "40001" });
+    await expect(save(value, base, confirmed.slice(1), key)).rejects.toMatchObject({ code: "PT409" });
   });
   it("does not resume a paused request or its cancelled job when stale WIC answers are reaffirmed", async () => {
     const value = await start(); await fixture.admin.query("update public.parent_requests set status='paused' where id=$1", [value.id]); await clear();
@@ -109,7 +109,7 @@ describe.skipIf(!modulePath)("explicit WIC application-only reaffirmation", () =
     if (state === "expired") await fixture.admin.query("update public.parent_requests set mandate=jsonb_set(mandate,'{expiresAt}',to_jsonb((now()-interval '1 second')::text)) where id=$1", [value.id]);
     if (state === "purpose_closed") await fixture.admin.query("update parent_private.processing_controls set wic_details_enabled=false");
     if (state === "account_closed") await fixture.admin.query("update public.parent_accounts set status='deletion_requested' where id=$1", [owner]);
-    await expect(save(value, base, ["contact.firstName"])).rejects.toMatchObject({ code: state === "cancelled" || state === "closed" ? "40001" : "42501" });
+    await expect(save(value, base, ["contact.firstName"])).rejects.toMatchObject({ code: state === "cancelled" || state === "closed" ? "PT409" : "42501" });
     expect(await saved(value.id)).toEqual(before);
   });
   it("keeps confirmation-aware internals inaccessible to every application role", async () => {

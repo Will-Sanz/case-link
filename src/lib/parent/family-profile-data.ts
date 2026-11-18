@@ -6,7 +6,7 @@ import { familyProfileBindingsSchema, familyProfileClearSchema, familyProfileRea
 function check(error: unknown) {
   if (!error) return;
   const code = typeof error === "object" && "code" in error ? error.code : null;
-  if (code === "40001") throw new Error("This request changed. Reload your family profile before saving.");
+  if (code === "40001" || code === "PT409") throw new Error("This request changed. Reload your family profile before saving.");
   if (code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
   if (["23514", "22023"].includes(String(code))) throw new Error("parent_invalid_input");
   throw new Error("CaseLink could not confirm your family profile. Please try again.");

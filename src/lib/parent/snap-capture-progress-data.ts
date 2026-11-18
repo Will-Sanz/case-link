@@ -10,7 +10,7 @@ async function call(name: string, args: Record<string, unknown>) {
   let result;
   try { result = await supabase.rpc(name, args); } catch { throw new Error(unconfirmed); }
   if (result.error?.code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
-  if (result.error?.code === "40001") throw new Error("This request changed. Reload before replacing its private pages.");
+  if (result.error?.code === "40001" || result.error?.code === "PT409") throw new Error("This request changed. Reload before replacing its private pages.");
   if (result.error) throw new Error(unconfirmed);
   return result.data;
 }

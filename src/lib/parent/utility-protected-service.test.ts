@@ -74,6 +74,16 @@ describe("isolated local utility HTTP capture (no provider, model or ordinary St
     expect(result.status).toBe(201); expect(mocks.rpc).toHaveBeenCalledWith("parent_authorize_utility_protected_input", expect.objectContaining({ p_consent_accepted: true, p_subject_authority_declared: true, p_account_authority_declared: true, p_targets: reference.targets }));
     expect(mocks.store).not.toHaveBeenCalled(); expect(JSON.stringify(mocks.rpc.mock.calls)).not.toContain(canary);
   });
+  it.each([["40001", 409], ["PT409", 409], ["42501", 403], ["XX000", 403]])("keeps protected authorization %s conflicts distinct without exposing private errors", async (code, status) => {
+    const authorization = { requestId: id(1), expectedVersion: 2, programId: "peco-cap", snapshotId: id(5), snapshotRevision: 1, snapshotHash: "a".repeat(64), inputId: id(2),
+      purpose: "income_proof", targets: reference.targets, mediaType: "application/pdf", byteLength: canary.length, noticeVersion: UTILITY_PROTECTED_INPUT_NOTICE_VERSION,
+      consentAccepted: true, subjectAuthorityDeclared: true, accountAuthorityDeclared: true };
+    mocks.rpc.mockImplementation(async name => name === "parent_authorize_utility_protected_input"
+      ? { data: null, error: { code, message: canary } } : { data: id(4), error: null });
+    const result = await createUtilityProtectedHandler(config)(request("POST", JSON.stringify(authorization), `/protected/utilities/requests/${id(1)}/inputs?expectedVersion=2`, { "Content-Type": "application/json" }));
+    expect(result.status).toBe(status); expect(await result.text()).not.toContain(canary); expect(mocks.store).not.toHaveBeenCalled();
+    expect(mocks.rpc.mock.calls.filter(([name]) => name === "parent_authorize_utility_protected_input")).toHaveLength(1);
+  });
   it("stops when identity is revoked while the private parser is awaited", async () => {
     mocks.inspect.mockImplementation(async () => { mocks.user.mockResolvedValue({ data: { user: null }, error: null }); return { mediaType: "application/pdf", pageCount: 1 }; });
     const result = await createUtilityProtectedHandler(config)(request("PUT", canary)); expect(result.status).toBe(403); expect(mocks.store).not.toHaveBeenCalled();

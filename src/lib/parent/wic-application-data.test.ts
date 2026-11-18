@@ -74,7 +74,7 @@ describe("separate WIC private data boundary", () => {
     expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.session).not.toHaveBeenCalled();
   });
   it.each([
-    ["40001", "private", "This request changed"], ["42501", "private", "This request is unavailable"], ["23514", "private", "parent_invalid_input"],
+    ["40001", "private", "This request changed"], ["PT409", "private", "This request changed"], ["42501", "private", "This request is unavailable"], ["23514", "private", "parent_invalid_input"],
     ["XX000", "private-canary", "CaseLink could not save or load"], ["P0001", "parent_reuse_source_changed", "parent_reuse_source_changed"],
   ])("maps %s to a fixed safe message", async (code, message, expected) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message, details: "WicPrivateCanary" } });

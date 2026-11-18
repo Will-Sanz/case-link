@@ -172,7 +172,7 @@ describe.skipIf(!modulePath)("durable exact SNAP capture on existing jobs (expli
   it("rejects a foreign or stale replacement without changing current work", async () => {
     const s = await setup(); await stage(s); const other = await setup();
     await expect(tx(() => role("authenticated", "select public.parent_replace_snap_personal_pages($1,$2,$3)", [s.request, s.version, s.packet], other))).rejects.toMatchObject({ code: "42501" });
-    await expect(tx(() => role("authenticated", "select public.parent_replace_snap_personal_pages($1,$2,$3)", [s.request, s.version, randomUUID()], s))).rejects.toMatchObject({ code: "40001" });
+    await expect(tx(() => role("authenticated", "select public.parent_replace_snap_personal_pages($1,$2,$3)", [s.request, s.version, randomUUID()], s))).rejects.toMatchObject({ code: "PT409" });
     await expect(tx(() => role("authenticated", "select public.parent_replace_snap_personal_pages($1,$2,$3)", [s.request, 2147483647, s.packet], s))).rejects.toMatchObject({ code: "23514" });
     expect((await job(s)).snap_packet_id).toBe(s.packet);
   });

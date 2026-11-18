@@ -79,7 +79,7 @@ describe("owned SNAP private file continuation HTTP bridge", () => {
     mocks.rpc.mockResolvedValue({ data, error: null }); expect((await POST(post(), context())).status).toBe(500);
   });
   it("keeps unknown delivery recoverable, contains private errors, and preserves conflict and ownership denials", async () => {
-    for (const [code, status] of [["40001", 409], ["42501", 403], ["XX000", 500]]) {
+    for (const [code, status] of [["40001", 409], ["PT409", 409], ["42501", 403], ["XX000", 500]]) {
       mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "PRIVATE-CANARY" } });
       const response = await POST(post(), context()); expect(response.status).toBe(status); expect(JSON.stringify(await response.json())).not.toContain("PRIVATE-");
     }

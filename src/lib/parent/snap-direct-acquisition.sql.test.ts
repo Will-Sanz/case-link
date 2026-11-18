@@ -137,7 +137,7 @@ describe.skipIf(!modulePath)("closed SNAP direct-acquisition authority SQL (logi
     await fixture.admin.query("update parent_private.processing_controls set snap_protected_max_retention_seconds=600");
     expect((await get(s)).expiresAt).toBe(permission.expiresAt); expect((await packet(s, permission.acquisitionId)).authorizationExpiresAt).toBe(permission.expiresAt);
     await fixture.admin.query("update parent_private.processing_controls set snap_protected_max_retention_seconds=100");
-    await expect(packet(s, permission.acquisitionId)).rejects.toMatchObject({ code: "40001" });
+    await expect(packet(s, permission.acquisitionId)).rejects.toMatchObject({ code: "PT409" });
     const next = await correction(s), shorter = await packet(next, permission.acquisitionId);
     expect(Date.parse(shorter.authorizationExpiresAt)).toBeLessThan(Date.parse(permission.expiresAt));
     expect(Date.parse(shorter.authorizationExpiresAt)).toBeLessThanOrEqual(Date.parse(permission.consentedAt!) + 100000);
