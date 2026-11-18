@@ -1,11 +1,13 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { runOneParentAssistantTurn } from "./assistant";
+import { FOOD_DESCRIPTION_FINGERPRINT, foodDescriptionCatalogReady, foodDescriptionProjectIdSchema, runOneFoodDescriptionTurn } from "./food-description-runtime";
 import { runOneParentNotification } from "./notification-runtime";
 import { runOneParentJob, type WorkerRuntimeOptions } from "./worker-runtime";
 
 /** The browser never drives this loop. Database leases and budgets bound each authorized turn. */
 export async function runParentWorkerService(
   options: WorkerRuntimeOptions & {
+    foodDescriptionProjectId?: string;
     watch?: boolean;
     signal?: AbortSignal;
     notifications?: Omit<
@@ -38,6 +40,7 @@ export async function runParentWorkerService(
       "select parent_private.parent_record_worker_health($1,$2,$3)",
       [planningReady, Boolean(apiKey), true],
     );
+    await database.query("select parent_private.parent_record_food_description_health($1,$2,$3)", [Boolean(apiKey) && foodDescriptionProjectIdSchema.safeParse(options.foodDescriptionProjectId).success && foodDescriptionCatalogReady(options.now?.() ?? new Date()), FOOD_DESCRIPTION_FINGERPRINT, options.foodDescriptionProjectId ?? null]);
   };
   await reportHealth();
   const timer = options.watch
@@ -65,6 +68,8 @@ export async function runParentWorkerService(
           now: options.now,
         });
       if (signal?.aborted || healthFailed) break;
+      if (apiKey) await runOneFoodDescriptionTurn({ database, apiKey, projectId: options.foodDescriptionProjectId, fetcher: options.fetcher, now: options.now });
+      if (signal?.aborted || healthFailed) break;
       if (!signal?.aborted && options.notifications)
         await runOneParentNotification({ ...options.notifications, database });
       if (!options.watch || signal?.aborted) break;
@@ -79,6 +84,7 @@ export async function runParentWorkerService(
   } finally {
     if (timer) clearInterval(timer);
     await heartbeat;
+    await database.query("select parent_private.parent_record_food_description_health(false,$1,$2)", [FOOD_DESCRIPTION_FINGERPRINT, options.foodDescriptionProjectId ?? null]).catch(() => {});
     await database
       .query("select parent_private.parent_record_worker_health(false,false,false)")
       .catch(() => {});

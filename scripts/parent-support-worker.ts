@@ -21,6 +21,7 @@ export async function runParentSupportWorker(env: Record<string, string | undefi
     await Promise.race([runParentWorkerService({
       database: service.database,
       apiKey: env.OPENAI_API_KEY,
+      foodDescriptionProjectId: env.CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID,
       brokerOrigin,
       brokerSecret,
       supabaseOrigin,

@@ -1,3 +1,4 @@
+import { foodDescriptionArchiveSchema } from "./food-description-draft";
 import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -211,7 +212,11 @@ export async function exportParentInformation() {
   const profile = familyProfileReadSchema.safeParse(profileReply.data);
   if (!profile.success || profile.data.ownerId !== household.owner_id)
     throw new Error("CaseLink could not export your family profile. Please try again.");
-  return { exportedAt, household, familyProfile: profile.data.profile, requests };
+  const descriptionReply = await supabase.rpc("parent_get_food_descriptions");
+  check(descriptionReply.error);
+  const descriptions = foodDescriptionArchiveSchema.safeParse(descriptionReply.data);
+  if (!descriptions.success || descriptions.data.ownerId !== household.owner_id) throw new Error("CaseLink could not export your food-description drafts. Please try again.");
+  return { exportedAt, household, familyProfile: profile.data.profile, foodDescriptions: descriptions.data.drafts, requests };
 }
 export async function getSupportRequest(
   id: string,

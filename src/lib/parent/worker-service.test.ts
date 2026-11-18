@@ -1,12 +1,16 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), assistant: vi.fn() }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), assistant: vi.fn(), description: vi.fn(), delay: vi.fn() }));
+vi.mock("node:timers/promises", () => ({ setTimeout: mocks.delay }));
 vi.mock("./assistant", () => ({ runOneParentAssistantTurn: mocks.assistant }));
 vi.mock("./worker-runtime", () => ({ runOneParentJob: mocks.plan }));
+vi.mock("./food-description-runtime", async importOriginal => ({ ...await importOriginal<typeof import("./food-description-runtime")>(), runOneFoodDescriptionTurn: mocks.description }));
 import { runParentWorkerService } from "./worker-service";
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.plan.mockResolvedValue({ state: "idle" });
   mocks.assistant.mockResolvedValue({ state: "idle" });
+  mocks.description.mockResolvedValue(false);
+  mocks.delay.mockResolvedValue(undefined);
 });
 const options = () => ({
   database: { query: vi.fn().mockResolvedValue({ rows: [] }) },
@@ -69,6 +73,7 @@ it("continues authorized work independently of page polling until stopped", asyn
     });
     await running;
     expect(mocks.plan.mock.calls.length).toBeGreaterThan(1);
+    expect(mocks.delay).toHaveBeenCalledExactlyOnceWith(5000, undefined, { signal: stop.signal });
     expect(input.database.query).toHaveBeenCalledWith(
       "select parent_private.parent_record_worker_health($1,$2,$3)",
       [true, true, true],
@@ -94,4 +99,18 @@ it("runs the fixed private utility preparation port without a model key or plann
   await runParentWorkerService({ ...input, apiKey: undefined, protectedUtilityPreparation });
   expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, protectedUtilityPreparation }));
   expect(mocks.assistant).not.toHaveBeenCalled(); expect(input.fetcher).not.toHaveBeenCalled(); expect(protectedUtilityPreparation.prepare).not.toHaveBeenCalled();
+});
+
+it("refreshes independent description health during one bounded asynchronous interpretation and clears it at shutdown", async () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-18T15:00:00Z"));
+  const input=options(),stop=new AbortController(); input.fetcher.mockImplementation(async()=>Response.json({ready:true}));
+  mocks.description.mockImplementation(async()=>{await new Promise(resolve=>setTimeout(resolve,60000));stop.abort();return true;});
+  try {
+    const running=runParentWorkerService({...input,watch:true,signal:stop.signal,foodDescriptionProjectId:"proj_synthetic"});
+    await vi.advanceTimersByTimeAsync(59000);
+    const heartbeats=input.database.query.mock.calls.filter(call=>call[0]==="select parent_private.parent_record_food_description_health($1,$2,$3)"&&call[1]?.[0]===true);
+    expect(heartbeats.length).toBeGreaterThanOrEqual(3); expect(heartbeats.every(call=>call[1]?.[2]==="proj_synthetic")).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000); await running;
+    expect(input.database.query).toHaveBeenCalledWith("select parent_private.parent_record_food_description_health(false,$1,$2)",[expect.stringMatching(/^[a-f0-9]{64}$/),"proj_synthetic"]);
+  } finally {stop.abort();vi.useRealTimers();}
 });

@@ -4,7 +4,7 @@ import { actionSchema, needSchema, outcomeSchema } from "./domain";
 import { assessFoodSupport, foodAssessmentQuestionReasons, foodAssessmentSchema, type FoodAssessmentAnswers, type FoodRecommendation } from "./food-assessment";
 import { getProgramsForNeeds, programRoutingIssue, supportsInitialServiceDelivery } from "./programs";
 
-// Unwired contract only. Passing these guards is not permission to collect prose or call a processor.
+// Passing these guards is not permission to collect prose or call a processor; durable callers have separate closed gates.
 export const foodDescriptionNeedSchema = needSchema.extract(["food_now", "snap_new", "snap_pending", "snap_renewal", "snap_problem"]);
 const programId = z.enum(["philly-food", "share-community-fridge-19129", "snap-pa", "uesf-benefits"]);
 const questionId = z.enum(Object.keys(foodAssessmentQuestionReasons) as (keyof typeof foodAssessmentQuestionReasons)[]);
@@ -103,12 +103,21 @@ export function buildFoodDescriptionProjection(input: unknown, trustedContext: u
   };
 }
 export type FoodDescriptionProjection = ReturnType<typeof buildFoodDescriptionProjection>;
+export const foodDescriptionProjectionSchema = foodDescriptionInputSchema.extend({
+  revision, catalogVersion: foodDescriptionContextSchema.shape.catalogVersion, capabilityVersion: foodDescriptionContextSchema.shape.capabilityVersion,
+  routingFacts: factsSchema,
+  ownedFoodHistory: z.array(z.object({ need: foodDescriptionNeedSchema.exclude(["food_now"]), state: outcomeSchema, current: z.boolean() }).strict()).max(20),
+  candidates: z.array(z.object({ need: foodDescriptionNeedSchema, programId, sourceCheckedAt: z.iso.date(), actions: z.array(actionSchema).max(6) }).strict()).max(20),
+  questionReasons: z.object({ foodForTwoDays: z.literal(foodAssessmentQuestionReasons.foodForTwoDays), benefitHistory: z.literal(foodAssessmentQuestionReasons.benefitHistory), existingIssue: z.literal(foodAssessmentQuestionReasons.existingIssue) }).strict(),
+  excludedNeedIds: z.array(foodDescriptionNeedSchema).max(5).refine(unique),
+}).strict();
+
 
 /** Span checks anchor an interpretation, not its semantic quality. That requires the still-unapproved measured evaluation. */
 export function validateFoodDescriptionSelection(input: {
   projection: FoodDescriptionProjection; selection: unknown; currentContext: unknown; now: Date;
 }) {
-  const { projection, now } = input, context = checkedContext(input.currentContext, now);
+  const { now } = input, projection = foodDescriptionProjectionSchema.parse(input.projection), context = checkedContext(input.currentContext, now);
   const current = buildFoodDescriptionProjection({ description: projection.description, screenLocale: projection.screenLocale }, context, now);
   if (JSON.stringify(projection) !== JSON.stringify(current)) throw new Error("parent_food_description_changed");
   const selection = foodDescriptionSelectionSchema.parse(input.selection);

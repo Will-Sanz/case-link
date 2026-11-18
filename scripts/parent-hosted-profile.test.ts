@@ -52,6 +52,16 @@ describe("hosted single-service profiles", () => {
     expect(work.OPENAI_API_KEY).toBe(worker.modelKey); expect(work.CASELINK_PARENT_SNAP_SENDER_SECRET).toBeUndefined();
     expect(work.CASELINK_PARENT_STORAGE_BROKER_S3_SECRET_ACCESS_KEY).toBeUndefined(); expect(work.NODE_OPTIONS).toBeUndefined();
   });
+  it("pins only an explicitly configured description project in the private worker environment", () => {
+    const ambient={NODE_ENV:"production" as const,CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID:"proj_ambient"};
+    expect(hostedChildEnvironment(parseHostedProfile(worker,now),ambient).CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID).toBeUndefined();
+    const configured=parseHostedProfile({...worker,foodDescriptionProjectId:"proj_synthetic"},now);
+    expect(hostedChildEnvironment(configured,ambient).CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID).toBe("proj_synthetic");
+    expect(hostedChildEnvironment(parseHostedProfile(web,now),ambient).CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID).toBeUndefined();
+    expect(hostedChildEnvironment(parseHostedProfile({...base,service:"retention",databaseUrl},now),ambient).CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID).toBeUndefined();
+    expect(()=>parseHostedProfile({...worker,foodDescriptionProjectId:"different"},now)).toThrow();
+    expect(()=>parseHostedProfile({...web,foodDescriptionProjectId:"proj_synthetic"},now)).toThrow();
+  });
   it("retention has independent maintenance authority and no storage/model/carrier credentials", () => {
     const env = hostedChildEnvironment(parseHostedProfile({ ...base, service: "retention", databaseUrl, approvedUntil: "2027-02-01T00:00:00Z" }, now), { NODE_ENV: "production" });
     expect(env.CASELINK_PARENT_RETENTION_MODE).toBe("snap-packets"); expect(env.CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL).toBe("2027-02-01T00:00:00Z");

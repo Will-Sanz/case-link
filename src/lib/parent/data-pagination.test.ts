@@ -13,6 +13,7 @@ type Row = Record<string, unknown>;
 let tables: Record<string, Row[]>;
 let protectedReferences: unknown[];
 let profileReply: unknown;
+let descriptionReply: unknown;
 let pending = 0,
   maxPending = 0;
 const calls: {
@@ -24,6 +25,7 @@ function client() {
   return {
     rpc: async (name: string) => {
       if (name === "parent_get_family_profile") return { data: profileReply, error: null };
+      if (name === "parent_get_food_descriptions") return { data: descriptionReply, error: null };
       if (name !== "parent_export_utility_protected_inputs") throw new Error("unexpected RPC"); return { data: protectedReferences, error: null };
     },
     from(table: string) {
@@ -92,6 +94,7 @@ function client() {
 }
 beforeEach(() => {
   protectedReferences = [];
+  descriptionReply = { ownerId: id(2), available: false, drafts: [] };
   profileReply = { ownerId: id(2), revision: 0, lastMutationKey: null, profile: null,
     collection: { collectionEnabled: false, noticeVersion: null, expiresAt: null, retentionDays: 45 } };
   pending = 0;
@@ -114,6 +117,11 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ user: { id: id(2) }, supabase: client() });
 });
 describe("complete parent data pagination", () => {
+  it("includes retained description rights separately from request history and refuses foreign ownership", async () => {
+    expect((await exportParentInformation()).foodDescriptions).toEqual([]);
+    descriptionReply = { ownerId: id(7), available: false, drafts: [] };
+    await expect(exportParentInformation()).rejects.toThrow("could not export your food-description drafts");
+  });
   it("exports the current owned profile and original dates, rejecting foreign or malformed records", async () => {
     const confirmedAt = new Date(Date.now() - 1000).toISOString(), expiresAt = new Date(Date.now() + 60000).toISOString();
     const profile = { revision: 1, idempotencyKey: id(3), details: { primaryPerson: { id: id(4), firstName: "Saved family name" } },

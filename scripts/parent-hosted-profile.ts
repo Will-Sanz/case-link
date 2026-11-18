@@ -16,7 +16,7 @@ const databaseUrl = z.string().min(1).max(2048);
 export const hostedProfileSchema = z.discriminatedUnion("service", [
   z.object({ ...common, service: z.literal("web"), publicKey, realDataApproved: z.boolean().default(false) }).strict(),
   z.object({ ...common, service: z.literal("frontdoor") }).strict(),
-  z.object({ ...common, service: z.literal("worker"), databaseUrl, brokerSecret: secret, modelKey: z.string().min(1).max(512),
+  z.object({ ...common, service: z.literal("worker"), databaseUrl, brokerSecret: secret, modelKey: z.string().min(1).max(512), foodDescriptionProjectId: z.string().regex(/^proj_[A-Za-z0-9_-]{1,100}$/).optional(),
     parserImage: z.string().max(201).regex(/^[a-z0-9][a-z0-9./:_-]*@sha256:[a-f0-9]{64}$/),
     dockerHost: z.string().regex(/^unix:\/\/\/run\/user\/[0-9]+\/docker\.sock$/),
     parserDaemonId: z.string().regex(/^[A-Za-z0-9:_.-]{16,128}$/),
@@ -82,6 +82,7 @@ export function hostedChildEnvironment(config: HostedProfile, system: NodeJS.Pro
     Object.assign(env, { CASELINK_PARENT_WORKER_APPROVED: "1", CASELINK_PARENT_WORKER_DATABASE_URL: config.databaseUrl,
       CASELINK_PARENT_WORKER_SUPABASE_URL: config.projectOrigin, CASELINK_PARENT_STORAGE_BROKER_ORIGIN: "http://127.0.0.1:3310",
       CASELINK_PARENT_STORAGE_BROKER_SECRET: config.brokerSecret, OPENAI_API_KEY: config.modelKey,
+      ...(config.foodDescriptionProjectId ? { CASELINK_PARENT_FOOD_DESCRIPTION_OPENAI_PROJECT_ID: config.foodDescriptionProjectId } : {}),
       CASELINK_DOCUMENT_PARSER_IMAGE: config.parserImage, DOCKER_HOST: config.dockerHost,
       ...(config.senderSecret ? { CASELINK_PARENT_SNAP_SENDER_ORIGIN: "http://127.0.0.1:3500", CASELINK_PARENT_SNAP_SENDER_SECRET: config.senderSecret } : {}) });
   } else if (config.service === "broker") {

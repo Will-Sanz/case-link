@@ -11,10 +11,10 @@ import {
 
 async function main() {
   const env = process.env;
-  const mode = z.enum(["all", "snap-packets", "utility-inputs", "family-profiles", "ordinary"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
+  const mode = z.enum(["all", "snap-packets", "utility-inputs", "family-profiles", "food-descriptions", "ordinary"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
   const packetsOnly = mode === "snap-packets", utilityOnly = mode === "utility-inputs", ordinaryOnly = mode === "ordinary";
-  const profilesOnly = mode === "family-profiles";
-  const maintained = packetsOnly || utilityOnly || profilesOnly || ordinaryOnly;
+  const profilesOnly = mode === "family-profiles", descriptionsOnly = mode === "food-descriptions";
+  const maintained = packetsOnly || utilityOnly || profilesOnly || descriptionsOnly || ordinaryOnly;
   const connectionString = env.CASELINK_PARENT_RETENTION_DATABASE_URL;
   const projectUrl = env.CASELINK_PARENT_RETENTION_SUPABASE_URL;
   const storageKey = env.CASELINK_PARENT_RETENTION_STORAGE_KEY;
@@ -192,7 +192,7 @@ async function main() {
     let removedDocuments = 0,
       removedAccounts = 0,
       removedPackets = 0, removedUtilityInputs = 0, removedUtilityPreparations = 0, removedProfiles = 0;
-    for (let count = 0; !ordinaryOnly && !utilityOnly && !profilesOnly && count < 10; count++) {
+    for (let count = 0; !ordinaryOnly && !utilityOnly && !profilesOnly && !descriptionsOnly && count < 10; count++) {
       const result = await query(
         "select parent_private.parent_purge_snap_final_packets(100) removed",
       );
@@ -204,23 +204,30 @@ async function main() {
       process.stdout.write(`Retention completed: ${removedPackets} protected packets erased.\n`);
       return;
     }
-    for (let count = 0; !ordinaryOnly && !profilesOnly && count < 10; count++) {
+    for (let count = 0; !ordinaryOnly && !profilesOnly && !descriptionsOnly && count < 10; count++) {
       const result = await query("select parent_private.parent_purge_utility_protected_inputs(100) removed");
       const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed); removedUtilityInputs += removed;
       if (removed < 100) break;
     }
-    for (let count = 0; !ordinaryOnly && !profilesOnly && count < 10; count++) {
+    for (let count = 0; !ordinaryOnly && !profilesOnly && !descriptionsOnly && count < 10; count++) {
       const result = await query("select parent_private.parent_purge_utility_prepared_artifacts(100) removed");
       const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed); removedUtilityPreparations += removed;
       if (removed < 100) break;
     }
     if (utilityOnly) { process.stdout.write(`Retention completed: ${removedUtilityInputs} protected utility inputs and ${removedUtilityPreparations} protected utility drafts erased.\n`); return; }
-    for (let count = 0; !ordinaryOnly && count < 10; count++) {
+    for (let count = 0; !ordinaryOnly && !descriptionsOnly && count < 10; count++) {
       const result = await query("select parent_private.parent_purge_family_profiles(100) removed");
       const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed); removedProfiles += removed;
       if (removed < 100) break;
     }
     if (profilesOnly) { process.stdout.write(`Retention completed: ${removedProfiles} family profiles erased.\n`); return; }
+    let removedDescriptions = 0;
+    for (let count = 0; (mode === "all" || descriptionsOnly) && count < 10; count++) {
+      const result = await query("select parent_private.parent_purge_food_descriptions(100) removed");
+      const removed = z.number().int().min(0).max(200).parse(result.rows[0]?.removed); removedDescriptions += removed;
+      if (removed < 100) break;
+    }
+    if (descriptionsOnly) { process.stdout.write(`Retention completed: ${removedDescriptions} description content/metadata records erased.\n`); return; }
     if (!supabase && !s3) throw new Error("Ordinary retention requires its Storage credential.");
     for (let count = 0; count < 10; count++) {
       const result = await query(

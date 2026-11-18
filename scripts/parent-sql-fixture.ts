@@ -139,6 +139,7 @@ export async function createParentSqlFixture(
     "20261118050422_parent_public_food_access.sql",
     "20261118080328_parent_public_food_snap_continuation.sql",
     "20261118080954_parent_snap_food_profile_sync.sql",
+    "20261118095752_parent_food_description_drafts.sql",
     "20261118121715_parent_snap_document_sources.sql",
     "20261118121854_parent_job_claim_recheck.sql",
   ];
