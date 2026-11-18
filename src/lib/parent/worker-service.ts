@@ -55,7 +55,7 @@ export async function runParentWorkerService(
   try {
     do {
       if (signal?.aborted || healthFailed) break;
-      if (planningReady || options.protectedSnapSubmission)
+      if (planningReady || options.protectedSnapSubmission || options.protectedUtilityPreparation)
         await runOneParentJob({ ...options, continuationOnly: !planningReady });
       if (signal?.aborted || healthFailed) break;
       if (apiKey)

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireParentSession } from "./auth";
 import { intakeSchema, mandateSchema, reusedZipSourceSchema, type ServiceMandate, type SupportIntake } from "./domain";
 import { pecoApplicationWriteSchema, pecoApplicationSnapshotSchema, pecoApplicationCollectionSchema, type PecoApplicationSnapshot } from "./peco-application-snapshot";
+import { isUtilityPreparationMandate } from "./utility-preparation-scope";
 
 export { pecoApplicationWriteSchema, pecoApplicationSnapshotSchema } from "./peco-application-snapshot";
 export const pecoInitialIntakeSchema = intakeSchema.superRefine((value, context) => {
@@ -12,8 +13,7 @@ export const pecoInitialIntakeSchema = intakeSchema.superRefine((value, context)
     context.addIssue({ code: "custom", message: "Start PECO preparation with only its current routing and account authority." });
 });
 const initialMandateSchema = mandateSchema.superRefine((value, context) => {
-  if (value.mode !== "prepare_only" || value.recipientIds.length !== 1 || value.recipientIds[0] !== "peco-cap" ||
-    !value.allowedActions.includes("prepare") || value.allowedData.length !== 3 || !["household", "income", "utility"].every(category => value.allowedData.includes(category as "household" | "income" | "utility")))
+  if (!isUtilityPreparationMandate(value, "peco-cap"))
     context.addIssue({ code: "custom", message: "Use PECO-specific preparation permission for household, income and utility information." });
 });
 const columns = "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key";

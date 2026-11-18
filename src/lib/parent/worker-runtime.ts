@@ -26,6 +26,9 @@ import { receiptSchema } from "./policy";
 import { sameSnapProtectedPacket, sameSnapProtectedOperationBinding, snapProtectedOperationSchema, snapProtectedReferenceSchema, type SnapProtectedOperation } from "./snap-protected-operation";
 import { snapProtectedSubmissionResultSchema, type SnapProtectedSubmissionIntent, type SnapProtectedSubmissionPort } from "./snap-protected-submission-port";
 import { parseSnapPendingCapture, runSnapCaptureCheck, snapCaptureCheckResultSchema, type SnapCapturePreparationPort, type SnapPendingCapture } from "./snap-pending-capture";
+import { sameUtilityProtectedOperationBinding, utilityProtectedOperationSchema } from "./utility-protected-operation";
+import { utilityPreparationJobSchema, utilityProtectedPreparationResultSchema, type UtilityProtectedPreparationPort, type UtilityPreparationJob, type UtilityProtectedPreparationResult } from "./utility-preparation-port";
+import { isUtilityPreparationMandate, type UtilityPreparationProgram } from "./utility-preparation-scope";
 import { canonicalProjectOrigin } from "./project-origin";
 import { parentStorageDownloadAllowed } from "./storage-download";
 import { getProgram, programRoutingIssue } from "./programs";
@@ -84,6 +87,7 @@ export type WorkerRuntimeOptions = {
   supabaseOrigin: string;
   transports?: ReadonlyMap<string, RuntimeTransport>;
   protectedSnapSubmission?: SnapProtectedSubmissionPort;
+  protectedUtilityPreparation?: UtilityProtectedPreparationPort;
   snapCapturePreparation?: SnapCapturePreparationPort;
   fetcher?: typeof fetch;
   now?: () => Date;
@@ -224,6 +228,12 @@ export function normalizeWorkerOperation(
     protectedParentSubmitReady: operation.protectedParentSubmitReady === true,
     snapSubmissionAuthorized: operation.snapSubmissionAuthorized === true,
   }) : undefined;
+  const protectedUtility = Object.hasOwn(operation.packet, "protectedUtilityPacket") ? utilityProtectedOperationSchema.parse({
+    operationId: operation.id, requestId: operation.request_id, requestVersion: operation.request_version,
+    need: operation.need, programId: operation.program_id, action: operation.action, state,
+    packet: operation.packet, packetHash: operation.packet_hash, dataCategories: operation.data_categories, documentIds: operation.document_ids,
+    artifactId: operation.artifact_id, idempotencyKey: operation.idempotency_key, protectedPacketCurrent: operation.protectedPacketCurrent === true,
+  }) : undefined;
   return {
     id: operation.id,
     need: operation.need,
@@ -238,6 +248,7 @@ export function normalizeWorkerOperation(
     ...(receipt.success ? { receipt: receipt.data } : {}),
     snapSubmissionAuthorized: operation.snapSubmissionAuthorized === true,
     ...(protectedSnap ? { protectedSnap } : {}),
+    ...(protectedUtility ? { protectedUtility } : {}),
   };
 }
 
@@ -363,12 +374,19 @@ export async function runOneParentJob(
   if (!brokerOrigin || !supabaseOrigin || options.brokerSecret.length < 32)
     throw new Error("isolated_worker_configuration_required");
   const claimed = await db.query(
-    options.continuationOnly ? "select parent_private.parent_claim_job($1,$2) as job" : "select parent_private.parent_claim_job($1) as job",
-    options.continuationOnly ? [300, true] : [300],
+    options.continuationOnly ? options.protectedUtilityPreparation
+      ? "select parent_private.parent_claim_job($1,$2,$3,$4) as job" : "select parent_private.parent_claim_job($1,$2) as job"
+      : "select parent_private.parent_claim_job($1) as job",
+    options.continuationOnly ? options.protectedUtilityPreparation ? [300, true, Boolean(options.protectedSnapSubmission), true] : [300, true] : [300],
   );
   if (!claimed.rows[0]?.job) return { state: "idle" };
   const job = claimSchema.parse(claimed.rows[0].job),
     request = job.request as unknown as SupportRequest;
+  const utilityProgram: UtilityPreparationProgram | undefined = request.intake.needs.length === 1
+    ? request.intake.needs[0] === "electricity" && request.has_peco_application_details ? "peco-cap"
+      : request.intake.needs[0] === "gas" && request.has_pgw_application_details ? "pgw-crp"
+      : request.intake.needs[0] === "water" && request.has_water_application_details ? "pwd-tap" : undefined : undefined;
+  let utilityPreparation: Parameters<typeof runSupportService>[0]["utilityPreparation"];
   const transports = options.transports ?? PARENT_TRANSPORTS;
   const rpc = async (sql: string, values: unknown[] = []) =>
     (await db.query(sql, values)).rows[0]?.value;
@@ -543,6 +561,42 @@ export async function runOneParentJob(
       }
     }
   }
+  if (utilityProgram) {
+    utilityPreparation = { programId: utilityProgram, state: "service_blocked" };
+    let target: UtilityPreparationJob | null = null, observed: UtilityProtectedPreparationResult | null = null, attempted = false;
+    try {
+      if (isUtilityPreparationMandate(request.mandate, utilityProgram)) {
+        await lease();
+        const raw = await rpc("select parent_private.parent_get_utility_preparation_target($1,$2) as value", [job.jobId, job.leaseToken]);
+        target = raw == null ? null : utilityPreparationJobSchema.parse(raw);
+        if (target && (target.jobId !== job.jobId || target.leaseToken !== job.leaseToken || target.scope.requestId !== request.id ||
+          target.scope.expectedVersion !== request.version || target.scope.programId !== utilityProgram)) throw new Error("utility_preparation_scope_changed");
+        if (target && options.protectedUtilityPreparation) {
+          attempted = true;
+          try { observed = utilityProtectedPreparationResultSchema.parse(await options.protectedUtilityPreparation.prepare({ ...target, signal: AbortSignal.timeout(30000) })); }
+          catch { /* A lost response can still have committed. Reconcile actual current metadata below. */ }
+          await lease();
+          rawOperations = await loadOperations(); operations = rawOperations.map(normalizeWorkerOperation).filter((operation): operation is ServiceOperation => operation !== null);
+          const matches = operations.flatMap(value => value.protectedUtility?.protectedPacketCurrent &&
+            value.protectedUtility.requestId === request.id && value.protectedUtility.requestVersion === request.version && value.protectedUtility.programId === utilityProgram &&
+            value.protectedUtility.packet.protectedUtilityPacket.snapshotId === target!.scope.snapshotId &&
+            value.protectedUtility.packet.protectedUtilityPacket.snapshotRevision === target!.scope.snapshotRevision &&
+            value.protectedUtility.packet.protectedUtilityPacket.snapshotHash === target!.scope.snapshotHash ? [value.protectedUtility] : []);
+          if (matches.length === 1) {
+            const canonical = utilityProtectedOperationSchema.parse(await rpc("select parent_private.parent_get_utility_prepared_operation($1,$2,$3) as value", [job.jobId, job.leaseToken, matches[0].packet.protectedUtilityPacket.packetId]));
+            if (!canonical.protectedPacketCurrent || !sameUtilityProtectedOperationBinding(canonical, matches[0]) ||
+              observed?.state === "prepared" && !sameUtilityProtectedOperationBinding(canonical, observed.operation) ||
+              observed?.state === "commit_unknown" && (observed.operationId !== canonical.operationId || observed.packetId !== canonical.packet.protectedUtilityPacket.packetId))
+              throw new Error("utility_preparation_scope_changed");
+            utilityPreparation.state = "prepared";
+          } else if (observed?.state === "prepared") throw new Error("utility_preparation_unconfirmed");
+          else if (!observed || observed.state === "commit_unknown") utilityPreparation.state = "commit_unknown";
+        }
+      }
+    } catch { if (attempted) utilityPreparation.state = "commit_unknown"; }
+    if (utilityPreparation.state === "commit_unknown" && now().getTime() + 30000 < Date.parse(request.mandate.expiresAt))
+      utilityPreparation.retryAt = new Date(now().getTime() + 30000).toISOString();
+  }
   const protectedIntent = (canonical: SnapProtectedOperation, signal: AbortSignal): SnapProtectedSubmissionIntent => ({
     jobId: job.jobId, leaseToken: job.leaseToken, operationId: canonical.operationId, requestId: canonical.requestId,
     requestVersion: canonical.requestVersion, idempotencyKey: canonical.idempotencyKey, packetHash: canonical.packetHash,
@@ -561,6 +615,13 @@ export async function runOneParentJob(
     if (continuationPass && (!operation.protectedSnap || !continuations.some(known => sameSnapProtectedOperationBinding(known, operation.protectedSnap!))))
       throw new Error("fresh_planning_required");
     await lease();
+    if (operation.protectedUtility) {
+      const current = utilityProtectedOperationSchema.parse(await rpc("select parent_private.parent_get_utility_prepared_operation($1,$2,$3) as value",
+        [job.jobId, job.leaseToken, operation.protectedUtility.packet.protectedUtilityPacket.packetId]));
+      if (!current.protectedPacketCurrent || current.requestId !== request.id || current.requestVersion !== request.version ||
+        !sameUtilityProtectedOperationBinding(current, operation.protectedUtility)) throw new Error("utility_preparation_scope_changed");
+      return current.operationId;
+    }
     if (operation.protectedSnap) {
       const current = await currentProtectedOperation(operation.protectedSnap);
       if (!current.protectedPacketCurrent || !current.protectedParentSubmitReady || !current.personalActsComplete || !current.snapSubmissionAuthorized) throw new Error("protected_operation_authority_changed");
@@ -699,6 +760,7 @@ export async function runOneParentJob(
   };
   const ports: ServicePorts = {
     coordinate: async (request) => {
+      if (utilityProgram) return { plan: buildSupportPlan(request, now(), { [request.intake.needs[0]]: utilityProgram }), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
       if (continuationPass) return { plan: buildSupportPlan(request, now(), { snap_new: "snap-pa" }), requiredActions: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 };
       if (options.continuationOnly || !options.apiKey)
         throw new DocumentProcessingError("configuration_unavailable");
@@ -771,6 +833,7 @@ export async function runOneParentJob(
     },
     personalActsComplete,
     execute: async (operation) => {
+      if (operation.protectedUtility || Object.hasOwn(operation.packet, "protectedUtilityPacket")) return { state: "blocked", reason: "utility_preparation_only" };
       if (continuationPass && (!operation.protectedSnap || !continuations.some(known => sameSnapProtectedOperationBinding(known, operation.protectedSnap!))))
         return { state: "blocked", reason: "fresh_planning_required" };
       const capability = await getCapability(
@@ -1161,7 +1224,8 @@ export async function runOneParentJob(
   try {
     const result = await runSupportService({
       request: serviceRequest,
-      documents: continuation ? [] : job.documents.map(normalizeDocument),
+      documents: continuation || utilityProgram ? [] : job.documents.map(normalizeDocument),
+      ...(utilityPreparation ? { utilityPreparation } : {}),
       operations,
       jobAttempts: deliveryJobAttempts,
       ...(snapCapture && !continuation ? { snapCapture } : {}),

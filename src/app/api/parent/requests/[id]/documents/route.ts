@@ -45,6 +45,8 @@ export async function POST(request: Request, { params }: Context) {
       return parentJson({ ok: false, error: "WIC document processing is not available. Use official WIC help; your saved history remains available." }, 403);
     if (support.has_peco_application_details)
       return parentJson({ ok: false, error: "Private PECO document processing is not available. Your saved history remains available." }, 403);
+    if (support.has_pgw_application_details || support.has_water_application_details)
+      return parentJson({ ok: false, error: "Use this request's protected utility document path. Your saved history remains available." }, 403);
     if (
       Number(request.headers.get("content-length") ?? 0) >
       MAX_DOCUMENT_BYTES + 32768

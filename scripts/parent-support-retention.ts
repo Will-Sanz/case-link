@@ -10,9 +10,10 @@ import {
 
 async function main() {
   const env = process.env;
-  const mode = z.enum(["all", "snap-packets", "ordinary"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
-  const packetsOnly = mode === "snap-packets", ordinaryOnly = mode === "ordinary";
-  const maintained = packetsOnly || ordinaryOnly;
+  const mode = z.enum(["all", "snap-packets", "utility-inputs", "family-profiles", "ordinary"]).parse(env.CASELINK_PARENT_RETENTION_MODE ?? "all");
+  const packetsOnly = mode === "snap-packets", utilityOnly = mode === "utility-inputs", ordinaryOnly = mode === "ordinary";
+  const profilesOnly = mode === "family-profiles";
+  const maintained = packetsOnly || utilityOnly || profilesOnly || ordinaryOnly;
   const connectionString = env.CASELINK_PARENT_RETENTION_DATABASE_URL;
   const projectUrl = env.CASELINK_PARENT_RETENTION_SUPABASE_URL;
   const storageKey = env.CASELINK_PARENT_RETENTION_STORAGE_KEY;
@@ -89,7 +90,7 @@ async function main() {
     s3SecretAccessKey: env.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY,
     s3Region: env.CASELINK_PARENT_RETENTION_S3_REGION,
   }) : null;
-  if (packetsOnly && [env.CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID, env.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY, env.CASELINK_PARENT_RETENTION_S3_REGION].some(value => value !== undefined))
+  if ((packetsOnly || utilityOnly || profilesOnly) && [env.CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID, env.CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY, env.CASELINK_PARENT_RETENTION_S3_REGION].some(value => value !== undefined))
     throw new Error("Protected packet maintenance cannot receive Storage credentials.");
   const batchSchema = z.object({
     batchId: z.uuid(),
@@ -184,8 +185,8 @@ async function main() {
       throw new Error("Could not enter the restricted retention role.");
     let removedDocuments = 0,
       removedAccounts = 0,
-      removedPackets = 0;
-    for (let count = 0; !ordinaryOnly && count < 10; count++) {
+      removedPackets = 0, removedUtilityInputs = 0, removedUtilityPreparations = 0, removedProfiles = 0;
+    for (let count = 0; !ordinaryOnly && !utilityOnly && !profilesOnly && count < 10; count++) {
       const result = await query(
         "select parent_private.parent_purge_snap_final_packets(100) removed",
       );
@@ -197,6 +198,23 @@ async function main() {
       process.stdout.write(`Retention completed: ${removedPackets} protected packets erased.\n`);
       return;
     }
+    for (let count = 0; !ordinaryOnly && !profilesOnly && count < 10; count++) {
+      const result = await query("select parent_private.parent_purge_utility_protected_inputs(100) removed");
+      const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed); removedUtilityInputs += removed;
+      if (removed < 100) break;
+    }
+    for (let count = 0; !ordinaryOnly && !profilesOnly && count < 10; count++) {
+      const result = await query("select parent_private.parent_purge_utility_prepared_artifacts(100) removed");
+      const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed); removedUtilityPreparations += removed;
+      if (removed < 100) break;
+    }
+    if (utilityOnly) { process.stdout.write(`Retention completed: ${removedUtilityInputs} protected utility inputs and ${removedUtilityPreparations} protected utility drafts erased.\n`); return; }
+    for (let count = 0; !ordinaryOnly && count < 10; count++) {
+      const result = await query("select parent_private.parent_purge_family_profiles(100) removed");
+      const removed = z.number().int().min(0).max(100).parse(result.rows[0]?.removed); removedProfiles += removed;
+      if (removed < 100) break;
+    }
+    if (profilesOnly) { process.stdout.write(`Retention completed: ${removedProfiles} family profiles erased.\n`); return; }
     if (!supabase && !s3) throw new Error("Ordinary retention requires its Storage credential.");
     for (let count = 0; count < 10; count++) {
       const result = await query(
@@ -242,7 +260,7 @@ async function main() {
       removedAccounts += accounts.length;
     }
     process.stdout.write(
-      `Retention completed: ${removedPackets} protected packets, ${removedDocuments} private objects and ${removedAccounts} parent memberships erased.\n`,
+      `Retention completed: ${removedPackets} protected packets, ${removedUtilityInputs} protected utility inputs, ${removedUtilityPreparations} protected utility drafts, ${removedProfiles} family profiles, ${removedDocuments} private objects and ${removedAccounts} parent memberships erased.\n`,
     );
   } finally {
     if (ordinaryOnly) { process.removeListener("SIGTERM", abort); process.removeListener("SIGINT", abort); }

@@ -62,7 +62,7 @@ function createParentProtectedFrontdoor(appOrigin: string, protectedOrigin: stri
       protectedPath = [path, decoded, parsed.pathname, normalized].some(value => /^\/protected(?:\/|$)/i.test(value));
       if (protectedPath) {
         // Ambiguous protected paths must never fall through to Next or reach a different service route.
-        if (path !== decoded || path !== parsed.pathname || !path.startsWith("/protected/snap/")) return reject(400);
+        if (path !== decoded || path !== parsed.pathname || !["/protected/snap/", "/protected/utilities/"].some(prefix => path.startsWith(prefix))) return reject(400);
         const method = incoming.method ?? "GET", length = incoming.headers["content-length"];
         if (!["GET", "HEAD", "POST", "PUT", "DELETE"].includes(method) || incoming.headers["transfer-encoding"]
           || (length !== undefined && (!/^(0|[1-9]\d{0,8})$/.test(length) || Number(length) > maxPacketBytes))

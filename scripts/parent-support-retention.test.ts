@@ -60,7 +60,7 @@ const principal = () => ({ rolname: "synthetic_retention", rolcanlogin: true, ro
   rolcreaterole: false, rolcreatedb: false, rolreplication: false, member: true, can_set: true, admin_option: false,
   broader_membership: false, group_membership: false, group_login: false, group_inherit: false, group_super: false,
   group_bypassrls: false, group_createrole: false, group_createdb: false, group_replication: false });
-type Options = { env?: Record<string, string | undefined>; principal?: Record<string, unknown> | null; wait?: boolean;
+type Options = { env?: Record<string, string | undefined>; principal?: Record<string, unknown> | null; wait?: boolean; utilityCounts?: unknown[]; utilityPreparedCounts?: unknown[]; profileCounts?: unknown[];
   hangAt?: "connect" | "purge" | "end"; errorAt?: "connect" | "purge"; batch?: unknown; purgeReply?: Promise<unknown> };
 async function localRetention(counts: unknown[], options: Options = {}) {
   vi.resetModules();
@@ -74,7 +74,7 @@ async function localRetention(counts: unknown[], options: Options = {}) {
     CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL:undefined,CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE:undefined,
     ...options.env,
   }))vi.stubEnv(key,value);
-  let next=0;
+  let next=0, nextUtility=0, nextPrepared=0, nextProfile=0;
   mocks.storage.mockReturnValue({});
   mocks.s3.mockReturnValue({ remove: mocks.remove, destroy: mocks.s3Destroy });
   if(options.hangAt==="connect")mocks.connect.mockImplementation(()=>new Promise(()=>{}));
@@ -91,6 +91,9 @@ async function localRetention(counts: unknown[], options: Options = {}) {
       if(options.purgeReply)return options.purgeReply;
       return{rows:[{removed:counts[next++]??0}]};
     }
+    if(sql.includes("parent_purge_utility_protected_inputs")) return {rows:[{removed:options.utilityCounts?.[nextUtility++]??0}]};
+    if(sql.includes("parent_purge_utility_prepared_artifacts")) return {rows:[{removed:options.utilityPreparedCounts?.[nextPrepared++]??0}]};
+    if(sql.includes("parent_purge_family_profiles")) return {rows:[{removed:options.profileCounts?.[nextProfile++]??0}]};
     if(sql.includes("parent_claim_cleanup")){const batch=claimed?null:options.batch??null;claimed=true;return{rows:[{batch}]};}
     if(sql.includes("parent_finish_cleanup"))return{rows:[]};
     throw new Error("Unexpected synthetic retention query");
@@ -105,11 +108,47 @@ const packetRetention = (counts: unknown[], options: Options = {}) => localReten
   CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE: "Synthetic offline maintenance approval only", ...options.env,
 } });
 
+it("purges utility inputs and prepared drafts without a Storage client and before ordinary cleanup", async () => {
+  const result = await localRetention([0], { utilityCounts: [100, 2], utilityPreparedCounts: [100, 3] });
+  expect(result.stdout).toContain("102 protected utility inputs, 103 protected utility drafts");
+  const cleanup = result.queries.findIndex(sql => sql.includes("parent_claim_cleanup"));
+  for (const name of ["parent_purge_utility_protected_inputs", "parent_purge_utility_prepared_artifacts"])
+    expect(result.queries.findLastIndex(sql => sql.includes(name))).toBeLessThan(cleanup);
+});
+
+it("caps each utility purge independently and preserves pending cleanup on malformed prepared counts", async () => {
+  const result = await packetRetention([], { utilityPreparedCounts: ["PRIVATE_COUNT_CANARY"], env: { CASELINK_PARENT_RETENTION_MODE: "utility-inputs" } });
+  expect(process.exitCode).toBe(1);
+  expect(result.stdout).toBe(""); expect(result.stderr).not.toContain("PRIVATE_COUNT_CANARY");
+  expect(mocks.storage).not.toHaveBeenCalled();
+  expect(result.queries.some(sql => sql.includes("parent_claim_cleanup"))).toBe(false);
+});
+
+it("bounds SQL-only utility input and draft cleanup to ten batches each", async () => {
+  const result = await packetRetention([], { utilityCounts: Array(11).fill(100), utilityPreparedCounts: Array(11).fill(100), env: { CASELINK_PARENT_RETENTION_MODE: "utility-inputs" } });
+  expect(result.queries.filter(sql => sql.includes("parent_purge_utility_protected_inputs"))).toHaveLength(10);
+  expect(result.queries.filter(sql => sql.includes("parent_purge_utility_prepared_artifacts"))).toHaveLength(10);
+  expect(result.stdout).toBe("Retention completed: 1000 protected utility inputs and 1000 protected utility drafts erased.\n");
+  expect(mocks.storage).not.toHaveBeenCalled();
+});
+
+it("erases expired family profiles in a SQL-only bounded invocation without Storage credentials", async () => {
+  const result = await packetRetention([], { profileCounts: [100, 2], env: { CASELINK_PARENT_RETENTION_MODE: "family-profiles" } });
+  expect(result.stdout).toBe("Retention completed: 102 family profiles erased.\n");
+  expect(result.queries.filter(sql => sql.includes("parent_purge_family_profiles"))).toHaveLength(2);
+  expect(result.queries.some(sql => /parent_purge_snap|parent_purge_utility|parent_claim_cleanup/.test(sql))).toBe(false);
+  expect(mocks.storage).not.toHaveBeenCalled(); expect(mocks.s3).not.toHaveBeenCalled();
+});
+it.each(["PRIVATE_PROFILE_COUNT", -1, 101])("rejects invalid profile cleanup result %j without logging content", async count => {
+  const result = await packetRetention([], { profileCounts: [count], env: { CASELINK_PARENT_RETENTION_MODE: "family-profiles" } });
+  expect(process.exitCode).toBe(1); expect(result.stdout).toBe(""); expect(result.stderr).not.toContain("PRIVATE_PROFILE_COUNT");
+});
+
 it("purges protected packets first and reports only aggregate counts",async()=>{
   const result=await localRetention([100,100,3]);
   expect(result.queries.filter(sql=>sql.includes("parent_purge_snap_final_packets"))).toHaveLength(3);
   expect(result.queries.findLastIndex(sql=>sql.includes("parent_purge_snap_final_packets"))).toBeLessThan(result.queries.findIndex(sql=>sql.includes("parent_claim_cleanup")));
-  expect(result.stdout).toBe("Retention completed: 203 protected packets, 0 private objects and 0 parent memberships erased.\n");expect(result.stderr).toBe("");
+  expect(result.stdout).toBe("Retention completed: 203 protected packets, 0 protected utility inputs, 0 protected utility drafts, 0 family profiles, 0 private objects and 0 parent memberships erased.\n");expect(result.stderr).toBe("");
   expect(result.queries.some(sql=>/vault\.|ciphertext|keyBase64|owner_id|processing_controls/.test(sql))).toBe(false);
 });
 it("bounds protected deletion to ten batches without skipping ordinary cleanup",async()=>{
@@ -224,7 +263,7 @@ it("preserves default full Storage cleanup and parent-membership acknowledgement
   const result=await localRetention([0],{batch:{batchId:id,leaseToken:doc,documents:[{id:doc,objectPath:`${id}/${doc}/${artifact}`}],artifacts:[{id:artifact,objectPath:`${id}/${artifact}.pdf`}],accountIds:[account],requestIds:[]}});
   expect(from.mock.calls.map(call=>call[0])).toEqual(["parent-documents","parent-form-artifacts"]);expect(remove).toHaveBeenCalledTimes(2);
   expect(mocks.query.mock.calls.find(([sql])=>String(sql).includes("parent_finish_cleanup"))?.[1]).toEqual([id,doc,[doc],[account],[artifact]]);
-  expect(deleteUser).not.toHaveBeenCalled();expect(result.stdout).toBe("Retention completed: 0 protected packets, 2 private objects and 1 parent memberships erased.\n");
+  expect(deleteUser).not.toHaveBeenCalled();expect(result.stdout).toBe("Retention completed: 0 protected packets, 0 protected utility inputs, 0 protected utility drafts, 0 family profiles, 2 private objects and 1 parent memberships erased.\n");
 });
 
 const cleanupId = "11111111-1111-4111-8111-111111111111", cleanupDoc = "22222222-2222-4222-8222-222222222222", cleanupArtifact = "33333333-3333-4333-8333-333333333333";
@@ -241,7 +280,7 @@ it("ordinary-only maintenance uses S3 and exact acknowledgements without protect
   expect(mocks.storage).not.toHaveBeenCalled(); expect(mocks.s3).toHaveBeenCalledOnce(); expect(mocks.remove).toHaveBeenCalledTimes(2);
   expect(mocks.remove.mock.calls.map(([bucket, path]) => [bucket, path])).toEqual([["parent-documents", cleanupBatch.documents[0].objectPath], ["parent-form-artifacts", cleanupBatch.artifacts[0].objectPath]]);
   expect(mocks.query.mock.calls.find(([sql]) => String(sql).includes("parent_finish_cleanup"))?.[1]).toEqual([cleanupId, cleanupDoc, [cleanupDoc], [cleanupId], [cleanupArtifact]]);
-  expect(result.queries.some(sql => sql.includes("parent_purge_snap"))).toBe(false); expect(result.queries).toContain("select parent_private.parent_claim_cleanup(1) batch");
+  expect(result.queries.some(sql => /parent_purge_(snap|utility|family)/.test(sql))).toBe(false); expect(result.queries).toContain("select parent_private.parent_claim_cleanup(1) batch");
   expect(result.stdout).toContain("2 private objects and 1 parent memberships erased"); expect(mocks.s3Destroy).toHaveBeenCalledOnce();
 });
 it.each([

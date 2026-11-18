@@ -68,7 +68,8 @@ describe("explicit PECO CAP family preparation", () => {
     expect(body.details.journey).toBeUndefined(); expect(body.details.currentCapState).toBeUndefined();
     expect(JSON.stringify(body.intake)).not.toMatch(/PecoPrivateCanary|1234567890|19147/);
     expect(body.mandate.mode).toBe("prepare_only"); expect(body.mandate.recipientIds).toEqual(["peco-cap"]);
-    expect(body.mandate.allowedData).toEqual(["household", "income", "utility"]);
+    expect(body.mandate.allowedData).toEqual(["household", "income", "utility", "documents"]);
+    expect(authority).toContain("each protected document needs its separate processing consent");
     expect(screen.queryByText(/Any bills or notices you later/)).toBeNull();
   });
   it("preserves an ordinary urgent shutoff date alongside private preparation", async () => {

@@ -1,4 +1,5 @@
 import "server-only";
+import { familyProfileSourceSchema } from "./family-profile";
 import { z } from "zod";
 import { requireParentSession } from "./auth";
 import { intakeSchema, mandateSchema, reusedZipSourceSchema, type ServiceMandate, type SupportIntake } from "./domain";
@@ -23,6 +24,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 function check(error: unknown) {
   if (!error) return;
   const code = typeof error === "object" && "code" in error ? error.code : undefined;
+  if (code === "P0001" && typeof error === "object" && error && "message" in error && error.message === "parent_family_profile_source_changed") throw new Error("parent_family_profile_source_changed");
   if (code === "40001") throw new Error("This request changed. Reload it before saving your update.");
   if (code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
   if (code === "23514" || code === "22023") throw new Error("parent_invalid_input");
@@ -47,7 +49,8 @@ export async function saveWicApplicationDetails(requestId: string, input: unknow
   const value = parse(wicApplicationWriteSchema, input);
   parse(z.uuid(), requestId); parse(z.uuid(), idempotencyKey);
   const { supabase } = await requireParentSession();
-  const { data, error } = await supabase.rpc("parent_save_wic_application_details", {
+  const { data, error } = await supabase.rpc("parent_save_application_with_family_profile", {
+    p_kind: "wic_application", p_family_profile_source: value.familyProfileSource ?? null,
     p_request_id: requestId, p_expected_version: value.expectedVersion, p_details: value.details,
     p_notice_version: value.noticeVersion, p_idempotency_key: idempotencyKey,
     p_subject_authority_declared: value.subjectAuthorityDeclared,
@@ -55,12 +58,13 @@ export async function saveWicApplicationDetails(requestId: string, input: unknow
   check(error);
   return parse(z.uuid(), data);
 }
-export async function startWicApplication(intake: SupportIntake, mandate: ServiceMandate, details: unknown, noticeVersion: string, subjectAuthorityDeclared: boolean, idempotencyKey: string, reusedZip?: unknown): Promise<string> {
+export async function startWicApplication(intake: SupportIntake, mandate: ServiceMandate, details: unknown, noticeVersion: string, subjectAuthorityDeclared: boolean, idempotencyKey: string, reusedZip?: unknown, familyProfileSource?: unknown): Promise<string> {
   const value = parse(z.object({ intake: wicInitialIntakeSchema, mandate: mandateSchema, details: wicApplicationFieldsValueSchema,
-    noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), idempotencyKey: z.uuid(), reusedZip: reusedZipSourceSchema.optional() }).strict(),
-  { intake, mandate, details, noticeVersion, subjectAuthorityDeclared, idempotencyKey, reusedZip });
+    noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), familyProfileSource: familyProfileSourceSchema.optional(), idempotencyKey: z.uuid(), reusedZip: reusedZipSourceSchema.optional() }).strict(),
+  { intake, mandate, details, noticeVersion, subjectAuthorityDeclared, idempotencyKey, reusedZip, familyProfileSource });
   const { supabase } = await requireParentSession();
-  const { data, error } = await supabase.rpc("parent_start_wic_application", {
+  const { data, error } = await supabase.rpc(value.familyProfileSource ? "parent_start_application_with_family_profile" : "parent_start_wic_application", {
+    ...(value.familyProfileSource ? { p_kind: "wic_application", p_family_profile_source: value.familyProfileSource } : {}),
     p_intake: value.intake, p_mandate: value.mandate, p_details: value.details, p_notice_version: value.noticeVersion, p_idempotency_key: value.idempotencyKey,
     p_subject_authority_declared: value.subjectAuthorityDeclared,
     ...(value.reusedZip ? { p_source_request_id: value.reusedZip.sourceRequestId, p_source_version: value.reusedZip.sourceVersion } : {}),

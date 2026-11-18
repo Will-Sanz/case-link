@@ -3,8 +3,23 @@ const mocks = vi.hoisted(() => ({ session: vi.fn(), client: vi.fn() }));
 vi.mock("./auth", () => ({ requireParentSession: mocks.session, createParentClient: mocks.client }));
 import { listRequestOperations, trustedReferral } from "./activity";
 import { fixtureProtectedSnapOperation } from "./test-fixtures";
+import { fixtureUtilityProtectedOperation } from "./utility-preparation-test-fixtures";
 
 describe("owned operation history", () => {
+  it("projects only the exact utility reference and drops malformed, mismatched and raw auxiliary fields", async () => {
+    const operation = fixtureUtilityProtectedOperation();
+    operation.requestId = "abcdefab-1234-4abc-8abc-abcdefabcdef";
+    operation.packet.protectedUtilityPacket.requestId = operation.requestId;
+    const reference = operation.packet.protectedUtilityPacket;
+    const base = { id: operation.operationId, request_id: reference.requestId, request_version: reference.requestVersion, need: operation.need,
+      program_id: operation.programId, action: "prepare", artifact_id: null, utility_packet: reference };
+    const rows = [base, { ...base, action: "submit" }, { ...base, request_version: reference.requestVersion + 1 }, { ...base, utility_packet: { ...reference, raw: "PRIVATE_CANARY" } }];
+    const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue({ data: rows, error: null }) };
+    mocks.session.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(query) } });
+    const result = await listRequestOperations(reference.requestId.toUpperCase());
+    expect(result.operations.map(row => row.protected_packet)).toEqual([reference, null, null, null]);
+    expect(JSON.stringify(result)).not.toMatch(/utility_packet|PRIVATE_CANARY/);
+  });
   it.each([100, 101])(
     "marks whether %s fetched rows leave earlier history outside the response",
     async (count) => {

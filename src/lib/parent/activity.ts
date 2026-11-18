@@ -4,15 +4,17 @@ import { requireParentSession, createParentClient } from "./auth";
 import { needSchema } from "./domain";
 import { agencyStatusSchema, receiptSchema } from "./policy";
 import { snapProtectedReferenceSchema } from "./snap-protected-operation";
+import { utilityPreparedReferenceSchema } from "./utility-protected-operation";
 const uuid = z.uuid();
 export async function listRequestOperations(requestId: string) {
+  const ownedRequestId = uuid.parse(requestId).toLowerCase();
   const { supabase } = await requireParentSession();
   const { data, error } = await supabase
     .from("parent_operations")
     .select(
-      "id,request_id,request_version,need,program_id,action,packet_hash,state,evidence,created_at,executed_at,artifact_id,protected_packet:packet->protectedSnapPacket,form:parent_form_artifacts(preparation_only,snap_snapshot_id,snap_snapshot_hash)",
+      "id,request_id,request_version,need,program_id,action,packet_hash,state,evidence,created_at,executed_at,artifact_id,protected_packet:packet->protectedSnapPacket,utility_packet:packet->protectedUtilityPacket,form:parent_form_artifacts(preparation_only,snap_snapshot_id,snap_snapshot_hash)",
     )
-    .eq("request_id", uuid.parse(requestId))
+    .eq("request_id", ownedRequestId)
     .order("created_at", { ascending: false })
     .limit(101);
   if (error)
@@ -20,7 +22,12 @@ export async function listRequestOperations(requestId: string) {
   return {
     operations: (data ?? []).slice(0, 100).map(operation => {
       const reference = snapProtectedReferenceSchema.safeParse(operation.protected_packet);
-      return { ...operation, protected_packet: operation.need === "snap_new" && operation.program_id === "snap-pa" && operation.action === "submit" && operation.artifact_id === null && reference.success ? reference.data : null };
+      const utility = utilityPreparedReferenceSchema.safeParse(operation.utility_packet);
+      const { utility_packet: _, ...safe } = operation; void _;
+      return { ...safe, protected_packet: operation.need === "snap_new" && operation.program_id === "snap-pa" && operation.action === "submit" && operation.artifact_id === null && reference.success ? reference.data
+        : utility.success && operation.action === "prepare" && operation.artifact_id === null && operation.request_id === ownedRequestId && utility.data.requestId === ownedRequestId
+          && utility.data.requestVersion === operation.request_version && utility.data.programId === operation.program_id
+          && { "peco-cap": "electricity", "pgw-crp": "gas", "pwd-tap": "water" }[utility.data.programId] === operation.need ? utility.data : null };
     }),
     historyLimited: (data?.length ?? 0) > 100,
   };

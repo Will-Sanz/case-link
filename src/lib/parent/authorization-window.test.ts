@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), timing: vi.fn(), collection: vi.fn(), wicCollection: vi.fn(), pecoCollection: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), timing: vi.fn(), collection: vi.fn(), wicCollection: vi.fn(), pecoCollection: vi.fn(), pgwCollection: vi.fn(), waterCollection: vi.fn() }));
 vi.mock("./auth", () => ({ requireParentSession: mocks.session }));
 import { getParentAuthorizationWindow } from "./authorization-window";
 import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION } from "./constants";
 import { PECO_APPLICATION_NOTICE_VERSION } from "./peco-application-fields";
+import { PGW_APPLICATION_NOTICE_VERSION } from "./pgw-application-fields";
+import { WATER_APPLICATION_NOTICE_VERSION } from "./water-application-fields";
 
 const timing = { issuedAt: "2026-10-26T12:00:00+00:00", expiresAt: "2026-11-25T12:00:00+00:00" };
 beforeEach(() => {
@@ -12,7 +14,9 @@ beforeEach(() => {
   mocks.collection.mockResolvedValue({ data: { collectionEnabled: false, noticeVersion: null }, error: null });
   mocks.wicCollection.mockResolvedValue({ data: { collectionEnabled: false, noticeVersion: null, expiresAt: null }, error: null });
   mocks.pecoCollection.mockResolvedValue({ data: { collectionEnabled: false, noticeVersion: null, expiresAt: null }, error: null });
-  mocks.rpc.mockImplementation((name: string) => name === "parent_authorization_window" ? mocks.timing() : name === "parent_wic_application_collection" ? mocks.wicCollection() : name === "parent_peco_application_collection" ? mocks.pecoCollection() : mocks.collection());
+  mocks.pgwCollection.mockResolvedValue({ data: { collectionEnabled: false, noticeVersion: null, expiresAt: null }, error: null });
+  mocks.waterCollection.mockResolvedValue({ data: { collectionEnabled: false, noticeVersion: null, expiresAt: null }, error: null });
+  mocks.rpc.mockImplementation((name: string) => name === "parent_authorization_window" ? mocks.timing() : name === "parent_wic_application_collection" ? mocks.wicCollection() : name === "parent_peco_application_collection" ? mocks.pecoCollection() : name === "parent_pgw_application_collection" ? mocks.pgwCollection() : name === "parent_water_application_collection" ? mocks.waterCollection() : mocks.collection());
 });
 describe("database-issued authorization timing", () => {
   it("preserves the original strict two-field RPC contract and composes separate collection status", async () => {
@@ -21,9 +25,11 @@ describe("database-issued authorization timing", () => {
       snapApplication: { collectionEnabled: false, noticeVersion: null },
       wicApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
       pecoApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
+      pgwApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
+      waterApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
     });
     expect(mocks.session).toHaveBeenCalledTimes(1);
-    expect(mocks.rpc.mock.calls).toEqual([["parent_authorization_window"], ["parent_snap_application_collection"], ["parent_wic_application_collection"], ["parent_peco_application_collection"]]);
+    expect(mocks.rpc.mock.calls).toEqual([["parent_authorization_window"], ["parent_snap_application_collection"], ["parent_wic_application_collection"], ["parent_peco_application_collection"], ["parent_pgw_application_collection"], ["parent_water_application_collection"]]);
   });
   it("exposes only a separately approved SNAP collection purpose and its accepted notice", async () => {
     const snapApplication = { collectionEnabled: true, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION };
@@ -37,6 +43,8 @@ describe("database-issued authorization timing", () => {
       snapApplication: { collectionEnabled: false, noticeVersion: null },
       wicApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
       pecoApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
+      pgwApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
+      waterApplication: { collectionEnabled: false, noticeVersion: null, expiresAt: null },
     });
   });
   it("keeps collection closed if its separate request rejects", async () => {
@@ -90,4 +98,22 @@ describe("database-issued authorization timing", () => {
       await expect(getParentAuthorizationWindow()).rejects.toThrow("Authorization timing is temporarily unavailable.");
     }
   });
+});
+
+it.each([
+  ["pgwApplication", "pgwCollection", PGW_APPLICATION_NOTICE_VERSION],
+  ["waterApplication", "waterCollection", WATER_APPLICATION_NOTICE_VERSION],
+] as const)("keeps %s optional, independently closed and separate from existing SNAP access", async (field, mock, notice) => {
+  mocks.collection.mockResolvedValue({ data: { collectionEnabled: true, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION }, error: null });
+  const allowed = { collectionEnabled: true, noticeVersion: notice, expiresAt: "2026-11-20T22:00:00Z" };
+  mocks[mock].mockResolvedValue({ data: allowed, error: null });
+  expect((await getParentAuthorizationWindow())[field]).toEqual(allowed);
+  for (const data of [null, { ...allowed, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION }, { ...allowed, privateCanary: "secret" }, { collectionEnabled: true }]) {
+    mocks[mock].mockResolvedValue({ data, error: null });
+    const window = await getParentAuthorizationWindow();
+    expect(window[field]).toEqual({ collectionEnabled: false, noticeVersion: null, expiresAt: null });
+    expect(window.snapApplication.collectionEnabled).toBe(true);
+  }
+  mocks[mock].mockRejectedValueOnce(new Error("private-utility-canary"));
+  expect((await getParentAuthorizationWindow())[field].collectionEnabled).toBe(false);
 });

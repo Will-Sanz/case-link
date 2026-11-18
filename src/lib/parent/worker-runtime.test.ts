@@ -30,6 +30,8 @@ import { createSnapProtectedSubmissionClient } from "./snap-sender-worker-client
 import { snapSenderAttemptSchema, type SnapSenderAttempt } from "./snap-sender-contract";
 import type { SnapSenderStore } from "./snap-sender-store";
 import type { SnapSenderCarrier } from "./snap-sender-carrier";
+import { fixtureUtilityProtectedOperation } from "./utility-preparation-test-fixtures";
+import type { UtilityProtectedOperation } from "./utility-protected-operation";
 import type { SnapProtectedSubmissionPort } from "./snap-protected-submission-port";
 
 const jobId = "d1b9b24b-591f-4917-8d8c-46273f5ffbc7",
@@ -95,6 +97,8 @@ function setup() {
     badDownloadPath: false,
     leaseExpiresAt: "2026-10-25T16:05:00Z",
     deliveryJobAttempts: 1 as number | null,
+    utilityTarget: null as unknown,
+    utilityCurrent: null as unknown,
   };
   const database = {
     query: vi.fn(async (text: string, values: unknown[] = []) => {
@@ -107,6 +111,10 @@ function setup() {
           if (state.revoked) throw new Error("authority_changed");
           value = state.leaseExpiresAt;
           break;
+        case "parent_get_utility_preparation_target":
+          value = state.utilityTarget; break;
+        case "parent_get_utility_prepared_operation":
+          value = state.utilityCurrent; break;
         case "parent_get_operations":
           value = state.operations;
           break;
@@ -1373,5 +1381,66 @@ describe("private full-answer SNAP worker preview", () => {
     expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_prepare_snap_application_preview"))).toBe(true);
     expect(test.state.privatePrepared).toHaveLength(0); expect(test.state.prepared).toHaveLength(0);
     expect(test.execute).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("durable private utility preparation", () => {
+  function utilitySetup() {
+    const test = setup(), canonical = fixtureUtilityProtectedOperation();
+    const request = fixtureRequest({ id: canonical.requestId, version: canonical.requestVersion, has_water_application_details: true,
+      intake: fixtureIntake({ needs: ["water"], utilityProviders: ["pwd"], householdSize: null, incomeAmount: null, incomeFrequency: "unknown" }),
+      mandate: fixtureMandate({ mode: "prepare_only", recipientIds: ["pwd-tap"], allowedActions: ["research", "prepare"], allowedData: ["household", "income", "utility", "documents"] }) });
+    canonical.packet.protectedUtilityPacket.preparedAt = fixtureNow.toISOString();
+    canonical.packet.protectedUtilityPacket.expiresAt = new Date(fixtureNow.getTime()+300000).toISOString();
+    test.state.claim.request = request;
+    test.state.utilityTarget = { jobId, leaseToken, scope: { requestId: request.id, expectedVersion: request.version, programId: "pwd-tap",
+      snapshotId: canonical.packet.protectedUtilityPacket.snapshotId, snapshotRevision: 1, snapshotHash: canonical.packet.protectedUtilityPacket.snapshotHash }, inputSetHash: "a".repeat(64) };
+    const raw = (value: UtilityProtectedOperation) => ({ id: value.operationId, request_id: value.requestId, request_version: value.requestVersion, need: value.need,
+      program_id: value.programId, action: value.action, state: value.state, packet: value.packet, packet_hash: value.packetHash,
+      data_categories: value.dataCategories, document_ids: [], artifact_id: null, idempotency_key: value.idempotencyKey, protectedPacketCurrent: value.protectedPacketCurrent, updated_at: fixtureNow.toISOString() });
+    const commit = () => { test.state.operations = [raw(canonical)]; test.state.utilityCurrent = canonical; };
+    const prepare = vi.fn(async () => { commit(); return { state: "prepared" as const, operation: canonical }; });
+    test.options.protectedUtilityPreparation = { prepare }; delete test.options.apiKey; test.options.continuationOnly = true;
+    test.options.coordinate = vi.fn();
+    return { ...test, canonical, prepare, commit, raw };
+  }
+  it("uses the actual opaque canonical operation with no model, ordinary PDF upload, provider call or browser", async () => {
+    const test = utilitySetup();
+    expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
+    expect(test.prepare).toHaveBeenCalledExactlyOnceWith({ ...(test.state.utilityTarget as object), signal: expect.any(AbortSignal) });
+    expect(test.database.query).toHaveBeenNthCalledWith(1, "select parent_private.parent_claim_job($1,$2,$3,$4) as job", [300, true, false, true]);
+    expect(test.options.coordinate).not.toHaveBeenCalled(); expect(test.fetcher).not.toHaveBeenCalled(); expect(test.execute).not.toHaveBeenCalled();
+    expect(test.state.prepared).toEqual([]); expect(test.state.finished).toEqual([]);
+    expect(test.state.saved[0][3]).toContain("CaseLink LOCAL TEST"); expect(test.state.saved[0][4]).toBe("[]");
+    expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_reserve_ai_call"))).toBe(false);
+    expect(JSON.stringify(test.database.query.mock.calls)).not.toMatch(/keyBase64|ciphertext|PRIVATE_WATER/);
+  });
+  it.each(["lost_response", "commit_unknown"])("reconciles %s against actual current metadata without generating a second operation", async kind => {
+    const test = utilitySetup(); test.prepare.mockImplementation(async () => { test.commit();
+      if (kind === "lost_response") throw new Error("PRIVATE_PROVIDER_CANARY");
+      return { state: "commit_unknown", packetId: test.canonical.packet.protectedUtilityPacket.packetId, operationId: test.canonical.operationId } as never;
+    });
+    expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
+    expect(test.prepare).toHaveBeenCalledTimes(1); expect(test.state.prepared).toEqual([]); expect(test.state.saved[0][4]).toBe("[]");
+    expect(JSON.stringify(test.state.saved)).not.toContain("PRIVATE_PROVIDER_CANARY");
+  });
+  it.each(["missing_port", "closed_policy", "stale_current", "uncommitted", "superseded_scope"])("keeps %s private work closed without generic fallback or new approval", async kind => {
+    const test = utilitySetup();
+    if (kind === "missing_port") delete test.options.protectedUtilityPreparation;
+    if (kind === "closed_policy") test.state.utilityTarget = null;
+    if (kind === "stale_current") test.prepare.mockImplementation(async () => { test.commit(); test.canonical.protectedPacketCurrent = false; return { state: "prepared", operation: test.canonical }; });
+    if (kind === "uncommitted") test.prepare.mockRejectedValue(new Error("PRIVATE_CANARY"));
+    if (kind === "superseded_scope") (test.state.utilityTarget as {scope:{expectedVersion:number}}).scope.expectedVersion++;
+    expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
+    expect(test.state.saved[0][4]).toContain("execution_issue"); expect(test.state.saved[0][4]).not.toMatch(/missing_fact|expanded_permission|PRIVATE_CANARY/);
+    expect(test.state.prepared).toEqual([]); expect(test.execute).not.toHaveBeenCalled(); expect(test.options.coordinate).not.toHaveBeenCalled(); expect(test.fetcher).not.toHaveBeenCalled();
+    if (kind === "uncommitted") expect(test.state.saved[0][5]).toBe(new Date(fixtureNow.getTime()+30000).toISOString());
+  });
+  it("rejects ordinary transport promotion and malformed extra private packet fields during normalization", () => {
+    const test = utilitySetup(), row = test.raw(test.canonical);
+    expect(normalizeWorkerOperation(row)?.protectedUtility).toEqual(test.canonical);
+    expect(() => normalizeWorkerOperation({ ...row, action: "submit" })).toThrow();
+    expect(() => normalizeWorkerOperation({ ...row, packet: { ...row.packet, rawAccount: "PRIVATE_CANARY" } })).toThrow();
   });
 });

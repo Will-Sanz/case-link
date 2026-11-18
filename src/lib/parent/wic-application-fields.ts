@@ -1,12 +1,8 @@
 import { z } from "zod";
+import { isOrdinaryText } from "./ordinary-text";
 import contract from "../../../data/verified-forms/wic-pa-preapplication-2026-11-13.json";
 
-const text = (maximum: number) => z.string().trim().min(1).max(maximum).refine(value => {
-  const normalized = value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
-  return value.length <= maximum && !/[\u0000-\u001f\u007f-\u009f<>]/.test(value) &&
-    !/\d{3}[-.\/\s‐‑‒–—―]*\d{2}[-.\/\s‐‑‒–—―]*\d{4}|\d{12,19}/.test(normalized) &&
-    !/\b(?:password|passcode|pin|ssn|social\s+security(?:\s+number)?|signature|ebt\s+pin)\s*(?:is\s+|[:=#]\s*)\S+/i.test(normalized);
-});
+const text = (maximum: number) => z.string().trim().min(1).max(maximum).refine(value => value.length <= maximum && isOrdinaryText(value));
 const date = z.string().regex(/^(19|20)\d{2}-\d{2}-\d{2}$/).refine(value => {
   const parsed = new Date(`${value}T12:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;

@@ -1,5 +1,17 @@
 # CaseLink parent support implementation plan
 
+**November 17 food-first owner priority:** continue immediate food, SNAP, WIC and the shared family profile/reliability work needed to perfect food support. Pause utility and other expansion work at its current checkpoint. This supersedes the earlier same-day five-program next-candidate scope. Use test data in the isolated checkout and preserve the live demo. Finish and independently review the food-specific milestones before dependent work; apply all existing privacy, execution, recovery, accessibility and outcome gates. See the food-first checkpoint below for preserved expansion work.
+
+## Food-first development checkpoint — November 17, 2026
+
+The active isolated checkout is `/private/tmp/caselink-reuse-review`, on `codex/protected-utility-applications-2026-11-13`, based on `7202ef456595431218f95656bcf66633d53d97aa`. No changes from this work have been deployed or applied to the live demo. All family/application fixtures are synthetic. Uncommitted implementation is a development checkpoint, not release evidence.
+
+Active: shared profile ownership, optional intake, consent, original answer dates, expiry/deletion/export; source-bound SNAP/WIC reuse and correction recovery; shared save/privacy/database-boundary audit fixes; food-specific automated and local browser/database verification. Preserve immediate food access and required personal steps honestly.
+
+Paused: new electricity/gas/water profile integration; PGW protected-identifier replacement completion; utility protected-document/form/preparation and application completion; new worker-fleet scaling work and other catalog expansion. The unreviewed, untested fleet-only changes are parked at `/private/tmp/caselink-worker-fleet-health-wip/` with a narrowly scoped resume patch; their migration is excluded from the active checkout and fixture list. Existing utility code, fixtures, reviewed shared fixes and historical verification remain preserved. Water still has only a clearly labelled local test form, and no synthetic preparation or protected PDF proves provider submission, enrollment, financial agreement or shutoff protection. Keep existing regression coverage while routes remain reachable.
+
+Before utility work resumes: review the preserved work and outstanding tests, confirm an actual City-issued water form and each provider's permitted transport/account access, finish protected identifier replacement/recovery, and collect exact-route execution/receipt evidence. Do not enable providers or real-family processing from this checkpoint.
+
 **Planning revision:** October 27, 2026 (America/New_York)
 **Status:** R1 launch sequence L0–L6 defined; existing PECO/SNAP work preserved for R2; actual provider connections and family release gates remain open
 **Product authority:** [Parent support MVP PRD](parent-support-mvp-prd.md)

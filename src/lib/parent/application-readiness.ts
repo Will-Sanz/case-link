@@ -1,5 +1,6 @@
 import { OUTCOME_LABELS, OUTCOME_PROGRESS, type SupportRoute } from "./domain";
 import { authorizeOperation, receiptSchema } from "./policy";
+import { utilityPreparedReferenceSchema } from "./utility-protected-operation";
 import { snapProtectedReferenceSchema } from "./snap-protected-operation";
 
 type OperationAuthority = Parameters<typeof authorizeOperation>[0];
@@ -93,6 +94,8 @@ export function applicationReadiness(input: {
       owner: "caselink",
     },
   );
+  if (input.authority.operation.protectedUtility || Object.hasOwn(input.authority.operation.packet, "protectedUtilityPacket"))
+    checks.push({ id: "utility-preparation-only", label: "This unsigned private draft has no submission authority", complete: false, owner: "caselink" });
   if (input.modelJudgmentUsed) {
     const calibration = input.calibration;
     const evaluated = Date.parse(calibration?.evaluatedAt ?? "");
@@ -196,6 +199,13 @@ export function supportRouteLabel(
     operation.need === route.need && operation.state === "prepared");
   if (prepared.some(operation => route.need === "snap_new" && route.programId === "snap-pa" && operation.action === "submit" && operation.artifactId === null && snapProtectedReferenceSchema.safeParse(operation.protectedPacket).success))
     return "Application prepared";
+  for (const operation of prepared) {
+    if (operation.action !== "prepare" || operation.artifactId !== null) continue;
+    const parsed = utilityPreparedReferenceSchema.safeParse(operation.protectedPacket);
+    if (parsed.success && parsed.data.programId === route.programId &&
+      ({ "peco-cap": "electricity", "pgw-crp": "gas", "pwd-tap": "water" } as const)[parsed.data.programId] === route.need)
+      return "Unsigned private draft prepared";
+  }
   const forms = prepared.filter((operation) => operation.artifactId);
   if (forms.some((operation) => !operation.preparationOnly))
     return "Application prepared";

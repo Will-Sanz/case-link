@@ -22,6 +22,7 @@ import {
   type ExtractedFacts,
 } from "./documents";
 import {
+  authorizeOperation,
   hasUtilityAccountAuthority,
   utilityProviderFor,
   receiptSchema,
@@ -35,6 +36,9 @@ import {
   supportsInitialServiceDelivery,
 } from "./programs";
 import { sameSnapProtectedPacket, snapProtectedOperationSchema, type SnapProtectedOperation } from "./snap-protected-operation";
+import { sameUtilityPreparedPacket, utilityProtectedOperationSchema, type UtilityProtectedOperation } from "./utility-protected-operation";
+import type { UtilityProtectedPreparationResult } from "./utility-preparation-port";
+import { isUtilityPreparationMandate, type UtilityPreparationProgram } from "./utility-preparation-scope";
 import type { SnapCaptureProgress } from "./snap-capture-progress";
 import { snapTransportFailureSchema } from "./snap-protected-submission-port";
 
@@ -60,6 +64,7 @@ export type ServiceOperation = {
   receipt?: ServiceReceipt;
   snapSubmissionAuthorized?: boolean;
   protectedSnap?: SnapProtectedOperation;
+  protectedUtility?: UtilityProtectedOperation;
 };
 const personalActSchema = z
   .object({
@@ -430,6 +435,7 @@ export async function runSupportService(input: {
   operations?: ServiceOperation[];
   unknownOperations?: ServiceOperation[];
   snapCapture?: { state: SnapCaptureProgress["state"]; reason: SnapCaptureProgress["reason"]; retryAt?: string };
+  utilityPreparation?: { programId: UtilityPreparationProgram; state: UtilityProtectedPreparationResult["state"]; retryAt?: string };
   jobAttempts?: number;
   now: Date;
   ports: ServicePorts;
@@ -476,7 +482,7 @@ export async function runSupportService(input: {
     [];
   const documentIssues: string[] = [];
   if (
-    request.mandate.allowedData.includes("documents") &&
+    !input.utilityPreparation && request.mandate.allowedData.includes("documents") &&
     request.mandate.allowedData.includes("utility") &&
     request.intake.needs.some((need) => utilityNeeds.includes(need))
   ) {
@@ -795,6 +801,36 @@ export async function runSupportService(input: {
         );
         plan.routes[index] = route;
         continue;
+      }
+      if (input.utilityPreparation?.programId === route.programId) {
+        for (let actionIndex = actions.length - 1; actionIndex >= 0; actionIndex--)
+          if (actions[actionIndex].need === route.need && actions[actionIndex].reason === "missing_fact") actions.splice(actionIndex, 1);
+        const candidates = operations.filter(operation => operation.need === route.need && operation.programId === route.programId && operation.protectedUtility?.protectedPacketCurrent);
+        const owned = candidates[0], parsed = utilityProtectedOperationSchema.safeParse(owned?.protectedUtility);
+        if (input.utilityPreparation.state !== "prepared" || candidates.length !== 1 || !parsed.success ||
+          parsed.data.operationId !== owned.id || parsed.data.action !== owned.action || owned.state !== "prepared" ||
+          parsed.data.idempotencyKey !== owned.idempotencyKey || !sameUtilityPreparedPacket(parsed.data.packet, owned.packet) ||
+          !isUtilityPreparationMandate(request.mandate, parsed.data.programId)) {
+          route.state = "checking"; route.nextActor = "caselink";
+          route.limitation = "Private application preparation needs a service check. Saved answers remain recorded; nothing has been sent.";
+          addAction(route, "execution_issue", "CaseLink is checking private application preparation",
+            "The source, protected inputs or exact current draft need a service check. You do not need to approve preparation again.");
+          const retry = Date.parse(input.utilityPreparation.retryAt ?? "");
+          if (Number.isFinite(retry) && retry > now.getTime() && retry < expiry) nextRuns.push(retry);
+          plan.routes[index] = route; continue;
+        }
+        const canonical = parsed.data;
+        const operation: ServiceProposedOperation = { need: canonical.need, requestVersion: canonical.requestVersion, programId: canonical.programId,
+          action: "prepare", packet: canonical.packet, dataCategories: canonical.dataCategories, documentIds: [], idempotencyKey: canonical.idempotencyKey, protectedUtility: canonical };
+        const decision = authorizeOperation({ request, operation, capability: { programId: canonical.programId, enabled: false, actions: [],
+          permissionReference: null, permissionExpiresAt: null, dataCategories: [], personalActsComplete: false }, accountActive: true, revoked: false, attempts: 0, documentsValid: false, now });
+        if (!decision.allowed) { route.state = "checking"; throw new Error("utility_preparation_authority_changed"); }
+        await ports.prepareOperation(operation);
+        route.state = "prepared"; route.nextActor = "caselink";
+        route.limitation = canonical.packet.protectedUtilityPacket.sourceKind === "local_test_issued_form"
+          ? "A CaseLink LOCAL TEST water draft is prepared. It is not a City-issued application and cannot be submitted. Nothing has been sent."
+          : "An unsigned private application draft is prepared. Required personal acts, complete supporting evidence and permitted submission remain separate. Nothing has been sent.";
+        plan.routes[index] = route; await record(route); continue;
       }
       if (documentIssues.length && utilityNeeds.includes(route.need))
         addAction(

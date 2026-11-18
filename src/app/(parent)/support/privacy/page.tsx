@@ -75,6 +75,25 @@ export default function ParentPrivacyPage() {
         another program. We ask only for information that is still needed for
         the selected support and covered by its notice and permission.
       </p>
+      <h2 id="family-profile">Your shared family profile</h2>
+      <p>
+        When profile saving is available and you choose it, CaseLink stores the
+        family basics you provide: contact details, home and mailing addresses,
+        language, names, birth dates, relationships and known income-source types.
+        You can leave questions unanswered and continue directly to support.
+        Do not enter government identifiers, account access codes, passwords,
+        pregnancy or medical details, citizenship answers or signatures here.
+      </p>
+      <p>
+        Your profile supplies compatible answers for support applications you
+        choose and authorize. It does not give a program access to your profile
+        or authorize a submission. Each confirmed answer is kept for up to
+        45 days; opening the profile or starting another request does not restart
+        that time. You can update, download or clear your saved profile. Clearing
+        or expiration stops future reuse. Copies in earlier application records
+        follow their own stated purpose and retention rules. Corrections stop
+        queued uses of superseded answers; already sent records stay in history.
+      </p>
       <h2 id="snap-application">Private SNAP application details</h2>
       <p>
         When this collection purpose is enabled, the separate SNAP application

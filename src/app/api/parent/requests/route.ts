@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { familyProfileSourceSchema } from "@/lib/parent/family-profile";
 import { intakeSchema, mandateSchema, reusedZipSourceSchema } from "@/lib/parent/domain";
 import {
   getSupportRequest,
@@ -24,16 +25,25 @@ import { WIC_APPLICATION_NOTICE_VERSION, startWicApplication, wicInitialIntakeSc
 import { wicApplicationFieldsValueSchema } from "@/lib/parent/wic-application-fields";
 import { startPecoApplication, pecoInitialIntakeSchema } from "@/lib/parent/peco-application-data";
 import { pecoApplicationWriteSchema } from "@/lib/parent/peco-application-snapshot";
+import { startPgwApplication, pgwInitialIntakeSchema } from "@/lib/parent/pgw-application-data";
+import { pgwApplicationWriteSchema } from "@/lib/parent/pgw-application-snapshot";
+import { startWaterApplication, waterInitialIntakeSchema } from "@/lib/parent/water-application-data";
+import { waterApplicationWriteSchema } from "@/lib/parent/water-application-snapshot";
 
 const startSchema = z.union([
   z.object({ intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
-  z.object({ kind: z.literal("snap_application"), intake: intakeSchema, mandate: mandateSchema,
+  z.object({ kind: z.literal("snap_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema,
     details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION) }).strict(),
-  z.object({ kind: z.literal("wic_application"), intake: wicInitialIntakeSchema, mandate: mandateSchema,
+  z.object({ kind: z.literal("wic_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: wicInitialIntakeSchema, mandate: mandateSchema,
     details: wicApplicationFieldsValueSchema, noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), reusedZip: reusedZipSourceSchema.optional() }).strict(),
   pecoApplicationWriteSchema.omit({ expectedVersion: true }).extend({ kind: z.literal("peco_application"),
     intake: pecoInitialIntakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
+  pgwApplicationWriteSchema.omit({ expectedVersion: true }).extend({ kind: z.literal("pgw_application"),
+    intake: pgwInitialIntakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
+  waterApplicationWriteSchema.omit({ expectedVersion: true }).extend({ kind: z.literal("water_application"),
+    intake: waterInitialIntakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
 ]);
+const utilityStarts = { peco_application: startPecoApplication, pgw_application: startPgwApplication, water_application: startWaterApplication };
 
 export async function GET() {
   try {
@@ -50,7 +60,7 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const authorization = await getParentAuthorizationWindow();
-    const input = await readParentJson(request, 65536);
+    const input = await readParentJson(request, 131072);
     if (input && typeof input === "object" && "kind" in input && input.kind === "snap_application" &&
       !authorization.snapApplication?.collectionEnabled)
       throw new Error("This request is unavailable, or its permission has changed.");
@@ -59,6 +69,12 @@ export async function POST(request: Request) {
       throw new Error("This request is unavailable, or its permission has changed.");
     if (input && typeof input === "object" && "kind" in input && input.kind === "peco_application" &&
       !authorization.pecoApplication?.collectionEnabled)
+      throw new Error("This request is unavailable, or its permission has changed.");
+    if (input && typeof input === "object" && "kind" in input && input.kind === "pgw_application" &&
+      !authorization.pgwApplication?.collectionEnabled)
+      throw new Error("This request is unavailable, or its permission has changed.");
+    if (input && typeof input === "object" && "kind" in input && input.kind === "water_application" &&
+      !authorization.waterApplication?.collectionEnabled)
       throw new Error("This request is unavailable, or its permission has changed.");
     const value = startSchema.parse(input);
     if (validateMandate(value.mandate, new Date(authorization.issuedAt)))
@@ -83,12 +99,12 @@ export async function POST(request: Request) {
       .uuid()
       .parse(request.headers.get("idempotency-key"));
     const id = "kind" in value
-      ? value.kind === "peco_application"
-        ? await startPecoApplication(value.intake, value.mandate, { details: value.details, noticeVersion: value.noticeVersion,
+      ? value.kind === "peco_application" || value.kind === "pgw_application" || value.kind === "water_application"
+        ? await utilityStarts[value.kind](value.intake, value.mandate, { details: value.details, noticeVersion: value.noticeVersion,
           subjectAuthorityDeclared: value.subjectAuthorityDeclared, accountAuthorityDeclared: value.accountAuthorityDeclared }, idempotencyKey, value.reusedZip)
         : value.kind === "wic_application"
-        ? await startWicApplication(value.intake, value.mandate, value.details, value.noticeVersion, value.subjectAuthorityDeclared, idempotencyKey, value.reusedZip)
-        : await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey)
+        ? await startWicApplication(value.intake, value.mandate, value.details, value.noticeVersion, value.subjectAuthorityDeclared, idempotencyKey, value.reusedZip, ...(value.familyProfileSource ? [value.familyProfileSource] : []))
+        : await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey, ...(value.familyProfileSource ? [value.familyProfileSource] : []))
       : value.reusedZip
         ? await startSupportRequest(value.intake, value.mandate, idempotencyKey, value.reusedZip)
         : await startSupportRequest(value.intake, value.mandate, idempotencyKey);

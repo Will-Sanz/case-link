@@ -56,8 +56,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("consented quarantined upload", () => {
-  it("denies an owned private PECO request before reading or storing any file", async () => {
-    mocks.request.mockResolvedValue(fixtureRequest({ has_peco_application_details: true }));
+  it.each(["has_peco_application_details", "has_pgw_application_details", "has_water_application_details"])("denies an owned private utility request (%s) before reading or storing any file", async flag => {
+    mocks.request.mockResolvedValue(fixtureRequest({ [flag]: true }));
     const input = request();
     expect((await POST(input, context)).status).toBe(403); expect(input.bodyUsed).toBe(false);
     expect(mocks.register).not.toHaveBeenCalled(); expect(mocks.upload).not.toHaveBeenCalled(); expect(mocks.confirm).not.toHaveBeenCalled();

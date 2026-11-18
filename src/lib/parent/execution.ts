@@ -48,6 +48,8 @@ export async function executeSupportOperation(input: {
   reason?: string;
   receipt?: z.infer<typeof receiptSchema>;
 }> {
+  if (input.operation.protectedUtility || Object.hasOwn(input.operation.packet, "protectedUtilityPacket"))
+    return { state: "blocked", reason: "utility_preparation_only" };
   const readiness = applicationReadiness({
     authority: input,
     ...input.readiness,

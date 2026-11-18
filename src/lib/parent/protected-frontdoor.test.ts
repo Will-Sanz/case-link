@@ -79,6 +79,12 @@ describe("credential-free local protected frontdoor (actual HTTP servers; no Aut
     expect(protectedCalls).toEqual([]); expect(appCalls[0].body.toString()).toBe('{"synthetic":true}');
     expect(appCalls[0].headers.cookie).toBe("parent=synthetic");
   });
+  it("keeps utility private uploads outside the ordinary application on the same protected upstream", async () => {
+    const response = await send("/protected/utilities/requests/synthetic/inputs/synthetic?expectedVersion=2", "PUT", packet, { Origin: front, "Content-Type": "application/pdf" });
+    expect(response.status).toBe(200); expect(response.body).toEqual(packet); expect(appCalls).toEqual([]);
+    expect(protectedCalls).toHaveLength(1); expect(protectedCalls[0].body).toEqual(packet);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
   it.each(["/protected", "/protected/other", "/Protected/snap/review", "/%70rotected/snap/review", "/x/../protected/snap/review", "/protected/snap/../other", "/protected/snap/%2e%2e/other", "/protected/snap/%252f", "/protected/snap/%zz", "/protected\\snap/review"])("rejects ambiguous/reserved path %s before either upstream", async path => {
     expect((await send(path)).status).toBe(400); expect(appCalls).toEqual([]); expect(protectedCalls).toEqual([]);
   });

@@ -74,6 +74,8 @@ export function parentError(error: unknown): Response {
       400,
     );
   const message = error instanceof Error ? error.message : "";
+  if (message === "parent_family_profile_source_changed")
+    return parentJson({ ok: false, error: "Your saved family answers changed or expired before this save. Check the current family profile before trying again." }, 412);
   if (message.startsWith("This request changed"))
     return parentJson(
       {

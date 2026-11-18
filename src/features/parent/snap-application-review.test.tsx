@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupportRequest } from "@/lib/parent/domain";
+import { FAMILY_PROFILE_NOTICE_VERSION } from "@/lib/parent/family-profile";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
 import { SNAP_APPLICATION_SOURCE, type SnapApplicationFields } from "@/lib/parent/snap-application-fields";
 import { snapApplicationLeaves, type SnapApplicationSnapshot } from "@/lib/parent/snap-application-snapshot";
@@ -37,14 +38,59 @@ const json=(body:unknown,status=200)=>({ok:status<400,status,json:async()=>body}
 const authorization=(enabled=true)=>({authorization:{issuedAt:"2026-11-03T12:00:00Z",expiresAt:"2099-12-01T12:00:00Z",snapApplication:{collectionEnabled:enabled,noticeVersion:enabled?SNAP_APPLICATION_NOTICE_VERSION:null}}});
 function api(options:{saved?:unknown;gate?:unknown;getStatus?:number;post?:(init:RequestInit)=>unknown}={}){
   const fetch=vi.fn(async(url:string,init?:RequestInit)=>{
+    if(url.includes("/family-profile-source?"))return json({ok:true,fields:[]});
     if(url.endsWith("/authorization-window"))return json(options.gate??authorization());
     if(init?.method==="POST")return options.post ? options.post(init) : json({ok:true,snapshotId:"44444444-4444-4444-8444-444444444444"});
     return json({ok:!options.getStatus,snapshot:options.saved??snapshot(),error:"This saved application is unavailable."},options.getStatus??200);
   });vi.stubGlobal("fetch",fetch);return fetch;
 }
+async function press(name: string) { const button = screen.queryByRole("button", { name }) ?? await screen.findByRole("button", { name }); await act(async () => { fireEvent.click(button); }); }
 beforeEach(()=>{prepared.render.mockClear();vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-03T15:00:00Z'));});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.useRealTimers();});
 describe("owned exact SNAP application review",()=>{
+  it('automatically confirms its exact interrupted save from the owned latest snapshot',async()=>{
+    const saved=completeSnapshot(),fetch=api({saved,post:()=>new Promise(()=>{})}),current=request();
+    const view=render(<SnapApplicationReview request={current}/>);
+    await press("Change address");
+    fireEvent.change(screen.getByLabelText('Your address'),{target:{value:'401 Synthetic Lane'}});
+    await press("Save application changes");
+    await waitFor(()=>expect(fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(true));
+    const init=fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!,body=JSON.parse(String(init.body));
+    Object.assign(saved,{id:crypto.randomUUID(),revision:2,base_version:2,request_version:3,details:body.details,
+      idempotency_key:(init.headers as Record<string,string>)['Idempotency-Key'],confirmed_paths:body.confirmedPaths??[]});
+    view.rerender(<SnapApplicationReview request={{...current,version:3}}/>);
+    await screen.findByText(/Your application answers are saved as a new revision/);
+    expect(screen.queryByRole('button',{name:'Load latest saved application'})).toBeNull();
+    expect(screen.queryByRole('form')).toBeNull();expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+  });
+
+  it("saves linked current family facts with their exact owner/source token and freezes it across an unknown retry", async () => {
+    const owner = "55555555-5555-4555-8555-555555555555", fields = [{ applicationPath: "applicant.firstName", profilePaths: ["primaryPerson.firstName"] }, { applicationPath: `household.${personId}.firstName`, profilePaths: ["primaryPerson.firstName"] }];
+    let revision = 2, count = 0;
+    const base = api({ saved: completeSnapshot(), post: () => { if (++count === 1) throw new Error("lost response"); return json({ snapshotId }); } });
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/family-profile-source?")) return json({ fields });
+      if (url.endsWith("/account")) return json({ account: { id: owner } });
+      if (url.endsWith("/family-profile")) return json({ ok: true, ownerId: owner, revision, lastMutationKey: personId,
+        collection: { collectionEnabled: true, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION, expiresAt: "2026-11-20T20:00:00Z", retentionDays: 45 },
+        profile: { revision, idempotencyKey: personId, details: { primaryPerson: { id: personId, firstName: "ProfileCanary" } }, provenance: { "primaryPerson.firstName": { confirmedAt: "2026-11-01T15:00:00Z", expiresAt: "2026-12-01T15:00:00Z" } } } });
+      return base(url, init);
+    }); vi.stubGlobal("fetch", fetcher);
+    render(<SnapApplicationReview request={request()}/>); await press("Correct application answers");
+    expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("ProfileCanary");
+    fireEvent.change(screen.getByLabelText("Home phone, if available"), { target: { value: "215-555-0199" } });
+    await press("Save application changes"); await screen.findByRole("button", { name: "Retry the same save" });
+    const reads = fetcher.mock.calls.filter(([url]) => url.endsWith("/family-profile")).length; revision = 3;
+    await press("Retry the same save"); await screen.findByText(/Your application answers are saved as a new revision/);
+    const posts = fetcher.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(posts).toHaveLength(2); expect(posts[1][1]!.body).toBe(posts[0][1]!.body); expect(posts[1][1]!.headers).toEqual(posts[0][1]!.headers);
+    const body = JSON.parse(String(posts[0][1]!.body));
+    expect(body.familyProfileSource).toEqual({ expectedOwnerId: owner, revision: 2, fields });
+    expect(body.details.household[0]).toMatchObject({ id: personId, firstName: "ProfileCanary", citizen: true });
+    expect(body.details.income).toEqual(completeSnapshot().details.income);
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/family-profile"))).toHaveLength(reads);
+  });
+
   it('shows the next personal step before the full saved-answer recap',async()=>{
     api({saved:completeSnapshot()});render(<SnapApplicationReview request={request()}/>);
     const personal=await screen.findByRole('region',{name:'Prepared SNAP application fixture'});
@@ -53,21 +99,21 @@ describe("owned exact SNAP application review",()=>{
   });
   it('corrects only the address without asking for unchanged application answers again',async()=>{
     const saved=completeSnapshot(),fetch=api({saved});render(<SnapApplicationReview request={request()}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'Change address'}));
+    await press("Change address");
     await waitFor(()=>expect(document.activeElement).toBe(screen.getByLabelText('Your address')));
     expect(screen.queryByLabelText('Your first name')).toBeNull();expect(screen.queryByLabelText('Your date of birth')).toBeNull();
     expect(screen.queryByLabelText('Does anyone have income received or expected this month?')).toBeNull();
     expect(screen.queryByText('A telephone is optional. Leave it blank if none is available.')).toBeNull();
     expect((screen.getByLabelText('ZIP code') as HTMLInputElement).value).toBe('19104');
     fireEvent.change(screen.getByLabelText('Your address'),{target:{value:'2 Example Street'}});
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     const body=JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string);
     expect(body.details).toEqual({...saved.details,address:{...saved.details.address,street:'2 Example Street'}});
     expect(body.expectedVersion).toBe(2);expect(body.confirmedPaths).toBeUndefined();
   });
   it('keeps an address correction when opening other saved answers and canceling preserves the original',async()=>{
     const fetch=api({saved:completeSnapshot()});render(<SnapApplicationReview request={request()}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'Change address'}));
+    await press("Change address");
     fireEvent.change(screen.getByLabelText('Your address'),{target:{value:'2 Example Street'}});
     fireEvent.click(screen.getByRole('button',{name:'Change other saved answers'}));
     expect(screen.getByLabelText('Your first name')).toBeTruthy();expect((screen.getByLabelText('Your address') as HTMLInputElement).value).toBe('2 Example Street');
@@ -85,29 +131,29 @@ describe("owned exact SNAP application review",()=>{
   it.each(['fetch','body'] as const)('bounds a stalled correction %s and retains the same frozen retry',async kind=>{
     vi.useFakeTimers();
     const fetch=api({post:()=>kind==='fetch'?new Promise(()=>{}):{ok:true,status:201,json:()=>new Promise(()=>{})}});
-    render(<SnapApplicationReview request={request()}/>);await act(async()=>{});fireEvent.click(screen.getByRole('button',{name:'Correct application answers'}));
-    fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Retained'}});fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));
+    render(<SnapApplicationReview request={request()}/>);await act(async()=>{});await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Retained'}});await press("Save application changes");
     await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});
     expect(screen.getByRole('button',{name:'Retry the same save'})).toBeTruthy();expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Retained');
-    fireEvent.click(screen.getByRole('button',{name:'Retry the same save'}));
+    await press("Retry the same save");
     const posts=fetch.mock.calls.filter(([,init])=>init?.method==='POST').map(([,init])=>init!);
     expect(posts).toHaveLength(2);expect(posts[0].body).toBe(posts[1].body);expect(posts[0].headers).toEqual(posts[1].headers);
   });
   it('closes correction controls at the known mandate expiry without a poll',async()=>{
     vi.useFakeTimers();
     const value=request();value.mandate.expiresAt=new Date(Date.now()+1000).toISOString();const fetch=api();
-    render(<SnapApplicationReview request={value}/>);await act(async()=>{});fireEvent.click(screen.getByRole('button',{name:'Correct application answers'}));
+    render(<SnapApplicationReview request={value}/>);await act(async()=>{});await press("Correct application answers");
     await act(async()=>{await vi.advanceTimersByTimeAsync(1000);});
     expect(screen.queryByLabelText('Your first name')).toBeNull();expect(screen.getByText(/permission has expired/i)).toBeTruthy();
     expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
   });
   it.each(['version','unmount'] as const)('ignores a late correction reply after %s changes',async kind=>{
     let finish!:(value:unknown)=>void;const onChange=vi.fn();api({post:()=>new Promise(resolve=>{finish=resolve;})});
-    const view=render(<SnapApplicationReview request={request()} onChange={onChange}/>);fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));
+    const view=render(<SnapApplicationReview request={request()} onChange={onChange}/>);await press("Correct application answers");
+    await press("Save application changes");
     if(kind==='unmount')view.unmount();else{
       view.rerender(<SnapApplicationReview request={{...request(),version:3}} onChange={onChange}/>);
-      fireEvent.click(await screen.findByRole('button',{name:'Load latest saved application'}));fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
+      fireEvent.click(await screen.findByRole('button',{name:'Load latest saved application'}));await press("Correct application answers");
       fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Current draft'}});
     }
     await act(async()=>{finish(json({ok:true,snapshotId}));});expect(onChange).toHaveBeenCalledTimes(kind==='version'?1:0);
@@ -115,8 +161,8 @@ describe("owned exact SNAP application review",()=>{
   });
   it('preserves a pending correction across same-value background request clones',async()=>{
     let finish!:(value:unknown)=>void;const onChange=vi.fn();const fetch=api({post:()=>new Promise(resolve=>{finish=resolve;})});
-    const value=request(),view=render(<SnapApplicationReview request={value} onChange={onChange}/>);fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));
+    const value=request(),view=render(<SnapApplicationReview request={value} onChange={onChange}/>);await press("Correct application answers");
+    await press("Save application changes");
     view.rerender(<SnapApplicationReview request={{...structuredClone(value),updated_at:'2026-11-03T15:01:00Z'}} onChange={onChange}/>);
     expect(screen.getByRole('button',{name:'Saving application answers…'})).toBeTruthy();
     await act(async()=>{finish(json({ok:true,snapshotId}));});expect(onChange).toHaveBeenCalledOnce();expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
@@ -124,7 +170,7 @@ describe("owned exact SNAP application review",()=>{
   it('does not revive a cancelled pending save when its previous permission scope returns',async()=>{
     let finish!:(value:unknown)=>void;const changed=vi.fn(),fetch=api({post:()=>new Promise(resolve=>{finish=resolve;})});
     const value=request(),view=render(<SnapApplicationReview request={value} onChange={changed}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));
+    await press("Correct application answers");await press("Save application changes");
     view.rerender(<SnapApplicationReview request={{...value,mandate:{...value.mandate,expiresAt:new Date(Date.parse(value.mandate.expiresAt)-1000).toISOString()}}} onChange={changed}/>);
     view.rerender(<SnapApplicationReview request={value} onChange={changed}/>);
     expect(screen.queryByRole('button',{name:'Saving application answers…'})).toBeNull();
@@ -134,8 +180,8 @@ describe("owned exact SNAP application review",()=>{
   });
   it('bounds a stalled private-access recheck without discarding the retained draft',async()=>{
     const fetch=api({post:()=>json({ok:false,error:'Permission changed.'},403)});render(<SnapApplicationReview request={request()}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Retained'}});
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByRole('button',{name:'Check private application access again'});
+    await press("Correct application answers");fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Retained'}});
+    await press("Save application changes");await screen.findByRole('button',{name:'Check private application access again'});
     const original=fetch.getMockImplementation()!;fetch.mockImplementation(async(url:string,init?:RequestInit)=>url.endsWith('/authorization-window')?new Promise(()=>{}):original(url,init));
     vi.useFakeTimers();fireEvent.click(screen.getByRole('button',{name:'Check private application access again'}));await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});
     expect(screen.getByRole('button',{name:'Check private application access again'}).matches(':disabled')).toBe(false);expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
@@ -145,7 +191,7 @@ describe("owned exact SNAP application review",()=>{
     await screen.findByRole('region',{name:'Prepared SNAP application fixture'});
     expect(prepared.render).toHaveBeenLastCalledWith(expect.objectContaining({request:expect.objectContaining({id:requestId,version:2}),snapshot:saved,onChange:changed}));
     expect(fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
-    fireEvent.click(screen.getByRole('button',{name:'Correct application answers'}));
+    await press("Correct application answers");
     expect(screen.queryByRole('region',{name:'Prepared SNAP application fixture'})).toBeNull();
     fireEvent.click(screen.getByRole('button',{name:'Cancel editing'}));
     await screen.findByRole('region',{name:'Prepared SNAP application fixture'});
@@ -171,7 +217,7 @@ describe("owned exact SNAP application review",()=>{
     const fetch=api({saved:value});render(<SnapApplicationReview request={request()} answerRequest={1}/>);
     const county=await screen.findByLabelText('County');await waitFor(()=>expect(document.activeElement).toBe(county));
     expect(screen.queryByLabelText('Your first name')).toBeNull();expect(screen.queryByLabelText('Your date of birth')).toBeNull();expect(screen.queryByRole('button',{name:/Still correct/})).toBeNull();
-    fireEvent.change(county,{target:{value:'Philadelphia'}});fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    fireEvent.change(county,{target:{value:'Philadelphia'}});await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     const [url,init]=fetch.mock.calls.find(([,init])=>init?.method==='POST')!;expect(url).toContain('/snap-application');
     const body=JSON.parse(init!.body as string);expect(body.action).toBeUndefined();expect(body.confirmedPaths).toBeUndefined();expect(body.expectedVersion).toBe(2);
   });
@@ -180,7 +226,7 @@ describe("owned exact SNAP application review",()=>{
     render(<SnapApplicationReview request={request()} answerRequest={1}/>);await screen.findByLabelText('Your first name');
     expect(screen.getAllByLabelText('Your first name')).toHaveLength(1);expect(screen.queryByLabelText('Your last name')).toBeNull();expect(screen.queryByLabelText('Your date of birth')).toBeNull();
     expect(document.body.textContent).not.toContain(personId);expect(screen.queryByLabelText(/People in your household|relationship to the applicant/)).toBeNull();
-    fireEvent.click(screen.getByRole('button',{name:'Still correct: Your first name'}));fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    fireEvent.click(screen.getByRole('button',{name:'Still correct: Your first name'}));await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     const body=JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string);
     expect(body.confirmedPaths).toEqual([stale]);expect(body.details.applicant.firstName).toBe('Maria');expect(body.details.household[0].firstName).toBe('Maria');
   });
@@ -188,9 +234,9 @@ describe("owned exact SNAP application review",()=>{
     const paths=['applicant.firstName',`household.${personId}.firstName`];let posts=0;
     const fetch=api({saved:completeSnapshot(paths),post:()=>{if(++posts===1)throw new Error('lost response');return json({snapshotId});}});
     render(<SnapApplicationReview request={request()} answerRequest={1}/>);fireEvent.click(await screen.findByRole('button',{name:'Still correct: Your first name'}));
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByRole('button',{name:'Retry the same save'});
+    await press("Save application changes");await screen.findByRole('button',{name:'Retry the same save'});
     expect(screen.getByRole('button',{name:'Still correct: Your first name'}).matches(':disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('button',{name:'Retry the same save'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Retry the same save");await screen.findByText(/application answers are saved as a new revision/);
     const attempts=fetch.mock.calls.filter(([,init])=>init?.method==='POST').map(([,init])=>init!);expect(attempts[0].body).toBe(attempts[1].body);expect(attempts[0].headers).toEqual(attempts[1].headers);
     expect(JSON.parse(attempts[0].body as string).confirmedPaths).toEqual(paths);
   });
@@ -205,7 +251,7 @@ describe("owned exact SNAP application review",()=>{
     expect(document.body.textContent).not.toContain(otherId);expect(document.body.textContent).not.toContain(incomeId);
     fireEvent.click(screen.getByRole('button',{name:'Still correct: Person 2 relationship to you'}));
     fireEvent.change(screen.getByLabelText('Payment 1 actual or expected date'),{target:{value:'2026-11-02'}});
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     const body=JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string);
     expect(body.confirmedPaths).toEqual([path]);expect(body.details.income.entries[0]).toMatchObject({id:incomeId,personId:otherId,amount:20,date:'2026-11-02'});
   });
@@ -215,7 +261,7 @@ describe("owned exact SNAP application review",()=>{
     const fetch=api({saved:withDetails(value.details,['expenses.utilities'])});render(<SnapApplicationReview request={request()} answerRequest={1}/>);
     await screen.findByLabelText('Electric');expect((screen.getByLabelText('Electric') as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByLabelText('Do you pay for heat?')).toBeNull();expect(screen.queryByLabelText('Medical expense deduction')).toBeNull();expect(screen.queryByLabelText('Rent')).toBeNull();
-    fireEvent.click(screen.getByRole('button',{name:'Still correct: Utilities paid each month, even partly'}));fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    fireEvent.click(screen.getByRole('button',{name:'Still correct: Utilities paid each month, even partly'}));await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     expect(JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string).confirmedPaths).toEqual(['expenses.utilities']);
   });
   it('requires new current-month income answers instead of reaffirming or retagging old payments',async()=>{
@@ -224,7 +270,7 @@ describe("owned exact SNAP application review",()=>{
     await screen.findByText(/saved income answers are for 2026-10/);expect(screen.queryByRole('button',{name:/Still correct/})).toBeNull();expect(screen.queryByLabelText('Payment 1 amount before taxes ($)')).toBeNull();
     fireEvent.click(screen.getByRole('button',{name:'Enter this month’s income'}));
     fireEvent.change(screen.getByLabelText('Does anyone have income received or expected this month?'),{target:{value:'no'}});
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     const body=JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string);expect(body.details.income).toEqual({month:'2026-11',hasIncome:false});expect(body.confirmedPaths).toBeUndefined();
     expect(value.details.income.entries![0].date).toBe('2026-10-20');expect(value.details.income.month).toBe('2026-10');
   });
@@ -281,8 +327,8 @@ describe("owned exact SNAP application review",()=>{
     view.rerender(<SnapApplicationReview request={{...request(),version:3,status:'paused'}}/>);
     await screen.findByText(/Latest saved answers checked for this request/);expect(screen.queryByRole('button',{name:'Correct application answers'})).toBeNull();
     view.rerender(<SnapApplicationReview request={{...request(),version:4}}/>);
-    fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Marie'}});
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Correct application answers");fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Marie'}});
+    await press("Save application changes");await screen.findByText(/application answers are saved as a new revision/);
     const [,init]=fetch.mock.calls.find(([,init])=>init?.method==='POST')!;const body=JSON.parse(init!.body as string);
     expect(body.expectedVersion).toBe(4);expect(body.details.income.month).toBe('2026-10');
     expect(fetch.mock.calls.some(([url])=>url.includes('requestVersion=3'))).toBe(true);
@@ -297,13 +343,13 @@ describe("owned exact SNAP application review",()=>{
     view.rerender(<SnapApplicationReview request={{...request(),version:3}}/>);await screen.findByRole('status',{name:'Loading saved SNAP application'});
     view.rerender(<SnapApplicationReview request={{...request(),version:4}}/>);await screen.findByText(/Saved revision 2/);
     releaseOld(json({snapshot:snapshot()}));await waitFor(()=>expect(screen.queryByText(/Saved revision 1/)).toBeNull());
-    fireEvent.click(screen.getByRole('button',{name:'Correct application answers'}));expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Nora');
+    await press("Correct application answers");expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Nora');
   });
   it("retains an unsaved draft across a request-version change until the parent explicitly loads the latest saved answers",async()=>{
-    api();const view=render(<SnapApplicationReview request={request()}/>);fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
+    api();const view=render(<SnapApplicationReview request={request()}/>);await press("Correct application answers");
     fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Unsaved'}});view.rerender(<SnapApplicationReview request={{...request(),version:3}}/>);
     await screen.findByText(/request changed while you were editing/);expect(screen.queryByRole('button',{name:'Correct application answers'})).toBeNull();
-    fireEvent.click(screen.getByRole('button',{name:'Load latest saved application'}));fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
+    fireEvent.click(screen.getByRole('button',{name:'Load latest saved application'}));await press("Correct application answers");
     expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Maria');
   });
   it("does not offer new collection under an expired mandate",async()=>{
@@ -316,10 +362,10 @@ describe("owned exact SNAP application review",()=>{
   });
   it("saves a single version-bound correction and keeps names aligned without refreshing the original income period",async()=>{
     const fetch=api(),onChange=vi.fn();render(<SnapApplicationReview request={request()} onChange={onChange}/>);
-    fireEvent.click(await screen.findByRole("button",{name:"Correct application answers"}));
+    await press("Correct application answers");
     const first=screen.getByLabelText("Your first name");fireEvent.change(first,{target:{value:"Marie"}});
     expect(document.activeElement).toBe(first);
-    fireEvent.click(screen.getByRole("button",{name:"Save application changes"}));
+    await press("Save application changes");
     await waitFor(()=>expect(onChange).toHaveBeenCalledOnce());
     const [,init]=fetch.mock.calls.find(([,init])=>init?.method==="POST")!;
     const body=JSON.parse(init!.body as string);
@@ -330,47 +376,74 @@ describe("owned exact SNAP application review",()=>{
   });
   it("freezes an uncertain save and retries the exact same payload and key",async()=>{
     let posts=0;const fetch=api({post:()=>{if(++posts===1)throw new Error("connection lost");return json({ok:true,snapshotId});}});
-    render(<SnapApplicationReview request={request()}/>);fireEvent.click(await screen.findByRole("button",{name:"Correct application answers"}));
-    fireEvent.change(screen.getByLabelText("Your first name"),{target:{value:"Marie"}});fireEvent.click(screen.getByRole("button",{name:"Save application changes"}));
+    render(<SnapApplicationReview request={request()}/>);await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText("Your first name"),{target:{value:"Marie"}});await press("Save application changes");
     await screen.findByRole("button",{name:"Retry the same save"});
     expect(screen.getByLabelText("Your first name").matches(":disabled")).toBe(true);
-    fireEvent.click(screen.getByRole("button",{name:"Retry the same save"}));
+    await press("Retry the same save");
     await screen.findByText(/application answers are saved as a new revision/);
     const attempts=fetch.mock.calls.filter(([,init])=>init?.method==="POST").map(([,init])=>init);
     expect(attempts).toHaveLength(2);expect(attempts[0]!.body).toBe(attempts[1]!.body);expect(attempts[0]!.headers).toEqual(attempts[1]!.headers);
   });
+  it.each([401,403])("retains an unresolved exact save after a later %s until access returns",async status=>{
+    let posts=0;
+    const options={gate:authorization(),post:()=>{
+      posts++;
+      if(posts===1)throw new Error("lost response");
+      if(posts===2){options.gate=authorization(false);return json({ok:false,error:"Permission changed."},status);}
+      return json({ok:true,snapshotId});
+    }};
+    const fetch=api(options);
+    render(<SnapApplicationReview request={request()}/>);
+    await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText("Your first name"),{target:{value:"Retained"}});
+    await press("Save application changes");
+    await press("Retry the same save");
+    await waitFor(()=>expect(screen.queryByLabelText("Your first name")).toBeNull());
+    options.gate=authorization();
+    fireEvent.click(screen.getByRole("button",{name:"Check private application access again"}));
+    const retry=await screen.findByRole("button",{name:"Retry the same save"});
+    expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Retained");
+    expect(screen.getByLabelText("Your first name").matches(":disabled")).toBe(true);
+    fireEvent.click(retry);await screen.findByText(/application answers are saved as a new revision/);
+    const attempts=fetch.mock.calls.filter(([,init])=>init?.method==="POST").map(([,init])=>init!);
+    expect(attempts).toHaveLength(3);
+    for(const exact of attempts.slice(1)){expect(exact.body).toBe(attempts[0].body);expect(exact.headers).toEqual(attempts[0].headers);}
+  });
   it("keeps an unreadable HTTP-successful correction uncertain and reuses its key",async()=>{
     let posts=0;const fetch=api({post:()=>++posts===1?{ok:true,status:201,json:async()=>{throw new Error('truncated JSON');}}:json({ok:true,snapshotId})});
-    render(<SnapApplicationReview request={request()}/>);fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
-    fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Marie'}});fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));
+    render(<SnapApplicationReview request={request()}/>);await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Marie'}});await press("Save application changes");
     await screen.findByRole('button',{name:'Retry the same save'});expect(screen.getByLabelText('Your first name').matches(':disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('button',{name:'Retry the same save'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Retry the same save");await screen.findByText(/application answers are saved as a new revision/);
     const attempts=fetch.mock.calls.filter(([,init])=>init?.method==='POST').map(([,init])=>init!);
     expect(attempts[0].body).toBe(attempts[1].body);expect(attempts[0].headers).toEqual(attempts[1].headers);
   });
   it("retains unsaved answers on a version conflict until an explicit reload",async()=>{
     api({post:()=>json({ok:false,error:"The request changed. Reload it."},409)});render(<SnapApplicationReview request={request()}/>);
-    fireEvent.click(await screen.findByRole("button",{name:"Correct application answers"}));fireEvent.change(screen.getByLabelText("Your first name"),{target:{value:"Unsaved"}});
-    fireEvent.click(screen.getByRole("button",{name:"Save application changes"}));await screen.findByText(/Your unsaved draft is still here/);
+    await press("Correct application answers");fireEvent.change(screen.getByLabelText("Your first name"),{target:{value:"Unsaved"}});
+    await press("Save application changes");await screen.findByText(/Your unsaved draft is still here/);
     expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Unsaved");
     fireEvent.click(screen.getByRole("button",{name:"Load latest saved application"}));await screen.findByRole("button",{name:"Correct application answers"});
     expect(screen.queryByLabelText("Your first name")).toBeNull();
   });
   it("does not collect further edits after the server withdraws collection permission",async()=>{
     const fetch=api({post:()=>json({ok:false,error:"Its permission has changed."},403)});render(<SnapApplicationReview request={request()}/>);
-    fireEvent.click(await screen.findByRole("button",{name:"Correct application answers"}));fireEvent.click(screen.getByRole("button",{name:"Save application changes"}));
+    await press("Correct application answers");await press("Save application changes");
     await screen.findByText(/Its permission has changed/);
     expect(screen.queryByLabelText("Your first name")).toBeNull();
     expect(fetch.mock.calls.filter(([,init])=>init?.method==="POST")).toHaveLength(1);
   });
-  it("rechecks restored access and a fresh snapshot before resuming the retained draft",async()=>{
+  it("rechecks restored access and a fresh snapshot before retrying the exact retained save",async()=>{
     let posts=0;const fetch=api({post:()=>++posts===1?json({ok:false,error:'Permission changed.'},403):json({ok:true,snapshotId})});
-    render(<SnapApplicationReview request={request()}/>);fireEvent.click(await screen.findByRole('button',{name:'Correct application answers'}));
-    fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Retained'}});fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));
+    render(<SnapApplicationReview request={request()}/>);await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText('Your first name'),{target:{value:'Retained'}});await press("Save application changes");
     fireEvent.click(await screen.findByRole('button',{name:'Check private application access again'}));
     await screen.findByLabelText('Your first name');expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Retained');
     expect(fetch.mock.calls.some(([url])=>url.includes('read=1'))).toBe(true);
-    fireEvent.click(screen.getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
+    await press("Retry the same save");await screen.findByText(/application answers are saved as a new revision/);
+    const attempts=fetch.mock.calls.filter(([,init])=>init?.method==='POST').map(([,init])=>init!);
+    expect(attempts[1].body).toBe(attempts[0].body);expect(attempts[1].headers).toEqual(attempts[0].headers);
   });
   it("treats missing owned history as an empty saved-record state",async()=>{
     api({getStatus:404});render(<SnapApplicationReview request={request()}/>);

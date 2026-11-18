@@ -1,10 +1,8 @@
 import { z } from "zod";
+import { isOrdinaryText } from "./ordinary-text";
 import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
 
-const text = (max = 160) => z.string().trim().min(1).max(max).refine((value) =>
-  value.length <= max &&
-  !/[\u0000-\u001f\u007f-\u009f]/.test(value) &&
-  !/\b\d{3}[-.\s]*\d{2}[-.\s]*\d{4}\b/.test(value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")));
+const text = (max = 160, snapPhone = false) => z.string().trim().min(1).max(max).refine(value => value.length <= max && isOrdinaryText(value, snapPhone));
 const amount = z.number().finite().min(0).max(1000000);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   const parsed = new Date(`${value}T12:00:00Z`);
@@ -46,7 +44,7 @@ const expensesSchema = z.object({
 }).strict();
 const screeningSchema = z.object({ lowCashAndIncome: z.boolean().optional(), migrantOrSeasonal: z.boolean().optional(), belowShelterCosts: z.boolean().optional() }).strict();
 const contactFields = {
-  county: text(80).optional(), phone: text(30).optional(), otherPhone: text(30).optional(), bestTimeToCall: text(70).optional(),
+  county: text(80).optional(), phone: text(30, true).optional(), otherPhone: text(30, true).optional(), bestTimeToCall: text(70).optional(),
   interpreter: z.boolean().optional(), interpreterLanguage: text(80).optional(),
 };
 export const snapRehearsalInputSchema = z.object({
@@ -61,7 +59,7 @@ export const snapRehearsalInputSchema = z.object({
 export const snapPreparationInputSchema = z.discriminatedUnion("kind", [scopedSchema, snapRehearsalInputSchema]);
 
 const housingFields = ["rent", "condoFees", "mortgage", "propertyFees", "homeownersInsurance"] as const;
-const applicationPhone = text(30).refine(value => /^\+?[\d ().-]+$/.test(value) && value.replace(/\D/g, "").length >= 7 && value.replace(/\D/g, "").length <= 15);
+const applicationPhone = text(30, true).refine(value => /^\+?[\d ().-]+$/.test(value) && value.replace(/\D/g, "").length >= 7 && value.replace(/\D/g, "").length <= 15);
 const applicationPerson = personSchema.partial().extend({ id: z.uuid() }).strict();
 const applicationFields = z.object({
   ...existingFields,
@@ -104,10 +102,7 @@ export const snapApplicationFieldsValueSchema = applicationFields.superRefine((v
     const issue = (path: (string | number)[], message = "Check this field and its applicable answers.") => ctx.addIssue({ code: "custom", path, message });
     const scan = (item: unknown, path: (string | number)[] = []) => {
       if (typeof item === "string") {
-        const normalized = item.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
-        if (/\b\d{3}[-.\/\s‐‑‒–—―]*\d{2}[-.\/\s‐‑‒–—―]*\d{4}\b/.test(normalized) ||
-          (!['phone', 'otherPhone'].includes(String(path.at(-1))) && /\b\d{12,19}\b/.test(normalized)) ||
-          /\b(?:password|passcode|pin|ssn|social\s+security(?:\s+number)?|signature|ebt\s+pin)\s*(?:is\s+|[:=#]\s*)\S+/i.test(normalized))
+        if (!isOrdinaryText(item, ["phone", "otherPhone", "authorizedRepresentative.phone"].includes(path.join("."))))
           issue(path, "Use the protected official-program step for identifiers, credentials and signatures.");
       } else if (item && typeof item === "object")
         for (const [key, child] of Object.entries(item))

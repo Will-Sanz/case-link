@@ -39,6 +39,13 @@ jobs:
       - name: Verify rendered plan text, pagination, margins, and monochrome output
         run: npm run test:pdf
 
+      - name: Verify parent SQL authorization and workflow regressions
+        run: |
+          npm install --prefix "$RUNNER_TEMP/parent-sql-runtime" --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.3.14
+          export CASELINK_PARENT_SQL_FIXTURE_MODULE="$RUNNER_TEMP/parent-sql-runtime/node_modules/@electric-sql/pglite/dist/index.js"
+          test -f "$CASELINK_PARENT_SQL_FIXTURE_MODULE"
+          NODE_ENV=test npx vitest run src/lib/parent/*.sql.test.ts scripts/parent-test-approval.test.ts
+
       - name: Typecheck, lint, and production build
         run: npm run ci
         env:
@@ -92,6 +99,12 @@ jobs:
       - name: Install the browser for synthetic workflow checks
         run: npx playwright install --with-deps chromium
 
+      - name: Verify protected document consent, recovery, and accessibility in Chromium
+        run: NODE_ENV=test CASELINK_PARENT_TEST_PROTECTED_PAGE_BROWSER=1 npx vitest run src/lib/parent/utility-protected-page.test.ts
+
+      - name: Verify family profile recovery and accessibility in Chromium
+        run: NODE_ENV=test CASELINK_PARENT_TEST_PROFILE_BROWSER=1 npx vitest run src/features/parent/family-profile.browser.test.ts
+
       - name: Install PDF text verification tools
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
 
@@ -101,3 +114,65 @@ jobs:
       - name: Stop isolated Supabase
         if: always()
         run: npx --yes supabase@2.111.0 stop --no-backup
+
+  parent-native-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      DO_NOT_TRACK: "1"
+      CASELINK_SUPABASE_CLI: ${{ runner.temp }}/parent-cli/node_modules/.bin/supabase
+      CASELINK_PARENT_SQL_FIXTURE_MODULE: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies and the pinned local service CLI
+        run: |
+          npm ci
+          npm install --prefix "$RUNNER_TEMP/parent-cli" --no-save --no-package-lock supabase@2.111.0
+
+      - name: Start the separate synthetic parent stack
+        run: |
+          node scripts/parent-local-stack.mjs start
+          node scripts/parent-local-stack.mjs reset
+
+      - name: Verify native parent grants, RLS, transactions and concurrency
+        run: npm run parent:test:db
+
+      - name: Install the headless account-flow browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the parent app against isolated local services
+        run: npm run parent:verify -- --local-services --build
+
+      - name: Start the isolated parent app
+        run: |
+          node scripts/serve-parent.mjs --local-services > "$RUNNER_TEMP/parent-native-app.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/parent-native-app.pid"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:3200/sign-in; then exit 0; fi
+            sleep 1
+          done
+          echo "The isolated parent app did not become ready."
+          exit 1
+
+      - name: Verify real local parent Auth, food intake, recovery and privacy
+        run: npm run parent:test:auth -- --synthetic-approval
+
+      - name: Stop the isolated parent app
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/parent-native-app.pid"; then
+            read -r parent_app_pid < "$RUNNER_TEMP/parent-native-app.pid"
+            kill "$parent_app_pid" 2>/dev/null || true
+          fi
+
+      - name: Stop the separate synthetic parent stack
+        if: always()
+        run: node scripts/parent-local-stack.mjs stop

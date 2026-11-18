@@ -41,7 +41,7 @@ import {
 import { useParentResource } from "./use-parent-resource";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { ProgressBadge, SupportProgressPanel } from "./support-progress";
-import { ApplicationWorkspace, isPecoPreparationRequest, supportTitle } from "./application-workspace";
+import { ApplicationWorkspace, isPrivateUtilityPreparationRequest, supportTitle } from "./application-workspace";
 import workspace from "./application-workspace.module.css";
 import { UrgentHelp } from "./landing";
 import styles from "./parent.module.css";
@@ -149,7 +149,7 @@ function CorrectDetails({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const legacyPrivate = request.intake.childrenUnderFive !== null || request.intake.pregnantOrPostpartum !== null;
-  const privatePeco = isPecoPreparationRequest(request);
+  const privateUtility = isPrivateUtilityPreparationRequest(request);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
   const scope=JSON.stringify({id:request.id,version:request.version,status:request.status,mandate:request.mandate,legacyPrivate});
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
@@ -249,7 +249,7 @@ function CorrectDetails({
                 onChange={(e) => change("zip", e.target.value)}
               />
             </div>
-            {!privatePeco && <div className={styles.field}>
+            {!privateUtility && <div className={styles.field}>
               <label htmlFor="correct-size">Household size</label>
               <input
                 id="correct-size"
@@ -267,7 +267,7 @@ function CorrectDetails({
               />
             </div>}
           </div>
-          {!privatePeco && <div className={styles.row}>
+          {!privateUtility && <div className={styles.row}>
             <div className={styles.field}>
               <label htmlFor="correct-income">Income before taxes ($)</label>
               <input
@@ -308,7 +308,7 @@ function CorrectDetails({
               </select>
             </div>
           </div>}
-          {privatePeco && <p className={styles.hint}>Names, birth dates, PECO account number, service address and income source lists are corrected in <a className={styles.textLink} href="#application-review">Your PECO CAP answers</a>. Household routing ZIP and any shutoff date stay separate.</p>}
+          {privateUtility && <p className={styles.hint}>Names, birth dates, account details, addresses and income source lists are corrected in <a className={styles.textLink} href="#application-review">Your utility application answers</a>. Household routing ZIP and any shutoff date stay separate.</p>}
           {intake.needs.some(need=>need.startsWith('wic_')) && <p className={styles.hint}>Private WIC questions are not available here yet. Ordinary routing changes do not collect those answers.</p>}
           {request.intake.needs.some((need) =>
             ["electricity", "gas", "water"].includes(need),
@@ -851,11 +851,14 @@ export function SupportDetail({ requestId }: { requestId: string }) {
               ? "Private WIC document intake is not connected. Existing document history remains available; do not upload WIC health or family documents through this route. Use official WIC help for required documents."
               : "This document route covers only the verified other support needs in this request. WIC private or health documents are not accepted here; use official WIC help for those documents."}
           </p>}
-          {isPecoPreparationRequest(request) && <p className={styles.notice}>Private PECO CAP document intake is not connected. Existing document history remains available. Use official PECO help for required income proof and other documents.</p>}
+          {isPrivateUtilityPreparationRequest(request) && <div className={styles.notice}><div>
+            <p>Utility application documents and required identifiers use a separate protected step. Read its processing notice before adding anything. CaseLink checks and prepares permitted information automatically; saved documents do not confirm agency acceptance or stop a shutoff.</p>
+            <a className={styles.textLink} href={`/protected/utilities/requests/${request.id}/workspace?expectedVersion=${request.version}`}>Open protected utility documents</a>
+          </div></div>}
           <SupportDocuments
             requestId={requestId}
             documents={request.documents ?? []}
-            inactive={!acceptingActions || request.intake.needs.every(need => need.startsWith("wic_")) || isPecoPreparationRequest(request)}
+            inactive={!acceptingActions || request.intake.needs.every(need => need.startsWith("wic_")) || isPrivateUtilityPreparationRequest(request)}
             onChange={reload}
           />
         </div>

@@ -23,6 +23,25 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); for (const path of paths.splice(0)) rmSync(path, { recursive: true, force: true }); });
 
 describe("closed private SNAP launcher configuration", () => {
+  function utilityConfig() { return { ...config(), utilityDatabaseUrl: "postgresql://caselink_utility:UTILITY_PASSWORD_CANARY@127.0.0.1:55322/postgres", utilitySecret: "utility-private-token-".repeat(3) }; }
+  it("isolates utility database credentials to the private review child and sends only metadata access to the worker", () => {
+    const value = utilityConfig(), parsed = parseSnapPrivateServices(value);
+    const review = JSON.stringify(snapPrivateChildEnvironment("snap-review", parsed, {}));
+    expect(review).toContain("UTILITY_PASSWORD_CANARY"); expect(review).toContain(value.utilitySecret);
+    for (const service of ["snap-sender", "snap-frontdoor"] as const)
+      expect(JSON.stringify(snapPrivateChildEnvironment(service, parsed, {}))).not.toMatch(/UTILITY_PASSWORD|utility-private-token/);
+    const worker = snapSenderWorkerEnvironment(parsed);
+    expect(worker.CASELINK_PARENT_UTILITY_PREPARATION_ORIGIN).toBe(value.reviewOrigin);
+    expect(worker.CASELINK_PARENT_UTILITY_PREPARATION_SECRET).toBe(value.utilitySecret);
+    expect(JSON.stringify(worker)).not.toMatch(/PASSWORD_CANARY|databaseUrl/);
+  });
+  it.each(["secret_without_database", "shared_secret", "shared_login"])("rejects unsafe utility configuration %s", kind => {
+    const value: Record<string, unknown> = utilityConfig();
+    if (kind === "secret_without_database") delete value.utilityDatabaseUrl;
+    if (kind === "shared_secret") value.utilitySecret = value.senderSecret;
+    if (kind === "shared_login") value.utilityDatabaseUrl = value.finalizerDatabaseUrl;
+    expect(() => parseSnapPrivateServices(value)).toThrow("isolated SNAP services could not run");
+  });
   it("accepts only an explicit bounded local config without provisioning or creating files", () => {
     expect(parseSnapPrivateServices(config())).toEqual(config());
     expect(snapSenderWorkerEnvironment(parseSnapPrivateServices(config()))).toEqual({
