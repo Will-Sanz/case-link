@@ -600,6 +600,18 @@ async function main() {
       );
     }
     stage = "actual cross-request routing reuse without retyping";
+    const conflictingDefaults = await first.page.request.get(`${origin}/api/parent/intake-defaults`);
+    check(conflictingDefaults.status() === 200 && conflictingDefaults.headers()["cache-control"] === "private, no-store"
+      && (await conflictingDefaults.json()).zip === null,
+    "The actual API does not choose between the completed 19129 food visit and the current 19104 routing fact.");
+    // Age only the completed synthetic fixture's ZIP before testing reuse of an unambiguous current fact.
+    const foodBeforeExpiry = await foodState();
+    const expiredFoodZip = await db.query(`update public.parent_requests r
+      set intake_confirmed_at=jsonb_set(intake_confirmed_at,'{zip}',to_jsonb(now()-interval '46 days'))
+      where r.id=$1 and r.status='closed' and r.closed_reason='completed'
+        and exists(select 1 from public.parent_households h where h.id=r.household_id and h.owner_id=$2)`, [foodRequestId, first.id]);
+    check(expiredFoodZip.rowCount === 1 && JSON.stringify(await foodState()) === JSON.stringify(foodBeforeExpiry),
+      "Aging only the owned synthetic ZIP fixture preserves the food receipts, completion, version, job and retention clock.");
     const reusePage = await first.context.newPage();
     const reuseSource = await startFoodRequest(reusePage);
     const defaultsReply = await reusePage.request.get(`${origin}/api/parent/intake-defaults`);

@@ -64,6 +64,18 @@ describe.skipIf(!modulePath)("cross-request routing reuse against PostgreSQL", (
     await fixture.admin.query("update public.parent_requests set intake_confirmed_at=jsonb_set(intake_confirmed_at,'{zip}',to_jsonb(now()-interval '46 days')) where id=$1", [fresh]);
     expect(await candidate()).toBeNull();
   });
+  it("keeps a completed food request in conflict detection until its ordinary ZIP expires", async () => {
+    const completed = await start("19129");
+    await parent("select public.parent_report_outcome($1,'food_now','support_received','Fictional collection report')", [completed]);
+    await parent("select public.parent_close_request($1,'completed','Fictional completed support','parent','Return for support when needed')", [completed]);
+    const current = await start();
+    expect(await candidate()).toBeNull();
+    const before = await row(completed);
+    await fixture.admin.query("update public.parent_requests set intake_confirmed_at=jsonb_set(intake_confirmed_at,'{zip}',to_jsonb(now()-interval '46 days')) where id=$1", [completed]);
+    const after = await row(completed);
+    expect(after).toMatchObject({ status: before.status, version: before.version, updated_at: before.updated_at, closed_reason: before.closed_reason });
+    expect((await candidate())?.sourceRequestId).toBe(current);
+  });
   it("stops pending copied routing when a new original request conflicts, and resumes when resolved", async () => {
     await start(); const target = await reuse((await candidate())!);
     const conflicting = await start("19103");
