@@ -12,7 +12,7 @@ function fixtureBudget(){
     const food=pending?"need food today":unclear?"food for only one more day":description.includes("groceries today")?"groceries today":"no food for tomorrow";
     const benefit=pending?"already pending":"never applied for SNAP";
     const selection=description.includes("already started")?{needIds:["snap_pending"],selections:[],assertions:[{questionId:"benefitHistory",value:"applied",span:span("already started")}],exclusions:[],questionIds:[],outOfScope:null}
-      :{needIds:unclear?["food_now"]:["food_now",pending?"snap_pending":"snap_new"],selections:[],assertions:[{questionId:"foodForTwoDays",value:"no",span:span(food)},...unclear?[]:[{questionId:"benefitHistory",value:pending?"applied":"never",span:span(benefit)}]],exclusions:[],questionIds:unclear?["benefitHistory"]:[],outOfScope:null};
+      :{needIds:unclear?["food_now"]:["food_now",pending?"snap_pending":"snap_new"],selections:[],assertions:[{questionId:"foodForTwoDays",value:"no",span:span(food)},...unclear?[]:[{questionId:"benefitHistory",value:pending?"applied":"never",span:span(benefit)}]],exclusions:[],questionIds:[],outOfScope:null};
     return Response.json({id:"resp_synthetic",status:"completed",model:"gpt-6.1-sol",service_tier:"default",usage:{input_tokens:100,output_tokens:40,total_tokens:140,input_tokens_details:{cached_tokens:0,cache_write_tokens:0,cache_write_tokens_details:{ttl_30m_tokens:0,ttl_12h_tokens:0}},output_tokens_details:{reasoning_tokens:10}},output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(selection)}]}]});
   });
   return{requests,halt,fetcher,budget:{fetch:()=>fetcher,halt,attempts:()=>requests.length}};

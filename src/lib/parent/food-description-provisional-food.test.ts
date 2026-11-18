@@ -1,9 +1,8 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyDescriptionEvaluationAnswers, DESCRIPTION_EVALUATION_NOW, descriptionEvaluationContext, descriptionEvaluationInput, loadDescriptionEvaluationCorpus } from "../../../scripts/food-description-evaluation-adapter";
-import { descriptionEvaluationHash } from "../../../scripts/food-description-evaluation-budget";
 import { buildFoodDescriptionProjection, reconcileFoodDescriptionRequests, validateFoodDescriptionSelection, type FoodDescriptionContext } from "./food-description";
-import { FOOD_DESCRIPTION_EVALUATION_BINDING, FOOD_DESCRIPTION_FINGERPRINT } from "./food-description-runtime";
+const legacyPlan = JSON.parse(readFileSync(new URL("../../../tests/fixtures/parent/food-description-2026-11-18.v6-adapter.json", import.meta.url), "utf8"));
 
 // Only the exact message was extracted from retained revised-run attempt003, never its reasoning or complete response.
 const retained = JSON.parse(readFileSync(new URL("../../../tests/fixtures/parent/food-description-provisional-food-response-2026-11-18.json", import.meta.url), "utf8")) as {
@@ -24,8 +23,10 @@ describe("server reconciliation of an unanswered food question", () => {
   it("retains provisional food from the exact revised response without changing its request, typed source or execution boundary", () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
     const current = context(), projection = buildFoodDescriptionProjection(input, current, now);
-    expect(FOOD_DESCRIPTION_FINGERPRINT).toBe("88601cb7e99625144dc88e3866b0377eeeb4c10aa90fcc4af58c392ff3fcb5ea");
-    expect(descriptionEvaluationHash({ ...FOOD_DESCRIPTION_EVALUATION_BINDING.request, input: [{ role: "user", content: JSON.stringify(projection) }] })).toBe(retained.requestHash);
+    expect(legacyPlan.modelFingerprint).toBe("88601cb7e99625144dc88e3866b0377eeeb4c10aa90fcc4af58c392ff3fcb5ea");
+    const legacyStage = legacyPlan.cases.find((value: { id: string }) => value.id === retained.caseId).turns[0];
+    expect({ ...projection, catalogVersion: legacyPlan.modelFingerprint }).toEqual(legacyStage.projection);
+    expect(legacyStage.requestSha256).toBe(retained.requestHash);
     const value = result(current);
     expect(value).toMatchObject({ state: "needs_clarification", needIds: ["food_now", "snap_pending"], questionIds: ["foodForTwoDays"],
       proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null }, conflicts: ["benefitHistory"],

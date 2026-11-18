@@ -904,7 +904,7 @@ async function main() {
         "Actual foreign sessions cannot upload to or read another owner's description.");
       check((await descriptionHttp(descriptionOwner.page, "POST", `/food-description?draft=${a}`, { ...aBody, input: { ...aInput, description: "Different food support description." } })).status() === 409,
         "A changed body cannot reuse an actual queue key.");
-      await descriptionTurn({ needIds: ["food_now"], selections: [], assertions: [], exclusions: [], questionIds: ["benefitHistory"], outOfScope: null });
+      await descriptionTurn({ needIds: ["food_now"], selections: [], assertions: [], exclusions: [], questionIds: [], outOfScope: null });
       const aView = await descriptionResult(descriptionOwner.page, a, 1);
       check(aView.state === "needs_clarification" && JSON.stringify(aView.questionIds) === '["benefitHistory"]', "The actual validated result asks only its one unresolved vetted question.");
       const noReinterpret = await descriptionHttp(descriptionOwner.page, "POST", `/food-description?draft=${a}`, { ...aBody, expectedRevision: 1, idempotencyKey: randomUUID(), input: { ...aInput, screenLocale: "es" } });
@@ -1144,7 +1144,7 @@ async function main() {
       for (const mode of ["cancel", "edit", "delete"] as const) {
         const id = await descriptionCreate(lateOwner);
         await descriptionQueue(lateOwner, id, 0, { description: `Food help for this explicit ${mode} fixture.`, screenLocale: "en" });
-        await descriptionTurn({ needIds: ["food_now"], selections: [], assertions: [], exclusions: [], questionIds: ["foodForTwoDays", "benefitHistory"], outOfScope: null }, async () => {
+        await descriptionTurn({ needIds: ["food_now"], selections: [], assertions: [], exclusions: [], questionIds: [], outOfScope: null }, async () => {
           if (mode === "edit") await descriptionQueue(lateOwner, id, 1, { description: "A genuinely changed food-help description.", screenLocale: "en" });
           else if (mode === "delete") {
             await db.query("update parent_private.processing_controls set food_description_project_id='proj_changed' where singleton");

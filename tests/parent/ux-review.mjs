@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -74,13 +75,23 @@ try {
     const page = await context.newPage();
     let rejectAnswer = false,
       activeRequest = request,
-      assistantConversation = answeredConversation;
+      assistantConversation = answeredConversation,
+      receiptReads = 0;
+    const ownerId = "11111111-1111-4111-8111-111111111111", receipts = new Map(), answerAttempts = [];
     await page.route("**/api/parent/**", async (route) => {
       const url = new URL(route.request().url()),
         method = route.request().method();
       let status = 200,
         body = { ok: true, request: activeRequest, progress: savedProgress };
-      if (url.pathname.endsWith("/account"))
+      if (url.pathname === `/api/parent/requests/${request.id}` && method === "GET" && url.searchParams.has("updateKey")) {
+        const key = url.searchParams.get("updateKey");
+        assert.match(key, /^[0-9a-f-]{36}$/i);
+        const receipt = receipts.get(key)?.receipt ?? null;
+        if (receipt) receiptReads++;
+        body = { ok: true, request: activeRequest, update: { ownerId, receipt,
+          issuedAt: receipt ? null : new Date().toISOString(),
+          expiresAt: receipt ? null : new Date(Date.now() + 86400000).toISOString() } };
+      } else if (url.pathname.endsWith("/account"))
         body = {
           ok: true,
           account: {
@@ -196,7 +207,14 @@ try {
           };
         }
       } else if (method === "POST" && route.request().postDataJSON().action === "answer_facts") {
-        const payload = route.request().postDataJSON();
+        const payload = route.request().postDataJSON(), key = route.request().headers()["idempotency-key"];
+        assert.match(key, /^[0-9a-f-]{36}$/i);
+        answerAttempts.push({ key, body: route.request().postData(), version: payload.version });
+        const known = receipts.get(key);
+        if (known) {
+          assert.equal(known.body, route.request().postData());
+          return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, update: { ownerId, receipt: known.receipt } }) });
+        }
         assert.equal(payload.version, activeRequest.version);
         assert.equal(payload.answers.length, 2);
         assert.ok(payload.answers.some((answer) => answer.field === "accountAuthority" && answer.value === "self"));
@@ -210,7 +228,10 @@ try {
               payload.answers.some((answer) => answer.need === action.need && answer.field === action.field)
                 ? { ...action, resolved: true } : action),
           };
-          body = { ok: true, request: activeRequest, progress: savedProgress };
+          const receipt = { id: randomUUID(), key, requestId: activeRequest.id, action: payload.action,
+            baseVersion: payload.version, resultVersion: activeRequest.version, recordedAt: new Date().toISOString() };
+          receipts.set(key, { body: route.request().postData(), receipt });
+          body = { ok: true, update: { ownerId, receipt } };
         }
       } else if (method === "POST" && rejectAnswer) {
         status = 409;
@@ -513,6 +534,8 @@ try {
       .getByRole("button", { name: "Save all answers and continue", exact: true })
       .click();
     await page.getByRole("main").getByRole("alert").waitFor();
+    assert.equal(answerAttempts.length, 1, "The intended conflict must come from the answer POST, after owned preflight.");
+    assert.equal(receipts.size, 0, "A rejected answer must not create a receipt.");
     await snapshot("answer-error");
     rejectAnswer = false;
     activeRequest = { ...request, version: 2 };
@@ -523,6 +546,10 @@ try {
     await page.locator("#answer-synthetic-amount").fill("45");
     await page.getByRole("button", { name: "Save all answers and continue", exact: true }).click();
     await page.getByText("All your answers are saved. Permitted work can continue.").waitFor();
+    assert.deepEqual(answerAttempts.map(attempt => attempt.version), [1, 2]);
+    assert.notEqual(answerAttempts[0].key, answerAttempts[1].key, "Reviewed newer questions start a distinct accepted update.");
+    assert.equal(receipts.size, 1);
+    assert.ok(receiptReads > 0, "Show success only after the owned saved receipt is read back.");
     assert.equal(await page.getByRole("button", { name: "Save all answers and continue", exact: true }).count(), 0);
     await snapshot("answers-saved");
     await checklist.getByRole("link", { name: /Details & controls/ }).click();

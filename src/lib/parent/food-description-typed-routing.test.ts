@@ -27,7 +27,8 @@ describe("offline replay of the actual third response, without a new model-quali
     // A prompt-contract regression only. It cannot establish how a future model will respond.
     const instructions = FOOD_DESCRIPTION_EVALUATION_BINDING.request.instructions;
     expect(instructions).toContain("routingFacts");
-    expect(instructions).toMatch(/never return their keys in questionIds/i);
+    expect(instructions).toMatch(/return questionIds as an empty array/i);
+    expect(FOOD_DESCRIPTION_EVALUATION_BINDING.request.text.format.schema.properties!.questionIds).toMatchObject({ maxItems: 0 });
     expect(instructions).toContain("server computes final missing questions");
   });
   it("fails the actual prior message closed in the worker after its synthetic dispatch, without repair, finish or retry", async () => {

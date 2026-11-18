@@ -76,6 +76,22 @@ describe("one reserved private food interpretation turn", () => {
     const options=setup(); await runOneFoodDescriptionTurn({...options,projectId}); expect(options.fetcher).not.toHaveBeenCalled();
     expect(options.database.query.mock.calls.some(call=>call[0].includes("reserve_food_description"))).toBe(false);
   });
+  it("keeps question selection with the server and rejects a model-owned question list before finish", async () => {
+    const current: FoodDescriptionContext = { ...context, facts: { benefitHistory: { value: "applied", source: "parent_typed", confirmedAt: "2026-11-18T14:00:00Z", expiresAt: "2026-11-19T14:00:00Z" } } };
+    const options = setup(), original = options.database.query.getMockImplementation()!;
+    options.database.query.mockImplementation(async sql => {
+      const result = await original(sql);
+      if (sql.includes("claim_food_description")) (result.rows[0].value as {context:FoodDescriptionContext}).context = current;
+      if (sql.includes("food_description_current")) return { rows: [{ value: current }] };
+      return result;
+    });
+    options.fetcher.mockResolvedValue(response({ needIds: ["snap_pending"], selections: [], assertions: [selection.assertions[1]], exclusions: [], questionIds: ["foodForTwoDays"], outOfScope: null }));
+    await runOneFoodDescriptionTurn(options);
+    expect(options.database.query.mock.calls.some(([sql]) => sql.includes("finish_food_description"))).toBe(false);
+    expect(options.database.query.mock.calls.some(([sql]) => sql.includes("record_food_description_usage"))).toBe(true);
+    const questions = FOOD_DESCRIPTION_EVALUATION_BINDING.request.text.format.schema.properties!.questionIds;
+    expect(questions).toMatchObject({ type: "array", minItems: 0, maxItems: 0 });
+  });
   it("exports the supported strict Responses schema while retaining the disjoint assertion branches", () => {
     const schema = FOOD_DESCRIPTION_EVALUATION_BINDING.request.text.format.schema;
     expect(schema).not.toHaveProperty("$schema"); expect(JSON.stringify(schema)).not.toContain('"oneOf"');
