@@ -1,3 +1,4 @@
+import { readParentLocale } from "@/lib/parent/locale-server";
 import { getSupportRequest } from "@/lib/parent/data";
 import { renderParentSummary } from "@/lib/parent/export";
 import { parentError, parentJson, uuidSchema } from "@/lib/parent/http";
@@ -15,10 +16,12 @@ export async function GET(
         { ok: false, error: "This support request is unavailable." },
         404,
       );
-    const pdf = await renderParentSummary(request);
+    const locale = await readParentLocale();
+    const pdf = await renderParentSummary(request, locale);
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
+        "Content-Language": locale,
         "Content-Disposition":
           "attachment; filename=caselink-support-summary.pdf",
         "Cache-Control": "private, no-store",

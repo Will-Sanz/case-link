@@ -1,3 +1,4 @@
+import { readParentLocale } from "@/lib/parent/locale-server";
 import { getExactOperation } from "@/lib/parent/activity";
 import { renderParentPacket, type RecordedPacket } from "@/lib/parent/export";
 import { parentError, parentJson, uuidSchema } from "@/lib/parent/http";
@@ -17,10 +18,12 @@ export async function GET(
         { ok: false, error: "This recorded packet is unavailable." },
         404,
       );
-    const bytes = await renderParentPacket(operation as RecordedPacket);
+    const locale = await readParentLocale();
+    const bytes = await renderParentPacket(operation as RecordedPacket, locale);
     return new Response(new Uint8Array(bytes), {
       headers: {
         "Content-Type": "application/pdf",
+        "Content-Language": locale,
         "Content-Disposition": `attachment; filename=caselink-packet-${operationId}.pdf`,
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
