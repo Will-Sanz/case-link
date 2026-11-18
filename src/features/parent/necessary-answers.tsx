@@ -1,10 +1,11 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { ANSWER_FIELDS, factAnswerBundleSchema } from "@/lib/parent/answers";
-import { NEED_LABELS, type NecessaryAction, type SupportRequest } from "@/lib/parent/domain";
+import { NEED_LABELS, type NecessaryAction, type SupportNeed, type SupportRequest } from "@/lib/parent/domain";
 import { parentApi, ParentApiError } from "./api";
+import { useParentLocale } from "./parent-locale";
 import {
-  canonicalFactField, currentAnswer, factualAnswer, NecessaryAnswerFields, type AnswerDraft,
+  canonicalFactField, currentAnswer, factualAnswer, factualAnswerError, NecessaryAnswerFields, type AnswerDraft,
 } from "./necessary-answer";
 import styles from "./parent.module.css";
 
@@ -47,13 +48,14 @@ function currentQuestions(request: SupportRequest, saved: ReturnType<typeof snap
 }
 
 export function NecessaryAnswers({ request, onChange }: { request: SupportRequest; onChange: () => void }) {
+  const { t, locale } = useParentLocale();
   const [savedBundle, setBundle] = useState(() => snapshot(request));
   const [pending, setPending] = useState(false);
   const bundle = pending ? savedBundle : currentQuestions(request, savedBundle);
   const [conflict, setConflict] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string; action?: NecessaryAction } | null>(null);
   const [message, setMessage] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<SupportNeed | null>(null);
   const focusNext = useRef(false);
   useLayoutEffect(() => {
     if (!focusNext.current || pending) return;
@@ -73,25 +75,24 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
         : providerChanged && item.action.need === need && accountFields.includes(item.action.field ?? "")
           ? { ...item, draft: { value: "", frequency: "" } } : item),
     });
-    setNotice(providerChanged
-      ? `The provider changed for ${NEED_LABELS[need].toLowerCase()}. Enter this account’s current details below; other answers are kept.` : "");
-    setError("");
+    setNotice(providerChanged ? need : null);
+    setError(null);
     setMessage("");
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending || conflict || request.status !== "active" || bundle.status !== "active" || bundle.requestId !== request.id) return;
-    setError(""); setMessage("");
+    setError(null); setMessage("");
     const provided = bundle.questions.filter((question) => question.draft.value.trim() ||
       (question.action.field === "income" && question.draft.frequency));
     if (!provided.length) {
-      setError("Enter at least one answer before saving. Questions you leave blank stay open.");
+      setError({ message: "Enter at least one answer before saving. Questions you leave blank stay open." });
       return;
     }
     const empty = provided.find((question) => question.action.field === "income" &&
       (!question.draft.value.trim() || !question.draft.frequency));
     if (empty) {
-      setError(`${NEED_LABELS[empty.action.need]}: ${empty.action.title}. Enter both the income amount and frequency, or clear both for now. Zero is a valid amount.`);
+      setError({ action: empty.action, message: "Enter both the income amount and frequency, or clear both for now. Zero is a valid amount." });
       document.getElementById(`${empty.draft.value.trim() ? "frequency" : "answer"}-${empty.action.id}`)?.focus();
       return;
     }
@@ -102,7 +103,7 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const question = typeof issue?.path[1] === "number" ? provided[issue.path[1]] : undefined;
-      setError(`${question ? `${NEED_LABELS[question.action.need]}: ${question.action.title}. ` : ""}${issue?.message ?? "Check each answer before saving."}`);
+      setError({ action: question?.action, message: question ? factualAnswerError(question.action.field) : "Check each answer before saving." });
       if (question) document.getElementById(
         `${question.action.field === "income" && !question.draft.frequency ? "frequency" : "answer"}-${question.action.id}`,
       )?.focus();
@@ -123,16 +124,18 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
         draft: omitted.get(question.key) ?? question.draft,
       }));
       setBundle(remaining);
-      setConflict(false); setNotice("");
+      setConflict(false); setNotice(null);
       setMessage(remaining.questions.length
-        ? `Your provided answers are saved. Unanswered questions stay open; ${saved.request.status === "paused" ? "this request remains paused." : "other permitted work can continue."}`
+        ? saved.request.status === "paused"
+          ? "Your provided answers are saved. Unanswered questions stay open; this request remains paused."
+          : "Your provided answers are saved. Unanswered questions stay open; other permitted work can continue."
         : saved.request.status === "paused"
         ? "All your answers are saved. This request remains paused."
         : "All your answers are saved. Permitted work can continue.");
       onChange();
     } catch (err) {
       setConflict(!(err instanceof ParentApiError) || err.status < 400 || err.status === 409 || err.status >= 500);
-      setError(err instanceof Error ? err.message : "Your answers could not be saved. Try again.");
+      setError({ message: err instanceof Error ? err.message : "Your answers could not be saved. Try again." });
     } finally { setPending(false); }
   }
   async function reviewLatest() {
@@ -143,39 +146,38 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
         throw new Error("The latest questions are unavailable. Your draft is still here.");
       focusNext.current = true;
       setBundle(snapshot(latest.request));
-      setError(""); setConflict(false); setNotice("");
+      setError(null); setConflict(false); setNotice(null);
       setMessage("The latest saved answers and questions are loaded. Check them before saving.");
       onChange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "We couldn’t load the latest questions. Your draft is still here.");
+      setError({ message: err instanceof Error ? err.message : "We couldn’t load the latest questions. Your draft is still here." });
     } finally { setPending(false); }
   }
   if (bundle.requestId !== request.id || (!bundle.questions.length && !message)) return null;
   const changed = conflict || request.version > bundle.version;
   return (
-    <form lang="en" className={styles.form} aria-label="Household questions" onSubmit={submit}>
+    <form lang={locale} className={`${styles.form} ${styles.supportControls}`} aria-label={t("Household questions")} onSubmit={submit}>
       {bundle.questions.length > 0 && <p className={styles.hint}>
-        Save the answers you know together. Leave a question blank if you’re not sure yet; that step stays open.
-      </p>}
+        {t("Save the answers you know together. Leave a question blank if you’re not sure yet; that step stays open.")}</p>}
       {bundle.questions.map((question) => <section key={question.key} className={styles.actionBox}
         aria-labelledby={`context-${question.action.id} step-${question.action.id}`}>
-        <p id={`context-${question.action.id}`}><strong>{NEED_LABELS[question.action.need]}</strong></p>
-        <h3 id={`step-${question.action.id}`} tabIndex={-1}>{question.action.title}</h3>
+        <p id={`context-${question.action.id}`}><strong>{t(NEED_LABELS[question.action.need])}</strong></p>
+        <h3 lang={t(question.action.title) === question.action.title ? "" : locale} id={`step-${question.action.id}`} tabIndex={-1}>{t(question.action.title)}</h3>
         {question.sources.map((source, index) => <p key={source.id}
-          id={index ? `step-${source.id}` : undefined} tabIndex={index ? -1 : undefined}>{source.explanation}</p>)}
+          lang={t(source.explanation) === source.explanation ? "" : locale} id={index ? `step-${source.id}` : undefined} tabIndex={index ? -1 : undefined}>{t(source.explanation)}</p>)}
         <NecessaryAnswerFields action={question.action} draft={question.draft}
           onChange={(draft) => change(question, draft)} required={false} disabled={pending || request.status !== "active" || bundle.status !== "active"} />
       </section>)}
-      {notice && <p className={styles.notice} role="status">{notice}</p>}
+      {notice && <p className={styles.notice} role="status">{t("The provider changed for {need}. Enter this account’s current details below; other answers are kept.").replace("{need}", t(NEED_LABELS[notice]).toLocaleLowerCase(locale))}</p>}
       {bundle.questions.length > 0 && <button className={styles.button} disabled={pending || conflict || request.status !== "active" || bundle.status !== "active"}>
-        {pending ? "Saving answers…" : "Save all answers and continue"}
+        {t(pending ? "Saving answers…" : "Save all answers and continue")}
       </button>}
-      {message && <p className={styles.success} role="status">{message}</p>}
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {message && <p className={styles.success} role="status">{t(message)}</p>}
+      {error && <p className={styles.error} role="alert"><span>{error.action && <>{t(NEED_LABELS[error.action.need])}: <span lang={t(error.action.title) === error.action.title ? "" : locale}>{t(error.action.title)}</span>. </>}<span lang={t(error.message) === error.message ? "" : locale}>{t(error.message)}</span></span></p>}
       {changed && <div>
-        <p className={styles.hint}>Loading the latest questions replaces your unsaved answers with the current saved information.</p>
+        <p className={styles.hint}>{t("Loading the latest questions replaces your unsaved answers with the current saved information.")}</p>
         <button className={styles.secondary} type="button" disabled={pending} onClick={reviewLatest}>
-          {pending ? "Loading latest questions…" : "Review latest questions"}
+          {t(pending ? "Loading latest questions…" : "Review latest questions")}
         </button>
       </div>}
     </form>

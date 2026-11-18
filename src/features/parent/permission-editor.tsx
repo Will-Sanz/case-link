@@ -3,6 +3,7 @@ import { useState, useImperativeHandle, type FormEvent, type Ref } from "react";
 import type { ServiceMandate, SupportRequest } from "@/lib/parent/domain";
 import { getProgramsForNeeds } from "@/lib/parent/programs";
 import { parentApi } from "./api";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 export type PermissionEditorHandle = { open: () => void };
@@ -18,6 +19,7 @@ export function PermissionEditor({
   onChange: () => void;
   ref?: Ref<PermissionEditorHandle>;
 }) {
+  const { t, locale } = useParentLocale();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(request.mandate);
   const [version, setVersion] = useState(request.version);
@@ -100,21 +102,17 @@ export function PermissionEditor({
     setAccepted(false);
   };
   return (
-    <div className={`${styles.space} ${styles.hidePrint}`}>
+    <div lang={locale} className={`${styles.space} ${styles.hidePrint} ${styles.supportControls}`}>
       {!editing ? (
         <button className={styles.secondary} onClick={open}>
-          Change or renew permission
-        </button>
+          {t("Change or renew permission")}</button>
       ) : (
         <form className={styles.form} onSubmit={submit} ref={focusFirstField}>
-          <h3>Permission for up to 30 days</h3>
+          <h3>{t("Permission for up to 30 days")}</h3>
           <p className={styles.small}>
-            Choose exactly who can receive information and what CaseLink can
-            use. Removing permission stops new uses; information already
-            delivered may remain with its recipient.
-          </p>
+            {t("Choose exactly who can receive information and what CaseLink can use. Removing permission stops new uses; information already delivered may remain with its recipient.")}</p>
           <fieldset className={styles.fieldset}>
-            <legend className={styles.legend}>Named programs</legend>
+            <legend className={styles.legend}>{t("Named programs")}</legend>
             <div className={styles.choices}>
               {getProgramsForNeeds(request.intake.needs).map((program) => (
                 <label className={styles.choice} key={program.id}>
@@ -123,15 +121,14 @@ export function PermissionEditor({
                     checked={draft.recipientIds.includes(program.id)}
                     onChange={() => toggleRecipient(program.id)}
                   />
-                  <span>{program.name}</span>
+                  <span lang={t(program.name) === program.name ? "" : locale}>{t(program.name)}</span>
                 </label>
               ))}
             </div>
           </fieldset>
           <fieldset className={styles.fieldset}>
             <legend className={styles.legend}>
-              Information CaseLink may use
-            </legend>
+              {t("Information CaseLink may use")}</legend>
             <div className={styles.choices}>
               {[
                 ["household", "Household and routing details"],
@@ -149,15 +146,14 @@ export function PermissionEditor({
                       toggleData(id as ServiceMandate["allowedData"][number])
                     }
                   />
-                  <span>{label}</span>
+                  <span>{t(label)}</span>
                 </label>
               ))}
             </div>
           </fieldset>
           <fieldset className={styles.fieldset}>
             <legend className={styles.legend}>
-              Actions within these limits
-            </legend>
+              {t("Actions within these limits")}</legend>
             <div className={styles.choices}>
               <label className={styles.choice}>
                 <input
@@ -167,12 +163,9 @@ export function PermissionEditor({
                   onChange={() => changeMode("full")}
                 />
                 <span>
-                  <strong>Prepare and carry out permitted steps</strong>
+                  <strong>{t("Prepare and carry out permitted steps")}</strong>
                   <small>
-                    Share allowed information, submit supported applications,
-                    coordinate appointments and follow up. Required personal
-                    acts remain yours.
-                  </small>
+                    {t("Share allowed information, submit supported applications, coordinate appointments and follow up. Required personal acts remain yours.")}</small>
                 </span>
               </label>
               <label className={styles.choice}>
@@ -183,20 +176,15 @@ export function PermissionEditor({
                   onChange={() => changeMode("prepare_only")}
                 />
                 <span>
-                  <strong>Prepare only</strong>
+                  <strong>{t("Prepare only")}</strong>
                   <small>
-                    Research and prepare without sharing information or
-                    submitting anything.
-                  </small>
+                    {t("Research and prepare without sharing information or submitting anything.")}</small>
                 </span>
               </label>
             </div>
           </fieldset>
           <p className={styles.hint}>
-            Up to {draft.maxAttempts} attempts among these named programs.
-            External actions require a verified permitted connection.
-            Signatures, identity checks, agency declarations and binding
-            financial commitments still need the appropriate personal step.
+            {t("Up to {n} attempts among these named programs. External actions require a verified permitted connection. Signatures, identity checks, agency declarations and binding financial commitments still need the appropriate personal step.").replace("{n}", String(draft.maxAttempts))}
           </p>
           <label className={styles.choice}>
             <input
@@ -206,9 +194,7 @@ export function PermissionEditor({
               required
             />
             <span>
-              I authorize these programs, actions and information for up to 30
-              days. I can pause or withdraw future work.
-            </span>
+              {t("I authorize these programs, actions and information for up to 30 days. I can pause or withdraw future work.")}</span>
           </label>
           <button
             className={styles.button}
@@ -219,7 +205,7 @@ export function PermissionEditor({
               !draft.allowedData.length
             }
           >
-            {pending ? "Saving…" : "Save updated permission"}
+            {t(pending ? "Saving…" : "Save updated permission")}
           </button>
           <button
             className={styles.quiet}
@@ -227,18 +213,17 @@ export function PermissionEditor({
             disabled={pending}
             onClick={() => setEditing(false)}
           >
-            Keep existing permission
-          </button>
+            {t("Keep existing permission")}</button>
         </form>
       )}
       {message && (
         <p role="status" className={styles.success}>
-          {message}
+          {t(message)}
         </p>
       )}
       {error && (
-        <p role="alert" className={styles.error}>
-          {error}
+        <p lang={t(error) === error ? "" : locale} role="alert" className={styles.error}>
+          {t(error)}
         </p>
       )}
     </div>

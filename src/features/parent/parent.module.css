@@ -328,7 +328,21 @@
 .account .surface {
   min-width: 0;
 }
+.supportControls {
+  min-width: 0;
+}
 @media (max-width: 35rem) {
+  .surface:has(.supportControls),
+  .supportControls :is(.actionBox, .choice, .notice, .error, .success) {
+    padding: 12px;
+  }
+  .supportControls .choice {
+    gap: 12px;
+  }
+  .supportControls :is(.button, .secondary, .quiet) {
+    max-width: 100%;
+    padding-inline: 12px;
+  }
   .container.snapIntake {
     padding-inline: 12px;
   }

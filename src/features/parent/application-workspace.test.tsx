@@ -118,6 +118,15 @@ it.each((["en", "es"] as const).flatMap(locale => (["wic_new", "wic_continuing"]
     for (const detail of [pending, saved]) expect(screen.getByText(detail).closest("[lang]")?.getAttribute("lang")).toBe(locale);
 });
 describe("canonical application continuity", () => {
+  it("keeps the content keyboard-focusable while pending answers disable every inner control", () => {
+    mockApi();
+    render(<ApplicationWorkspace request={fixture()} history={{ data: { operations: [], historyLimited: false }, loading: false, error: null, reload: vi.fn() }}>
+      <section id="your-next-steps"><button disabled>Saving answers…</button></section>
+    </ApplicationWorkspace>);
+    const content = screen.getByText("Saving answers…").closest("[data-workspace-panel]")!.parentElement!;
+    content.focus();
+    expect(document.activeElement).toBe(content);
+  });
   it("opens exact private PECO preparation in the checklist without claiming an application or provider session", async () => {
     const request = fixture(); request.intake = { ...request.intake, needs: ["electricity"], utilityProviders: ["peco"], accountAuthority: "self" };
     request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt, true);

@@ -429,7 +429,7 @@ export function ApplicationWorkspace({
           <a href="mailto:willsanz23@gmail.com">{t("Contact CaseLink")}</a>
         </div>
       </nav>
-      <div className={layout.content}>
+      <div className={layout.content} tabIndex={0}>
         <section
           lang={snap || wicInterface ? locale : "en"}
           className={`${layout.overview} ${wicInterface ? wicStyles.overview : ""}`}

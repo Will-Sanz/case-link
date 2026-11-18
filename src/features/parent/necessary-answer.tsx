@@ -4,6 +4,7 @@ import type { NecessaryAction, SupportRequest } from "@/lib/parent/domain";
 import { ANSWER_FIELDS, factAnswerSchema } from "@/lib/parent/answers";
 import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
 import { parentApi, ParentApiError } from "./api";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 export type AnswerDraft = { value: string; frequency: string };
@@ -54,6 +55,15 @@ export function factualAnswer(action: NecessaryAction, draft: AnswerDraft) {
   };
 }
 
+export function factualAnswerError(field?: string): string {
+  if (field === "zip") return "Enter a ZIP code with five digits.";
+  if (field === "householdSize") return "Enter a whole number of people from 1 to 30.";
+  if (["income", "incomeAmount", "incomeFrequency"].includes(field ?? "")) return "Enter an income amount from 0 to 1000000 and choose how often it is received.";
+  if (field === "amountDue" || field === "totalBalance") return "Enter an amount from 0 to 1000000. Zero is a valid amount.";
+  if (field === "dueDate" || field === "shutoffDate") return "Enter a real date.";
+  return "Choose one of the listed options.";
+}
+
 export function NecessaryAnswerFields({
   action, draft, onChange, correction = false, disabled = false, required = true,
 }: {
@@ -64,6 +74,7 @@ export function NecessaryAnswerFields({
   disabled?: boolean;
   required?: boolean;
 }) {
+  const { t, locale } = useParentLocale();
   const { value, frequency } = draft;
   const field = action.field;
   const booking = field === "bookingPreference";
@@ -102,10 +113,16 @@ export function NecessaryAnswerFields({
             ["other", "Another provider"],
           ]
         : null;
+  const frequencies = [
+    ["weekly", "Weekly"], ["biweekly", "Every two weeks"], ["twice_monthly", "Twice a month"],
+    ["monthly", "Monthly"], ["yearly", "Yearly"],
+  ];
+  const selectedLabel = options?.find(([key]) => key === value)?.[1];
+  const frequencyLabel = frequencies.find(([key]) => key === frequency)?.[1];
   return (
-      <div className={styles.field}>
-        <label htmlFor={`answer-${action.id}`}>
-          {correction
+      <div lang={locale} className={styles.field}>
+        <label lang={correction && t(action.title) === action.title ? "" : undefined} htmlFor={`answer-${action.id}`}>
+          {t(correction
             ? action.title
             : booking
               ? "Preferred appointment window"
@@ -113,7 +130,7 @@ export function NecessaryAnswerFields({
                 ? "Household income before taxes ($)"
                 : field === "accountAuthority"
                   ? "How are you connected to the account?"
-                  : "Your answer"}
+                  : "Your answer")}
         </label>
         {options ? (
           <select
@@ -121,13 +138,14 @@ export function NecessaryAnswerFields({
             className={styles.select}
             value={value}
             required={required}
+            aria-describedby={selectedLabel ? `choice-${action.id}` : undefined}
             disabled={disabled}
             onChange={(event) => onChange({ value: event.target.value, frequency })}
           >
-            <option value="">Choose your answer</option>
+            <option value="">{t("Choose your answer")}</option>
             {options.map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
+              <option key={key} value={key} lang={t(label) === label ? "" : locale}>
+                {t(label)}
               </option>
             ))}
           </select>
@@ -149,11 +167,11 @@ export function NecessaryAnswerFields({
             onChange={(event) => onChange({ value: event.target.value, frequency })}
           />
         )}
+        {selectedLabel && <p className={styles.hint} id={`choice-${action.id}`} lang={t(selectedLabel) === selectedLabel ? "" : locale}>{t(selectedLabel)}</p>}
         {income && (
           <>
             <label htmlFor={`frequency-${action.id}`}>
-              How often is this income received?
-            </label>
+              {t("How often is this income received?")}</label>
             <select
               id={`frequency-${action.id}`}
               className={styles.select}
@@ -161,26 +179,22 @@ export function NecessaryAnswerFields({
               onChange={(event) => onChange({ value, frequency: event.target.value })}
               required={required}
               disabled={disabled}
+              aria-describedby={frequencyLabel ? `frequency-choice-${action.id}` : undefined}
             >
-              <option value="">Choose frequency</option>
-              {[
-                ["weekly", "Weekly"],
-                ["biweekly", "Every two weeks"],
-                ["twice_monthly", "Twice a month"],
-                ["monthly", "Monthly"],
-                ["yearly", "Yearly"],
-              ].map(([key, label]) => (
+              <option value="">{t("Choose frequency")}</option>
+              {frequencies.map(([key, label]) => (
                 <option value={key} key={key}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </select>
+            {frequencyLabel && <p className={styles.hint} id={`frequency-choice-${action.id}`}>{t(frequencyLabel)}</p>}
           </>
         )}
         <p className={styles.hint}>
-          {booking
+          {t(booking
             ? "This permits a routine booking in this window. A binding payment or other meaningful commitment still needs your choice."
-            : "Enter a current fact you know. This does not sign a form or certify an agency declaration."}
+            : "Enter a current fact you know. This does not sign a form or certify an agency declaration.")}
         </p>
       </div>
   );
@@ -197,6 +211,7 @@ export function NecessaryAnswer({
   onChange: () => void;
   correction?: boolean;
 }) {
+  const { t, locale } = useParentLocale();
   const [{ value, frequency }, setAnswer] = useState(() => currentAnswer(request, action));
   const [baseVersion, setBaseVersion] = useState(request.version);
   const [conflict, setConflict] = useState(false);
@@ -218,7 +233,7 @@ export function NecessaryAnswer({
     if (!booking) {
       const parsed = factAnswerSchema.safeParse(answer);
       if (!parsed.success) {
-        setError(parsed.error.issues[0]?.message ?? "Check your answer.");
+        setError(factualAnswerError(field));
         return;
       }
     }
@@ -283,27 +298,27 @@ export function NecessaryAnswer({
     }
   }
   return (
-    <form lang="en" className={styles.form} onSubmit={submit}>
+    <form lang={locale} className={`${styles.form} ${styles.supportControls}`} onSubmit={submit}>
       <NecessaryAnswerFields action={action} draft={{ value, frequency }} onChange={setAnswer}
         correction={correction} disabled={pending} />
       <button
         className={styles.button}
         disabled={pending || (!correction && request.status === "paused")}
       >
-        {pending
+        {t(pending
           ? "Saving…"
           : correction
             ? "Save account answer"
-            : "Save and continue"}
+            : "Save and continue")}
       </button>
       {message && (
         <p role="status" className={styles.success}>
-          {message}
+          {t(message)}
         </p>
       )}
       {error && (
-        <p role="alert" className={styles.error}>
-          {error}
+        <p lang={t(error) === error ? "" : locale} role="alert" className={styles.error}>
+          {t(error)}
         </p>
       )}
       {conflict && (
@@ -313,7 +328,7 @@ export function NecessaryAnswer({
           disabled={pending}
           onClick={reviewLatest}
         >
-          {pending ? "Loading latest information…" : "Review latest question"}
+          {t(pending ? "Loading latest information…" : "Review latest question")}
         </button>
       )}
     </form>
