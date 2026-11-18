@@ -122,7 +122,6 @@ def stage():
 import * as profile from './scripts/parent-hosted-profile.ts'; import * as launch from './scripts/parent-hosted-services.ts';
 const p=profile.default??profile,l=launch.default??launch,s=process.argv[1],path='/etc/caselink/'+s+'/profile.json';
 const c=JSON.parse(readFileSync(path,'utf8')),next={...c,approvedUntil:null,approvalReference:'Explicit ongoing owner approval'};
-p.hostedProfileSchema.parse(next);
 if(s==='sender'){assert.equal(c.enabled,false);assert.equal(c.sendingApproved,false);assert.throws(()=>p.parseHostedProfile(next));}
 else{const cfg=p.parseHostedProfile(next,Date.parse('2030-01-01T00:00:00Z'));assert.equal(p.hostedChildEnvironment(cfg).CASELINK_PARENT_HOSTED_APPROVED_UNTIL,'ongoing');
 if(s==='web')assert.equal(l.hostedWebFingerprint(cfg),JSON.parse(readFileSync('tmp/parent-hosted-build.json','utf8')).fingerprint);}
