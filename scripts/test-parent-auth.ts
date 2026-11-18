@@ -26,7 +26,12 @@ import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE, WATER_SU
 import { waterApplicationSnapshotSchema } from "../src/lib/parent/water-application-snapshot";
 import { foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM } from "../src/lib/parent/food-access";
 import { FAMILY_PROFILE_NOTICE_VERSION, familyProfileReadSchema } from "../src/lib/parent/family-profile";
-import { fixtureIntake, fixtureMandate } from "../src/lib/parent/test-fixtures";
+import { projectFamilyProfileApplication, familyProfileApplicationValue, replaceFamilyProfileApplicationValue } from "../src/lib/parent/family-profile-application";
+import { FOOD_DESCRIPTION_NOTICE_VERSION, foodDescriptionArchiveSchema } from "../src/lib/parent/food-description-draft";
+import { FOOD_DESCRIPTION_FINGERPRINT, runOneFoodDescriptionTurn } from "../src/lib/parent/food-description-runtime";
+import { buildFoodDescriptionProjection } from "../src/lib/parent/food-description";
+import { foodDescriptionViewSchema } from "../src/lib/parent/food-description-view";
+import { fixtureIntake, fixtureMandate, fixtureSnapApplication } from "../src/lib/parent/test-fixtures";
 import type { SupportRequest } from "../src/lib/parent/domain";
 import { runOneParentJob } from "../src/lib/parent/worker-runtime";
 import { assertSyntheticParentAuthTargets, beginParentTestApproval } from "./parent-test-approval";
@@ -104,7 +109,7 @@ async function main() {
       throw error;
     });
   const contexts: BrowserContext[] = [];
-  const emails = [0, 1, 2].map(
+  const emails = [0, 1, 2, 3, 4, 5, 6].map(
     () => `parent-auth-${randomUUID()}@example.test`,
   );
   const seenMail = new Set<string>();
@@ -622,6 +627,605 @@ async function main() {
         }
       }
       stage = foodOutcomeStage;
+    }
+
+    // Dedicated disposable owners keep new profile/history/budget cases out of every original rehearsal.
+    stage = "native optional-description fixture ownership and closed gates";
+    check(syntheticApproval && !!fixtureApproval && Date.parse(fixtureApproval.approvedUntil) > Date.now(),
+      "Description fixtures require the original explicit, still-current isolated synthetic approval.");
+    assertSyntheticParentAuthTargets(origin, local);
+    const descriptionControls = (await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+    const descriptionHealth = (await db.query("select to_jsonb(h) value from parent_private.worker_health h where singleton")).rows[0]?.value;
+    const descriptionMemberships = await foodMemberships();
+    let descriptionMembershipChange: { existed: boolean; set: boolean } | undefined;
+    const descriptionWorkers = [0, 1].map(() => new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000, idle_in_transaction_session_timeout: 10000 }));
+    const descriptionRequests: { page: Page; id: string }[] = [];
+    const descriptionPids: number[] = [];
+    let descriptionFetches = 0;
+    const descriptionReservationBaseline = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    const descriptionColumns = ["existing_accounts_enabled", "food_description_enabled", "food_description_approval_reference", "food_description_approved_until", "food_description_notice_version",
+      "food_description_processor_reference", "food_description_evaluation_reference", "food_description_evaluation_fingerprint", "food_description_retention_reference",
+      "food_description_project_budget_reference", "food_description_project_id", "food_description_budget_reference", "food_description_budget_started_at", "food_description_call_limit",
+      "model_budget_started_at", "model_call_limit", "snap_details_enabled", "snap_details_approval_reference", "snap_details_approved_until", "snap_details_notice_version",
+      "family_profile_enabled", "family_profile_approval_reference", "family_profile_approved_until", "family_profile_notice_version"];
+    const descriptionUrl = `${origin}/api/parent/food-description`;
+    const descriptionHttp = (page: Page, method: string, path: string, data?: unknown, key?: string) => page.request.fetch(`${origin}/api/parent${path}`, {
+      method, headers: { origin, ...(key ? { "Idempotency-Key": key } : {}) }, ...(data === undefined ? {} : { data }),
+    });
+    async function descriptionAccount(index: number, school = false, foreignDraftId?: string) {
+      const password = `Isolated-description-${randomUUID()}-Aa9!`;
+      const created = await operator.auth.admin.createUser({ email: emails[index], password, email_confirm: true });
+      check(!created.error && created.data.user, "An additional disposable description identity exists only in the isolated local Auth project.");
+      const id = created.data.user.id;
+      if (school) {
+        await db.query("insert into public.app_users(id,email,role,is_active) values($1,$2,'case_manager',true)", [id, emails[index]]);
+        await db.query("insert into public.families(name,created_by_id) values('Synthetic description school separation',$1)", [id]);
+        const schoolAuth = createClient(local.API_URL, local.ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchWithTimeout } });
+        const signed = await schoolAuth.auth.signInWithPassword({ email: emails[index], password });
+        check(!signed.error && signed.data.session, "The school-only fixture receives a real local Auth token before any parent enrollment.");
+        check((await rest(signed.data.session.access_token, "rpc/parent_food_description_result", { p_draft: foreignDraftId ?? randomUUID() })).status === 403
+          && (await db.query("select count(*)::int n from public.parent_accounts where id=$1", [id])).rows[0].n === 0,
+        "School-only authority cannot open the private description port or silently enroll a parent account.");
+        await schoolAuth.auth.signOut({ scope: "local" });
+      }
+      const context = await browser.newContext({ baseURL: origin, reducedMotion: "reduce" }); contexts.push(context);
+      const page = await context.newPage();
+      const signed = await page.request.post(`${origin}/api/parent/auth`, { headers: { origin }, data: { action: "sign_in", email: emails[index], password } });
+      check(signed.status() === 200, `The disposable description owner signs in through the real local Auth/web boundary (HTTP${signed.status()}).`);
+      const owned = await page.request.get(`${origin}/api/parent/account`);
+      check(owned.status() === 200 && (await owned.json()).account.id === id, "The actual web account binds the description session to its own household.");
+      return { id, context, page, password, token: await accessToken(context) };
+    }
+    async function descriptionArchive(page: Page) {
+      const response = await page.request.get(descriptionUrl);
+      check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "Actual retained description rights use an owned private HTTP read.");
+      return foodDescriptionArchiveSchema.parse((await response.json()).archive);
+    }
+    async function descriptionCreate(owner: { id: string; page: Page }) {
+      const body = { action: "create", expectedOwnerId: owner.id, idempotencyKey: randomUUID(), noticeVersion: FOOD_DESCRIPTION_NOTICE_VERSION, consentAccepted: true };
+      const created = await descriptionHttp(owner.page, "POST", "/food-description", body);
+      check(created.status() === 200, `The actual consent-first API creates an empty owned description (HTTP${created.status()}).`);
+      const reply = await created.json();
+      check(typeof reply.draftId === "string" && reply.revision === 0, "The server creates the description identifier before any prose is accepted.");
+      const same = await descriptionHttp(owner.page, "POST", "/food-description", body);
+      check(same.status() === 200 && (await same.json()).draftId === reply.draftId, "An exact create key acknowledges one server-created description.");
+      return reply.draftId as string;
+    }
+    async function descriptionQueue(owner: { id: string; page: Page }, id: string, expectedRevision: number, input: { description: string; screenLocale: "en" | "es" }, routingAnswers?: unknown) {
+      const body = { action: "queue", expectedOwnerId: owner.id, draftId: id, expectedRevision, idempotencyKey: randomUUID(), input, ...(routingAnswers ? { routingAnswers } : {}) };
+      const response = await descriptionHttp(owner.page, "POST", `/food-description?draft=${id}`, body);
+      check(response.status() === 200 && (await response.json()).revision === expectedRevision + 1, `A real owned queue freezes the exact current revision (HTTP${response.status()}).`);
+      return body;
+    }
+    async function descriptionResult(page: Page, id: string, revision: number) {
+      const response = await page.request.get(`${descriptionUrl}?draft=${id}&revision=${revision}`);
+      check(response.status() === 200, `The actual owned result endpoint validates the current source revision (HTTP${response.status()}).`);
+      return foodDescriptionViewSchema.parse((await response.json()).result);
+    }
+    const descriptionCount = async () => (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n as number;
+    const descriptionWorker = (worker = descriptionWorkers[0]) => ({ query: async (sql: string, values?: unknown[]) => {
+      const result = await worker.query(sql, values); return { rows: result.rows };
+    } });
+    async function descriptionHeartbeat(ready = true) {
+      await descriptionWorkers[0].query("select parent_private.parent_record_food_description_health($1,$2,'proj_synthetic')", [ready, FOOD_DESCRIPTION_FINGERPRINT]);
+    }
+    function descriptionExchange(selection: unknown, beforeReply?: () => Promise<void>): typeof fetch {
+      return async (input, init) => {
+        check(String(input) === "https://api.openai.com/v1/responses" && init?.method === "POST" && init.redirect === "error",
+          "The in-process synthetic description exchange accepts only the fixed Responses request and never performs network I/O.");
+        const headers = new Headers(init.headers), body = JSON.parse(String(init.body)), projection = JSON.parse(body.input[0].content);
+        check(headers.get("OpenAI-Project") === "proj_synthetic" && headers.get("Authorization") === "Bearer isolated-native-no-provider-key"
+          && body.model === "gpt-6.1-sol" && body.service_tier === "default" && body.store === false && body.max_output_tokens === 1500
+          && body.text?.format?.strict === true && body.reasoning?.effort === "medium" && !["tools", "metadata", "conversation", "previous_response_id"].some(key => key in body),
+        "The synthetic exchange verifies the exact pinned project/model/tier/schema, no storage and no tools before supplying fixture bytes.");
+        check(!/DescriptionProfileCanary|DescriptionProfileCorrected|145 Synthetic Lane|primaryPerson|homeAddress|ownerId|requestId|household_id/.test(body.input[0].content)
+          && typeof projection.description === "string", "Only minimized food routing information reaches the explicit synthetic exchange; private profile/application fields and IDs stay outside it.");
+        descriptionFetches++; await beforeReply?.();
+        return Response.json({ id: "resp_isolated_native_fixture", model: "gpt-6.1-sol", service_tier: "default", status: "completed",
+          usage: { input_tokens: 200, output_tokens: 80, total_tokens: 280, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0,
+            cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } },
+          output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selection) }] }] }, { headers: { "x-request-id": "req_isolated_native_fixture" } });
+      };
+    }
+    async function descriptionTurn(selection: unknown, beforeReply?: () => Promise<void>) {
+      await descriptionHeartbeat(); const before = descriptionFetches;
+      check(await runOneFoodDescriptionTurn({ database: descriptionWorker(), apiKey: "isolated-native-no-provider-key", projectId: "proj_synthetic", fetcher: descriptionExchange(selection, beforeReply) })
+        && descriptionFetches === before + 1, "The actual restricted native claim/prepare/reserve pipeline invokes exactly one in-process synthetic exchange.");
+    }
+    async function descriptionStart(page: Page, body: Record<string, unknown>, key = randomUUID()) {
+      const response = await descriptionHttp(page, "POST", "/requests", body, key);
+      check(response.status() === 201, `The actual description source creates only explicitly selected, named service work (HTTP${response.status()}).`);
+      const request = (await response.json()).request as SupportRequest; descriptionRequests.push({ page, id: request.id });
+      return { request, key, body };
+    }
+    async function descriptionStop(page: Page, id: string) {
+      const response = await descriptionHttp(page, "POST", `/requests/${id}`, { action: "cancel" });
+      check(response.status() === 200 && (await response.json()).request.status === "cancelled", "Only this fixture's owned synthetic work is stopped through actual parent controls.");
+    }
+    const descriptionPacket = (deadline: string, needs: SupportRequest["intake"]["needs"], recipients: string[], source?: { draftId: string; revision: number }) => ({
+      ...(source ? { descriptionSource: source } : {}), intake: fixtureIntake({ needs, zip: "19104", householdSize: null, utilityProviders: [], accountAuthority: "not_sure" }),
+      mandate: fixtureMandate({ mode: "prepare_only", recipientIds: recipients, allowedActions: ["research", "prepare"], allowedData: needs.includes("snap_new") ? ["household", "income"] : ["household"], maxRecipients: recipients.length, expiresAt: deadline }),
+    });
+    const descriptionErrors: unknown[] = [];
+    try {
+      const original = descriptionMemberships.filter(membership => membership.role_name === "parent_worker");
+      check(original.some(membership => membership.admin_option), "Description native role selection requires the existing fixture ADMIN membership.");
+      if (!original.some(membership => membership.set_option)) {
+        const own = original.find(membership => membership.grantor === foodOperator);
+        descriptionMembershipChange = { existed: !!own, set: own?.set_option ?? false };
+        await db.query(`grant parent_worker to ${foodIdentifier(foodOperator)} with ${own ? "" : "admin false, inherit false, "}set true`);
+      }
+      for (const worker of descriptionWorkers) { await worker.connect(); await worker.query("set role parent_worker");
+        check((await worker.query("select current_user role")).rows[0].role === "parent_worker", "Each native description connection actually runs as the restricted worker.");
+        descriptionPids.push((await worker.query("select pg_backend_pid() pid")).rows[0].pid); }
+      await db.query("update parent_private.processing_controls set existing_accounts_enabled=true where singleton");
+      const descriptionOwner = await descriptionAccount(3), capOwner = await descriptionAccount(4);
+      const deadline = (await (await descriptionOwner.page.request.get(`${origin}/api/parent/authorization-window`)).json()).authorization.expiresAt as string;
+      const anon = await browser.newContext({ baseURL: origin }); contexts.push(anon); const anonPage = await anon.newPage();
+      await anonPage.goto(`${origin}/get-support`, { waitUntil: "networkidle" });
+      check(await anonPage.getByRole("link", { name: "Find food now", exact: true }).isVisible()
+        && await anonPage.getByLabel(/enough food for today and tomorrow/).isVisible(), "The actual anonymous guide retains urgent official food help and manual questions with optional interpretation closed.");
+      check((await anonPage.request.get(`${descriptionUrl}/availability`)).status() === 200 && !(await (await anonPage.request.get(`${descriptionUrl}/availability`)).json()).available,
+        "New optional interpretation is actually unavailable before any fixture-specific purpose approval.");
+      const deniedCreate = { action: "create", expectedOwnerId: descriptionOwner.id, idempotencyKey: randomUUID(), noticeVersion: FOOD_DESCRIPTION_NOTICE_VERSION, consentAccepted: true };
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/food-description", deniedCreate)).status() === 403,
+        "A real authenticated caller cannot create a description under default-closed purpose controls.");
+      await db.query(`update parent_private.processing_controls set food_description_enabled=true,
+        food_description_approval_reference='isolated synthetic Auth description fixture; no processor call',food_description_approved_until=$1,
+        food_description_notice_version=$2,food_description_processor_reference='synthetic exchange only',food_description_evaluation_reference='native guards only; no model-quality approval',
+        food_description_evaluation_fingerprint=$3,food_description_retention_reference='synthetic original24h48h',food_description_project_budget_reference='synthetic project only',
+        food_description_project_id='proj_synthetic',food_description_budget_reference='synthetic native counters only',food_description_budget_started_at=now()-interval '1 hour',
+        food_description_call_limit=10000,model_budget_started_at=now()-interval '1 hour',model_call_limit=10000 where singleton`,
+      [new Date(Math.min(Date.parse(fixtureApproval!.approvedUntil), Date.now() + 3600000)).toISOString(), FOOD_DESCRIPTION_NOTICE_VERSION, FOOD_DESCRIPTION_FINGERPRINT]);
+      await descriptionHeartbeat();
+      for (const column of ["food_description_approval_reference", "food_description_processor_reference", "food_description_evaluation_reference", "food_description_retention_reference",
+        "food_description_project_budget_reference", "food_description_budget_reference", "food_description_notice_version", "food_description_project_id", "food_description_evaluation_fingerprint", "food_description_approved_until"] as const) {
+        const before = (await db.query(`select ${column} value from parent_private.processing_controls where singleton`)).rows[0].value;
+        await db.query(`update parent_private.processing_controls set ${column}=null where singleton`);
+        check((await descriptionHttp(descriptionOwner.page, "POST", "/food-description", deniedCreate)).status() === 403,
+          `The actual create boundary stays closed without ${column}.`);
+        await db.query(`update parent_private.processing_controls set ${column}=$1 where singleton`, [before]);
+      }
+      await descriptionHeartbeat(false);
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/food-description", deniedCreate)).status() === 403, "Old/general worker readiness cannot replace the dedicated current description capability.");
+      await descriptionHeartbeat();
+      check((await descriptionHttp(anonPage, "POST", "/food-description", deniedCreate)).status() === 401,
+        "An actual anonymous session cannot create the consented private draft even while the separate feature is available.");
+      check((await db.query("select count(*)::int n from parent_private.food_description_drafts where owner_id=any($1::uuid[])", [[descriptionOwner.id, capOwner.id]])).rows[0].n === 0
+        && await descriptionCount() === descriptionReservationBaseline, "Closed/foreign/anonymous setup attempts record no prose, draft or model reservation.");
+
+      stage = "native shared final-slot locks and rolling account/description ceilings";
+      const capRequest = await descriptionStart(capOwner.page, descriptionPacket(deadline, ["snap_pending"], ["snap-pa"]));
+      const capJob = (await descriptionWorkers[1].query("select parent_private.parent_claim_job(300) job")).rows[0].job;
+      check(capJob?.request?.id === capRequest.request.id, "The coordinator-cap fixture obtains its actual isolated current durable lease, without forcing a target row.");
+      await descriptionWorkers[0].query("select parent_private.parent_record_worker_health(false,true)");
+      const question = await rest(capOwner.token, "rpc/parent_ask_assistant", { p_request_id: capRequest.request.id, p_question: "What is recorded as the next permitted step?", p_idempotency_key: randomUUID(), p_consented: true });
+      check(question.status === 200, "The real owned assistant RPC queues the bounded synthetic counter fixture.");
+      const assistant = (await descriptionWorkers[1].query("select parent_private.parent_claim_assistant() value")).rows[0].value;
+      check(assistant?.requestId === capRequest.request.id || assistant?.request?.id === capRequest.request.id,
+        "The assistant-cap fixture claims only its real owned queued question.");
+      const capDraft = await descriptionCreate(capOwner);
+      const seededAccountCalls: string[] = [];
+      try {
+        for (let revision = 0; revision < 3; revision++) {
+          await descriptionHeartbeat(); await descriptionQueue(capOwner, capDraft, revision, { description: `Food support with an explicit synthetic edit ${revision}.`, screenLocale: "en" });
+          const [left, right] = await Promise.all(descriptionWorkers.map(worker => worker.query("select parent_private.parent_claim_food_description() value")));
+          const claimed = [left.rows[0].value, right.rows[0].value].filter(Boolean);
+          check(claimed.length === 1 && claimed[0].draftId === capDraft, "Two real restricted connections cannot claim the same description lease.");
+          const claim = claimed[0], stored = (await db.query("select input from parent_private.food_description_drafts where id=$1", [capDraft])).rows[0].input;
+          await descriptionWorkers[0].query("select parent_private.parent_prepare_food_description($1,$2,$3,$4)", [capDraft, claim.revision, claim.leaseToken, JSON.stringify(buildFoodDescriptionProjection(stored, claim.context, new Date()))]);
+          if (revision === 2) {
+            const seeded = await db.query("insert into parent_private.ai_calls(account_id,request_id) select $1,$2 from generate_series(1,57) returning id::text", [capOwner.id, capRequest.request.id]);
+            seededAccountCalls.push(...seeded.rows.map(row => row.id));
+            await db.query("update parent_private.processing_controls set model_call_limit=10000 where singleton");
+          } else {
+            const used = (await db.query("select greatest((select count(*) from parent_private.model_call_reservations),(select count(*) from parent_private.ai_calls)+(select count(*) from parent_private.assistant_calls)+(select count(*) from parent_private.food_description_calls))::int n")).rows[0].n;
+            await db.query("update parent_private.processing_controls set model_call_limit=$1 where singleton", [used + 1]);
+          }
+          await descriptionWorkers[0].query("begin");
+          let charge: string | undefined, competing: Promise<import("pg").QueryResult> | undefined;
+          try {
+            charge = (await descriptionWorkers[0].query("select parent_private.parent_reserve_food_description($1,$2,$3) value", [capDraft, claim.revision, claim.leaseToken])).rows[0].value;
+            check(typeof charge === "string", "The native description reservation takes the final permitted slot under its real account/advisory locks.");
+            competing = revision === 1
+              ? descriptionWorkers[1].query("select parent_private.parent_reserve_assistant_call($1,$2) value", [assistant.messageId, assistant.leaseToken])
+              : descriptionWorkers[1].query("select parent_private.parent_reserve_ai_call($1,$2) value", [capJob.jobId, capJob.leaseToken]);
+            const blocked = await db.query("select pg_backend_pid() operator,(select pid from pg_stat_activity where pid=$1 and cardinality(pg_blocking_pids(pid))>0) blocked", [descriptionPids[1]]);
+            // Observe an actual wait while the first transaction owns the account/global serialization lock.
+            let waiting = Boolean(blocked.rows[0].blocked);
+            for (let attempt = 0; !waiting && attempt < 50; attempt++) { await delay(10); waiting = (await db.query("select cardinality(pg_blocking_pids($1))>0 value", [descriptionPids[1]])).rows[0].value; }
+            check(waiting, "The competing native reserve really waits on the held account/global transaction lock.");
+            await descriptionWorkers[0].query("commit");
+            check((await competing).rows[0].value === false, "Only one description/coordinator/assistant contender consumes the actual final shared slot.");
+          } finally { await descriptionWorkers[0].query("rollback").catch(() => {}); await competing?.catch(() => {}); }
+          await descriptionWorkers[0].query("select parent_private.parent_record_food_description_usage($1,$2)", [charge, JSON.stringify({ complete: false })]);
+          if (revision === 0) {
+            await db.query("update parent_private.food_description_drafts set lease_until=clock_timestamp()-interval '1 second' where id=$1", [capDraft]);
+            let rejectedLease = false;
+            try { await descriptionWorkers[0].query("select parent_private.parent_food_description_current($1,$2,$3)", [capDraft, claim.revision, claim.leaseToken]); }
+            catch (error) { rejectedLease = (error as { code?: string }).code === "42501"; }
+            check(rejectedLease && !(await descriptionWorkers[0].query("select parent_private.parent_claim_food_description() value")).rows[0].value,
+              "The actual expired charged lease is rejected and never reclaimed for another dispatch.");
+          } else await descriptionWorkers[0].query("select parent_private.parent_fail_food_description($1,$2,$3)", [capDraft, claim.revision, claim.leaseToken]);
+          await db.query("update parent_private.processing_controls set model_call_limit=10000 where singleton");
+          if (revision === 0) {
+            const used = (await db.query("select count(*)::int n from parent_private.model_call_reservations where purpose='food_description'")).rows[0].n;
+            await db.query("update parent_private.processing_controls set food_description_call_limit=$1 where singleton", [used]);
+            check((await descriptionHttp(descriptionOwner.page, "POST", "/food-description", deniedCreate)).status() === 403, "Known feature-budget exhaustion rejects a different fresh owner before prose capture.");
+            await db.query("update parent_private.processing_controls set food_description_call_limit=10000 where singleton");
+          }
+        }
+      } finally {
+        if (seededAccountCalls.length) await db.query("delete from parent_private.ai_calls where id=any($1::bigint[]) and account_id=$2", [seededAccountCalls, capOwner.id]);
+      }
+      check((await descriptionHttp(capOwner.page, "POST", "/food-description", { ...deniedCreate, expectedOwnerId: capOwner.id, idempotencyKey: randomUUID() })).status() === 403,
+        "The actual third rolling description reservation still closes capture after synthetic account-cap history is removed; no anonymous reservation is refunded.");
+      check((await descriptionHttp(capOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: capOwner.id, draftId: capDraft })).status() === 200,
+        "Actual owned cancellation remains available after the final resource slot.");
+      await descriptionStop(capOwner.page, capRequest.request.id);
+
+      stage = "native description exact queue, clarification, source-bound lost acknowledgement and private receipt";
+      await descriptionHeartbeat(); const a = await descriptionCreate(descriptionOwner);
+      const aOriginal = (await descriptionArchive(descriptionOwner.page)).drafts.find(draft => draft.id === a)!;
+      check(aOriginal.state === "empty" && aOriginal.input === null && Date.parse(aOriginal.contentExpiresAt) - Date.parse(aOriginal.createdAt) === 86400000
+        && Date.parse(aOriginal.metadataExpiresAt) - Date.parse(aOriginal.createdAt) === 172800000, "The real consent draft fixes original24h/48h deadlines before prose.");
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/food-description", { ...deniedCreate, expectedOwnerId: capOwner.id })).status() === 403,
+        "A different expected owner cannot create content under the actual signed-in identity.");
+      const expiredAuth = createClient(local.API_URL, local.ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchWithTimeout } });
+      const expiredSigned = await expiredAuth.auth.signInWithPassword({ email: emails[3], password: descriptionOwner.password });
+      check(!expiredSigned.error && expiredSigned.data.session, "The expiry probe uses a separately issued actual local Auth session.");
+      const expiredClaims = JSON.parse(Buffer.from(expiredSigned.data.session.access_token.split(".")[1], "base64url").toString());
+      const sessionBefore = (await db.query("select not_after from auth.sessions where id=$1 and user_id=$2", [expiredClaims.session_id, descriptionOwner.id])).rows[0];
+      check(sessionBefore, "The actual issued session exists before its owned fixture expiry.");
+      try {
+        await db.query("update auth.sessions set not_after=clock_timestamp()-interval '1 second' where id=$1 and user_id=$2", [expiredClaims.session_id, descriptionOwner.id]);
+        check((await rest(expiredSigned.data.session.access_token, "rpc/parent_food_description_result", { p_draft: a })).status === 403,
+          "An actually expired issued session cannot read a description even though its signed JWT has not expired.");
+      } finally {
+        await db.query("update auth.sessions set not_after=$1 where id=$2 and user_id=$3", [sessionBefore.not_after, expiredClaims.session_id, descriptionOwner.id]);
+        await expiredAuth.auth.signOut({ scope: "local" });
+      }
+      const aInput = { description: "Food help and grocery support, please.", screenLocale: "en" as const }, confirmedAt = new Date(Date.now() - 1000).toISOString();
+      const aBody = { action: "queue", expectedOwnerId: descriptionOwner.id, draftId: a, expectedRevision: 0, idempotencyKey: randomUUID(), input: aInput,
+        routingAnswers: { foodForTwoDays: { value: "no", confirmedAt } } };
+      const aQueued = await Promise.all([0, 1].map(() => descriptionHttp(descriptionOwner.page, "POST", `/food-description?draft=${a}`, aBody)));
+      check(aQueued.every(reply => reply.status() === 200) && (await db.query("select revision from parent_private.food_description_drafts where id=$1", [a])).rows[0].revision === 1,
+        "Concurrent actual same-body/key queues acknowledge one immutable queued revision.");
+      check((await descriptionHttp(first.page, "POST", `/food-description?draft=${a}`, aBody)).status() === 403
+        && (await first.page.request.get(`${descriptionUrl}?draft=${a}&revision=1`)).status() === 403,
+        "Actual foreign sessions cannot upload to or read another owner's description.");
+      check((await descriptionHttp(descriptionOwner.page, "POST", `/food-description?draft=${a}`, { ...aBody, input: { ...aInput, description: "Different food support description." } })).status() === 409,
+        "A changed body cannot reuse an actual queue key.");
+      await descriptionTurn({ needIds: ["food_now"], selections: [], assertions: [], exclusions: [], questionIds: ["benefitHistory"], outOfScope: null });
+      const aView = await descriptionResult(descriptionOwner.page, a, 1);
+      check(aView.state === "needs_clarification" && JSON.stringify(aView.questionIds) === '["benefitHistory"]', "The actual validated result asks only its one unresolved vetted question.");
+      const noReinterpret = await descriptionHttp(descriptionOwner.page, "POST", `/food-description?draft=${a}`, { ...aBody, expectedRevision: 1, idempotencyKey: randomUUID(), input: { ...aInput, screenLocale: "es" } });
+      check(noReinterpret.status() === 409, "A locale/new key alone cannot dispatch the same already charged prose and current context again.");
+      const beforeResolve = await descriptionCount(), resolveBody = { action: "resolve", expectedOwnerId: descriptionOwner.id, draftId: a, expectedRevision: 1,
+        idempotencyKey: randomUUID(), answers: { foodForTwoDays: "no", benefitHistory: "never", existingIssue: null }, changedQuestionIds: ["benefitHistory"] };
+      check((await descriptionHttp(first.page, "PATCH", `/food-description?draft=${a}`, resolveBody)).status() === 403
+        && (await descriptionHttp(first.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: descriptionOwner.id, draftId: a })).status() === 403,
+        "Actual foreign sessions cannot clarify or cancel another owner's retained source.");
+      const resolved = await descriptionHttp(descriptionOwner.page, "PATCH", `/food-description?draft=${a}`, resolveBody);
+      check(resolved.status() === 200 && (await resolved.json()).revision === 2, "Actual deterministic clarification advances only the current owned revision.");
+      check((await descriptionHttp(descriptionOwner.page, "PATCH", `/food-description?draft=${a}`, resolveBody)).status() === 200 && await descriptionCount() === beforeResolve,
+        "Exact clarification replay uses zero additional reservations or model exchanges.");
+      check((await descriptionHttp(descriptionOwner.page, "PATCH", `/food-description?draft=${a}`, { ...resolveBody, idempotencyKey: randomUUID() })).status() === 409,
+        "A new clarification key cannot reuse a superseded source revision.");
+      const aAfterResolve = (await descriptionArchive(descriptionOwner.page)).drafts.find(draft => draft.id === a)!;
+      check(aAfterResolve.contentExpiresAt === aOriginal.contentExpiresAt && aAfterResolve.metadataExpiresAt === aOriginal.metadataExpiresAt && aAfterResolve.consentedAt === aOriginal.consentedAt,
+        "Deterministic clarification never renews the original consent or content/metadata deadlines.");
+      const aSource = { draftId: a, revision: 2 }, aResult = await descriptionResult(descriptionOwner.page, a, 2);
+      check(aResult.state === "proposal" && JSON.stringify(aResult.needIds) === '["food_now","snap_new"]', "Actual clarification retains each independent supported proposed need.");
+      const originalProjection = (await db.query("select model_projection from parent_private.food_description_calls where draft_id=$1", [a])).rows[0].model_projection;
+      check(originalProjection.revision === 1 && Date.parse(originalProjection.routingFacts.foodForTwoDays.confirmedAt) === Date.parse(confirmedAt) && !originalProjection.routingFacts.benefitHistory,
+        "The original charged projection and original supplied fact time survive deterministic clarification unchanged.");
+      const routing = await descriptionStart(descriptionOwner.page, descriptionPacket(deadline, ["food_now"], ["philly-food"]));
+      check((await descriptionHttp(descriptionOwner.page, "POST", `/requests/${routing.request.id}/outcome`, { need: "food_now", outcome: "support_received", reference: "Synthetic attributed report for an isolated routing-source fixture; no actual collection." })).status() === 200,
+        "An existing generic source fixture uses a truthfully attributed synthetic parent report.");
+      check((await descriptionHttp(descriptionOwner.page, "POST", `/requests/${routing.request.id}/outcome`, { action: "close", reason: "completed", detail: "Synthetic completed routing source only.", nextOwner: "parent", reentry: "Begin new support only when a new need exists." })).status() === 200,
+        "Actual owned closure makes the known synthetic routing source independently readable without future work.");
+      const defaults = await descriptionOwner.page.request.get(`${origin}/api/parent/intake-defaults`), reused = (await defaults.json()).zip;
+      check(defaults.status() === 200 && reused?.sourceRequestId === routing.request.id && reused.value === "19104", "The real saved-routing endpoint selects only this owner's fresh recorded ZIP source.");
+      const aFoodBody = { ...descriptionPacket(deadline, ["food_now"], ["philly-food"], aSource), reusedZip: { sourceRequestId: reused.sourceRequestId, sourceVersion: reused.sourceVersion } };
+      const locker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 1000, statement_timeout: 2000, idle_in_transaction_session_timeout: 5000 });
+      await locker.connect();
+      try {
+        await locker.query("begin"); await locker.query("select id from public.parent_requests where id=$1 for update", [routing.request.id]);
+        const locked = await descriptionHttp(descriptionOwner.page, "POST", "/requests", aFoodBody, randomUUID());
+        check(locked.status() === 412, "A genuinely held reused-ZIP source returns its bounded specific412 through native PostgREST, without inverse-lock waiting.");
+      } finally { await locker.query("rollback").catch(() => {}); await locker.end(); }
+      const beforeInvalidStarts = (await db.query("select count(*)::int n from public.parent_requests r join public.parent_households h on h.id=r.household_id where h.owner_id=$1", [descriptionOwner.id])).rows[0].n;
+      for (const [invalid, status] of [
+        [{ ...aFoodBody, descriptionSource: { draftId: a, revision: 1 } }, 409],
+        [{ ...aFoodBody, mandate: { ...aFoodBody.mandate, recipientIds: ["philly-food", "uesf-benefits"], maxRecipients: 2 } }, 400],
+        [{ ...aFoodBody, intake: { ...aFoodBody.intake, needs: ["food_now", "snap_new", "snap_renewal"] } }, 409],
+      ] as const) check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", invalid, randomUUID())).status() === status,
+        "The actual source start rejects stale revision, expanded unselected recipients and contradictory SNAP scope before any partial service start.");
+      check((await descriptionHttp(first.page, "POST", "/requests", aFoodBody, randomUUID())).status() === 409,
+        "A real different owner cannot bind service work to this description source.");
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", {
+        ...descriptionPacket(deadline, ["wic_new"], ["wic-pa"], aSource), kind: "wic_application", details: {}, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true,
+      }, randomUUID())).status() === 403, "Description interpretation cannot open WIC private capture under its unrelated food permission.");
+      check((await db.query("select count(*)::int n from public.parent_requests r join public.parent_households h on h.id=r.household_id where h.owner_id=$1", [descriptionOwner.id])).rows[0].n === beforeInvalidStarts,
+        "Every rejected source/owner/program/need/private-purpose start leaves no partial request, mandate or job.");
+      const aFoodKey = randomUUID(); let aFoodId = "", forwarded = 0;
+      const dropDescriptionStartAck = async (route: Route) => {
+        forwarded++; const response = await route.fetch(); check(response.status() === 201, "The native browser's intercepted acknowledgement follows a real committed description start.");
+        aFoodId = (await response.json()).request.id; await route.abort("failed");
+      };
+      await descriptionOwner.page.goto(`${origin}/get-support`, { waitUntil: "networkidle" });
+      await descriptionOwner.page.route(`${origin}/api/parent/requests`, dropDescriptionStartAck);
+      try {
+        const unknown = await descriptionOwner.page.evaluate(async ({ body, key }) => { try { await fetch("/api/parent/requests", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key }, body: JSON.stringify(body) }); return false; } catch { return true; } }, { body: aFoodBody, key: aFoodKey });
+        check(unknown && forwarded === 1 && !!aFoodId, "Only the actual browser reply is dropped after its one source-bound request has committed.");
+      } finally { await descriptionOwner.page.unroute(`${origin}/api/parent/requests`, dropDescriptionStartAck); }
+      descriptionRequests.push({ page: descriptionOwner.page, id: aFoodId });
+      const aFoodReplay = await descriptionStart(descriptionOwner.page, aFoodBody, aFoodKey);
+      check(aFoodReplay.request.id === aFoodId && (await db.query("select count(*)::int n from public.parent_jobs where request_id=$1", [aFoodId])).rows[0].n === 1,
+        "An exact native retry reconciles the lost start acknowledgement to one request and one current durable job.");
+      const coveredFood = await descriptionResult(descriptionOwner.page, a, 2);
+      check(JSON.stringify(coveredFood.needIds) === '["snap_new"]' && coveredFood.existingRequests.some(request => request.requestId === aFoodId && request.needIds.includes("food_now")),
+        "Actual server-side current food coverage leaves uncovered SNAP separate, outside the minimized model history.");
+      await db.query(`update parent_private.processing_controls set family_profile_enabled=true,family_profile_approval_reference='isolated native description profile fixture',
+        family_profile_approved_until=$1,family_profile_notice_version=$2,snap_details_enabled=true,snap_details_approval_reference='isolated native description SNAP fixture',
+        snap_details_approved_until=$1,snap_details_notice_version=$3 where singleton`, [deadline, FAMILY_PROFILE_NOTICE_VERSION, SNAP_APPLICATION_NOTICE_VERSION]);
+      const profileDetails = { primaryPerson: { id: randomUUID(), firstName: "DescriptionProfileCanary", lastName: "Parent", dateOfBirth: "1988-04-15" },
+        homeAddress: { street: "145 Synthetic Lane", city: "Philadelphia", state: "PA", zip: "19104", county: "Philadelphia" }, preferredLanguage: "en" };
+      const profileBody = { expectedOwnerId: descriptionOwner.id, expectedRevision: 0, details: profileDetails, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION, consentAccepted: true, subjectAuthorityDeclared: true };
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/family-profile", profileBody, randomUUID())).status() === 201, "The separate native description owner explicitly saves only its own permitted synthetic profile.");
+      const profileRead = familyProfileReadSchema.parse((({ ok: _, ...read }) => { void _; return read; })(await (await descriptionOwner.page.request.get(`${origin}/api/parent/family-profile`)).json()));
+      const projected = projectFamilyProfileApplication(profileRead.profile!, "snap-pa", { now: new Date(), useHomeAddress: true });
+      const snapDetails = fixtureSnapApplication(new Date());
+      snapDetails.household = [{ ...snapDetails.household![0], id: profileDetails.primaryPerson.id }];
+      for (const field of projected.fields) replaceFamilyProfileApplicationValue(snapDetails, field.applicationPath, familyProfileApplicationValue(projected.details, field.applicationPath));
+      const profileSource = { expectedOwnerId: descriptionOwner.id, revision: profileRead.revision, fields: projected.fields, options: { useHomeAddress: true } };
+      const aSnapPacket = descriptionPacket(deadline, ["snap_new"], ["snap-pa"], aSource);
+      const aSnapBody = { ...aSnapPacket, intake: { ...aSnapPacket.intake, householdSize: snapDetails.householdSize ?? null }, kind: "snap_application", details: snapDetails,
+        noticeVersion: SNAP_APPLICATION_NOTICE_VERSION, documentTemplateId: SNAP_ES_TEMPLATE_ID, familyProfileSource: profileSource };
+      const historyLocker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 1000, statement_timeout: 2000, idle_in_transaction_session_timeout: 5000 });
+      await historyLocker.connect();
+      try {
+        await historyLocker.query("begin"); await historyLocker.query("select id from public.parent_requests where id=$1 for update", [aFoodId]);
+        check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", aSnapBody, randomUUID())).status() === 409,
+          "A held relevant owned history request produces bounded native409 before a new private source start, without a partial request or inverse-lock deadlock.");
+      } finally { await historyLocker.query("rollback").catch(() => {}); await historyLocker.end(); }
+      const aSnap = await descriptionStart(descriptionOwner.page, aSnapBody), privateId = aSnap.request.id;
+      const readPrivate = async () => snapApplicationSnapshotSchema.parse((await (await descriptionOwner.page.request.get(`${origin}/api/parent/requests/${privateId}/snap-application`)).json()).snapshot);
+      const privateOriginal = await readPrivate();
+      check(privateOriginal.source.templateId === SNAP_ES_TEMPLATE_ID && privateOriginal.details.applicant?.firstName === "DescriptionProfileCanary",
+        "The actual disjoint private SNAP start binds its own Spanish form and owned profile fields without copying those fields into model context.");
+      const [corrected, concurrentReceipt] = await Promise.all([
+        descriptionHttp(descriptionOwner.page, "POST", "/family-profile", { ...profileBody, expectedRevision: 1,
+          details: { ...profileDetails, primaryPerson: { ...profileDetails.primaryPerson, firstName: "DescriptionProfileCorrected" } } }, randomUUID()),
+        descriptionHttp(descriptionOwner.page, "POST", "/requests", aSnapBody, aSnap.key),
+      ]);
+      check(corrected.status() === 201 && concurrentReceipt.status() === 201 && (await concurrentReceipt.json()).request.id === privateId,
+        "Real profile propagation and the exact source-aware historical start complete concurrently under their native request/account lock order.");
+      const privateCorrected = await readPrivate();
+      check(privateCorrected.request_version === 4 && privateCorrected.revision === 2 && privateCorrected.base_version === 3,
+        "Native profile correction invalidates version2 and saves the corrected immutable private snapshot at version4.");
+      check((await descriptionHttp(descriptionOwner.page, "DELETE", "/family-profile", { expectedOwnerId: descriptionOwner.id, expectedRevision: 2 }, randomUUID())).status() === 200,
+        "The independent source profile can be cleared without rewriting immutable request/application history.");
+      check((await descriptionHttp(descriptionOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: descriptionOwner.id, draftId: a })).status() === 200,
+        "Cancelling the optional interpretation clears its content rather than cancelling separately authorized service work.");
+      const privateBeforeReceipt = (await db.query("select to_jsonb(r) value from public.parent_requests r where id=$1", [privateId])).rows[0].value;
+      const known = await descriptionStart(descriptionOwner.page, aSnapBody, aSnap.key);
+      check(known.request.id === privateId && known.request.version === 4, "The original source/profile/ES start receipt acknowledges the corrected current request after profile clear and description cancellation.");
+      assert.deepEqual((await db.query("select to_jsonb(r) value from public.parent_requests r where id=$1", [privateId])).rows[0].value, privateBeforeReceipt);
+      assert.deepEqual(await readPrivate(), privateCorrected);
+      const immutableRead = await descriptionOwner.page.request.get(`${origin}/api/parent/requests/${privateId}/snap-application?revision=${privateOriginal.id}`);
+      check(immutableRead.status() === 200, "The owned original immutable application remains separately readable after correction and profile removal.");
+      assert.deepEqual(snapApplicationSnapshotSchema.parse((await immutableRead.json()).snapshot), privateOriginal);
+      for (const changed of [{ ...aSnapBody, documentTemplateId: SNAP_EN_TEMPLATE_ID }, { ...aSnapBody, descriptionSource: { draftId: a, revision: 999 } }])
+        check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", changed, aSnap.key)).status() === 409, "The same actual start key cannot change its official language/source provenance.");
+      for (const id of [aFoodId, privateId]) await descriptionStop(descriptionOwner.page, id);
+
+      stage = "native exact need coverage, reverse disjoint start and original-scope audit";
+      const renewal = await descriptionStart(descriptionOwner.page, descriptionPacket(deadline, ["snap_renewal"], ["uesf-benefits"]));
+      const b = await descriptionCreate(descriptionOwner), bSource = { draftId: b, revision: 1 };
+      const bText = "Food now and a problem with the benefit card.";
+      await descriptionQueue(descriptionOwner, b, 0, { description: bText, screenLocale: "es" }, {
+        foodForTwoDays: { value: "no", confirmedAt }, benefitHistory: { value: "receiving", confirmedAt },
+      });
+      await descriptionTurn({ needIds: ["food_now", "snap_problem"], selections: [], assertions: [{ questionId: "existingIssue", value: "card", span: { start: bText.indexOf("card"), end: bText.indexOf("card") + 4, text: "card" } }], exclusions: [], questionIds: [], outOfScope: null });
+      const bView = await descriptionResult(descriptionOwner.page, b, 1);
+      check(bView.needIds.includes("snap_problem") && bView.needIds.includes("food_now"), "A current renewal-only mandate cannot suppress a separately needed card-problem journey.");
+      const problemBody = descriptionPacket(deadline, ["snap_problem"], ["uesf-benefits"], bSource), problemKeys = [randomUUID(), randomUUID()];
+      const problemRace = await Promise.all(problemKeys.map(key => descriptionHttp(descriptionOwner.page, "POST", "/requests", problemBody, key)));
+      check(problemRace.filter(response => response.status() === 201).length === 1 && problemRace.filter(response => response.status() === 409).length === 1,
+        "Two real concurrent overlapping starts create one exact need/request/mandate/job and reject the losing source use.");
+      const problem = (await problemRace.find(response => response.status() === 201)!.json()).request as SupportRequest;
+      descriptionRequests.push({ page: descriptionOwner.page, id: problem.id });
+      const foodOnly = await descriptionResult(descriptionOwner.page, b, 1);
+      check(JSON.stringify(foodOnly.needIds) === '["food_now"]', "Starting the exact problem journey leaves the disjoint food need available under a separate mandate.");
+      const bFood = await descriptionStart(descriptionOwner.page, descriptionPacket(deadline, ["food_now"], ["philly-food"], bSource));
+      check(bFood.request.id !== problem.id && bFood.request.id !== renewal.request.id, "Reverse SNAP-then-food composition preserves each independently named durable request.");
+      const bChargeCount = await descriptionCount();
+      const changedHistory = await descriptionHttp(descriptionOwner.page, "PATCH", `/food-description?draft=${b}`, { action: "resolve", expectedOwnerId: descriptionOwner.id,
+        draftId: b, expectedRevision: 1, idempotencyKey: randomUUID(), answers: { foodForTwoDays: "no", benefitHistory: "never", existingIssue: null }, changedQuestionIds: ["benefitHistory"] });
+      const bCurrent = (await db.query("select routing_facts,selection from parent_private.food_description_drafts where id=$1", [b])).rows[0];
+      check(changedHistory.status() === 200 && (await changedHistory.json()).revision === 2 && !bCurrent.routing_facts.existingIssue
+        && !bCurrent.selection.assertions.some((assertion: { questionId: string }) => assertion.questionId === "existingIssue") && await descriptionCount() === bChargeCount,
+        "A real typed history correction clears the obsolete model issue assertion without another interpretation charge or automatic service start.");
+      for (const id of [renewal.request.id, problem.id, bFood.request.id]) await descriptionStop(descriptionOwner.page, id);
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", problemBody, randomUUID())).status() === 409,
+        "Closing or cancelling a request never permits the same original source/revision/need to start again.");
+      await descriptionHttp(descriptionOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: descriptionOwner.id, draftId: b });
+      const c = await descriptionCreate(descriptionOwner), cSource = { draftId: c, revision: 1 };
+      await descriptionQueue(descriptionOwner, c, 0, { description: "Food now and the pending SNAP application.", screenLocale: "en" }, {
+        foodForTwoDays: { value: "no", confirmedAt }, benefitHistory: { value: "applied", confirmedAt },
+      });
+      await descriptionTurn({ needIds: ["food_now", "snap_pending"], selections: [], assertions: [], exclusions: [], questionIds: [], outOfScope: null });
+      const cBody = descriptionPacket(deadline, ["food_now", "snap_pending"], ["philly-food", "snap-pa"], cSource), cKey = randomUUID();
+      const deleteLock = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 1000, statement_timeout: 2000, idle_in_transaction_session_timeout: 5000 });
+      await deleteLock.connect();
+      let newDuringDeletion: Promise<APIResponse> | undefined, knownDuringDeletion: Promise<APIResponse> | undefined;
+      const beforeDeletion = (await db.query("select to_jsonb(a) value from public.parent_accounts a where id=$1", [descriptionOwner.id])).rows[0].value;
+      try {
+        await deleteLock.query("begin"); await deleteLock.query("set local role authenticated");
+        await deleteLock.query("select set_config('request.jwt.claims',$1,true)", [Buffer.from(descriptionOwner.token.split(".")[1], "base64url").toString()]);
+        const deletingPid = (await deleteLock.query("select pg_backend_pid() pid")).rows[0].pid;
+        await deleteLock.query("select public.parent_request_deletion()");
+        newDuringDeletion = descriptionHttp(descriptionOwner.page, "POST", "/requests", cBody, cKey);
+        knownDuringDeletion = descriptionHttp(descriptionOwner.page, "POST", "/requests", aSnapBody, aSnap.key);
+        let blocked = false;
+        for (let attempt = 0; !blocked && attempt < 50; attempt++) {
+          blocked = (await db.query("select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) value", [deletingPid])).rows[0].value;
+          if (!blocked) await delay(10);
+        }
+        check(blocked, "A real issued identity's deletion transaction holds the actual native request/account locks observed by concurrent source starts.");
+      } finally {
+        await deleteLock.query("rollback").catch(() => {}); await deleteLock.end();
+        await Promise.allSettled([newDuringDeletion, knownDuringDeletion].filter(Boolean));
+      }
+      const [newAfterDeletion, knownAfterDeletion] = await Promise.all([newDuringDeletion!, knownDuringDeletion!]);
+      check([201, 409].includes(newAfterDeletion.status()) && knownAfterDeletion.status() === 201 && (await knownAfterDeletion.json()).request.id === privateId,
+        "Concurrent new/known starts finish within native bounds after deletion-lock rollback, preserving the existing exact receipt and normal conflict semantics.");
+      assert.deepEqual((await db.query("select to_jsonb(a) value from public.parent_accounts a where id=$1", [descriptionOwner.id])).rows[0].value, beforeDeletion);
+      const combined = await descriptionStart(descriptionOwner.page, cBody, cKey);
+      const correctedIntake = { ...combined.request.intake, needs: ["snap_pending"] };
+      const correction = await rest(descriptionOwner.token, "rpc/parent_correct_request", { p_request_id: combined.request.id, p_intake: correctedIntake, p_expected_version: combined.request.version });
+      check(correction.status === 204 || correction.status === 200, "Actual current-intake correction may remove food while preserving the existing sibling authorization.");
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", descriptionPacket(deadline, ["food_now"], ["philly-food"], cSource), randomUUID())).status() === 409,
+        "The immutable original request-start audit prevents reusing a source need even after current intake removed it.");
+      check((await descriptionHttp(descriptionOwner.page, "POST", "/requests", combined.body, combined.key)).status() === 409,
+        "The existing plain non-profile historical packet remains a conflict after superseding its recorded intake.");
+      await descriptionStop(descriptionOwner.page, combined.request.id);
+      check(descriptionFetches === 3, "Three complete native result paths used exactly three explicit synthetic exchanges and no external model request.");
+
+      const audit = (await db.query("select evidence from public.parent_events where request_id=$1 and kind='request.started'", [combined.request.id])).rows[0].evidence;
+      assert.deepEqual(audit.descriptionSource, cSource); assert.deepEqual(audit.descriptionNeeds, ["food_now", "snap_pending"]);
+      check(!JSON.stringify(audit).includes(aInput.description) && !/DescriptionProfileCanary|DescriptionProfileCorrected|145 Synthetic Lane/.test(JSON.stringify(audit))
+        && (await db.query("select count(*)::int n from public.parent_operations where request_id=any($1::uuid[])", [[aFoodId, privateId, problem.id, bFood.request.id, combined.request.id]])).rows[0].n === 0,
+        "Native request provenance keeps only the opaque source/original selected scope, with no prose/private-profile copying or invented provider execution.");
+
+      stage = "native exact submitted-application pending follow-up coverage";
+      const pendingOwner = await descriptionAccount(6);
+      for (const underlying of ["snap_new", "snap_renewal"] as const) {
+        const underlyingBody = descriptionPacket(deadline, [underlying], ["snap-pa"]);
+        underlyingBody.mandate = { ...underlyingBody.mandate, mode: "full", allowedActions: ["research", "prepare", "follow_up"] };
+        const prior = await descriptionStart(pendingOwner.page, underlyingBody);
+        // This admin-only synthetic receipt is source-validation input, never a claim of real agency submission.
+        await db.query("insert into public.parent_operations(request_id,request_version,program_id,need,action,packet,packet_hash,data_categories,idempotency_key,state,evidence) values($1,$2,'snap-pa',$3,'submit','{}',repeat('a',64),'{}',$4,'agency_submitted',jsonb_build_object('source','agency_receipt','reference','isolated synthetic native fixture; no agency action','recordedAt',clock_timestamp()))",
+          [prior.request.id, prior.request.version, underlying, randomUUID()]);
+        const id = await descriptionCreate(pendingOwner), source = { draftId: id, revision: 1 };
+        await descriptionQueue(pendingOwner, id, 0, { description: `Check the recorded pending ${underlying} application.`, screenLocale: "en" }, {
+          foodForTwoDays: { value: "yes", confirmedAt }, benefitHistory: { value: "applied", confirmedAt },
+        });
+        await descriptionTurn({ needIds: ["snap_pending"], selections: [], assertions: [], exclusions: [], questionIds: [], outOfScope: null });
+        const current = await descriptionResult(pendingOwner.page, id, 1);
+        check(current.state === "open_existing" && current.needIds.length === 0 && current.existingRequests.some(request => request.requestId === prior.request.id && request.needIds.includes(underlying)),
+          "Actual current same-program submission evidence and follow-up scope reuse the underlying new/renewal application without expanding its mandate.");
+        check((await descriptionHttp(pendingOwner.page, "POST", "/requests", descriptionPacket(deadline, ["snap_pending"], ["snap-pa"], source), randomUUID())).status() === 409,
+          "A pending journey already covered by verified current follow-up cannot create duplicate service work.");
+        await db.query("insert into public.parent_operations(request_id,request_version,program_id,need,action,packet,packet_hash,data_categories,idempotency_key,state,evidence,updated_at) values($1,$2,'snap-pa',$3,'follow_up','{}',repeat('b',64),'{}',$4,'declined',jsonb_build_object('source','agency_receipt','reference','isolated later synthetic denial','recordedAt',clock_timestamp()),clock_timestamp()+interval '1 second')",
+          [prior.request.id, prior.request.version, underlying, randomUUID()]);
+        const changed = await rest(pendingOwner.token, "rpc/parent_food_description_result", { p_draft: id });
+        check(changed.status === 200 && !(await changed.json()).currentRequests.find((request: { requestId: string; pendingSnapFollowUp: boolean }) => request.requestId === prior.request.id).pendingSnapFollowUp
+          && (await pendingOwner.page.request.get(`${descriptionUrl}?draft=${id}&revision=1`)).status() === 409,
+          "A current later denial removes pending-follow-up compatibility and the old model source fails closed until refreshed.");
+        await descriptionStop(pendingOwner.page, prior.request.id);
+        await descriptionHttp(pendingOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: pendingOwner.id, draftId: id });
+      }
+
+      stage = "native late usage, cancellation, edit, revocation, retained rights and expiry";
+      const lateOwner = await descriptionAccount(5, true, c);
+      for (const mode of ["cancel", "edit", "delete"] as const) {
+        const id = await descriptionCreate(lateOwner);
+        await descriptionQueue(lateOwner, id, 0, { description: `Food help for this explicit ${mode} fixture.`, screenLocale: "en" });
+        await descriptionTurn({ needIds: ["food_now"], selections: [], assertions: [], exclusions: [], questionIds: ["foodForTwoDays", "benefitHistory"], outOfScope: null }, async () => {
+          if (mode === "edit") await descriptionQueue(lateOwner, id, 1, { description: "A genuinely changed food-help description.", screenLocale: "en" });
+          else if (mode === "delete") {
+            await db.query("update parent_private.processing_controls set food_description_project_id='proj_changed' where singleton");
+            check((await descriptionHttp(lateOwner.page, "POST", "/account", { action: "delete", confirmation: "DELETE", expectedOwnerId: lateOwner.id })).status() === 200,
+              "Actual parent-purpose deletion stops this synthetic owner's future work without deleting shared Auth/school records.");
+          } else check((await descriptionHttp(lateOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: lateOwner.id, draftId: id })).status() === 200,
+            "An actual owner cancellation occurs while the one synthetic response is still pending.");
+        });
+        const retained = (await db.query("select state,input,selection,revision from parent_private.food_description_drafts where id=$1", [id])).rows[0];
+        check(retained.selection === null && (mode !== "edit" || retained.revision === 2), "A stale post-response lease cannot publish a result or restore superseded content.");
+        check((await db.query("select count(*)::int n from parent_private.food_description_calls where draft_id=$1 and usage->'complete'='true'", [id])).rows[0].n === 1,
+          "Late token evidence updates only its existing exact charge even after cancellation, edit or account revocation.");
+        if (mode === "edit") {
+          await descriptionHttp(lateOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: lateOwner.id, draftId: id });
+          check(!(await descriptionWorkers[0].query("select parent_private.parent_claim_food_description() value")).rows[0].value,
+            "Cancelled superseded work is not reclaimed or automatically dispatched a second time.");
+        }
+      }
+      check((await db.query("select count(*)::int n from auth.users where id=$1", [lateOwner.id])).rows[0].n === 1
+        && (await db.query("select count(*)::int n from public.families where created_by_id=$1", [lateOwner.id])).rows[0].n === 1,
+        "Native parent-purpose deletion preserves the separate synthetic shared sign-in and school family.");
+      await db.query("update parent_private.processing_controls set food_description_project_id='proj_synthetic',food_description_enabled=false where singleton");
+      check((await descriptionArchive(descriptionOwner.page)).ownerId === descriptionOwner.id, "Actual owned retained rights remain available after description purpose closure.");
+      const exportReply = await descriptionOwner.page.request.get(`${descriptionUrl}?download=1`);
+      check(exportReply.status() === 200 && exportReply.headers()["cache-control"] === "private, no-store" && exportReply.headers()["content-disposition"]?.includes("attachment"),
+        "The actual rights export remains private and downloadable after collection closure.");
+      const retainedBeforeExpiry = (await descriptionArchive(descriptionOwner.page)).drafts.find(draft => draft.id === c);
+      check(retainedBeforeExpiry?.input && retainedBeforeExpiry.projection && retainedBeforeExpiry.selection,
+        "The retention probe starts from actual retained content, rather than already-erased cancelled records.");
+      await db.query("update parent_private.processing_controls set food_description_enabled=true where singleton"); await descriptionHeartbeat();
+      check((await descriptionOwner.page.request.get(`${descriptionUrl}?draft=${c}&revision=1`)).status() === 200,
+        "The retained current result remains readable before the isolated fixture reaches its original expiry.");
+      const reservations = await descriptionCount();
+      // Shift only owned synthetic fixture dates together; no clock/function override or deadline renewal is used.
+      await db.query("update parent_private.food_description_drafts set created_at=now()-interval '25 hours',content_expires_at=now()-interval '1 hour',metadata_expires_at=now()+interval '23 hours' where owner_id=any($1::uuid[])", [[descriptionOwner.id, capOwner.id, lateOwner.id, pendingOwner.id]]);
+      check((await descriptionArchive(descriptionOwner.page)).drafts.every(draft => !draft.input && !draft.projection && !draft.selection), "Original24h expiry hides all retained content and derived source projections through actual owned HTTP rights.");
+      check((await descriptionOwner.page.request.get(`${descriptionUrl}?draft=${c}&revision=1`)).status() === 403,
+        "Original content expiry denies the previously readable owned result even while the synthetic collection gates remain open.");
+      await db.query("select parent_private.parent_purge_food_descriptions(100)");
+      check((await db.query("select count(*)::int n from parent_private.food_description_drafts where owner_id=any($1::uuid[]) and (input is not null or context is not null or projection is not null or selection is not null or payload_hash is not null)", [[descriptionOwner.id, capOwner.id, lateOwner.id, pendingOwner.id]])).rows[0].n === 0,
+        "Actual native retention clears content, hashes and routing bindings for the known expired synthetic drafts.");
+      await db.query("update parent_private.food_description_drafts set created_at=now()-interval '49 hours',content_expires_at=now()-interval '25 hours',metadata_expires_at=now()-interval '1 hour' where owner_id=any($1::uuid[])", [[descriptionOwner.id, capOwner.id, lateOwner.id, pendingOwner.id]]);
+      await db.query("select parent_private.parent_purge_food_descriptions(100)");
+      check((await descriptionArchive(descriptionOwner.page)).drafts.length === 0 && await descriptionCount() === reservations,
+        "Original48h purge removes owned minimal evidence without refunding any anonymous reservation from this run.");
+      await db.query("update parent_private.processing_controls set food_description_enabled=false where singleton");
+      const historical = await descriptionStart(descriptionOwner.page, aSnapBody, aSnap.key);
+      check(historical.request.id === privateId && historical.request.status === "cancelled", "The exact private source-aware receipt survives description purge without reviving revoked service work.");
+      check((await db.query("select count(*)::int n from public.parent_jobs j join public.parent_requests r on r.id=j.request_id join public.parent_households h on h.id=r.household_id where h.owner_id=any($1::uuid[]) and j.state not in ('cancelled','done')", [[descriptionOwner.id, capOwner.id, lateOwner.id, pendingOwner.id]])).rows[0].n === 0,
+        "Every additional synthetic service job is cancelled before the original native browser fixtures continue.");
+      check(Number(descriptionFetches) === 8 && await descriptionCount() === descriptionReservationBaseline + 11,
+        "Native proofs retain eleven exact internal reservations, eight synthetic exchanges and zero charged external model/provider calls.");
+    } catch (error) {
+      descriptionErrors.push(error); throw error;
+    } finally {
+      const failures: { step: string; error: unknown }[] = [];
+      async function restore(step: string, run: () => Promise<unknown>) {
+        try { await run(); } catch (error) { failures.push({ step, error }); }
+      }
+      for (const worker of descriptionWorkers) {
+        await restore("worker rollback", () => worker.query("rollback"));
+        await restore("worker close", () => worker.end());
+      }
+      for (const entry of descriptionRequests) await restore("owned request cancellation", async () => {
+        const status = (await db.query("select status from public.parent_requests where id=$1", [entry.id])).rows[0]?.status;
+        if (status === "active" || status === "paused") await descriptionStop(entry.page, entry.id);
+      });
+      await restore("processing controls restoration", async () => {
+        const columns = descriptionColumns.join(",");
+        await db.query(`update parent_private.processing_controls c set (${columns})=(select ${columns} from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb)) where singleton`, [JSON.stringify(descriptionControls)]);
+        assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, descriptionControls);
+      });
+      await restore("worker health restoration", async () => {
+        if (descriptionHealth) {
+          const healthColumns = Object.keys(descriptionHealth).filter(column => column !== "singleton").map(foodIdentifier).join(",");
+          await db.query(`update parent_private.worker_health set (${healthColumns})=(select ${healthColumns} from jsonb_populate_record(null::parent_private.worker_health,$1::jsonb)) where singleton`, [JSON.stringify(descriptionHealth)]);
+          assert.deepEqual((await db.query("select to_jsonb(h) value from parent_private.worker_health h where singleton")).rows[0].value, descriptionHealth);
+        } else await db.query("delete from parent_private.worker_health where singleton");
+      });
+      await restore("worker membership restoration", async () => {
+        const changed = descriptionMembershipChange;
+        if (changed) await db.query(changed.existed
+          ? `grant parent_worker to ${foodIdentifier(foodOperator)} with set ${changed.set ? "true" : "false"}`
+          : `revoke parent_worker from ${foodIdentifier(foodOperator)} granted by ${foodIdentifier(foodOperator)}`);
+        assert.deepEqual(await foodMemberships(), descriptionMemberships);
+      });
+      if (failures.length) {
+        process.stderr.write(`Native description fixture cleanup failed during ${failures.map(failure => failure.step).join(", ")}. No error values were logged.\n`);
+        throw new AggregateError([...descriptionErrors, ...failures.map(failure => failure.error)], "Native description fixture cleanup failed.");
+      }
+      check(true, "All synthetic description controls, capability health and original native role memberships are restored before legacy cases.");
     }
 
     stage = "real data ownership and a preparation-only support request";
@@ -2746,6 +3350,7 @@ async function main() {
       "The WIC form check establishes isolated private intake, correction and owned history, not provider submission, a booked appointment, enrollment or specialist assessment.",
       "The PECO form check establishes isolated private preparation, correction, account binding and owned history, not a trusted renderer/income adapter, provider submission, CAP enrollment, a payment change or shutoff protection.",
       "PGW and water form checks establish owned private preparation, real interrupted-save reconciliation and immutable corrections/exports. They do not establish protected identifier insertion, validated proof assembly, signatures, financial assent, agency submission, enrollment or shutoff protection; water still uses a public sample reference, not an account-issued form.",
+      "Optional-description checks use eight in-process synthetic Responses exchanges and visibly synthetic agency-evidence rows with actual local Auth/HTTP/SQL; they do not evaluate model quality, processor retention or real agency status. Expiry uses only owned synthetic timestamp fixtures, not49 hours of elapsed time.",
       "No external application or model provider was called.",
     ],
   };

@@ -5,14 +5,15 @@ import { ArrowRight } from "iconoir-react";
 import { UrgentHelp } from "./landing";
 import { FoodAssessment } from "./food-assessment";
 import { FoodSites } from "./food-sites";
+import type { ParentIntakeSignInOptions } from "./intake";
 import type { FoodAssessmentHandoff } from "@/lib/parent/food-assessment";
 import styles from "./parent.module.css";
 
-export function FoodServices({ initial, onChoose }: { initial?: FoodAssessmentHandoff; onChoose?: (value: FoodAssessmentHandoff) => void }) {
+export function FoodServices({ initial, onChoose, signInOptions, onOwnerChanged }: { initial?: FoodAssessmentHandoff; onChoose?: (value: FoodAssessmentHandoff) => void; signInOptions?: ParentIntakeSignInOptions; onOwnerChanged?: () => void }) {
   const { t, locale } = useParentLocale();
   return (
     <div lang={locale} className={`${styles.container} ${styles.foodServices}`}>
-      <FoodAssessment initial={initial} onChoose={onChoose}/>
+      <FoodAssessment initial={initial} onChoose={onChoose} onOwnerChanged={onOwnerChanged} descriptionOptions={onChoose ? { signInOptions } : undefined}/>
       <FoodSites />
       <details className={styles.disclosure}>
         <summary>{t("I already know which program I need")}</summary>

@@ -270,6 +270,7 @@ export type ParentDocument = {
   upload_key?: string | null;
 };
 export type SupportRequest = {
+  description_source?: { draftId: string; revision: number } | null;
   id: string;
   household_id: string;
   status: "active" | "paused" | "cancelled" | "closed";

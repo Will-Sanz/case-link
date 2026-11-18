@@ -180,3 +180,16 @@ it.each([401, 403, 404, 503])(
     expect(result.current.data).toBeNull();
   },
 );
+
+it("explicit clearing aborts a pending read, drops old data and prevents late or failed replies from restoring it",async()=>{
+  const stalled=stalledRead("fetch"),fetch=vi.fn().mockResolvedValueOnce(reply({private:"old"})).mockImplementationOnce(stalled.read)
+    .mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(reply({private:"new legitimate draft"}));
+  vi.stubGlobal("fetch",fetch);
+  const {result}=renderHook(()=>useParentResource<{private:string}>("/food-description"));
+  await waitFor(()=>expect(result.current.data?.private).toBe("old"));
+  act(()=>result.current.reload());await waitFor(()=>expect(fetch).toHaveBeenCalledTimes(2));
+  act(()=>result.current.clear());expect(stalled.signal()?.aborted).toBe(true);expect(result.current.data).toBeNull();
+  await act(async()=>{stalled.finish({private:"late expired content"});});expect(result.current.data).toBeNull();
+  act(()=>result.current.reload());await waitFor(()=>expect(result.current.error).not.toBeNull());expect(result.current.data).toBeNull();
+  act(()=>result.current.reload());await waitFor(()=>expect(result.current.data?.private).toBe("new legitimate draft"));
+});

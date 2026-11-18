@@ -15,12 +15,12 @@ const outputSchema = z.toJSONSchema(foodDescriptionSelectionSchema, { target: "d
 delete outputSchema.$schema;
 const evaluatedTransport = { endpoint: "https://api.openai.com/v1/responses", method: "POST", redirect: "error", contentType: "application/json", projectHeader: "OpenAI-Project" } as const;
 const evaluatedRequest = {
-  model: "gpt-6.1-sol", store: false, max_output_tokens: 1500, reasoning: { effort: "medium" }, instructions,
+  model: "gpt-6.1-sol", service_tier: "default", store: false, max_output_tokens: 1500, reasoning: { effort: "medium" }, instructions,
   text: { format: { type: "json_schema", name: "parent_food_description", strict: true, schema: outputSchema } },
 } as const;
 /** Bump the guard version for assessed projection/validation changes; changing any dispatched setting changes this binding. */
 export const FOOD_DESCRIPTION_EVALUATION_BINDING = {
-  contract: "food-description-2026-11-18.v1", projectionValidatorVersion: "food-description-guards-2026-11-18.v4", projectSelection: "exact approved project, private heartbeat and OpenAI-Project header", request: evaluatedRequest, transport: evaluatedTransport,
+  contract: "food-description-2026-11-18.v1", projectionValidatorVersion: "food-description-guards-2026-11-18.v6", projectSelection: "exact approved project, private heartbeat and OpenAI-Project header", request: evaluatedRequest, transport: evaluatedTransport,
   programs: PROGRAMS.filter(program => ["philly-food", "share-community-fridge-19129", "snap-pa", "uesf-benefits"].includes(program.id)),
 } as const;
 export const FOOD_DESCRIPTION_FINGERPRINT = createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex");
@@ -35,7 +35,7 @@ const claimSchema = z.object({ projectId: foodDescriptionProjectIdSchema, draftI
 });
 const token = z.number().int().nonnegative().max(10000000);
 const usageSchema = z.object({ input_tokens: token, output_tokens: token, total_tokens: token,
-  input_tokens_details: z.object({ cached_tokens: token }).strict(),
+  input_tokens_details: z.object({ cached_tokens: token, cache_write_tokens: token, cache_write_tokens_details: z.object({ ttl_30m_tokens: token, ttl_12h_tokens: token }).strict() }).strict(),
   output_tokens_details: z.object({ reasoning_tokens: token }).strict(),
 }).strict();
 const opaqueId = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(value) ? value : undefined;
@@ -45,9 +45,12 @@ export function foodDescriptionUsage(value: unknown, requestId?: string | null) 
   const ids = { ...(opaqueId(requestId) ? { requestId: opaqueId(requestId) } : {}),
     ...(response.success && opaqueId(response.data.id) ? { responseId: opaqueId(response.data.id) } : {}) };
   if (!usage.success || usage.data.total_tokens !== usage.data.input_tokens + usage.data.output_tokens || usage.data.input_tokens_details.cached_tokens > usage.data.input_tokens
-    || usage.data.output_tokens_details.reasoning_tokens > usage.data.output_tokens) return { complete: false, ...ids };
+    || usage.data.output_tokens_details.reasoning_tokens > usage.data.output_tokens
+    || usage.data.input_tokens_details.cache_write_tokens !== usage.data.input_tokens_details.cache_write_tokens_details.ttl_30m_tokens + usage.data.input_tokens_details.cache_write_tokens_details.ttl_12h_tokens
+    || usage.data.input_tokens_details.cached_tokens + usage.data.input_tokens_details.cache_write_tokens > usage.data.input_tokens) return { complete: false, ...ids };
   return { complete: true, ...ids, inputTokens: usage.data.input_tokens, outputTokens: usage.data.output_tokens,
-    cachedInputTokens: usage.data.input_tokens_details.cached_tokens, reasoningTokens: usage.data.output_tokens_details.reasoning_tokens };
+    cachedInputTokens: usage.data.input_tokens_details.cached_tokens, cacheWriteInputTokens: usage.data.input_tokens_details.cache_write_tokens,
+    cacheWrite30mInputTokens: usage.data.input_tokens_details.cache_write_tokens_details.ttl_30m_tokens, cacheWrite12hInputTokens: usage.data.input_tokens_details.cache_write_tokens_details.ttl_12h_tokens, reasoningTokens: usage.data.output_tokens_details.reasoning_tokens };
 }
 
 /** One reserved revision, one HTTP attempt. A charged unknown is never dispatched again. */

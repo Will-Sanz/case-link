@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), description: vi.fn() }));
 vi.mock("@/lib/parent/auth", () => ({ requireParentSession: mocks.session }));
+vi.mock("@/lib/parent/food-description-data", () => ({ getFoodDescriptionResult: mocks.description }));
 import { POST } from "./route";
 const owner = "11111111-1111-4111-8111-111111111111";
 const input = { answers: { foodForTwoDays: "no", benefitHistory: "applied", existingIssue: null }, needs: ["food_now", "snap_pending"] };
@@ -54,4 +55,14 @@ describe("authenticated deterministic food preflight", () => {
     const response = await POST(request()); expect(response.status).toBe(503);
     expect(await response.text()).not.toContain("untrusted-runtime-detail");
   });
+});
+
+it("keeps an optional description handoff bound to its current owned revision and exact vetted answers/subset", async () => {
+  const descriptionSource={draftId:owner,revision:2}; mocks.description.mockResolvedValue({state:"proposal",proposedAnswers:input.answers,needIds:input.needs});
+  expect((await POST(request({...input,descriptionSource}))).status).toBe(200);
+  expect(mocks.description).toHaveBeenCalledWith(owner,{ownerId:owner,revision:2});
+  mocks.description.mockResolvedValue({state:"open_existing",proposedAnswers:input.answers,needIds:input.needs});
+  expect((await POST(request({...input,descriptionSource}))).status).toBe(409);
+  mocks.description.mockResolvedValue({state:"proposal",proposedAnswers:{...input.answers,foodForTwoDays:"yes"},needIds:input.needs});
+  expect((await POST(request({...input,descriptionSource}))).status).toBe(409);
 });

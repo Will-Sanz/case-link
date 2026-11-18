@@ -8,6 +8,8 @@ describe("existing reviewed terminal corpus with current selected-needs wrapper"
   it.each(terminals)("retains the explicit single choice for $id without introducing a compound request", ({ handoff }) => {
     const wrapped = { needs: [handoff.need], answers: handoff.answers };
     expect(foodAssessmentHandoffSchema.parse(wrapped)).toEqual(wrapped);
+    const bound={...wrapped,descriptionSource:{draftId:"00000000-0000-4000-8000-000000000001",revision:1}};
+    expect(foodAssessmentHandoffSchema.parse(bound)).toEqual(bound);
   });
   it("preserves all26 reviewed handoff oracles without altering the60-case80-call corpus", () => { expect(terminals).toHaveLength(26); expect(corpus.cases).toHaveLength(60); });
   it("refuses a fake pre-mandate request, private input and invented client context", () => {

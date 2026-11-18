@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ available: vi.fn(), archive: vi.fn(), result: vi.fn(), mutate: vi.fn(), authorize: vi.fn() }));
 vi.mock("@/lib/parent/food-description-data", () => ({ authorizeFoodDescriptionCollection: mocks.authorize, foodDescriptionAvailable: mocks.available, getFoodDescriptionArchive: mocks.archive, getFoodDescriptionResult: mocks.result, mutateFoodDescription: mocks.mutate }));
-import { DELETE, GET, POST } from "./route";
+import { DELETE, GET, POST, PATCH } from "./route";
 import { FoodDescriptionError } from "@/lib/parent/food-description-draft";
 const id = "00000000-0000-4000-8000-000000000001";
 const request = (method: string, body: unknown, origin = "http://localhost") => new Request(`http://localhost/api/parent/food-description${body && typeof body === "object" && "action" in body && body.action === "queue" ? `?draft=${id}` : ""}`, { method, headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -35,4 +35,17 @@ it.each(["project","feature","account3","combined60"])("never reads new prose wh
 it("keeps the already-reserved result readable when new collection capacity is exhausted",async()=>{
   mocks.available.mockResolvedValue(false);mocks.result.mockResolvedValue({state:"proposal",executionGranted:false});
   const reply=await GET(new Request(`http://localhost/api/parent/food-description?draft=${id}`));expect(reply.status).toBe(200);expect(mocks.available).not.toHaveBeenCalled();
+});
+
+it("resolves only typed routing enums after current owned-result authorization, without collection capacity or another model charge", async () => {
+  mocks.available.mockResolvedValue(false); mocks.result.mockResolvedValue({ state: "needs_clarification" });
+  const body = { action: "resolve", draftId: id, expectedOwnerId: id, expectedRevision: 1, idempotencyKey: id,
+    answers: { foodForTwoDays: "no", benefitHistory: "never", existingIssue: null }, changedQuestionIds: ["foodForTwoDays", "benefitHistory"] };
+  const reply = await PATCH(new Request(`http://localhost/api/parent/food-description?draft=${id}`, { method: "PATCH", headers: { origin: "http://localhost", "content-type": "application/json" }, body: JSON.stringify(body) }));
+  expect(reply.status).toBe(200); expect(mocks.result).toHaveBeenCalledWith(id); expect(mocks.available).not.toHaveBeenCalled(); expect(mocks.mutate).toHaveBeenCalledExactlyOnceWith(body);
+});
+it("does not read clarification when its owner, source or purpose is unavailable", async () => {
+  mocks.result.mockRejectedValue(new FoodDescriptionError(409, "changed"));
+  const input = new Request(`http://localhost/api/parent/food-description?draft=${id}`, { method: "PATCH", headers: { origin: "http://localhost" }, body: "PRIVATE_BODY_CANARY" }), read=vi.spyOn(input,"body","get");
+  expect((await PATCH(input)).status).toBe(409); expect(read).not.toHaveBeenCalled(); expect(mocks.mutate).not.toHaveBeenCalled();
 });

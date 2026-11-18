@@ -22,7 +22,9 @@ const recommendationSchema = z.object({
   reason: z.enum(["immediate", "new", "pending", "renewal", "problem"]),
 }).strict();
 export type FoodRecommendation = z.infer<typeof recommendationSchema>;
+export const foodDescriptionSourceSchema = z.object({ draftId: z.uuid(), revision: z.number().int().positive() }).strict();
 export const foodAssessmentInputSchema = z.object({
+  descriptionSource: foodDescriptionSourceSchema.optional(),
   answers: foodAssessmentSchema,
   needs: z.array(recommendationSchema.shape.need).min(1).max(2).superRefine((needs, context) => {
     if (new Set(needs).size !== needs.length || needs.filter(need => need !== "food_now").length > 1)

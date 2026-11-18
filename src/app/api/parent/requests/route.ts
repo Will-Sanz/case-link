@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { foodDescriptionSourceSchema } from "@/lib/parent/food-assessment";
+import { startFoodDescriptionRequest } from "@/lib/parent/food-description-data";
+import { FoodDescriptionError } from "@/lib/parent/food-description-draft";
 import { familyProfileSourceSchema } from "@/lib/parent/family-profile";
 import { intakeSchema, mandateSchema, reusedZipSourceSchema } from "@/lib/parent/domain";
 import {
@@ -32,8 +35,8 @@ import { startWaterApplication, waterInitialIntakeSchema } from "@/lib/parent/wa
 import { waterApplicationWriteSchema } from "@/lib/parent/water-application-snapshot";
 
 const startSchema = z.union([
-  z.object({ intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
-  z.object({ kind: z.literal("snap_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema,
+  z.object({ descriptionSource: foodDescriptionSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
+  z.object({ descriptionSource: foodDescriptionSourceSchema.optional(), kind: z.literal("snap_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema,
     details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION), documentTemplateId: snapFormTemplateIdSchema.optional() }).strict(),
   z.object({ kind: z.literal("wic_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: wicInitialIntakeSchema, mandate: mandateSchema,
     details: wicApplicationFieldsValueSchema, noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), reusedZip: reusedZipSourceSchema.optional() }).strict(),
@@ -99,7 +102,7 @@ export async function POST(request: Request) {
     const idempotencyKey = z
       .uuid()
       .parse(request.headers.get("idempotency-key"));
-    const id = "kind" in value
+    const id = "descriptionSource" in value && value.descriptionSource ? await startFoodDescriptionRequest(value, idempotencyKey) : "kind" in value
       ? value.kind === "peco_application" || value.kind === "pgw_application" || value.kind === "water_application"
         ? await utilityStarts[value.kind](value.intake, value.mandate, { details: value.details, noticeVersion: value.noticeVersion,
           subjectAuthorityDeclared: value.subjectAuthorityDeclared, accountAuthorityDeclared: value.accountAuthorityDeclared }, idempotencyKey, value.reusedZip)
@@ -116,6 +119,7 @@ export async function POST(request: Request) {
     ]);
     return parentJson({ ok: true, request: supportRequest, progress }, 201);
   } catch (error) {
+    if (error instanceof FoodDescriptionError) return parentJson({ ok: false, error: "The optional description or selected support changed. Check your saved support or return to the guided questions." }, error.status);
     if (error instanceof Error && error.message === "parent_reuse_source_changed")
       return parentJson({ ok: false, error: "Saved routing information changed before this request was created." }, 412);
     return parentError(error instanceof z.ZodError ? new Error("parent_invalid_input") : error);

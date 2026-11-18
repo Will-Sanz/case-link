@@ -324,6 +324,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.foodDescription,
 .account .surface {
   min-width: 0;
 }
@@ -340,6 +341,7 @@
     align-items: stretch;
   }
   .surface.foodPrograms,
+  .surface.foodDescription,
   .foodAccess :is(.notice, .error, .success),
   .container.account,
   .account :is(.surface, .trustLine, .error, .success, .fieldset, a.secondary) {
@@ -353,6 +355,14 @@
   }
   .account .fieldset {
     min-inline-size: 0;
+  }
+  .foodDescription .checkbox {
+    display: block;
+  }
+  .foodDescription :is(.button, .secondary) {
+    max-width: 100%;
+    padding-inline: 12px;
+    overflow-wrap: normal;
   }
 }
 .section {

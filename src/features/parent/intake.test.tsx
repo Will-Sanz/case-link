@@ -276,7 +276,7 @@ describe("one coherent upfront support intake", () => {
     render(<ParentIntake initialNeed={need}/>);fireEvent.change(await screen.findByLabelText('Household ZIP code'),{target:{value:'19104'}});fireEvent.click(screen.getByLabelText(/I’m 18 or older/));fireEvent.click(screen.getByRole('button',{name:'Continue'}));
     expect(screen.queryByText('Permitted actions available')).toBeNull();expect(screen.getAllByText('Prepare only · nothing sent').length).toBeGreaterThan(0);
   });
-  it("offers separate food services before account access or household collection", () => {
+  it("offers separate food services without requiring sign-in or collecting household answers", async () => {
     render(<ParentIntake initialNeed="food" />);
     expect(screen.getByRole("link", { name: "Find food now" }).getAttribute("href")).toBe("https://www.phila.gov/food/");
     expect(screen.getByRole("link", { name: "Apply for SNAP" }).getAttribute("href")).toBe("/get-support?need=snap_new");
@@ -286,7 +286,8 @@ describe("one coherent upfront support intake", () => {
     expect(screen.getByRole("link", { name: /Not sure, or need more than one/ }).getAttribute("href")).toBe("/get-support?need=all");
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByLabelText("Household ZIP code")).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(fetch).mock.calls.every(([url, init]) => String(url).startsWith("/api/parent/food-description") && !init?.method && !init?.body)).toBe(true);
   });
   it("still requires an explicit choice in the combined support form", async () => {
     render(<ParentIntake />);

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { assessFoodSupport } from "./food-assessment";
 import {
   buildFoodDescriptionProjection, foodDescriptionContextSchema, foodDescriptionInputSchema, foodDescriptionSelectionSchema,
-  validateFoodDescriptionSelection, type FoodDescriptionContext,
+  validateFoodDescriptionSelection, reconcileFoodDescriptionRequests, type FoodDescriptionContext,
 } from "./food-description";
 
 type Corpus = { cases: { id: string; language: string; humanReview: string; turns: {
@@ -198,4 +198,56 @@ describe("reviewed expected-behavior corpus, not measured model quality", () => 
     }
     expect(checked).toBe(56);
   });
+});
+
+it("keeps server-owned request coverage out of the model projection and rejects foreign or duplicated scope records",()=>{
+  const current=context(),projection=buildFoodDescriptionProjection(input,current,now),validated=validateFoodDescriptionSelection({projection,selection:selection(),currentContext:current,now});
+  const existing={ownerId:owner,requestId:request,requestVersion:2,requestStatus:"active",needIds:["food_now"],pendingSnapFollowUp:false};
+  const result=reconcileFoodDescriptionRequests(validated,[existing],owner);
+  expect(result).toMatchObject({state:"proposal",needIds:["snap_new"],existingRequests:[{requestId:request,needIds:["food_now"]}]});
+  expect(JSON.stringify(projection)).not.toContain(request);
+  expect(()=>reconcileFoodDescriptionRequests(validated,[{...existing,ownerId:other}],owner)).toThrow("parent_food_description_changed");
+  expect(()=>reconcileFoodDescriptionRequests(validated,[existing,existing],owner)).toThrow();
+});
+
+it("retains a distinct card-problem need when current owned permission covers renewal only", () => {
+  const current = context({ facts: { zip: { value: "19129", ...dates }, foodForTwoDays: { value: "yes", ...dates },
+    benefitHistory: { value: "receiving", ...dates }, existingIssue: { value: "card", ...dates } } });
+  const described = { description: "My SNAP card is not working.", screenLocale: "en" as const };
+  const projection = buildFoodDescriptionProjection(described, current, now);
+  const selected = { needIds: ["snap_problem"], selections: [{ need: "snap_problem", programId: "snap-pa", reason: "problem" }], assertions: [], exclusions: [], questionIds: [], outOfScope: null };
+  const result = validateFoodDescriptionSelection({ projection, selection: selected, currentContext: current, now });
+  expect(result.needIds).toEqual(["snap_problem"]);
+  const reconciled = reconcileFoodDescriptionRequests(result, [{ ownerId: owner, requestId: request, requestVersion: 1,
+    requestStatus: "active", needIds: ["snap_renewal"], pendingSnapFollowUp: false }], owner);
+  expect(reconciled.needIds).toEqual(["snap_problem"]);
+  expect(reconciled.state).toBe("proposal");
+});
+
+it.each(["snap_renewal","snap_problem"] as const)("covers only the exact %s journey and leaves a distinct other journey under its own mandate", need=>{
+  const issue=need==="snap_renewal"?"renewal":"card",otherNeed=need==="snap_renewal"?"snap_problem":"snap_renewal";
+  const current=context({facts:{foodForTwoDays:{value:"yes",...dates},benefitHistory:{value:"receiving",...dates},existingIssue:{value:issue,...dates}}});
+  const projected=buildFoodDescriptionProjection(input,current,now),selected={needIds:[need],selections:[],assertions:[],exclusions:[],questionIds:[],outOfScope:null};
+  const validated=validateFoodDescriptionSelection({projection:projected,selection:selected,currentContext:current,now});
+  const prior={ownerId:owner,requestId:request,requestVersion:1,requestStatus:"active",needIds:[otherNeed],pendingSnapFollowUp:false};
+  expect(reconcileFoodDescriptionRequests(validated,[prior],owner)).toMatchObject({state:"proposal",needIds:[need],existingRequests:[]});
+  expect(reconcileFoodDescriptionRequests(validated,[{...prior,needIds:[need]}],owner)).toMatchObject({state:"open_existing",needIds:[],existingRequests:[{requestId:request,needIds:[need]}]});
+});
+it.each([false,true])("requires server-confirmed pending follow-up scope before reusing a prior new application (%s)",pendingSnapFollowUp=>{
+  const current=context({facts:{benefitHistory:{value:"applied",...dates}}});
+  const validated=validateFoodDescriptionSelection({projection:buildFoodDescriptionProjection(input,current,now),selection:{needIds:["snap_pending"],selections:[],assertions:[],exclusions:[],questionIds:[],outOfScope:null},currentContext:current,now});
+  const prior={ownerId:owner,requestId:request,requestVersion:1,requestStatus:"active",needIds:["snap_new"],pendingSnapFollowUp};
+  const value=reconcileFoodDescriptionRequests(validated,[prior],owner);
+  expect(value.needIds).toEqual(pendingSnapFollowUp?[]:["snap_pending"]);expect(value.state).toBe(pendingSnapFollowUp?"open_existing":"needs_clarification");
+  expect(value.existingRequests).toEqual(pendingSnapFollowUp?[{requestId:request,needIds:["snap_new"]}]:[]);
+});
+it("asks an actually unknown benefit fact despite an unrelated active renewal and preserves exclusions",()=>{
+  const current=context({facts:{foodForTwoDays:{value:"no",...dates}},excludedNeedIds:["snap_renewal"],history:[{ownerId:owner,requestId:request,requestVersion:1,requestStatus:"active",need:"snap_renewal",state:"prepared",current:true}]});
+  const validated=validateFoodDescriptionSelection({projection:buildFoodDescriptionProjection(input,current,now),selection:{needIds:["food_now"],selections:[],assertions:[],exclusions:[],questionIds:["benefitHistory"],outOfScope:null},currentContext:current,now});
+  expect(reconcileFoodDescriptionRequests(validated,[{ownerId:owner,requestId:request,requestVersion:1,requestStatus:"active",needIds:["snap_renewal"],pendingSnapFollowUp:false}],owner)).toMatchObject({needIds:["food_now"],questionIds:["benefitHistory"],existingRequests:[]});
+});
+it("does not mistake a declined card-problem case for an existing application",()=>{
+  const current=context({history:[{ownerId:owner,requestId:request,requestVersion:1,requestStatus:"active",need:"snap_problem",state:"declined",current:true}]});
+  const validated=validate(selection(),current,buildFoodDescriptionProjection(input,current,now));
+  expect(validated).toMatchObject({needIds:["food_now","snap_new"],duplicateApplicationBlocked:false});
 });

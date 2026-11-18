@@ -9,7 +9,7 @@ const context: FoodDescriptionContext = { expectedOwnerId: owner, ownerId: owner
   capabilityVersion: "synthetic-capabilities-v1", facts: {}, history: [], programIds: ["philly-food", "snap-pa"], capabilities: [], excludedNeedIds: [] };
 const selection = { needIds: ["food_now", "snap_new"], selections: [{ need: "food_now", programId: "philly-food", reason: "immediate" }, { need: "snap_new", programId: "snap-pa", reason: "new" }],
   assertions: [{ questionId: "foodForTwoDays", value: "no", span: span("no food for tomorrow") }, { questionId: "benefitHistory", value: "never", span: span("never applied for SNAP") }], exclusions: [], questionIds: [], outOfScope: null };
-const response = (value: unknown = selection, usage: unknown = { input_tokens: 100, output_tokens: 40, total_tokens: 140, input_tokens_details: { cached_tokens: 20 }, output_tokens_details: { reasoning_tokens: 10 } }) => Response.json({ id: "resp_synthetic", status: "completed", usage, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] }, { headers: { "x-request-id": "req_synthetic" } });
+const response = (value: unknown = selection, usage: unknown = { input_tokens: 100, output_tokens: 40, total_tokens: 140, input_tokens_details: { cached_tokens: 20, cache_write_tokens: 30, cache_write_tokens_details: { ttl_30m_tokens: 30, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 10 } }) => Response.json({ id: "resp_synthetic", status: "completed", usage, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] }, { headers: { "x-request-id": "req_synthetic" } });
 function setup() {
   const query = vi.fn(async (sql: string): Promise<{ rows: Record<string, unknown>[] }> => {
     if (sql.includes("parent_claim_food_description")) return { rows: [{ value: { draftId: draft, revision: 1, leaseToken: lease, projectId: "proj_synthetic", input: { description, screenLocale: "en" }, context, dispatchUntil: "2026-11-18T15:15:00Z" } }] };
@@ -26,11 +26,11 @@ describe("one reserved private food interpretation turn", () => {
     const [url, init] = options.fetcher.mock.calls[0], body = JSON.parse(String(init!.body));
     expect(url).toBe(FOOD_DESCRIPTION_EVALUATION_BINDING.transport.endpoint);
     expect(init?.method).toBe(FOOD_DESCRIPTION_EVALUATION_BINDING.transport.method); expect(init?.redirect).toBe(FOOD_DESCRIPTION_EVALUATION_BINDING.transport.redirect); expect(init).toMatchObject({ redirect: "error", headers: expect.objectContaining({ "OpenAI-Project": "proj_synthetic" }) });
-    expect(body).toMatchObject({ model: "gpt-6.1-sol", store: false, max_output_tokens: 1500, reasoning: { effort: "medium" } });
+    expect(body).toMatchObject({ model: "gpt-6.1-sol", service_tier: "default", store: false, max_output_tokens: 1500, reasoning: { effort: "medium" } });
     const { input: variableInput, ...fixedRequest } = body; expect(variableInput).toHaveLength(1);
     expect(fixedRequest).toEqual(FOOD_DESCRIPTION_EVALUATION_BINDING.request);
     expect(FOOD_DESCRIPTION_FINGERPRINT).toBe(createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex"));
-    for (const drift of [{ store: true }, { reasoning: { effort: "low" } }, { max_output_tokens: 2000 }]) {
+    for (const drift of [{ service_tier: "priority" }, { store: true }, { reasoning: { effort: "low" } }, { max_output_tokens: 2000 }]) {
       const changed = { ...FOOD_DESCRIPTION_EVALUATION_BINDING, request: { ...fixedRequest, ...drift } };
       expect(createHash("sha256").update(JSON.stringify(changed)).digest("hex")).not.toBe(FOOD_DESCRIPTION_FINGERPRINT);
     }
@@ -41,7 +41,7 @@ describe("one reserved private food interpretation turn", () => {
     expect(sql.findIndex(text => text.includes("reserve_food_description"))).toBeLessThan(sql.findIndex(text => text.includes("food_description_current")));
     expect(options.database.query.mock.invocationCallOrder[2]).toBeLessThan(options.fetcher.mock.invocationCallOrder[0]);
     expect(sql.findIndex(text => text.includes("record_food_description_usage"))).toBeLessThan(sql.findIndex(text => text.includes("finish_food_description")));
-    expect(options.database.query).toHaveBeenCalledWith("select parent_private.parent_record_food_description_usage($1,$2)", [charge, JSON.stringify({ complete: true, requestId: "req_synthetic", responseId: "resp_synthetic", inputTokens: 100, outputTokens: 40, cachedInputTokens: 20, reasoningTokens: 10 })]);
+    expect(options.database.query).toHaveBeenCalledWith("select parent_private.parent_record_food_description_usage($1,$2)", [charge, JSON.stringify({ complete: true, requestId: "req_synthetic", responseId: "resp_synthetic", inputTokens: 100, outputTokens: 40, cachedInputTokens: 20, cacheWriteInputTokens: 30, cacheWrite30mInputTokens: 30, cacheWrite12hInputTokens: 0, reasoningTokens: 10 })]);
   });
   it.each(["budget", "purpose", "source", "private input", "no key"])("never dispatches when %s fails", async kind => {
     const options = setup(), original = options.database.query.getMockImplementation()!;
@@ -101,6 +101,25 @@ describe("one reserved private food interpretation turn", () => {
   it("does not fabricate free usage; cached/reasoning tokens are subsets, never added twice", () => {
     for (const usage of [null, {}, { input_tokens: -1, output_tokens: 2 }, { input_tokens: 3, output_tokens: 2, input_tokens_details: { cached_tokens: 4 } }, { input_tokens: 3, output_tokens: 2, output_tokens_details: { reasoning_tokens: 4 } }]) expect(foodDescriptionUsage({ usage })).toEqual({ complete: false });
     expect(foodDescriptionUsage({ usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } })).toEqual({ complete: false });
-    expect(foodDescriptionUsage({ usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } })).toMatchObject({ complete: true, inputTokens: 0, outputTokens: 0 });
+    expect(foodDescriptionUsage({ usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } } })).toMatchObject({ complete: true, inputTokens: 0, outputTokens: 0 });
   });
+  it("records documented Sol cache-write subsets without treating a valid response as unknown", () => {
+    const usage = { input_tokens: 12000, output_tokens: 40, total_tokens: 12040,
+      input_tokens_details: { cached_tokens: 4000, cache_write_tokens: 7000, cache_write_tokens_details: { ttl_30m_tokens: 3000, ttl_12h_tokens: 4000 } },
+      output_tokens_details: { reasoning_tokens: 10 } };
+    expect(foodDescriptionUsage({ id: "resp_synthetic", usage }, "req_synthetic")).toEqual({ complete: true, responseId: "resp_synthetic", requestId: "req_synthetic",
+      inputTokens: 12000, outputTokens: 40, cachedInputTokens: 4000, cacheWriteInputTokens: 7000, cacheWrite30mInputTokens: 3000, cacheWrite12hInputTokens: 4000, reasoningTokens: 10 });
+  });
+
+  it("keeps incomplete, contradictory, fractional and unrecognized cache counters unknown", () => {
+    const details = { cached_tokens: 20, cache_write_tokens: 30, cache_write_tokens_details: { ttl_30m_tokens: 30, ttl_12h_tokens: 0 } };
+    const usage = { input_tokens: 100, output_tokens: 40, total_tokens: 140, input_tokens_details: details, output_tokens_details: { reasoning_tokens: 10 } };
+    for (const input_tokens_details of [
+      { cached_tokens: 20 }, { ...details, cache_write_tokens: undefined }, { ...details, cache_write_tokens_details: undefined },
+      { ...details, cache_write_tokens: 31 }, { ...details, cached_tokens: 80 }, { ...details, cache_write_tokens: -1 },
+      { ...details, cache_write_tokens: 1.5 }, { ...details, cache_write_tokens_details: { ttl_30m_tokens: 30 } },
+      { ...details, cache_write_tokens_details: { ttl_30m_tokens: 30, ttl_12h_tokens: 0, unpriced_tokens: 1 } }, { ...details, unpriced_tokens: 1 },
+    ]) expect(foodDescriptionUsage({ usage: { ...usage, input_tokens_details } })).toEqual({ complete: false });
+  });
+
 });

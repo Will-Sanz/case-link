@@ -139,8 +139,11 @@ export function validateFoodDescriptionSelection(input: {
   const benefitWanted = foodDescriptionNeedSchema.options.some(need => need !== "food_now" && !excludedNeedIds.includes(need))
     && (values.benefitHistory !== undefined || selection.needIds.some(need => need !== "food_now") || selection.questionIds.includes("benefitHistory"));
   const history = context.history.filter(item => item.current), active = history.filter(item => ["active", "paused"].includes(item.requestStatus));
-  const existingRequestIds = benefitWanted ? [...new Set(active.map(item => item.requestId))] : [];
-  const duplicateBlocked = history.some(item => !["checking", "prepared", "withdrawn"].includes(item.state)) || active.length > 0;
+  const applicationHistory = history.filter(item => item.need !== "snap_problem");
+  const duplicateBlocked = applicationHistory.some(item => !["checking", "prepared", "withdrawn"].includes(item.state)) || active.some(item => ["snap_new", "snap_pending"].includes(item.need));
+  const proposedBenefit = assessFoodSupport(answers).find(item => item.need !== "food_now")?.need;
+  const existingRequestIds = benefitWanted ? [...new Set(active.filter(item => item.need === proposedBenefit
+    || proposedBenefit === "snap_new" && applicationHistory.some(receipt => receipt.requestId === item.requestId && !["checking", "prepared", "withdrawn"].includes(receipt.state))).map(item => item.requestId))] : [];
   const allowedNeeds = assessFoodSupport(answers).map(value => value.need).filter(need => !excludedNeedIds.includes(need) && !(need === "snap_new" && duplicateBlocked));
   const needIds = allowedNeeds.filter(need => need !== "food_now" || values.foodForTwoDays !== undefined || selection.needIds.includes(need));
   // An existing application takes precedence over a requested duplicate; never revive its prior permission.
@@ -166,4 +169,35 @@ export function validateFoodDescriptionSelection(input: {
     requiresTypedTiming: answers.foodForTwoDays !== "no", duplicateApplicationBlocked: duplicateBlocked,
     executionGranted: false as const,
   };
+}
+
+/** Owned operational coverage stays outside the minimized model input and never resumes or expands a mandate. */
+export const foodDescriptionCurrentRequestsSchema = z.array(z.object({
+  ownerId: z.uuid(), requestId: z.uuid(), requestVersion: revision, requestStatus: z.enum(["active", "paused", "cancelled", "closed"]),
+  needIds: z.array(foodDescriptionNeedSchema).min(1).max(5).refine(unique), pendingSnapFollowUp: z.boolean(),
+}).strict().refine(value => !value.pendingSnapFollowUp || ["active", "paused"].includes(value.requestStatus) && value.needIds.some(need => need === "snap_new" || need === "snap_renewal"))).max(14).refine(values => unique(values.map(value => value.requestId)));
+export function reconcileFoodDescriptionRequests(result: ReturnType<typeof validateFoodDescriptionSelection>, currentRequests: unknown, ownerId: string) {
+  const requests = foodDescriptionCurrentRequestsSchema.parse(currentRequests);
+  if (requests.some(request => request.ownerId !== ownerId)) throw new Error("parent_food_description_changed");
+  const { existingRequestIds, ...validated } = result;
+  const benefitWanted = foodDescriptionNeedSchema.options.some(need => need !== "food_now" && !result.excludedNeedIds.includes(need))
+    && (result.needIds.some(need => need !== "food_now") || result.proposedAnswers.benefitHistory !== "not_sure" || result.questionIds.includes("benefitHistory") || existingRequestIds.length > 0);
+  const foodWanted = result.needIds.includes("food_now") || result.questionIds.includes("foodForTwoDays");
+  const blockedNew = result.proposedAnswers.benefitHistory === "never" && result.duplicateApplicationBlocked && !result.excludedNeedIds.includes("snap_new");
+  const covers = (request: typeof requests[number], need: z.infer<typeof foodDescriptionNeedSchema>) => request.needIds.includes(need)
+    || need === "snap_pending" && request.pendingSnapFollowUp;
+  const existingRequests = requests.map(request => ({ requestId: request.requestId, needIds: request.needIds.filter(need => need === "food_now" ? foodWanted && !result.excludedNeedIds.includes(need)
+    : benefitWanted && (!result.excludedNeedIds.includes(need) && (result.needIds.includes(need) || blockedNew && existingRequestIds.includes(request.requestId))
+      || result.needIds.includes("snap_pending") && request.pendingSnapFollowUp && ["snap_new", "snap_renewal"].includes(need))) })).filter(request => request.needIds.length);
+  const foodCovered = existingRequests.some(request => request.needIds.includes("food_now"));
+  const benefitCovered = result.needIds.some(need => need !== "food_now" && requests.some(request => covers(request, need))) || blockedNew && existingRequests.some(request => request.needIds.some(need => need !== "food_now"));
+  const needIds = result.needIds.filter(need => !requests.some(request => covers(request, need)));
+  const questionIds = result.questionIds.filter(id => id === "foodForTwoDays" ? !foodCovered : !benefitCovered);
+  if (benefitCovered && !result.needIds.includes("food_now") && !result.originalFacts.foodForTwoDays && !result.assertions.some(value => value.questionId === "foodForTwoDays")) {
+    const index = questionIds.indexOf("foodForTwoDays"); if (index >= 0) questionIds.splice(index, 1);
+  }
+  if (needIds.includes("food_now") && !result.originalFacts.foodForTwoDays && !result.assertions.some(value => value.questionId === "foodForTwoDays") && !questionIds.includes("foodForTwoDays")) questionIds.unshift("foodForTwoDays");
+  const candidates = result.candidates.filter(candidate => needIds.includes(candidate.need));
+  return { ...validated, needIds, candidates, selections: result.selections.filter(selection => needIds.includes(selection.need)), questionIds, existingRequests,
+    state: questionIds.length ? "needs_clarification" as const : candidates.length ? "proposal" as const : needIds.length ? "manual" as const : existingRequests.length ? "open_existing" as const : "manual" as const };
 }

@@ -12,9 +12,12 @@ vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 const renderGuide = (children: ReactNode) => render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header>{children}</ParentLocaleProvider>);
 const owner = "11111111-1111-4111-8111-111111111111", other = "22222222-2222-4222-8222-222222222222";
 const reply = (value: unknown, status = 200) => ({ ok: status < 400, status, json: async () => value });
-function api(options: { assessment?: (body: unknown) => unknown | Promise<unknown>; post?: (init: RequestInit) => unknown; signedIn?: boolean } = {}) {
+function api(options: { assessment?: (body: unknown) => unknown | Promise<unknown>; post?: (init: RequestInit) => unknown; signedIn?: boolean; description?: boolean } = {}) {
   const state = { owner, signedIn: options.signedIn ?? true };
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/food-description/availability")) return reply({available:options.description===true});
+    if(url.includes("/food-description?draft="))return reply({result:{state:"proposal",proposedAnswers:{foodForTwoDays:"no",benefitHistory:"applied",existingIssue:null},needIds:["food_now","snap_pending"],questionIds:[],existingRequests:[],excludedNeedIds:[],outOfScope:null,executionGranted:false}});
+    if(url.endsWith("/food-description"))return reply({archive:{ownerId:state.owner,available:options.description===true,drafts:options.description?[{id:other,revision:2,state:"result",noticeVersion:"food-description-2026-11-18.v1",consentedAt:new Date().toISOString(),createdAt:new Date().toISOString(),contentExpiresAt:new Date(Date.now()+86400000).toISOString(),metadataExpiresAt:new Date(Date.now()+172800000).toISOString(),input:{description:"Food help",screenLocale:"en"},projection:null,selection:null,queueKey:null,sameChargedContext:true,usage:[]}]:[]}});
     if (url.endsWith("/auth")) { state.signedIn = true; return reply({ ok: true }); }
     if (url.endsWith("/account")) return state.signedIn ? reply({ account: { id: state.owner, email: "fixture@example.invalid", preferences: { language: "en", contactPreference: "in_app" } } }) : reply({ ok: false, error: "Sign in to continue." }, 401);
     if (url.endsWith("/authorization-window")) return reply({ authorization: { issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), snapApplication: { collectionEnabled: false, noticeVersion: null } } });
@@ -202,4 +205,22 @@ describe("guided food recovery and keyboard handoff", () => {
     expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment"))).toHaveLength(checks);
   });
+});
+
+it("carries only the opaque owned description pair through preflight and the complete exact unknown combined-start retry",async()=>{
+  let first=true;const {fetcher}=api({description:true,post:()=>{if(first){first=false;throw new Error("lost start acknowledgement");}return reply({request:{id:owner}});}});
+  renderGuide(<ParentIntake initialNeed="food"/>);fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
+  fireEvent.click(await screen.findByRole("button",{name:"Continue with both options"}));await facts();await permission();
+  fireEvent.click(screen.getByRole("button",{name:"Start getting support"}));await screen.findByText(/save result has not been confirmed/);
+  const checks=fetcher.mock.calls.filter(([url])=>url.endsWith("/food-assessment")).length;
+  fireEvent.change(screen.getByLabelText(/Screen language/),{target:{value:"es"}});fireEvent.click(screen.getByRole("button",{name:"Start getting support"}));
+  await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
+  const posts=fetcher.mock.calls.filter(([url,init])=>url.endsWith("/requests")&&init?.method==="POST");
+  expect(posts).toHaveLength(2);expect(posts[0][1]?.body).toBe(posts[1][1]?.body);expect(posts[0][1]?.headers).toEqual(posts[1][1]?.headers);
+  expect(JSON.parse(String(posts[0][1]?.body))).toMatchObject({descriptionSource:{draftId:other,revision:2},intake:{needs:["food_now","snap_pending"]}});
+  expect(String(posts[0][1]?.body)).not.toContain("Food help");
+  const preflight=fetcher.mock.calls.find(([url])=>url.endsWith("/food-assessment"))!;
+  expect(JSON.parse(String(preflight[1]?.body)).descriptionSource).toEqual({draftId:other,revision:2});
+  expect(fetcher.mock.calls.filter(([url])=>url.endsWith("/food-assessment"))).toHaveLength(checks);
+  expect(fetcher.mock.calls.some(([url,init])=>url.includes("/food-description")&&init?.method)).toBe(false);
 });

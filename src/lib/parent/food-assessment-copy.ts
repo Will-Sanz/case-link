@@ -1,0 +1,28 @@
+export const foodAssessmentCopy = {
+  en: {
+    title: "Let's find food support that works for your family.", intro: "Answer a few short questions. You do not need to know any program names. When you continue, CaseLink checks your selected options for your signed-in account before you authorize a specific request.",
+    immediate: "Need food today?", direct: "Find food now", directNote: "No account needed. A listing does not confirm food in stock or a reservation.",
+    enough: "Do you have enough food for today and tomorrow?", yes: "Yes", no: "No", unknown: "I'm not sure", select: "Choose an answer",
+    history: "Do you get help paying for groceries, sometimes called SNAP or food stamps, or have you received it before?", never: "No, and I have not applied", applied: "I applied and am waiting", receiving: "I receive it now, or received it before",
+    issue: "What has happened with that help?", renewal: "I need to renew or received a renewal notice", stopped: "My benefits stopped or changed", card: "I have a card, access or other benefit problem", none: "No current problem",
+    submit: "See my options", results: "Your proposed next steps", pending: "You already applied. Follow up on that application rather than starting another one.",
+    new: "Consider a new SNAP application for help paying for groceries. The program decides eligibility.", renewalReason: "Work on the renewal for the benefit you already receive.", problem: "Clarify the existing benefit issue. A new application may not be the right next step.", immediateReason: "Explore groceries or meals now while any longer benefit work continues.",
+    titles: { food_now: "Food for now", snap_new: "Apply for SNAP", snap_pending: "Check a pending application", snap_renewal: "Renew SNAP", snap_problem: "Help with SNAP benefits" },
+    unknownResult: "Your benefit history is still unknown. You can use direct food help and read the program choices below without guessing or starting a new application.", empty: "No new benefit action is proposed from these answers. Direct food help and the program choices below remain available.",
+    both: "Continue with both options", together: "Food for now and your SNAP next step can be included in one request. You can also choose just one.",
+    control: "Nothing has started. Continue to review the named programs and exact permission for your selected options. Unselected options stay proposed.", change: "Change my answers", english: "These questions and sign-in screens are available in Spanish. Some application screens and program materials remain in English.",
+  },
+  es: {
+    title: "Busquemos apoyo alimentario para su familia.", intro: "Responda unas preguntas breves. No necesita conocer los nombres de los programas. Al continuar, CaseLink comprueba las opciones que eligió para su cuenta antes de que autorice una solicitud específica.",
+    immediate: "¿Necesita comida hoy?", direct: "Buscar comida ahora", directNote: "No necesita una cuenta. Un lugar en la lista no confirma que haya comida disponible ni una reserva.",
+    enough: "¿Tiene suficiente comida para hoy y mañana?", yes: "Sí", no: "No", unknown: "No estoy seguro/a", select: "Elija una respuesta",
+    history: "¿Recibe ayuda para comprar alimentos, a veces llamada SNAP o cupones de alimentos, o la recibió antes?", never: "No, y no he presentado una solicitud", applied: "Presenté una solicitud y estoy esperando", receiving: "La recibo ahora o la recibí antes",
+    issue: "¿Qué ha ocurrido con esa ayuda?", renewal: "Necesito renovar o recibí un aviso de renovación", stopped: "Mis beneficios terminaron o cambiaron", card: "Tengo un problema con la tarjeta, el acceso u otro beneficio", none: "No tengo ningún problema actualmente",
+    submit: "Ver mis opciones", results: "Sus próximos pasos propuestos", pending: "Ya presentó una solicitud. Dé seguimiento a esa solicitud en vez de iniciar otra.",
+    new: "Considere solicitar SNAP para ayudar a pagar los alimentos. El programa determina la elegibilidad.", renewalReason: "Continúe con la renovación de los beneficios que ya recibe.", problem: "Aclare el problema con sus beneficios actuales. Una nueva solicitud puede no ser el paso adecuado.", immediateReason: "Busque alimentos o comidas ahora mientras continúa cualquier trámite de beneficios.",
+    titles: { food_now: "Comida para ahora", snap_new: "Solicitar SNAP", snap_pending: "Consultar una solicitud pendiente", snap_renewal: "Renovar SNAP", snap_problem: "Ayuda con los beneficios de SNAP" },
+    unknownResult: "Aún no sabemos si recibe beneficios. Puede buscar comida directamente y leer las opciones de programas sin adivinar ni iniciar una nueva solicitud.", empty: "Estas respuestas no indican que deba iniciar un nuevo trámite de beneficios. La ayuda alimentaria directa y las opciones de programas siguen disponibles.",
+    both: "Continuar con ambas opciones", together: "La comida para ahora y el próximo paso de SNAP pueden incluirse en una sola solicitud de apoyo. También puede elegir solo una opción.",
+    control: "Nada ha comenzado. Continúe para revisar los programas nombrados y el permiso específico para las opciones que eligió. Las opciones no seleccionadas siguen siendo propuestas.", change: "Cambiar mis respuestas", english: "Estas preguntas y las pantallas de inicio de sesión están disponibles en español. Algunas pantallas de solicitud y materiales de los programas siguen en inglés.",
+  },
+} as const;

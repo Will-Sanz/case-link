@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test-fixtures";
-const mocks = vi.hoisted(() => ({ start: vi.fn(), startSnap: vi.fn(), startWic: vi.fn(), startPeco: vi.fn(), startPgw: vi.fn(), startWater: vi.fn(), get: vi.fn(), list: vi.fn(), getProgress: vi.fn(), listProgress: vi.fn(), window: vi.fn() }));
+const mocks = vi.hoisted(() => ({ description: vi.fn(), start: vi.fn(), startSnap: vi.fn(), startWic: vi.fn(), startPeco: vi.fn(), startPgw: vi.fn(), startWater: vi.fn(), get: vi.fn(), list: vi.fn(), getProgress: vi.fn(), listProgress: vi.fn(), window: vi.fn() }));
+vi.mock("@/lib/parent/food-description-data", () => ({ startFoodDescriptionRequest: mocks.description }));
 vi.mock("@/lib/parent/data", () => ({ startSupportRequest: mocks.start, getSupportRequest: mocks.get, listSupportRequests: mocks.list }));
 vi.mock("@/lib/parent/snap-application-data", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/parent/snap-application-data")>(), startSnapApplication: mocks.startSnap }));
 vi.mock("@/lib/parent/wic-application-data", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/parent/wic-application-data")>(), startWicApplication: mocks.startWic }));
@@ -33,6 +34,7 @@ function request(value: unknown, origin = "https://caselink.test") {
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://caselink.test");
   mocks.window.mockResolvedValue({ issuedAt: "2026-10-25T16:00:00Z", expiresAt: "2026-11-24T16:00:00Z", snapApplication: { collectionEnabled: true, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION } });
+  mocks.description.mockResolvedValue(fixtureRequest().id);
   mocks.start.mockResolvedValue(fixtureRequest().id); mocks.startSnap.mockResolvedValue(fixtureRequest().id); mocks.startWic.mockResolvedValue(fixtureRequest().id);
   mocks.startPeco.mockResolvedValue(fixtureRequest().id); mocks.startPgw.mockResolvedValue(fixtureRequest().id); mocks.startWater.mockResolvedValue(fixtureRequest().id);
   mocks.get.mockResolvedValue(fixtureRequest()); mocks.getProgress.mockResolvedValue(null);
@@ -248,4 +250,14 @@ describe.each([
     enable(); const response = await POST(request({ ...value(), ...patch })); expect(response.status).toBe(400);
     expect(mocks[option.mock]).not.toHaveBeenCalled(); expect(mocks.start).not.toHaveBeenCalled(); expect(await response.text()).not.toContain("private-canary");
   });
+});
+
+it("uses one atomic optional-description start port with the exact private SNAP and explicit document-source packet", async () => {
+  const value={...snap(),descriptionSource:{draftId:key,revision:2},documentTemplateId:SNAP_ES_TEMPLATE_ID};
+  expect((await POST(request(value))).status).toBe(201);
+  expect(mocks.description).toHaveBeenCalledExactlyOnceWith(value,key);expect(mocks.startSnap).not.toHaveBeenCalled();expect(mocks.start).not.toHaveBeenCalled();
+});
+it("does not allow optional-description provenance on an unrelated private WIC start", async () => {
+  mocks.window.mockResolvedValue({ ...(await mocks.window()), wicApplication: { collectionEnabled: true, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-24T16:00:00Z" } });
+  expect((await POST(request({...wic(),descriptionSource:{draftId:key,revision:2}}))).status).toBe(400);expect(mocks.description).not.toHaveBeenCalled();
 });

@@ -7,7 +7,8 @@ type Result<T> = { path: string; data: T | null; error: Error | null };
 export function useParentResource<T>(path: string) {
   const [result, setResult] = useState<Result<T> | null>(null);
   const [revision, setRevision] = useState(0);
-  const pending = useRef(false);
+  const pending = useRef(false), activeRead = useRef<AbortController | null>(null);
+  const clear = useCallback(() => { activeRead.current?.abort(); activeRead.current = null; pending.current = false; setResult(null); }, []);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   const reloadIfIdle = useCallback(() => {
     if (pending.current) return;
@@ -15,7 +16,7 @@ export function useParentResource<T>(path: string) {
     reload();
   }, [reload]);
   useEffect(() => {
-    const controller = new AbortController();
+    const controller = new AbortController(); activeRead.current = controller;
     pending.current = true;
     boundedParentApi(path, {}, controller.signal, new Date(Date.now() + 30_000).toISOString())
       .then((data) => {
@@ -40,6 +41,7 @@ export function useParentResource<T>(path: string) {
       });
     return () => {
       controller.abort();
+      if (activeRead.current === controller) activeRead.current = null;
       pending.current = false;
     };
   }, [path, revision]);
@@ -50,5 +52,6 @@ export function useParentResource<T>(path: string) {
     loading: !current,
     reload,
     reloadIfIdle,
+    clear,
   };
 }

@@ -85,7 +85,7 @@ describe.skipIf(!modulePath)("optional food description actual SQL authority, re
   });
   it("enforces three per account rolling24h; cancellation and feature/global ledgers do not refund", async () => {
     await enable(); const id = await create();
-    for (let revision = 0; revision < 3; revision++) { await queue(id, revision); const c = (await claim())!; expect(await reserve(c)).toEqual(expect.any(String)); await query("select parent_private.parent_fail_food_description($1,$2,$3)", [id, c.revision, c.leaseToken], "parent_worker"); }
+    for (let revision = 0; revision < 3; revision++) { await queue(id, revision, randomUUID(), { ...input, description: `Food support request, edit ${revision}.` }); const c = (await claim())!; expect(await reserve(c)).toEqual(expect.any(String)); await query("select parent_private.parent_fail_food_description($1,$2,$3)", [id, c.revision, c.leaseToken], "parent_worker"); }
     await expect(queue(id, 3)).rejects.toMatchObject({ code: "42501" });
     expect((await query("select public.parent_get_food_descriptions() value")).rows[0].value.available).toBe(false);
     const before = (await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations where purpose='food_description'")).rows[0].n;
@@ -164,7 +164,7 @@ describe.skipIf(!modulePath)("optional food description actual SQL authority, re
       { questionId: "foodForTwoDays", value: "no", span: span("no food for tomorrow") },
       { questionId: "benefitHistory", value: "never", span: span("never applied for SNAP") },
     ], exclusions: [], questionIds: [], outOfScope: null };
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 200, output_tokens: 80, total_tokens: 280, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } }, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selected) }] }] }));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 200, output_tokens: 80, total_tokens: 280, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } }, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selected) }] }] }));
     expect(await runOneFoodDescriptionTurn({ database: { query: (sql, values) => query(sql, values, "parent_worker") }, apiKey: "synthetic-no-provider-connection", projectId: "proj_synthetic", fetcher, now: () => new Date() })).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(1);
     const archive = foodDescriptionArchiveSchema.parse(await read()), draft = archive.drafts[0];
@@ -251,6 +251,23 @@ describe.skipIf(!modulePath)("optional food description actual SQL authority, re
     expect((await fixture.admin.query("select state from parent_private.current_program_operation($1,'snap_pending','snap-pa')",[request])).rows[0].state).toBe("assistance_approved");
     const id=await create();await queue(id);const context=(await fixture.admin.query("select context from parent_private.food_description_drafts where id=$1",[id])).rows[0].context;
     expect(buildFoodDescriptionProjection(input,context,new Date()).ownedFoodHistory).toContainEqual({need:"snap_pending",state:"assistance_approved",current:true});
+  });
+  it("retains exact cache-write billing subsets in owned exports after cancellation without rewriting or refunding the charge", async () => {
+    await enable(); const id = await create(); await queue(id); const charge = await reserve((await claim())!);
+    const usage = { complete: true, inputTokens: 12000, outputTokens: 40, cachedInputTokens: 4000, cacheWriteInputTokens: 7000,
+      cacheWrite30mInputTokens: 3000, cacheWrite12hInputTokens: 4000, reasoningTokens: 10, responseId: "resp_synthetic", requestId: "req_synthetic" };
+    const record = (value: unknown, role = "parent_worker") => query("select parent_private.parent_record_food_description_usage($1,$2)", [charge, JSON.stringify(value)], role);
+    for (const value of [null, [], { ...usage, inputTokens: "not a number" }, { ...usage, inputTokens: -1 }, { ...usage, inputTokens: 10000001 }, { ...usage, cacheWriteInputTokens: 7001 }, { ...usage, cachedInputTokens: 5001 }, { ...usage, cacheWrite30mInputTokens: 0.5 },
+      { ...usage, cacheWrite12hInputTokens: undefined }, { ...usage, unexpectedTokens: 0 }, { complete: false, cacheWriteInputTokens: 0 }])
+      await expect(record(value)).rejects.toMatchObject({ code: "23514" });
+    for (const role of ["authenticated", "anon", "service_role", "parent_storage_broker", "parent_retention_worker"])
+      await expect(record(usage, role)).rejects.toMatchObject({ code: "42501" });
+    await query("select public.parent_cancel_food_description($1,$2)", [id, owner]);
+    const reservations = (await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    await record(usage); await record({ ...usage, inputTokens: 13000 });
+    const exported = foodDescriptionArchiveSchema.parse((await query("select public.parent_get_food_descriptions() value")).rows[0].value);
+    expect(exported.drafts[0].usage[0].usage).toEqual(usage);
+    expect((await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n).toBe(reservations);
   });
 
 });

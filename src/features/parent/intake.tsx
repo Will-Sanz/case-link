@@ -157,7 +157,7 @@ export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: str
   }, [guide]);
   const guideNeed = guide?.handoff.needs.find(need => need !== "food_now") ?? guide?.handoff.needs[0];
   return initialNeed === "food" ? (
-    <><div ref={guidePanel} hidden={guide?.editing}><FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/></div>
+    <><div ref={guidePanel} hidden={guide?.editing}><FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} signInOptions={signInOptions} onOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }} onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/></div>
       {guideOwnerChanged && <p role="status">Your sign-in changed. The earlier answers were cleared; begin with your current household.</p>}
       {guide && <div hidden={!guide.editing}><ParentIntakeForm key={guideNeed} active={guide.editing} initialNeed={guideNeed} handoff={guide.handoff} signInOptions={signInOptions}
       onFoodBack={() => setGuide({ ...guide, editing: false })}
@@ -238,7 +238,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource; documentTemplateId?: SnapFormTemplateId };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource; descriptionSource?: FoodAssessmentHandoff["descriptionSource"]; documentTemplateId?: SnapFormTemplateId };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
   const scope=JSON.stringify({intake,snapDetails,snapDocument,snapDocumentChosen,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip,handoff});
@@ -279,7 +279,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   }
   async function checkFoodAssessment(signal: AbortSignal, deadline: string) {
     if (!handoff) return;
-    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify({ answers: handoff.answers, needs: handoff.needs }) }, signal, deadline));
+    const result = foodAssessmentReplySchema.parse(await boundedParentApi("/food-assessment", { method: "POST", body: JSON.stringify(handoff) }, signal, deadline));
     signal.throwIfAborted();
     if (!guideOwner.current || result.ownerId.toLowerCase() !== guideOwner.current) {
       onFoodOwnerChanged?.(); throw new ParentApiError("Your sign-in changed. Earlier answers cannot be used for another household.", 412);
@@ -765,6 +765,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
           key: crypto.randomUUID(),
           packet: {
             intake,
+            ...(handoff?.descriptionSource ? { descriptionSource: handoff.descriptionSource } : {}),
             mandate: buildMandate(
               intake,
               recipientIds,
