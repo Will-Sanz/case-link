@@ -238,7 +238,7 @@ it.each([false,true])("requires server-confirmed pending follow-up scope before 
   const validated=validateFoodDescriptionSelection({projection:buildFoodDescriptionProjection(input,current,now),selection:{needIds:["snap_pending"],selections:[],assertions:[],exclusions:[],questionIds:[],outOfScope:null},currentContext:current,now});
   const prior={ownerId:owner,requestId:request,requestVersion:1,requestStatus:"active",needIds:["snap_new"],pendingSnapFollowUp};
   const value=reconcileFoodDescriptionRequests(validated,[prior],owner);
-  expect(value.needIds).toEqual(pendingSnapFollowUp?[]:["snap_pending"]);expect(value.state).toBe(pendingSnapFollowUp?"open_existing":"needs_clarification");
+  expect(value.needIds).toEqual(pendingSnapFollowUp?[]:["food_now","snap_pending"]);expect(value.state).toBe(pendingSnapFollowUp?"open_existing":"needs_clarification");
   expect(value.existingRequests).toEqual(pendingSnapFollowUp?[{requestId:request,needIds:["snap_new"]}]:[]);
 });
 it("asks an actually unknown benefit fact despite an unrelated active renewal and preserves exclusions",()=>{

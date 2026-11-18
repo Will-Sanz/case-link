@@ -196,6 +196,8 @@ export function reconcileFoodDescriptionRequests(result: ReturnType<typeof valid
   if (benefitCovered && !result.needIds.includes("food_now") && !result.originalFacts.foodForTwoDays && !result.assertions.some(value => value.questionId === "foodForTwoDays")) {
     const index = questionIds.indexOf("foodForTwoDays"); if (index >= 0) questionIds.splice(index, 1);
   }
+  // An uncovered food question retains the compatible provisional need; it does not select a program or grant execution.
+  if (questionIds.includes("foodForTwoDays") && !needIds.includes("food_now")) needIds.unshift("food_now");
   if (needIds.includes("food_now") && !result.originalFacts.foodForTwoDays && !result.assertions.some(value => value.questionId === "foodForTwoDays") && !questionIds.includes("foodForTwoDays")) questionIds.unshift("foodForTwoDays");
   const candidates = result.candidates.filter(candidate => needIds.includes(candidate.need));
   return { ...validated, needIds, candidates, selections: result.selections.filter(selection => needIds.includes(selection.need)), questionIds, existingRequests,
