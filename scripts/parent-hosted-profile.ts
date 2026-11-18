@@ -12,7 +12,7 @@ export const HOSTED_PORTS = { web: 3100, frontdoor: 3200, broker: 3310, review: 
 const secret = z.string().regex(/^[\x21-\x7e]{32,256}$/);
 const publicKey = z.string().min(1).max(4096).regex(/^[A-Za-z0-9._-]+$/).refine(publicKeyIsSafe);
 const common = { enabled: z.boolean().default(false), approvalReference: z.string().trim().min(1).max(500),
-  approvedUntil: z.iso.datetime({ offset: true }), publicOrigin: z.string().url().max(100), projectOrigin: z.literal(HOSTED_PROJECT) };
+  approvedUntil: z.iso.datetime({ offset: true }).nullable(), publicOrigin: z.string().url().max(100), projectOrigin: z.literal(HOSTED_PROJECT) };
 const databaseUrl = z.string().min(1).max(2048);
 export const hostedProfileSchema = z.discriminatedUnion("service", [
   z.object({ ...common, service: z.literal("web"), publicKey, realDataApproved: z.boolean().default(false) }).strict(),
@@ -37,7 +37,7 @@ function authority(config: HostedProfile): Record<string, string> {
   return { CASELINK_PRODUCT: "parent", CASELINK_ENVIRONMENT: "production", CASELINK_PARENT_ACCOUNT_MODE: "existing",
     NEXT_PUBLIC_SITE_URL: config.publicOrigin, CASELINK_SCHOOL_SUPABASE_URL: config.projectOrigin,
     CASELINK_PARENT_PRODUCTION_SUPABASE_URL: config.projectOrigin, CASELINK_PARENT_HOSTED_APPROVED: "1",
-    CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE: config.approvalReference, CASELINK_PARENT_HOSTED_APPROVED_UNTIL: config.approvedUntil };
+    CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE: config.approvalReference, CASELINK_PARENT_HOSTED_APPROVED_UNTIL: config.approvedUntil ?? "ongoing" };
 }
 export function parseHostedProfile(input: unknown, now = Date.now(), operation: "run" | "parser-cleanup" = "run"): HostedProfile {
   try {
@@ -47,7 +47,7 @@ export function parseHostedProfile(input: unknown, now = Date.now(), operation: 
     const cleanup = operation === "parser-cleanup";
     // Cleanup may outlive operating approval; it can only delete this worker's exact parser containers.
     if ((cleanup ? config.service !== "worker" : !config.enabled)
-      || !hostedParentServiceAllowed(authority(config), database, config.projectOrigin, "http://127.0.0.1:3310", cleanup ? Date.parse(config.approvedUntil) - 1 : now)
+      || !hostedParentServiceAllowed(authority(config), database, config.projectOrigin, "http://127.0.0.1:3310", cleanup && config.approvedUntil !== null ? Date.parse(config.approvedUntil) - 1 : now)
       || (config.service === "web" && !config.realDataApproved)
       || (config.service === "review" && !config.collectionApproved)
       || (config.service === "sender" && (config.emulator ? config.sendingApproved : !config.sendingApproved))) throw new Error();
@@ -95,7 +95,7 @@ export function hostedChildEnvironment(config: HostedProfile, system: NodeJS.Pro
     Object.assign(env, { CASELINK_PARENT_RETENTION_APPROVED: "1", CASELINK_PARENT_RETENTION_DATABASE_URL: config.databaseUrl,
       CASELINK_PARENT_RETENTION_SUPABASE_URL: config.projectOrigin, CASELINK_PARENT_RETENTION_MODE: config.service === "retention" ? "snap-packets" : "ordinary",
       CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED: "1", CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVAL_REFERENCE: config.approvalReference,
-      CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: config.approvedUntil });
+      CASELINK_PARENT_RETENTION_MAINTENANCE_APPROVED_UNTIL: config.approvedUntil ?? "ongoing" });
     if (config.service === "ordinary-retention") Object.assign(env, {
       CASELINK_PARENT_RETENTION_S3_ACCESS_KEY_ID: config.storage.s3AccessKeyId,
       CASELINK_PARENT_RETENTION_S3_SECRET_ACCESS_KEY: config.storage.s3SecretAccessKey,
@@ -106,7 +106,8 @@ export function hostedChildEnvironment(config: HostedProfile, system: NodeJS.Pro
 }
 
 /** Rechecks the original deadline; long approvals never overflow Node's 32-bit timeout or renew themselves. */
-export function stopAtHostedDeadline(until: string, stop: () => void, now = Date.now): () => void {
+export function stopAtHostedDeadline(until: string | null, stop: () => void, now = Date.now): () => void {
+  if (until === null) return () => {};
   const deadline = Date.parse(until);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const check = () => { const remaining = deadline - now(); if (!Number.isFinite(remaining) || remaining <= 0) stop();

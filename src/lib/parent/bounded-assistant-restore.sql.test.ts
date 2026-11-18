@@ -27,18 +27,25 @@ it.skipIf(!modulePath)("restores only the restricted assistant login within two 
   } finally { await admin.end(); }
 });
 
-it.skipIf(!modulePath)("keeps the unapplied permanent transaction compatible with the bounded worker and refuses an unrestricted cohort", async () => {
+it.skipIf(!modulePath)("removes only approved operating expiries and rejects broader roles or an unrestricted cohort", async () => {
   const { admin } = await createParentSqlFixture(modulePath!);
   const sql = readFileSync("deploy/parent-vm/enable-ongoing-existing-services.sql", "utf8");
   try {
     await admin.query("update parent_private.processing_controls set enabled=true,approval_reference='synthetic permanent candidate only',approved_until='infinity',existing_accounts_enabled=true,existing_identity_created_before=now(),pilot_account_ids=null,snap_details_enabled=true,snap_details_approved_until='2026-11-11T05:00:00Z',snap_protected_enabled=true,snap_protected_approved_until='2026-11-11T04:00:00Z'");
     await expect(admin.query(sql)).rejects.toThrow("Expected existing owner-scoped operating settings");
     await admin.query("update parent_private.processing_controls set pilot_account_ids=array[$1::uuid]", [randomUUID()]);
-    const roles = ["caselink_parent_pilot_worker_20261026", "caselink_parent_pilot_broker_20261026", "caselink_parent_pilot_retention_20261026", "caselink_parent_pilot_finalizer_20261109", "caselink_parent_pilot_ordinary_retention_20261109"];
+    const roles = ["caselink_parent_pilot_worker_20261026", "caselink_parent_pilot_broker_20261026", "caselink_parent_pilot_retention_20261026", "caselink_parent_pilot_finalizer_20261109", "caselink_parent_pilot_ordinary_retention_20261109", "caselink_parent_pilot_sender_20261109"];
     for (const role of roles) await admin.query(`create role ${role} login noinherit valid until '${role === roles[0] ? "2026-11-17T21:07:45Z" : "2026-11-11T05:00:00Z"}'`);
+    const memberships = ["parent_worker", "parent_storage_broker", "parent_retention_worker", "parent_snap_finalizer", "parent_retention_worker", "parent_snap_sender"];
+    for (let i = 0; i < roles.length; i++) await admin.query(`grant ${memberships[i]} to ${roles[i]}`);
+    await admin.query(`grant parent_storage_broker to ${roles[0]}`);
+    await expect(admin.query(sql)).rejects.toThrow("Unexpected existing service role");
+    await admin.query(`revoke parent_storage_broker from ${roles[0]}`);
+    const roleBefore = (await admin.query("select jsonb_agg(to_jsonb(r)-'rolvaliduntil' order by rolname) value from pg_roles r where rolname=any($1::text[])", [roles])).rows[0].value;
     const before = (await admin.query("select to_jsonb(c)-array['snap_details_approved_until','snap_details_approval_reference','snap_protected_approved_until','snap_protected_approval_reference','updated_at'] value from parent_private.processing_controls c")).rows[0].value;
     await admin.query(sql);
-    expect((await admin.query("select count(*)::int total from pg_roles where rolname=any($1::text[]) and rolvaliduntil='infinity'::timestamptz and not rolsuper and not rolbypassrls and not rolcreaterole and not rolcreatedb and not rolreplication", [roles])).rows[0].total).toBe(5);
+    expect((await admin.query("select count(*)::int total from pg_roles where rolname=any($1::text[]) and rolvaliduntil='infinity'::timestamptz and not rolsuper and not rolbypassrls and not rolcreaterole and not rolcreatedb and not rolreplication", [roles])).rows[0].total).toBe(6);
+    expect((await admin.query("select jsonb_agg(to_jsonb(r)-'rolvaliduntil' order by rolname) value from pg_roles r where rolname=any($1::text[])", [roles])).rows[0].value).toEqual(roleBefore);
     expect((await admin.query("select to_jsonb(c)-array['snap_details_approved_until','snap_details_approval_reference','snap_protected_approved_until','snap_protected_approval_reference','updated_at'] value from parent_private.processing_controls c")).rows[0].value).toEqual(before);
   } finally { await admin.end(); }
 });

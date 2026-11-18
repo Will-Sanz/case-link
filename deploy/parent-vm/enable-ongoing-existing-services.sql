@@ -1,5 +1,5 @@
--- Prepared ongoing operation for the existing five service logins and SNAP purposes.
--- Permanent activation remains blocked pending the required explicit approval.
+-- Owner approved removing the listed operating expiries on November 17, 2026.
+-- Existing six service logins and enabled SNAP purposes only; sender remains disabled.
 -- Preserve passwords, memberships, cohort, provider flags and model ledger.
 do $ongoing$
 declare c parent_private.processing_controls; r record; n integer := 0;
@@ -15,17 +15,24 @@ begin
   for r in select * from pg_roles where rolname in (
     'caselink_parent_pilot_worker_20261026', 'caselink_parent_pilot_broker_20261026',
     'caselink_parent_pilot_retention_20261026', 'caselink_parent_pilot_finalizer_20261109',
-    'caselink_parent_pilot_ordinary_retention_20261109')
+    'caselink_parent_pilot_ordinary_retention_20261109', 'caselink_parent_pilot_sender_20261109')
   loop
-    if not r.rolcanlogin or r.rolsuper or r.rolbypassrls or r.rolcreaterole
+    if not r.rolcanlogin or r.rolinherit or r.rolsuper or r.rolbypassrls or r.rolcreaterole
       or r.rolcreatedb or r.rolreplication
       or r.rolvaliduntil is distinct from (case when r.rolname='caselink_parent_pilot_worker_20261026'
         then '2026-11-17T21:07:45Z'::timestamptz else '2026-11-11T05:00:00Z'::timestamptz end)
+      or (select array_agg(p.rolname::text order by p.rolname) from pg_auth_members m join pg_roles p on p.oid=m.roleid where m.member=r.oid)
+        is distinct from array[case r.rolname
+          when 'caselink_parent_pilot_worker_20261026' then 'parent_worker'
+          when 'caselink_parent_pilot_broker_20261026' then 'parent_storage_broker'
+          when 'caselink_parent_pilot_finalizer_20261109' then 'parent_snap_finalizer'
+          when 'caselink_parent_pilot_sender_20261109' then 'parent_snap_sender'
+          else 'parent_retention_worker' end]
     then raise exception 'Unexpected existing service role; no change'; end if;
     execute format('alter role %I valid until %L', r.rolname, 'infinity');
     n := n + 1;
   end loop;
-  if n <> 5 then raise exception 'Expected five existing service logins'; end if;
+  if n <> 6 then raise exception 'Expected six existing service logins'; end if;
   update parent_private.processing_controls set
     snap_details_approved_until='infinity'::timestamptz,
     snap_details_approval_reference='Owner explicitly approved ongoing existing SNAP details processing on 2026-11-17; existing purpose, notice, cohort and retention preserved',

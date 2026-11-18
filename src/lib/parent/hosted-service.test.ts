@@ -7,8 +7,16 @@ const env = { CASELINK_ENVIRONMENT: "production", CASELINK_PARENT_ACCOUNT_MODE: 
   CASELINK_SCHOOL_SUPABASE_URL: project, CASELINK_PARENT_PRODUCTION_SUPABASE_URL: project };
 describe("explicit same-host production service boundary", () => {
   it("allows an explicitly authorized multi-day pilot without changing connected mode", () => expect(hostedParentServiceAllowed(env, db, project, "http://127.0.0.1:3310", now)).toBe(true));
+  it("allows explicit ongoing operation after the old demo deadline while preserving the service boundary", () => {
+    const ongoing = { ...env, CASELINK_PARENT_HOSTED_APPROVED_UNTIL: "ongoing" };
+    const later = now + 365 * 86400000;
+    expect(hostedParentServiceAllowed(ongoing, db, project, "http://127.0.0.1:3310", later)).toBe(true);
+    expect(hostedParentServiceAllowed({ ...ongoing, CASELINK_PARENT_HOSTED_APPROVED: "0" }, db, project, "http://127.0.0.1:3310", later)).toBe(false);
+    expect(hostedParentServiceAllowed(ongoing, db.replace("verify-full", "require"), project, "http://127.0.0.1:3310", later)).toBe(false);
+  });
   it.each([
     { CASELINK_PARENT_HOSTED_APPROVED: "0" }, { CASELINK_PARENT_HOSTED_APPROVAL_REFERENCE: " " }, { CASELINK_PARENT_HOSTED_APPROVED_UNTIL: "2026-11-07T12:00:00Z" },
+    { CASELINK_PARENT_HOSTED_APPROVED_UNTIL: undefined }, { CASELINK_PARENT_HOSTED_APPROVED_UNTIL: "" }, { CASELINK_PARENT_HOSTED_APPROVED_UNTIL: "invalid" },
     { CASELINK_PARENT_CONNECTED_APPROVED: "1" }, { VERCEL: "1" }, { VERCEL_ENV: "production" }, { CASELINK_ENVIRONMENT: "connected" },
     { CASELINK_PARENT_ACCOUNT_MODE: "separate" }, { CASELINK_SCHOOL_SUPABASE_URL: "https://other.supabase.co" },
     { NEXT_PUBLIC_SITE_URL: "http://pilot.thecaselink.com" }, { NEXT_PUBLIC_SITE_URL: "https://127.0.0.1" }, { NEXT_PUBLIC_SITE_URL: "https://child.localhost" },
