@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { z } from "zod";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { boundedParentApi, ParentApiError } from "./api";
@@ -22,6 +22,8 @@ export function useSavedApplicationDraft<T>({ request, record, current, availabl
   const [blocked, setBlocked] = useState(false), [uncertain, setUncertain] = useState(false), [conflict, setConflict] = useState(false);
   const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const work = useRef<AbortController | null>(null), running = useRef<AbortController | null>(null);
+  const recheck = useRef({ ready: current, refresh: onSaved });
+  useLayoutEffect(() => { recheck.current = { ready: current, refresh: onSaved }; });
   const permitted = available && !blocked;
   const scope = JSON.stringify({ id: request.id, version: request.version, status: request.status, needs: request.intake.needs,
     mandate: request.mandate, record: record?.id, permitted });
@@ -34,6 +36,24 @@ export function useSavedApplicationDraft<T>({ request, record, current, availabl
     const controller = new AbortController(); work.current = controller;
     return () => { controller.abort(); if (work.current === controller) work.current = null; };
   }, [scope]);
+  useEffect(() => {
+    if (!attempt || !uncertain || conflict) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible" && recheck.current.ready) recheck.current.refresh();
+    };
+    // Paused requests and slower progress polls must also reconcile lost replies using owned reads.
+    let ticks = 0;
+    const timer = setInterval(() => { refresh(); if (++ticks === 6) clearInterval(timer); }, 5000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [attempt, uncertain, conflict]);
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
   const editingCurrent = !!draft && current && draft.version === request.version && draft.snapshotId === (record?.id ?? null);
   function reset() {

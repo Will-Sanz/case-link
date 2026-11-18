@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axe from "axe-core";
 import { PgwSavedApplication } from "./pgw-saved-application";
@@ -27,7 +28,7 @@ function api(post: (init: RequestInit) => unknown = () => response({ snapshotId 
     if (url.includes("/authorization-window")) return response({ authorization: { issuedAt: now.toISOString(), expiresAt: "2026-11-16T20:00:00Z",
       pgwApplication: { collectionEnabled: enabled, noticeVersion: enabled ? PGW_APPLICATION_NOTICE_VERSION : null, expiresAt: enabled ? gateExpiry : null } } });
     if (init?.method === "POST") return post(init);
-    return missing ? response({ ok: false, error: "This saved application is unavailable." }, 404) : response({ snapshot: record });
+    return missing ? response({ ok: false, error: "This saved application is unavailable." }, 404) : response({ snapshot: structuredClone(record) });
   });
   vi.stubGlobal("fetch", fetcher); return fetcher;
 }
@@ -35,6 +36,49 @@ async function edit() { fireEvent.click(await screen.findByRole("button", { name
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); enabled = true; gateExpiry = "2026-11-14T20:00:00Z"; });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("owned PGW saved answers", () => {
+  it.each(["active", "paused"] as const)("checks an uncertain committed %s save without a parent refresh or another write", async status => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    const record = snapshot();
+    const fetcher = api(init => {
+      const body = JSON.parse(String(init.body));
+      Object.assign(record, { id: crypto.randomUUID(), revision: 2, base_version: 2, request_version: 3, details: body.details,
+        idempotency_key: (init.headers as Record<string, string>)["Idempotency-Key"], consent_evidence: { ...record.consent_evidence, revision: 2 } });
+      throw new Error("The committed response was lost");
+    }, false, record);
+    function HouseholdPage() {
+      const [version, setVersion] = useState(2);
+      return <PgwSavedApplication request={{ ...support(status), version }} onChange={() => setVersion(record.request_version)}/>;
+    }
+    render(<HouseholdPage/>); await edit();
+    fireEvent.change(screen.getByLabelText("Customer first name"), { target: { value: "CommittedCanary" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save PGW changes" }));
+    await screen.findByRole("button", { name: "Retry the same PGW save" });
+    const reads = fetcher.mock.calls.filter(([url, init]) => url.includes("/pgw-application") && init?.method !== "POST").length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    await screen.findByText(status === "paused" ? /Your PGW CRP answers are saved. Your request stays paused/ : /Your private PGW CRP answers are saved as a new revision/);
+    expect(fetcher.mock.calls.filter(([url, init]) => url.includes("/pgw-application") && init?.method !== "POST").length).toBeGreaterThan(reads);
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    expect(screen.queryByRole("form")).toBeNull();
+  });
+
+  it("bounds automatic owned reads and checks again when an uncertain family returns", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    const fetcher = api(() => { throw new Error("The save result is unknown"); }), refresh = vi.fn();
+    render(<PgwSavedApplication request={support("paused")} onChange={refresh}/>); await edit();
+    fireEvent.change(screen.getByLabelText("Customer first name"), { target: { value: "UnconfirmedCanary" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save PGW changes" }));
+    await screen.findByRole("button", { name: "Retry the same PGW save" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    const checks = refresh.mock.calls.length;
+    expect(checks).toBeGreaterThan(0); expect(checks).toBeLessThanOrEqual(6);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(refresh).toHaveBeenCalledTimes(checks);
+    fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(checks + 1));
+    expect(screen.getByRole("button", { name: "Retry the same PGW save" })).toBeTruthy();
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
   it("automatically confirms its exact interrupted save when the owned latest snapshot arrives", async () => {
     const record = snapshot(), fetcher = api(() => new Promise(() => {}), false, record);
     const request = support(), view = render(<PgwSavedApplication request={request}/>); await edit();
