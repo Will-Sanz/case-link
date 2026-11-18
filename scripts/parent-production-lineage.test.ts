@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { createParentSqlFixture } from "./parent-sql-fixture";
 import { lineageHash, executeLineageSql, installObservedProductionSchema, assertObservedProductionSchema, loadProductionLineage, validateProductionLineage, applyPendingProductionSources } from "./parent-production-lineage";
 import { rehearseParentProductionUpgrade } from "./parent-production-lineage-cases";
-import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory, fingerprint } from "./test-parent-production-lineage";
+import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory, fingerprint, withNativeLineageRoleAccess } from "./test-parent-production-lineage";
 
 const modulePath=process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
 let fixture:Awaited<ReturnType<typeof createParentSqlFixture>>;
@@ -57,4 +57,29 @@ it("uses the existing byte order for historical schema fingerprints, independent
 it("canonicalizes schema row keys with the historical byte order",()=>{
   const row={a:1,A:2,_:3};
   expect(fingerprint({policies:[row]})).toEqual({policies:{count:1,sha256:lineageHash('[{"A":2,"_":3,"a":1}]')}});
+});
+
+it.skipIf(!modulePath).each(["success","failed work","missing ADMIN"])("restores exact native fixture memberships after %s",async mode=>{
+  const {PGlite}=await import(modulePath!),db=new PGlite(),operator="caselink_lineage_operator";
+  const targets=["authenticated","parent_worker","parent_snap_finalizer"],definitions="create role parent_worker nologin noinherit nobypassrls;create role parent_snap_finalizer nologin noinherit;";
+  try{
+    await db.exec(`create role authenticated;create role native_authenticator nologin;create role ${operator} createrole noinherit;grant authenticated to native_authenticator with admin false,inherit false,set true;grant native_authenticator to ${operator} with admin false,inherit false,set true;`);
+    if(mode==="missing ADMIN")await db.exec(`${definitions}grant parent_worker to ${operator} with admin false,inherit false,set false;grant parent_snap_finalizer to ${operator} with admin true,inherit false,set false;`);
+    await db.exec(`set session authorization ${operator}`);
+    if(mode!=="missing ADMIN"){await db.exec(definitions);await db.exec(`grant parent_worker to ${operator} with admin false,inherit true,set false`);}
+    const memberships=async()=>(await db.query("select granted.rolname,grantor.rolname grantor,m.admin_option,m.inherit_option,m.set_option from pg_auth_members m join pg_roles granted on granted.oid=m.roleid join pg_roles grantor on grantor.oid=m.grantor where m.member=current_user::regrole and granted.rolname=any($1) order by granted.rolname,grantor.rolname",[targets])).rows;
+    const roles=async()=>(await db.query("select rolname,rolsuper,rolcreaterole,rolinherit,rolcanlogin,rolbypassrls from pg_roles where rolname=any($1) order by rolname",[[...targets,operator]])).rows;
+    const before=await memberships(),attributes=await roles();
+    expect(attributes.find((role:{rolname:string})=>role.rolname===operator)).toMatchObject({rolsuper:false,rolcreaterole:true});
+    for(const role of ["parent_worker","parent_snap_finalizer"])await expect(db.query(`set role ${role}`)).rejects.toMatchObject({code:"42501"});
+    const work=vi.fn(async()=>{
+      for(const role of targets){await db.query("begin");try{await db.query(`set local role ${role}`);expect((await db.query("select current_user name")).rows[0].name).toBe(role);}finally{await db.query("rollback");}}
+      if(mode==="failed work")throw new Error("synthetic interrupted case");
+      await db.exec("create role parent_new_lineage_fixture nologin noinherit");return "complete";
+    });
+    if(mode==="success")expect(await withNativeLineageRoleAccess(db,work)).toBe("complete");
+    else await expect(withNativeLineageRoleAccess(db,work)).rejects.toThrow(mode==="failed work"?"synthetic interrupted case":"existing ADMIN membership");
+    expect(work).toHaveBeenCalledTimes(mode==="missing ADMIN"?0:1);expect(await memberships()).toEqual(before);expect(await roles()).toEqual(attributes);
+    for(const role of ["parent_worker","parent_snap_finalizer"])await expect(db.query(`set role ${role}`)).rejects.toMatchObject({code:"42501"});
+  }finally{await db.close();}
 });

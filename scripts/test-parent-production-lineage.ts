@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 import { executeLineageSql, installObservedProductionSchema, lineageHash, loadProductionLineage, transactionalLineageSource } from "./parent-production-lineage";
 import { rehearseParentProductionUpgrade } from "./parent-production-lineage-cases";
+import type { WorkerDatabase } from "../src/lib/parent/worker-runtime";
 
 const port=58422;
+const quote=(name:string)=>'"'+name.replaceAll('"','""')+'"';
 export function assertNativeLineageTarget(value:string){
   const url=new URL(value);assert.equal(url.protocol,"postgresql:");assert.equal(url.hostname,"127.0.0.1");assert.equal(url.port,String(port));assert.equal(url.username,"postgres");assert.equal(url.password,"postgres");assert.equal(url.search+url.hash,"");assert.match(url.pathname,/^\/(?:postgres|caselink_parent_lineage_[a-f0-9]{32})$/);return value;
 }
@@ -19,13 +21,36 @@ type Inventory=Record<string,Record<string,unknown>[]>;
 export function fingerprint(snapshot:Inventory){return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>{const sorted=(rows??[]).map(canonical).sort((a,b)=>encode(a)<encode(b)?-1:encode(a)>encode(b)?1:0);return[key,{count:sorted.length,sha256:lineageHash(encode(sorted))}];}));}
 export function schoolInventory(snapshot:Inventory):Inventory{return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>[key,(rows??[]).filter(row=>{const name=String(row.table??row.name??(row.schemaname&&row.tablename?`${row.schemaname}.${row.tablename}`:""));return !/^public\.parent_/.test(name);})]));}
 
+/** Only the owned native fixture temporarily uses its existing ADMIN grants; source roles stay restricted. */
+export async function withNativeLineageRoleAccess<T>(db:WorkerDatabase,work:()=>Promise<T>):Promise<T>{
+  const roles=["authenticated","parent_worker","parent_snap_finalizer"],operator=String((await db.query("select current_user name")).rows[0].name);
+  type Membership={role_name:string;grantor:string;admin_option:boolean;inherit_option:boolean;set_option:boolean};
+  const memberships=async()=>(await db.query("select granted.rolname role_name,grantor.rolname grantor,m.admin_option,m.inherit_option,m.set_option from pg_auth_members m join pg_roles member on member.oid=m.member join pg_roles granted on granted.oid=m.roleid join pg_roles grantor on grantor.oid=m.grantor where member.rolname=current_user and granted.rolname=any($1) order by granted.rolname,grantor.rolname",[roles])).rows as Membership[];
+  const before=await memberships(),changed:{role:string;existed:boolean;set:boolean}[]=[];
+  try{
+    for(const role of roles){
+      if((await db.query("select pg_has_role(current_user,$1,'SET') allowed",[role])).rows[0].allowed)continue;
+      const existing=before.filter(member=>member.role_name===role);
+      assert.ok(existing.some(member=>member.admin_option),`The isolated fixture requires an existing ADMIN membership for ${role}`);
+      const own=existing.find(member=>member.grantor===operator);changed.push({role,existed:!!own,set:own?.set_option??false});
+      await db.query(`grant ${quote(role)} to ${quote(operator)} with ${own?"":"admin false, inherit false, "}set true`);
+    }
+    return await work();
+  }finally{
+    const errors:unknown[]=[];
+    for(const member of changed.reverse())try{await db.query(member.existed?`grant ${quote(member.role)} to ${quote(operator)} with set ${member.set?"true":"false"}`:`revoke ${quote(member.role)} from ${quote(operator)} granted by ${quote(operator)}`);}catch(error){errors.push(error);}
+    try{assert.deepEqual(await memberships(),before);}catch(error){errors.push(error);}
+    if(errors.length)throw new AggregateError(errors,"Native fixture role membership restoration failed");
+  }
+}
+
 /** No URL/configuration input: this script can create and remove only its own disposable loopback cluster. */
 export async function runNativeParentProductionLineage(args:string[]){
   const lineage=loadProductionLineage();
   if(args.length===0||args.length===1&&args[0]==="--dry")return{mode:"dry",baselineFiles:lineage.baselineSources.length,pendingFiles:lineage.pendingSources.length,observedFunctions:25,observedColumns:82,modelCalls:0,providerCalls:0};
   if(args.length!==1||args[0]!=="--synthetic-approval")throw new Error("Only --dry or --synthetic-approval is supported; a database URL cannot be supplied.");
   const project=`caselink-lineage-${randomUUID().replaceAll("-","").slice(0,16)}`,container=`supabase_db_${project}`,directory=mkdtempSync(join(tmpdir(),"caselink-parent-lineage-")),database=`caselink_parent_lineage_${randomUUID().replaceAll("-","")}`;
-  const address=(name:string)=>assertNativeLineageTarget(`postgresql://postgres:postgres@127.0.0.1:${port}/${name}`),quote=(name:string)=>'"'+name.replaceAll('"','""')+'"';
+  const address=(name:string)=>assertNativeLineageTarget(`postgresql://postgres:postgres@127.0.0.1:${port}/${name}`);
   const admin=new Client({connectionString:address("postgres"),statement_timeout:60000}),client=new Client({connectionString:address(database),statement_timeout:60000}),peer=new Client({connectionString:address(database),statement_timeout:60000});
   const platform=(command:string[])=>{const configured=process.env.CASELINK_SUPABASE_CLI;if(configured)assert.ok(isAbsolute(configured));return execFileSync(configured??"npx",[...(configured?[]:["--yes","supabase@2.111.0"]),...command,"--workdir",directory],{encoding:"utf8",timeout:240000,maxBuffer:5000000,stdio:["ignore","pipe","pipe"],env:{PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,NODE_ENV:"test",DO_NOT_TRACK:"1",SUPABASE_TELEMETRY_DISABLED:"1"}});};
   const docker=(command:string[],input?:string|Buffer)=>execFileSync("docker",["exec","-i",container,...command],{input,maxBuffer:30000000,stdio:["pipe","pipe","pipe"]});
@@ -50,7 +75,6 @@ export async function runNativeParentProductionLineage(args:string[]){
     stage="observed-parent-lineage";
     for(const source of lineage.baselineSources)await executeLineageSql(client,transactionalLineageSource(source.name));
     await installObservedProductionSchema(client,lineage);
-    await peer.query("set role parent_worker");
     const staff=randomUUID(),family=randomUUID();await client.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())",[staff,`${staff}@example.invalid`]);
     await client.query("insert into public.app_users(id,email,role) values($1,$2,'case_manager')",[staff,`${staff}@example.invalid`]);await client.query("insert into public.families(id,name,created_by_id) values($1,'Synthetic lineage family',$2)",[family,staff]);
     const schoolBefore=fingerprint(schoolInventory(await inventory()));
@@ -62,8 +86,8 @@ export async function runNativeParentProductionLineage(args:string[]){
     // These are synthetic metadata records, never copied production statements or activation/login SQL.
     await client.query("create schema lineage_fixture; create table lineage_fixture.migration_history(version text primary key,name text not null)");
     for(const record of lineage.recordedMigrationHistory)await client.query("insert into lineage_fixture.migration_history values($1,$2)",[record.version,record.name]);
-    stage="parent-upgrade-and-leased-flows";
-    const cases=await rehearseParentProductionUpgrade(client,{embedded:false,peer});
+    stage="native-fixture-role-access";
+    const cases=await withNativeLineageRoleAccess(client,async()=>{stage="parent-upgrade-and-leased-flows";return rehearseParentProductionUpgrade(client,{embedded:false,peer});});
     assert.deepEqual(fingerprint(schoolInventory(await inventory())),schoolBefore,"Pending parent upgrade preserves every existing school definition/grant/default");
     assert.deepEqual((await client.query("select to_jsonb(u) app_user,(select to_jsonb(f) from public.families f where f.id=$2) family from public.app_users u where u.id=$1",[staff,family])).rows[0],rowsBefore);
     const afterRoles=await roles();for(const role of oldRoles)assert.deepEqual(afterRoles.find(after=>after.rolname===role.rolname),role);assert.deepEqual(await memberships(),oldMemberships);
