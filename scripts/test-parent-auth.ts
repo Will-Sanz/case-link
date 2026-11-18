@@ -368,13 +368,30 @@ async function main() {
     );
 
     stage = "actual owned public food request before other queued work";
-    check((await db.query("select count(*)::int n from public.parent_requests")).rows[0].n === 0,
+    async function foodSetupStep<T>(label: string, operation: () => Promise<T>): Promise<T> {
+      stage = label;
+      try { return await operation(); }
+      catch (error) {
+        const name = error instanceof Error && ["Error", "TypeError", "SyntaxError", "RangeError", "TimeoutError", "AssertionError", "ZodError", "error"].includes(error.name)
+          ? error.name : "unclassified";
+        const rawCode = error && typeof error === "object" && "code" in error ? error.code : undefined;
+        const code = typeof rawCode === "string" && ["42501", "23514", "23503", "23505", "42P01", "42703", "42883", "42804", "22007", "22023", "22P02", "PT409", "40001", "57014", "57P01", "53300", "08006", "28P01"].includes(rawCode)
+          ? rawCode : "unclassified";
+        process.stderr.write(`Native public food setup category: name=${name}, pg=${code}. No response or database values were logged.\n`);
+        throw new Error("Native public food setup failed.");
+      }
+    }
+    check((await foodSetupStep("counting existing requests before native public food", () => db.query("select count(*)::int n from public.parent_requests"))).rows[0].n === 0,
       "The public food rehearsal starts before any other request can be claimed by its worker.");
-    const foodBudgetBefore = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
-    const foodWindowReply = await first.page.request.get(`${origin}/api/parent/authorization-window`);
-    check(foodWindowReply.status() === 200, "The public food mandate uses the actual server authorization deadline.");
-    const foodDeadline = (await foodWindowReply.json()).authorization.expiresAt as string;
-    const foodStarting = await first.page.request.post(`${origin}/api/parent/requests`, {
+    const foodBudgetBefore = (await foodSetupStep("reading native public food model reservation baseline", () => db.query("select count(*)::int n from parent_private.model_call_reservations"))).rows[0].n;
+    const foodWindowReply = await foodSetupStep("reading the actual native public food authorization window", () => first.page.request.get(`${origin}/api/parent/authorization-window`));
+    check(foodWindowReply.status() === 200, `The public food mandate uses the actual server authorization deadline (HTTP${foodWindowReply.status()}).`);
+    const foodWindow = await foodSetupStep("parsing the actual native public food authorization window", () => foodWindowReply.json());
+    check(foodWindow?.ok === true && typeof foodWindow.authorization?.expiresAt === "string"
+      && Number.isFinite(Date.parse(foodWindow.authorization.expiresAt)) && Date.parse(foodWindow.authorization.expiresAt) > Date.now(),
+    "The actual authorization response supplies a current public food deadline before the request is created.");
+    const foodDeadline = foodWindow.authorization.expiresAt as string;
+    const foodStarting = await foodSetupStep("creating the actual owned preparation-only Share request", () => first.page.request.post(`${origin}/api/parent/requests`, {
       headers: { origin, "Idempotency-Key": randomUUID() },
       data: {
         intake: fixtureIntake({ needs: ["food_now"], zip: "19129", householdSize: null, utilityProviders: [], accountAuthority: "not_sure" }),
@@ -382,11 +399,15 @@ async function main() {
           allowedActions: ["research", "prepare"], allowedData: ["household"], maxRecipients: 1,
           bookingPreference: "ask_me", expiresAt: foodDeadline }),
       },
-    });
-    check(foodStarting.status() === 201, "The real owned API creates one preparation-only Share food request.");
-    const foodRequestId = (await foodStarting.json()).request.id as string;
+    }));
+    check(foodStarting.status() === 201, `The real owned API creates one preparation-only Share food request (HTTP${foodStarting.status()}).`);
+    const foodCreated = await foodSetupStep("parsing the actual newly created Share request", () => foodStarting.json());
+    check(foodCreated?.ok === true && typeof foodCreated.request?.id === "string"
+      && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(foodCreated.request.id),
+    "The actual creation response contains the owned food request identifier.");
+    const foodRequestId = foodCreated.request.id as string;
     const foodUrl = `${origin}/api/parent/requests/${foodRequestId}`;
-    check((await db.query("select count(*)::int n from public.parent_requests r join public.parent_households h on h.id=r.household_id where r.id=$1 and h.owner_id=$2", [foodRequestId, first.id])).rows[0].n === 1,
+    check((await foodSetupStep("checking the native Share request household ownership", () => db.query("select count(*)::int n from public.parent_requests r join public.parent_households h on h.id=r.household_id where r.id=$1 and h.owner_id=$2", [foodRequestId, first.id]))).rows[0].n === 1,
       "The native food request belongs only to the enrolled parent household.");
     async function readFoodRequest() {
       const response = await first.page.request.get(foodUrl);
@@ -403,16 +424,16 @@ async function main() {
       (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls,
       (select count(*)::int from parent_private.model_call_reservations) model_reservations
       from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [foodRequestId])).rows[0];
-    const foodViewer = await first.context.newPage();
-    const foodPage = await foodViewer.goto(`${origin}/support/${foodRequestId}`, { waitUntil: "networkidle" });
+    const foodViewer = await foodSetupStep("creating the owned native food request viewer", () => first.context.newPage());
+    const foodPage = await foodSetupStep("opening the owned native food request viewer", () => foodViewer.goto(`${origin}/support/${foodRequestId}`, { waitUntil: "networkidle" }));
     check(foodPage?.status() === 200, "The enrolled parent can open the actual owned food request viewer.");
-    await foodViewer.close();
+    await foodSetupStep("closing the owned native food request viewer before work", () => foodViewer.close());
     check(foodViewer.isClosed(), "The owned request viewer closes before its durable food continuation runs.");
     const foodWorker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
     try {
-      await foodWorker.connect();
-      await foodWorker.query("set role parent_worker");
-      check((await foodWorker.query("select current_user as role")).rows[0].role === "parent_worker",
+      await foodSetupStep("connecting the isolated native public food worker", () => foodWorker.connect());
+      await foodSetupStep("selecting the restricted native public food worker role", () => foodWorker.query("set role parent_worker"));
+      check((await foodSetupStep("verifying the restricted native public food worker role", () => foodWorker.query("select current_user as role"))).rows[0].role === "parent_worker",
         "The native public food continuation runs under the actual restricted parent_worker role.");
       let cityChecks = 0;
       async function foodTurn() {
