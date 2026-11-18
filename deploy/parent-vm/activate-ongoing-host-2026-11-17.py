@@ -89,7 +89,7 @@ def stage():
         base = Path(run(['systemctl', 'show', unit(role), '-p', 'WorkingDirectory', '--value'])).resolve()
         assert base == Path('/opt/caselink/releases') / BASES[key], 'Installed release changed'
         snapshot[role] = {'hash': sha(p), 'base': str(base)}
-    assert not WORK.exists() or not any(WORK.iterdir()), 'Staging directory is not empty'
+    assert not WORK.is_symlink(), 'Staging path changed'
     WORK.mkdir(mode=0o755, exist_ok=True)
     for f, (_, expected) in FILES.items():
         dst = WORK / 'source' / f
@@ -101,13 +101,17 @@ def stage():
         dst = target(key if key != 'shared' else 'frontdoor')
         for f, (expected, _) in FILES.items():
             assert sha(base / f) == expected, 'Baseline source changed'
-        shutil.copytree(base, dst, symlinks=True, ignore=lambda directory, names: [n for n in names if Path(directory) == base and n in ('node_modules', '.git', 'tmp', 'output')])
-        (dst / 'node_modules').symlink_to((base / 'node_modules').resolve())
-        for f in FILES:
-            shutil.copyfile(WORK / 'source' / f, dst / f)
-            (dst / f).chmod(0o644)
+        if dst.exists():
+            assert all(sha(dst / f) == expected for f, (_, expected) in FILES.items()), 'Existing staged source changed'
+            assert (dst / 'node_modules').resolve() == (base / 'node_modules').resolve(), 'Staged dependencies changed'
+        else:
+            shutil.copytree(base, dst, symlinks=True, ignore=lambda directory, names: [n for n in names if Path(directory) == base and n in ('node_modules', '.git', 'tmp', 'output')])
+            (dst / 'node_modules').symlink_to((base / 'node_modules').resolve())
+            for f in FILES:
+                shutil.copyfile(WORK / 'source' / f, dst / f)
+                (dst / f).chmod(0o644)
         if key == 'web':
-            (dst / 'tmp').mkdir(mode=0o755)
+            (dst / 'tmp').mkdir(mode=0o755, exist_ok=True)
             shutil.copyfile(base / 'tmp/parent-hosted-build.json', dst / 'tmp/parent-hosted-build.json')
             assert (base / '.next/BUILD_ID').read_bytes() == (dst / '.next/BUILD_ID').read_bytes()
         for f in ('package.json', 'package-lock.json'):
@@ -123,7 +127,7 @@ if(s==='web')assert.equal(l.hostedWebFingerprint(cfg),JSON.parse(readFileSync('t
 for(const other of ['web','frontdoor','worker','broker','review','retention','ordinary-retention','sender'])if(other!==s)assert.throws(()=>readFileSync('/etc/caselink/'+other+'/profile.json'),{code:'EACCES'});
 """
     for role in ROLES:
-        run(['runuser', '-u', 'caselink-' + role, '--', '/usr/bin/node', '--import', 'tsx', '--input-type=module', '-e', check, role], cwd=target(role), env={'PATH': '/usr/bin:/bin', 'NODE_ENV': 'production'})
+        run(['/usr/sbin/runuser', '-u', 'caselink-' + role, '--', '/usr/bin/node', '--import', 'tsx', '--input-type=module', '-e', check, role], cwd=target(role), env={'PATH': '/usr/bin:/bin', 'NODE_ENV': 'production'})
         assert sha(profile_path(role)) == snapshot[role]['hash'], 'Concurrent profile change'
     (WORK / 'snapshot.json').write_text(json.dumps(snapshot))
     print('STAGED: three existing releases; eight own-profile reads and 56 cross-profile denials passed; profiles and services unchanged.')
