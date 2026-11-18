@@ -42,6 +42,7 @@ it.each(["/", "/account", "/get-support", "/my-support"])("offers request select
   expect(screen.queryByLabelText("Question suggestions")).toBeNull();
   expect(screen.queryByLabelText("Application website status")).toBeNull();
   fireEvent.change(input, { target: { value: "What information have I already provided?" } });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Send" }).matches(":disabled")).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => {
     const post = fetch.mock.calls.find(([, init]) => init?.method === "POST");
