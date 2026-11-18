@@ -263,28 +263,65 @@ it.each(['unsealed third','nested reference','missing aggregate','missing respon
   expect(s.fetcher).not.toHaveBeenCalled();
 });
 
-it("still enforces the original5 dollars when complete historical charges exceed the planned headroom",async()=>{
-  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,true,true);
-  const approval={...s.approval,aggregate:{maximumCalls:93,maximumCountRequests:93,maximumNanoDollars:5_000_000_000,priorRuns}},options={...s.options,approval};
-  expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(approval))).toMatchObject({pairs:13,knownMeasuredNanoDollars:715_000_000,budgetedNanoDollars:715_000_000});
+it.each([3,4]as const)("still enforces the original5 dollars when%s complete prior histories exceed the planned headroom",async histories=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,histories===4?4:true,true),pairs=histories===4?20:13,allowed=histories===4?70:77;
+  const maximum=histories===4?100:93,approval={...s.approval,aggregate:{maximumCalls:maximum,maximumCountRequests:maximum,maximumNanoDollars:5_000_000_000,priorRuns}},options={...s.options,approval};
+  expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(approval))).toMatchObject({pairs,knownMeasuredNanoDollars:pairs*55_000_000,budgetedNanoDollars:pairs*55_000_000});
   await withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-first-en',1)(endpoint,s.init));
   const prefix=join(dirname(s.dir),`.food-description-evaluation-${descriptionEvaluationHash(approval.approvalReference)}`);
-  for(let attempt=2;attempt<=77;attempt++)for(const suffix of ['intent','count-dispatch','count','dispatch','observation','response']){
+  for(let attempt=2;attempt<=allowed;attempt++)for(const suffix of ['intent','count-dispatch','count','dispatch','observation','response']){
     const original=readFileSync(join(s.dir,`attempt-001-${suffix}.json`));
     const bytes=suffix==='intent'?JSON.stringify({...JSON.parse(original.toString()),attempt,caseId:`description-seeded-${attempt}-en`}):original;
     const stem=`attempt-${String(attempt).padStart(3,'0')}`;writeFileSync(join(s.dir,`${stem}-${suffix}.json`),bytes,{mode:0o600,flag:'wx'});
     if(suffix!=='response')writeFileSync(`${prefix}-${stem}-${suffix}.json`,bytes,{mode:0o600,flag:'wx'});
   }
   await expect(withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-cap-en',1)(endpoint,s.init))).rejects.toThrow();
-  expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:77,reservedNanoDollars:4_235_000_000,costComplete:true});
+  expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:allowed,reservedNanoDollars:allowed*55_000_000,costComplete:true});
   expect(s.fetcher).toHaveBeenCalledTimes(2);
 });
 
-it("refuses pre-existing quality results in a fresh93 run without changing the sealed histories",async()=>{
-  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,true);
+it.each([93,100]as const)("refuses pre-existing quality results in a fresh%s run without changing the sealed histories",async maximum=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,maximum===100?4:true);
   const before=priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory));
-  const approval={...s.approval,aggregate:{maximumCalls:93,maximumCountRequests:93,maximumNanoDollars:5_000_000_000,priorRuns}};
+  const approval={...s.approval,aggregate:{maximumCalls:maximum,maximumCountRequests:maximum,maximumNanoDollars:5_000_000_000,priorRuns}};
   mkdirSync(s.dir,{mode:0o700});writeFileSync(join(s.dir,'description-urgent-1-en-result.json'),'{"synthetic":"retained quality from another source"}',{mode:0o600});
   await expect(withFoodDescriptionEvaluationBudget({...s.options,approval},async()=>{})).rejects.toThrow();
   expect(s.fetcher).not.toHaveBeenCalled();expect(priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory))).toEqual(before);
+});
+
+it("counts the exact3/4/6/7 histories once and preserves20 old reservations before100 total pairs",async()=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,4);
+  const approval={...s.approval,aggregate:{maximumCalls:100,maximumCountRequests:100,maximumNanoDollars:5_000_000_000,priorRuns}},options={...s.options,approval};
+  const before=priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory));
+  await withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-first-en',1)(endpoint,s.init));
+  expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(approval))).toEqual({pairs:20,reservedNanoDollars:1_100_000_000,knownMeasuredNanoDollars:12_000_000,budgetedNanoDollars:12_000_000});
+  const prefix=join(dirname(s.dir),`.food-description-evaluation-${descriptionEvaluationHash(approval.approvalReference)}`);
+  for(let attempt=2;attempt<80;attempt++)for(const suffix of ['intent','count-dispatch','count','dispatch','observation','response']){
+    const original=readFileSync(join(s.dir,`attempt-001-${suffix}.json`)),bytes=suffix==='intent'?JSON.stringify({...JSON.parse(original.toString()),attempt,caseId:`description-seeded-${attempt}-en`}):original;
+    const stem=`attempt-${String(attempt).padStart(3,'0')}`;writeFileSync(join(s.dir,`${stem}-${suffix}.json`),bytes,{mode:0o600,flag:'wx'});if(suffix!=='response')writeFileSync(`${prefix}-${stem}-${suffix}.json`,bytes,{mode:0o600,flag:'wx'});
+  }
+  await withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-final-en',1)(endpoint,s.init));
+  expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:80,reservedNanoDollars:4_400_000_000,costComplete:true});
+  await expect(withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-forbidden-101-en',1)(endpoint,s.init))).rejects.toThrow();
+  expect(s.fetcher).toHaveBeenCalledTimes(4);expect(priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory))).toEqual(before);
+});
+
+it.each(['wrong nested reference','wrong fourth aggregate','unsealed fourth','missing response','false charge','renewed fourth expiry','duplicate fourth'])("blocks100 %s before any new endpoint",async kind=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,4),ref=priorRuns[3];
+  const approval={...s.approval,aggregate:{maximumCalls:100,maximumCountRequests:100,maximumNanoDollars:5_000_000_000,priorRuns}};
+  const config=JSON.parse(readFileSync(ref.configurationPath,'utf8')),prior=config.approval,prefix=join(dirname(ref.runDirectory),`.food-description-evaluation-${descriptionEvaluationHash(prior.approvalReference)}`);
+  if(kind==='wrong nested reference')prior.aggregate.priorRuns[2].evidenceSha256='f'.repeat(64);
+  if(kind==='wrong fourth aggregate')prior.aggregate={...prior.aggregate,maximumCalls:87,maximumCountRequests:87,priorRuns:prior.aggregate.priorRuns.slice(0,2)};
+  if(kind==='unsealed fourth'){rmSync(join(ref.runDirectory,'halted.json'));rmSync(`${prefix}-halted.json`);}
+  if(kind==='missing response')rmSync(join(ref.runDirectory,'attempt-001-response.json'));
+  if(kind==='false charge')for(const p of [join(ref.runDirectory,'attempt-001-observation.json'),`${prefix}-attempt-001-observation.json`]){const observation=JSON.parse(readFileSync(p,'utf8'));observation.measuredNanoDollars=0;writeFileSync(p,JSON.stringify(observation));}
+  if(kind==='renewed fourth expiry')prior.approvedUntil='2026-11-18T23:59:59Z';
+  if(['wrong nested reference','wrong fourth aggregate','renewed fourth expiry'].includes(kind)){
+    for(const p of [join(ref.runDirectory,'approval.json'),`${prefix}.json`])writeFileSync(p,JSON.stringify(prior));
+    writeFileSync(ref.configurationPath,JSON.stringify(config));ref.configurationSha256=descriptionEvaluationFileHash(ref.configurationPath);
+  }
+  ref.evidenceSha256=sealedDescriptionEvaluationEvidenceHash(ref.runDirectory);
+  if(kind==='duplicate fourth')priorRuns[3]={...priorRuns[2],reservedPairs:7};
+  await expect(withFoodDescriptionEvaluationBudget({...s.options,approval},budget=>budget.fetch('description-new-en',1)(endpoint,s.init))).rejects.toThrow();
+  expect(s.fetcher).not.toHaveBeenCalled();
 });

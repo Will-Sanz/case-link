@@ -48,7 +48,7 @@ describe.skipIf(!modulePath)("source-bound unknown resolution through the actual
     if (excluded) { const text = "Do not apply for SNAP."; selection.exclusions = [{ need: "snap_new", span: { text, start: input.description.indexOf(text), end: input.description.length } }]; }
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3,
       input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } },
-    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selection) }] }] }));
+    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selection, (key, item) => key === "span" ? { text: item.text } : item) }] }] }));
     await runOneFoodDescriptionTurn({ database: { query: (sql, values) => query(sql, values, "parent_worker") }, apiKey: "synthetic-no-network", projectId: "proj_synthetic", fetcher, now: () => new Date() });
     expect(fetcher).toHaveBeenCalledOnce();
     const value = (await query("select public.parent_food_description_result($1) value", [id])).rows[0].value;

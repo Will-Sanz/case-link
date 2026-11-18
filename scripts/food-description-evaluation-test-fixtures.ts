@@ -2,11 +2,11 @@ import { dirname, join } from "node:path";
 import { descriptionEvaluationApprovalSchema, descriptionEvaluationFileHash, sealedDescriptionEvaluationEvidenceHash, withFoodDescriptionEvaluationBudget, writeDescriptionEvaluationEvidence } from "./food-description-evaluation-budget";
 
 /** Complete synthetic accounting predecessors only; the fetcher never makes HTTP or measures model quality. */
-export async function sealedDescriptionEvaluationPriors(value: unknown, init: RequestInit, includeAggregatePrior = false, worstCaseUsage = false) {
+export async function sealedDescriptionEvaluationPriors(value: unknown, init: RequestInit, includeAggregatePrior: boolean | 4 = false, worstCaseUsage = false) {
   const approval = descriptionEvaluationApprovalSchema.parse(value), root = dirname(approval.runDirectory);
   const refs: {runDirectory:string;configurationPath:string;configurationSha256:string;evidenceSha256:string;reservedPairs:number}[] = [];
-  for (const count of (includeAggregatePrior ? [3, 4, 6] : [3, 4])) {
-    const prior = { ...approval, aggregate: count === 6 ? { maximumCalls: 87, maximumCountRequests: 87, maximumNanoDollars: 5_000_000_000, priorRuns: [...refs] } : undefined, approvalReference: `SYNTHETIC SEALED PRIOR ${count}`, runDirectory: join(root, `prior-${count}`) };
+  for (const count of (includeAggregatePrior === 4 ? [3, 4, 6, 7] : includeAggregatePrior ? [3, 4, 6] : [3, 4])) {
+    const prior = { ...approval, aggregate: count >= 6 ? { maximumCalls: count === 6 ? 87 : 93, maximumCountRequests: count === 6 ? 87 : 93, maximumNanoDollars: 5_000_000_000, priorRuns: [...refs] } : undefined, approvalReference: `SYNTHETIC SEALED PRIOR ${count}`, runDirectory: join(root, `prior-${count}`) };
     const configurationPath = join(root, `prior-${count}-config.json`);
     writeDescriptionEvaluationEvidence(configurationPath, { approval: prior });
     const fetcher: typeof fetch = async url => Response.json(String(url).endsWith("/input_tokens")

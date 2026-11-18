@@ -1038,7 +1038,7 @@ async function main() {
       await descriptionQueue(descriptionOwner, b, 0, { description: bText, screenLocale: "es" }, {
         foodForTwoDays: { value: "no", confirmedAt }, benefitHistory: { value: "receiving", confirmedAt },
       });
-      await descriptionTurn({ needIds: ["food_now", "snap_problem"], selections: [], assertions: [{ questionId: "existingIssue", value: "card", span: { start: bText.indexOf("card"), end: bText.indexOf("card") + 4, text: "card" } }], exclusions: [], questionIds: [], outOfScope: null });
+      await descriptionTurn({ needIds: ["food_now", "snap_problem"], selections: [], assertions: [{ questionId: "existingIssue", value: "card", span: { text: "card" } }], exclusions: [], questionIds: [], outOfScope: null });
       const bView = await descriptionResult(descriptionOwner.page, b, 1);
       check(bView.needIds.includes("snap_problem") && bView.needIds.includes("food_now"), "A current renewal-only mandate cannot suppress a separately needed card-problem journey.");
       const problemBody = descriptionPacket(deadline, ["snap_problem"], ["uesf-benefits"], bSource), problemKeys = [randomUUID(), randomUUID()];
