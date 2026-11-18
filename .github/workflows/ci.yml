@@ -132,7 +132,6 @@ jobs:
     timeout-minutes: 35
     env:
       DO_NOT_TRACK: "1"
-      CASELINK_SUPABASE_CLI: ${{ runner.temp }}/parent-cli/node_modules/.bin/supabase
       CASELINK_PARENT_SQL_FIXTURE_MODULE: ""
     steps:
       - name: Checkout
@@ -148,6 +147,7 @@ jobs:
         run: |
           npm ci
           npm install --prefix "$RUNNER_TEMP/parent-cli" --no-save --no-package-lock supabase@2.111.0
+          printf 'CASELINK_SUPABASE_CLI=%s/parent-cli/node_modules/.bin/supabase\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
 
       - name: Start the separate synthetic parent stack
         run: |
