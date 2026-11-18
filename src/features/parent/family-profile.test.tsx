@@ -3,6 +3,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FAMILY_PROFILE_NOTICE_VERSION, familyProfileLeaves, type FamilyProfileDetails, type FamilyProfileRead } from "@/lib/parent/family-profile";
 import { FamilyProfile, FamilyProfileWelcome } from "./family-profile";
+import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }) }));
 
 const ownerId = "11111111-1111-4111-8111-111111111111", personId = "22222222-2222-4222-8222-222222222222";
 const previousKey = "33333333-3333-4333-8333-333333333333";
@@ -261,5 +264,61 @@ describe("optional first-sign-in profile offer", () => {
     const api = fakeApi(initial); if (kind === "failed") api.fetcher.mockResolvedValue(response({ ok: false, error: "Unavailable" }, 503));
     const { container } = render(<FamilyProfileWelcome/>); await waitFor(() => expect(api.fetcher).toHaveBeenCalled()); await act(async () => {});
     expect(container.textContent).toBe(""); expect(screen.queryByRole("link", { name: "Save family basics" })).toBeNull();
+  });
+});
+
+
+describe("Spanish family information", () => {
+  it("localizes optional fields and consent while keeping original typed values, subject IDs and packet enums", async () => {
+    const api = fakeApi(); render(<ParentLocaleProvider initialLocale="es"><FamilyProfile/></ParentLocaleProvider>);
+    const firstName = await screen.findByLabelText("Su nombre");
+    expect(screen.getByRole("heading", { name: "Su información familiar", level: 1 })).toBeTruthy();
+    fireEvent.change(firstName, { target: { value: "Morgan" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar a una persona que vive con usted" }));
+    fireEvent.change(screen.getByLabelText("Nombre del integrante 1"), { target: { value: "Casey" } });
+    fireEvent.change(screen.getByLabelText("Inventario de ingresos del integrante 1"), { target: { value: "unknown" } });
+    fireEvent.change(screen.getByLabelText("Idioma preferido para el servicio"), { target: { value: "en" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Tengo permiso para proporcionar estos datos familiares/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y terminar después" }));
+    const savedNotice = await screen.findByText("Su información familiar está guardada. Puede completarla después o continuar para obtener apoyo.");
+    await waitFor(() => expect(document.activeElement).toBe(savedNotice));
+    expect(api.mutations).toHaveLength(1);
+    expect(JSON.parse(api.mutations[0].body)).toMatchObject({ expectedOwnerId: ownerId, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION, consentAccepted: true, subjectAuthorityDeclared: true,
+      details: { primaryPerson: { firstName: "Morgan" }, members: [{ firstName: "Casey", income: { state: "unknown", sources: [] } }], preferredLanguage: "en" } });
+  });
+  it("keeps the exact unknown save packet when only screen language changes", async () => {
+    const api = fakeApi(), normal = api.fetcher.getMockImplementation()!;
+    let lose = true;
+    api.fetcher.mockImplementation(async (url, init) => {
+      if (init?.method === "POST" && lose) { lose = false; throw new TypeError("Synthetic lost response before commit"); }
+      return normal(url, init);
+    });
+    render(<ParentLocaleProvider initialLocale="es"><ParentLanguageSelector/><FamilyProfile/></ParentLocaleProvider>);
+    fireEvent.change(await screen.findByLabelText("Su nombre"), { target: { value: "Morgan" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Tengo permiso para proporcionar estos datos familiares/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y terminar después" }));
+    await screen.findByRole("button", { name: "Reintentar el mismo guardado familiar" });
+    expect(document.activeElement).toBe(screen.getByRole("alert").parentElement);
+    fireEvent.change(screen.getByLabelText("Idioma de pantalla / Screen language"), { target: { value: "en" } });
+    expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Morgan");
+    fireEvent.click(screen.getByRole("button", { name: "Retry the same family save" }));
+    await screen.findByText("Your family information is saved. You can finish it later or continue to support.");
+    const attempts = api.fetcher.mock.calls.filter(call => call[1]?.method === "POST");
+    expect(attempts).toHaveLength(2); expect(attempts[1][1]?.body).toBe(attempts[0][1]?.body);
+    expect(new Headers(attempts[1][1]?.headers).get("Idempotency-Key")).toBe(new Headers(attempts[0][1]?.headers).get("Idempotency-Key"));
+    expect(JSON.parse(attempts[1][1]?.body as string).details.preferredLanguage).toBeUndefined();
+  });
+  it("offers Spanish narrow reaffirmation without refreshing a different saved answer", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(now));
+    const initial = read(true); initial.profile!.provenance["primaryPerson.firstName"].expiresAt = "2026-11-17T18:00:01.000Z";
+    const api = fakeApi(initial); render(<ParentLocaleProvider initialLocale="es"><FamilyProfile/></ParentLocaleProvider>);
+    await act(async () => {});
+    await act(async () => { vi.advanceTimersByTime(1001); });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Confirme que este dato sigue vigente: Su nombre" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Tengo permiso para proporcionar estos datos familiares/ }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Guardar y terminar después" })); });
+    expect(api.mutations).toHaveLength(1);
+    expect(JSON.parse(api.mutations[0].body).confirmedPaths).toEqual(["primaryPerson.firstName"]);
+    expect(JSON.parse(api.mutations[0].body).details.primaryPerson.lastName).toBe("Example");
   });
 });

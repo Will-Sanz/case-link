@@ -17,6 +17,7 @@ import { boundedParentApi, displayDate, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { usePermissionWindow } from "./use-permission-window";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 type Person = FamilyProfileDetails["primaryPerson"];
@@ -54,10 +55,11 @@ function ProfileField({ id, label, value, onChange, type = "text", maximum = 80,
 function ProfileFreshness({ source, path, label, checked, onConfirm }: {
   source: FamilyProfileSnapshot["provenance"][string]; path: string; label: string; checked: boolean; onConfirm: (path: string, checked: boolean) => void;
 }) {
+  const { locale, t } = useParentLocale();
   const current = usePermissionWindow(Date.parse(source.expiresAt));
   return <div className={styles.hint}>
-    <p>You provided · {displayDate(source.confirmedAt)} · Reuse until {displayDate(source.expiresAt)}{!current ? " · Expired for reuse" : ""}.</p>
-    {!current && <label className={styles.checkbox}><input type="checkbox" checked={checked} onChange={event => onConfirm(path, event.target.checked)}/>Confirm {label.toLowerCase()} is still current</label>}
+    <p>{t("You provided ·")}{" "}{displayDate(source.confirmedAt, false, locale)}{" "}{t("· Reuse until")}{" "}{displayDate(source.expiresAt, false, locale)}{!current ? ` · ${t("Expired for reuse")}` : ""}.</p>
+    {!current && <label className={styles.checkbox}><input type="checkbox" checked={checked} onChange={event => onConfirm(path, event.target.checked)}/>{locale === "es" ? `${t("Confirm this answer is still current:")} ${t(label)}` : `Confirm ${label.toLowerCase()} is still current`}</label>}
   </div>;
 }
 
@@ -65,6 +67,7 @@ function ProfileFields({ value, provenance, confirmedPaths, onConfirm, onChange,
   value: FamilyProfileDetails; provenance: Draft["provenance"]; confirmedPaths: string[];
   onConfirm: (path: string, checked: boolean) => void; onChange: (value: FamilyProfileDetails) => void; disabled: boolean;
 }) {
+  const { locale, t } = useParentLocale();
   const [focusMember, setFocusMember] = useState<string | null>(null);
   useLayoutEffect(() => { if (focusMember) document.getElementById(`family-${focusMember}-firstName`)?.focus(); }, [focusMember]);
   const freshness = (path: string, label: string) => {
@@ -72,64 +75,70 @@ function ProfileFields({ value, provenance, confirmedPaths, onConfirm, onChange,
     if (!source) return null;
     return <ProfileFreshness source={source} path={path} label={label} checked={confirmedPaths.includes(path)} onConfirm={onConfirm}/>;
   };
-  const person = (item: Person, prefix: string, label: string, change: (person: Person) => void) => <>
+  const person = (item: Person, prefix: string, label: string, change: (person: Person) => void) => {
+    const personLabel = label === "Your" ? t("You") : `${t("Household member")} ${label.slice(7)}`;
+    const fieldLabel = (name: string) => locale === "en" ? `${label} ${name.toLowerCase()}`
+      : label === "Your" ? `${t("Your")} ${t(name).toLowerCase()}` : `${t(name)} ${t("of household member")} ${label.slice(7)}`;
+    return <>
     <div className={styles.row}>{([["firstName", "First name", "given-name"], ["lastName", "Last name", "family-name"], ["middleInitial", "Middle initial", "additional-name"]] as const).map(([field, name, autocomplete]) =>
-      <ProfileField key={field} id={`family-${item.id}-${field}`} label={`${label} ${name.toLowerCase()}`} value={item[field]} maximum={field === "middleInitial" ? 2 : 80} autoComplete={label === "Your" ? autocomplete : "off"} onChange={text => change({ ...item, [field]: text })}>{freshness(`${prefix}.${field}`, `${label} ${name}`)}</ProfileField>)}</div>
-    <ProfileField id={`family-${item.id}-birth`} label={`${label} date of birth`} type="date" value={item.dateOfBirth} autoComplete={label === "Your" ? "bday" : "off"} onChange={dateOfBirth => change({ ...item, dateOfBirth })}>{freshness(`${prefix}.dateOfBirth`, `${label} date of birth`)}</ProfileField>
-    <details className={styles.disclosure}><summary>{label} income sources (optional)</summary>
-      <p className={styles.hint}>Useful for food or utility help. Save the types only. Amounts, proof and program rules are checked separately when needed.</p>
-      <div className={`${styles.field} ${styles.space}`}><label htmlFor={`family-${item.id}-income`}>{label} income source inventory</label>
+      <ProfileField key={field} id={`family-${item.id}-${field}`} label={fieldLabel(name)} value={item[field]} maximum={field === "middleInitial" ? 2 : 80} autoComplete={label === "Your" ? autocomplete : "off"} onChange={text => change({ ...item, [field]: text })}>{freshness(`${prefix}.${field}`, fieldLabel(name))}</ProfileField>)}</div>
+    <ProfileField id={`family-${item.id}-birth`} label={fieldLabel("Date of birth")} type="date" value={item.dateOfBirth} autoComplete={label === "Your" ? "bday" : "off"} onChange={dateOfBirth => change({ ...item, dateOfBirth })}>{freshness(`${prefix}.dateOfBirth`, fieldLabel("Date of birth"))}</ProfileField>
+    <details className={styles.disclosure}><summary>{locale === "en" ? `${label} income sources (optional)` : `${t("Income sources (optional)")} · ${personLabel}`}</summary>
+      <p className={styles.hint}>{t("Useful for food or utility help. Save the types only. Amounts, proof and program rules are checked separately when needed.")}</p>
+      <div className={`${styles.field} ${styles.space}`}><label htmlFor={`family-${item.id}-income`}>{fieldLabel("Income source inventory")}</label>
         <select id={`family-${item.id}-income`} className={styles.select} value={item.income?.state ?? ""} onChange={event => change({ ...item, income: event.target.value ? { state: event.target.value as NonNullable<Person["income"]>["state"], sources: event.target.value === "sources" ? item.income?.sources ?? [] : [] } : undefined })}>
-          <option value="">Unanswered</option><option value="unknown">Not sure</option><option value="none">No income sources</option><option value="sources">Has income sources</option>
+          <option value="">{t("Unanswered")}</option><option value="unknown">{t("Not sure")}</option><option value="none">{t("No income sources")}</option><option value="sources">{t("Has income sources")}</option>
         </select>
-        {freshness(`${prefix}.income`, `${label} income source inventory`)}
+        {freshness(`${prefix}.income`, fieldLabel("Income source inventory"))}
       </div>
       {item.income?.state === "sources" && <>
         {item.income.sources.map((source, index) => <div className={`${styles.row} ${styles.space}`} key={source.id}><div className={styles.field}>
-          <label htmlFor={`family-source-${source.id}`}>{label} income source {index + 1}</label><select id={`family-source-${source.id}`} className={styles.select} value={source.kind} onChange={event => change({ ...item, income: { state: "sources", sources: item.income!.sources.map(existing => existing.id === source.id ? { ...existing, kind: event.target.value as typeof source.kind } : existing) } })}>{Object.entries(INCOME_LABELS).map(([kind, name]) => <option key={kind} value={kind}>{name}</option>)}</select>
-        </div><button type="button" className={styles.quiet} onClick={() => { document.getElementById(`family-${item.id}-add-income`)?.focus(); change({ ...item, income: { state: "sources", sources: item.income!.sources.filter(existing => existing.id !== source.id) } }); }}>Remove {label.toLowerCase()} income source {index + 1}</button></div>)}
-        <div className={`${styles.field} ${styles.space}`}><label htmlFor={`family-${item.id}-add-income`}>Add {label.toLowerCase()} income source</label><select id={`family-${item.id}-add-income`} className={styles.select} value="" disabled={disabled || item.income.sources.length >= 30} onChange={event => { if (event.target.value) change({ ...item, income: { state: "sources", sources: [...item.income!.sources, { id: crypto.randomUUID(), kind: event.target.value as FamilyProfileIncomeKind }] } }); }}><option value="">Choose a source to add</option>{Object.entries(INCOME_LABELS).map(([kind, name]) => <option key={kind} value={kind}>{name}</option>)}</select></div>
-        {!item.income.sources.length && <p className={styles.hint}>Add a source, choose Not sure, or leave this inventory unanswered before saving.</p>}
+          <label htmlFor={`family-source-${source.id}`}>{fieldLabel("Income source")} {index + 1}</label><select id={`family-source-${source.id}`} className={styles.select} value={source.kind} onChange={event => change({ ...item, income: { state: "sources", sources: item.income!.sources.map(existing => existing.id === source.id ? { ...existing, kind: event.target.value as typeof source.kind } : existing) } })}>{Object.entries(INCOME_LABELS).map(([kind, name]) => <option key={kind} value={kind}>{t(name)}</option>)}</select>
+        </div><button type="button" className={styles.quiet} onClick={() => { document.getElementById(`family-${item.id}-add-income`)?.focus(); change({ ...item, income: { state: "sources", sources: item.income!.sources.filter(existing => existing.id !== source.id) } }); }}>{locale === "en" ? `Remove ${label.toLowerCase()} income source ${index + 1}` : `${t("Remove income source")} ${index + 1} · ${personLabel}`}</button></div>)}
+        <div className={`${styles.field} ${styles.space}`}><label htmlFor={`family-${item.id}-add-income`}>{locale === "en" ? `Add ${label.toLowerCase()} income source` : `${t("Add income source")} · ${personLabel}`}</label><select id={`family-${item.id}-add-income`} className={styles.select} value="" disabled={disabled || item.income.sources.length >= 30} onChange={event => { if (event.target.value) change({ ...item, income: { state: "sources", sources: [...item.income!.sources, { id: crypto.randomUUID(), kind: event.target.value as FamilyProfileIncomeKind }] } }); }}><option value="">{t("Choose a source to add")}</option>{Object.entries(INCOME_LABELS).map(([kind, name]) => <option key={kind} value={kind}>{t(name)}</option>)}</select></div>
+        {!item.income.sources.length && <p className={styles.hint}>{t("Add a source, choose Not sure, or leave this inventory unanswered before saving.")}</p>}
       </>}
     </details>
   </>;
+  };
   const address = (key: "homeAddress" | "mailingAddress", label: string) => <details className={styles.disclosure}>
-    <summary>{label} (optional)</summary>
-    <fieldset className={`${styles.fieldset} ${styles.space}`}><legend className={styles.screenReader}>{label}</legend>
+    <summary>{t(label)} {t("(optional)")}</summary>
+    <fieldset className={`${styles.fieldset} ${styles.space}`}><legend className={styles.screenReader}>{t(label)}</legend>
     <div className={styles.form}>{([["street", "Street address", 160, "address-line1"], ["apartment", "Apartment or unit", 80, "address-line2"], ["city", "City", 80, "address-level2"], ["state", "State (two letters)", 2, "address-level1"], ["zip", "ZIP code", 5, "postal-code"], ["county", "County", 80, "off"]] as const).map(([field, name, maximum, autocomplete]) =>
-      <ProfileField key={field} id={`family-${key}-${field}`} label={`${label} ${name.toLowerCase()}`} maximum={maximum} value={value[key]?.[field]} autoComplete={autocomplete === "off" ? "off" : `${key === "homeAddress" ? "section-home" : "section-mailing"} ${autocomplete}`} onChange={text => onChange({ ...value, [key]: { ...value[key], [field]: field === "state" ? text?.toUpperCase() : text } as Address })}>{freshness(`${key}.${field}`, `${label} ${name}`)}</ProfileField>)}</div>
+      <ProfileField key={field} id={`family-${key}-${field}`} label={locale === "en" ? `${label} ${name.toLowerCase()}` : `${t(label)}: ${t(name)}`} maximum={maximum} value={value[key]?.[field]} autoComplete={autocomplete === "off" ? "off" : `${key === "homeAddress" ? "section-home" : "section-mailing"} ${autocomplete}`} onChange={text => onChange({ ...value, [key]: { ...value[key], [field]: field === "state" ? text?.toUpperCase() : text } as Address })}>{freshness(`${key}.${field}`, locale === "en" ? `${label} ${name}` : `${t(label)}: ${t(name)}`)}</ProfileField>)}</div>
     </fieldset>
   </details>;
   return <fieldset className={styles.fieldset} disabled={disabled}>
-    <legend className={styles.screenReader}>Optional family information</legend>
+    <legend className={styles.screenReader}>{t("Optional family information")}</legend>
     <div className={styles.form}>
-      <fieldset className={styles.fieldset}><legend className={styles.legend}>Your details</legend><div className={styles.form}>{person(value.primaryPerson, "primaryPerson", "Your", primaryPerson => onChange({ ...value, primaryPerson }))}</div>
-        <p className={styles.hint}>These are your contact details. They do not establish who holds a utility account or who is applying for a program.</p>
+      <fieldset className={styles.fieldset}><legend className={styles.legend}>{t("Your details")}</legend><div className={styles.form}>{person(value.primaryPerson, "primaryPerson", "Your", primaryPerson => onChange({ ...value, primaryPerson }))}</div>
+        <p className={styles.hint}>{t("These are your contact details. They do not establish who holds a utility account or who is applying for a program.")}</p>
       </fieldset>
-      <fieldset className={styles.fieldset}><legend className={styles.legend}>Contact & language</legend><div className={styles.form}>
-        <ProfileField id="family-phone" label="Contact phone" type="tel" value={value.contact?.phone} autoComplete="tel" maximum={14} onChange={phone => onChange({ ...value, contact: { ...value.contact, phone } })}>{freshness("contact.phone", "Contact phone")}</ProfileField>
-        <ProfileField id="family-email" label="Contact email" type="email" value={value.contact?.email} autoComplete="email" maximum={100} onChange={email => onChange({ ...value, contact: { ...value.contact, email } })}>{freshness("contact.email", "Contact email")}</ProfileField>
-        <p className={styles.hint}>Saving a contact email does not change your sign-in email or enroll you in messages.</p>
-        <div className={styles.field}><label htmlFor="family-language">Preferred service language</label><select id="family-language" className={styles.select} value={value.preferredLanguage ?? ""} onChange={event => onChange({ ...value, preferredLanguage: optional(event.target.value) as FamilyProfileDetails["preferredLanguage"], otherLanguage: event.target.value === "other" ? value.otherLanguage : undefined })}><option value="">Unanswered</option><option value="en">English</option><option value="es">Spanish / Español</option><option value="other">Another language</option></select>{freshness("preferredLanguage", "Preferred service language")}</div>
-        {value.preferredLanguage === "other" && <ProfileField id="family-other-language" label="Language you prefer" value={value.otherLanguage} onChange={otherLanguage => onChange({ ...value, otherLanguage })}>{freshness("otherLanguage", "Language you prefer")}</ProfileField>}
+      <fieldset className={styles.fieldset}><legend className={styles.legend}>{t("Contact & language")}</legend><div className={styles.form}>
+        <ProfileField id="family-phone" label={t("Contact phone")} type="tel" value={value.contact?.phone} autoComplete="tel" maximum={14} onChange={phone => onChange({ ...value, contact: { ...value.contact, phone } })}>{freshness("contact.phone", "Contact phone")}</ProfileField>
+        <ProfileField id="family-email" label={t("Contact email")} type="email" value={value.contact?.email} autoComplete="email" maximum={100} onChange={email => onChange({ ...value, contact: { ...value.contact, email } })}>{freshness("contact.email", "Contact email")}</ProfileField>
+        <p className={styles.hint}>{t("Saving a contact email does not change your sign-in email or enroll you in messages.")}</p>
+        <div className={styles.field}><label htmlFor="family-language">{t("Preferred service language")}</label><select id="family-language" className={styles.select} value={value.preferredLanguage ?? ""} onChange={event => onChange({ ...value, preferredLanguage: optional(event.target.value) as FamilyProfileDetails["preferredLanguage"], otherLanguage: event.target.value === "other" ? value.otherLanguage : undefined })}><option value="">{t("Unanswered")}</option><option value="en">{t("English")}</option><option value="es">{t("Spanish / Español")}</option><option value="other">{t("Another language")}</option></select>{freshness("preferredLanguage", "Preferred service language")}</div>
+        {value.preferredLanguage === "other" && <ProfileField id="family-other-language" label={t("Language you prefer")} value={value.otherLanguage} onChange={otherLanguage => onChange({ ...value, otherLanguage })}>{freshness("otherLanguage", "Language you prefer")}</ProfileField>}
       </div></fieldset>
       {address("homeAddress", "Home address")}
-      <div className={styles.field}><label htmlFor="family-mailing-same">Is your mailing address the same as your home address?</label><select id="family-mailing-same" className={styles.select} value={value.mailingAddressSameAsHome === true ? "yes" : value.mailingAddressSameAsHome === false ? "no" : ""} onChange={event => onChange({ ...value, mailingAddressSameAsHome: event.target.value === "" ? undefined : event.target.value === "yes", ...(event.target.value === "yes" ? { mailingAddress: undefined } : {}) })}><option value="">Unanswered</option><option value="yes">Yes</option><option value="no">No</option></select>{freshness("mailingAddressSameAsHome", "Mailing address choice")}</div>
+      <div className={styles.field}><label htmlFor="family-mailing-same">{t("Is your mailing address the same as your home address?")}</label><select id="family-mailing-same" className={styles.select} value={value.mailingAddressSameAsHome === true ? "yes" : value.mailingAddressSameAsHome === false ? "no" : ""} onChange={event => onChange({ ...value, mailingAddressSameAsHome: event.target.value === "" ? undefined : event.target.value === "yes", ...(event.target.value === "yes" ? { mailingAddress: undefined } : {}) })}><option value="">{t("Unanswered")}</option><option value="yes">{t("Yes")}</option><option value="no">{t("No")}</option></select>{freshness("mailingAddressSameAsHome", "Mailing address choice")}</div>
       {value.mailingAddressSameAsHome !== true && address("mailingAddress", "Mailing address")}
-      <fieldset className={styles.fieldset}><legend className={styles.legend}>Other people living with you</legend>
-        <p className={styles.hint}>Add only people who live in your household and whose information you have permission to provide. Each program checks its own household rules; saving this list does not declare a complete application household.</p>
-        {(value.members ?? []).map((member, index) => <fieldset className={`${styles.fieldset} ${styles.section}`} key={member.id}><legend className={styles.legend}>Household member {index + 1}</legend><div className={styles.form}>
+      <fieldset className={styles.fieldset}><legend className={styles.legend}>{t("Other people living with you")}</legend>
+        <p className={styles.hint}>{t("Add only people who live in your household and whose information you have permission to provide. Each program checks its own household rules; saving this list does not declare a complete application household.")}</p>
+        {(value.members ?? []).map((member, index) => <fieldset className={`${styles.fieldset} ${styles.section}`} key={member.id}><legend className={styles.legend}>{t("Household member")}{" "}{index + 1}</legend><div className={styles.form}>
           {person(member, `members.${member.id}`, `Member ${index + 1}`, update => onChange({ ...value, members: value.members!.map(current => current.id === member.id ? { ...member, ...update } : current) }))}
-          <ProfileField id={`family-${member.id}-relationship`} label={`Member ${index + 1} relationship to you`} value={member.relationship} onChange={relationship => onChange({ ...value, members: value.members!.map(current => current.id === member.id ? { ...current, relationship } : current) })}>{freshness(`members.${member.id}.relationship`, `Member ${index + 1} relationship`)}</ProfileField>
-          <button type="button" className={styles.quiet} onClick={() => { document.getElementById("family-add-person")?.focus(); onChange({ ...value, members: value.members!.filter(current => current.id !== member.id) }); }}>Remove household member {index + 1}</button>
+          <ProfileField id={`family-${member.id}-relationship`} label={locale === "en" ? `Member ${index + 1} relationship to you` : `${t("Relationship to you")} · ${t("Household member")} ${index + 1}`} value={member.relationship} onChange={relationship => onChange({ ...value, members: value.members!.map(current => current.id === member.id ? { ...current, relationship } : current) })}>{freshness(`members.${member.id}.relationship`, locale === "en" ? `Member ${index + 1} relationship` : `${t("Relationship to you")} · ${t("Household member")} ${index + 1}`)}</ProfileField>
+          <button type="button" className={styles.quiet} onClick={() => { document.getElementById("family-add-person")?.focus(); onChange({ ...value, members: value.members!.filter(current => current.id !== member.id) }); }}>{t("Remove household member")}{" "}{index + 1}</button>
         </div></fieldset>)}
-        <button id="family-add-person" type="button" className={`${styles.secondary} ${styles.space}`} disabled={disabled || (value.members?.length ?? 0) >= 29} onClick={() => { const id = crypto.randomUUID(); onChange({ ...value, members: [...value.members ?? [], { id }] }); setFocusMember(id); }}>Add a person living with you</button>
+        <button id="family-add-person" type="button" className={`${styles.secondary} ${styles.space}`} disabled={disabled || (value.members?.length ?? 0) >= 29} onClick={() => { const id = crypto.randomUUID(); onChange({ ...value, members: [...value.members ?? [], { id }] }); setFocusMember(id); }}>{t("Add a person living with you")}</button>
       </fieldset>
     </div>
   </fieldset>;
 }
 
 export function FamilyProfile({ returnTo = "/my-support" }: { returnTo?: string }) {
+  const { locale, t } = useParentLocale();
   const [read, setRead] = useState(0);
   const saved = useParentResource<unknown>(`/family-profile?read=${read}`);
   const parsed = useMemo(() => profileReply.safeParse(saved.data), [saved.data]), current = !saved.error && parsed.success ? parsed.data : null;
@@ -139,6 +148,12 @@ export function FamilyProfile({ returnTo = "/my-support" }: { returnTo?: string 
   const [error, setError] = useState<Error | null>(null), [message, setMessage] = useState("");
   const [observed, setObserved] = useState<{ data: unknown; error: Error | null }>({ data: null, error: null });
   const running = useRef<AbortController | null>(null), form = useRef<HTMLFormElement>(null);
+  const errorMessage = useRef<HTMLDivElement>(null), savedMessage = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (saved.loading) return;
+    if (error) errorMessage.current?.focus();
+    else if (message) savedMessage.current?.focus();
+  }, [error, message, saved.loading]);
   const deadline = current?.collection.expiresAt ? Date.parse(current.collection.expiresAt) : NaN;
   const permitted = usePermissionWindow(deadline) && currentCollection(current);
   const wipe = useCallback(() => {
@@ -212,40 +227,41 @@ export function FamilyProfile({ returnTo = "/my-support" }: { returnTo?: string 
     } finally { if (running.current === controller) { running.current = null; setPending(false); } }
   }
   const visible = current && draft?.ownerId === current.ownerId;
-  return <div className={styles.container}>
-    <div className={styles.pageTop}><div><h1>Your family information</h1><p>Save family basics once. CaseLink checks fresh saved information before asking again.</p></div></div>
-    <div className={`${styles.inline} ${styles.space}`}><Link className={styles.textLink} href={returnTo}>Skip for now and continue to support</Link><Link className={styles.textLink} href="/get-support?need=food_now">Find urgent food help</Link></div>
+  return <div lang={locale} className={`${styles.container} ${styles.familyProfile}`}>
+    <div className={styles.pageTop}><div><h1>{t("Your family information")}</h1><p>{t("Save family basics once. CaseLink checks fresh saved information before asking again.")}</p></div></div>
+    <div className={`${styles.inline} ${styles.space}`}><Link className={styles.textLink} href={returnTo}>{t("Skip for now and continue to support")}</Link><Link className={styles.textLink} href="/get-support?need=food_now">{t("Find urgent food help")}</Link></div>
     {saved.loading ? <ParentLoading label="Loading your family information"/> : saved.error ? <ServiceError error={saved.error} retry={() => setRead(value => value + 1)} returnTo="/family-profile"/>
-      : !current ? <p className={styles.notice}>Your saved family information needs a service check before it can be opened. <button type="button" className={styles.quiet} onClick={() => setRead(value => value + 1)}>Try loading family information again</button></p>
+      : !current ? <p className={styles.notice}>{t("Your saved family information needs a service check before it can be opened.")}{" "}<button type="button" className={styles.quiet} onClick={() => setRead(value => value + 1)}>{t("Try loading family information again")}</button></p>
       : visible && <section className={`${styles.surface} ${styles.section}`}>
-        <h2>{current.profile ? "Saved family basics" : "Start with what you know"}</h2>
-        <p className={styles.hint}>Everything here is optional. Leave unknown answers blank and save a partial profile. Never enter a government ID, account number, password, pregnancy or medical information here.</p>
-        {current.profile && <p className={styles.hint}>Each answer keeps its original confirmation and expiry dates. Opening this page never extends them.</p>}
-        {!permitted && <div className={`${styles.notice} ${styles.space}`}><div><p>Saving family information is unavailable in this environment or its current permission has ended. You can continue directly to support. Saved information remains readable where account access allows.</p><button type="button" className={styles.secondary} onClick={() => setRead(value => value + 1)}>Check saving access again</button></div></div>}
-        <form ref={form} aria-label="Save family information" className={`${styles.form} ${styles.space}`} onSubmit={event => send("save", event)}>
+        <h2>{t(current.profile ? "Saved family basics" : "Start with what you know")}</h2>
+        <p className={styles.hint}>{t("Everything here is optional. Leave unknown answers blank and save a partial profile. Never enter a government ID, account number, password, pregnancy or medical information here.")}</p>
+        {current.profile && <p className={styles.hint}>{t("Each answer keeps its original confirmation and expiry dates. Opening this page never extends them.")}</p>}
+        {!permitted && <div className={`${styles.notice} ${styles.space}`}><div><p>{t("Saving family information is unavailable in this environment or its current permission has ended. You can continue directly to support. Saved information remains readable where account access allows.")}</p><button type="button" className={styles.secondary} onClick={() => setRead(value => value + 1)}>{t("Check saving access again")}</button></div></div>}
+        <form ref={form} aria-label={t("Save family information")} className={`${styles.form} ${styles.space}`} onSubmit={event => send("save", event)}>
           <ProfileFields value={draft.details} provenance={draft.provenance} confirmedPaths={confirmedPaths} disabled={!permitted || pending || !!attempt || conflict} onConfirm={(path, checked) => setConfirmedPaths(paths => checked ? [...paths, path] : paths.filter(value => value !== path))} onChange={details => { setDraft({ ...draft, details }); setError(null); }}/>
           {permitted && <>
-            <section className={styles.notice} aria-label="Family information storage and reuse notice"><div><h3>Before you save</h3>
-              <p>CaseLink and its database provider, Supabase, store these family basics privately in your account for up to {current.collection.retentionDays} days from each answer’s confirmation. We reuse fresh answers only for named programs under the separate support permission you choose. This save does not authorize sharing, an application, a signature or a payment.</p>
-              <p>You have permission to provide the information for yourself and each person listed, including children and other adults. You can change or remove this profile. Removing it does not erase information already recorded for a support request. Processor and backup limits are in the <Link className={styles.textLink} href="/support/privacy">privacy and data policy</Link>.</p>
+            <section className={styles.notice} aria-label={t("Family information storage and reuse notice")}><div><h3>{t("Before you save")}</h3>
+              <p>{t("CaseLink and its database provider, Supabase, store these family basics privately in your account for up to")}{" "}{current.collection.retentionDays}{" "}{t("days from each answer’s confirmation. We reuse fresh answers only for named programs under the separate support permission you choose. This save does not authorize sharing, an application, a signature or a payment.")}</p>
+              <p>{t("You have permission to provide the information for yourself and each person listed, including children and other adults. You can change or remove this profile. Removing it does not erase information already recorded for a support request. Processor and backup limits are in the")}{" "}<Link className={styles.textLink} href="/support/privacy">{t("privacy and data policy")}</Link>.</p>
             </div></section>
-            <label className={styles.checkbox}><input type="checkbox" checked={consent} disabled={pending || !!attempt || conflict} onChange={event => setConsent(event.target.checked)}/>I have permission to provide these family details and agree to their private storage and reuse as described above.</label>
-            <div className={styles.inline}><button className={styles.button} type="submit" disabled={pending || conflict || !consent && !attempt || attempt?.action === "delete"}>{pending && attempt?.action === "save" ? "Saving family information…" : attempt?.action === "save" ? "Retry the same family save" : "Save and finish later"}</button><Link className={styles.textLink} href={returnTo}>Continue to support</Link></div>
+            <label className={styles.checkbox}><input type="checkbox" checked={consent} disabled={pending || !!attempt || conflict} onChange={event => setConsent(event.target.checked)}/>{t("I have permission to provide these family details and agree to their private storage and reuse as described above.")}</label>
+            <div className={styles.inline}><button className={styles.button} type="submit" disabled={pending || conflict || !consent && !attempt || attempt?.action === "delete"}>{t(pending && attempt?.action === "save" ? "Saving family information…" : attempt?.action === "save" ? "Retry the same family save" : "Save and finish later")}</button><Link className={styles.textLink} href={returnTo}>{t("Continue to support")}</Link></div>
           </>}
         </form>
-        {attempt && !pending && !conflict && <div className={`${styles.notice} ${styles.space}`}><p>The result is unconfirmed. Your exact change is kept only on this page. Check saved information or retry the same change before editing again.</p><button type="button" className={styles.secondary} onClick={() => setRead(value => value + 1)}>Check saved family information</button>{attempt.action === "delete" && <button type="button" className={styles.secondary} onClick={() => send("delete")}>Retry the same removal</button>}</div>}
-        {conflict && <div className={`${styles.notice} ${styles.space}`}><p>Your saved family information changed. Your unsaved draft is still here. Load the latest information before replacing it.</p><button type="button" className={styles.secondary} onClick={() => { setDraft(null); setAttempt(null); setConsent(false); setConfirmedPaths([]); setConflict(false); setError(null); setRead(value => value + 1); }}>Load latest family information</button></div>}
-        {!!current.profile && !pending && !attempt && <details className={`${styles.disclosure} ${styles.section}`} open={confirmDelete} onToggle={event => setConfirmDelete(event.currentTarget.open)}><summary>Remove saved family information</summary><p>This removes this reusable profile. Existing requests and their recorded permissions, applications and receipts stay separate. Use Your account to request deletion of all parent-support data.</p><button type="button" className={`${styles.secondary} ${styles.space}`} onClick={() => send("delete")}>Confirm removal of saved family information</button></details>}
+        {attempt && !pending && !conflict && <div className={`${styles.notice} ${styles.space}`}><p>{t("The result is unconfirmed. Your exact change is kept only on this page. Check saved information or retry the same change before editing again.")}</p><button type="button" className={styles.secondary} onClick={() => setRead(value => value + 1)}>{t("Check saved family information")}</button>{attempt.action === "delete" && <button type="button" className={styles.secondary} onClick={() => send("delete")}>{t("Retry the same removal")}</button>}</div>}
+        {conflict && <div className={`${styles.notice} ${styles.space}`}><p>{t("Your saved family information changed. Your unsaved draft is still here. Load the latest information before replacing it.")}</p><button type="button" className={styles.secondary} onClick={() => { setDraft(null); setAttempt(null); setConsent(false); setConfirmedPaths([]); setConflict(false); setError(null); setRead(value => value + 1); }}>{t("Load latest family information")}</button></div>}
+        {!!current.profile && !pending && !attempt && <details className={`${styles.disclosure} ${styles.section}`} open={confirmDelete} onToggle={event => setConfirmDelete(event.currentTarget.open)}><summary>{t("Remove saved family information")}</summary><p>{t("This removes this reusable profile. Existing requests and their recorded permissions, applications and receipts stay separate. Use Your account to request deletion of all parent-support data.")}</p><button type="button" className={`${styles.secondary} ${styles.space}`} onClick={() => send("delete")}>{t("Confirm removal of saved family information")}</button></details>}
       </section>}
-    {error && <div className={styles.space}><ServiceError error={error} returnTo="/family-profile"/></div>}
-    {message && <p className={`${styles.success} ${styles.space}`} role="status">{message}</p>}
+    {error && <div ref={errorMessage} tabIndex={-1} className={styles.space}><ServiceError error={error} returnTo="/family-profile"/></div>}
+    {message && <p ref={savedMessage} tabIndex={-1} className={`${styles.success} ${styles.space}`} role="status">{t(message)}</p>}
   </div>;
 }
 
 export function FamilyProfileWelcome() {
+  const { locale, t } = useParentLocale();
   const saved = useParentResource<unknown>("/family-profile");
   const parsed = useMemo(() => profileReply.safeParse(saved.data), [saved.data]), current = !saved.error && parsed.success ? parsed.data : null;
   const available = usePermissionWindow(current?.collection.expiresAt ? Date.parse(current.collection.expiresAt) : NaN) && currentCollection(current);
   if (!available || current?.profile) return null;
-  return <section className={`${styles.notice} ${styles.space}`} aria-label="Save family information"><div><h2>Tell us once, use it again</h2><p>Save optional family basics so future requests can start with what you already shared. You can save part now and finish later.</p><Link className={styles.textLink} href="/family-profile">Save family basics</Link><p className={styles.hint}>You can also get support directly. A family profile is optional.</p></div></section>;
+  return <section lang={locale} className={`${styles.notice} ${styles.space}`} aria-label={t("Save family information")}><div><h2>{t("Tell us once, use it again")}</h2><p>{t("Save optional family basics so future requests can start with what you already shared. You can save part now and finish later.")}</p><Link className={styles.textLink} href="/family-profile">{t("Save family basics")}</Link><p className={styles.hint}>{t("You can also get support directly. A family profile is optional.")}</p></div></section>;
 }

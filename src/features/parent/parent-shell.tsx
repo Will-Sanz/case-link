@@ -39,7 +39,7 @@ export function ParentShell({
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
-            <Link href="/" aria-label={t("CaseLink home")}>
+            <Link className={styles.brand} href="/" aria-label={t("CaseLink home")}>
               <CaseLinkWordmark />
             </Link>
             <p>{t("Support for your family, with you in control.")}</p>

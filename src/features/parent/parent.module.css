@@ -1398,6 +1398,22 @@
   white-space: nowrap;
   border: 0;
 }
+.familyProfile :is(.surface, .fieldset, .input) {
+  min-width: 0;
+  min-inline-size: 0;
+}
+@media (max-width: 35rem) {
+  .container.familyProfile,
+  .familyProfile :is(.surface, .notice, .error, .success, .button, .secondary) {
+    padding: 12px;
+  }
+  .familyProfile :is(.notice, .error, .success) {
+    flex-direction: column;
+  }
+  .familyProfile h1 {
+    font-size: 1.75rem;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .shell *,
   .shell *::before,
@@ -1577,6 +1593,7 @@
     padding: 1.5rem 1.25rem;
   }
   .footerLinks {
+    grid-template-columns: 1fr;
     gap: 1rem;
   }
   .authGrid {
