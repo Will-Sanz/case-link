@@ -64,7 +64,8 @@ export async function foodDescriptionEvaluationCommand(args: string[], env: Reco
       return results;
     });
     const accounting=descriptionEvaluationAccounting(approval.runDirectory);
-    return {...report,accounting,reservedAttemptsAcrossRun:accounting.reservedPairs,aggregateReservedAttempts:3+accounting.reservedPairs,remainingGenerationRequests:80-accounting.reservedPairs};
+    return {...report,accounting,reservedAttemptsAcrossRun:accounting.reservedPairs,aggregateReservedAttempts:3+accounting.reservedPairs,remainingGenerationRequests:80-accounting.reservedPairs,
+      ...(recoveredPlan.retainedReconciliation?{validatedSuccessorSourceSha256:sourceSha256,retainedReconciliationSourceSha256:recoveredPlan.retainedReconciliation.sourceSha256,retainedReconciliationReportSha256:recoveredPlan.retainedReconciliation.reportSha256}: {})};
   }
   if (![3,4].includes(args.length) || args[0] !== "--approved-live" || !/^[0-7]$/.test(args[2])) throw new Error(generic);
   if (env.CASELINK_FOOD_DESCRIPTION_EVAL_NEW_APPROVAL !== "1") throw new Error(generic);
@@ -77,7 +78,8 @@ export async function foodDescriptionEvaluationCommand(args: string[], env: Reco
   if (!apiKey) throw new Error(generic); // No ordinary OPENAI_API_KEY or legacy allowance fallback.
   const batch = Number(args[2]), selected = batches[batch], results: Awaited<ReturnType<typeof runDescriptionEvaluationCase>>[] = [];
   return withFoodDescriptionEvaluationBudget({ approval, apiKey, fetcher, reconciliation: recovery }, async budget => {
-    const retained=recovery?reconciliationReport(approval,sourceSha256).results:[];
+    const predecessor=recovery?descriptionEvaluationReconciliationPlanSchema.parse(recovery.plan).retainedReconciliation:undefined;
+    const retained=recovery?reconciliationReport(approval,predecessor?.sourceSha256??sourceSha256).results:[];
     if(descriptionEvaluationAccounting(approval.runDirectory).reservedCaseIds.some(id=>!existsSync(join(approval.runDirectory,`${id}-result.json`))))throw new Error(generic);
     for (const id of selected) {
       const item = corpus.cases.find(value => value.id === id)!;
@@ -96,7 +98,8 @@ export async function foodDescriptionEvaluationCommand(args: string[], env: Reco
       unrunCorpusTurns: (60-recorded.length)*4+recorded.flatMap(result=>result.turns).filter(turn=>turn.status==="unrun_after_failure").length,
       authorityTurnsStillRequiringNativeEvidence:recorded.flatMap(result=>result.turns).filter(turn=>turn.status==="requires_native_evidence").length,
       reservedAttemptsAcrossRun: budget.attempts(), accounting:descriptionEvaluationAccounting(approval.runDirectory), sourceSha256, adapterSha256, modelQualityApproved: false, humanReviewedCases: 0,
-      ...(recovery?{reconciliationPlanSha256:recovery.planSha256,originalHaltRetained:true,aggregateReservedAttempts:3+budget.attempts(),maximumAggregateGenerationCalls:83,maximumAggregateCountRequests:83}: {}) };
+      ...(recovery?{reconciliationPlanSha256:recovery.planSha256,originalHaltRetained:true,aggregateReservedAttempts:3+budget.attempts(),maximumAggregateGenerationCalls:83,maximumAggregateCountRequests:83,
+        ...(predecessor?{retainedReconciliationSourceSha256:predecessor.sourceSha256,retainedReconciliationReportSha256:predecessor.reportSha256}: {})}: {}) };
     const savedReport=join(approval.runDirectory,`batch-${batch}-report${recovery?`-${sourceSha256}`:""}.json`);if(!existsSync(savedReport))writeDescriptionEvaluationEvidence(savedReport,output);return output;
   });
 }

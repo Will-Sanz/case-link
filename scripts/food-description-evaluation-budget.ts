@@ -75,12 +75,18 @@ function completeAttemptEvidence(approval: LedgerIdentity, intent: z.infer<typeo
   return existsSync(response) && descriptionEvaluationHash(readDescriptionEvaluationEvidence(response)) === observation.responseHash;
 }
 const manifestSchema = z.array(z.object({ path: z.string().min(1).max(200), sha256: sha }).strict()).min(1).max(40);
+const retainedReconciliationSchema = z.object({
+  sourceSha256: z.literal("9c01d344fab1a0b5f09eeb9b9d321b8f7e10b470756cc7676ceaa6ac066e7608"),
+  planPath: z.string().refine(isAbsolute), planSha256: sha,
+  innerReceiptSha256: sha, outerReceiptSha256: sha, reportSha256: sha,
+}).strict();
 export const descriptionEvaluationReconciliationPlanSchema = z.object({ version: z.literal("food-description-post-validation-reconciliation.v1"),
   originalConfigurationSha256: sha, originalApprovalSha256: sha, originalHaltSha256: sha,
   originalSourceManifest: manifestSchema, currentSourceManifest: manifestSchema,
   priorRunDirectory: z.string().refine(isAbsolute), priorApprovalSha256: sha, priorHaltSha256: sha,
   maximumAggregateCalls: z.literal(83), maximumAggregateCountRequests: z.literal(83), maximumAggregateNanoDollars: z.literal(5_000_000_000),
   attempts: z.array(intentSchema.extend({ responseHash: sha, responseFileSha256: sha, receiptsSha256: sha, originalResultSha256: sha }).strict()).length(3),
+  retainedReconciliation: retainedReconciliationSchema.optional(),
 }).strict();
 export type DescriptionEvaluationReconciliation = { plan: unknown; planSha256: string; configurationSha256: string };
 type ReconciliationReport<T> = { mode: "retained_reconciliation"; sourceSha256: string; originalSourceSha256: string; sourceManifest: z.infer<typeof manifestSchema>; results: T[];
@@ -107,7 +113,21 @@ function checkedReconciliation(approval: DescriptionEvaluationApproval, recovery
     || plan.currentSourceManifest.some(value => createHash("sha256").update(readFileSync(value.path)).digest("hex") !== value.sha256)) throw safeError();
   if (recovery.configurationSha256 !== plan.originalConfigurationSha256 || !sha.safeParse(recovery.planSha256).success
     || plan.priorRunDirectory === approval.runDirectory || plan.attempts.some((value, index) => value.attempt !== index + 1)) throw safeError();
-  const paths = descriptionEvaluationReconciliationPaths(approval, descriptionEvaluationHash(plan.currentSourceManifest));
+  const retained = plan.retainedReconciliation;
+  let receiptPlan = plan, receiptPlanSha256 = recovery.planSha256;
+  if (retained) {
+    const previous = descriptionEvaluationReconciliationPlanSchema.parse(readDescriptionEvaluationEvidence(retained.planPath));
+    const stable = (value: typeof plan) => descriptionEvaluationHash({ ...value, currentSourceManifest: [], retainedReconciliation: undefined });
+    const amended = plan.currentSourceManifest.filter((value, index) => value.sha256 !== previous.currentSourceManifest[index]?.sha256).map(value => value.path);
+    if (descriptionEvaluationFileHash(retained.planPath) !== retained.planSha256 || previous.retainedReconciliation
+      || descriptionEvaluationHash(previous.currentSourceManifest) !== retained.sourceSha256 || stable(previous) !== stable(plan)
+      || previous.currentSourceManifest.length !== plan.currentSourceManifest.length
+      || previous.currentSourceManifest.some((value, index) => value.path !== plan.currentSourceManifest[index].path)
+      || amended.length !== 2 || amended.some(path => !["scripts/food-description-evaluation-budget.ts", "scripts/run-food-description-evaluation.ts"].includes(path))) throw safeError();
+    receiptPlan = previous; receiptPlanSha256 = retained.planSha256;
+  }
+  const receiptSource = descriptionEvaluationHash(receiptPlan.currentSourceManifest);
+  const paths = descriptionEvaluationReconciliationPaths(approval, receiptSource);
   if (existsSync(paths.innerHalt) || existsSync(paths.outerHalt)
     || descriptionEvaluationFileHash(`${ledger}.json`) !== plan.originalApprovalSha256
     || descriptionEvaluationFileHash(join(approval.runDirectory, "approval.json")) !== plan.originalApprovalSha256
@@ -131,12 +151,15 @@ function checkedReconciliation(approval: DescriptionEvaluationApproval, recovery
       || descriptionEvaluationFileHash(join(approval.runDirectory, `${intent.caseId}-result.json`)) !== originalResultSha256
       || z.object({ responseHash: sha }).passthrough().parse(readDescriptionEvaluationEvidence(`${prefix}-observation.json`)).responseHash !== responseHash) throw safeError();
   }
-  const receipt = requireReceipt ? receiptSchema.parse(readDescriptionEvaluationEvidence(paths.inner)) : null;
+  const receipt = requireReceipt || retained ? receiptSchema.parse(readDescriptionEvaluationEvidence(paths.inner)) : null;
   if (receipt && (descriptionEvaluationHash(readDescriptionEvaluationEvidence(paths.outer)) !== descriptionEvaluationHash(receipt)
-    || receipt.planSha256 !== recovery.planSha256 || receipt.planValueSha256 !== descriptionEvaluationHash(plan) || receipt.configurationSha256 !== recovery.configurationSha256
+    || receipt.planSha256 !== receiptPlanSha256 || receipt.planValueSha256 !== descriptionEvaluationHash(receiptPlan) || receipt.configurationSha256 !== recovery.configurationSha256
     || receipt.approvalSha256 !== plan.originalApprovalSha256 || receipt.originalHaltSha256 !== plan.originalHaltSha256
-    || receipt.sourceSha256 !== descriptionEvaluationHash(plan.currentSourceManifest)
+    || receipt.sourceSha256 !== receiptSource
     || descriptionEvaluationHash(readDescriptionEvaluationEvidence(paths.report)) !== receipt.reportSha256)) throw safeError();
+  if (retained && (descriptionEvaluationFileHash(paths.inner) !== retained.innerReceiptSha256
+    || descriptionEvaluationFileHash(paths.outer) !== retained.outerReceiptSha256
+    || descriptionEvaluationFileHash(paths.report) !== retained.reportSha256)) throw safeError();
   return { plan, paths, prior, current, receipt };
 }
 async function withRunLock<T>(dir: string, work: () => Promise<T>) {
@@ -218,6 +241,7 @@ export async function withFoodDescriptionEvaluationBudget<T>(input: {
   catch (error) { if (!(error && typeof error === "object" && "code" in error && error.code === "EEXIST")) throw safeError(); }
   try { return await withRunLock(dir, async () => {
     const manifestPath = join(dir, "approval.json");
+    if (input.reconciliation && !existsSync(manifestPath)) throw safeError();
     if (existsSync(manifestPath)) { if (descriptionEvaluationHash(readDescriptionEvaluationEvidence(manifestPath)) !== descriptionEvaluationHash(approval)) throw safeError(); }
     else durable(manifestPath, approval);
     const haltPath = join(dir, "halted.json"), outsideHalt = `${ledger}-halted.json`;

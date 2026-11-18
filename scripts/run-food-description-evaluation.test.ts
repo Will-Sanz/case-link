@@ -7,7 +7,7 @@ import { FOOD_DESCRIPTION_EVALUATION_BINDING, FOOD_DESCRIPTION_FINGERPRINT } fro
 import { FOOD_DESCRIPTION_CORPUS_SHA, withFoodDescriptionEvaluationBudget } from "./food-description-evaluation-budget";
 import { descriptionEvaluationPlan, loadDescriptionEvaluationCorpus } from "./food-description-evaluation-adapter";
 import { descriptionEvaluationSourceManifest, runDescriptionEvaluationCase } from "./food-description-evaluation";
-import { descriptionEvaluationAccounting, descriptionEvaluationHash, reconcileFoodDescriptionEvaluation } from "./food-description-evaluation-budget";
+import { descriptionEvaluationAccounting, descriptionEvaluationHash, descriptionEvaluationReconciliationPaths, reconcileFoodDescriptionEvaluation } from "./food-description-evaluation-budget";
 import { foodDescriptionEvaluationCommand } from "./run-food-description-evaluation";
 const roots:string[]=[];
 afterEach(()=>{for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});vi.useRealTimers();vi.unstubAllGlobals();});
@@ -108,6 +108,49 @@ async function recoveryFixture(){
   const oldHashes=oldFiles.map(path=>[path,fileHash(path)]);
   return{approval,prior,config,env,plan,planPath,savePlan,fetcher,oldHashes,prefix};
 }
+async function amendedRecoveryFixture(){
+  const s=await recoveryFixture();await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
+  const currentSourceManifest=descriptionEvaluationSourceManifest(),currentSource=descriptionEvaluationHash(currentSourceManifest);
+  const predecessorHashes:Record<string,string>={'scripts/food-description-evaluation-budget.ts':'c1667cdb3e443d45f0b087d882358ea5a18a818869aedcf155a53436234e6b33','scripts/run-food-description-evaluation.ts':'eb42aed089ada16aacef107360b7fe32f9e5263465850838985aa4c36b1abdc7'};
+  const previousManifest=currentSourceManifest.map(value=>predecessorHashes[value.path]?{...value,sha256:predecessorHashes[value.path]}:value);
+  const predecessorSource='9c01d344fab1a0b5f09eeb9b9d321b8f7e10b470756cc7676ceaa6ac066e7608';
+  expect(descriptionEvaluationHash(previousManifest)).toBe(predecessorSource);
+  const previousPaths=descriptionEvaluationReconciliationPaths(s.approval,predecessorSource),currentPaths=descriptionEvaluationReconciliationPaths(s.approval,currentSource);
+  // Synthetic predecessor metadata only: the unchanged pure interpreter produced these fixture results.
+  const previousReport={...JSON.parse(readFileSync(currentPaths.report,'utf8')),sourceSha256:predecessorSource,sourceManifest:previousManifest};
+  rmSync(currentPaths.report);writeFileSync(previousPaths.report,JSON.stringify(previousReport),{mode:0o600,flag:'wx'});
+  s.plan.currentSourceManifest=previousManifest;s.savePlan();
+  const previousReceipt={...JSON.parse(readFileSync(previousPaths.inner,'utf8')),planSha256:fileHash(s.planPath),planValueSha256:descriptionEvaluationHash(s.plan),sourceSha256:predecessorSource,reportSha256:descriptionEvaluationHash(previousReport)};
+  for(const path of [previousPaths.inner,previousPaths.outer])writeFileSync(path,JSON.stringify(previousReceipt));
+  const plan={...s.plan,currentSourceManifest,retainedReconciliation:{sourceSha256:predecessorSource,planPath:s.planPath,planSha256:fileHash(s.planPath),innerReceiptSha256:fileHash(previousPaths.inner),outerReceiptSha256:fileHash(previousPaths.outer),reportSha256:fileHash(previousPaths.report)}};
+  const planPath=join(s.approval.runDirectory,'..','amended-reconciliation-plan.json'),env={...s.env};
+  const savePlan=()=>{writeFileSync(planPath,JSON.stringify(plan),{mode:0o600});env.CASELINK_FOOD_DESCRIPTION_EVAL_RECONCILIATION_SHA256=fileHash(planPath);};savePlan();
+  const originalPaths=[...readdirSync(s.approval.runDirectory).map(name=>join(s.approval.runDirectory,name)),...readdirSync(join(s.approval.runDirectory,'..')).filter(name=>name.startsWith('.food-description-evaluation-')).map(name=>join(s.approval.runDirectory,'..',name)),s.planPath,s.config];
+  return{...s,plan,planPath,env,savePlan,previousPaths,originalHashes:originalPaths.map(path=>[path,fileHash(path)])};
+}
+it('validates the single reviewed source amendment without replaying or changing original evidence',async()=>{
+  const s=await amendedRecoveryFixture(),network=vi.fn<typeof fetch>(),before=readdirSync(s.approval.runDirectory).sort();
+  const view=await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],{...s.env,CASELINK_FOOD_DESCRIPTION_EVAL_API_KEY:undefined},network);
+  expect(view).toMatchObject({sourceSha256:s.plan.retainedReconciliation.sourceSha256,validatedSuccessorSourceSha256:descriptionEvaluationHash(descriptionEvaluationSourceManifest()),retainedReconciliationReportSha256:s.plan.retainedReconciliation.reportSha256,newHttpRequests:0,reservedAttemptsAcrossRun:3,aggregateReservedAttempts:6,remainingGenerationRequests:77});
+  expect(network).not.toHaveBeenCalled();expect(readdirSync(s.approval.runDirectory).sort()).toEqual(before);
+  for(const [path,hash]of s.originalHashes)expect(fileHash(path)).toBe(hash);
+});
+it.each(['plan','inner receipt','outside receipt','report','stable scope','source','nested amendment','normalizer'])(
+  'rejects a changed or missing predecessor %s without replay or spending',async kind=>{
+    const s=await amendedRecoveryFixture(),network=vi.fn<typeof fetch>(),retained=s.plan.retainedReconciliation;
+    if(kind==='plan')rmSync(retained.planPath);
+    if(kind==='inner receipt')rmSync(s.previousPaths.inner);
+    if(kind==='outside receipt')rmSync(s.previousPaths.outer);
+    if(kind==='report')rmSync(s.previousPaths.report);
+    if(kind==='stable scope')s.plan.attempts[0].caseId='description-other-en';
+    if(kind==='source')retained.sourceSha256='a'.repeat(64);
+    if(kind==='nested amendment'){const previous=JSON.parse(readFileSync(retained.planPath,'utf8'));previous.retainedReconciliation=retained;writeFileSync(retained.planPath,JSON.stringify(previous));retained.planSha256=fileHash(retained.planPath);}
+    if(kind==='normalizer')s.plan.currentSourceManifest.find(value=>value.path==='src/lib/parent/food-description.ts')!.sha256='a'.repeat(64);
+    s.savePlan();
+    await expect(foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env,network)).rejects.toThrow();
+    await expect(foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,network)).rejects.toThrow();
+    expect(network).not.toHaveBeenCalled();expect(descriptionEvaluationAccounting(s.approval.runDirectory).reservedPairs).toBe(3);
+  });
 it('re-evaluates exact retained responses with no key/HTTP/reservation and keeps original bytes, timing and denominators',async()=>{
   const s=await recoveryFixture(),network=vi.fn<typeof fetch>();
   const result=await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],{...s.env,CASELINK_FOOD_DESCRIPTION_EVAL_API_KEY:undefined},network);
@@ -160,13 +203,13 @@ it.each(['inner receipt','outside receipt','response','prior response substitute
     await expect(foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env,network)).rejects.toThrow();
     expect(network).not.toHaveBeenCalled();expect(readdirSync(s.approval.runDirectory)).not.toContain('reconciliation.json');
   });
-it('permits expired retained reads but never extends the original live deadline or rate-card day',async()=>{
-  const s=await recoveryFixture(),network=vi.fn<typeof fetch>();vi.setSystemTime(new Date('2026-11-19T16:00:00Z'));
+it.each([false,true])('permits expired retained reads but never extends the original live deadline or rate-card day (amended=%s)',async amended=>{
+  const s=await(amended?amendedRecoveryFixture():recoveryFixture()),network=vi.fn<typeof fetch>();vi.setSystemTime(new Date('2026-11-19T16:00:00Z'));
   await expect(foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env,network)).resolves.toMatchObject({newHttpRequests:0});
   await expect(foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,network)).rejects.toThrow();expect(network).not.toHaveBeenCalled();
 });
-it('uses current-source retained results, continues at004 and permanently stops a subsequent critical failure',async()=>{
-  const s=await recoveryFixture();await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
+it.each([false,true])('uses current-source retained results, continues at004 and permanently stops a subsequent critical failure (amended=%s)',async amended=>{
+  const s=await(amended?amendedRecoveryFixture():recoveryFixture());await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
   const before=s.fetcher.mock.calls.length;
   // The next Spanish case deliberately receives the unsupported fixture span; complete billing remains charged, quality fails closed.
   const report=await foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,s.fetcher);
@@ -182,16 +225,16 @@ it('uses current-source retained results, continues at004 and permanently stops 
   await expect(foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,s.fetcher)).rejects.toThrow();expect(s.fetcher).toHaveBeenCalledTimes(calls);
   for(const [path,hash]of s.oldHashes)expect(fileHash(path)).toBe(hash);
 });
-it('keeps a charged unknown after continuation reserved and blocks recovery without refund or redispatch',async()=>{
-  const s=await recoveryFixture();await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
+it.each([false,true])('keeps a charged unknown after continuation reserved and blocks recovery without refund or redispatch (amended=%s)',async amended=>{
+  const s=await(amended?amendedRecoveryFixture():recoveryFixture());await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
   const network=vi.fn<typeof fetch>().mockRejectedValue(new Error('synthetic interrupted count'));
   await foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,network);
   expect(descriptionEvaluationAccounting(s.approval.runDirectory)).toMatchObject({reservedPairs:4,reservedNanoDollars:220000000,costComplete:false});
   const calls=network.mock.calls.length;
   await expect(foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,network)).rejects.toThrow();expect(network).toHaveBeenCalledTimes(calls);
 });
-it('keeps the80 run2/83 aggregate/$5 reservation boundary across restarts and creates no replacement anchor',async()=>{
-  const s=await recoveryFixture();await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
+it.each([false,true])('keeps the80 run2/83 aggregate/$5 reservation boundary across restarts and creates no replacement anchor (amended=%s)',async amended=>{
+  const s=await(amended?amendedRecoveryFixture():recoveryFixture());await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
   const recovery={plan:s.plan,planSha256:s.env.CASELINK_FOOD_DESCRIPTION_EVAL_RECONCILIATION_SHA256!,configurationSha256:s.env.CASELINK_FOOD_DESCRIPTION_EVAL_APPROVAL_SHA256};
   const projection=descriptionEvaluationPlan().cases[0].turns[0].projection;
   const init={method:'POST',redirect:'error' as const,headers:{Authorization:'Bearer synthetic','Content-Type':'application/json','OpenAI-Project':'proj_synthetic'},body:JSON.stringify({...FOOD_DESCRIPTION_EVALUATION_BINDING.request,input:[{role:'user',content:JSON.stringify(projection)}]})};
@@ -215,4 +258,12 @@ it('keeps the80 run2/83 aggregate/$5 reservation boundary across restarts and cr
   const replacement={...s.approval,runDirectory:join(s.approval.runDirectory,'..','replacement'),approvalReference:'NO REPLACEMENT APPROVAL'};
   await expect(withFoodDescriptionEvaluationBudget({approval:replacement,apiKey:'synthetic',fetcher:s.fetcher,reconciliation:recovery},async()=>{})).rejects.toThrow();
   expect(readdirSync(join(s.approval.runDirectory,'..'))).not.toContain(`.food-description-evaluation-${descriptionEvaluationHash(replacement.approvalReference)}.json`);expect(s.fetcher).toHaveBeenCalledTimes(calls);
+});
+it.each([false,true])('refuses a missing original inner approval without recreating it or dispatching (amended=%s)',async amended=>{
+  const s=await(amended?amendedRecoveryFixture():recoveryFixture());await foodDescriptionEvaluationCommand(['--reconcile-retained',s.config,s.planPath],s.env);
+  rmSync(join(s.approval.runDirectory,'approval.json'));
+  const calls=s.fetcher.mock.calls.length;
+  let denied=false;try{await foodDescriptionEvaluationCommand(['--approved-live',s.config,'0',s.planPath],s.env,s.fetcher);}catch{denied=true;}
+  expect(denied).toBe(true);expect(s.fetcher.mock.calls.length).toBe(calls);
+  expect(readdirSync(s.approval.runDirectory)).not.toContain('approval.json');
 });
