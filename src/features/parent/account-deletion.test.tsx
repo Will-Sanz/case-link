@@ -57,7 +57,7 @@ describe("parent account deletion during processing closure", () => {
     const fetchMock=vi.fn().mockResolvedValue(response({ok:true,ownerId:"11111111-1111-4111-8111-111111111111",status:"deletion_requested"}));vi.stubGlobal("fetch",fetchMock);
     render(<ParentAccount deletionOnly/>);
     const heading = await screen.findByRole("heading",{name:"Your deletion request is recorded"});
-    expect(document.activeElement).toBe(heading);
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(fetchMock).toHaveBeenCalledOnce();expect(screen.queryByLabelText("Type DELETE to confirm")).toBeNull();
   });
   it("does not expose a deletion form for unrecognized ownership metadata",async()=>{
