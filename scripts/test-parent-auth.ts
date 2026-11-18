@@ -1010,8 +1010,10 @@ async function main() {
       check((await descriptionHttp(descriptionOwner.page, "DELETE", "/food-description", { action: "cancel", expectedOwnerId: descriptionOwner.id, draftId: a })).status() === 200,
         "Cancelling the optional interpretation clears its content rather than cancelling separately authorized service work.");
       const privateBeforeReceipt = (await db.query("select to_jsonb(r) value from public.parent_requests r where id=$1", [privateId])).rows[0].value;
+      check(privateBeforeReceipt.version === privateCorrected.request_version + 1,
+        "Clearing the linked profile advances the current request once while preserving its earlier immutable private snapshot.");
       const known = await descriptionStart(descriptionOwner.page, aSnapBody, aSnap.key);
-      check(known.request.id === privateId && known.request.version === 4, "The original source/profile/ES start receipt acknowledges the corrected current request after profile clear and description cancellation.");
+      check(known.request.id === privateId && known.request.version === privateBeforeReceipt.version, "The original source/profile/ES start receipt acknowledges the corrected current request after profile clear and description cancellation.");
       assert.deepEqual((await db.query("select to_jsonb(r) value from public.parent_requests r where id=$1", [privateId])).rows[0].value, privateBeforeReceipt);
       assert.deepEqual(await readPrivate(), privateCorrected);
       const immutableRead = await descriptionOwner.page.request.get(`${origin}/api/parent/requests/${privateId}/snap-application?revision=${privateOriginal.id}`);
