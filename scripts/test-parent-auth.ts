@@ -1577,9 +1577,10 @@ async function main() {
         const profileCorrected = await first.page.request.post(profileUrl, { headers: { origin, "Idempotency-Key": randomUUID() }, data: profileCorrectionBody });
         check(profileCorrected.status() === 201 && (await profileCorrected.json()).revision === 2, "The real family-profile API accepts an owned correction without new service authorization.");
         const correctedProfile = (await readProfile()).profile!, privateMixedCorrected = await readSnap(undefined, privateMixedId), privateMixedCorrectionState = await snapState(privateMixedId);
-        check(privateMixedCorrected.revision === 2 && privateMixedCorrected.request_version === 3 && privateMixedCorrected.base_version === 2 &&
-          privateMixedCorrected.details.applicant?.firstName === "AuthProfileCorrected" && privateMixedCorrectionState.request.version === 3 &&
-          privateMixedCorrectionState.job.request_version === 3 && privateMixedCorrectionState.job.state === "queued",
+        // A changed source first invalidates version2; saving its corrected private details then advances version3 to4.
+        check(privateMixedCorrected.revision === 2 && privateMixedCorrected.request_version === 4 && privateMixedCorrected.base_version === 3 &&
+          privateMixedCorrected.details.applicant?.firstName === "AuthProfileCorrected" && privateMixedCorrectionState.request.version === 4 &&
+          privateMixedCorrectionState.job.request_version === 4 && privateMixedCorrectionState.job.state === "queued",
         "A real profile correction atomically creates the next immutable mixed SNAP revision and queues only its current request version.");
         assert.deepEqual(privateMixedCorrectionState.request.mandate, privateMixedPreparedState.request.mandate);
         assert.deepEqual(privateMixedCorrectionState.request.plan, privateMixedPreparedState.request.plan);
@@ -1592,19 +1593,22 @@ async function main() {
           if (!changedNamePaths.includes(path)) assert.deepEqual(privateMixedCorrected.provenance[path], evidence);
         assert.deepEqual(correctedProfile.provenance["primaryPerson.lastName"], originalProfile.provenance["primaryPerson.lastName"]);
         assert.equal(new Date(privateMixedCorrected.provenance["applicant.firstName"].confirmedAt).toISOString(), new Date(correctedProfile.provenance["primaryPerson.firstName"].confirmedAt).toISOString());
-        const currentBindings = await profileSources(3);
+        const currentBindings = await profileSources(4);
         check(currentBindings.some(binding => binding.application_path === "applicant.firstName" && binding.profile_revision === 2) &&
-          (await db.query("select parent_private.current_grant($1,3) allowed", [privateMixedId])).rows[0].allowed,
+          (await db.query("select parent_private.current_grant($1,4) allowed", [privateMixedId])).rows[0].allowed,
         "The corrected mixed work retains current owned source bindings and its existing bounded mandate.");
-        const stalePrivateStart = await first.page.request.post(`${origin}/api/parent/requests`, { headers: { origin, "Idempotency-Key": privateMixedKey }, data: privateMixedBody });
-        check(stalePrivateStart.status() === 409, "A superseded lost-start packet cannot overwrite the subsequent profile correction.");
+        const privateStartReceipt = await first.page.request.post(`${origin}/api/parent/requests`, { headers: { origin, "Idempotency-Key": privateMixedKey }, data: privateMixedBody });
+        check(privateStartReceipt.status() === 201, "An exact previously committed source-aware start remains an acknowledgement read after profile correction.");
+        const acknowledgedPrivateRequest = (await privateStartReceipt.json()).request as SupportRequest;
+        check(acknowledgedPrivateRequest.id === privateMixedId && acknowledgedPrivateRequest.version === 4,
+          "The original start receipt returns the same owned request at its corrected current version without rewriting old answers.");
         const staleFoodReport = await first.page.request.post(`${privateMixedUrl}/outcome`, { headers: { origin }, data: { action: "food_visit", expectedVersion: 2,
           siteId: privateFoodPlan.site.id, planHash: privateFoodPlan.planHash, reportKey: randomUUID(), result: "no_food" } });
         check(staleFoodReport.status() === 409, "The older food plan cannot accept a report after the shared request version changed.");
         assert.deepEqual(await snapState(privateMixedId), privateMixedCorrectionState);
         await foodTurn(privateMixedId, privateWorker);
         const currentPrivateMixed = await readPrivateMixed(), currentPrivateFood = foodAccessPlanSchema.parse(currentPrivateMixed.plan?.routes.find(route => route.need === "food_now")?.foodAccess);
-        check(currentPrivateMixed.version === 3 && currentPrivateMixed.status === "active" && currentPrivateFood.state === "prepared" && currentPrivateFood.requestVersion === 3,
+        check(currentPrivateMixed.version === 4 && currentPrivateMixed.status === "active" && currentPrivateFood.state === "prepared" && currentPrivateFood.requestVersion === 4,
           "The real worker resumes at the corrected version and rebuilds only current public directions without losing SNAP work.");
         assert.deepEqual(currentPrivateMixed.plan?.routes.map(route => route.need), ["food_now", "snap_new"]);
         assert.deepEqual(await readSnap(undefined, privateMixedId), privateMixedCorrected);
