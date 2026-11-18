@@ -9,6 +9,11 @@ import { foodAccessAlternativesSchema } from "../src/lib/parent/food-access-alte
 import type { SupportRequest } from "../src/lib/parent/domain";
 import { applyPendingProductionSources, lineageHash, loadProductionLineage } from "./parent-production-lineage";
 
+export async function assertNativeLineageVault(db:WorkerDatabase){
+  assert.equal((await db.query("select exists(select 1 from pg_extension where extname='supabase_vault') and to_regclass('vault.decrypted_secrets') is not null value")).rows[0]?.value,true,"Native rehearsal requires its real local Vault extension and view");
+  assert.equal((await db.query("select p.pronargs-p.pronargdefaults=1 and p.proargtypes[0]='text'::regtype and p.prorettype='uuid'::regtype and not p.proretset value from pg_proc p where p.oid=to_regprocedure('vault.create_secret(text,text,text,uuid)')")).rows[0]?.value,true,"Native rehearsal requires the supported one-text-argument Vault call");
+}
+
 /** All identities/records below are created here; fake non-PDF packet bytes prove SQL authority only. */
 export async function rehearseParentProductionUpgrade(db:WorkerDatabase,options:{embedded:boolean;peer?:WorkerDatabase}){
   const lineage=loadProductionLineage(),owner=randomUUID(),session=randomUUID(),other=randomUUID(),otherSession=randomUUID();
@@ -25,7 +30,7 @@ export async function rehearseParentProductionUpgrade(db:WorkerDatabase,options:
   if(options.embedded){
     for(const sql of ["create schema vault","create schema extensions","create table vault.secrets(id uuid primary key default gen_random_uuid(),secret text not null)","create view vault.decrypted_secrets as select id,secret decrypted_secret from vault.secrets",
       "create function vault.create_secret(text) returns uuid language sql as $$insert into vault.secrets(secret) values($1) returning id$$","create function extensions.gen_random_bytes(integer) returns bytea language sql as $$select decode(repeat('ab',$1),'hex')$$"])await db.query(sql);
-  }else assert.ok(await value("select to_regprocedure('vault.create_secret(text,text,text)')::text value"),"Native rehearsal requires its real local Vault schema");
+  }else await assertNativeLineageVault(db);
   await db.query("create role caselink_lineage_worker_fixture login connection limit 2 valid until 'infinity'");
   await db.query("grant parent_worker to caselink_lineage_worker_fixture");
   await db.query(`update parent_private.processing_controls set enabled=true,approval_reference='SYNTHETIC lineage only',approved_until='infinity',

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { AssertionError } from "node:assert";
 import { createParentSqlFixture } from "./parent-sql-fixture";
 import { lineageHash, executeLineageSql, installObservedProductionSchema, assertObservedProductionSchema, loadProductionLineage, validateProductionLineage, applyPendingProductionSources } from "./parent-production-lineage";
-import { rehearseParentProductionUpgrade } from "./parent-production-lineage-cases";
+import { rehearseParentProductionUpgrade, assertNativeLineageVault } from "./parent-production-lineage-cases";
 import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory, fingerprint, withNativeLineageRoleAccess, nativeLineageAssertionLocation } from "./test-parent-production-lineage";
 
 const modulePath=process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
@@ -75,6 +75,20 @@ it("locates an actual shared-rehearsal assertion in the runtime source-mapped st
   try{await rehearseParentProductionUpgrade(db,{embedded:false});expect.fail("The absent synthetic Vault must fail before fixture writes");}
   catch(error){expect(error).toMatchObject({code:"ERR_ASSERTION"});expect(nativeLineageAssertionLocation(error)).toMatch(/^; assertion case line [1-9]\d*$/);}
   expect(db.query).toHaveBeenCalledTimes(1);
+});
+
+it.skipIf(!modulePath).each(["defaulted API","required extra arguments","uninstalled stand-in"])("checks the actual one-text Vault port without writes: %s",async mode=>{
+  const {PGlite}=await import(modulePath!),db=new PGlite();
+  try{
+    await db.exec("create schema vault;create view vault.decrypted_secrets as select null::uuid id,null::text decrypted_secret where false");
+    await db.exec(`create function vault.create_secret(text,text${mode==="required extra arguments"?"":" default null"},text${mode==="required extra arguments"?"":" default ''"},uuid${mode==="required extra arguments"?"":" default null"}) returns uuid language plpgsql as $$begin raise exception 'The readiness probe must never create a secret';end$$`);
+    expect((await db.query("select to_regprocedure('vault.create_secret(text,text,text)')::text value")).rows[0].value).toBe(null);
+    const query=vi.fn(async(sql:string)=>mode!=="uninstalled stand-in"&&sql.startsWith("select exists(")?{rows:[{value:true}]}:db.query(sql));
+    // Only extension-presence metadata is a positive unit double; the API catalog/defaults are real PostgreSQL.
+    if(mode==="defaulted API")await expect(assertNativeLineageVault({query})).resolves.toBeUndefined();
+    else await expect(assertNativeLineageVault({query})).rejects.toThrow(mode==="uninstalled stand-in"?"real local Vault extension and view":"supported one-text-argument Vault call");
+    expect(query).toHaveBeenCalledTimes(mode==="uninstalled stand-in"?1:2);
+  }finally{await db.close();}
 });
 
 it.skipIf(!modulePath).each(["success","failed work","missing ADMIN"])("restores exact native fixture memberships after %s",async mode=>{
