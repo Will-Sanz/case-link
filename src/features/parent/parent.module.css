@@ -543,6 +543,26 @@
 .resourceSearch .field {
   flex: 1 1 12rem;
 }
+.foodSites,
+.foodSites .input {
+  min-width: 0;
+}
+@media (max-width: 35rem) {
+  .container.foodServices,
+  .surface.foodSites,
+  :is(.foodServices, .foodSites) :is(.notice, .error, .urgent, .button, .secondary) {
+    padding: 12px;
+  }
+  .foodServices h1 {
+    font-size: 1.75rem;
+  }
+  :is(.foodServices, .foodSites) :is(.notice, .error) {
+    flex-direction: column;
+  }
+  .foodSites .hoursList > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .resourceResults {
   margin-top: 1rem;
 }

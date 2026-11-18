@@ -33,6 +33,13 @@ it("preserves policy/contact/program destinations and anchor IDs in both languag
   }
 });
 
+it.each(["en", "es"] as const)("lets the food tool use the selected display language without an outdated English-only notice (%s)", async value => {
+  locale.value = value;
+  render(await HelpPage());
+  expect(screen.getByText("Original food-location tool").closest("[lang]")?.getAttribute("lang")).toBe(value);
+  expect(screen.queryByText(/The food-location tool below remains in English|La herramienta para buscar lugares con alimentos que aparece abajo sigue en inglés/)).toBeNull();
+});
+
 it("keeps purpose closure and distinct family, application, protected and proposed retention limits in Spanish", async () => {
   const view = render(await PrivacyPage()), text = view.container.textContent!;
   expect(text).toContain("El procesamiento de datos personales reales no está abierto de forma predeterminada");

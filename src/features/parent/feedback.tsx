@@ -38,9 +38,7 @@ export function ServiceError({
       <WarningTriangle width={23} height={23} aria-hidden="true" />
       <div>
         <strong>
-          {error instanceof ParentApiError && error.status === 503
-            ? t("Live support isn’t available yet")
-            : t("We couldn’t finish this step")}
+          {t("We couldn’t finish this step")}
         </strong>
         <p lang={t(error.message) === error.message ? "en" : locale}>{t(error.message)}</p>
         <div className={`${styles.inline} ${styles.space}`}>

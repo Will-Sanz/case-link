@@ -2,6 +2,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoodSites } from "./food-sites";
+import { ParentLocaleProvider, useParentLocale } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const result = {
   sites: [
     {
@@ -150,5 +152,58 @@ describe("connected City food listings", () => {
         .getAttribute("href"),
     ).toBe("https://www.phila.gov/food/");
     expect(screen.queryByText("City-listed location")).toBeNull();
+  });
+});
+
+describe("Spanish public food listings", () => {
+  it("localizes directory guidance and dates while preserving original source names, notes and links", async () => {
+    const fetch = vi.fn().mockResolvedValue(response(result)); vi.stubGlobal("fetch", fetch);
+    render(<ParentLocaleProvider initialLocale="es"><FoodSites zip="19104"/></ParentLocaleProvider>);
+    await screen.findByRole("heading", { name: "City-listed location" });
+    expect(screen.getByRole("heading", { name: "Alimentos cerca de su código postal" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Llamar al 215-555-0123" }).getAttribute("href")).toBe("tel:2155550123");
+    fireEvent.click(screen.getByText("Horarios y detalles publicados"));
+    expect(screen.getByText("Lunes")).toBeTruthy();
+    expect(screen.getByText("Confirm who this site serves.").getAttribute("lang")).toBe("");
+    expect(screen.getByRole("heading", { name: "City-listed location" }).getAttribute("lang")).toBe("");
+    expect(document.body.textContent).toContain("26 oct");
+    expect(fetch.mock.calls[0][0]).toBe("/api/parent/food-sites?zip=19104");
+    expect(screen.getByText(/no es una reserva ni una recogida confirmada/)).toBeTruthy();
+  });
+  it("keeps public urgent access and empty-result alternatives readable without an account", async () => {
+    const fetch = vi.fn().mockResolvedValue(response({ ...result, sites: [] })); vi.stubGlobal("fetch", fetch);
+    render(<ParentLocaleProvider initialLocale="es"><FoodSites/></ParentLocaleProvider>);
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Código postal de Filadelfia"), { target: { value: "19104" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar lugares con alimentos" }));
+    await screen.findByText(/Puede haber ayuda en lugares cercanos/);
+    expect(screen.getByRole("link", { name: "Abrir el buscador de alimentos de la Ciudad" }).getAttribute("href")).toBe("https://www.phila.gov/food/");
+    expect(fetch.mock.calls.every(call => !String(call[0]).includes("account"))).toBe(true);
+  });
+  it("links an invalid ZIP error to the input without making a source request", () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    render(<ParentLocaleProvider initialLocale="es"><FoodSites/></ParentLocaleProvider>);
+    const input = screen.getByLabelText("Código postal de Filadelfia");
+    fireEvent.change(input, { target: { value: "19000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar lugares con alimentos" }));
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+    expect(screen.getByRole("alert").textContent).toContain("191");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("changes display language without re-fetching or losing the searched ZIP and expanded locations", async () => {
+    const fetch = vi.fn().mockResolvedValue(response({ ...result, sites: Array.from({ length: 4 }, (_, i) => ({ ...result.sites[0], id: i + 1, name: `Source location ${i + 1}` })) })); vi.stubGlobal("fetch", fetch);
+    function Switch() { const { chooseLocale } = useParentLocale(); return <button onClick={() => chooseLocale("es")}>Español</button>; }
+    render(<ParentLocaleProvider initialLocale="en"><Switch/><FoodSites/></ParentLocaleProvider>);
+    const input = screen.getByLabelText("Philadelphia ZIP code");
+    fireEvent.change(input, { target: { value: "19104" } }); fireEvent.click(screen.getByRole("button", { name: "Find food locations" }));
+    await screen.findByRole("heading", { name: "Source location 1" });
+    fireEvent.click(screen.getByRole("button", { name: "See 1 more city-listed locations" }));
+    fireEvent.click(screen.getByRole("button", { name: "Español" }));
+    expect((screen.getByLabelText("Código postal de Filadelfia") as HTMLInputElement).value).toBe("19104");
+    expect(screen.getByRole("button", { name: "Mostrar menos lugares" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("heading", { name: "Source location 4" })).toBeTruthy();
+    expect(document.body.textContent).toContain("26 oct");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

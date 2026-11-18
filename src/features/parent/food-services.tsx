@@ -11,9 +11,9 @@ import styles from "./parent.module.css";
 export function FoodServices({ initial, onChoose }: { initial?: FoodAssessmentHandoff; onChoose?: (value: FoodAssessmentHandoff) => void }) {
   const { t, locale } = useParentLocale();
   return (
-    <div lang={locale} className={styles.container}>
+    <div lang={locale} className={`${styles.container} ${styles.foodServices}`}>
       <FoodAssessment initial={initial} onChoose={onChoose}/>
-      <div lang="en"><FoodSites /></div>
+      <FoodSites />
       <details className={styles.disclosure}>
         <summary>{t("I already know which program I need")}</summary>
       <div className={styles.pageTop}>

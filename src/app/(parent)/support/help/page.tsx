@@ -67,8 +67,7 @@ export default async function HelpPage() {
           {t("Published program information does not establish available funding, appointments or a reservation. CaseLink does not currently offer a staffed emergency line.")}</p>
       </section>
       <div className={styles.section}>
-        <p>{t("The food-location tool below remains in English.")}</p>
-        <div lang="en"><FoodSites /></div>
+        <FoodSites />
       </div>
       <section className={`${styles.section} ${styles.infoWide}`}>
         <h2>{t("Official programs & partner options")}</h2>
