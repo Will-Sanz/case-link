@@ -112,7 +112,9 @@ def stage():
                 (dst / f).chmod(0o644)
         if key == 'web':
             (dst / 'tmp').mkdir(mode=0o755, exist_ok=True)
+            (dst / 'tmp').chmod(0o755)
             shutil.copyfile(base / 'tmp/parent-hosted-build.json', dst / 'tmp/parent-hosted-build.json')
+            (dst / 'tmp/parent-hosted-build.json').chmod(0o644)
             assert (base / '.next/BUILD_ID').read_bytes() == (dst / '.next/BUILD_ID').read_bytes()
         for f in ('package.json', 'package-lock.json'):
             assert sha(base / f) == sha(dst / f), 'Dependencies changed'
