@@ -1,7 +1,10 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from "react";
-import { SNAP_DIRECT_CERTIFICATION_REGIONS, type SnapDirectCompletion } from "@/lib/parent/snap-direct-completion-core";
+import { snapDirectCertificationRegions, type SnapDirectCompletion } from "@/lib/parent/snap-direct-completion-core";
 import { SNAP_PARENT_CERTIFICATION_ACTS } from "@/lib/parent/snap-protected-operation";
+import { SNAP_EN_TEMPLATE_ID } from "@/lib/parent/snap-form-source";
+import type { SnapFormTemplateId } from "./snap-document-language";
 import styles from "./parent.module.css";
 import { usePermissionWindow } from "./use-permission-window";
 
@@ -30,19 +33,22 @@ function erase(drawing: Drawing, surface: HTMLCanvasElement | null) {
 
 /** Parent must remount for a changed request/snapshot/source. No saved drawing can be supplied or reused. */
 type DrawingProps = {
-  actId: SnapPersonalDrawingValue["actId"]; label: string; instructions: string; expiresAt: string; disabled?: boolean;
+  actId: SnapPersonalDrawingValue["actId"]; templateId?: SnapFormTemplateId; label: string; instructions: string; expiresAt: string; disabled?: boolean;
   onChange: (value: SnapPersonalDrawingValue | null) => void; onRecovery: () => void;
 };
 export function SnapPersonalDrawing(props: DrawingProps) {
-  return <DrawingSession key={JSON.stringify([props.actId, props.expiresAt, !!props.disabled])} {...props}/>;
+  return <DrawingSession key={JSON.stringify([props.actId, props.templateId, props.expiresAt, !!props.disabled])} {...props}/>;
 }
-function DrawingSession({ actId, label, instructions, expiresAt, disabled = false, onChange, onRecovery }: DrawingProps) {
+function DrawingSession({ actId, templateId = SNAP_EN_TEMPLATE_ID, label, instructions, expiresAt, disabled = false, onChange, onRecovery }: DrawingProps) {
+  const { t, locale } = useParentLocale();
   const id = useId(), canvas = useRef<HTMLCanvasElement>(null), drawing = useRef<Drawing>({ strokes: [] });
   const changed = useRef(onChange);
   const [hasInk, setHasInk] = useState(false), [active, setActive] = useState(false), [message, setMessage] = useState("");
   const [expired, setExpired] = useState(false), [focused, setFocused] = useState(false);
   const timeCurrent = usePermissionWindow(Date.parse(expiresAt));
-  const supported = SNAP_PARENT_CERTIFICATION_ACTS.includes(actId), inactive = disabled || expired || !supported || !timeCurrent;
+  let regions: ReturnType<typeof snapDirectCertificationRegions> | undefined;
+  try { regions = snapDirectCertificationRegions(templateId); } catch { /* An unknown source never mounts usable personal entry. */ }
+  const supported = !!regions && SNAP_PARENT_CERTIFICATION_ACTS.includes(actId), inactive = disabled || expired || !supported || !timeCurrent;
   useEffect(() => { changed.current = onChange; }, [onChange]);
   const clear = useCallback((message = "") => {
     erase(drawing.current, canvas.current); setHasInk(false); setActive(false); setMessage(message); changed.current(null);
@@ -107,7 +113,7 @@ function DrawingSession({ actId, label, instructions, expiresAt, disabled = fals
     const session = drawing.current;
     setHasInk(session.strokes.length > 0); setActive(false);
     if (session.started === undefined || session.completed === undefined || !session.strokes.length || !session.size) { changed.current(null); return; }
-    const [x0, y0, x1, y1] = SNAP_DIRECT_CERTIFICATION_REGIONS[actId].ink, width = x1 - x0 - 2, height = y1 - y0 - 2;
+    const [x0, y0, x1, y1] = regions![actId].ink, width = x1 - x0 - 2, height = y1 - y0 - 2;
     const points = session.strokes.flat(), size = session.size;
     const minX = Math.min(...points.map(point => point.x * size.width)), maxX = Math.max(...points.map(point => point.x * size.width));
     const minY = Math.min(...points.map(point => point.y * size.height)), maxY = Math.max(...points.map(point => point.y * size.height));
@@ -150,21 +156,20 @@ function DrawingSession({ actId, label, instructions, expiresAt, disabled = fals
   function cancel(event: PointerEvent<HTMLCanvasElement>) {
     if (drawing.current.pointer === event.pointerId) clear("The drawing was interrupted. Please draw again, or choose another way.");
   }
-  return <fieldset className={styles.fieldset} aria-describedby={`${id}-instructions ${id}-status`}>
-    <legend className={styles.legend}>{label}</legend>
+  return <fieldset lang={locale} className={styles.fieldset} aria-describedby={`${id}-instructions ${id}-status`}>
+    <legend className={styles.legend}>{t(label)}</legend>
     <div className={styles.field}>
-      <p id={`${id}-instructions`} className={styles.hint}>{instructions} Draw with your finger, mouse or pen. If you cannot draw here, choose another way below.</p>
-      <canvas ref={canvas} width={640} height={160} role="img" aria-label={`${label} drawing area`} aria-describedby={`${id}-instructions ${id}-status`}
+      <p id={`${id}-instructions`} className={styles.hint}>{t(instructions)} {t("Draw with your finger, mouse or pen. If you cannot draw here, choose another way below.") }</p>
+      <canvas ref={canvas} width={640} height={160} role="img" aria-label={t("{label} drawing area").replace("{label}", t(label))} aria-describedby={`${id}-instructions ${id}-status`}
         tabIndex={inactive ? -1 : 0} className={styles.input} style={{ height: "10rem", padding: 0, touchAction: "none", outline: focused ? "3px solid var(--color-focus)" : undefined, outlineOffset: focused ? 4 : undefined }}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
         onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); clear(); } }}>
-        Use a drawing-capable device or choose another way below.
-      </canvas>
-      <p id={`${id}-status`} className={styles.hint} role="status">{message || (inactive ? "Drawing is unavailable for this step." : active ? "Drawing in progress." : hasInk ? "Drawing added on this page. Clear it to start again." : "Draw inside the empty box. Escape clears the drawing.")}</p>
+        {t("Use a drawing-capable device or choose another way below.") }{" "}</canvas>
+      <p id={`${id}-status`} className={styles.hint} role="status">{t(message || (inactive ? "Drawing is unavailable for this step." : active ? "Drawing in progress." : hasInk ? "Drawing added on this page. Clear it to start again." : "Draw inside the empty box. Escape clears the drawing."))}</p>
       <div className={styles.inline}>
-        <button type="button" className={styles.quiet} disabled={inactive || (!hasInk && !active)} onClick={() => clear()}>Clear drawing</button>
-        <button type="button" className={styles.quiet} disabled={disabled} onClick={() => { clear(); onRecovery(); }}>I need another way</button>
+        <button type="button" className={styles.quiet} disabled={inactive || (!hasInk && !active)} onClick={() => clear()}>{t("Clear drawing") }</button>
+        <button type="button" className={styles.quiet} disabled={disabled} onClick={() => { clear(); onRecovery(); }}>{t("I need another way") }</button>
       </div>
     </div>
   </fieldset>;

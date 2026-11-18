@@ -1,10 +1,12 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import type { SupportRequest } from "@/lib/parent/domain";
 import type { SnapApplicationSnapshot } from "@/lib/parent/snap-application-snapshot";
 import type { SnapCaptureContext } from "@/lib/parent/snap-capture-context";
 import { snapDirectAcquisitionInputSchema, snapDirectAcquisitionResultSchema, type SnapDirectAcquisitionResult } from "@/lib/parent/snap-direct-acquisition-contract";
+import { snapFormSource } from "@/lib/parent/snap-form-source";
 import { getProgram } from "@/lib/parent/programs";
 import { boundedParentApi, displayDate } from "./api";
 import styles from "./parent.module.css";
@@ -18,6 +20,7 @@ export function SnapAcquisitionPermission({ request, snapshot, context, acquisit
   request: SupportRequest; snapshot: SnapApplicationSnapshot; context: SnapCaptureContext;
   acquisition: SnapDirectAcquisitionResult; onAuthorized: (value: SnapDirectAcquisitionResult) => void;
 }) {
+  const { t, locale } = useParentLocale();
   const serialized = JSON.stringify({ id: request.id, version: request.version, status: request.status, needs: request.intake.needs, mandate: request.mandate, snapshot, context, acquisition });
   const scope = useMemo(() => {
     try {
@@ -95,25 +98,25 @@ export function SnapAcquisitionPermission({ request, snapshot, context, acquisit
       setAttempt({ scope, state: "unknown" }); void reconcile();
     }
   }
-  if (!current || !scope) return <p className={styles.notice} role="status">Private personal-step permission is unavailable. Your saved answers are kept.</p>;
+  if (!current || !scope) return <p lang={locale} className={styles.notice} role="status">{t("Private personal-step permission is unavailable. Your saved answers are kept.") }</p>;
   const pending = attempt?.scope === scope && attempt.state === "pending";
-  return <section className={styles.space} aria-labelledby="snap-private-permission-title">
-    <h3 id="snap-private-permission-title">Allow private SNAP personal steps</h3>
-    <p>The application needs Social Security numbers for the people applying, plus your own signatures and dates on form pages 1 and 5.</p>
-    <p><strong>People applying:</strong> {scope.people.map(person => `${person.firstName} ${person.lastName}`).join(", ")}.</p>
-    <p>CaseLink may use these entries to complete, privately store and show your Pennsylvania SNAP application, and deliver it only after your separate Submit choice and a verified service connection. Protected entries stay out of AI, chat and ordinary household records. This permission does not sign or send anything.</p>
-    <p>Permission and the private form expire by <strong>{displayDate(scope.deadline, true)} Eastern time</strong>. Use “Cancel request &amp; withdraw permission” on this request to stop future work. Copies already delivered follow the recipient’s own rules.</p>
-    <details><summary>Permission details</summary><p>Program: Pennsylvania SNAP · Form: PA 600 FS (SG) 9/19 · Policy: {scope.value.policyVersion} · Retention policy: {scope.value.retentionPolicyVersion}.</p></details>
-    {declined ? <p className={styles.notice} role="status">Personal steps are paused. Your saved answers are kept. You can continue through Pennsylvania’s official service.</p> : <label className={`${styles.checkbox} ${styles.space}`}>
+  return <section lang={locale} className={styles.space} aria-labelledby="snap-private-permission-title">
+    <h3 id="snap-private-permission-title">{t("Allow private SNAP personal steps") }</h3>
+    <p>{t("The application needs Social Security numbers for the people applying, plus your own signatures and dates on form pages 1 and 5.") }</p>
+    <p><strong>{t("People applying:") }</strong> {scope.people.map(person => `${person.firstName} ${person.lastName}`).join(", ")}.</p>
+    <p>{t("CaseLink may use these entries to complete, privately store and show your Pennsylvania SNAP application, and deliver it only after your separate Submit choice and a verified service connection. Protected entries stay out of AI, chat and ordinary household records. This permission does not sign or send anything.") }</p>
+    <p>{t("Permission and the private form expire by") }{" "}<strong>{displayDate(scope.deadline, true, locale)} {t("Eastern time") }</strong>{t(". Use “Cancel request & withdraw permission” on this request to stop future work. Copies already delivered follow the recipient’s own rules.") }</p>
+    <details><summary>{t("Permission details") }</summary><p>{t("Program: Pennsylvania SNAP · Form:")} <span lang={snapFormSource(scope.value.source.templateId).language}>{snapFormSource(scope.value.source.templateId).contract.printedRevision}</span> · {t("Policy:")}{" "}{scope.value.policyVersion} {t("· Retention policy:") }{" "}{scope.value.retentionPolicyVersion}.</p></details>
+    {declined ? <p className={styles.notice} role="status">{t("Personal steps are paused. Your saved answers are kept. You can continue through Pennsylvania’s official service.") }</p> : <label className={`${styles.checkbox} ${styles.space}`}>
       <input type="checkbox" checked={declared} disabled={pending || unknown} onChange={event => setDeclaration(event.target.checked ? scope : null)}/>
-      <span>I may provide the applying people’s information, and I allow this private use for their SNAP application.</span>
+      <span>{t("I may provide the applying people’s information, and I allow this private use for their SNAP application.") }</span>
     </label>}
     <div className={`${styles.inline} ${styles.space}`}>
-      {declined && <button type="button" className={styles.quiet} onClick={() => { setDeclinedScope(null); setDeclaration(null); }}>Review personal-step permission</button>}
-      {!declined && <button type="button" className={styles.button} disabled={!declared || pending || unknown} onClick={allow}>{pending ? "Saving permission…" : "Allow and continue"}</button>}
-      {!declined && <button type="button" className={styles.quiet} disabled={pending || unknown} onClick={() => setDeclinedScope(scope)}>Not now</button>}
-      <a className={styles.textLink} href={getProgram("snap-pa")!.officialUrl}>Use the official SNAP service</a>
+      {declined && <button type="button" className={styles.quiet} onClick={() => { setDeclinedScope(null); setDeclaration(null); }}>{t("Review personal-step permission") }</button>}
+      {!declined && <button type="button" className={styles.button} disabled={!declared || pending || unknown} onClick={allow}>{t(pending ? "Saving permission…" : "Allow and continue")}</button>}
+      {!declined && <button type="button" className={styles.quiet} disabled={pending || unknown} onClick={() => setDeclinedScope(scope)}>{t("Not now") }</button>}
+      <a className={styles.textLink} href={getProgram("snap-pa")!.officialUrl}>{t("Use the official SNAP service") }</a>
     </div>
-    {unknown && <div className={styles.notice} role="status"><p>Permission is not confirmed yet. CaseLink is checking the saved result before opening personal steps. No application has been sent.</p><button type="button" className={styles.quiet} onClick={() => { void reconcile(); }}>Check saved permission</button></div>}
+    {unknown && <div className={styles.notice} role="status"><p>{t("Permission is not confirmed yet. CaseLink is checking the saved result before opening personal steps. No application has been sent.") }</p><button type="button" className={styles.quiet} onClick={() => { void reconcile(); }}>{t("Check saved permission") }</button></div>}
   </section>;
 }

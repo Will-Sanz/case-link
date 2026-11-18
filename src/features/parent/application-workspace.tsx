@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import Link from "next/link";
 import { Children, isValidElement, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Clock } from "iconoir-react";
@@ -215,7 +216,9 @@ export function ApplicationWorkspace({
   }, [request.id]);
   const needsVerification = verification.requestId === request.id && verification.needed;
   const { data, error, loading, reload } = history;
+  const { t, locale } = useParentLocale();
   const snap = request.intake.needs.includes("snap_new");
+  const st = (copy: string) => snap ? t(copy) : copy;
   const wic = request.intake.needs.includes("wic_new");
   const peco = isPecoPreparationRequest(request), pgw = request.has_pgw_application_details === true, water = request.has_water_application_details === true;
   const utility = peco || pgw || water;
@@ -339,7 +342,7 @@ export function ApplicationWorkspace({
       detail: inactive
         ? "History"
         : actions.length
-          ? `${actions.length} need you`
+          ? st("{n} need you").replace("{n}", String(actions.length))
           : needsVerification
             ? "COMPASS step above"
           : "Nothing requested",
@@ -363,7 +366,7 @@ export function ApplicationWorkspace({
     {
       id: "application-documents",
       label: "Your documents",
-      detail: `${request.documents?.length ?? 0} saved`,
+      detail: st("{n} saved").replace("{n}", String(request.documents?.length ?? 0)),
       done: !!request.documents?.length,
     },
     {
@@ -388,8 +391,8 @@ export function ApplicationWorkspace({
         if (window.location.hash !== link.hash) window.history.pushState(null, "", link.hash);
       }
     }}>
-      <nav className={layout.checklist} aria-label="Your application checklist">
-        <h2>{snap ? "Your SNAP request" : "Your support request"}</h2>
+      <nav lang={snap ? locale : "en"} className={layout.checklist} aria-label={st("Your application checklist")}>
+        <h2>{st(snap ? "Your SNAP request" : "Your support request")}</h2>
         <ol>
           {steps.map((step) => (
             <li key={step.id}>
@@ -407,18 +410,18 @@ export function ApplicationWorkspace({
                   {step.done ? <Check width={15} height={15} /> : <Clock width={14} height={14} />}
                 </span>
                 <span>
-                  <strong>{step.label}</strong>
-                  <small>{step.detail}</small>
+                  <strong lang={st(step.label) === step.label ? "en" : locale}>{st(step.label)}</strong>
+                  <small lang={st(step.detail) === step.detail ? "en" : locale}>{st(step.detail)}</small>
                 </span>
               </a>
             </li>
           ))}
         </ol>
         <div className={layout.helpLinks}>
-          <Link href="/support/help">Get help</Link>
-          <Link href="/support/privacy">Privacy & data</Link>
-          <Link href="/support/terms">Terms</Link>
-          <a href="mailto:willsanz23@gmail.com">Contact CaseLink</a>
+          <Link href="/support/help">{st("Get help")}</Link>
+          <Link href="/support/privacy">{st("Privacy & data")}</Link>
+          <Link href="/support/terms">{st("Terms")}</Link>
+          <a href="mailto:willsanz23@gmail.com">{st("Contact CaseLink")}</a>
         </div>
       </nav>
       <div className={layout.content}>
@@ -507,8 +510,8 @@ export function ApplicationWorkspace({
             <strong>{nextActor}</strong>
             <p>{nextDetail}</p>
             {!inactive && (actions.length > 0 || needsVerification) && (
-              <a className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
-                {needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps"}{" "}
+              <a lang={snap ? locale : "en"} className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
+                {st(needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps")}{" "}
                 <ArrowRight width={17} height={17} aria-hidden="true" />
               </a>
             )}

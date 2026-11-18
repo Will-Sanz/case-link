@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { intakeSchema, mandateSchema, type SupportRequest } from "@/lib/parent/domain";
@@ -11,9 +12,10 @@ import { boundedParentApi, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { SnapDirectPersonalEntry } from "./snap-direct-personal-entry";
 import { SnapAcquisitionPermission } from "./snap-acquisition-permission";
+import { SnapManualSigningCopy } from "./snap-manual-signing-copy";
 import { SnapPreparedApplication } from "./snap-prepared-application";
 import { isSnapFinalReviewAction } from "./support-activity";
-import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import { snapFormSource } from "@/lib/parent/snap-form-source";
 import styles from "./parent.module.css";
 import { usePermissionWindow } from "./use-permission-window";
 
@@ -30,6 +32,7 @@ const unavailable = "The current application permission could not be checked. Yo
 export function SnapProtectedApplication({ request, snapshot, onChange }: {
   request: SupportRequest; snapshot: SnapApplicationSnapshot; onChange?: () => void;
 }) {
+  const { t, locale } = useParentLocale();
   const [revision, setRevision] = useState(0);
   // Background activity polls cannot discard unsaved personal entries when their authority and facts are unchanged.
   const serialized = JSON.stringify({ id: request.id, version: request.version, status: request.status, needs: request.intake.needs,
@@ -38,11 +41,12 @@ export function SnapProtectedApplication({ request, snapshot, onChange }: {
     const parsed = scopeSchema.safeParse(JSON.parse(serialized)); return parsed.success ? parsed.data : null;
   }, [serialized]);
   const scope = useMemo(() => ({ binding, revision }), [binding, revision]);
-  type View = { scope: typeof scope } & ({ kind: "prepared" } | { kind: "recovery" } | { kind: "unavailable" } | { kind: "error"; error: Error }
+  type View = { scope: typeof scope } & ({ kind: "prepared" } | { kind: "recovery" } | { kind: "unavailable"; context: SnapCaptureContext } | { kind: "error"; error: Error }
     | { kind: "entry" | "permission"; context: SnapCaptureContext; acquisition: SnapDirectAcquisitionResult });
   const [result, setResult] = useState<View | null>(null), work = useRef<AbortController | null>(null);
   let current = false;
-  const deadline = binding ? Math.min(Date.parse(binding.mandate.expiresAt), Date.parse(source.verifiedUntil)) : NaN;
+  const source = binding ? snapFormSource(binding.snapshot.source.templateId).contract : null;
+  const deadline = binding && source ? Math.min(Date.parse(binding.mandate.expiresAt), Date.parse(source.verifiedUntil)) : NaN;
   const timeCurrent = usePermissionWindow(deadline);
   try {
     if (!binding) throw new Error();
@@ -83,7 +87,7 @@ export function SnapProtectedApplication({ request, snapshot, onChange }: {
         try { acquisitionValue = await read(`/requests/${id}/snap-acquisition?${query}`); }
         catch (failure) {
           if (controller.signal.aborted) return;
-          if (failure instanceof ParentApiError && failure.status === 403) { setResult({ scope, kind: "unavailable" }); return; }
+          if (failure instanceof ParentApiError && failure.status === 403) { setResult({ scope, kind: "unavailable", context }); return; }
           throw failure;
         }
         const acquisition = acquisitionReply.parse(acquisitionValue).acquisition;
@@ -106,22 +110,23 @@ export function SnapProtectedApplication({ request, snapshot, onChange }: {
   if (!current) return null;
   if (!view) return <ParentLoading label="Checking application personal steps"/>;
   if (view.kind === "prepared") return <SnapPreparedApplication request={request} snapshot={snapshot} onChange={onChange}/>;
-  if (view.kind === "unavailable") return <section className={styles.space} aria-label="Personal steps unavailable">
-    <p className={styles.hint}>Personal steps are unavailable through CaseLink right now. Your saved answers are unchanged. Check Activity &amp; receipts for any prepared drafts.</p>
+  if (view.kind === "unavailable") return <section lang={locale} className={styles.space} aria-label={t("Personal steps unavailable")}>
+    <p className={styles.hint}>{t("Personal steps are unavailable through CaseLink right now. Your saved answers are unchanged. Check Activity & receipts for any prepared drafts.") }</p>
+    <SnapManualSigningCopy request={request} snapshot={snapshot} context={view.context}/>
     <div className={styles.inline}>
-      <a className={styles.textLink} href="#application-receipts">View drafts and recorded activity</a>
-      <button type="button" className={styles.quiet} onClick={() => setRevision(value => value + 1)}>Check current application</button>
+      <a className={styles.textLink} href="#application-receipts">{t("View drafts and recorded activity") }</a>
+      <button type="button" className={styles.quiet} onClick={() => setRevision(value => value + 1)}>{t("Check current application") }</button>
     </div>
   </section>;
   if (view.kind === "error") return <ServiceError error={view.error} retry={() => setRevision(value => value + 1)} returnTo={`/support/${request.id}`}/>;
   if (view.kind === "permission") return <SnapAcquisitionPermission request={request} snapshot={snapshot} context={view.context} acquisition={view.acquisition}
     onAuthorized={acquisition => { if (!work.current?.signal.aborted) setResult({ scope, kind: "entry", context: view.context, acquisition }); }}/>;
-  if (view.kind === "recovery") return <section className={styles.space} aria-label="Another way to complete personal steps">
-    <h3>Another way to complete personal steps</h3>
-    <p>Your personal steps still need to be completed. Your saved CaseLink answers are kept. You can use Pennsylvania’s official SNAP application service.</p>
+  if (view.kind === "recovery") return <section lang={locale} className={styles.space} aria-label={t("Another way to complete personal steps")}>
+    <h3>{t("Another way to complete personal steps") }</h3>
+    <p>{t("Your personal steps still need to be completed. Your saved CaseLink answers are kept. You can use Pennsylvania’s official SNAP application service.") }</p>
     <div className={styles.inline}>
-      <a className={styles.textLink} href={getProgram("snap-pa")!.officialUrl}>Open the official SNAP service</a>
-      <button type="button" className={styles.quiet} onClick={() => setRevision(value => value + 1)}>Check current application</button>
+      <a className={styles.textLink} href={getProgram("snap-pa")!.officialUrl}>{t("Open the official SNAP service") }</a>
+      <button type="button" className={styles.quiet} onClick={() => setRevision(value => value + 1)}>{t("Check current application") }</button>
     </div>
   </section>;
   return <SnapDirectPersonalEntry request={request} snapshot={snapshot} context={view.context} acquisition={view.acquisition} onChange={onChange}

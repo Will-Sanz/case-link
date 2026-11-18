@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";
@@ -124,7 +125,8 @@ export function useSavedFamilyProfile({ request, program, snapshotId, permitted,
 }
 
 export function SavedFamilyProfileNotice({ reuse, refresh, disabled }: { reuse: Pick<ReturnType<typeof useSavedFamilyProfile>, "notice" | "loading" | "blocked" | "canReload">; refresh: () => void; disabled: boolean }) {
-  return reuse.notice ? <div className={styles.notice}><div><p>{reuse.notice} <Link className={styles.textLink} href="/family-profile">Update family information</Link>.</p>
-    {(!reuse.blocked || reuse.canReload) && <button type="button" className={styles.secondary} disabled={disabled || reuse.loading} onClick={refresh}>{reuse.loading ? "Checking family answers…" : (reuse.canReload ? "Recheck private editing access" : "Refresh linked family answers")}</button>}
+  const { t, locale } = useParentLocale();
+  return reuse.notice ? <div lang={locale} className={styles.notice}><div><p>{t(reuse.notice)} <Link className={styles.textLink} href="/family-profile">{t("Update family information")}</Link>.</p>
+    {(!reuse.blocked || reuse.canReload) && <button type="button" className={styles.secondary} disabled={disabled || reuse.loading} onClick={refresh}>{t(reuse.loading ? "Checking family answers…" : (reuse.canReload ? "Recheck private editing access" : "Refresh linked family answers"))}</button>}
   </div></div> : null;
 }

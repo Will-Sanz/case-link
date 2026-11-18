@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import Link from "next/link";
 import { z } from "zod";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -73,6 +74,7 @@ function RequiredStep({
   onReviewPermission: () => void;
   onSnapDetails: () => void;
 }) {
+  const { t, locale } = useParentLocale();
   const snapDetails = action.need === "snap_new" && request.intake.needs.includes("snap_new") &&
     action.reason === "missing_fact" && action.field === "snap_application_details";
   const snapSubmit = action.need === "snap_new" && request.intake.needs.includes("snap_new") && action.reason === "submission_review" && action.field === "snap_final_submit";
@@ -93,7 +95,7 @@ function RequiredStep({
         {action.title}
       </h2>
       <p>{action.explanation}</p>
-      {snapSubmit ? <a className={styles.button} href="#snap-final-review">Review application and Submit</a> : snapDetails ? <a className={styles.button} href="#application-answers" onClick={onSnapDetails}>Answer SNAP application questions</a> : canAnswer ? (
+      {snapSubmit ? <a lang={locale} className={styles.button} href="#snap-final-review">{t("Review application and Submit")}</a> : snapDetails ? <a lang={locale} className={styles.button} href="#application-answers" onClick={onSnapDetails}>{t("Answer SNAP application questions")}</a> : canAnswer ? (
         <NecessaryAnswer
           action={action}
           request={request}

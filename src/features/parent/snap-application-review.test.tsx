@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { FAMILY_PROFILE_NOTICE_VERSION } from "@/lib/parent/family-profile";
+import { SNAP_ES_TEMPLATE_ID, SNAP_EN_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "@/lib/parent/snap-form-source";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
 import { SNAP_APPLICATION_SOURCE, type SnapApplicationFields } from "@/lib/parent/snap-application-fields";
 import { snapApplicationLeaves, type SnapApplicationSnapshot } from "@/lib/parent/snap-application-snapshot";
@@ -449,5 +450,42 @@ describe("owned exact SNAP application review",()=>{
     api({getStatus:404});render(<SnapApplicationReview request={request()}/>);
     await screen.findByText(/No full SNAP application answers are saved/);
     expect(screen.queryByRole("button",{name:"Correct application answers"})).toBeNull();
+  });
+});
+
+
+describe("exact document-source editing", () => {
+  it("saves a source-only revision without changing factual values or requesting fresh confirmation", async () => {
+    const saved = completeSnapshot(), fetcher = api({ saved });
+    render(<SnapApplicationReview request={request()}/>);
+    await screen.findByRole("button", { name: "Correct application answers" });
+    await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText("Official SNAP document language"), { target: { value: SNAP_ES_TEMPLATE_ID } });
+    expect(screen.getByRole("link", { name: "reviewed Pennsylvania SNAP form" }).getAttribute("href")).toContain("pa-600-fs-s.pdf");
+    expect(screen.queryByRole("button", { name: /^Still correct:/ })).toBeNull();
+    await press("Save application changes");
+    const post = fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!;
+    expect(JSON.parse(String(post.body))).toEqual({ expectedVersion: 2, details: saved.details, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION, documentTemplateId: SNAP_ES_TEMPLATE_ID });
+  });
+  it("starts an ordinary correction on the saved Spanish source without adding a new choice", async () => {
+    const saved = { ...completeSnapshot(), source: SNAP_SPANISH_APPLICATION_SOURCE }, fetcher = api({ saved });
+    render(<SnapApplicationReview request={request()}/>); await press("Correct application answers");
+    expect((screen.getByLabelText("Official SNAP document language") as HTMLSelectElement).value).toBe(SNAP_ES_TEMPLATE_ID);
+    fireEvent.change(screen.getByLabelText("Your first name"), { target: { value: "José" } });
+    await press("Save application changes");
+    const body = JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body));
+    expect(body.documentTemplateId).toBeUndefined(); expect(body.details.applicant.firstName).toBe("José");
+  });
+  it("freezes source choice with the exact save key/body after a lost response", async () => {
+    let count=0; const fetcher = api({ saved: completeSnapshot(), post: () => { if (++count === 1) throw new Error("synthetic lost acknowledgement"); return json({ snapshotId }); } });
+    render(<SnapApplicationReview request={request()}/>); await press("Correct application answers");
+    fireEvent.change(screen.getByLabelText("Official SNAP document language"), { target: { value: SNAP_ES_TEMPLATE_ID } });
+    await press("Save application changes"); await screen.findByRole("button", { name: "Retry the same save" });
+    expect(screen.getByLabelText("Official SNAP document language").matches(":disabled")).toBe(true);
+    await press("Retry the same save");
+    const posts = fetcher.mock.calls.filter(([, init]) => init?.method === "POST").map(([, init]) => init!);
+    expect(posts).toHaveLength(2); expect(posts[0].body).toBe(posts[1].body); expect(posts[0].headers).toEqual(posts[1].headers);
+    expect(JSON.parse(String(posts[1].body)).documentTemplateId).toBe(SNAP_ES_TEMPLATE_ID);
+    expect(SNAP_EN_TEMPLATE_ID).not.toBe(SNAP_ES_TEMPLATE_ID);
   });
 });

@@ -2,9 +2,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode, useLayoutEffect, useState } from "react";
-import { fixtureIntake, fixtureMandate, fixtureProtectedSnapOperation, fixtureRequest } from "@/lib/parent/test-fixtures";
+import { fixtureSnapSnapshot, fixtureIntake, fixtureMandate, fixtureProtectedSnapOperation, fixtureRequest } from "@/lib/parent/test-fixtures";
+import { SNAP_SPANISH_APPLICATION_SOURCE } from "@/lib/parent/snap-form-source";
 import { SNAP_PARENT_CERTIFICATION_ACTS } from "@/lib/parent/snap-protected-operation";
-const mocks = vi.hoisted(() => ({ load: vi.fn(), create: vi.fn(), revoke: vi.fn(), display: vi.fn(), reloads: new Map<string, () => void>() }));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), create: vi.fn(), revoke: vi.fn(), display: vi.fn(), language: vi.fn(), reloads: new Map<string, () => void>() }));
 vi.mock("@/lib/parent/snap-review-file", () => ({ loadSnapReviewFile: mocks.load }));
 vi.mock("./use-parent-resource", async importOriginal => {
   const actual = await importOriginal<typeof import("./use-parent-resource")>();
@@ -12,7 +13,8 @@ vi.mock("./use-parent-resource", async importOriginal => {
 });
 vi.mock("./snap-review-pdf", async () => {
   const { useEffect } = await import("react");
-  return { SnapReviewPdf: ({ onReady }: { onReady: (ready: boolean) => void }) => {
+  return { SnapReviewPdf: ({ onReady, documentLanguage }: { onReady: (ready: boolean) => void; documentLanguage?: string }) => {
+    mocks.language(documentLanguage);
     const ready = mocks.display(); useEffect(() => onReady(ready), [ready, onReady]);
     return <div role="img" aria-label="Exact SNAP application test viewer"/>;
   } };
@@ -144,7 +146,7 @@ describe("exact parent SNAP final review and genuine Submit", () => {
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull(); expect(screen.getByRole("button", { name: "Replace personal pages" }).matches(":disabled")).toBe(true);
     expect(screen.getByText(/Your application permission has expired or could not be checked/)).toBeTruthy();
     expect(mocks.revoke).toHaveBeenCalledWith("blob:https://caselink.test/synthetic-pdf"); expect(changed).toHaveBeenLastCalledWith(null);
-    expect(fetcher).toHaveBeenCalledOnce(); expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    expect(fetcher.mock.calls.filter(([url])=>!url.includes("/snap-application?"))).toHaveLength(1); expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
   it("aborts an unfinished exact load at mandate expiry and wipes late private bytes", async () => {
     vi.useFakeTimers(); const now = new Date("2026-11-05T22:00:00.000Z"); vi.setSystemTime(now);
@@ -196,7 +198,7 @@ describe("exact parent SNAP final review and genuine Submit", () => {
     expect(screen.queryByText("Recording Submit…")).toBeNull(); expect(screen.getByText(/Submit result is not confirmed/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
-    expect(fetcher.mock.calls.filter(([, init]) => init?.method !== "POST")).toHaveLength(2);
+    expect(fetcher.mock.calls.filter(([url, init]) => init?.method !== "POST" && !url.includes("/snap-application?"))).toHaveLength(2);
     const signal = fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.signal!; expect(signal.aborted).toBe(true);
     const calls = changed.mock.calls.length;
     await act(async () => { finish(stage === "fetch" ? json({ ok: true, operationId: operation.operationId, state: "authorization_recorded" }) : { ok: true, operationId: operation.operationId, state: "authorization_recorded" }); });
@@ -268,11 +270,11 @@ describe("exact parent SNAP final review and genuine Submit", () => {
     const review = structuredClone(operation), fetcher = api(review, () => { throw new Error("Synthetic lost Submit response"); });
     await act(async () => { render(<SnapFinalReview request={request}/>); await vi.advanceTimersByTimeAsync(0); });
     fireEvent.click(screen.getByRole("button", { name: "Submit" })); await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-    expect(screen.getByText(/Submit result is not confirmed/)).toBeTruthy(); expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(screen.getByText(/Submit result is not confirmed/)).toBeTruthy(); expect(fetcher.mock.calls.filter(([url])=>!url.includes("/snap-application?"))).toHaveLength(3);
     Object.assign(review, { snapSubmissionAuthorized: true, personalActsComplete: true });
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(screen.getByText(/Your Submit decision is recorded/)).toBeTruthy(); expect(screen.queryByText(/Submit result is not confirmed/)).toBeNull();
-    expect(fetcher).toHaveBeenCalledTimes(4); await act(async () => { await vi.advanceTimersByTimeAsync(15000); }); expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher.mock.calls.filter(([url])=>!url.includes("/snap-application?"))).toHaveLength(4); await act(async () => { await vi.advanceTimersByTimeAsync(15000); }); expect(fetcher.mock.calls.filter(([url])=>!url.includes("/snap-application?"))).toHaveLength(4);
     const posts = fetcher.mock.calls.filter(([, init]) => init?.method === "POST"); expect(posts).toHaveLength(1);
     expect(JSON.parse(posts[0][1]!.body as string).completedActs).toEqual([...SNAP_PARENT_CERTIFICATION_ACTS]);
   });
@@ -298,4 +300,21 @@ describe("exact parent SNAP final review and genuine Submit", () => {
     expect(document.body.textContent).not.toMatch(/will check the delivery|preparing the exact/);
     expect(mocks.revoke).toHaveBeenCalled(); await waitFor(() => expect(changed).toHaveBeenLastCalledWith(null));
   });
+});
+
+
+describe("packet-bound official document language",()=>{
+ it.each(["exact","foreign_snapshot","future_revision","wrong_source"])("uses only the exact immutable source for %s",async kind=>{
+  const saved={...fixtureSnapSnapshot(new Date("2026-11-06T16:00:00Z")),id:operation.packet.protectedSnapPacket.snapshotId,request_id:operation.requestId,request_version:operation.requestVersion,source:{...SNAP_SPANISH_APPLICATION_SOURCE}};
+  if(kind==="foreign_snapshot")saved.id=request.household_id;
+  if(kind==="future_revision")saved.request_version++;
+  if(kind==="wrong_source")Reflect.set(saved.source,"templateSha256","f".repeat(64));
+  const base=api(), fetcher=vi.fn((url:string,init?:RequestInit)=>url.includes("/snap-application?")?Promise.resolve(json({ok:true,snapshot:saved})):base(url,init));
+  vi.stubGlobal("fetch",fetcher);render(<SnapFinalReview request={request}/>);
+  await screen.findByRole("button",{name:"Submit"});await act(async()=>{});
+  expect(mocks.language.mock.calls.at(-1)?.[0]).toBe(kind==="exact"?"es":undefined);
+  const read=fetcher.mock.calls.find(([url])=>url.includes("/snap-application?"))!;
+  expect(read[0]).toContain(`revision=${operation.packet.protectedSnapPacket.snapshotId}`);expect(read[1]?.method).not.toBe("POST");
+  expect(fetcher.mock.calls.some(([,init])=>init?.method==="POST")).toBe(false);
+ });
 });

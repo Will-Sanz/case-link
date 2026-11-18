@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import Link from "next/link";
 import { z } from "zod";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -38,6 +39,8 @@ import { FoodServices } from "./food-services";
 import { foodAssessmentHandoffSchema, foodAssessmentReplySchema, type FoodAssessmentHandoff } from "@/lib/parent/food-assessment";
 import { ParentSignIn } from "./sign-in";
 import { SnapApplicationFormFields } from "./snap-application-form";
+import { SnapDocumentLanguage, type SnapFormTemplateId } from "./snap-document-language";
+import { SNAP_EN_TEMPLATE_ID } from "@/lib/parent/snap-form-source";
 import { SnapApplicationNotice } from "./snap-application-review";
 import { WicApplicationNotice, WicApplicationFormFields } from "./wic-application-form";
 import { PecoApplicationNotice, PecoApplicationFormFields, PECO_HELP_URL } from "./peco-application-form";
@@ -165,6 +168,7 @@ export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: str
 }
 
 function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged, signInOptions, active = true }: { initialNeed?: string; handoff?: FoodAssessmentHandoff; onFoodBack?: () => void; onFoodOwnerChanged?: () => void; signInOptions?: ParentIntakeSignInOptions; active?: boolean }) {
+  const { t, locale } = useParentLocale();
   const session = useParentResource<{
     account: { id?: string; email: string; preferences?: ParentPreferences };
   }>("/account");
@@ -219,6 +223,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [snapDetails, setSnapDetails] = useState<SnapApplicationFields>({});
+  const [snapDocument, setSnapDocument] = useState<SnapFormTemplateId>(SNAP_EN_TEMPLATE_ID);
+  const [snapDocumentChosen, setSnapDocumentChosen] = useState(false);
   const [detailsReady, setDetailsReady] = useState(false);
   const [startUncertain, setStartUncertain] = useState(false);
   const [collectionBlocked, setCollectionBlocked] = useState(false);
@@ -232,10 +238,10 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource; documentTemplateId?: SnapFormTemplateId };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
-  const scope=JSON.stringify({intake,snapDetails,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip,handoff});
+  const scope=JSON.stringify({intake,snapDetails,snapDocument,snapDocumentChosen,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip,handoff});
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
   useLayoutEffect(()=>{
     const controller=new AbortController();work.current=controller;
@@ -327,7 +333,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const closeChangedFamily = useCallback(() => {
     work.current?.abort(); running.current?.abort(); familyProfileWork.current?.abort();
     familyOwner.current = null; familySources.current = {}; familyApplied.current.clear();
-    setFamilyProfile(null); setFamilyFilled({}); setSnapDetails({}); setWicDetails({}); setUtilityDetails({});
+    setFamilyProfile(null); setFamilyFilled({}); setSnapDetails({}); setSnapDocument(SNAP_EN_TEMPLATE_ID); setSnapDocumentChosen(false); setWicDetails({}); setUtilityDetails({});
     setReusedZip(null); setIntake(current => ({ ...current, zip: "", householdSize: null, incomeAmount: null, incomeFrequency: "unknown", accountAuthority: "not_sure" }));
     setAccepted(false); setError(null); setStartUncertain(false); startAttempt.current = null;
     setFamilyAccess("changed");
@@ -768,7 +774,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
               !!utility,
               !!utility,
             ),
-            ...(details?{kind:"snap_application" as const,details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}:{}),
+            ...(details?{kind:"snap_application" as const,details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION,...(snapDocumentChosen ? { documentTemplateId: snapDocument } : {})}:{}),
             ...(wic ? { kind: "wic_application" as const, details: wic, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true as const } : {}),
             ...(utility && utilityConfig ? { kind: utilityConfig.kind, details: utility, noticeVersion: utilityConfig.noticeVersion, subjectAuthorityDeclared: true as const, accountAuthorityDeclared: true as const } : {}),
             ...(profileSource ? { familyProfileSource: profileSource } : {}),
@@ -897,23 +903,21 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);
     }
   }
+  const st = (copy: string) => snapSelected ? t(copy) : copy;
   return (
-    <div className={styles.container}>
-      <div className={styles.pageTop}>
+    <div className={`${styles.container} ${snapSelected ? styles.snapIntake : ""}`}>
+      <div lang={snapSelected ? locale : "en"} className={styles.pageTop}>
         <div>
-          <h1>{directSnap ? "Apply for SNAP" : "Let’s make the next steps easier."}</h1>
+          <h1>{st(directSnap ? "Apply for SNAP" : "Let’s make the next steps easier.")}</h1>
           <p>
-            Share what your family needs. You choose what we can handle, and you
-            can change your mind.
-          </p>
+            {st("Share what your family needs. You choose what we can handle, and you can change your mind.")}{" "}</p>
         </div>
       </div>
       {snapSelected && <p className={`${styles.hint} ${styles.space}`}>
-        You can <a className={styles.textLink} href={SNAP_NEW_APPLICATION_URL} target="_blank" rel="noreferrer">apply directly with Pennsylvania SNAP</a> at any time, including before completing these questions. The official application opens in a new tab.
-      </p>}
+        {st("You can")}{" "}<a className={styles.textLink} href={SNAP_NEW_APPLICATION_URL} target="_blank" rel="noreferrer">{st("apply directly with Pennsylvania SNAP")}</a> {st("at any time, including before completing these questions. The official application opens in a new tab.")}{" "}</p>}
       {session.loading ? (
         <ParentLoading label="Checking secure access" />
-      ) : familyAccess === "changed" ? <section className={styles.surface}><h2>Your sign-in changed</h2><p>This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>Start a fresh request</a></section>
+      ) : familyAccess === "changed" ? <section lang={snapSelected ? locale : "en"} className={styles.surface}><h2>{st("Your sign-in changed")}</h2><p>{st("This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.")}</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>{st("Start a fresh request")}</a></section>
       : handoff && (guideSignIn || session.error instanceof ParentApiError && [401, 403].includes(session.error.status)) ? <ParentSignIn {...signInOptions} onSignedIn={async () => {
         const controller = work.current;
         if (!controller || controller.signal.aborted) throw new Error("The request changed. Return to the food questions before continuing.");
@@ -929,17 +933,17 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       ) : (
         <>
           {familyAccess === "checking" && <ParentLoading label="Checking secure access"/>}
-          {familyAccess === "unavailable" && <section className={styles.surface}><h2>We could not recheck your saved family information</h2><p>Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>Recheck secure access</button></section>}
+          {familyAccess === "unavailable" && <section lang={snapSelected ? locale : "en"} className={styles.surface}><h2>{st("We could not recheck your saved family information")}</h2><p>{st("Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.")}</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>{st("Recheck secure access")}</button></section>}
           <div hidden={familyAccess !== "ready"}>
           {handoff && step === 1 && <fieldset className={styles.fieldset} disabled={pending || startUncertain}>
-            <legend className={styles.legend}>When should CaseLink prioritize this request?</legend>
-            <p className={styles.hint}>{handoff.answers.foodForTwoDays === "no" ? "You said there is not enough food for today and tomorrow. Today is the proposed priority; you can change it." : "Your earlier answer does not establish a deadline. Choose the timing that works for this request."}</p>
-            <label htmlFor="guided-food-timing">Request timing</label><select id="guided-food-timing" className={styles.select} value={guideTimingChosen ? intake.urgency : ""} onChange={event => { guideTimingManual.current = true; setGuideTimingChosen(true); change("urgency", event.target.value as SupportIntake["urgency"]); }} required>
-              <option value="">Choose a priority</option><option value="today">Today</option><option value="soon">Soon</option><option value="planning">Planning ahead</option>
+            <legend className={styles.legend}>{st("When should CaseLink prioritize this request?")}</legend>
+            <p className={styles.hint}>{st(handoff.answers.foodForTwoDays === "no" ? "You said there is not enough food for today and tomorrow. Today is the proposed priority; you can change it." : "Your earlier answer does not establish a deadline. Choose the timing that works for this request.")}</p>
+            <label htmlFor="guided-food-timing">{st("Request timing")}</label><select id="guided-food-timing" className={styles.select} value={guideTimingChosen ? intake.urgency : ""} onChange={event => { guideTimingManual.current = true; setGuideTimingChosen(true); change("urgency", event.target.value as SupportIntake["urgency"]); }} required>
+              <option value="">{st("Choose a priority")}</option><option value="today">{st("Today")}</option><option value="soon">{st("Soon")}</option><option value="planning">{st("Planning ahead")}</option>
             </select>
           </fieldset>}
-          {handoff && step === 2 && guideCheck && <p className={styles.hint}>Food options checked for this account. {guideCheck.candidates.some(candidate => candidate.programs.some(program => program.actions.some(action => supportsInitialServiceDelivery(candidate.need, action)))) ? "Any connected action still needs the exact permission below and a current service check." : "No connected sending or booking action was confirmed for these options. The permission below describes preparation; official help stays available."} Unselected food options have not started.</p>}
-          <ol className={styles.progress} aria-label="Support request steps">
+          {handoff && step === 2 && guideCheck && <p className={styles.hint}>{st("Food options checked for this account.")}{" "}{st(guideCheck.candidates.some(candidate => candidate.programs.some(program => program.actions.some(action => supportsInitialServiceDelivery(candidate.need, action)))) ? "Any connected action still needs the exact permission below and a current service check." : "No connected sending or booking action was confirmed for these options. The permission below describes preparation; official help stays available.")} {st("Unselected food options have not started.")}</p>}
+          <ol lang={snapSelected ? locale : "en"} className={styles.progress} aria-label={st("Support request steps")}>
             {(directSnap ? ["Application details", "Your permission"] : ["Your needs", "Household details", "Your permission"]).map(
               (label, index) => {
                 const i = directSnap ? index + 1 : index;
@@ -952,38 +956,38 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       index + 1
                     )}
                   </span>
-                  {label}
+                  {st(label)}
                 </li>
                 );
               },
             )}
           </ol>
-          <section className={styles.surface}>
-            <form className={styles.form} onSubmit={submit}>
+          <section lang={snapSelected ? locale : "en"} className={styles.surface}>
+            <form lang={snapSelected ? locale : "en"} className={styles.form} onSubmit={submit}>
               <div className={styles.formHeader}>
                 <h2 ref={heading} tabIndex={-1}>
                   {
-                    [
+                    st([
                       "What would help your household?",
                       fullSnap ? "Tell us about your household" : "Your household details, in one place",
                       "You’re in control of what happens next",
-                    ][step]
+                    ][step])
                   }
                 </h2>
                 <p>
                   {
-                    [
+                    st([
                       "Choose the food or utility support your household needs.",
                       fullSnap ? "Answer the questions that apply to you. CaseLink will use these answers to prepare your application; you can review and correct it afterward. Leave optional or uncertain answers blank." : "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
                       "These are the specific programs and limits for this request. No unknown recipients or open-ended permission.",
-                    ][step]
+                    ][step])
                   }
                 </p>
               </div>
               {step === 0 && (
                 <>
                   <fieldset className={styles.fieldset}>
-                    <legend className={styles.legend}>Food & benefits</legend>
+                    <legend className={styles.legend}>{st("Food & benefits")}</legend>
                     <div className={`${styles.choices} ${styles.needChoices}`}>
                       {foodNeeds.map((need) => (
                         <label className={styles.choice} key={need}>
@@ -993,37 +997,29 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                             onChange={() => toggleNeed(need)}
                           />
                           <span>
-                            <strong>{NEED_LABELS[need]}</strong>
+                            <strong>{st(NEED_LABELS[need])}</strong>
                             {need === "food_now" && (
                               <small>
-                                Find groceries or meals now. This does not start
-                                a SNAP application.
-                              </small>
+                                {st("Find groceries or meals now. This does not start a SNAP application.")}{" "}</small>
                             )}
                             {need === "snap_new" && (
                               <small>
-                                A new application for help paying for groceries
-                              </small>
+                                {st("A new application for help paying for groceries")}{" "}</small>
                             )}
                             {need === "snap_renewal" && (
-                              <small>Keep benefits you already receive</small>
+                              <small>{st("Keep benefits you already receive")}</small>
                             )}
                             {need === "snap_pending" && (
                               <small>
-                                Follow an application you already sent; avoid
-                                applying twice
-                              </small>
+                                {st("Follow an application you already sent; avoid applying twice")}{" "}</small>
                             )}
                             {need === "snap_problem" && (
                               <small>
-                                A notice, missing benefits or another routine
-                                issue
-                              </small>
+                                {st("A notice, missing benefits or another routine issue")}{" "}</small>
                             )}
                             {need === "wic_new" && (
                               <small>
-                                Pregnancy, postpartum or a child under five
-                              </small>
+                                {st("Pregnancy, postpartum or a child under five")}{" "}</small>
                             )}
                           </span>
                         </label>
@@ -1031,18 +1027,17 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     </div>
                   </fieldset>
                   <fieldset className={styles.fieldset}>
-                    <legend className={styles.legend}>Utility bills & service</legend>
+                    <legend className={styles.legend}>{st("Utility bills & service")}</legend>
                     <div className={`${styles.choices} ${styles.needChoices}`}>
                       {utilityNeeds.map(need => <label className={styles.choice} key={need}>
                         <input type="checkbox" checked={intake.needs.includes(need)} onChange={() => toggleNeed(need)}/>
-                        <span><strong>{NEED_LABELS[need]}</strong><small>Bill assistance, a shutoff notice or disconnected service</small></span>
+                        <span><strong>{NEED_LABELS[need]}</strong><small>{st("Bill assistance, a shutoff notice or disconnected service")}</small></span>
                       </label>)}
                     </div>
                   </fieldset>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
-                      How soon do you need help?
-                    </legend>
+                      {st("How soon do you need help?")}{" "}</legend>
                     <div className={styles.choices}>
                       {(
                         [
@@ -1065,7 +1060,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                             checked={intake.urgency === item.value}
                             onChange={() => change("urgency", item.value)}
                           />
-                          <span>{item.label}</span>
+                          <span>{st(item.label)}</span>
                         </label>
                       ))}
                     </div>
@@ -1075,18 +1070,19 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
               {step === 1 && (
                 <>
                   {snapSelected && authorization.loading ? <ParentLoading label="Checking SNAP application availability"/> : fullSnap ? <>
-                    {familyProfile && familyFilled["snap-pa"] ? <p className={styles.hint}>We filled current answers from your saved family information. Change anything that needs correcting. Reuse keeps its original dates. <Link href="/family-profile" className={styles.textLink}>Update family information</Link>.</p> : null}
-                    <SnapApplicationNotice />
+                    {familyProfile && familyFilled["snap-pa"] ? <p className={styles.hint}>{st("We filled current answers from your saved family information. Change anything that needs correcting. Reuse keeps its original dates.")}{" "}<Link href="/family-profile" className={styles.textLink}>{st("Update family information")}</Link>.</p> : null}
+                    <SnapApplicationNotice templateId={snapDocument}/>
+                    <SnapDocumentLanguage value={snapDocument} disabled={pending || startUncertain} onChange={value => { setSnapDocument(value); setSnapDocumentChosen(true); setDetailsReady(false); setAccepted(false); setError(null); startAttempt.current=null; }}/>
                     <SnapApplicationFormFields value={snapValues} onChange={changeSnapDetails} disabled={pending}/>
                   </> : <>
                   {snapSelected && <div className={styles.notice}>
-                    <p>{authorization.loading ? "Checking whether private SNAP application fields are available…" : "Full private SNAP application fields are not available here yet. You can still save minimum routing details and use the official program directly; this does not complete or submit an application."}</p>
-                    {(authorization.error || collectionBlocked) && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshSnapCollection}>Check application availability again</button>}
-                    <a className={styles.textLink} href={getProgramsForNeeds(["snap_new"])[0].officialUrl}>Open official SNAP help</a>
+                    <p>{st(authorization.loading ? "Checking whether private SNAP application fields are available…" : "Full private SNAP application fields are not available here yet. You can still save minimum routing details and use the official program directly; this does not complete or submit an application.")}</p>
+                    {(authorization.error || collectionBlocked) && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshSnapCollection}>{st("Check application availability again")}</button>}
+                    <a className={styles.textLink} href={getProgramsForNeeds(["snap_new"])[0].officialUrl}>{st("Open official SNAP help")}</a>
                   </div>}
                   <div className={styles.row}>
                     <div className={styles.field}>
-                      <label htmlFor="support-zip">Household ZIP code</label>
+                      <label htmlFor="support-zip">{st("Household ZIP code")}</label>
                       <input
                         className={styles.input}
                         id="support-zip"
@@ -1099,15 +1095,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                         onChange={(e) => change("zip", e.target.value)}
                       />
                       <p className={styles.hint}>
-                        Philadelphia is our first service area. We’ll explain
-                        any coverage limits.
-                      </p>
-                      {reusedZip && <p className={styles.hint}>We filled your ZIP code from your saved information, provided {new Date(reusedZip.confirmedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}. You can change it here. Reuse keeps its original date and expiry.</p>}
+                        {st("Philadelphia is our first service area. We’ll explain any coverage limits.")}{" "}</p>
+                      {reusedZip && <p className={styles.hint}>{st("We filled your ZIP code from your saved information, provided")}{" "}{new Date(reusedZip.confirmedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}{st(". You can change it here. Reuse keeps its original date and expiry.")}</p>}
                     </div>
                     <div className={styles.field}>
                       <label htmlFor="support-language">
-                        Preferred service language
-                      </label>
+                        {st("Preferred service language")}{" "}</label>
                       <select
                         id="support-language"
                         className={styles.select}
@@ -1116,47 +1109,44 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                           change("language", e.target.value as "en" | "es")
                         }
                       >
-                        <option value="en">English</option>
-                        <option value="es">Spanish / Español</option>
+                        <option value="en">{st("English")}</option>
+                        <option value="es">{st("Spanish / Español")}</option>
                       </select>
                       {intake.language === "es" && (
                         <p className={styles.hint}>
-                          We’ll record your Spanish preference. This
-                          interface is currently in English;
-                          Spanish service availability depends on the program.
-                        </p>
+                          {snapSelected ? st("Your service language preference is separate from the screen and official document languages. Language services depend on the program.") : "We’ll record your Spanish preference. This interface is currently in English; Spanish service availability depends on the program."}{" "}</p>
                       )}
                     </div>
                   </div>
                   </>}
                   {wicOnly && authorization.loading ? <ParentLoading label="Checking WIC application availability"/> : fullWic ? <>
-                    {familyProfile && <p className={styles.hint}>Current saved contact details can be reused here. Choose any child separately; your saved family information does not choose WIC beneficiaries. <Link href="/family-profile" className={styles.textLink}>Update family information</Link>.</p>}
+                    {familyProfile && <p className={styles.hint}>{st("Current saved contact details can be reused here. Choose any child separately; your saved family information does not choose WIC beneficiaries.")}{" "}<Link href="/family-profile" className={styles.textLink}>{st("Update family information")}</Link>.</p>}
                     <WicApplicationNotice/>
                     <WicApplicationFormFields value={wicDetails} onChange={changeWicDetails} disabled={pending}/>
                     {familyProfile && ["children", "mother_and_children"].includes(wicDetails.beneficiaries ?? "") && <div className={styles.field}>
-                      <label htmlFor="wic-saved-child">Add a child from your saved family information</label><select id="wic-saved-child" className={styles.select} value="" disabled={pending} onChange={event => { if (event.target.value) chooseSavedWicChild(event.target.value); }}>
-                        <option value="">Choose a child, or add their details above</option>{(familyProfile.details.members ?? []).filter(person => !wicDetails.children?.some(child => child.id === person.id)).map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
-                      </select><p className={styles.hint}>Choose only the child or children this WIC request is for. This does not establish eligibility.</p>
+                      <label htmlFor="wic-saved-child">{st("Add a child from your saved family information")}</label><select id="wic-saved-child" className={styles.select} value="" disabled={pending} onChange={event => { if (event.target.value) chooseSavedWicChild(event.target.value); }}>
+                        <option value="">{st("Choose a child, or add their details above")}</option>{(familyProfile.details.members ?? []).filter(person => !wicDetails.children?.some(child => child.id === person.id)).map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
+                      </select><p className={styles.hint}>{st("Choose only the child or children this WIC request is for. This does not establish eligibility.")}</p>
                     </div>}
 
                   </> : intake.needs.some(need => need === "wic_new" || need === "wic_continuing") ? <div className={styles.notice}><div>
-                    <p>Private WIC questions are not available for this request. {wicOnly ? "Your unsaved WIC answers, if any, remain on this page. You can save minimum routing information when no private draft is pending." : "Combined and continuing requests keep their separate routing; this does not start a new WIC pre-application."}</p>
-                    {wicOnly && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshWicCollection}>Check WIC availability again</button>}
-                    <a className={styles.textLink} href={getProgramsForNeeds(["wic_new"])[0].officialUrl}>Open official WIC help</a>
+                    <p>{st("Private WIC questions are not available for this request.")}{" "}{st(wicOnly ? "Your unsaved WIC answers, if any, remain on this page. You can save minimum routing information when no private draft is pending." : "Combined and continuing requests keep their separate routing; this does not start a new WIC pre-application.")}</p>
+                    {wicOnly && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshWicCollection}>{st("Check WIC availability again")}</button>}
+                    <a className={styles.textLink} href={getProgramsForNeeds(["wic_new"])[0].officialUrl}>{st("Open official WIC help")}</a>
                   </div></div> : null}
                   {selectedUtilities.length > 0 && <fieldset className={styles.fieldset}>
-                    <legend className={styles.legend}>Utility routing</legend>
-                    <fieldset className={styles.fieldset}><legend className={styles.legend}>Utility providers</legend>
+                    <legend className={styles.legend}>{st("Utility routing")}</legend>
+                    <fieldset className={styles.fieldset}><legend className={styles.legend}>{st("Utility providers")}</legend>
                       <div className={styles.choices}>
                         {utilityProviderChoices.filter(provider => !provider.need || intake.needs.includes(provider.need)).map(({ id, label }) => <label key={id} className={styles.choice}>
                           <input type="checkbox" checked={intake.utilityProviders.includes(id)} onChange={() => change("utilityProviders", intake.utilityProviders.includes(id) ? intake.utilityProviders.filter(provider => provider !== id) : [...intake.utilityProviders.filter(provider => id !== "unknown" && provider !== "unknown"), id])}/><span>{label}</span>
                         </label>)}
                       </div>
                     </fieldset>
-                    <div className={styles.field}><label htmlFor="support-utility-authority">Your authority for the selected utility accounts</label><select id="support-utility-authority" className={styles.select} value={intake.accountAuthority} onChange={event => change("accountAuthority", event.target.value as SupportIntake["accountAuthority"])}>
-                      <option value="not_sure">Not sure / unanswered</option><option value="self">I hold every selected account</option><option value="authorized_caregiver">I hold or have permission to help with every selected account</option></select></div>
-                    {selectedUtilities.length === 1 && <div className={styles.field}><label htmlFor="support-shutoff">Shutoff date, if on a notice</label><input id="support-shutoff" className={styles.input} type="date" value={intake.shutoffDate ?? ""} onChange={event => change("shutoffDate", event.target.value || null)}/></div>}
-                    <p className={styles.hint}>Use official utility help now if service is at risk. Saving a request does not stop a shutoff or restore service.</p>
+                    <div className={styles.field}><label htmlFor="support-utility-authority">{st("Your authority for the selected utility accounts")}</label><select id="support-utility-authority" className={styles.select} value={intake.accountAuthority} onChange={event => change("accountAuthority", event.target.value as SupportIntake["accountAuthority"])}>
+                      <option value="not_sure">{st("Not sure / unanswered")}</option><option value="self">{st("I hold every selected account")}</option><option value="authorized_caregiver">{st("I hold or have permission to help with every selected account")}</option></select></div>
+                    {selectedUtilities.length === 1 && <div className={styles.field}><label htmlFor="support-shutoff">{st("Shutoff date, if on a notice")}</label><input id="support-shutoff" className={styles.input} type="date" value={intake.shutoffDate ?? ""} onChange={event => change("shutoffDate", event.target.value || null)}/></div>}
+                    <p className={styles.hint}>{st("Use official utility help now if service is at risk. Saving a request does not stop a shutoff or restore service.")}</p>
                     {utilityChoice && <label className={styles.checkbox}><input type="checkbox" checked={utilityPreparation === utilityChoice} onChange={event => {
                       familyDraftChanged.current.utility = false; familyApplied.current.delete(utilityPreparationChoices[utilityChoice].programId); delete familySources.current[utilityPreparationChoices[utilityChoice].programId];
                       setFamilyAccountPerson(""); setFamilyHomeAddress(false); setFamilyPecoPhone("");
@@ -1165,41 +1155,36 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                         setIntake(current => ({ ...current, householdSize: null, incomeAmount: null, incomeFrequency: "unknown" }));
                         if (familyProfile && utilityPreparationChoices[utilityChoice].canCollect(authorization.data)) seedFamilyProfile(familyProfile, utilityPreparationChoices[utilityChoice].programId, intake.accountAuthority);
                       }
-                    }}/><span>{utilityPreparationChoices[utilityChoice].optIn}. Keep this a separate, preparation-only request for this named program.</span></label>}
-                    {utilityChoice && !utilityPreparation && <p className={styles.hint}>Ordinary utility help does not start a benefit application. Choose {utilityPreparationChoices[utilityChoice].label} preparation only if you want CaseLink to save its private answers.</p>}
-                    {!utilityChoice && <p className={styles.hint}>Private application preparation needs a separate request for one named utility account. This request keeps its selected utility needs.</p>}
+                    }}/><span>{utilityPreparationChoices[utilityChoice].optIn}{st(". Keep this a separate, preparation-only request for this named program.")}</span></label>}
+                    {utilityChoice && !utilityPreparation && <p className={styles.hint}>{st("Ordinary utility help does not start a benefit application. Choose")}{" "}{utilityPreparationChoices[utilityChoice].label} {st("preparation only if you want CaseLink to save its private answers.")}</p>}
+                    {!utilityChoice && <p className={styles.hint}>{st("Private application preparation needs a separate request for one named utility account. This request keeps its selected utility needs.")}</p>}
                   </fieldset>}
                   {utilityPreparation && utilityConfig && (authorization.loading ? <ParentLoading label={`Checking ${utilityConfig.short} preparation availability`}/> : fullUtility ? <>
-                    {familyProfile && <fieldset className={styles.fieldset}><legend className={styles.legend}>Use saved family information</legend>
-                      <p className={styles.hint}>{intake.accountAuthority === "self" ? "We filled current saved names and household details for your account." : "Choose the actual account holder below to reuse their saved details."} Check which address this account serves; an application still needs its specific answers. Reuse keeps original dates. <Link href="/family-profile" className={styles.textLink}>Update family information</Link>.</p>
-                      {intake.accountAuthority === "authorized_caregiver" && <div className={styles.field}><label htmlFor="utility-saved-holder">Account holder from your saved family information</label><select id="utility-saved-holder" className={styles.select} value={familyAccountPerson} disabled={pending} onChange={event => { setFamilyAccountPerson(event.target.value); if (event.target.value) chooseSavedUtility({ accountPersonId: event.target.value }); }}>
-                        <option value="">Choose the account holder, or enter their details below</option>{[familyProfile.details.primaryPerson, ...(familyProfile.details.members ?? [])].map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
+                    {familyProfile && <fieldset className={styles.fieldset}><legend className={styles.legend}>{st("Use saved family information")}</legend>
+                      <p className={styles.hint}>{st(intake.accountAuthority === "self" ? "We filled current saved names and household details for your account." : "Choose the actual account holder below to reuse their saved details.")} {st("Check which address this account serves; an application still needs its specific answers. Reuse keeps original dates.")}{" "}<Link href="/family-profile" className={styles.textLink}>{st("Update family information")}</Link>.</p>
+                      {intake.accountAuthority === "authorized_caregiver" && <div className={styles.field}><label htmlFor="utility-saved-holder">{st("Account holder from your saved family information")}</label><select id="utility-saved-holder" className={styles.select} value={familyAccountPerson} disabled={pending} onChange={event => { setFamilyAccountPerson(event.target.value); if (event.target.value) chooseSavedUtility({ accountPersonId: event.target.value }); }}>
+                        <option value="">{st("Choose the account holder, or enter their details below")}</option>{[familyProfile.details.primaryPerson, ...(familyProfile.details.members ?? [])].map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
                       </select></div>}
-                      {familyProfile.details.homeAddress?.street && <button type="button" className={styles.secondary} disabled={pending || familyHomeAddress} onClick={() => { chooseSavedUtility({ useHomeAddress: true }); setFamilyHomeAddress(true); }}>Use saved home address for this utility account</button>}
-                      {utilityPreparation === "peco" && familyProfile.details.contact?.phone && <div className={styles.field}><label htmlFor="peco-saved-phone">Use your saved phone number as</label><select id="peco-saved-phone" className={styles.select} value={familyPecoPhone} disabled={pending} onChange={event => { const type = event.target.value as "home" | "cell" | ""; setFamilyPecoPhone(type); if (type) chooseSavedUtility({ pecoPhoneType: type }); }}><option value="">Choose a phone type, or enter a number below</option><option value="home">Home phone</option><option value="cell">Mobile phone</option></select></div>}
+                      {familyProfile.details.homeAddress?.street && <button type="button" className={styles.secondary} disabled={pending || familyHomeAddress} onClick={() => { chooseSavedUtility({ useHomeAddress: true }); setFamilyHomeAddress(true); }}>{st("Use saved home address for this utility account")}</button>}
+                      {utilityPreparation === "peco" && familyProfile.details.contact?.phone && <div className={styles.field}><label htmlFor="peco-saved-phone">{st("Use your saved phone number as")}</label><select id="peco-saved-phone" className={styles.select} value={familyPecoPhone} disabled={pending} onChange={event => { const type = event.target.value as "home" | "cell" | ""; setFamilyPecoPhone(type); if (type) chooseSavedUtility({ pecoPhoneType: type }); }}><option value="">{st("Choose a phone type, or enter a number below")}</option><option value="home">{st("Home phone")}</option><option value="cell">{st("Mobile phone")}</option></select></div>}
                     </fieldset>}
                     {utilityPreparation === "peco" ? <><PecoApplicationNotice/><PecoApplicationFormFields value={utilityDetails as PecoApplicationFields} onChange={changeUtilityDetails} disabled={pending}/></>
                       : utilityPreparation === "pgw" ? <><PgwApplicationNotice/><PgwApplicationFormFields value={utilityDetails as PgwApplicationFields} onChange={changeUtilityDetails} disabled={pending}/></>
                       : <><WaterApplicationNotice/><WaterApplicationFormFields value={utilityDetails as WaterApplicationFields} onChange={changeUtilityDetails} disabled={pending}/></>}
-                  </> : <div className={styles.notice}><div><p>Private {utilityConfig.label} preparation is not available or account authority is unresolved. Your unsaved answers remain on this page. Confirm your account authority and check access before entering private answers.</p>
-                    <button type="button" className={styles.secondary} disabled={pending} onClick={refreshUtilityCollection}>Check {utilityConfig.short} preparation access again</button>
-                    <a className={styles.textLink} href={utilityConfig.helpUrl}>Open official {utilityConfig.short} help</a>
+                  </> : <div className={styles.notice}><div><p>{st("Private")}{" "}{utilityConfig.label} {st("preparation is not available or account authority is unresolved. Your unsaved answers remain on this page. Confirm your account authority and check access before entering private answers.")}</p>
+                    <button type="button" className={styles.secondary} disabled={pending} onClick={refreshUtilityCollection}>{st("Check")}{" "}{utilityConfig.short} {st("preparation access again")}</button>
+                    <a className={styles.textLink} href={utilityConfig.helpUrl}>{st("Open official")}{" "}{utilityConfig.short} {st("help")}</a>
                   </div></div>)}
                   {hasBenefits && !(snapSelected&&authorization.loading) && (!fullSnap || intake.needs.some(need=>need==='wic_new'||need==='wic_continuing')) ? (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
-                        Household & income
-                      </legend>
+                        {st("Household & income")}{" "}</legend>
                       <p className={styles.hint}>
-                        These answers can be reused for the programs you choose.
-                        They are optional here; you can still access official
-                        help without them.
-                      </p>
+                        {st("These answers can be reused for the programs you choose. They are optional here; you can still access official help without them.")}{" "}</p>
                       <div className={styles.stack}>
                         {!fullSnap && <div className={styles.field}>
                           <label htmlFor="household-size">
-                            People in your household
-                          </label>
+                            {st("People in your household")}{" "}</label>
                           <input
                             id="household-size"
                             className={styles.input}
@@ -1217,15 +1202,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                             }
                           />
                           <p className={styles.hint}>
-                            Leave blank if you’re not sure who a program will
-                            count.
-                          </p>
+                            {st("Leave blank if you’re not sure who a program will count.")}{" "}</p>
                         </div>}
                         {!fullSnap && <div className={styles.row}>
                           <div className={styles.field}>
                             <label htmlFor="income-amount">
-                              Household income before taxes ($)
-                            </label>
+                              {st("Household income before taxes ($)")}{" "}</label>
                             <input
                               className={styles.input}
                               id="income-amount"
@@ -1244,14 +1226,11 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                               }
                             />
                             <p className={styles.hint}>
-                              Zero income is okay. Leave blank if variable or
-                              unknown.
-                            </p>
+                              {st("Zero income is okay. Leave blank if variable or unknown.")}{" "}</p>
                           </div>
                           <div className={styles.field}>
                             <label htmlFor="income-frequency">
-                              How often is that amount received?
-                            </label>
+                              {st("How often is that amount received?")}{" "}</label>
                             <select
                               id="income-frequency"
                               className={styles.select}
@@ -1264,14 +1243,13 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                                 )
                               }
                             >
-                              <option value="unknown">Not sure / skip</option>
-                              <option value="weekly">Weekly</option>
-                              <option value="biweekly">Every two weeks</option>
+                              <option value="unknown">{st("Not sure / skip")}</option>
+                              <option value="weekly">{st("Weekly")}</option>
+                              <option value="biweekly">{st("Every two weeks")}</option>
                               <option value="twice_monthly">
-                                Twice a month
-                              </option>
-                              <option value="monthly">Monthly</option>
-                              <option value="yearly">Yearly</option>
+                                {st("Twice a month")}{" "}</option>
+                              <option value="monthly">{st("Monthly")}</option>
+                              <option value="yearly">{st("Yearly")}</option>
                             </select>
                           </div>
                         </div>}
@@ -1282,18 +1260,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     <div className={styles.notice}>
                       <Lock width={22} height={22} aria-hidden="true" />
                       <p>
-                        Names, addresses, dates of birth and required identity
-                        numbers belong in a protected application step. Don’t
-                        put them in chat or these household fields. We’ll reuse
-                        your saved answers; a provider may still require a
-                        personal identity check or declaration.
-                      </p>
+                        {st("Names, addresses, dates of birth and required identity numbers belong in a protected application step. Don’t put them in chat or these household fields. We’ll reuse your saved answers; a provider may still require a personal identity check or declaration.")}{" "}</p>
                     </div>
                   )}
                   <div className={styles.field}>
                     <label htmlFor="contact-preference">
-                      How would you like support updates?
-                    </label>
+                      {st("How would you like support updates?")}{" "}</label>
                     <select
                       id="contact-preference"
                       className={styles.select}
@@ -1305,13 +1277,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                         )
                       }
                     >
-                      <option value="in_app">Only in My support</option>
-                      <option value="email">Email and My support</option>
+                      <option value="in_app">{st("Only in My support")}</option>
+                      <option value="email">{st("Email and My support")}</option>
                     </select>
+                    {snapSelected && <p className={styles.hint}>{st(intake.contactPreference === "email" ? "Email and My support" : "Only in My support")}</p>}
                     <p className={styles.hint}>
-                      Email availability is confirmed before it’s used.
-                      Sensitive details stay in your account.
-                    </p>
+                      {st("Email availability is confirmed before it’s used. Sensitive details stay in your account.")}{" "}</p>
                   </div>
                   <label className={styles.checkbox}>
                     <input
@@ -1321,9 +1292,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       required
                     />
                     <span>
-                      I’m 18 or older and requesting support for my household or
-                      as an authorized caregiver.
-                    </span>
+                      {st("I’m 18 or older and requesting support for my household or as an authorized caregiver.")}{" "}</span>
                   </label>
                 </>
               )}
@@ -1333,19 +1302,18 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     <ShieldCheck width={23} height={23} aria-hidden="true" />
                     <p>
                       <strong>
-                        {fullAvailable
+                        {st(fullAvailable
                           ? "Supported work, within your limits."
-                          : "We can prepare. Applications are not connected yet."}
+                          : "We can prepare. Applications are not connected yet.")}
                       </strong>{" "}
-                      {fullAvailable
+                      {st(fullAvailable
                         ? "Only programs with a verified permitted channel can receive information or carry out applications."
-                        : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly."}
+                        : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly.")}
                     </p>
                   </div>
-                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || utilityDetailsReady && recipientIds.length === 1 && recipientIds[0] === utilityConfig?.programId) ? <p><strong>{utilityDetailsReady ? utilityConfig?.label : fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP"}</strong> is the named program for your {utilityDetailsReady ? utilityConfig?.purpose : fullWic ? "prepared WIC answers" : "application"}.</p> : <fieldset className={styles.fieldset}>
+                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || utilityDetailsReady && recipientIds.length === 1 && recipientIds[0] === utilityConfig?.programId) ? <p><strong>{utilityDetailsReady ? utilityConfig?.label : st(fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP")}</strong> {st("is the named program for your")}{" "}{utilityDetailsReady ? utilityConfig?.purpose : st(fullWic ? "prepared WIC answers" : "application")}.</p> : <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
-                      Named programs for this request
-                    </legend>
+                      {st("Named programs for this request")}{" "}</legend>
                     <div
                       className={`${styles.choices} ${styles.programChoices}`}
                     >
@@ -1365,11 +1333,11 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                             }}
                           />
                           <span>
-                            <strong>{program.name}</strong>
+                            <strong lang={st(program.name) === program.name ? "en" : locale}>{st(program.name)}</strong>
                             <small>
-                              {connected(program.id)
+                              {st(connected(program.id)
                                 ? "Permitted actions available"
-                                : "Prepare only · nothing sent"}
+                                : "Prepare only · nothing sent")}
                             </small>
                           </span>
                         </label>
@@ -1377,18 +1345,17 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     </div>
                   </fieldset>}
                   <details className={styles.programDetails}>
-                    <summary>About these programs & direct access</summary>
+                    <summary>{st("About these programs & direct access")}</summary>
                     <ul className={styles.programDescriptions}>
                       {programs.map((program) => (
                         <li key={program.id}>
                           <strong>{program.name}</strong>
-                          <p>{program.description}</p>
+                          <p lang={st(program.description) === program.description ? "en" : locale}>{st(program.description)}</p>
                           <a
                             className={styles.textLink}
                             href={program.officialUrl}
                           >
-                            Open official program
-                          </a>
+                            {st("Open official program")}{" "}</a>
                         </li>
                       ))}
                     </ul>
@@ -1396,8 +1363,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                   {fullAvailable && (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
-                        What can CaseLink handle?
-                      </legend>
+                        {st("What can CaseLink handle?")}{" "}</legend>
                       <div className={styles.choices}>
                         <label className={styles.choice}>
                           <input
@@ -1412,13 +1378,9 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                           />
                           <span>
                             <strong>
-                              Prepare and carry out permitted steps
-                            </strong>
+                              {st("Prepare and carry out permitted steps")}{" "}</strong>
                             <small>
-                              Share allowed information, submit supported
-                              applications, coordinate appointments and follow
-                              up. Required personal acts remain yours.
-                            </small>
+                              {st("Share allowed information, submit supported applications, coordinate appointments and follow up. Required personal acts remain yours.")}{" "}</small>
                           </span>
                         </label>
                         <label className={styles.choice}>
@@ -1433,11 +1395,9 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                             }}
                           />
                           <span>
-                            <strong>Prepare only</strong>
+                            <strong>{st("Prepare only")}</strong>
                             <small>
-                              Research and prepare without sharing information
-                              or submitting anything.
-                            </small>
+                              {st("Research and prepare without sharing information or submitting anything.")}{" "}</small>
                           </span>
                         </label>
                       </div>
@@ -1447,48 +1407,34 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     <div className={styles.mandateItem}>
                       <Lock width={22} height={22} aria-hidden="true" />
                       <div>
-                        <h3>The information we can use</h3>
+                        <h3>{st("The information we can use")}</h3>
                         <p>
-                          {utilityDetailsReady ? `Your private ${utilityConfig?.label} answers described in its notice, your household, income, utility and routing information` : wicDetailsReady ? "Your private WIC preparation answers described in the WIC notice, your needs and routing information" : detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
-                          {intake.needs.some((need) => incomeNeeds.includes(need))
+                          {st(utilityDetailsReady ? `Your private ${utilityConfig?.label} answers described in its notice, your household, income, utility and routing information` : wicDetailsReady ? "Your private WIC preparation answers described in the WIC notice, your needs and routing information" : detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details")}
+                          {st(intake.needs.some((need) => incomeNeeds.includes(need))
                             ? ", income information when a named program requires it"
-                            : ""}, only
-                          for this request. {utilityDetailsReady ? "Documents for this named program are included in your preparation permission. Each document still needs separate processing consent in the protected step when available. Do not put documents or required identifiers or account secrets in this form or chat. " : wicNeedsOnly ? "WIC document uploads are not available. " : <>Any bills or notices you later
-                          choose to add can be used for the verified needs and named programs, after separate document-processing
-                          consent. {intake.needs.some(need => need === "wic_new" || need === "wic_continuing") && "Do not upload WIC documents here. "}</>}No passwords, EBT PINs or signatures.
-                        </p>
+                            : "")}{st(", only for this request.")}{" "}{utilityDetailsReady ? "Documents for this named program are included in your preparation permission. Each document still needs separate processing consent in the protected step when available. Do not put documents or required identifiers or account secrets in this form or chat. " : wicNeedsOnly ? "WIC document uploads are not available. " : <>{st("Any bills or notices you later choose to add can be used for the verified needs and named programs, after separate document-processing consent.")}{" "}{intake.needs.some(need => need === "wic_new" || need === "wic_continuing") && "Do not upload WIC documents here. "}</>}{st("No passwords, EBT PINs or signatures.")}{" "}</p>
                       </div>
                     </div>
                     <div className={styles.mandateItem}>
                       <Clock width={22} height={22} aria-hidden="true" />
                       <div>
-                        <h3>Up to 30 days · up to 12 attempts</h3>
-                        <p>
-                          Limited to the {recipientIds.length || "selected"}{" "}
-                          named program{recipientIds.length === 1 ? "" : "s"}.
-                          We stop future work if you pause, cancel or withdraw
-                          permission. Already delivered information may not be
-                          recallable.
-                        </p>
+                        <h3>{st("Up to 30 days · up to 12 attempts")}</h3>
+                        <p>{st(recipientIds.length === 1 ? "Limited to one named program. We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable." : "Limited to {count} named programs. We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable.").replace("{count}", String(recipientIds.length || st("selected")))}</p>
                       </div>
                     </div>
                     <div className={styles.mandateItem}>
                       <Check width={22} height={22} aria-hidden="true" />
                       <div>
-                        <h3>Your personal decisions stay yours</h3>
+                        <h3>{st("Your personal decisions stay yours")}</h3>
                         <p>
-                          No signing as you, accepting payment plans, paying
-                          fees or making binding commitments. A program decides
-                          eligibility and available assistance.
-                        </p>
+                          {st("No signing as you, accepting payment plans, paying fees or making binding commitments. A program decides eligibility and available assistance.")}{" "}</p>
                       </div>
                     </div>
                   </div>
                   {mode === "full" && fullAvailable && (!fullSnap || intake.needs.some(need=>need!=='snap_new')) && (
                     <div className={styles.field}>
                       <label htmlFor="booking-preference">
-                        Appointment preference
-                      </label>
+                        {st("Appointment preference")}{" "}</label>
                       <select
                         id="booking-preference"
                         className={styles.select}
@@ -1502,18 +1448,15 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                           startAttempt.current = null;
                         }}
                       >
-                        <option value="ask_me">Ask me before booking</option>
+                        <option value="ask_me">{st("Ask me before booking")}</option>
                         <option value="weekday_morning">
-                          Weekday mornings
-                        </option>
+                          {st("Weekday mornings")}{" "}</option>
                         <option value="weekday_afternoon">
-                          Weekday afternoons
-                        </option>
-                        <option value="any_weekday">Any weekday</option>
+                          {st("Weekday afternoons")}{" "}</option>
+                        <option value="any_weekday">{st("Any weekday")}</option>
                       </select>
                       <p className={styles.hint}>
-                        This does not authorize fees or financial commitments.
-                      </p>
+                        {st("This does not authorize fees or financial commitments.")}{" "}</p>
                     </div>
                   )}
                   <label className={styles.checkbox}>
@@ -1524,30 +1467,24 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       onChange={(e) => setAccepted(e.target.checked)}
                     />
                     <span>
-                      I authorize{" "}
-                      {mode === "full" && fullAvailable
+                      {st("I authorize")}{" "}
+                      {st(mode === "full" && fullAvailable
                         ? "the permitted steps described above"
-                        : "research and preparation only"}{" "}
-                      for this request within these limits. I can stop future
-                      work in My support.
-                      {detailsReady && " I also agree to save and use my private SNAP application answers for this named program under the SNAP data notice."}
+                        : "research and preparation only")}{" "}
+                      {st("for this request within these limits. I can stop future work in My support.")}{" "}{detailsReady && st(" I also agree to save and use my private SNAP application answers for this named program under the SNAP data notice.")}
                       {wicDetailsReady && ` I agree to save and use my private WIC answers for Pennsylvania WIC under the WIC notice. ${WIC_SUBJECT_AUTHORITY_STATEMENT}`}
                       {utilityDetailsReady && utilityConfig && ` I agree to save and use my private ${utilityConfig.label} answers for this named program under its notice. I authorize household, income, utility and document use for this preparation; each protected document needs its separate processing consent. ${utilityConfig.subjectStatement} ${utilityConfig.accountStatement}`}
                     </span>
                   </label>
                   <p className={styles.hint}>
-                    Closing the page or signing out does not cancel your
-                    permission. My support shows whether work is running,
-                    waiting or unavailable. Your{" "}
+                    {st("Closing the page or signing out does not cancel your permission. My support shows whether work is running, waiting or unavailable. Your")}{" "}
                     <Link className={styles.textLink} href="/support/privacy">
-                      privacy and control options
-                    </Link>{" "}
-                    are always available.
-                  </p>
+                      {st("privacy and control options")}{" "}</Link>{" "}
+                    {st("are always available.")}{" "}</p>
                 </fieldset>
               )}
               {error && <ServiceError error={error} />}
-              {startUncertain && <p className={styles.notice}><span>The save result has not been confirmed. Retry the same request before changing answers or starting another request. <Link className={styles.textLink} href="/my-support">Check My support for the saved request</Link>.</span></p>}
+              {startUncertain && <p className={styles.notice}><span>{st("The save result has not been confirmed. Retry the same request before changing answers or starting another request.")}{" "}<Link className={styles.textLink} href="/my-support">{st("Check My support for the saved request")}</Link>.</span></p>}
               <div className={styles.formFooter}>
                 {step > 0 ? (
                   <button
@@ -1567,25 +1504,23 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     disabled={pending || startUncertain}
                   >
                     <ArrowLeft width={17} height={17} aria-hidden="true" />
-                    Back
-                  </button>
+                    {st("Back")}{" "}</button>
                 ) : (
                   <span className={styles.hint}>
-                    You can choose more than one.
-                  </span>
+                    {st("You can choose more than one.")}{" "}</span>
                 )}
                 <button
                   className={styles.button}
                   type="submit"
                   disabled={pending || (step===1 && (snapSelected || wicOnly || !!utilityPreparation) && authorization.loading)}
                 >
-                  {pending
+                  {st(pending
                     ? "Saving your request…"
                     : wicOnly && startUncertain ? "Retry the same WIC request"
                     : utilityPreparation && startUncertain ? `Retry the same ${utilityConfig?.short} request`
                     : step === 2
                       ? "Start getting support"
-                      : "Continue"}
+                      : "Continue")}
                   <ArrowRight width={18} height={18} aria-hidden="true" />
                 </button>
               </div>

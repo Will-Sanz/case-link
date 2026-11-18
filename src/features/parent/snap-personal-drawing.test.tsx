@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SNAP_DIRECT_CERTIFICATION_REGIONS } from "@/lib/parent/snap-direct-completion-core";
+import { ParentLocaleProvider, ParentLanguageSelector } from "./parent-locale";
+import { SNAP_ES_TEMPLATE_ID, SNAP_EN_TEMPLATE_ID } from "@/lib/parent/snap-form-source";
+import { snapDirectCertificationRegions, SNAP_DIRECT_CERTIFICATION_REGIONS } from "@/lib/parent/snap-direct-completion-core";
 import { SnapPersonalDrawing, type SnapPersonalDrawingValue } from "./snap-personal-drawing";
 
+vi.mock("next/navigation",()=>({useRouter:()=>({refresh:vi.fn()})}));
 const now = new Date("2026-11-06T01:30:00.000Z"), expiresAt = "2026-11-06T02:30:00.000Z";
 const first = "applicant_signature_printed_page_1", second = "rights_certification_printed_page_5";
 let bounds: { left: number; top: number; width: number; height: number };
@@ -213,4 +216,29 @@ describe("fresh local personal drawing (mock canvas; no native handwriting or ac
     vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(null); const { canvas, change, recovery } = setup(); pointer(canvas, "pointerDown");
     expect(latest(change)).toBeNull(); expect(screen.getByRole("status").textContent).toContain("Drawing is unavailable here"); fireEvent.click(screen.getByRole("button", { name: "I need another way" })); expect(recovery).toHaveBeenCalledOnce();
   });
+});
+
+
+describe("selected official document drawing geometry", () => {
+  it("fits Spanish applicant handwriting using the exact Spanish region without stretching", () => {
+    const { canvas, change } = setup({ templateId: SNAP_ES_TEMPLATE_ID }); draw(canvas); const value=latest(change)!;
+    const [x0,y0,x1,y1] = snapDirectCertificationRegions(SNAP_ES_TEMPLATE_ID)[first].ink;
+    const points=value.strokes[0].map(p=>({x:p.x*(x1-x0-2),y:p.y*(y1-y0-2)}));
+    expect((points.at(-1)!.x-points[0].x)/(points[0].y-points.at(-1)!.y)).toBeCloseTo(2.5,10);
+    expect(value.provenance).toBe("caller_reported_fresh_parent_drawing");
+  });
+  it("clears old personal work when the source changes even with the same act and expiry", () => {
+    const value=setup({templateId:SNAP_EN_TEMPLATE_ID});draw(value.canvas);expect(latest(value.change)).not.toBeNull();
+    value.rerender(<SnapPersonalDrawing {...value.props} templateId={SNAP_ES_TEMPLATE_ID}/>);
+    expect(latest(value.change)).toBeNull();expect(screen.getByRole("status").textContent).toContain("empty box");
+    expect(value.canvas).not.toBe(screen.getByRole("img"));
+  });
+});
+
+
+it("keeps the same personal work and document binding when only screen language changes",()=>{
+ const change=vi.fn(),recovery=vi.fn();render(<ParentLocaleProvider initialLocale="en"><ParentLanguageSelector/><SnapPersonalDrawing actId={first} templateId={SNAP_EN_TEMPLATE_ID} label="Your applicant certification" instructions="Read the exact official page above, then write your own name below. CaseLink cannot sign for you." expiresAt={expiresAt} onChange={change} onRecovery={recovery}/></ParentLocaleProvider>);
+ const canvas=screen.getByRole("img") as HTMLCanvasElement;draw(canvas);const value=change.mock.calls.at(-1)?.[0];expect(value).not.toBeNull();
+ fireEvent.change(screen.getByLabelText("Screen language / Idioma de pantalla"),{target:{value:"es"}});
+ expect(screen.getByRole("img")).toBe(canvas);expect(change.mock.calls.at(-1)?.[0]).toEqual(value);expect(screen.getByRole("status").textContent).toContain("Se agregó el dibujo");
 });

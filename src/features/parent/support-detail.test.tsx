@@ -11,6 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
+import { ParentLocaleProvider } from "./parent-locale";
 import { SupportDetail } from "./support-detail";
 import { buildSupportPlan } from "@/lib/parent/planning";
 import { getProgram, SNAP_NEW_APPLICATION_URL } from "@/lib/parent/programs";
@@ -1080,4 +1081,15 @@ describe("support detail", () => {
       screen.queryByRole("link", { name: "Open the official program" }),
     ).toBeNull();
   });
+});
+
+
+it("uses the same focused SNAP answer route from the Spanish necessary-step action",async()=>{
+ const request=fixture();request.intake.needs=["snap_new"];request.mandate=buildMandate(request.intake,["snap-pa"],"prepare_only","ask_me","2026-11-24T12:00:00Z");
+ request.required_actions=[{id:"spanish-snap-question",need:"snap_new",field:"snap_application_details",reason:"missing_fact",resolver:"parent",title:"Synthetic recorded question",explanation:"Synthetic unresolved field"}];
+ const fetcher=vi.fn(async (url:string,init?:RequestInit)=>{expect(url.startsWith("/api/parent/")).toBe(true);expect(init?.method).not.toBe("POST");return response(request);});vi.stubGlobal("fetch",fetcher);
+ render(<ParentLocaleProvider initialLocale="es"><SupportDetail requestId={requestId}/></ParentLocaleProvider>);
+ const nav=await screen.findByRole("navigation",{name:"Lista de pasos de su solicitud"});fireEvent.click(within(nav).getByRole("link",{name:/^Sus próximos pasos/}));
+ const link=await screen.findByRole("link",{name:"Responder preguntas de la solicitud de SNAP"});expect(link.getAttribute("href")).toBe("#application-answers");expect(link.getAttribute("lang")).toBe("es");
+ expect(fetcher.mock.calls.every(([,init])=>init?.method!=="POST")).toBe(true);
 });

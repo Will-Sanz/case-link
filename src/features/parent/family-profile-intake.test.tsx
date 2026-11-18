@@ -45,16 +45,16 @@ function api(profile: () => unknown | Promise<unknown> = saved) {
     return reply({ capabilities: [] });
   }); vi.stubGlobal("fetch", fetcher); return fetcher;
 }
-async function authorize() {
-  fireEvent.click(screen.getByLabelText(/I’m 18 or older/)); fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  fireEvent.click(await screen.findByRole("checkbox", { name: /I authorize/ })); fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+async function authorize(locale: "en" | "es" = "en") {
+  fireEvent.click(screen.getByLabelText(locale === "es" ? /Tengo 18 años/ : /I’m 18 or older/)); fireEvent.click(screen.getByRole("button", { name: locale === "es" ? "Continuar" : "Continue" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: locale === "es" ? /Autorizo/ : /I authorize/ })); fireEvent.click(screen.getByRole("button", { name: locale === "es" ? "Comenzar a recibir apoyo" : "Start getting support" }));
 }
-async function completeSnapQuestions() {
+async function completeSnapQuestions(locale: "en" | "es" = "en") {
   const answer = (path: string, value: string) => fireEvent.change(document.querySelector(`[data-snap-path="${path}"]`)!, { target: { value } });
   answer("interpreter", "no");
   for (const [label, value] of [["Your sex, as requested on the form", "female"], ["Are you a student?", "no"], ["Are you applying for SNAP?", "yes"], ["Are you a U.S. citizen?", "yes"],
     ["Person 2 sex, as requested on the form", "male"], ["Is person 2 a student?", "no"], ["Is person 2 applying for SNAP?", "no"]])
-    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.change(screen.getByLabelText(locale === "es" ? ({"Your sex, as requested on the form":"Su sexo, como lo pide el formulario","Are you a student?":"¿Es estudiante?","Are you applying for SNAP?":"¿Solicita SNAP?","Are you a U.S. citizen?":"¿Es ciudadano de los Estados Unidos?","Person 2 sex, as requested on the form":"Sexo de la persona 2, como lo pide el formulario","Is person 2 a student?":"¿La persona 2 es estudiante?","Is person 2 applying for SNAP?":"¿La persona 2 solicita SNAP?"} as Record<string,string>)[label] : label), { target: { value } });
   answer("income.hasIncome", "no");
   for (const path of ["screening.lowCashAndIncome", "screening.migrantOrSeasonal", "screening.belowShelterCosts", "history.fleeingOrProbation.answer", "history.welfareFraud.answer", "history.otherStateDisqualification.answer"]) answer(path, "no");
   answer("expenseClaims.household", "do_not_claim"); answer("expenseClaims.medical", "not_applicable");
@@ -115,10 +115,10 @@ describe("saved family information in actual application intake", () => {
     fireEvent.change(screen.getByLabelText(/ayuda para comprar/), { target: { value: "never" } });
     fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
     fireEvent.click(screen.getByRole("button", { name: "Solicitar SNAP" }));
-    await waitFor(() => expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Saved"));
+    await waitFor(() => expect((screen.getByLabelText("Su nombre") as HTMLInputElement).value).toBe("Saved"));
     expect((document.querySelector('[data-snap-path="language"]') as HTMLSelectElement).value).toBe("en");
     fireEvent.change(document.querySelector('[data-snap-path="language"]')!, { target: { value: "es" } });
-    await completeSnapQuestions(); await authorize();
+    await completeSnapQuestions("es"); await authorize("es");
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const packet = JSON.parse(String(fetcher.mock.calls.find(([url, init]) => url.endsWith("/requests") && init?.method === "POST")![1]!.body));
     expect(packet.intake).toMatchObject({ language: "es", urgency: "today" }); expect(packet.details.language).toBe("es");

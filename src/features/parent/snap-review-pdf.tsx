@@ -1,5 +1,7 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useEffect, useId, useRef, useState } from "react";
+import type { ParentLocale } from "@/lib/parent/locale";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFWorker, RenderTask } from "pdfjs-dist";
 import styles from "./parent.module.css";
 
@@ -7,7 +9,8 @@ const VIEW_ERROR = "The application page could not be displayed. Try opening the
 const BLANK_PAGE = "This page is blank in the official SNAP form.";
 
 /** Render only the already verified local file; no PDF links, scripts, attachments or remote URLs. */
-export function SnapReviewPdf({ source, onReady, initialPage = 1 }: { source: Blob; onReady: (ready: boolean, pageNumber?: number) => void; initialPage?: number }) {
+export function SnapReviewPdf({ source, onReady, initialPage = 1, documentLanguage }: { source: Blob; onReady: (ready: boolean, pageNumber?: number) => void; initialPage?: number; documentLanguage?: ParentLocale }) {
+  const { t, locale } = useParentLocale();
   const validInitialPage = Number.isInteger(initialPage) && initialPage >= 1 && initialPage <= 12;
   const canvas = useRef<HTMLCanvasElement>(null), viewport = useRef<HTMLDivElement>(null), id = useId();
   const closeDocument = useRef<() => void>(() => {});
@@ -112,25 +115,25 @@ export function SnapReviewPdf({ source, onReady, initialPage = 1 }: { source: Bl
     })();
     return () => { closed = true; clearTimeout(timer); task?.cancel(); surface.width = 0; surface.height = 0; };
   }, [document, pageNumber, zoom, onReady, validInitialPage]);
-  return <div className={styles.space}>
-    <div className={styles.inline} role="group" aria-label="Application page controls">
-      <button className={styles.quiet} type="button" disabled={!document || failed || pageNumber === 1} onClick={() => setPageNumber(value => value - 1)}>Previous page</button>
-      <span role="status">Page {pageNumber} of 12</span>
-      <button className={styles.quiet} type="button" disabled={!document || failed || pageNumber === 12} onClick={() => setPageNumber(value => value + 1)}>Next page</button>
-      <label htmlFor={id}>Page size</label>
+  return <div lang={locale} className={styles.space}>
+    <div className={styles.inline} role="group" aria-label={t("Application page controls")}>
+      <button className={styles.quiet} type="button" disabled={!document || failed || pageNumber === 1} onClick={() => setPageNumber(value => value - 1)}>{t("Previous page") }</button>
+      <span role="status">{t("Page") }{" "}{pageNumber} {t("of 12") }</span>
+      <button className={styles.quiet} type="button" disabled={!document || failed || pageNumber === 12} onClick={() => setPageNumber(value => value + 1)}>{t("Next page") }</button>
+      <label htmlFor={id}>{t("Page size") }</label>
       <select className={styles.select} id={id} value={size} disabled={failed} onChange={event => setSize(Number(event.target.value))}>
-        <option value={0}>Fit width</option><option value={1}>100%</option><option value={1.5}>150%</option><option value={2}>200%</option>
+        <option value={0}>{t("Fit width") }</option><option value={1}>100%</option><option value={1.5}>150%</option><option value={2}>200%</option>
       </select>
     </div>
-    {failed ? <p className={styles.error} role="alert">{VIEW_ERROR}</p> : !loaded && <p role="status">Displaying the exact application page…</p>}
-    {loaded && !failed && page?.officialBlank && <p className={styles.hint}>{BLANK_PAGE}</p>}
-    <div ref={viewport} className={styles.snapReviewPdf} tabIndex={0} role="region" aria-label={`Exact SNAP application, page ${pageNumber}; scroll to read the whole page`}>
-      <canvas key={`${pageNumber}:${zoom}`} ref={canvas} role="img" aria-label={`SNAP application page ${pageNumber}`} hidden={!loaded || failed}/>
+    {failed ? <p className={styles.error} role="alert">{t(VIEW_ERROR)}</p> : !loaded && <p role="status">{t("Displaying the exact application page…") }</p>}
+    {loaded && !failed && page?.officialBlank && <p className={styles.hint}>{t(BLANK_PAGE)}</p>}
+    <div ref={viewport} className={styles.snapReviewPdf} tabIndex={0} role="region" aria-label={t("Exact SNAP application, page {n}; scroll to read the whole page").replace("{n}", String(pageNumber))}>
+      <canvas key={`${pageNumber}:${zoom}`} ref={canvas} role="img" aria-label={t("SNAP application page {n}").replace("{n}", String(pageNumber))} hidden={!loaded || failed}/>
     </div>
     {loaded && !failed && <details className={`${styles.disclosure} ${styles.snapReviewText}`}>
-      <summary>Read page {pageNumber} text</summary>
-      <div><p>{page?.text || (page?.officialBlank ? BLANK_PAGE : "This page is an image. Use the exact PDF full size or ask for an accessible alternative.")}</p>
-        <p className={styles.hint}>Handwritten marks and text in images may not appear in this text view.</p></div>
+      <summary>{t("Read page {n} text").replace("{n}", String(pageNumber))}</summary>
+      <div><p lang={page?.text ? (documentLanguage ?? "") : locale}>{page?.text || (page?.officialBlank ? t(BLANK_PAGE) : t("This page is an image. Use the exact PDF full size or ask for an accessible alternative."))}</p>
+        <p className={styles.hint}>{t("Handwritten marks and text in images may not appear in this text view.") }</p></div>
     </details>}
   </div>;
 }

@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ParentLocaleProvider } from "./parent-locale";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { useParentResource } from "./use-parent-resource";
@@ -1006,4 +1007,14 @@ describe("application workspace", () => {
     ).toBe("#your-next-steps");
     expect(screen.getByText(/One personal step needs/)).toBeTruthy();
   });
+});
+
+
+vi.mock("next/navigation",()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn(),refresh:vi.fn()})}));
+it("keeps Spanish SNAP checklist navigation bound to the same actual application section",async()=>{
+ const fetcher=mockApi();render(<ParentLocaleProvider initialLocale="es"><WorkspaceFixture request={fixture()}/></ParentLocaleProvider>);
+ const nav=await screen.findByRole("navigation",{name:"Lista de pasos de su solicitud"});
+ const link=within(nav).getByRole("link",{name:/^Su solicitud/});expect(link.getAttribute("href")).toBe("#application-review");
+ fireEvent.click(link);expect(link.getAttribute("aria-current")).toBe("location");
+ expect(fetcher.mock.calls.some(([,init])=>init?.method==="POST")).toBe(false);
 });

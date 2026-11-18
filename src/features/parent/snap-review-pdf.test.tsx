@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 const mocks = vi.hoisted(() => ({ getDocument: vi.fn(), create: vi.fn(), page: vi.fn(), draw: vi.fn(), text: vi.fn(), pixels: vi.fn(), operators: vi.fn(), destroy: vi.fn(), destroyWorker: vi.fn(), terminate: vi.fn(), cancel: vi.fn(), workers: [] as EventTarget[] }));
 vi.mock("pdfjs-dist", () => ({ getDocument: mocks.getDocument, PDFWorker: { create: mocks.create } }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }) }));
 import { SnapReviewPdf } from "./snap-review-pdf";
+import { ParentLocaleProvider } from "./parent-locale";
 const source = () => ({ arrayBuffer: async () => new Uint8Array([37, 80, 68, 70]).buffer }) as Blob;
 const loaded = () => ({ numPages: 12, getPage: mocks.page });
 beforeEach(() => {
@@ -21,6 +23,27 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("local exact SNAP PDF viewing", () => {
+  it.each([
+    { ui: "es", language: "en", expected: "en" },
+    { ui: "en", language: "es", expected: "es" },
+    { ui: "es", language: undefined, expected: "" },
+  ] as const)("marks extracted document text from immutable language, independently of screen locale ($ui / $language)", async ({ ui, language, expected }) => {
+    const ready = vi.fn(); render(<ParentLocaleProvider initialLocale={ui}><SnapReviewPdf source={source()} documentLanguage={language} onReady={ready}/></ParentLocaleProvider>);
+    expect((await screen.findByText("Synthetic application page")).getAttribute("lang")).toBe(expected);
+    expect(screen.getByRole("group", { name: ui === "es" ? "Controles de las páginas de la solicitud" : "Application page controls" })).toBeTruthy();
+    expect(ready).toHaveBeenLastCalledWith(true, 1);
+  });
+  it.each([{ ui: "es", language: "en" }, { ui: "en", language: "es" }] as const)("marks localized image/blank fallback as screen language ($ui / $language)", async ({ ui, language }) => {
+    mocks.text.mockResolvedValue({ items: [] }); const ready = vi.fn();
+    render(<ParentLocaleProvider initialLocale={ui}><SnapReviewPdf source={source()} documentLanguage={language} onReady={ready}/></ParentLocaleProvider>);
+    const imageHelp = ui === "es" ? "Esta página es una imagen. Use el PDF exacto a tamaño completo o pida una alternativa accesible." : "This page is an image. Use the exact PDF full size or ask for an accessible alternative.";
+    expect((await screen.findByText(imageHelp, { selector: "details p" })).getAttribute("lang")).toBe(ui);
+    mocks.pixels.mockImplementation(() => ({ data: Uint8ClampedArray.from([255, 255, 255, 255]) }));
+    fireEvent.click(screen.getByRole("button", { name: ui === "es" ? "Página siguiente" : "Next page" }));
+    const blankHelp = ui === "es" ? "Esta página está en blanco en el formulario oficial de SNAP." : "This page is blank in the official SNAP form.";
+    expect((await screen.findByText(blankHelp, { selector: "details p" })).getAttribute("lang")).toBe(ui);
+    expect(ready).toHaveBeenLastCalledWith(true, 2);
+  });
   it("ships the exact installed decoder and license bytes for the pinned renderer", () => {
     expect(JSON.parse(readFileSync("node_modules/pdfjs-dist/package.json", "utf8")).version).toBe("6.5.438");
     for (const name of ["jbig2_nowasm_fallback.js", "LICENSE_JBIG2", "LICENSE_PDFJS_JBIG2"])

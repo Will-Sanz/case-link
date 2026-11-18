@@ -5,6 +5,7 @@ import { fixtureIntake, fixtureMandate, fixtureRequest, fixtureSnapCaptureIntent
 import { snapApplicationSnapshotSchema } from "@/lib/parent/snap-application-snapshot";
 import { SNAP_DIRECT_ACQUISITION_FIELDS, SNAP_DIRECT_ACQUISITION_METHOD } from "@/lib/parent/snap-direct-acquisition-contract";
 const mocks = vi.hoisted(() => ({ entry: vi.fn(), prepared: vi.fn() }));
+vi.mock("./snap-manual-signing-copy", () => ({ SnapManualSigningCopy: () => <div>Unsigned manual copy fixture</div> }));
 vi.mock("./snap-direct-personal-entry", () => ({ SnapDirectPersonalEntry: (props: { onRecovery: () => void }) => {
   mocks.entry(props); return <div><label>Entry instance<input defaultValue="synthetic unsaved work"/></label><button onClick={props.onRecovery}>Entry recovery</button></div>;
 } }));

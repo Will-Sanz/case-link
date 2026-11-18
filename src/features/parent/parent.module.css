@@ -328,6 +328,17 @@
   min-width: 0;
 }
 @media (max-width: 35rem) {
+  .container.snapIntake {
+    padding-inline: 12px;
+  }
+  .snapIntake :is(.surface, .notice, .error, .success),
+  .snapApplication :is(.notice, .error, .success) {
+    padding: 12px;
+  }
+  :is(.snapIntake, .snapApplication) :is(.notice, .error, .success) {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .surface.foodPrograms,
   .foodAccess :is(.notice, .error, .success),
   .container.account,

@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import type { SupportRequest } from "@/lib/parent/domain";
@@ -6,6 +7,7 @@ import type { SnapApplicationSnapshot } from "@/lib/parent/snap-application-snap
 import { snapCaptureContextSchema } from "@/lib/parent/snap-capture-context";
 import { snapCaptureProgressSchema } from "@/lib/parent/snap-capture-progress";
 import { snapPacketAuthorizationResultSchema, type SnapPacketAuthorizationResult } from "@/lib/parent/snap-packet-contract";
+import { snapFormSource } from "@/lib/parent/snap-form-source";
 import { recoverSnapDirectCompletion } from "@/lib/parent/snap-direct-completion-transport";
 import { loadSnapPacketReviewFile } from "@/lib/parent/snap-review-file";
 import { boundedParentApi, ParentApiError } from "./api";
@@ -24,6 +26,7 @@ const onDisplayReady = () => undefined; // Read-only display never enables Submi
 export function SnapPreparedApplication({ request, snapshot, onChange }: {
   request: SupportRequest; snapshot: SnapApplicationSnapshot; onChange?: () => void;
 }) {
+  const { t, locale } = useParentLocale();
   const id = useId(), [revision, setRevision] = useState(0);
   const canonicalReview = request.required_actions.some(isSnapFinalReviewAction);
   const mandateCurrent = usePermissionWindow(Date.parse(request.mandate.expiresAt));
@@ -142,23 +145,23 @@ export function SnapPreparedApplication({ request, snapshot, onChange }: {
     } finally { if (!replaced && correction.current === controller) correction.current = null; if (!controller.signal.aborted) setReplacing(null); }
   }
   if (!current || view?.kind === "hidden") return null;
-  return <section className={styles.space} aria-labelledby={id}>
-    <h3 id={id}>Your prepared application</h3>
+  return <section lang={locale} className={styles.space} aria-labelledby={id}>
+    <h3 id={id}>{t("Your prepared application") }</h3>
     {!view || pending ? <ParentLoading label={pending ? "Changing page version" : "Checking your saved application"}/> : <>
       {view.kind === "stored" && view.file ? <>
-        <p className={styles.hint}>Viewing these saved pages does not submit an application. Check <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for delivery records.</p>
-        <SnapReviewPdf source={view.file.blob} onReady={onDisplayReady}/>
-        <a className={styles.quiet} href={view.file.url} target="_blank" rel="noopener noreferrer">Open exact saved PDF full size</a>
-      </> : view.kind === "selected" ? <p className={styles.hint}>Your request has an application record. Check <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for its current status.</p>
-        : view.kind === "replaced" ? <p className={styles.success} role="status">The earlier personal pages are no longer current. Your saved application answers are unchanged.</p>
-          : !view.error && <p className={styles.hint}>{view.kind === "empty"
+        <p className={styles.hint}>{t("Viewing these saved pages does not submit an application. Check") }{" "}<a className={styles.textLink} href="#application-receipts">{t("Activity & receipts") }</a> {t("for delivery records.") }</p>
+        <SnapReviewPdf documentLanguage={snapFormSource(snapshot.source.templateId).language} source={view.file.blob} onReady={onDisplayReady}/>
+        <a className={styles.quiet} href={view.file.url} target="_blank" rel="noopener noreferrer">{t("Open exact saved PDF full size") }</a>
+      </> : view.kind === "selected" ? <p className={styles.hint}>{t("Your request has an application record. Check") }{" "}<a className={styles.textLink} href="#application-receipts">{t("Activity & receipts") }</a> {t("for its current status.") }</p>
+        : view.kind === "replaced" ? <p className={styles.success} role="status">{t("The earlier personal pages are no longer current. Your saved application answers are unchanged.") }</p>
+          : !view.error && <p className={styles.hint}>{t(view.kind === "empty"
             ? "A prepared application could not be confirmed here. Earlier work and delivery records remain in Activity & receipts."
-            : "Storage of these pages is not confirmed. Check the same saved application before making another change."}</p>}
+            : "Storage of these pages is not confirmed. Check the same saved application before making another change.")}</p>}
       {view.error && <ServiceError error={view.error} retry={() => { onChange?.(); reload(); }} returnTo={`/support/${request.id}`}/>}
       {view.kind !== "replaced" && <div className={`${styles.inline} ${styles.space}`}>
-        {!view.error && <button type="button" className={styles.quiet} onClick={reload}>Check saved application</button>}
+        {!view.error && <button type="button" className={styles.quiet} onClick={reload}>{t("Check saved application") }</button>}
         {view.locator && view.canReplace && !(view.error instanceof ParentApiError && view.error.status === 401) &&
-          <button type="button" className={styles.quiet} disabled={request.version >= 2147483647} onClick={replacePages}>Replace personal pages</button>}
+          <button type="button" className={styles.quiet} disabled={request.version >= 2147483647} onClick={replacePages}>{t("Replace personal pages") }</button>}
       </div>}
     </>}
   </section>;

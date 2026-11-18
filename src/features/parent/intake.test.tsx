@@ -11,6 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ParentIntake } from "./intake";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
+import { SNAP_EN_TEMPLATE_ID, SNAP_ES_TEMPLATE_ID } from "@/lib/parent/snap-form-source";
 
 const navigation=vi.hoisted(()=>({push:vi.fn(),refresh:vi.fn()}));
 vi.mock("next/navigation", () => ({
@@ -151,7 +152,7 @@ describe('full SNAP intake before background work',()=>{
     await waitFor(()=>expect(navigation.push).toHaveBeenCalledWith('/support/11111111-1111-4111-8111-111111111111'));
     const posts=fetch.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(1);
     const body=JSON.parse(posts[0][1]!.body as string);
-    expect(body.kind).toBe('snap_application');expect(body.noticeVersion).toBe(SNAP_APPLICATION_NOTICE_VERSION);
+    expect(body.kind).toBe('snap_application');expect(body.noticeVersion).toBe(SNAP_APPLICATION_NOTICE_VERSION);expect(body.documentTemplateId).toBeUndefined();
     expect(body.details.applicant).toMatchObject({firstName:'Maria',lastName:'Rivera'});expect(body.details.household[0]).toMatchObject({firstName:'Maria',lastName:'Rivera',relationship:'SELF'});
     expect(body.intake.householdSize).toBe(1);expect(body.intake.incomeAmount).toBeNull();expect(body.details.income.hasIncome).toBe(false);
     expect(body.details.phone).toBeUndefined();expect(body.mandate.accepted).toBe(true);expect(body.mandate.recipientIds).toEqual(['snap-pa']);
@@ -171,14 +172,28 @@ describe('full SNAP intake before background work',()=>{
     expect((screen.getByLabelText('ZIP code') as HTMLInputElement).value).toBe('19104');expect(screen.queryByLabelText('PECO')).toBeNull();
     expect(screen.queryByLabelText('Household income before taxes ($)')).toBeNull();
   });
+  it('keeps explicit document language separate from contact language and retains it with filled answers on Back',async()=>{
+    const fetch=snapApi();render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();
+    expect(screen.getByText('Only in My support',{selector:'p'})).toBeTruthy();
+    const selector=screen.getByLabelText('Official SNAP document language') as HTMLSelectElement;
+    expect(selector.value).toBe(SNAP_EN_TEMPLATE_ID);fireEvent.change(selector,{target:{value:SNAP_ES_TEMPLATE_ID}});
+    expect((document.querySelector('[data-snap-path="language"]') as HTMLSelectElement).value).toBe('en');
+    fireEvent.click(screen.getByRole('button',{name:'Back'}));fireEvent.click(screen.getByRole('button',{name:'Continue'}));
+    expect((screen.getByLabelText('Official SNAP document language') as HTMLSelectElement).value).toBe(SNAP_ES_TEMPLATE_ID);
+    expect((screen.getByLabelText('Your first name') as HTMLInputElement).value).toBe('Maria');
+    fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));
+    await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
+    const body=JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string);
+    expect(body.documentTemplateId).toBe(SNAP_ES_TEMPLATE_ID);expect(body.details.language).toBe('en');
+  });
   it('retries an uncertain atomic start with the identical payload and key',async()=>{
     let posts=0;const fetch=snapApi(snapWindow(),()=>{if(++posts===1)throw new Error('response lost');return response({request:{id:'11111111-1111-4111-8111-111111111111'}});});
-    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));
+    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();fireEvent.change(screen.getByLabelText('Official SNAP document language'),{target:{value:SNAP_ES_TEMPLATE_ID}});fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));
     fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await screen.findByText(/Retry the same request before changing/);
     expect((screen.getByRole('button',{name:'Back'}) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
     const attempts=fetch.mock.calls.filter(([,init])=>init?.method==='POST').map(([,init])=>init!);
-    expect(attempts).toHaveLength(2);expect(attempts[0].body).toBe(attempts[1].body);expect(attempts[0].headers).toEqual(attempts[1].headers);
+    expect(attempts).toHaveLength(2);expect(attempts[0].body).toBe(attempts[1].body);expect(attempts[0].headers).toEqual(attempts[1].headers);expect(JSON.parse(attempts[0].body as string).documentTemplateId).toBe(SNAP_ES_TEMPLATE_ID);
   });
   it('rechecks collection permission before the first write and does not substitute a generic request when it closes',async()=>{
     let windows=0;const fetch=snapApi();fetch.mockImplementation(async(url:string,init?:RequestInit)=>{

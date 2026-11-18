@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ParentLocaleProvider } from "./parent-locale";
 import { fixtureProtectedSnapOperation, fixtureRequest } from "@/lib/parent/test-fixtures";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { fixtureUtilityProtectedOperation } from "@/lib/parent/utility-preparation-test-fixtures";
 import { SupportActivity, SnapDraftReview, currentSnapDraft, currentSnapReview, type RecordedOperation } from "./support-activity";
 import { buildFoodAccessPlanBody, SHARE_FOOD_ACCESS_PROGRAM } from "@/lib/parent/food-access";
 
+vi.mock("next/navigation",()=>({useRouter:()=>({refresh:vi.fn()})}));
 const reviewPdf = vi.hoisted(() => vi.fn());
 vi.mock("./snap-review-pdf", () => ({ SnapReviewPdf: (props: unknown) => { reviewPdf(props); return <div role="region" aria-label="Exact draft preview"/>; } }));
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-06T22:00:00Z")); });
@@ -121,6 +123,12 @@ describe("inline prepared SNAP draft review", () => {
     return { ok: true, status: 200, redirected: false, headers: new Headers({ "Content-Type": "application/pdf", "Cache-Control": "private, no-store" }),
       arrayBuffer: async () => new TextEncoder().encode("%PDF-1.7\nexact stored draft").buffer, ...overrides };
   }
+  it("offers the same exact private draft and download in Spanish without inventing a source language",async()=>{
+    const fetcher=vi.fn().mockResolvedValue(response());vi.stubGlobal("fetch",fetcher);render(<ParentLocaleProvider initialLocale="es">{view()}</ParentLocaleProvider>);
+    expect(screen.getByRole("link",{name:"Descargar el borrador incompleto sin firmar"}).getAttribute("href")).toBe(`/api/parent/requests/${request.id}/forms/exact-form`);
+    fireEvent.click(screen.getByRole("button",{name:"Ver el borrador preparado"}));await screen.findByRole("region",{name:"Exact draft preview"});
+    expect(fetcher).toHaveBeenCalledOnce();expect(reviewPdf.mock.calls.at(-1)?.[0].documentLanguage).toBeUndefined();
+  });
   it("opens the same authenticated verified artifact on demand without downloading or submitting", async () => {
     const fetcher = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetcher); render(view());
     expect(fetcher).not.toHaveBeenCalled();

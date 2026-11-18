@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import {
   NEED_LABELS,
@@ -90,6 +91,7 @@ export function currentSnapDraft(request: SupportRequest, operations: readonly R
 
 const draftDisplayReady = () => undefined; // Inspecting an unsigned draft never authorizes submission.
 export function SnapDraftReview({ request, operation }: { request: SupportRequest; operation: RecordedOperation }) {
+  const { t, locale } = useParentLocale();
   const id = useId(), [open, setOpen] = useState(false), [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ scope: string; file?: Blob; error?: Error } | null>(null);
   const expiresAt = Date.parse(request.mandate.expiresAt);
@@ -126,14 +128,14 @@ export function SnapDraftReview({ request, operation }: { request: SupportReques
   }, [open, revision, request.id, artifactId, expiresAt, permitted, scope]);
   if (!permitted) return null;
   const view = result?.scope === scope ? result : null;
-  return <section className={styles.section} aria-label="Your prepared SNAP draft">
-    <h2>Your prepared draft</h2>
-    <p className={styles.hint}>Check the exact application here. You can correct your saved answers below.</p>
+  return <section lang={locale} className={styles.section} aria-label={t("Your prepared SNAP draft")}>
+    <h2>{t("Your prepared draft")}</h2>
+    <p className={styles.hint}>{t("Check the exact application here. You can correct your saved answers below.")}</p>
     <button type="button" className={open ? styles.quiet : styles.button} aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
-      {open ? "Hide prepared draft" : "View prepared draft"}
+      {t(open ? "Hide prepared draft" : "View prepared draft")}
     </button>
     {open && <div id={id} className={styles.space}>
-      <p className={styles.hint}>This is the exact incomplete, unsigned draft recorded for this attempt. Viewing it does not submit an application.</p>
+      <p className={styles.hint}>{t("This is the exact incomplete, unsigned draft recorded for this attempt. Viewing it does not submit an application.")}</p>
       {!view ? <ParentLoading label="Opening your prepared draft"/> : view.file ? <SnapReviewPdf source={view.file} onReady={draftDisplayReady}/>
         : view.error && <ServiceError error={view.error} retry={() => setRevision(value => value + 1)} returnTo={`/support/${request.id}`}/>}
     </div>}
@@ -148,6 +150,7 @@ export function SupportActivity({
   onChange: () => void;
   history: OperationHistory;
 }) {
+  const { t, locale } = useParentLocale();
   const { data, error, reload } = history;
   const typedFood = hasTypedFoodAccessPath(request,currentIntakeFields(request,new Date(),"food_now").zip);
   const reportableNeeds = request.intake.needs.filter(need => need !== "food_now" || !typedFood);
@@ -212,20 +215,20 @@ export function SupportActivity({
                 </p>
                 <a
                   className={styles.textLink}
+                  lang={operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
                   href={`/api/parent/requests/${request.id}/operations/${operation.id}/export`}
                 >
-                  Download recorded information
+                  {operation.need === "snap_new" && operation.program_id === "snap-pa" ? t("Download recorded information") : "Download recorded information"}
                 </a>
                 <UtilityDraftDownload request={request} operation={operation}/>
                 {operation.artifact_id && (
                   <p className={styles.space}>
                     <a
                       className={styles.textLink}
+                      lang={operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
                       href={`/api/parent/requests/${request.id}/forms/${operation.artifact_id}`}
                     >
-                      {operation.form?.preparation_only
-                        ? "Download incomplete unsigned draft"
-                        : "Download this prepared form"}
+                      {operation.need === "snap_new" && operation.program_id === "snap-pa" ? t(operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form") : operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form"}
                     </a>
                   </p>
                 )}

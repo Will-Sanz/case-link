@@ -1,3 +1,4 @@
+import { SNAP_SPANISH_COPY } from "./snap-copy";
 export type ParentLocale = "en" | "es";
 export const PARENT_LOCALE_COOKIE = "caselink-parent-ui-locale";
 export function parentLocale(value: unknown): ParentLocale {
@@ -17,8 +18,9 @@ export function parentText(locale: ParentLocale, english: string): string {
   return locale === "es" && Object.hasOwn(spanish, english) ? spanish[english as keyof typeof spanish] : english;
 }
 
-// shortcut: Entry, Auth, progress, documents and food access copy; complete the remaining consumers before advertising a full Spanish journey.
+// shortcut: Translate remaining family surfaces before advertising a full Spanish journey.
 const spanish = {
+  ...SNAP_SPANISH_COPY,
   "The original upload was already saved. No new file was added.": "La carga original ya estaba guardada. No se añadió ningún archivo nuevo.",
   "List each income source once, or choose no income or not sure.": "Enumere cada fuente de ingresos una sola vez, o elija que no tiene ingresos o que no sabe.",
   "Each person needs a distinct record.": "Cada persona necesita un registro distinto.",

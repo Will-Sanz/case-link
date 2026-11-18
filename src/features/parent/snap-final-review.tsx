@@ -1,6 +1,10 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
+import { snapApplicationSnapshotSchema } from "@/lib/parent/snap-application-snapshot";
+import { snapFormSource } from "@/lib/parent/snap-form-source";
+import type { ParentLocale } from "@/lib/parent/locale";
 import type { SupportRequest } from "@/lib/parent/domain";
 import { SNAP_PARENT_CERTIFICATION_ACTS, snapProtectedDeliveryAttempt, snapProtectedOperationSchema, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { loadSnapReviewFile } from "@/lib/parent/snap-review-file";
@@ -15,6 +19,7 @@ const submitReply = z.object({ ok: z.literal(true), operationId: z.uuid(), state
 const replacementReply = z.object({ ok: z.literal(true), requestVersion: z.number().int().positive().max(2147483647) }).strict();
 
 export function SnapFinalReview({ request, onChange, onReviewChange }: { request: SupportRequest; onChange?: () => void; onReviewChange?: (review: SnapProtectedOperation | null) => void }) {
+  const { t, locale } = useParentLocale();
   const saved = useParentResource<{ review: unknown }>(`/requests/${request.id}/snap-submission?expectedVersion=${request.version}`);
   const review = useMemo(() => {
     const parsed = snapProtectedOperationSchema.safeParse(saved.data?.review);
@@ -35,6 +40,7 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
   const current = request.status === "active" && mandateCurrent && !replaced && !saved.loading && !saved.error && !!review;
   // A metadata/access refresh revokes the old URL; it cannot count as the new load's usable viewer.
   const loadScope = useMemo(() => ({ review, fileRevision, current }), [review, fileRevision, current]);
+  const [documentLanguage, setDocumentLanguage] = useState<{ scope: typeof loadScope; language: ParentLocale } | null>(null);
   const [file, setFile] = useState<{ scope: typeof loadScope; url: string; blob: Blob } | null>(null);
   const [displayed, setDisplayed] = useState<typeof loadScope | null>(null);
   const onDisplayReady = useCallback((ready: boolean) => setDisplayed(ready ? loadScope : null), [loadScope]);
@@ -70,6 +76,15 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
   useLayoutEffect(() => {
     if (!binding || !current || !review) return;
     const controller = new AbortController(); let url: string | undefined;
+    // Source labels follow the packet's own immutable revision; this read grants no Submit authority.
+    void boundedParentApi(`/requests/${review.requestId}/snap-application?revision=${review.packet.protectedSnapPacket.snapshotId}`, {}, controller.signal, request.mandate.expiresAt)
+      .then(value => {
+        const parsed = z.object({ snapshot: snapApplicationSnapshotSchema }).safeParse(value);
+        const saved = parsed.success ? parsed.data.snapshot : null;
+        if (!controller.signal.aborted && saved && saved.id === review.packet.protectedSnapPacket.snapshotId
+          && saved.request_id === review.requestId && saved.request_version <= review.requestVersion)
+          setDocumentLanguage({ scope: loadScope, language: snapFormSource(saved.source.templateId).language });
+      }).catch(() => { /* Exact bytes remain reviewable; unavailable source metadata never implies English. */ });
     loadSnapReviewFile(review, controller.signal).then(bytes => {
       try {
         if (controller.signal.aborted) return;
@@ -78,7 +93,7 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
       } finally { bytes.fill(0); }
     }).catch(() => { if (!controller.signal.aborted) setFileError({ scope: loadScope, error: new Error("The exact application could not be opened. Check access and try again before choosing Submit.") }); });
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
-  }, [review, binding, current, loadScope]);
+  }, [review, binding, current, loadScope, request.mandate.expiresAt]);
   async function submit() {
     const controller = work.current;
     if (!maySubmit || pending || !review || Date.now() >= mandateDeadline || !controller || controller.signal.aborted || attempted.current === versionKey) return;
@@ -111,35 +126,35 @@ export function SnapFinalReview({ request, onChange, onReviewChange }: { request
       setAttempt({ key: versionKey, scope: actionScope, work: controller, kind: "replace", state: "unknown" }); saved.reload(); onChange?.();
     }
   }
-  if (request.status !== "active") return <section className={styles.section} id="snap-final-review" aria-labelledby="snap-final-review-title" tabIndex={-1}>
-    <h2 id="snap-final-review-title">SNAP work is {request.status}</h2>
-    <p>Future application work is stopped. Check <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for anything already sent or confirmed.</p>
+  if (request.status !== "active") return <section lang={locale} className={`${styles.section} ${styles.snapApplication}`} id="snap-final-review" aria-labelledby="snap-final-review-title" tabIndex={-1}>
+    <h2 id="snap-final-review-title">{t(request.status === "paused" ? "SNAP work is paused" : request.status === "cancelled" ? "SNAP work is cancelled" : "SNAP work is closed")}</h2>
+    <p>{t("Future application work is stopped. Check") }{" "}<a className={styles.textLink} href="#application-receipts">{t("Activity & receipts") }</a> {t("for anything already sent or confirmed.") }</p>
   </section>;
-  return <section className={styles.section} id="snap-final-review" aria-labelledby="snap-final-review-title" tabIndex={-1}>
-    <h2 id="snap-final-review-title">Review your SNAP application</h2>
-    <p>Check this complete application before choosing Submit. Correct any saved answer or personal page that needs changing.</p>
-    {!mandateCurrent && <p className={styles.notice} role="status">Your application permission has expired or could not be checked. Check your request’s permission before continuing. Your saved answers and receipts are kept.</p>}
+  return <section lang={locale} className={`${styles.section} ${styles.snapApplication}`} id="snap-final-review" aria-labelledby="snap-final-review-title" tabIndex={-1}>
+    <h2 id="snap-final-review-title">{t("Review your SNAP application") }</h2>
+    <p>{t("Check this complete application before choosing Submit. Correct any saved answer or personal page that needs changing.") }</p>
+    {!mandateCurrent && <p className={styles.notice} role="status">{t("Your application permission has expired or could not be checked. Check your request’s permission before continuing. Your saved answers and receipts are kept.") }</p>}
     {saved.loading ? <ParentLoading label="Loading your exact application"/> : saved.error ? <ServiceError error={saved.error} retry={saved.reload}/> : !review ?
-      <p className={styles.notice}>The exact application is not available for review yet. Your saved answers are kept. Check Activity &amp; receipts for recorded delivery status.</p> : <>
+      <p className={styles.notice}>{t("The exact application is not available for review yet. Your saved answers are kept. Check Activity & receipts for recorded delivery status.") }</p> : <>
       {exactFile && file ? <>
-        <SnapReviewPdf source={file.blob} onReady={onDisplayReady}/>
-        <a className={styles.textLink} href={file.url} target="_blank" rel="noopener noreferrer">Open this exact application PDF full size</a>
-        <button type="button" className={styles.quiet} onClick={() => setFileRevision(value => value + 1)}>Reload application pages</button>
+        <SnapReviewPdf documentLanguage={documentLanguage?.scope === loadScope ? documentLanguage.language : undefined} source={file.blob} onReady={onDisplayReady}/>
+        <a className={styles.textLink} href={file.url} target="_blank" rel="noopener noreferrer">{t("Open this exact application PDF full size") }</a>
+        <button type="button" className={styles.quiet} onClick={() => setFileRevision(value => value + 1)}>{t("Reload application pages") }</button>
       </> : fileError?.scope === loadScope ? <ServiceError error={fileError.error} retry={() => { setFileError(null); setFileRevision(value => value + 1); }}/> : current ? <ParentLoading label="Checking and opening the exact PDF"/> : null}
-      {authorized ? <p className={styles.success} role="status">Your Submit decision is recorded. CaseLink will check the delivery result. An agency confirmation is a separate record and will appear when verified.</p> : snapProtectedDeliveryAttempt(review.state) ?
-        <p className={styles.notice} role="status"><span>See <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> for the latest delivery record and any verified agency confirmation. You do not need to Submit this application again.</span></p> : <>
+      {authorized ? <p className={styles.success} role="status">{t("Your Submit decision is recorded. CaseLink will check the delivery result. An agency confirmation is a separate record and will appear when verified.") }</p> : snapProtectedDeliveryAttempt(review.state) ?
+        <p className={styles.notice} role="status"><span>{t("See") }{" "}<a className={styles.textLink} href="#application-receipts">{t("Activity & receipts") }</a> {t("for the latest delivery record and any verified agency confirmation. You do not need to Submit this application again.") }</span></p> : <>
         <div className={`${styles.inline} ${styles.space}`}>
-          <a className={styles.textLink} href="#application-answers">Correct saved answers</a>
-          <button type="button" className={styles.quiet} disabled={!current || writeAttempted || review.state !== "prepared"} onClick={replacePages}>Replace personal pages</button>
+          <a className={styles.textLink} href="#application-answers">{t("Correct saved answers") }</a>
+          <button type="button" className={styles.quiet} disabled={!current || writeAttempted || review.state !== "prepared"} onClick={replacePages}>{t("Replace personal pages") }</button>
         </div>
         {maySubmit ? <>
-          <p id="snap-final-submit-report" className={`${styles.hint} ${styles.space}`}>By choosing Submit, I confirm that my required handwritten signatures and dates are complete on form pages 1 and 5 of this exact application, and ask CaseLink to send it to Pennsylvania SNAP.</p>
-          <button type="button" className={`${styles.button} ${styles.space}`} aria-describedby="snap-final-submit-report" disabled={pending} onClick={submit}>{pending ? "Recording Submit…" : "Submit"}</button>
-        </> : current && exactFile && !writeAttempted && <p className={styles.notice}>CaseLink must resolve the application’s remaining submission requirements. You do not need to repeat your saved answers.</p>}
+          <p id="snap-final-submit-report" className={`${styles.hint} ${styles.space}`}>{t("By choosing Submit, I confirm that my required handwritten signatures and dates are complete on form pages 1 and 5 of this exact application, and ask CaseLink to send it to Pennsylvania SNAP.") }</p>
+          <button type="button" className={`${styles.button} ${styles.space}`} aria-describedby="snap-final-submit-report" disabled={pending} onClick={submit}>{t(pending ? "Recording Submit…" : "Submit")}</button>
+        </> : current && exactFile && !writeAttempted && <p className={styles.notice}>{t("CaseLink must resolve the application’s remaining submission requirements. You do not need to repeat your saved answers.") }</p>}
       </>}
     </>}
-    {pending && attempt.kind === "replace" && <p role="status">Recording page replacement…</p>}
-    {replaced && <p className={styles.notice} role="status">Page replacement is recorded. Waiting for the current application revision. Your earlier pages are no longer shown.</p>}
-    {unconfirmed && <div className={styles.notice} role="status"><p>{attempt.kind === "submit" ? "Submit result is not confirmed." : "Page replacement result is not confirmed."} CaseLink must check the current application before another attempt. This does not establish whether anything reached the agency.</p><button type="button" className={styles.quiet} onClick={() => { saved.reload(); onChange?.(); }}>Check current application status</button></div>}
+    {pending && attempt.kind === "replace" && <p role="status">{t("Recording page replacement…") }</p>}
+    {replaced && <p className={styles.notice} role="status">{t("Page replacement is recorded. Waiting for the current application revision. Your earlier pages are no longer shown.") }</p>}
+    {unconfirmed && <div className={styles.notice} role="status"><p>{t(attempt.kind === "submit" ? "Submit result is not confirmed." : "Page replacement result is not confirmed.")} {t("CaseLink must check the current application before another attempt. This does not establish whether anything reached the agency.") }</p><button type="button" className={styles.quiet} onClick={() => { saved.reload(); onChange?.(); }}>{t("Check current application status") }</button></div>}
   </section>;
 }

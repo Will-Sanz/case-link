@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import type { SupportRequest } from "@/lib/parent/domain";
@@ -13,11 +14,12 @@ import { sendSnapDirectCompletion } from "@/lib/parent/snap-direct-completion-tr
 import { loadSnapSigningCopyFile } from "@/lib/parent/snap-signing-copy-file";
 import { boundedParentApi } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
+import type { SnapFormTemplateId } from "./snap-document-language";
 import { SnapPersonalDrawing } from "./snap-personal-drawing";
 import { SnapPreparedApplication } from "./snap-prepared-application";
 import { SnapReviewPdf } from "./snap-review-pdf";
 import { isSnapFinalReviewAction } from "./support-activity";
-import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import { snapFormSource } from "@/lib/parent/snap-form-source";
 import styles from "./parent.module.css";
 import { permissionWindowCurrent, usePermissionWindow } from "./use-permission-window";
 
@@ -37,6 +39,7 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
   request: SupportRequest; snapshot: SnapApplicationSnapshot; context: SnapCaptureContext;
   acquisition: SnapDirectAcquisitionResult; onChange?: () => void; onRecovery: () => void;
 }) {
+  const { t, locale } = useParentLocale();
   const [revision, setRevision] = useState(0);
   // Status polling must not erase personal work when its actual authorization and application are unchanged.
   const serialized = JSON.stringify({ request: { id: requestProp.id, version: requestProp.version, status: requestProp.status,
@@ -60,6 +63,8 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
   const [drawings, setDrawings] = useState<Partial<Record<typeof drawingActs[number], Drawing>>>({});
   const [pages, setPages] = useState<Partial<Record<typeof drawingActs[number], boolean>>>({});
   const pageReady = useMemo(() => Object.fromEntries(drawingActs.map((act, index) => [act, (value: boolean, pageNumber?: number) => setPages(values => ({ ...values, [act]: values[act] || value && pageNumber === (index ? 7 : 3) }))])) as Record<typeof drawingActs[number], (value: boolean, pageNumber?: number) => void>, []);
+  let source: ReturnType<typeof snapFormSource>["contract"] | undefined;
+  try { source = snapFormSource(snapshot?.source?.templateId ?? "").contract; } catch { /* Invalid source metadata cannot enable personal entry. */ }
   let permitted = false, deadline = 0, consentedAt = NaN;
   try {
     const grant = snapDirectAcquisitionResultSchema.parse(acquisition), current = snapCaptureContextSchema.parse(context);
@@ -77,14 +82,14 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
       && [...grant.subjectIds].sort().join() === [...current.applyingSubjectIds].sort().join()
       && [...current.applyingSubjectIds].sort().join() === people.filter(person => person.requestingSnap).map(person => person.id.toLowerCase()).sort().join();
     consentedAt = grant.state === "authorized" ? Date.parse(grant.consentedAt) : NaN;
-    deadline = Math.min(Date.parse(request.mandate.expiresAt), Date.parse(grant.expiresAt), Date.parse(source.verifiedUntil));
+    deadline = Math.min(Date.parse(request.mandate.expiresAt), Date.parse(grant.expiresAt), Date.parse(source!.verifiedUntil));
   } catch { /* No private input mounts from incomplete or changed permission metadata. */ }
   const timeCurrent = usePermissionWindow(deadline, consentedAt);
   permitted = permitted && timeCurrent;
   const people = snapshot?.details?.household ?? [], applicants = people.filter(person => person.requestingSnap);
   const suppliedNumbers = applicants.filter(person => !deferredIdentifiers[person.id]).map(person => identifiers[person.id] ?? "").filter(value => /^[0-9]{9}$/.test(value));
   const duplicateNumbers = new Set(suppliedNumbers).size !== suppliedNumbers.length;
-  const supported = !snapshot?.details?.authorizedRepresentative && !applicants.some(person => person.citizen === false)
+  const supported = !!source && !snapshot?.details?.authorizedRepresentative && !applicants.some(person => person.citizen === false)
     && people.length <= source.limits.householdRows && (snapshot?.details?.income?.entries?.length ?? 0) <= source.limits.incomeRows;
   const expiresAt = Number.isFinite(deadline) && deadline > 0 ? new Date(deadline).toISOString() : "";
   const [previousSession, setPreviousSession] = useState({ scope, permitted, supported });
@@ -176,36 +181,35 @@ export function SnapDirectPersonalEntry({ request: requestProp, snapshot: snapsh
   }
   if (!permitted) return null;
   if (state?.scope === scope && state.kind === "existing") return <SnapPreparedApplication request={requestProp} snapshot={snapshot} onChange={onChange}/>;
-  if (!supported || state?.scope === scope && state.kind === "unsupported") return <div className={styles.notice}><p>CaseLink needs to resolve this application’s personal steps before asking for protected information.</p><button type="button" className={styles.quiet} onClick={recover}>Get help with personal steps</button></div>;
-  if (state?.scope === scope && state.kind === "error") return <div className={styles.space}><ServiceError error={new Error(errorText)} retry={() => setRevision(value => value + 1)} returnTo={`/support/${request.id}`}/><button type="button" className={styles.quiet} onClick={recover}>Get help with personal steps</button></div>;
+  if (!supported || state?.scope === scope && state.kind === "unsupported") return <div className={styles.notice}><p>{t("CaseLink needs to resolve this application’s personal steps before asking for protected information.") }</p><button type="button" className={styles.quiet} onClick={recover}>{t("Get help with personal steps") }</button></div>;
+  if (state?.scope === scope && state.kind === "error") return <div className={styles.space}><ServiceError error={new Error(errorText)} retry={() => setRevision(value => value + 1)} returnTo={`/support/${request.id}`}/><button type="button" className={styles.quiet} onClick={recover}>{t("Get help with personal steps") }</button></div>;
   if (!active || !ready) return <ParentLoading label="Preparing the protected personal steps"/>;
-  return <form ref={bindForm} className={styles.space} onSubmit={finish} autoComplete="off">
-    <h3>Personal steps for your SNAP application</h3>
-    <p className={styles.hint}>Your saved answers are already included. Add numbers only for people applying for SNAP, or choose to provide them to DHS later. Make your own certifications below. These entries stay out of chat, AI and ordinary household records. Finishing these steps stores the exact application privately; you review it and choose Submit separately.</p>
+  return <form lang={locale} ref={bindForm} className={styles.space} onSubmit={finish} autoComplete="off">
+    <h3>{t("Personal steps for your SNAP application") }</h3>
+    <p className={styles.hint}>{t("Your saved answers are already included. Add numbers only for people applying for SNAP, or choose to provide them to DHS later. Make your own certifications below. These entries stay out of chat, AI and ordinary household records. Finishing these steps stores the exact application privately; you review it and choose Submit separately.") }</p>
     <fieldset disabled={pending} className={`${styles.fieldset} ${styles.space} ${styles.stack}`}>
-      <legend className={styles.legend}>Applicant information</legend>
-      {applicants.map(person => <div className={styles.space} key={person.id}><label className={styles.field}>{person.firstName} {person.lastName} — Social Security number
-        <input className={styles.input} type="password" inputMode="numeric" autoComplete="off" required={!deferredIdentifiers[person.id]} disabled={pending || deferredIdentifiers[person.id]} pattern="[0-9]{9}" maxLength={11}
+      <legend className={styles.legend}>{t("Applicant information") }</legend>
+      {applicants.map(person => <div className={styles.space} key={person.id}><label className={styles.field}>{person.firstName} {person.lastName} {t("— Social Security number") }{" "}<input className={styles.input} type="password" inputMode="numeric" autoComplete="off" required={!deferredIdentifiers[person.id]} disabled={pending || deferredIdentifiers[person.id]} pattern="[0-9]{9}" maxLength={11}
           value={identifiers[person.id] ?? ""} onChange={event => setIdentifiers(values => ({ ...values, [person.id]: event.target.value.replace(/[ -]/g, "") }))}/>
       </label><label className={styles.checkbox}><input type="checkbox" checked={deferredIdentifiers[person.id] ?? false} onChange={event => {
         const deferred = event.currentTarget.checked;
         setDeferredIdentifiers(values => ({ ...values, [person.id]: deferred }));
         setIdentifiers(values => ({ ...values, [person.id]: "" }));
-      }}/>Provide {person.firstName} {person.lastName}’s number to DHS later</label></div>)}
-      <p className={styles.hint}>A missing number does not prevent an initial filing. A number left for later stays blank on the form; DHS may ask for missing information before deciding eligibility. Do not invent a number.</p>
-      {duplicateNumbers && <p className={styles.notice} role="alert">The same number is entered for more than one applicant. Check the entries, or provide a number to DHS later.</p>}
+      }}/>{t("Provide {name}’s number to DHS later").replace("{name}", `${person.firstName} ${person.lastName}`)}</label></div>)}
+      <p className={styles.hint}>{t("A missing number does not prevent an initial filing. A number left for later stays blank on the form; DHS may ask for missing information before deciding eligibility. Do not invent a number.") }</p>
+      {duplicateNumbers && <p className={styles.notice} role="alert">{t("The same number is entered for more than one applicant. Check the entries, or provide a number to DHS later.") }</p>}
       {drawingActs.map((act, index) => <div className={styles.space} key={act}>
-        <h4>{index ? "Rights and responsibilities — printed page 5" : "Applicant certification — printed page 1"}</h4>
-        <SnapReviewPdf source={ready.blob} initialPage={index ? 7 : 3} onReady={pageReady[act]}/>
-        <SnapPersonalDrawing actId={act} label={index ? "Your rights and responsibilities certification" : "Your applicant certification"}
+        <h4>{t(index ? "Rights and responsibilities — printed page 5" : "Applicant certification — printed page 1")}</h4>
+        <SnapReviewPdf documentLanguage={snapFormSource(snapshot.source.templateId).language} source={ready.blob} initialPage={index ? 7 : 3} onReady={pageReady[act]}/>
+        <SnapPersonalDrawing templateId={snapshot.source.templateId as SnapFormTemplateId} actId={act} label={index ? "Your rights and responsibilities certification" : "Your applicant certification"}
           instructions="Read the exact official page above, then write your own name below. CaseLink cannot sign for you."
           expiresAt={expiresAt} disabled={pending || !pages[act]} onRecovery={recover}
           onChange={value => setDrawings(values => ({ ...values, [act]: value ?? undefined }))}/>
       </div>)}
       <button className={styles.button} type="submit" disabled={pending || duplicateNumbers || !applicants.every(person => deferredIdentifiers[person.id] || /^[0-9]{9}$/.test(identifiers[person.id] ?? "")) || !drawingActs.every(act => drawings[act] && pages[act])}>
-        {pending ? "Preparing your exact application…" : "Finish personal steps"}
+        {t(pending ? "Preparing your exact application…" : "Finish personal steps")}
       </button>
-      <button className={styles.quiet} type="button" onClick={recover}>Get help with personal steps</button>
+      <button className={styles.quiet} type="button" onClick={recover}>{t("Get help with personal steps") }</button>
     </fieldset>
   </form>;
 }

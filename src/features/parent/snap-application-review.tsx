@@ -1,4 +1,5 @@
 "use client";
+import { useParentLocale } from "./parent-locale";
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { z } from "zod";
@@ -14,21 +15,16 @@ import { SavedFamilyProfileNotice, useSavedFamilyProfile } from "./use-saved-fam
 import { SnapApplicationFormFields, SnapApplicationSummary } from "./snap-application-form";
 import { SnapProtectedApplication } from "./snap-protected-application";
 import { isSnapFinalReviewAction } from "./support-activity";
-import formSource from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import { SNAP_EN_TEMPLATE_ID, snapFormSource } from "@/lib/parent/snap-form-source";
+import { SnapDocumentLanguage, type SnapFormTemplateId } from "./snap-document-language";
 import styles from "./parent.module.css";
 import { usePermissionWindow } from "./use-permission-window";
 
-export function SnapApplicationNotice() {
-  return <div className={styles.notice}><p>
-    These questions follow the <a className={styles.textLink} href={formSource.sourceUrl}>reviewed Pennsylvania SNAP form</a>.
-    CaseLink saves your name, address, household members’ birth dates and application answers,
-    including applicable income, medical and other expenses, citizenship and criminal-history or benefit-disqualification answers, for your Pennsylvania SNAP request.
-    They stay separate from chat and ordinary support facts. CaseLink keeps application details while your request
-    is active and for up to 90 days afterward under the <Link className={styles.textLink} href="/support/privacy#snap-application">SNAP data notice</Link>.
-    Do not enter Social Security numbers, passwords, EBT PINs or signatures here. Required identifiers and genuine
-    certifications need the protected official-program step. This does not appoint CaseLink as your representative or submit an application.
-    CaseLink saves these answers when you authorize and start support or save a correction.
-  </p></div>;
+export function SnapApplicationNotice({ templateId = SNAP_EN_TEMPLATE_ID }: { templateId?: SnapFormTemplateId }) {
+  const { t, locale } = useParentLocale();
+  const formSource = snapFormSource(templateId).contract;
+  return <div lang={locale} className={styles.notice}><p>
+    {t("These questions follow the") }{" "}<a className={styles.textLink} href={formSource.sourceUrl}>{t("reviewed Pennsylvania SNAP form") }</a>{t(". CaseLink saves your name, address, household members’ birth dates and application answers, including applicable income, medical and other expenses, citizenship and criminal-history or benefit-disqualification answers, for your Pennsylvania SNAP request. They stay separate from chat and ordinary support facts. CaseLink keeps application details while your request is active and for up to 90 days afterward under the") }{" "}<Link className={styles.textLink} href="/support/privacy#snap-application">{t("SNAP data notice") }</Link>{t(". Do not enter Social Security numbers, passwords, EBT PINs or signatures here. Required identifiers and genuine certifications need the protected official-program step. This does not appoint CaseLink as your representative or submit an application. CaseLink saves these answers when you authorize and start support or save a correction.") }{" "}</p></div>;
 }
 
 function questionPaths(paths: string[], value: SnapApplicationFields): string[] {
@@ -53,9 +49,11 @@ function editableDetails(value: SnapApplicationFields): SnapApplicationFields {
 }
 
 export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: { request: SupportRequest; onChange?: () => void; answerRequest?: number }) {
+  const { t, locale } = useParentLocale();
   const [readRevision,setReadRevision]=useState(0);
   const saved = useParentResource<{ snapshot: SnapApplicationSnapshot }>(`/requests/${request.id}/snap-application?requestVersion=${request.version}&read=${readRevision}`);
   const collection = useParentResource<ParentAuthorizationWindow>("/authorization-window");
+  const [documentChoice, setDocumentChoice] = useState<{ snapshotId: string; templateId: SnapFormTemplateId } | null>(null);
   const [focused, setFocused] = useState(false);
   const [changingAddress, setChangingAddress] = useState(false);
   const [confirmedPaths, setConfirmedPaths] = useState<string[]>([]);
@@ -78,6 +76,8 @@ export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: 
     onSaved: () => { refreshSnapshot(); onChange?.(); }, onAccessDenied: collection.reload });
   const { error, message, conflict, uncertain, blocked, pending, permitted, editingCurrent, setMessage } = editor;
   const draft = editor.draft?.value ?? null;
+  const documentTemplateId = documentChoice && documentChoice.snapshotId === record?.id ? documentChoice.templateId : record?.source.templateId as SnapFormTemplateId | undefined;
+  const sourceChanged = !!record && !!documentTemplateId && documentTemplateId !== record.source.templateId;
   const family = useSavedFamilyProfile({ request, program: "snap-pa", snapshotId: record?.id, permitted, onOwnerChanged: editor.reset });
   async function refreshFamily() { if (uncertain) return; if (draft) { const value = await family.load(draft); if (value) editor.change(value); } else await edit(); }
   const preparedReview = current && permitted && !draft && assessment?.readiness.nonProtectedDataReadyForReview
@@ -110,7 +110,7 @@ export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: 
   async function edit(addressOnly = false) {
     if (!current || !permitted || !details || !record) return;
     const value = await family.load(editableDetails(details));
-    if (value) { editor.begin(value);setFocused(false);setChangingAddress(addressOnly);setConfirmedPaths([]); }
+    if (value) { setDocumentChoice({ snapshotId: record.id, templateId: record.source.templateId as SnapFormTemplateId }); editor.begin(value);setFocused(false);setChangingAddress(addressOnly);setConfirmedPaths([]); }
   }
   if (answerRequest && handledAnswerRequest !== answerRequest && current && permitted && assessment && record) {
     setHandledAnswerRequest(answerRequest); setChangingAddress(false); setFocused(true);
@@ -149,44 +149,49 @@ export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: 
       if (focused && !confirmed.length && JSON.stringify(snapApplicationLeaves(value.data)) === JSON.stringify(originalLeaves))
         throw new ParentApiError("Answer an application question or mark an outdated answer still correct before saving.", 400);
       const familyProfileSource = await family.source(value.data, signal);
-      return { details: value.data, ...(familyProfileSource ? { familyProfileSource } : {}), expectedVersion, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION, ...(confirmed.length ? { confirmedPaths: confirmed } : {}) };
+      return { ...(sourceChanged ? { documentTemplateId } : {}), details: value.data, ...(familyProfileSource ? { familyProfileSource } : {}), expectedVersion, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION, ...(confirmed.length ? { confirmedPaths: confirmed } : {}) };
     });
   }
-  return <section className={styles.section} id="application-answers" aria-labelledby="application-answers-title" tabIndex={-1}>
-    <h2 id="application-answers-title">Your SNAP application answers</h2>
-    {!mandateCurrent && <p className={styles.notice} role="status">Your application permission has expired or could not be checked. Your unsaved draft remains on this page; saved answers stay readable.</p>}
+  return <section lang={locale} className={`${styles.section} ${styles.snapApplication}`} id="application-answers" aria-labelledby="application-answers-title" tabIndex={-1}>
+    <h2 id="application-answers-title">{t("Your SNAP application answers") }</h2>
+    {!mandateCurrent && <p className={styles.notice} role="status">{t("Your application permission has expired or could not be checked. Your unsaved draft remains on this page; saved answers stay readable.") }</p>}
     {saved.loading ? <ParentLoading label="Loading saved SNAP application"/> : saved.error ?
-      saved.error instanceof ParentApiError && saved.error.status===404 ? <p className={styles.hint}>No full SNAP application answers are saved for this request. Your existing support and recorded history remain available.</p> :
+      saved.error instanceof ParentApiError && saved.error.status===404 ? <p className={styles.hint}>{t("No full SNAP application answers are saved for this request. Your existing support and recorded history remain available.") }</p> :
       <ServiceError error={saved.error} retry={refreshSnapshot} returnTo={`/support/${request.id}`}/> : !valid || !details || !record ?
-      <p className={styles.hint}>A verified saved application revision is unavailable. Check the saved record before using these answers for an application.</p> : <>
-        <p className={styles.hint}>Saved revision {record.revision} · {displayDate(record.created_at,true)} · {current ? record.request_version===request.version ? "Matches your current request" : "Latest saved answers checked for this request" : "Updated request is loading"}</p>
-        {current && record.request_version<request.version && <p className={styles.hint}>These are the latest saved application answers, checked after the request changed. Their original recorded dates stay unchanged; a correction uses the current request version.</p>}
-        {!current && <p className={styles.notice}>This saved application belongs to a newer request version. Refresh the request before editing; your saved answers remain available.</p>}
-        <p className={styles.hint}>CaseLink uses these answers to prepare your application. Check them below and correct anything that has changed. Saving answers does not submit an application.</p>
-        {draft && !editingCurrent && <div className={styles.notice}><p>The request changed while you were editing. Your unsaved draft has not been applied to this revision. Loading the latest saved application replaces that unsaved draft.</p><button type="button" className={styles.secondary} onClick={()=>{editor.reset();refreshSnapshot();onChange?.();}}>Load latest saved application</button></div>}
-        {draft && permitted && editingCurrent ? <form className={styles.form} onSubmit={submit} ref={form} aria-label="Correct SNAP application answers">
-          <SnapApplicationNotice/>
+      <p className={styles.hint}>{t("A verified saved application revision is unavailable. Check the saved record before using these answers for an application.") }</p> : <>
+        <p className={styles.hint}>{t("Saved revision") }{" "}{record.revision} · {displayDate(record.created_at,true,locale)} · {t(current ? record.request_version===request.version ? "Matches your current request" : "Latest saved answers checked for this request" : "Updated request is loading")}</p>
+        {current && record.request_version<request.version && <p className={styles.hint}>{t("These are the latest saved application answers, checked after the request changed. Their original recorded dates stay unchanged; a correction uses the current request version.") }</p>}
+        {!current && <p className={styles.notice}>{t("This saved application belongs to a newer request version. Refresh the request before editing; your saved answers remain available.") }</p>}
+        <p className={styles.hint}>{t("CaseLink uses these answers to prepare your application. Check them below and correct anything that has changed. Saving answers does not submit an application.") }</p>
+        {draft && !editingCurrent && <div className={styles.notice}><p>{t("The request changed while you were editing. Your unsaved draft has not been applied to this revision. Loading the latest saved application replaces that unsaved draft.") }</p><button type="button" className={styles.secondary} onClick={()=>{editor.reset();refreshSnapshot();onChange?.();}}>{t("Load latest saved application") }</button></div>}
+        {draft && permitted && editingCurrent ? <form className={styles.form} onSubmit={submit} ref={form} aria-label={t("Correct SNAP application answers")}>
+          <SnapApplicationNotice templateId={documentTemplateId}/>
           <SavedFamilyProfileNotice reuse={family} refresh={refreshFamily} disabled={pending || uncertain || conflict}/>
-          {changingAddress && <p className={styles.hint}>Change your address below. Your other saved answers stay unchanged.</p>}
-          {focused && <p className={styles.hint}>Only missing or outdated answers are requested here. Change an answer or choose “Still correct” for an outdated value that is unchanged. Fresh saved answers stay unchanged.</p>}
+          {changingAddress && <p className={styles.hint}>{t("Change your address below. Your other saved answers stay unchanged.") }</p>}
+          {focused && <p className={styles.hint}>{t("Only missing or outdated answers are requested here. Change an answer or choose “Still correct” for an outdated value that is unchanged. Fresh saved answers stay unchanged.") }</p>}
           <SnapApplicationFormFields value={draft} questions={questions} disabled={pending||conflict||uncertain||family.loading||family.blocked} onChange={value=>{
             editor.change(value);setConfirmedPaths(current => current.filter(path => JSON.stringify(snapApplicationLeaves(value)[path]) === JSON.stringify(draftLeaves[path])));
           }}/>
-          {(focused || changingAddress) && <button type="button" className={styles.quiet} disabled={pending||conflict||uncertain||family.loading||family.blocked} onClick={()=>{setFocused(false);setChangingAddress(false);}}>Change other saved answers</button>}
-          <p className={styles.hint}>Saving a correction stops queued uses of superseded answers. Already delivered records stay unchanged. This saves your answers and does not submit an application.</p>
+          {!focused && !changingAddress && documentTemplateId && <SnapDocumentLanguage value={documentTemplateId} disabled={pending || conflict || uncertain || family.loading || family.blocked} onChange={templateId => {
+            if (!record) return; editor.change(draft); setDocumentChoice({ snapshotId: record.id, templateId });
+          }}/>}
+          {sourceChanged && <p className={styles.notice}>{t("Changing the official document language creates a new application revision. Earlier personal pages cannot be reused for the new form; your saved answers keep their original dates.")}</p>}
+          {(focused || changingAddress) && <button type="button" className={styles.quiet} disabled={pending||conflict||uncertain||family.loading||family.blocked} onClick={()=>{setFocused(false);setChangingAddress(false);}}>{t("Change other saved answers") }</button>}
+          <p className={styles.hint}>{t("Saving a correction stops queued uses of superseded answers. Already delivered records stay unchanged. This saves your answers and does not submit an application.") }</p>
           <div className={styles.inline}>
-            <button className={styles.button} disabled={pending||conflict||family.loading||family.blocked}>{pending?"Saving application answers…":uncertain?"Retry the same save":"Save application changes"}</button>
-            {!uncertain && <button className={styles.quiet} type="button" disabled={pending} onClick={()=>{editor.reset();}}>Cancel editing</button>}
+            <button className={styles.button} disabled={pending||conflict||family.loading||family.blocked}>{t(pending?"Saving application answers…":uncertain?"Retry the same save":"Save application changes")}</button>
+            {!uncertain && <button className={styles.quiet} type="button" disabled={pending} onClick={()=>{editor.reset();}}>{t("Cancel editing") }</button>}
           </div>
-          {conflict && <div><p className={styles.hint}>The request changed. Your unsaved draft is still here. Loading the latest revision replaces this unsaved draft.</p><button type="button" className={styles.secondary} onClick={()=>{editor.reset();refreshSnapshot();onChange?.();}}>Load latest saved application</button></div>}
+          {conflict && <div><p className={styles.hint}>{t("The request changed. Your unsaved draft is still here. Loading the latest revision replaces this unsaved draft.") }</p><button type="button" className={styles.secondary} onClick={()=>{editor.reset();refreshSnapshot();onChange?.();}}>{t("Load latest saved application") }</button></div>}
         </form> : <>
           {preparedReview && <SnapProtectedApplication key={`${request.id}:${request.version}:${record.id}`} request={request} snapshot={record} onChange={onChange}/>}
-          <SnapApplicationSummary value={details} onChangeAddress={current && permitted && !draft && !family.loading && !family.blocked ? ()=>edit(true) : undefined}/>{current && permitted && !draft && <button type="button" className={styles.secondary} disabled={family.loading || family.blocked} onClick={()=>edit()}>Correct application answers</button>}
-          {current && !permitted && <p className={styles.hint}>Application changes are unavailable while the request or its collection permission is paused. Your saved answers stay readable.</p>}</>}
+          <p className={styles.hint}>{t("Official SNAP form:")} <span lang={snapFormSource(record.source.templateId).language}>{snapFormSource(record.source.templateId).contract.printedRevision}</span> · {t(snapFormSource(record.source.templateId).language === "es" ? "Spanish document" : "English document")}</p>
+          <SnapApplicationSummary value={details} onChangeAddress={current && permitted && !draft && !family.loading && !family.blocked ? ()=>edit(true) : undefined}/>{current && permitted && !draft && <button type="button" className={styles.secondary} disabled={family.loading || family.blocked} onClick={()=>edit()}>{t("Correct application answers") }</button>}
+          {current && !permitted && <p className={styles.hint}>{t("Application changes are unavailable while the request or its collection permission is paused. Your saved answers stay readable.") }</p>}</>}
       </>}
     {family.blocked && <SavedFamilyProfileNotice reuse={family} refresh={refreshFamily} disabled={pending || uncertain || conflict}/>}
     {error && <ServiceError error={error} returnTo={`/support/${request.id}`}/>}
-    {(blocked || collection.error) && <button type="button" className={styles.secondary} disabled={pending} onClick={recheckAccess}>{pending?"Checking private application access…":"Check private application access again"}</button>}
-    {message && <p className={styles.success} role="status">{message}</p>}
+    {(blocked || collection.error) && <button type="button" className={styles.secondary} disabled={pending} onClick={recheckAccess}>{t(pending?"Checking private application access…":"Check private application access again")}</button>}
+    {message && <p className={styles.success} role="status">{t(message)}</p>}
   </section>;
 }
