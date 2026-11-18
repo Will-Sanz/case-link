@@ -88,3 +88,10 @@ it.each(["missing model key", "unavailable broker"])("checks only exact continua
   if (missing === "missing model key") { expect(mocks.assistant).not.toHaveBeenCalled(); expect(input.fetcher).not.toHaveBeenCalled(); }
   expect(protectedSnapSubmission.execute).not.toHaveBeenCalled(); expect(protectedSnapSubmission.reconcile).not.toHaveBeenCalled();
 });
+
+it("runs the fixed private utility preparation port without a model key or planning broker", async () => {
+  const input = options(), protectedUtilityPreparation = { prepare: vi.fn() };
+  await runParentWorkerService({ ...input, apiKey: undefined, protectedUtilityPreparation });
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, protectedUtilityPreparation }));
+  expect(mocks.assistant).not.toHaveBeenCalled(); expect(input.fetcher).not.toHaveBeenCalled(); expect(protectedUtilityPreparation.prepare).not.toHaveBeenCalled();
+});

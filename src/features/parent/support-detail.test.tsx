@@ -334,6 +334,7 @@ describe("support detail", () => {
       provenance:Object.fromEntries(Object.keys(snapApplicationLeaves(details)).map(path=>[path,{source:'parent',confirmedAt:'2026-11-03T12:00:00Z',asOf:'2026-11-03'}])),
       source:SNAP_APPLICATION_SOURCE,notice_version:SNAP_APPLICATION_NOTICE_VERSION,created_at:'2026-11-03T12:00:00Z',idempotency_key:request.household_id};
     const fetch=vi.fn(async(url:string,init?:RequestInit)=>{
+      if(url.includes('/family-profile-source?'))return {ok:false,status:503,json:async()=>({ok:false,error:'Saved family sources could not be checked.'})};
       if(url.endsWith('/authorization-window'))return {ok:true,status:200,json:async()=>({authorization:{issuedAt:'2026-11-03T12:00:00Z',expiresAt:'2026-11-24T12:00:00Z',snapApplication:{collectionEnabled:true,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}}})};
       if(url.includes('/snap-application'))return {ok:true,status:200,json:async()=>init?.method==='POST'?{snapshotId:snapshot.id}:{snapshot}};
       return response(request);
@@ -341,7 +342,8 @@ describe("support detail", () => {
     fireEvent.click(await screen.findByRole('link',{name:'Answer SNAP application questions'}));
     const form=await screen.findByRole('form',{name:'Correct SNAP application answers'});
     expect(screen.queryByRole('form',{name:'Household questions'})).toBeNull();expect(screen.queryByLabelText('Your answer')).toBeNull();
-    await waitFor(()=>expect(document.activeElement).toBe(form.querySelector('input,select,button')));
+    await waitFor(()=>expect(document.activeElement).toBe(within(form).getByLabelText('Your address')));
+    expect(within(form).getByRole('button',{name:'Refresh linked family answers'})).toBeTruthy();
     fireEvent.change(within(form).getByLabelText('County'),{target:{value:'Philadelphia'}});
     fireEvent.click(within(form).getByRole('button',{name:'Save application changes'}));await screen.findByText(/application answers are saved as a new revision/);
     const posts=fetch.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(1);expect(posts[0][0]).toBe(`/api/parent/requests/${requestId}/snap-application`);
@@ -706,23 +708,27 @@ describe("support detail", () => {
       version: 1,
     });
   });
-  it("keeps private PECO fields and documents out of ordinary corrections while preserving the shutoff date", async () => {
-    const request = fixture(); request.intake = { ...request.intake, utilityProviders: ["peco"], accountAuthority: "self", shutoffDate: "2026-11-15" };
-    request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt, true);
+  it.each([
+    { need: "electricity", provider: "peco", program: "peco-cap", flag: "has_peco_application_details" },
+    { need: "gas", provider: "pgw", program: "pgw-crp", flag: "has_pgw_application_details" },
+    { need: "water", provider: "pwd", program: "pwd-tap", flag: "has_water_application_details" },
+  ] as const)("keeps private $program fields and documents out of ordinary corrections while preserving the shutoff date", async option => {
+    const request = fixture(); request[option.flag] = true; request.intake = { ...request.intake, needs: [option.need], utilityProviders: [option.provider], accountAuthority: "self", shutoffDate: "2026-11-15" };
+    request.mandate = buildMandate(request.intake, [option.program], "prepare_only", "ask_me", request.mandate.expiresAt, true, true);
     const fetcher = vi.fn(async (_url: string, init?: RequestInit) => response(init?.method === "POST" ? { ...request, version: 2, intake: { ...request.intake, zip: "19105" } } : request));
     vi.stubGlobal("fetch", fetcher); render(<SupportDetail requestId={requestId}/>); await openSection(/Details & controls/);
     fireEvent.click(await screen.findByText("Correct household or bill information"));
     expect(screen.queryByLabelText("Household size")).toBeNull(); expect(screen.queryByLabelText("Income before taxes ($)")).toBeNull();
     expect(screen.queryByLabelText("PECO account number")).toBeNull();
     expect((screen.getByLabelText("Shutoff date, if on a notice") as HTMLInputElement).value).toBe("2026-11-15");
-    expect(screen.getByRole("link", { name: "Your PECO CAP answers" }).getAttribute("href")).toBe("#application-review");
+    expect(screen.getByRole("link", { name: "Your utility application answers" }).getAttribute("href")).toBe("#application-review");
     fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19105" } });
     fireEvent.click(screen.getByRole("button", { name: "Save correction" })); await screen.findByText(/Your correction is saved/);
     const body = JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body));
     expect(body.intake).toMatchObject({ zip: "19105", shutoffDate: "2026-11-15", householdSize: null, incomeAmount: null });
     expect(body.details).toBeUndefined();
     await openSection(/Your documents/);
-    expect(screen.getByText(/Private PECO CAP document intake is not connected/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open protected utility documents" }).getAttribute("href")).toBe(`/protected/utilities/requests/${request.id}/workspace?expectedVersion=${request.version}`);
     expect(screen.queryByLabelText(/Upload/)).toBeNull();
   });
   it('preserves legacy private WIC answers read-only without silently clearing them for a ZIP correction',async()=>{

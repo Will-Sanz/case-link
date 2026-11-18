@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { fixtureIntake, fixtureMandate } from "../src/lib/parent/test-fixtures";
 import { fetchWithTimeout } from "../src/lib/supabase/fetch-with-timeout";
+import { beginParentTestApproval } from "./parent-test-approval";
 
 type Check = (condition: unknown, label: string) => asserts condition;
 export type ParentBrowserFixture = {
@@ -86,45 +87,11 @@ export async function withParentBrowserFixtures(
     token: string;
     requestId: string;
   }[] = [];
-  let original:
-    | {
-        enabled: boolean;
-        approval_reference: string | null;
-        approved_until: string | null;
-        updated_at: string;
-        existing_identity_created_before: string | null;
-      }
-    | undefined;
-  let locked = false;
-  let changed = false;
+  let approval: Awaited<ReturnType<typeof beginParentTestApproval>> | undefined;
   try {
     onStage("locking isolated test controls");
-    locked = (
-      await db.query("select pg_try_advisory_lock(627281933) as acquired")
-    ).rows[0].acquired;
-    check(
-      locked,
-      "Another browser connection test must not share fixture controls.",
-    );
-    original = (
-      await db.query(
-        "select enabled,approval_reference,approved_until::text,updated_at::text,existing_identity_created_before::text from parent_private.processing_controls where singleton",
-      )
-    ).rows[0];
-    check(original, "The isolated processing control exists.");
-    check(
-      original.existing_identity_created_before === null,
-      "A configured identity cutoff must not be broadened for tests.",
-    );
-    const approvedUntil = new Date(Date.now() + 20 * 60 * 1000).toISOString();
-    await db.query(
-      "update parent_private.processing_controls set enabled=true,approval_reference=$1,approved_until=$2 where singleton",
-      [
-        "owner-authorized isolated synthetic browser connection test",
-        approvedUntil,
-      ],
-    );
-    changed = true;
+    approval = await beginParentTestApproval(db);
+    const approvedUntil = approval.approvedUntil;
 
     onStage("creating two exact isolated synthetic identities and sessions");
     for (let index = 0; index < 2; index++) {
@@ -234,31 +201,7 @@ export async function withParentBrowserFixtures(
         );
       });
     }
-    if (changed && original) {
-      const snapshot = original;
-      await cleanup(async () => {
-        await db.query(
-          "update parent_private.processing_controls set enabled=$1,approval_reference=$2,approved_until=$3,updated_at=$4 where singleton",
-          [
-            snapshot.enabled,
-            snapshot.approval_reference,
-            snapshot.approved_until,
-            snapshot.updated_at,
-          ],
-        );
-        const restored = (
-          await db.query(
-            "select enabled,approval_reference,approved_until::text,updated_at::text,existing_identity_created_before::text from parent_private.processing_controls where singleton",
-          )
-        ).rows[0];
-        check(
-          JSON.stringify(restored) === JSON.stringify(snapshot),
-          "The exact original processing controls and identity cutoff are restored.",
-        );
-      });
-    }
-    if (locked)
-      await cleanup(() => db.query("select pg_advisory_unlock(627281933)"));
+    if (approval) await cleanup(approval.restore);
     await cleanup(() => db.end());
     if (cleanupFailed) {
       onStage(

@@ -64,12 +64,21 @@ describe("owned private PECO preparation data", () => {
     await startPecoApplication(urgent, mandate(), { details: {}, noticeVersion: notice, subjectAuthorityDeclared: true, accountAuthorityDeclared: true }, key);
     expect(mocks.rpc.mock.calls[0][1].p_intake).toEqual(urgent);
   });
+  it("accepts explicit document preparation permission without treating it as upload authorization", async () => {
+    const permission = { ...mandate(), allowedData: ["household", "income", "utility", "documents"] as const };
+    mocks.rpc.mockResolvedValue({ data: requestId, error: null });
+    await startPecoApplication(intake(), { ...permission, allowedData: [...permission.allowedData] }, {
+      details: {}, noticeVersion: notice, subjectAuthorityDeclared: true, accountAuthorityDeclared: true,
+    }, key);
+    expect(mocks.rpc.mock.calls[0][1].p_mandate.allowedData).toEqual(permission.allowedData);
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
   it.each([{ householdSize: 3 }, { incomeAmount: 100, incomeFrequency: "monthly" }, { needs: ["gas"] }, { utilityProviders: ["pgw"] }, { accountAuthority: "not_sure" }, { needs: ["electricity", "water"] }])("rejects irrelevant or unscoped initial intake", async override => {
     const application = { details: {}, noticeVersion: notice, subjectAuthorityDeclared: true, accountAuthorityDeclared: true };
     await expect(startPecoApplication({ ...intake(), ...override } as ReturnType<typeof intake>, mandate(), application, key)).rejects.toThrow("parent_invalid_input");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it.each([{ mode: "full", allowedActions: ["prepare"] }, { recipientIds: ["pwd-tap"] }, { allowedData: ["household", "income"] }, { allowedData: ["household", "income", "utility", "documents"] }])("requires a PECO-specific preparation mandate", async override => {
+  it.each([{ mode: "full", allowedActions: ["prepare"] }, { recipientIds: ["pwd-tap"] }, { allowedData: ["household", "income"] }, { allowedData: ["household", "income", "utility", "income"] }])("requires a PECO-specific preparation mandate", async override => {
     await expect(startPecoApplication(intake(), { ...mandate(), ...override } as ReturnType<typeof mandate>, { details: {}, noticeVersion: notice, subjectAuthorityDeclared: true, accountAuthorityDeclared: true }, key)).rejects.toThrow("parent_invalid_input");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });

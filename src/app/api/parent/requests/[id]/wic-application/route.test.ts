@@ -8,9 +8,12 @@ vi.mock("@/lib/parent/wic-application-data", async importOriginal => ({
 }));
 import { WIC_APPLICATION_NOTICE_VERSION as notice } from "@/lib/parent/wic-application-data";
 import { GET, POST } from "./route";
+import { AuthenticationRequiredError } from "@/lib/auth/session-errors";
+import { familyProfileSourceSchema } from "@/lib/parent/family-profile";
 const requestId = "11111111-1111-4111-8111-111111111111", snapshotId = "22222222-2222-4222-8222-222222222222", key = "33333333-3333-4333-8333-333333333333";
 const context = () => ({ params: Promise.resolve({ id: requestId }) });
 const value = () => ({ expectedVersion: 2, details: { contact: { firstName: "WicPrivateCanary" } }, noticeVersion: notice, subjectAuthorityDeclared: true });
+const familySource = () => ({ expectedOwnerId: requestId, revision: 2, options: {}, fields: [{ applicationPath: "contact.firstName", profilePaths: ["primaryPerson.firstName"] }] });
 function request(body: unknown = value(), origin = "https://caselink.test") {
   return new Request(`https://caselink.test/api/parent/requests/${requestId}/wic-application`, { method: "POST", headers: { origin, "content-type": "application/json", "idempotency-key": key }, body: JSON.stringify(body) });
 }
@@ -66,5 +69,42 @@ describe("private owned WIC details endpoint", () => {
     mocks.save.mockRejectedValue(new Error("database WicPrivateCanary"));
     const response = await POST(request(), context());
     expect(response.status).toBe(500); expect(await response.text()).not.toContain("WicPrivateCanary");
+  });
+  it("forwards exact saved-family source and subject authority in the single owned save", async () => {
+    const body = { ...value(), familyProfileSource: familySource() }, response = await POST(request(body), context());
+    expect(mocks.save).toHaveBeenCalledExactlyOnceWith(requestId, body, key);
+    expect(await response.json()).toEqual({ ok: true, snapshotId });
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+  it("rejects a structurally valid source envelope above 128 KB without invoking save", async () => {
+    const familyProfileSource = { expectedOwnerId: requestId, revision: 2, fields: Array.from({ length: 80 }, (_, index) => ({
+      applicationPath: `custom.fact${index}`, profilePaths: Array.from({ length: 10 }, (_, part) => `custom.${part}.${"x".repeat(180)}`),
+    })) };
+    expect(familyProfileSourceSchema.safeParse(familyProfileSource).success).toBe(true);
+    const input = { ...value(), familyProfileSource }; expect(Buffer.byteLength(JSON.stringify(input))).toBeGreaterThan(131072);
+    expect((await POST(request(input), context())).status).toBe(400); expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it.each([
+    null, { ...familySource(), expectedOwnerId: "private-owner-canary" },
+    { ...familySource(), expiresAt: "2026-12-17T18:00:00Z" },
+    { ...familySource(), fields: [{ ...familySource().fields[0], confirmedAt: "2026-11-17T18:00:00Z" }] },
+    { ...familySource(), fields: [{ applicationPath: "contact/<private>", profilePaths: ["primaryPerson.firstName"] }] },
+  ])("rejects malformed source metadata before the save boundary", async familyProfileSource => {
+    const response = await POST(request({ ...value(), familyProfileSource }), context());
+    expect(response.status).toBe(400); expect(await response.json()).toEqual({ ok: false, error: "Check the information and try again." });
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("keeps a known source rejection distinct from unknown delivery and current Auth denial", async () => {
+    mocks.save.mockRejectedValueOnce(new Error("parent_family_profile_source_changed"));
+    const known = await POST(request({ ...value(), familyProfileSource: familySource() }), context());
+    expect(known.status).toBe(412); expect(await known.text()).not.toContain("parent_family_profile_source_changed");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.save.mockRejectedValueOnce(new Error("provider-private-canary parent_family_profile_source_changed"));
+    const unknown = await POST(request({ ...value(), familyProfileSource: familySource() }), context());
+    expect(unknown.status).toBe(500); expect(await unknown.text()).not.toContain("provider-private-canary");
+    mocks.window.mockRejectedValueOnce(new AuthenticationRequiredError());
+    const input = request({ ...value(), familyProfileSource: familySource() }), body = vi.spyOn(input, "body", "get");
+    expect((await POST(input, context())).status).toBe(401); expect(body).not.toHaveBeenCalled();
+    expect(mocks.save).toHaveBeenCalledTimes(2);
   });
 });

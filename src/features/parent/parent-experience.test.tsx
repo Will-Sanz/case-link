@@ -62,6 +62,8 @@ describe("parent API and navigation", () => {
     expect(safeReturnPath("https://attacker.test")).toBe("/my-support");
     expect(safeReturnPath("//attacker.test")).toBe("/my-support");
     expect(safeReturnPath("/support/privacy?token=secret")).toBe("/my-support");
+    expect(safeReturnPath("/family-profile")).toBe("/family-profile");
+    expect(safeReturnPath("/family-profile?next=https://attacker.test")).toBe("/my-support");
     expect(safeReturnPath("/get-support?need=food")).toBe(
       "/get-support?need=food",
     );
@@ -363,6 +365,7 @@ describe("informed support start", () => {
           return jsonResponse({ ok: true, capabilities: [] });
         if (url.endsWith("/authorization-window")) return windows();
         if (url.endsWith("/intake-defaults")) return jsonResponse({ ok: true, zip: null });
+        if (url.endsWith("/family-profile")) return jsonResponse({ ok: false });
         attempts.push(options);
         if (attempts.length === 1)
           throw new Error("The connection was interrupted. Try again.");

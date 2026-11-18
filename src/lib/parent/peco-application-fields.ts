@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isOrdinaryText } from "./ordinary-text";
 
 export const PECO_APPLICATION_NOTICE_VERSION = "peco-application-details-2026-11-13.v1";
 export const PECO_SUBJECT_AUTHORITY_STATEMENT = "I have permission to provide this information and prepare PECO CAP help for myself and every person named, including children and any other adult.";
@@ -10,12 +11,7 @@ export const PECO_APPLICATION_SOURCE = {
   sourceCheckedAt: "2026-11-13T20:06:00.000Z", verifiedUntil: "2026-11-20T20:06:00.000Z",
 } as const;
 
-const text = (maximum: number) => z.string().trim().min(1).max(maximum).refine(value => {
-  const normalized = value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
-  return value.length <= maximum && !/[\u0000-\u001f\u007f-\u009f<>]/.test(value) &&
-    !/\d{3}[-.\/\s‐‑‒–—―]*\d{2}[-.\/\s‐‑‒–—―]*\d{4}|\d{12,19}/.test(normalized) &&
-    !/\b(?:password|passcode|pin|ssn|social\s+security(?:\s+number)?|signature|ebt\s+pin)\s*(?:is\s+|[:=#]\s*)\S+/i.test(normalized);
-});
+const text = (maximum: number) => z.string().trim().min(1).max(maximum).refine(value => value.length <= maximum && isOrdinaryText(value));
 const date = z.string().regex(/^(19|20)\d{2}-\d{2}-\d{2}$/).refine(value => {
   const parsed = new Date(`${value}T12:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;

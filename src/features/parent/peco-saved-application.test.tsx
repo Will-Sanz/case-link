@@ -22,12 +22,12 @@ const support = (status: "active" | "paused" = "active") => fixtureRequest({ ver
 const response = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 let enabled = true;
 let gateExpiry = "2026-11-14T20:00:00Z";
-function api(post: (init: RequestInit) => unknown = () => response({ snapshotId }), missing = false) {
+function api(post: (init: RequestInit) => unknown = () => response({ snapshotId }), missing = false, record: unknown = snapshot()) {
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.includes("/authorization-window")) return response({ authorization: { issuedAt: now.toISOString(), expiresAt: "2026-11-16T20:00:00Z",
       pecoApplication: { collectionEnabled: enabled, noticeVersion: enabled ? PECO_APPLICATION_NOTICE_VERSION : null, expiresAt: enabled ? gateExpiry : null } } });
     if (init?.method === "POST") return post(init);
-    return missing ? response({ ok: false, error: "This saved application is unavailable." }, 404) : response({ snapshot: snapshot() });
+    return missing ? response({ ok: false, error: "This saved application is unavailable." }, 404) : response({ snapshot: record });
   });
   vi.stubGlobal("fetch", fetcher); return fetcher;
 }
@@ -35,8 +35,26 @@ async function edit() { fireEvent.click(await screen.findByRole("button", { name
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); enabled = true; gateExpiry = "2026-11-14T20:00:00Z"; });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("owned PECO saved answers", () => {
-  it("reuses saved private answers and an independent service ZIP while paused without extra consent checkbox", async () => {
-    const fetcher = api(), changed = vi.fn(); render(<PecoSavedApplication request={support("paused")} onChange={changed}/>); await edit();
+  it("automatically confirms its exact interrupted save when the owned latest snapshot arrives", async () => {
+    const record = snapshot(), fetcher = api(() => new Promise(() => {}), false, record);
+    const request = support(), view = render(<PecoSavedApplication request={request}/>); await edit();
+    fireEvent.change(screen.getByLabelText("Applicant first name"), { target: { value: "CommittedCanary" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save PECO changes" }));
+    await waitFor(() => expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+    const init = fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!, body = JSON.parse(String(init.body));
+    Object.assign(record, { id: crypto.randomUUID(), revision: 2, base_version: 2, request_version: 3, details: body.details,
+      idempotency_key: (init.headers as Record<string, string>)["Idempotency-Key"], consent_evidence: { ...record.consent_evidence, revision: 2 } });
+    view.rerender(<PecoSavedApplication request={{ ...request, version: 3 }}/>);
+    await screen.findByText(/Your private PECO CAP answers are saved as a new revision/);
+    expect(screen.queryByRole("button", { name: "Load latest saved PECO answers" })).toBeNull();
+    expect(screen.queryByRole("form")).toBeNull(); expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
+  it.each([false, true])("reuses paused saved answers without another checkbox with document scope %s", async documentScope => {
+    const request = support("paused");
+    if (documentScope) request.mandate.allowedData.push("documents");
+    const fetcher = api(), changed = vi.fn(); render(<PecoSavedApplication request={request} onChange={changed}/>); await edit();
     expect((screen.getByLabelText("Applicant first name") as HTMLInputElement).value).toBe("SavedCanary");
     expect((screen.getByLabelText("PECO service ZIP code") as HTMLInputElement).value).toBe("19147");
     expect(screen.queryByRole("checkbox")).toBeNull();

@@ -1,5 +1,7 @@
 # CaseLink parent support MVP PRD
 
+**November 17, 2026 owner update — food first:** perfect the food-support workflow before expanding. Active work is immediate food support, SNAP, WIC, and the shared family profile and reliability fixes needed by those routes. Electricity, gas, water and other expansion work are paused at their current development checkpoint; preserve it for later without activating, deploying or presenting it as complete. This supersedes the earlier same-day combined food/utility next-candidate scope. Use test data in the isolated checkout and leave the live demo unchanged. Existing privacy, accepted execution, receipt, recovery, accessibility, personal-act and outcome gates still apply; preparation alone does not establish food received or program enrollment.
+
 **Decision/revision date:** October 27, 2026 (America/New_York)
 **Status:** Current requirements; staged MVP and expansion plan; external completion routes and family release gates remain open
 **Primary user:** An adult parent or caregiver seeking practical support for their household
@@ -46,6 +48,12 @@ The Parent University catalog and [dated directory review](verification/2026-10-
 3. Let AI own routine coordination and supported execution, including follow-up and recovery; escalate genuine exceptions.
 4. Provide a calm, complete, accessible product with dependable account, document, communication and return-use experiences.
 5. Make autonomy, human intervention, service outcomes, errors and operating cost measurable by journey and route.
+
+### Shared family profile — November 17 scope
+
+Provide one parent-owned profile for contact details, explicitly supplied home/mailing addresses, language, the primary contact and other people living with them, stable person identities, names, birth dates and optional known income-source inventories. Keep every section partial and editable. Profile storage/reuse needs its own understandable notice and permission; it does not authorize provider disclosure or execution. A current request's named recipients, purposes and data limits still apply. Do not import school records, infer maternal identity, decide who applies or counts for a program, equate a home address with a utility service address, convert an income inventory into a period-specific amount, or collect protected identifiers here.
+
+Reuse original per-answer dates and expiration without renewing them on reads or new requests. Automatically fill compatible fresh facts before asking again; retain explicit choices where a provider-specific identity/address/beneficiary relationship is unresolved. Preserve typing when a profile changes or a save result is unknown. Profile corrections must stop pending uses of changed answers and update compatible authorized work; immutable attempts/submissions retain their exact history. Export and purpose-specific deletion include the profile, while expiry and clearing stop future reuse. Measure remaining manual synchronization and confirmation work honestly until automatic propagation is proved.
 
 ### Staged release scope (L-01)
 

@@ -16,6 +16,8 @@ import {
 } from "./domain";
 
 const uuid = z.uuid();
+import { utilityProtectedInputReferenceSchema } from "./utility-protected-input-contract";
+import { familyProfileReadSchema } from "./family-profile";
 import { DOCUMENT_CONSENT_VERSION } from "./constants";
 export { DOCUMENT_CONSENT_VERSION } from "./constants";
 export const PARENT_DOCUMENT_BUCKET = "parent-documents";
@@ -181,6 +183,10 @@ export async function exportParentInformation() {
       "parent_peco_application_details",
       "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key",
     ],
+    ["pgwApplicationDetails", "parent_pgw_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key"],
+    ["waterApplicationDetails", "parent_water_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key"],
   ] as const;
   for (const [key, table, columns] of tables) {
     const rows = await allParentRows(supabase, table, columns);
@@ -194,7 +200,18 @@ export async function exportParentInformation() {
     for (const request of requests)
       request[key] = byRequest.get(String(request.id)) ?? [];
   }
-  return { exportedAt, household, requests };
+  const protectedExport = await supabase.rpc("parent_export_utility_protected_inputs");
+  check(protectedExport.error);
+  const protectedInputs = z.array(utilityProtectedInputReferenceSchema).safeParse(protectedExport.data);
+  if (!protectedInputs.success || protectedInputs.data.some(input => input.ownerId !== household.owner_id || !requests.some(request => request.id === input.requestId)))
+    throw new Error("CaseLink could not export protected document references. Please try again.");
+  for (const request of requests) request.utilityProtectedInputs = protectedInputs.data.filter(input => input.requestId === request.id);
+  const profileReply = await supabase.rpc("parent_get_family_profile");
+  check(profileReply.error);
+  const profile = familyProfileReadSchema.safeParse(profileReply.data);
+  if (!profile.success || profile.data.ownerId !== household.owner_id)
+    throw new Error("CaseLink could not export your family profile. Please try again.");
+  return { exportedAt, household, familyProfile: profile.data.profile, requests };
 }
 export async function getSupportRequest(
   id: string,
@@ -208,7 +225,7 @@ export async function getSupportRequest(
     .maybeSingle();
   check(request.error);
   if (!request.data) return null;
-  const [events, documents, peco] = await Promise.all([
+  const [events, documents, peco, pgw, water] = await Promise.all([
     supabase
       .from("parent_events")
       .select(eventColumns)
@@ -225,16 +242,22 @@ export async function getSupportRequest(
       .neq("status", "deletion_pending")
       .order("created_at", { ascending: false }),
     supabase.from("parent_peco_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
+    supabase.from("parent_pgw_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
+    supabase.from("parent_water_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
   ]);
   check(events.error);
   check(documents.error);
   check(peco.error);
+  check(pgw.error);
+  check(water.error);
   return {
     ...request.data,
     events: (events.data ?? []).slice(0, 200).reverse(),
     events_truncated: (events.data?.length ?? 0) > 200,
     documents: documents.data ?? [],
     has_peco_application_details: !!peco.data,
+    has_pgw_application_details: !!pgw.data,
+    has_water_application_details: !!water.data,
   } as SupportRequest;
 }
 export async function startSupportRequest(

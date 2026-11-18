@@ -10,6 +10,8 @@ import { getProgram, supportsInitialServiceDelivery } from "./programs";
 import { factAnswerSchema } from "./answers";
 import { CURRENT_INTAKE_FIELDS, currentIntakeFields } from "./current-intake-fields";
 import { sameSnapProtectedPacket, snapProtectedOperationSchema, type SnapProtectedOperation } from "./snap-protected-operation";
+import { sameUtilityPreparedPacket, utilityProtectedOperationSchema, type UtilityProtectedOperation } from "./utility-protected-operation";
+import { isUtilityPreparationMandate } from "./utility-preparation-scope";
 import { hasExcludedAssistantInformation } from "./assistant-contract";
 
 export type ProviderCapability = {
@@ -32,6 +34,7 @@ export type ProposedOperation = {
   packet: Record<string, unknown>;
   idempotencyKey: string;
   protectedSnap?: SnapProtectedOperation;
+  protectedUtility?: UtilityProtectedOperation;
 };
 const packetSchema = z
   .object({
@@ -216,6 +219,22 @@ export function authorizeOperation(input: {
     )
   )
     return deny("data_not_authorized");
+  const utilityPacket = operation.packet != null && typeof operation.packet === "object" && Object.hasOwn(operation.packet, "protectedUtilityPacket");
+  if (operation.protectedUtility && !utilityPacket) return deny("invalid_protected_operation");
+  if (utilityPacket) {
+    const canonical = utilityProtectedOperationSchema.safeParse(operation.protectedUtility);
+    if (!canonical.success || operation.protectedSnap || !isUtilityPreparationMandate(request.mandate, canonical.data.programId) ||
+      canonical.data.requestId !== request.id || canonical.data.requestVersion !== operation.requestVersion ||
+      canonical.data.programId !== operation.programId || canonical.data.need !== need || operation.action !== "prepare" ||
+      canonical.data.idempotencyKey !== operation.idempotencyKey || !sameUtilityPreparedPacket(canonical.data.packet, operation.packet) ||
+      JSON.stringify(canonical.data.dataCategories) !== JSON.stringify(operation.dataCategories) || operation.documentIds.length)
+      return deny("invalid_protected_operation");
+    const reference = canonical.data.packet.protectedUtilityPacket;
+    if (!canonical.data.protectedPacketCurrent || Date.parse(reference.preparedAt) > now.getTime() || Date.parse(reference.expiresAt) <= now.getTime())
+      return deny("protected_packet_not_current");
+    if (input.attempts >= request.mandate.maxAttempts) return deny("attempt_limit");
+    return { allowed: true };
+  }
   const protectedPacket = operation.packet != null && typeof operation.packet === "object" && Object.hasOwn(operation.packet, "protectedSnapPacket");
   if (operation.protectedSnap && !protectedPacket) return deny("invalid_protected_operation");
   const canonical = protectedPacket ? snapProtectedOperationSchema.safeParse(operation.protectedSnap) : null;

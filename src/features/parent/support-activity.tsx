@@ -11,6 +11,7 @@ import {
 import { getProgram } from "@/lib/parent/programs";
 import { receiptSchema } from "@/lib/parent/policy";
 import { snapProtectedReferenceSchema, snapProtectedOperationSchema, snapProtectedDeliveryAttempt } from "@/lib/parent/snap-protected-operation";
+import { utilityPreparedReferenceSchema } from "@/lib/parent/utility-protected-operation";
 import { parentApi, displayDate, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { SnapReviewPdf } from "./snap-review-pdf";
@@ -33,6 +34,21 @@ export type RecordedOperation = {
 export function protectedRecordedSnapPacket(operation: Pick<RecordedOperation, "need" | "program_id" | "action" | "artifact_id" | "protected_packet">) {
   const reference = snapProtectedReferenceSchema.safeParse(operation.protected_packet);
   return operation.need === "snap_new" && operation.program_id === "snap-pa" && operation.action === "submit" && operation.artifact_id === null && reference.success ? reference.data : null;
+}
+export function protectedRecordedUtilityPacket(operation: Pick<RecordedOperation, "need" | "program_id" | "action" | "artifact_id" | "protected_packet" | "request_id" | "request_version">) {
+  const reference = utilityPreparedReferenceSchema.safeParse(operation.protected_packet);
+  return reference.success && operation.action === "prepare" && operation.artifact_id === null && reference.data.programId === operation.program_id && reference.data.requestId === operation.request_id
+    && reference.data.requestVersion === operation.request_version && { "peco-cap": "electricity", "pgw-crp": "gas", "pwd-tap": "water" }[reference.data.programId] === operation.need ? reference.data : null;
+}
+function UtilityDraftDownload({ request, operation }: { request: SupportRequest; operation: RecordedOperation }) {
+  const reference = protectedRecordedUtilityPacket(operation);
+  const current = usePermissionWindow(Math.min(Date.parse(reference?.expiresAt ?? ""), Date.parse(request.mandate.expiresAt)));
+  const inspectable = operation.state === "prepared" || operation.state === "invalidated" && request.status === "paused" && operation.request_version === request.version - 1;
+  if (!reference || !current || !inspectable || operation.request_id !== request.id || !["active", "paused"].includes(request.status)) return null;
+  return <p className={styles.space}><a className={styles.textLink}
+    href={`/protected/utilities/requests/${request.id}/prepared/${reference.packetId}?expectedVersion=${request.version}`}>
+    {reference.sourceKind === "local_test_issued_form" ? "Download LOCAL TEST water draft" : "Download unsigned utility draft"}
+  </a></p>;
 }
 export function currentSnapReview(request: Pick<SupportRequest, "id" | "version">, input: unknown) {
   const review = snapProtectedOperationSchema.safeParse(input);
@@ -180,6 +196,8 @@ export function SupportActivity({
                 <p className={styles.hint}>
                   {operation.state === "prepared" && protectedRecordedSnapPacket(operation)
                     ? "SNAP application prepared · not submitted"
+                    : operation.state === "prepared" && protectedRecordedUtilityPacket(operation)
+                    ? protectedRecordedUtilityPacket(operation)!.sourceKind === "local_test_issued_form" ? "LOCAL TEST water draft · not submitted" : "Unsigned utility draft · not submitted"
                     : operation.state === "prepared" && operation.form?.preparation_only
                     ? "Incomplete unsigned draft · not submitted"
                     : OUTCOME_LABELS[operation.state as OutcomeState] ??
@@ -192,6 +210,7 @@ export function SupportActivity({
                 >
                   Download recorded information
                 </a>
+                <UtilityDraftDownload request={request} operation={operation}/>
                 {operation.artifact_id && (
                   <p className={styles.space}>
                     <a

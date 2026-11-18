@@ -9,6 +9,7 @@ import { displayDate } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { ProgressBadge } from "./support-progress";
+import { FamilyProfileWelcome } from "./family-profile";
 import styles from "./parent.module.css";
 
 export function requestStatus(request: SupportRequest): string {
@@ -68,6 +69,7 @@ export function MySupport() {
           </Link>
         </div>
       </div>
+      {data && !error && <FamilyProfileWelcome/>}
       {loading ? (
         <ParentLoading />
       ) : error ? (

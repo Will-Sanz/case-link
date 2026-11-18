@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import type { SupportRequest } from "@/lib/parent/domain";
@@ -9,6 +9,8 @@ import { assessSnapApplicationSnapshot, snapApplicationLeaves, type SnapApplicat
 import { boundedParentApi, canCollectSnapApplication, displayDate, ParentApiError, type ParentAuthorizationWindow } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
+import { useSavedApplicationDraft } from "./use-saved-application-draft";
+import { SavedFamilyProfileNotice, useSavedFamilyProfile } from "./use-saved-family-profile";
 import { SnapApplicationFormFields, SnapApplicationSummary } from "./snap-application-form";
 import { SnapProtectedApplication } from "./snap-protected-application";
 import { isSnapFinalReviewAction } from "./support-activity";
@@ -54,45 +56,30 @@ export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: 
   const [readRevision,setReadRevision]=useState(0);
   const saved = useParentResource<{ snapshot: SnapApplicationSnapshot }>(`/requests/${request.id}/snap-application?requestVersion=${request.version}&read=${readRevision}`);
   const collection = useParentResource<ParentAuthorizationWindow>("/authorization-window");
-  const [draft, setDraft] = useState<SnapApplicationFields | null>(null);
-  const [base, setBase] = useState<{ id: string; version: number } | null>(null);
-  const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [conflict, setConflict] = useState(false);
-  const [uncertain, setUncertain] = useState(false);
-  const [blocked, setBlocked] = useState(false);
-  const [message, setMessage] = useState("");
   const [focused, setFocused] = useState(false);
   const [changingAddress, setChangingAddress] = useState(false);
   const [confirmedPaths, setConfirmedPaths] = useState<string[]>([]);
   const [handledAnswerRequest, setHandledAnswerRequest] = useState(0);
   const form = useRef<HTMLFormElement>(null);
-  const [attempt, setAttempt] = useState<{ key: string; body: string } | null>(null);
-  const work = useRef<AbortController | null>(null), running = useRef<AbortController | null>(null);
   const refreshSnapshot=()=>setReadRevision(current=>current+1);
   const record = saved.data?.snapshot;
   const mandateDeadline = Date.parse(request.mandate.expiresAt), mandateCurrent = usePermissionWindow(mandateDeadline);
-  const scope = JSON.stringify({ id: request.id, version: request.version, status: request.status, needs: request.intake.needs, mandate: request.mandate, snapshotId: record?.id, mandateCurrent });
-  const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
-  const [previousScope, setPreviousScope] = useState(scope);
-  if (previousScope !== scope) {
-    setPreviousScope(scope);
-    if (attempt) setUncertain(true);
-  }
-  useLayoutEffect(() => {
-    const controller = new AbortController();work.current=controller;
-    return()=>{controller.abort();if(work.current===controller)work.current=null;};
-  },[scope]);
   let assessment: ReturnType<typeof assessSnapApplicationSnapshot> | undefined;
   try { if (record?.request_id === request.id) assessment = assessSnapApplicationSnapshot(record, new Date()); } catch { /* Invalid evidence cannot establish an editable revision. */ }
   const details = assessment?.snapshot.details;
   const valid = !!assessment;
   const current = valid && !!record && record.request_version <= request.version && !saved.error && !saved.loading;
-  const permitted = canCollectSnapApplication(collection.data) && !collection.error && !blocked &&
+  const available = canCollectSnapApplication(collection.data) && !collection.error &&
     request.status === "active" && request.mandate.recipientIds.includes("snap-pa") &&
     request.mandate.allowedActions.includes("prepare") && request.mandate.allowedData.includes("household") &&
     request.mandate.allowedData.includes("income") && mandateCurrent;
-  const editingCurrent = !!draft && !!base && base.id === record?.id && base.version === request.version && current;
+  const editor = useSavedApplicationDraft<SnapApplicationFields>({ request, record: assessment?.snapshot ?? null, current, available,
+    savedMessage: "Your application answers are saved as a new revision. Queued work must use the current revision; earlier submitted records remain in history.",
+    onSaved: () => { refreshSnapshot(); onChange?.(); }, onAccessDenied: collection.reload });
+  const { error, message, conflict, uncertain, blocked, pending, permitted, editingCurrent, setMessage } = editor;
+  const draft = editor.draft?.value ?? null;
+  const family = useSavedFamilyProfile({ request, program: "snap-pa", snapshotId: record?.id, permitted, onOwnerChanged: editor.reset });
+  async function refreshFamily() { if (uncertain) return; if (draft) { const value = await family.load(draft); if (value) editor.change(value); } else await edit(); }
   const preparedReview = current && permitted && !draft && assessment?.readiness.nonProtectedDataReadyForReview
     && !request.required_actions.some(isSnapFinalReviewAction);
   const originalLeaves = details ? snapApplicationLeaves(details) : {};
@@ -120,80 +107,50 @@ export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: 
       setConfirmedPaths(current => paths.every(stale => current.includes(stale)) ? current.filter(stale => !paths.includes(stale)) : [...new Set([...current, ...paths])]);
     },
   } : undefined;
-  function edit(addressOnly = false) {
+  async function edit(addressOnly = false) {
     if (!current || !permitted || !details || !record) return;
-    setDraft(editableDetails(details));setBase({ id: record.id, version: request.version });setFocused(false);setChangingAddress(addressOnly);setConfirmedPaths([]);
-    setConflict(false);setUncertain(false);setError(null);setMessage("");setAttempt(null);
+    const value = await family.load(editableDetails(details));
+    if (value) { editor.begin(value);setFocused(false);setChangingAddress(addressOnly);setConfirmedPaths([]); }
   }
   if (answerRequest && handledAnswerRequest !== answerRequest && current && permitted && assessment && record) {
-    setHandledAnswerRequest(answerRequest);
-    setChangingAddress(false);setFocused(true);
-    if (!draft) {
-      if (!hasQuestions) {
-        setMessage("No additional application answers are currently needed. CaseLink needs to recheck this saved step; you do not need to repeat fresh answers.");
-      } else {
-        setDraft(editableDetails(assessment.snapshot.details));setBase({ id: record.id, version: request.version });setConfirmedPaths([]);
-        setConflict(false);setUncertain(false);setError(null);setMessage("");setAttempt(null);
-      }
-    }
+    setHandledAnswerRequest(answerRequest); setChangingAddress(false); setFocused(true);
+    if (!draft && !hasQuestions) setMessage("No additional application answers are currently needed. CaseLink needs to recheck this saved step; you do not need to repeat fresh answers.");
   }
+  const openRequestedAnswers = useEffectEvent(async () => {
+    if (draft || !hasQuestions || !assessment || !current || !permitted) return;
+    const value = await family.load(editableDetails(assessment.snapshot.details));
+    if (value) { editor.begin(value);setConfirmedPaths([]); }
+  });
+  useEffect(() => { if (handledAnswerRequest) void Promise.resolve().then(() => openRequestedAnswers()); }, [handledAnswerRequest]);
   useEffect(() => {
     if (!handledAnswerRequest) return;
-    const target = form.current?.querySelector<HTMLElement>("input,select,button") ?? document.getElementById("application-answers");
+    const target = (form.current?.querySelector<HTMLElement>("input,select,textarea") ?? form.current?.querySelector<HTMLElement>("button")) ?? document.getElementById("application-answers");
     target?.focus();
   }, [handledAnswerRequest]);
   useEffect(() => {
-    if (permitted && editingCurrent) form.current?.querySelector<HTMLElement>("input,select,button")?.focus();
+    if (permitted && editingCurrent) (form.current?.querySelector<HTMLElement>("input,select,textarea") ?? form.current?.querySelector<HTMLElement>("button"))?.focus();
     // Focus only when the editor opens; typing must retain the current control.
-  }, [base?.id, permitted, editingCurrent]);
+  }, [editor.draft?.snapshotId, permitted, editingCurrent]);
   async function recheckAccess() {
-    const controller=work.current;
-    if(!controller||controller.signal.aborted||running.current===controller||Date.now()>=mandateDeadline)return;
-    running.current=controller;
-    setPendingWork({ scope, controller });setError(null);
-    try {
-      const latest=await boundedParentApi("/authorization-window",{},controller.signal,request.mandate.expiresAt);
-      if(controller.signal.aborted||work.current!==controller)return;
-      const gate=z.object({authorization:z.object({issuedAt:z.string(),expiresAt:z.string(),snapApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable()}).optional()})}).safeParse(latest);
-      if(!gate.success||!canCollectSnapApplication(gate.data))throw new Error("Private SNAP application changes are not available yet. Your unsaved draft is still on this page.");
-      refreshSnapshot();collection.reload();setBlocked(false);onChange?.();
-    }catch(err){if(!controller.signal.aborted&&work.current===controller){setBlocked(true);setError(err instanceof Error?err:new Error("Your access could not be checked. Your draft remains on this page."));}}
-    finally{if(running.current===controller)running.current=null;if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);}
+    if (Date.now() >= mandateDeadline) return;
+    await editor.checkAccess(async signal => {
+      const latest = await boundedParentApi("/authorization-window", {}, signal, request.mandate.expiresAt);
+      signal.throwIfAborted();
+      const gate = z.object({ authorization: z.object({ issuedAt: z.string(), expiresAt: z.string(), snapApplication: z.object({ collectionEnabled: z.boolean(), noticeVersion: z.string().nullable() }).optional() }) }).safeParse(latest);
+      if (!gate.success || !canCollectSnapApplication(gate.data)) throw new Error("Private SNAP application changes are not available yet. Your unsaved draft is still on this page.");
+      refreshSnapshot(); collection.reload(); onChange?.();
+    });
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const controller=work.current;
-    if (!draft || !base || !editingCurrent || !permitted || pending || conflict || Date.now()>=mandateDeadline || !controller || controller.signal.aborted || running.current===controller) return;
-    running.current=controller;
-    setError(null);setPendingWork({ scope, controller });
-    try {
-      let savedAttempt = attempt;
-      if (!savedAttempt) {
-        const value=snapApplicationFieldsValueSchema.safeParse(draft);
-        if (!value.success) throw new ParentApiError("Check the application answers. Use only these fields’ requested information; protected identifiers and signatures cannot be saved here.",400);
-        if (focused && !confirmed.length && JSON.stringify(snapApplicationLeaves(value.data)) === JSON.stringify(originalLeaves))
-          throw new ParentApiError("Answer an application question or mark an outdated answer still correct before saving.",400);
-        savedAttempt={key:crypto.randomUUID(),body:JSON.stringify({details:value.data,expectedVersion:base.version,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION,...(confirmed.length ? {confirmedPaths:confirmed} : {})})};
-        setAttempt(savedAttempt);
-      }
-      const result=await boundedParentApi(`/requests/${request.id}/snap-application`,{
-        method:"POST",headers:{"Idempotency-Key":savedAttempt.key},body:savedAttempt.body,
-      },controller.signal,request.mandate.expiresAt);
-      if(controller.signal.aborted||work.current!==controller)return;
-      if (!z.object({snapshotId:z.uuid()}).safeParse(result).success) throw new ParentApiError("We could not confirm the saved revision. Retry the same save before making another change.",0);
-      setDraft(null);setBase(null);setAttempt(null);setUncertain(false);
-      setMessage("Your application answers are saved as a new revision. Queued work must use the current revision; earlier submitted records remain in history.");
-      refreshSnapshot();onChange?.();
-    } catch (err) {
-      if(controller.signal.aborted||work.current!==controller)return;
-      const failure=err instanceof Error ? err : new Error("Your application answers could not be saved. Your draft remains on this page.");
-      setError(failure);
-      const status=err instanceof ParentApiError ? err.status : 0;
-      setConflict(status===409);
-      setUncertain(status<400||status>=500);
-      if (status===401||status===403) {setBlocked(true);collection.reload();}
-      if (status>=400&&status<500&&status!==409) setAttempt(null);
-    } finally {if(running.current===controller)running.current=null;if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);}
+    await editor.save(`/requests/${request.id}/snap-application`, request.mandate.expiresAt, async (draft, expectedVersion, signal) => {
+      const value = snapApplicationFieldsValueSchema.safeParse(draft);
+      if (!value.success) throw new ParentApiError("Check the application answers. Use only these fields’ requested information; protected identifiers and signatures cannot be saved here.", 400);
+      if (focused && !confirmed.length && JSON.stringify(snapApplicationLeaves(value.data)) === JSON.stringify(originalLeaves))
+        throw new ParentApiError("Answer an application question or mark an outdated answer still correct before saving.", 400);
+      const familyProfileSource = await family.source(value.data, signal);
+      return { details: value.data, ...(familyProfileSource ? { familyProfileSource } : {}), expectedVersion, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION, ...(confirmed.length ? { confirmedPaths: confirmed } : {}) };
+    });
   }
   return <section className={styles.section} id="application-answers" aria-labelledby="application-answers-title" tabIndex={-1}>
     <h2 id="application-answers-title">Your SNAP application answers</h2>
@@ -206,27 +163,28 @@ export function SnapApplicationReview({ request, onChange, answerRequest = 0 }: 
         {current && record.request_version<request.version && <p className={styles.hint}>These are the latest saved application answers, checked after the request changed. Their original recorded dates stay unchanged; a correction uses the current request version.</p>}
         {!current && <p className={styles.notice}>This saved application belongs to a newer request version. Refresh the request before editing; your saved answers remain available.</p>}
         <p className={styles.hint}>CaseLink uses these answers to prepare your application. Check them below and correct anything that has changed. Saving answers does not submit an application.</p>
-        {draft && !editingCurrent && <div className={styles.notice}><p>The request changed while you were editing. Your unsaved draft has not been applied to this revision. Loading the latest saved application replaces that unsaved draft.</p><button type="button" className={styles.secondary} onClick={()=>{setDraft(null);setBase(null);setError(null);setConflict(false);setUncertain(false);setAttempt(null);refreshSnapshot();onChange?.();}}>Load latest saved application</button></div>}
+        {draft && !editingCurrent && <div className={styles.notice}><p>The request changed while you were editing. Your unsaved draft has not been applied to this revision. Loading the latest saved application replaces that unsaved draft.</p><button type="button" className={styles.secondary} onClick={()=>{editor.reset();refreshSnapshot();onChange?.();}}>Load latest saved application</button></div>}
         {draft && permitted && editingCurrent ? <form className={styles.form} onSubmit={submit} ref={form} aria-label="Correct SNAP application answers">
           <SnapApplicationNotice/>
+          <SavedFamilyProfileNotice reuse={family} refresh={refreshFamily} disabled={pending || uncertain || conflict}/>
           {changingAddress && <p className={styles.hint}>Change your address below. Your other saved answers stay unchanged.</p>}
           {focused && <p className={styles.hint}>Only missing or outdated answers are requested here. Change an answer or choose “Still correct” for an outdated value that is unchanged. Fresh saved answers stay unchanged.</p>}
-          <SnapApplicationFormFields value={draft} questions={questions} disabled={pending||conflict||uncertain} onChange={value=>{
-            setDraft(value);setConfirmedPaths(current => current.filter(path => JSON.stringify(snapApplicationLeaves(value)[path]) === JSON.stringify(draftLeaves[path])));
-            setError(null);setMessage("");setAttempt(null);
+          <SnapApplicationFormFields value={draft} questions={questions} disabled={pending||conflict||uncertain||family.loading||family.blocked} onChange={value=>{
+            editor.change(value);setConfirmedPaths(current => current.filter(path => JSON.stringify(snapApplicationLeaves(value)[path]) === JSON.stringify(draftLeaves[path])));
           }}/>
-          {(focused || changingAddress) && <button type="button" className={styles.quiet} disabled={pending||conflict||uncertain} onClick={()=>{setFocused(false);setChangingAddress(false);}}>Change other saved answers</button>}
+          {(focused || changingAddress) && <button type="button" className={styles.quiet} disabled={pending||conflict||uncertain||family.loading||family.blocked} onClick={()=>{setFocused(false);setChangingAddress(false);}}>Change other saved answers</button>}
           <p className={styles.hint}>Saving a correction stops queued uses of superseded answers. Already delivered records stay unchanged. This saves your answers and does not submit an application.</p>
           <div className={styles.inline}>
-            <button className={styles.button} disabled={pending||conflict}>{pending?"Saving application answers…":uncertain?"Retry the same save":"Save application changes"}</button>
-            {!uncertain && <button className={styles.quiet} type="button" disabled={pending} onClick={()=>{setDraft(null);setBase(null);setError(null);setAttempt(null);}}>Cancel editing</button>}
+            <button className={styles.button} disabled={pending||conflict||family.loading||family.blocked}>{pending?"Saving application answers…":uncertain?"Retry the same save":"Save application changes"}</button>
+            {!uncertain && <button className={styles.quiet} type="button" disabled={pending} onClick={()=>{editor.reset();}}>Cancel editing</button>}
           </div>
-          {conflict && <div><p className={styles.hint}>The request changed. Your unsaved draft is still here. Loading the latest revision replaces this unsaved draft.</p><button type="button" className={styles.secondary} onClick={()=>{setDraft(null);setBase(null);setConflict(false);setError(null);setAttempt(null);refreshSnapshot();onChange?.();}}>Load latest saved application</button></div>}
+          {conflict && <div><p className={styles.hint}>The request changed. Your unsaved draft is still here. Loading the latest revision replaces this unsaved draft.</p><button type="button" className={styles.secondary} onClick={()=>{editor.reset();refreshSnapshot();onChange?.();}}>Load latest saved application</button></div>}
         </form> : <>
           {preparedReview && <SnapProtectedApplication key={`${request.id}:${request.version}:${record.id}`} request={request} snapshot={record} onChange={onChange}/>}
-          <SnapApplicationSummary value={details} onChangeAddress={current && permitted && !draft ? ()=>edit(true) : undefined}/>{current && permitted && !draft && <button type="button" className={styles.secondary} onClick={()=>edit()}>Correct application answers</button>}
+          <SnapApplicationSummary value={details} onChangeAddress={current && permitted && !draft && !family.loading && !family.blocked ? ()=>edit(true) : undefined}/>{current && permitted && !draft && <button type="button" className={styles.secondary} disabled={family.loading || family.blocked} onClick={()=>edit()}>Correct application answers</button>}
           {current && !permitted && <p className={styles.hint}>Application changes are unavailable while the request or its collection permission is paused. Your saved answers stay readable.</p>}</>}
       </>}
+    {family.blocked && <SavedFamilyProfileNotice reuse={family} refresh={refreshFamily} disabled={pending || uncertain || conflict}/>}
     {error && <ServiceError error={error} returnTo={`/support/${request.id}`}/>}
     {(blocked || collection.error) && <button type="button" className={styles.secondary} disabled={pending} onClick={recheckAccess}>{pending?"Checking private application access…":"Check private application access again"}</button>}
     {message && <p className={styles.success} role="status">{message}</p>}

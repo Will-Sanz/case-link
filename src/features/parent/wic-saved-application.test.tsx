@@ -5,6 +5,7 @@ import axe from "axe-core";
 import { WicSavedApplication } from "./wic-saved-application";
 import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test-fixtures";
 import { WIC_APPLICATION_SOURCE, wicApplicationLeaves } from "@/lib/parent/wic-application-fields";
+import { FAMILY_PROFILE_NOTICE_VERSION } from "@/lib/parent/family-profile";
 import { WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "@/lib/parent/constants";
 const now = new Date("2026-11-13T20:00:00Z"), snapshotId = "22222222-2222-4222-8222-222222222222";
 const childId = "33333333-3333-4333-8333-333333333333", actorId = "44444444-4444-4444-8444-444444444444";
@@ -21,12 +22,13 @@ const support = (status: "active" | "paused" = "active") => fixtureRequest({ ver
 const response = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 let enabled = true;
 let gateExpiry = "2026-11-14T20:00:00Z";
-function api(post: (init: RequestInit) => unknown = () => response({ snapshotId }), missing = false) {
+function api(post: (init: RequestInit) => unknown = () => response({ snapshotId }), missing = false, record: unknown = snapshot()) {
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.includes("/family-profile-source?")) return response({ ok: true, fields: [] });
     if (url.includes("/authorization-window")) return response({ authorization: { issuedAt: now.toISOString(), expiresAt: "2026-11-16T20:00:00Z",
       wicApplication: { collectionEnabled: enabled, noticeVersion: enabled ? WIC_APPLICATION_NOTICE_VERSION : null, expiresAt: enabled ? gateExpiry : null } } });
     if (init?.method === "POST") return post(init);
-    return missing ? response({ ok: false, error: "This saved application is unavailable." }, 404) : response({ snapshot: snapshot(), routingContext: { label: "Household routing ZIP only; this does not establish the contact's postal address.", zip: "19104" } });
+    return missing ? response({ ok: false, error: "This saved application is unavailable." }, 404) : response({ snapshot: record, routingContext: { label: "Household routing ZIP only; this does not establish the contact's postal address.", zip: "19104" } });
   });
   vi.stubGlobal("fetch", fetcher); return fetcher;
 }
@@ -34,6 +36,78 @@ async function edit() { fireEvent.click(await screen.findByRole("button", { name
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); enabled = true; gateExpiry = "2026-11-14T20:00:00Z"; });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("owned WIC saved answers", () => {
+  it("automatically confirms its exact interrupted save when the owned latest snapshot arrives", async () => {
+    const record = snapshot(), fetcher = api(() => new Promise(() => {}), false, record);
+    const request = support(), view = render(<WicSavedApplication request={request}/>); await edit();
+    fireEvent.change(screen.getByLabelText("Contact first name"), { target: { value: "CommittedCanary" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save WIC changes" }));
+    await waitFor(() => expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+    const init = fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!, body = JSON.parse(String(init.body));
+    Object.assign(record, { id: crypto.randomUUID(), revision: 2, base_version: 2, request_version: 3, details: body.details,
+      idempotency_key: (init.headers as Record<string, string>)["Idempotency-Key"], consent_evidence: { ...record.consent_evidence, revision: 2 } });
+    view.rerender(<WicSavedApplication request={{ ...request, version: 3 }}/>);
+    await screen.findByText(/Your private WIC answers are saved as a new revision/);
+    expect(screen.queryByRole("button", { name: "Load latest saved WIC answers" })).toBeNull();
+    expect(screen.queryByRole("form")).toBeNull(); expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
+  it("refreshes changed linked child facts after a known-no-write preflight without losing manual WIC answers", async () => {
+    const fields = [{ applicationPath: `children.${childId}.firstName`, profilePaths: [`members.${childId}.firstName`] }];
+    let revision = 2, name = "ProfileChild";
+    const base = api(), fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/family-profile-source?")) return response({ fields });
+      if (url.endsWith("/account")) return response({ account: { id: actorId } });
+      if (url.endsWith("/family-profile")) return response({ ownerId: actorId, revision, lastMutationKey: snapshotId,
+        collection: { collectionEnabled: true, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION, expiresAt: "2026-11-20T20:00:00Z", retentionDays: 45 },
+        profile: { revision, idempotencyKey: snapshotId, details: { primaryPerson: { id: actorId }, members: [{ id: childId, firstName: name }] }, provenance: { [`members.${childId}.firstName`]: { confirmedAt: "2026-11-12T15:00:00Z", expiresAt: "2026-12-01T15:00:00Z" } } } });
+      return base(url, init);
+    }); vi.stubGlobal("fetch", fetcher);
+    render(<WicSavedApplication request={support()}/>); await edit();
+    expect((screen.getByLabelText("Child 1 first name") as HTMLInputElement).value).toBe("ProfileChild");
+    fireEvent.change(screen.getByLabelText("Contact first name"), { target: { value: "ManualContact" } });
+    revision = 3; name = "CorrectedChild";
+    fireEvent.click(screen.getByRole("button", { name: "Save WIC changes" }));
+    await screen.findByText(/Saved family information needs a fresh check/);
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+    expect((screen.getByLabelText("Contact first name") as HTMLInputElement).value).toBe("ManualContact");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh linked family answers" }));
+    await waitFor(() => expect((screen.getByLabelText("Child 1 first name") as HTMLInputElement).value).toBe("CorrectedChild"));
+    fireEvent.click(screen.getByRole("button", { name: "Save WIC changes" })); await screen.findByText(/Your private WIC answers are saved/);
+    const body = JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body));
+    expect(body.details).toMatchObject({ beneficiaries: "children", contact: { firstName: "ManualContact", zip: "19147" }, children: [{ id: childId, firstName: "CorrectedChild" }] });
+    expect(body.details.mother).toBeUndefined(); expect(body.familyProfileSource).toEqual({ expectedOwnerId: actorId, revision: 3, fields, options: { wicChildIds: [childId] } });
+  });
+  it("clears the retained editor before another signed-in family can save its profile-derived child", async () => {
+    let currentOwner = actorId; const fields = [{ applicationPath: `children.${childId}.firstName`, profilePaths: [`members.${childId}.firstName`] }], base = api();
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/family-profile-source?")) return response({ fields });
+      if (url.endsWith("/account")) return response({ account: { id: currentOwner } });
+      if (url.endsWith("/family-profile")) return response({ ownerId: actorId, revision: 2, lastMutationKey: snapshotId,
+        collection: { collectionEnabled: true, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION, expiresAt: "2026-11-20T20:00:00Z", retentionDays: 45 },
+        profile: { revision: 2, idempotencyKey: snapshotId, details: { primaryPerson: { id: actorId }, members: [{ id: childId, firstName: "ProfileChild" }] }, provenance: { [`members.${childId}.firstName`]: { confirmedAt: "2026-11-12T15:00:00Z", expiresAt: "2026-12-01T15:00:00Z" } } } });
+      return base(url, init);
+    }); vi.stubGlobal("fetch", fetcher);
+    render(<WicSavedApplication request={support()}/>); await edit();
+    currentOwner = snapshotId; act(() => window.dispatchEvent(new Event("focus")));
+    await screen.findByText(/The signed-in account changed/);
+    expect(screen.queryByRole("form")).toBeNull(); expect(screen.queryByDisplayValue("ProfileChild")).toBeNull();
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Correct WIC answers" }).matches(":disabled")).toBe(true);
+  });
+
+  it("keeps cached private fields closed after a denied source read and reopens only after owned access is restored", async () => {
+    let denied = true; const base = api(), fetcher = vi.fn(async (url: string, init?: RequestInit) => url.includes("/family-profile-source?") && denied
+      ? response({ ok: false, error: "Editing access unavailable" }, 403) : base(url, init));
+    vi.stubGlobal("fetch", fetcher); render(<WicSavedApplication request={support()}/>);
+    fireEvent.click(await screen.findByRole("button", { name: "Correct WIC answers" }));
+    await screen.findByText(/Private editing access could not be verified/); expect(screen.queryByLabelText("Contact first name")).toBeNull();
+    expect(screen.queryByText(/signed-in account changed/)).toBeNull(); denied = false;
+    fireEvent.click(screen.getByRole("button", { name: "Recheck private editing access" }));
+    expect((await screen.findByLabelText("Contact first name") as HTMLInputElement).value).toBe("SavedCanary");
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+  });
+
   it("reuses saved private answers and an independent postal ZIP while paused without extra consent checkbox", async () => {
     const fetcher = api(), changed = vi.fn(); render(<WicSavedApplication request={support("paused")} onChange={changed}/>); await edit();
     expect((screen.getByLabelText("Contact first name") as HTMLInputElement).value).toBe("SavedCanary");

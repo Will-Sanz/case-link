@@ -4,13 +4,16 @@ import { Children, isValidElement, useCallback, useLayoutEffect, useRef, useStat
 import { ArrowRight, Check, Clock } from "iconoir-react";
 import type { SupportNeed, SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
-import { currentProtectedSnapAttempt, currentSnapReview, currentSnapDraft, SnapDraftReview, isSnapFinalReviewAction, protectedRecordedSnapPacket, recordedReceipt, type OperationHistory, type RecordedOperation } from "./support-activity";
+import { currentProtectedSnapAttempt, currentSnapReview, currentSnapDraft, SnapDraftReview, isSnapFinalReviewAction, protectedRecordedSnapPacket, protectedRecordedUtilityPacket, recordedReceipt, type OperationHistory, type RecordedOperation } from "./support-activity";
 import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
 import { SnapSubmissionConfirmation } from "./snap-submission-confirmation";
 import { ApplicationBrowser } from "./application-browser";
 import { SnapApplicationReview } from "./snap-application-review";
 import { WicSavedApplication } from "./wic-saved-application";
 import { PecoSavedApplication } from "./peco-saved-application";
+import { PgwSavedApplication } from "./pgw-saved-application";
+import { WaterSavedApplication } from "./water-saved-application";
+import { isUtilityPreparationMandate } from "@/lib/parent/utility-preparation-scope";
 import { SnapFinalReview } from "./snap-final-review";
 import styles from "./parent.module.css";
 import layout from "./application-workspace.module.css";
@@ -28,8 +31,11 @@ export function supportTitle(request: SupportRequest): string {
 export function isPecoPreparationRequest(request: SupportRequest): boolean {
   return request.has_peco_application_details === true || request.intake.needs.length === 1 && request.intake.needs[0] === "electricity" &&
     request.intake.utilityProviders.length === 1 && request.intake.utilityProviders[0] === "peco" &&
-    request.mandate.mode === "prepare_only" && request.mandate.recipientIds.length === 1 && request.mandate.recipientIds[0] === "peco-cap" &&
-    request.mandate.allowedData.length === 3 && ["household", "income", "utility"].every(kind => request.mandate.allowedData.includes(kind as "household" | "income" | "utility"));
+    request.mandate.allowedData.length === 3 && isUtilityPreparationMandate(request.mandate, "peco-cap");
+}
+
+export function isPrivateUtilityPreparationRequest(request: SupportRequest): boolean {
+  return isPecoPreparationRequest(request) || request.has_pgw_application_details === true || request.has_water_application_details === true;
 }
 
 export function recordedApplicationState(
@@ -39,6 +45,7 @@ export function recordedApplicationState(
     | "program_id"
     | "state"
     | "request_version"
+    | "request_id"
     | "artifact_id"
     | "protected_packet"
     | "form"
@@ -135,6 +142,9 @@ export function recordedApplicationState(
       submitted: false,
       hasAttempt: true,
     };
+  const utility = relevant.find(operation => operation.state === "prepared" && (currentVersion === undefined || operation.request_version === currentVersion) && protectedRecordedUtilityPacket(operation));
+  if (utility) return { label: protectedRecordedUtilityPacket(utility)!.sourceKind === "local_test_issued_form" ? "LOCAL TEST water draft prepared" : "Unsigned utility draft prepared",
+    detail: "An unsigned private draft is recorded. Required personal steps and permitted submission remain separate; nothing has been sent.", submitted: false, hasAttempt: false };
   if (relevant.some(operation => operation.state === "prepared" && (currentVersion === undefined || operation.request_version === currentVersion) && protectedRecordedSnapPacket(operation)))
     return { label: "SNAP application prepared", detail: "The exact application is prepared for your review. No application submission is recorded.", submitted: false, hasAttempt: false };
   const forms = relevant.filter((operation) => operation.artifact_id);
@@ -207,7 +217,9 @@ export function ApplicationWorkspace({
   const { data, error, loading, reload } = history;
   const snap = request.intake.needs.includes("snap_new");
   const wic = request.intake.needs.includes("wic_new");
-  const peco = isPecoPreparationRequest(request);
+  const peco = isPecoPreparationRequest(request), pgw = request.has_pgw_application_details === true, water = request.has_water_application_details === true;
+  const utility = peco || pgw || water;
+  const utilityAnswers = pgw ? "Your PGW CRP answers" : water ? "Your water assistance answers" : "Your PECO CAP answers";
   const operations = data?.operations ?? [];
   const historyLimited = data?.historyLimited !== false;
   const ownedReview = snap ? currentSnapReview(request, snapReview) : null;
@@ -301,8 +313,8 @@ export function ApplicationWorkspace({
                   ? "Check Activity & receipts for the actual agency record and any interview, document or follow-up requirement."
                   : wic && !snap
                     ? "Open Your WIC answers to read or correct private preparation. CaseLink still needs an accepted pre-application and appointment connection; nothing here confirms a booking or enrollment. Official WIC help remains available there."
-                  : peco
-                    ? "Open Your PECO CAP answers to read or correct private preparation. A saved draft does not apply for CAP, change payments or protect against shutoff. Official PECO help remains available there."
+                  : utility
+                    ? `Open ${utilityAnswers} to read or correct private preparation. A saved draft does not apply for assistance, change payments or protect against shutoff. Official program help remains available there.`
                   : historyLimited
                     ? "Earlier application and delivery records need checking before a new filing. The Official website section remains available."
                     : needsService
@@ -315,8 +327,8 @@ export function ApplicationWorkspace({
       detail: "Saved",
       done: true,
     },
-    ...(snap || wic || peco ? [
-      { id: "application-review", label: snap ? "Your application" : peco ? "Your PECO CAP answers" : "Your WIC answers", detail: reviewRequested && !reviewFinished ? "Review needed" : "Answers & preparation", done: false },
+    ...(snap || wic || utility ? [
+      { id: "application-review", label: snap ? "Your application" : utility ? utilityAnswers : "Your WIC answers", detail: reviewRequested && !reviewFinished ? "Review needed" : "Answers & preparation", done: false },
     ] : []),
     ...(snap ? [
       { id: "application-browser", label: "Official website", detail: needsVerification && !inactive ? "Needs you now" : "COMPASS connection", done: false },
@@ -508,6 +520,8 @@ export function ApplicationWorkspace({
         {snap && <SnapApplicationReview key={`snap-answers:${request.id}`} request={request} onChange={onChange} answerRequest={snapAnswerRequest}/>}
         {wic && <WicSavedApplication key={`wic-answers:${request.id}`} request={request} onChange={onChange}/>}
         {peco && <PecoSavedApplication key={`peco-answers:${request.id}`} request={request} onChange={onChange}/>}
+        {pgw && <PgwSavedApplication key={`pgw-answers:${request.id}`} request={request} onChange={onChange}/>}
+        {water && <WaterSavedApplication key={`water-answers:${request.id}`} request={request} onChange={onChange}/>}
         </div>
         {snap && (
           <div className={layout.panel} data-workspace-panel="application-browser" hidden={activeSection !== "application-browser"}>

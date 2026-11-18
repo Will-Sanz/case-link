@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: Context) {
     const authorization = await getParentAuthorizationWindow();
     if (!authorization.snapApplication.collectionEnabled)
       throw new Error("This request is unavailable, or its permission has changed.");
-    const value = snapApplicationWriteSchema.parse(await readParentJson(request, 65536));
+    const value = snapApplicationWriteSchema.parse(await readParentJson(request, 131072));
     const key = uuidSchema.parse(request.headers.get("idempotency-key"));
     const snapshotId = await saveSnapApplicationDetails(id, value, key);
     return parentJson({ ok: true, snapshotId }, 201);

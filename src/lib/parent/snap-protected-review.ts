@@ -203,7 +203,7 @@ export function createSnapProtectedReviewHandler(input: unknown) {
 }
 
 /** Same-host ingress forwards the exact public Host; request URLs use configuration, never forwarding headers. */
-export function createSnapProtectedReviewServer(input: unknown) {
+export function createSnapProtectedReviewServer(input: unknown, utilityHandler?: (request: Request) => Promise<Response>, utilityPreparation?: { origin: string; handle: (request: Request) => Promise<Response> }) {
   const config = configuration(input), handle = createSnapProtectedReviewHandler(config);
   const server = createServer({ maxHeaderSize: 16384 }, async (incoming, outgoing) => {
     const controller = new AbortController(); let body: Uint8Array | undefined;
@@ -213,14 +213,17 @@ export function createSnapProtectedReviewServer(input: unknown) {
     outgoing.once("finish", () => { clearTimeout(timer); body?.fill(0); });
     outgoing.once("close", () => { clearTimeout(timer); stop(); });
     try {
-      if (!["127.0.0.1", "::ffff:127.0.0.1"].includes(incoming.socket.remoteAddress ?? "") || !route(incoming.url ?? "")) {
+      const utility = !!utilityHandler && (incoming.url ?? "").startsWith("/protected/utilities/");
+      const utilityWork = !!utilityPreparation && incoming.url === "/utility/prepare";
+      if (!["127.0.0.1", "::ffff:127.0.0.1"].includes(incoming.socket.remoteAddress ?? "") || (!utility && !utilityWork && !route(incoming.url ?? ""))) {
         outgoing.writeHead(400, responseHeaders); outgoing.end(unavailable); return;
       }
       const headers = new Headers();
       for (const [key, value] of Object.entries(incoming.headers)) if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
       const init: RequestInit & { duplex?: "half" } = { method: incoming.method, headers, signal: controller.signal,
-        ...(incoming.method === "POST" ? { body: Readable.toWeb(incoming) as ReadableStream<Uint8Array>, duplex: "half" as const } : {}) };
-      const response = await handle(new Request(config.publicOrigin + incoming.url, init));
+        ...(["POST", "PUT", "DELETE"].includes(incoming.method ?? "") ? { body: Readable.toWeb(incoming) as ReadableStream<Uint8Array>, duplex: "half" as const } : {}) };
+      const response = utilityWork ? await utilityPreparation!.handle(new Request(utilityPreparation!.origin + incoming.url, init))
+        : await (utility ? utilityHandler! : handle)(new Request(config.publicOrigin + incoming.url, init));
       if (controller.signal.aborted || outgoing.destroyed) return;
       const outgoingHeaders: Record<string, string | string[]> = Object.fromEntries([...response.headers].filter(([name]) => name !== "set-cookie"));
       const rotated = response.headers.getSetCookie(); if (rotated.length) outgoingHeaders["set-cookie"] = rotated;

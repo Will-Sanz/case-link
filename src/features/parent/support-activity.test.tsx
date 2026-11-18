@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureProtectedSnapOperation, fixtureRequest } from "@/lib/parent/test-fixtures";
 import type { SupportRequest } from "@/lib/parent/domain";
+import { fixtureUtilityProtectedOperation } from "@/lib/parent/utility-preparation-test-fixtures";
 import { SupportActivity, SnapDraftReview, currentSnapDraft, currentSnapReview, type RecordedOperation } from "./support-activity";
 
 const reviewPdf = vi.hoisted(() => vi.fn());
@@ -11,6 +12,21 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("recorded form downloads", () => {
+  it.each(["active", "paused"] as const)("keeps water LOCAL TEST and permits recorded private inspection while %s", async status => {
+    vi.setSystemTime(new Date("2026-11-13T22:21:00Z"));
+    const operation = fixtureUtilityProtectedOperation(), reference = operation.packet.protectedUtilityPacket;
+    const request = fixtureRequest({ id: reference.requestId, version: reference.requestVersion + (status === "paused" ? 1 : 0), status });
+    request.mandate.expiresAt = reference.expiresAt;
+    render(<SupportActivity request={request} onChange={vi.fn()} history={{ data: { operations: [{ id: operation.operationId,
+      request_id: reference.requestId, request_version: reference.requestVersion, program_id: reference.programId, need: operation.need, action: "prepare", state: status === "paused" ? "invalidated" : "prepared", artifact_id: null,
+      protected_packet: reference, created_at: reference.preparedAt }], historyLimited: false }, loading: false, error: null, reload: vi.fn() }}/>);
+    if (status === "active") expect(screen.getByText(/LOCAL TEST water draft · not submitted/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Download LOCAL TEST water draft" }).getAttribute("href"))
+      .toBe(`/protected/utilities/requests/${request.id}/prepared/${reference.packetId}?expectedVersion=${request.version}`);
+    expect(screen.queryByText(/agency submitted/i)).toBeNull();
+    await act(async () => { vi.setSystemTime(new Date(reference.expiresAt)); window.dispatchEvent(new Event("focus")); });
+    expect(screen.queryByRole("link", { name: "Download LOCAL TEST water draft" })).toBeNull();
+  });
   it("rejects malformed, unrelated and stale review metadata before using any Submit flag", () => {
     const request = fixtureRequest(), review = fixtureProtectedSnapOperation({ requestId: request.id, requestVersion: request.version, snapSubmissionAuthorized: true });
     expect(currentSnapReview(request, review)).toEqual(review);

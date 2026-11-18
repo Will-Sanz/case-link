@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { familyProfileSourceSchema } from "./family-profile";
 import { WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "./constants";
 import { WIC_APPLICATION_SOURCE, wicApplicationFieldsValueSchema, wicApplicationLeaves } from "./wic-application-fields";
 
 export const wicApplicationWriteSchema = z.object({
+  familyProfileSource: familyProfileSourceSchema.optional(),
   expectedVersion: z.number().int().positive(), details: wicApplicationFieldsValueSchema,
   noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION),
   subjectAuthorityDeclared: z.literal(true),

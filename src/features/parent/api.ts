@@ -2,6 +2,8 @@ import { NEEDS } from "@/lib/parent/domain";
 import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
 import wicSource from "../../../data/verified-forms/wic-pa-preapplication-2026-11-13.json";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE } from "@/lib/parent/peco-application-fields";
+import { PGW_APPLICATION_NOTICE_VERSION, PGW_APPLICATION_SOURCE } from "@/lib/parent/pgw-application-fields";
+import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE } from "@/lib/parent/water-application-fields";
 
 export type ParentAuthorizationWindow = {
   authorization?: {
@@ -10,6 +12,8 @@ export type ParentAuthorizationWindow = {
     snapApplication?: { collectionEnabled: boolean; noticeVersion: string | null };
     wicApplication?: { collectionEnabled: boolean; noticeVersion: string | null; expiresAt: string | null };
     pecoApplication?: { collectionEnabled: boolean; noticeVersion: string | null; expiresAt: string | null };
+    pgwApplication?: { collectionEnabled: boolean; noticeVersion: string | null; expiresAt: string | null };
+    waterApplication?: { collectionEnabled: boolean; noticeVersion: string | null; expiresAt: string | null };
   };
 };
 
@@ -25,10 +29,22 @@ export function canCollectWicApplication(value: ParentAuthorizationWindow | null
 }
 
 export function canCollectPecoApplication(value: ParentAuthorizationWindow | null): boolean {
-  const collection = value?.authorization?.pecoApplication, now = Date.now();
-  return collection?.collectionEnabled === true && collection.noticeVersion === PECO_APPLICATION_NOTICE_VERSION &&
+  return sourceCollectionCurrent(value?.authorization?.pecoApplication, PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE);
+}
+
+function sourceCollectionCurrent(collection: NonNullable<ParentAuthorizationWindow["authorization"]>["pecoApplication"], noticeVersion: string, source: { sourceCheckedAt: string; verifiedUntil: string }): boolean {
+  const now = Date.now();
+  return collection?.collectionEnabled === true && collection.noticeVersion === noticeVersion &&
     typeof collection.expiresAt === "string" && Date.parse(collection.expiresAt) > now &&
-    now >= Date.parse(PECO_APPLICATION_SOURCE.sourceCheckedAt) && now < Date.parse(PECO_APPLICATION_SOURCE.verifiedUntil);
+    now >= Date.parse(source.sourceCheckedAt) && now < Date.parse(source.verifiedUntil);
+}
+
+export function canCollectPgwApplication(value: ParentAuthorizationWindow | null): boolean {
+  return sourceCollectionCurrent(value?.authorization?.pgwApplication, PGW_APPLICATION_NOTICE_VERSION, PGW_APPLICATION_SOURCE);
+}
+
+export function canCollectWaterApplication(value: ParentAuthorizationWindow | null): boolean {
+  return sourceCollectionCurrent(value?.authorization?.waterApplication, WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE);
 }
 
 export class ParentApiError extends Error {
@@ -100,7 +116,7 @@ export function safeReturnPath(value: string | undefined): string {
   if (!value || value.trim() !== value) return "/my-support";
   const [path, need, ...extra] = value.split("?need=");
   return (
-    /^\/(?:get-support|my-support|account|support\/[a-zA-Z0-9-]+)$/.test(path) &&
+    /^\/(?:get-support|my-support|account|family-profile|support\/[a-zA-Z0-9-]+)$/.test(path) &&
     extra.length === 0 &&
     (need === undefined ||
       (path === "/get-support" &&

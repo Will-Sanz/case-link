@@ -105,6 +105,11 @@ function AccountSettings({
         </div>
       </section>
       <section className={styles.surface}>
+        <h2>Your family information</h2>
+        <p>Save optional family basics once, then reuse fresh information in support requests you authorize. You can correct or remove it whenever you need.</p>
+        <Link className={`${styles.textLink} ${styles.space}`} href="/family-profile">Manage family information</Link>
+      </section>
+      <section className={styles.surface}>
         <h2>Updates & preferences</h2>
         <form className={`${styles.form} ${styles.space}`} onSubmit={save}>
           <div className={styles.field}>

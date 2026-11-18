@@ -8,6 +8,23 @@ import {
 beforeEach(() => vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined));
 afterEach(() => vi.unstubAllEnvs());
 describe("parent HTTP trust boundary", () => {
+  it("marks only the exact known family-source failure as a private no-write retry response", async () => {
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = parentError(new Error("parent_family_profile_source_changed"));
+    expect(response.status).toBe(412); expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toEqual({ ok: false, error: "Your saved family answers changed or expired before this save. Check the current family profile before trying again." });
+    expect(logger).not.toHaveBeenCalled();
+  });
+  it.each([
+    new Error("parent_family_profile_source_changed private-family-canary"),
+    new Error("private-family-canary parent_family_profile_source_changed"),
+    { code: "P0001", message: "parent_family_profile_source_changed", details: "private-family-canary" },
+  ])("keeps unknown source-like failures private without promising a safe retry", async error => {
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = parentError(error); expect(response.status).toBe(500);
+    expect(await response.text()).not.toMatch(/private-family-canary|parent_family_profile_source_changed/);
+    expect(JSON.stringify(logger.mock.calls)).not.toMatch(/private-family-canary|parent_family_profile_source_changed/);
+  });
   it("records unexpected failures without private error details, even in development", async () => {
     vi.stubEnv("NODE_ENV", "development");
     const logger = vi.spyOn(console, "error").mockImplementation(() => {});

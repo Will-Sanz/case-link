@@ -35,6 +35,12 @@ afterEach(() => {
 });
 
 describe("parent account controls", () => {
+  it("offers the optional family profile separately from contact and sign-in preferences", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(account)));
+    render(<ParentAccount/>);
+    expect((await screen.findByRole("link", { name: "Manage family information" })).getAttribute("href")).toBe("/family-profile");
+    expect(screen.getByLabelText("Support updates")).toBeTruthy();
+  });
   it("saves chosen notification and quiet-hour preferences through the server", async () => {
     const fetchMock = vi.fn().mockResolvedValue(ok(account));
     vi.stubGlobal("fetch", fetchMock);

@@ -119,6 +119,18 @@ export async function createParentSqlFixture(
     "20261113200717_parent_peco_private_application_details.sql",
     "20261113201714_parent_wic_document_boundary.sql",
     "20261113204551_parent_peco_private_document_boundary.sql",
+    "20261113220718_parent_utility_preparation_document_scope.sql",
+    "20261113220747_parent_utility_protected_inputs.sql",
+    "20261113221224_parent_water_private_application_details.sql",
+    "20261113222134_parent_pgw_private_application_details.sql",
+    "20261113231523_parent_utility_prepared_artifacts.sql",
+    "20261113231943_parent_utility_private_document_boundary.sql",
+    "20261113234059_parent_utility_protected_reuse.sql",
+    "20261114013506_parent_utility_deterministic_preparation.sql",
+    "20261114014202_parent_pgw_identifier_replacement.sql",
+    "20261117175206_parent_family_profile.sql",
+    "20261117175622_parent_family_profile_application_reuse.sql",
+    "20261117185443_parent_ordinary_private_text_guard.sql",
   ];
   try {
     for (const migration of migrations)

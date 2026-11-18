@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { fixtureMandate } from "./test-fixtures";
 import { PECO_ACCOUNT_AUTHORITY_STATEMENT, PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE, PECO_SUBJECT_AUTHORITY_STATEMENT, pecoApplicationLeaves, type PecoApplicationFields } from "./peco-application-fields";
 import { pecoApplicationSnapshotSchema, type PecoApplicationSnapshot } from "./peco-application-snapshot";
-import { PECO_APPLICATION_PREPARATION_ERROR, prepareFictionalPecoApplicationDraft, type FictionalPecoPreparationContext } from "./peco-application-preparation";
+import { PECO_APPLICATION_PREPARATION_ERROR, prepareFictionalPecoApplicationDraft, prepareOwnedPecoApplicationDraft, type FictionalPecoPreparationContext } from "./peco-application-preparation";
 
 const template = readFileSync("tests/fixtures/parent/peco-cap-2026.pdf");
 const now = new Date("2026-11-13T20:10:00Z"), earlier = "2026-11-13T20:07:00.000Z", expiry = "2026-11-14T20:00:00.000Z";
@@ -35,8 +35,10 @@ function context(value: PecoApplicationSnapshot): FictionalPecoPreparationContex
 }
 const prepare = (value = snapshot(), scope = context(value), at = now) => prepareFictionalPecoApplicationDraft(template, value, scope, at);
 describe("fictional exact private PECO snapshot projection", () => {
-  it("prepares an unsigned source-bound draft without claiming proof, certification, submission or sending", async () => {
-    const value = snapshot(), scope = context(value), result = await prepare(value, scope);
+  it.each([false, true])("prepares an unsigned draft without proof or sending claims with document scope %s", async documentScope => {
+    const value = snapshot(), scope = context(value);
+    if (documentScope) scope.mandate.allowedData.push("documents");
+    const result = await prepare(value, scope);
     expect(result).toMatchObject({ kind: "fictional_unsigned_preparation", formFieldsReady: true, missingFacts: [], serviceBlockers: [],
       incomeProof: "not_assessed", certification: "not_recorded", submissionReady: false, sending: "not_attempted" });
     expect((await PDFDocument.load(result.bytes!)).getPageCount()).toBe(2);
@@ -139,4 +141,14 @@ describe("fictional exact private PECO snapshot projection", () => {
     const result = await prepare(snapshot(details));
     expect(result.bytes).toBeNull(); expect(result.missingFacts).toEqual([]); expect(result.serviceBlockers).toEqual(["form_rendering_requires_service_check"]);
   });
+});
+
+it("shares exact PECO mapping with trusted owned preparation while preserving the fixture boundary", async () => {
+  const value = snapshot(), scope = { ...context(value), kind: "owned_private_preparation" as const };
+  const result = await prepareOwnedPecoApplicationDraft(template, value, scope, now);
+  expect(result.kind).toBe("owned_unsigned_preparation"); expect(result.submissionReady).toBe(false); expect(result.certification).toBe("not_recorded");
+  expect(result.manifest?.sourceSnapshot.sha256).toBe(scope.expectedSnapshot.sha256);
+  await expect(prepareFictionalPecoApplicationDraft(template, value, scope, now)).rejects.toThrow(PECO_APPLICATION_PREPARATION_ERROR);
+  await expect(prepareOwnedPecoApplicationDraft(template, value, { ...scope, actorId: otherId }, now)).rejects.toThrow(PECO_APPLICATION_PREPARATION_ERROR);
+  await expect(prepareOwnedPecoApplicationDraft(template, value, { ...scope, accountNumberSha256: "f".repeat(64) }, now)).rejects.toThrow(PECO_APPLICATION_PREPARATION_ERROR);
 });

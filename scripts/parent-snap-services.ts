@@ -10,6 +10,11 @@ import { createSnapProtectedReviewServer } from "../src/lib/parent/snap-protecte
 import { createSinchSnapFaxCarrier, snapSenderCarrierConfigSchema } from "../src/lib/parent/snap-sender-carrier";
 import { createSnapProtectedDelivery, createSnapProtectedSenderHandler } from "../src/lib/parent/snap-sender-service";
 import { createSnapSenderStore } from "../src/lib/parent/snap-sender-store";
+import { createUtilityProtectedHandler } from "../src/lib/parent/utility-protected-service";
+import { renderUtilityProtectedPage } from "../src/lib/parent/utility-protected-page";
+import { validateStoredUtilityIncomeProof } from "../src/lib/parent/utility-protected-preparation";
+import { createUtilityPreparationRenderer } from "../src/lib/parent/utility-application-preparation";
+import { createUtilityPreparationHandler } from "../src/lib/parent/utility-preparation-service";
 
 const unavailable = "The isolated SNAP services could not run. No credentials or household information are logged.";
 function localOrigin(value: string) {
@@ -35,8 +40,9 @@ export const snapPrivateServicesSchema = z.object({
   publicOrigin: z.literal("http://127.0.0.1:3200"), appOrigin: origin, reviewOrigin: origin, senderOrigin: origin,
   supabaseOrigin: z.literal("http://127.0.0.1:55321"), supabasePublicKey: z.string().min(1).max(4096).regex(/^[A-Za-z0-9._-]+$/).refine(publicKeyIsSafe),
   finalizerDatabaseUrl: database, senderDatabaseUrl: database, senderSecret: secret, carrier: snapSenderCarrierConfigSchema,
-}).strict().refine(value => new Set([value.publicOrigin, value.appOrigin, value.reviewOrigin, value.senderOrigin, value.supabaseOrigin]).size === 5
-  && decodeURIComponent(new URL(value.finalizerDatabaseUrl).username) !== decodeURIComponent(new URL(value.senderDatabaseUrl).username));
+  utilityDatabaseUrl: database.optional(), utilitySecret: secret.optional(),
+}).strict().refine(value => (!value.utilitySecret || !!value.utilityDatabaseUrl && value.utilitySecret !== value.senderSecret) && new Set([value.publicOrigin, value.appOrigin, value.reviewOrigin, value.senderOrigin, value.supabaseOrigin]).size === 5
+  && new Set([value.finalizerDatabaseUrl, value.senderDatabaseUrl, ...(value.utilityDatabaseUrl ? [value.utilityDatabaseUrl] : [])].map(url => decodeURIComponent(new URL(url).username))).size === (value.utilityDatabaseUrl ? 3 : 2));
 export type SnapPrivateServicesConfig = z.infer<typeof snapPrivateServicesSchema>;
 export type SnapPrivateService = "snap-sender" | "snap-review" | "snap-frontdoor";
 
@@ -66,7 +72,8 @@ export function readSnapPrivateServices(path: string) {
 }
 
 export function snapSenderWorkerEnvironment(config: SnapPrivateServicesConfig): Record<string, string> {
-  return { CASELINK_PARENT_SNAP_SENDER_ORIGIN: config.senderOrigin, CASELINK_PARENT_SNAP_SENDER_SECRET: config.senderSecret };
+  return { CASELINK_PARENT_SNAP_SENDER_ORIGIN: config.senderOrigin, CASELINK_PARENT_SNAP_SENDER_SECRET: config.senderSecret,
+    ...(config.utilitySecret && config.utilityDatabaseUrl ? { CASELINK_PARENT_UTILITY_PREPARATION_ORIGIN: config.reviewOrigin, CASELINK_PARENT_UTILITY_PREPARATION_SECRET: config.utilitySecret } : {}) };
 }
 export function snapPrivateChildEnvironment(service: SnapPrivateService, value: unknown, system: Record<string, string | undefined> = process.env): NodeJS.ProcessEnv {
   const config = parseSnapPrivateServices(value);
@@ -75,7 +82,8 @@ export function snapPrivateChildEnvironment(service: SnapPrivateService, value: 
   const base = { approvedUntil: config.approvedUntil };
   const child = service === "snap-sender" ? { ...base, origin: config.senderOrigin, secret: config.senderSecret, databaseUrl: config.senderDatabaseUrl, carrier: config.carrier }
     : service === "snap-review" ? { ...base, origin: config.reviewOrigin, publicOrigin: config.publicOrigin,
-      supabaseOrigin: config.supabaseOrigin, supabasePublicKey: config.supabasePublicKey, finalizerDatabaseUrl: config.finalizerDatabaseUrl }
+      supabaseOrigin: config.supabaseOrigin, supabasePublicKey: config.supabasePublicKey, finalizerDatabaseUrl: config.finalizerDatabaseUrl,
+      ...(config.utilityDatabaseUrl ? { utilityDatabaseUrl: config.utilityDatabaseUrl, ...(config.utilitySecret ? { utilitySecret: config.utilitySecret } : {}) } : {}) }
       : { ...base, publicOrigin: config.publicOrigin, appOrigin: config.appOrigin, reviewOrigin: config.reviewOrigin };
   env.CASELINK_PARENT_SNAP_PRIVATE_CHILD = JSON.stringify(child);
   return env;
@@ -115,10 +123,14 @@ async function main() {
     server = senderServer(config.origin, config.secret, config.databaseUrl, config.carrier);
   } else if (service === "snap-review") {
     const config = z.object({ approvedUntil, origin, publicOrigin: z.literal("http://127.0.0.1:3200"), supabaseOrigin: z.literal("http://127.0.0.1:55321"),
-      supabasePublicKey: z.string().refine(publicKeyIsSafe), finalizerDatabaseUrl: database }).strict().parse(value);
+      supabasePublicKey: z.string().refine(publicKeyIsSafe), finalizerDatabaseUrl: database, utilityDatabaseUrl: database.optional(), utilitySecret: secret.optional() }).strict().parse(value);
     current(config.approvedUntil); until = config.approvedUntil; listenOrigin = config.origin;
-    const { approvedUntil: _, origin: __, ...review } = config; void _; void __;
-    server = createSnapProtectedReviewServer(review);
+    const { approvedUntil: _, origin: __, utilityDatabaseUrl, utilitySecret, ...review } = config; void _; void __;
+    const utility = utilityDatabaseUrl ? createUtilityProtectedHandler({ publicOrigin: config.publicOrigin, supabaseOrigin: config.supabaseOrigin,
+      supabasePublicKey: config.supabasePublicKey, utilityDatabaseUrl }, { workspace: renderUtilityProtectedPage, validate: validateStoredUtilityIncomeProof }) : undefined;
+    const preparation = utilityDatabaseUrl && utilitySecret ? { origin: config.origin, handle: createUtilityPreparationHandler({ origin: config.origin, secret: utilitySecret, utilityDatabaseUrl },
+      createUtilityPreparationRenderer({ peco: readFileSync(resolve("tests/fixtures/parent/peco-cap-2026.pdf")), pgw: readFileSync(resolve("tests/fixtures/parent/pgw-crp-2026-11-13.pdf")) })) } : undefined;
+    server = createSnapProtectedReviewServer(review, utility, preparation);
   } else {
     const config = z.object({ approvedUntil, publicOrigin: z.literal("http://127.0.0.1:3200"), appOrigin: origin, reviewOrigin: origin }).strict().parse(value);
     current(config.approvedUntil); until = config.approvedUntil; listenOrigin = config.publicOrigin;

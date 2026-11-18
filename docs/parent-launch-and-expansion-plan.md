@@ -1,5 +1,7 @@
 # CaseLink launch and expansion plan
 
+**Food-first update, November 17, 2026:** the owner paused expansion to perfect food support first. Continue immediate food, SNAP, WIC and the shared profile/reliability work those routes need. Preserve electricity/gas/water and other expansion work at the development checkpoint in [the implementation plan](parent-support-implementation-plan.md); resume only after the food direction is ready and the owner returns to expansion. This supersedes the earlier same-day combined next-candidate scope. Keep development synthetic and isolated from the live demo. Apply the existing evidence and release gates to the actual food routes; this decision neither activates collection nor claims a launch.
+
 Decision date: October 27, 2026 (America/New_York). Status: researched, independently reviewed delivery plan; no new route, data purpose, enrollment cohort or external action is activated by this document. Product authority remains the [PRD](parent-support-mvp-prd.md); this document supplies its release sequence, route evidence and delivery backlog.
 
 ## 1. Stable direction and release contract

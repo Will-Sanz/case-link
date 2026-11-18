@@ -5,12 +5,13 @@ import { pecoApplicationCollectionSchema, pecoApplicationSnapshotSchema } from "
 import { pecoCapIncomeBindingSchema, pecoCapPreparationReferenceSchema } from "./peco-cap-income";
 import { pecoCapPreparationSnapshotSchema, renderPecoCapPreparationDraft, type PecoCapDraftInput } from "./peco-cap-draft";
 import type { PecoApplicationFields } from "./peco-application-fields";
+import { isUtilityPreparationMandate } from "./utility-preparation-scope";
 
-export const PECO_APPLICATION_PREPARATION_ERROR = "The fictional PECO preparation could not be checked from the supplied information.";
+export const PECO_APPLICATION_PREPARATION_ERROR = "The PECO preparation could not be checked from the supplied information.";
 const timestamp = z.iso.datetime({ offset: true });
 const hash = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex");
 const contextSchema = z.object({
-  kind: z.literal("fictional_offline_rehearsal"),
+  kind: z.enum(["fictional_offline_rehearsal", "owned_private_preparation"]),
   expectedSnapshot: pecoCapPreparationReferenceSchema.extend({ binding: pecoCapIncomeBindingSchema }),
   binding: pecoCapIncomeBindingSchema,
   actorId: z.uuid(), accountAuthority: z.enum(["self", "authorized_caregiver"]),
@@ -21,7 +22,8 @@ const contextSchema = z.object({
   collection: pecoApplicationCollectionSchema,
   validUntil: timestamp, retentionUntil: timestamp,
 }).strict();
-export type FictionalPecoPreparationContext = z.infer<typeof contextSchema>;
+export type FictionalPecoPreparationContext = z.infer<typeof contextSchema> & { kind: "fictional_offline_rehearsal" };
+export type OwnedPecoPreparationContext = z.infer<typeof contextSchema> & { kind: "owned_private_preparation" };
 type MissingFacts = { group: string; fields: string[] }[];
 type Person = NonNullable<PecoApplicationFields["applicant"]>;
 const localDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -32,10 +34,9 @@ const incomeLabels = {
 } as const;
 
 /**
- * Fictional fixtures only, with no runtime/API caller or persistence. Expected references and scope model
- * future trusted owned resolution; supplying them is not authentication, permission or a retention policy.
+ * Pure mapping of an exact resolved snapshot. Callers must establish owner, current authority and retention separately.
  */
-export async function prepareFictionalPecoApplicationDraft(template: Uint8Array, sourceSnapshot: unknown, sourceContext: unknown, now: Date) {
+async function preparePecoApplicationDraft(template: Uint8Array, sourceSnapshot: unknown, sourceContext: unknown, now: Date) {
   try {
     const at = new Date(now), bytes = Uint8Array.from(template);
     const snapshot = pecoApplicationSnapshotSchema.parse(structuredClone(sourceSnapshot)), context = contextSchema.parse(structuredClone(sourceContext));
@@ -53,9 +54,7 @@ export async function prepareFictionalPecoApplicationDraft(template: Uint8Array,
       snapshot.consent_evidence.accountNumberSha256 !== context.accountNumberSha256 ||
       (details.accountNumber ? hash(details.accountNumber) : null) !== context.accountNumberSha256 ||
       context.requestState !== "active" || context.mandateRevoked || context.grant.revoked || !context.collection.collectionEnabled ||
-      context.mandate.mode !== "prepare_only" || context.mandate.recipientIds.length !== 1 || context.mandate.recipientIds[0] !== "peco-cap" ||
-      !context.mandate.allowedActions.includes("prepare") || context.mandate.allowedData.length !== 3 ||
-      !["household", "income", "utility"].every(category => context.mandate.allowedData.includes(category as "household" | "income" | "utility"))) throw new Error();
+      !isUtilityPreparationMandate(context.mandate, "peco-cap")) throw new Error();
     const today = localDate.format(at), missingFacts: MissingFacts = [], serviceBlockers: string[] = [];
     const missing = (group: string, fields: string[]) => {
       if (!fields.length) return;
@@ -89,7 +88,7 @@ export async function prepareFictionalPecoApplicationDraft(template: Uint8Array,
       return projected && member.relationship ? { ...projected, relationship: member.relationship } : null;
     });
     missing("service_address", ["street", "city", "state", "zip"].filter(key => !details.address?.[key as "street" | "city" | "state" | "zip"]).map(key => `address.${key}`));
-    const readiness = { kind: "fictional_unsigned_preparation" as const, sourceSnapshot: reference,
+    const readiness = { kind: context.kind === "fictional_offline_rehearsal" ? "fictional_unsigned_preparation" as const : "owned_unsigned_preparation" as const, sourceSnapshot: reference,
       missingFacts, serviceBlockers: [...new Set(serviceBlockers)], formFieldsReady: missingFacts.length === 0 && serviceBlockers.length === 0,
       incomeProof: "not_assessed" as const, certification: "not_recorded" as const, submissionReady: false as const, sending: "not_attempted" as const };
     if (!readiness.formFieldsReady) return { ...readiness, bytes: null, manifest: null };
@@ -115,4 +114,16 @@ export async function prepareFictionalPecoApplicationDraft(template: Uint8Array,
       formInputSha256: hash(JSON.stringify(projection.details)), artifactSha256: hash(rendered),
     } };
   } catch { throw new Error(PECO_APPLICATION_PREPARATION_ERROR); }
+}
+
+/** Retains the strict offline fixture boundary; it cannot relabel owned work as a fictional rehearsal. */
+export async function prepareFictionalPecoApplicationDraft(template: Uint8Array, snapshot: unknown, context: unknown, now: Date) {
+  if (!z.object({ kind: z.literal("fictional_offline_rehearsal") }).safeParse(context).success) throw new Error(PECO_APPLICATION_PREPARATION_ERROR);
+  return preparePecoApplicationDraft(template, snapshot, context, now);
+}
+
+/** Isolated service only: current ownership/scope must be resolved from the database, then rechecked after rendering. */
+export async function prepareOwnedPecoApplicationDraft(template: Uint8Array, snapshot: unknown, context: OwnedPecoPreparationContext, now: Date) {
+  if (!z.object({ kind: z.literal("owned_private_preparation") }).safeParse(context).success) throw new Error(PECO_APPLICATION_PREPARATION_ERROR);
+  return preparePecoApplicationDraft(template, snapshot, context, now);
 }

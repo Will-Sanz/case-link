@@ -5,6 +5,7 @@ import { fixtureRequest } from "@/lib/parent/test-fixtures";
 import type { SupportRequest } from "@/lib/parent/domain";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { MySupport } from "./my-support";
+vi.mock("./family-profile", () => ({ FamilyProfileWelcome: () => null }));
 
 const request = fixtureRequest();
 const response = (state: SupportProgress["state"], requests: SupportRequest[] = [request]) => ({

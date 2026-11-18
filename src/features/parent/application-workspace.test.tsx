@@ -21,6 +21,7 @@ import {
   recordedApplicationState,
   supportTitle,
   isPecoPreparationRequest,
+  isPrivateUtilityPreparationRequest,
 } from "./application-workspace";
 
 const requestId = "11111111-1111-4111-8111-111111111111";
@@ -114,10 +115,28 @@ describe("canonical application continuity", () => {
     expect(screen.getByText(/Saving answers prepares this request/).textContent).toContain("protect against shutoff");
     await screen.findByText(/saved PECO evidence needs a service check/);
   });
+  it.each([
+    { need: "gas", provider: "pgw", program: "pgw-crp", flag: "has_pgw_application_details", label: "Your PGW CRP answers", heading: "Your private PGW CRP answers" },
+    { need: "water", provider: "pwd", program: "pwd-tap", flag: "has_water_application_details", label: "Your water assistance answers", heading: "Your private water assistance answers" },
+  ] as const)("keeps $program private history reachable after its mandate changes without inventing provider activity", async option => {
+    const request = fixture(); request.intake = { ...request.intake, needs: [option.need], utilityProviders: [option.provider] };
+    request.mandate = buildMandate(request.intake, [option.program], "prepare_only", "ask_me", request.mandate.expiresAt, true, true);
+    expect(isPrivateUtilityPreparationRequest(request)).toBe(false); request[option.flag] = true;
+    request.mandate.recipientIds = ["uesf-utilities"]; request.status = "paused";
+    expect(isPrivateUtilityPreparationRequest(request)).toBe(true); mockApi(); renderWorkspace(request);
+    const checklist = screen.getByRole("navigation", { name: "Your application checklist" });
+    expect(within(checklist).queryByRole("link", { name: /Official website/ })).toBeNull();
+    fireEvent.click(within(checklist).getByRole("link", { name: new RegExp(option.label) }));
+    expect(screen.getByRole("heading", { name: option.heading }).closest("[data-workspace-panel]")?.id).toBe("application-review");
+    expect(screen.queryByRole("button", { name: /Correct .* answers/ })).toBeNull();
+  });
   it("keeps generic electricity or another mandate outside the private CAP workspace", () => {
     const request = fixture(); request.intake = { ...request.intake, needs: ["electricity"], utilityProviders: ["peco"], accountAuthority: "self" };
     request.mandate = buildMandate(request.intake, ["peco-cap"], "prepare_only", "ask_me", request.mandate.expiresAt);
     expect(isPecoPreparationRequest(request)).toBe(false);
+    request.has_peco_application_details = true;
+    expect(isPecoPreparationRequest(request)).toBe(true);
+    delete request.has_peco_application_details;
     request.mandate.allowedData = ["household", "income", "utility"];
     expect(isPecoPreparationRequest(request)).toBe(true);
     request.mandate.mode = "full"; expect(isPecoPreparationRequest(request)).toBe(false);

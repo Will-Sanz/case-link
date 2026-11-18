@@ -18,12 +18,18 @@ import { WIC_APPLICATION_SOURCE } from "../src/lib/parent/wic-application-fields
 import type { WicApplicationSnapshot } from "../src/lib/parent/wic-application-snapshot";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE, PECO_SUBJECT_AUTHORITY_STATEMENT, PECO_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/peco-application-fields";
 import type { PecoApplicationSnapshot } from "../src/lib/parent/peco-application-snapshot";
+import { PGW_APPLICATION_NOTICE_VERSION, PGW_APPLICATION_SOURCE, PGW_SUBJECT_AUTHORITY_STATEMENT, PGW_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/pgw-application-fields";
+import { pgwApplicationSnapshotSchema } from "../src/lib/parent/pgw-application-snapshot";
+import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE, WATER_SUBJECT_AUTHORITY_STATEMENT, WATER_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/water-application-fields";
+import { waterApplicationSnapshotSchema } from "../src/lib/parent/water-application-snapshot";
+import { assertSyntheticParentAuthTargets, beginParentTestApproval } from "./parent-test-approval";
 
 const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200";
 const checks: string[] = [];
 const snapAccessibility: { state: string; width: number; height: number; screenshot: string; overflow: boolean; violations: string[] }[] = [];
 const wicAccessibility: typeof snapAccessibility = [];
 const pecoAccessibility: typeof snapAccessibility = [];
+const utilityAccessibility: (typeof snapAccessibility[number] & { program: "pgw" | "water" })[] = [];
 let stage = "local service configuration";
 function check(condition: unknown, label: string): asserts condition {
   assert.ok(condition, label);
@@ -50,7 +56,7 @@ async function main() {
         "--output",
         "json",
       ],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 15000 },
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 15000, env: { ...process.env, DO_NOT_TRACK: "1" } },
     ),
   ) as Record<string, string>;
   for (const [name, port] of [
@@ -68,6 +74,8 @@ async function main() {
     local.ANON_KEY && local.SERVICE_ROLE_KEY,
     "Local Auth public and fixture-admin credentials are available.",
   );
+  const syntheticApproval = process.argv.includes("--synthetic-approval");
+  if (syntheticApproval) assertSyntheticParentAuthTargets(origin, local);
   const operator = createClient(local.API_URL, local.SERVICE_ROLE_KEY, {
     auth: {
       persistSession: false,
@@ -95,6 +103,7 @@ async function main() {
   const seenMail = new Set<string>();
   let rateLimitObserved = false;
   let previousExistingAccounts: boolean | undefined;
+  let fixtureApproval: Awaited<ReturnType<typeof beginParentTestApproval>> | undefined;
 
   async function deliveredCode(email: string): Promise<string> {
     for (let attempt = 0; attempt < 60; attempt++) {
@@ -267,6 +276,10 @@ async function main() {
   }
 
   try {
+    if (syntheticApproval) {
+      stage = "recording a bounded empty-stack synthetic Auth approval";
+      fixtureApproval = await beginParentTestApproval(db, true);
+    }
     check(
       (await db.query("select parent_private.processing_enabled() enabled"))
         .rows[0].enabled === true,
@@ -1477,7 +1490,7 @@ async function main() {
         pecoStartBody.subjectAuthorityDeclared === true && pecoStartBody.accountAuthorityDeclared === true && !!pecoStartHeaders["Idempotency-Key"] &&
         pecoStartBody.reusedZip?.sourceRequestId === routingSource.sourceRequestId && pecoStartBody.details.address.zip === "19147" && pecoStartBody.intake.zip === "19104" &&
         pecoStartBody.intake.householdSize === null && pecoStartBody.intake.incomeAmount === null && pecoStartBody.intake.pregnantOrPostpartum === null &&
-        pecoStartBody.mandate.mode === "prepare_only" && !pecoStartBody.mandate.allowedData.includes("documents"),
+        pecoStartBody.mandate.mode === "prepare_only" && pecoStartBody.mandate.allowedData.includes("documents") && pecoConsentText.includes("each protected document needs its separate processing consent"),
       "The real PECO start binds actual declarations while private values and the service ZIP remain separate from reused ordinary routing.");
       await first.page.waitForURL(`${origin}/support/${pecoRequestId}`);
       const pecoUrl = `${origin}/api/parent/requests/${pecoRequestId}/peco-application`;
@@ -1611,6 +1624,242 @@ async function main() {
       assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, pecoControls);
       check((await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n === pecoBudgetBefore,
         "All four PECO-purpose controls are restored exactly, the entire control row is unchanged and model-budget reservations are unchanged.");
+    }
+
+    for (const program of ["pgw", "water"] as const) {
+      const name = program === "pgw" ? "PGW" : "water", need = program === "pgw" ? "gas" : "water";
+      const provider = program === "pgw" ? "PGW" : "Philadelphia Water";
+      const notice = program === "pgw" ? PGW_APPLICATION_NOTICE_VERSION : WATER_APPLICATION_NOTICE_VERSION;
+      const source = program === "pgw" ? PGW_APPLICATION_SOURCE : WATER_APPLICATION_REFERENCE;
+      const subjectStatement = program === "pgw" ? PGW_SUBJECT_AUTHORITY_STATEMENT : WATER_SUBJECT_AUTHORITY_STATEMENT;
+      const accountStatement = program === "pgw" ? PGW_ACCOUNT_AUTHORITY_STATEMENT : WATER_ACCOUNT_AUTHORITY_STATEMENT;
+      const control = `${program}_details`, table = `parent_${program}_application_details`;
+      const controls = (await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value;
+      const budget = (await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+      const choose = async () => {
+        await first.page.getByLabel("Household ZIP code", { exact: true }).waitFor();
+        await first.page.getByRole("checkbox", { name: provider, exact: true }).check();
+        await first.page.getByLabel("Your authority for the selected utility accounts", { exact: true }).selectOption("self");
+        await first.page.getByLabel(program === "pgw" ? /Prepare PGW CRP help/ : /Prepare Philadelphia water assistance/).check();
+      };
+      const checkPage = async (state: string) => {
+        const viewport = first.page.viewportSize(), directory = "tmp/parent-verification/actual-auth";
+        mkdirSync(directory, { recursive: true });
+        try {
+          for (const [size, width, height] of [["phone", 320, 820], ["laptop", 1280, 900]] as const) {
+            await first.page.setViewportSize({ width, height });
+            await first.page.evaluate(() => document.fonts.ready.then(() => undefined));
+            const overflow = await first.page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+            const axe = await new AxeBuilder({ page: first.page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+            const screenshot = `${directory}/${program}-${state}-${size}.png`;
+            await first.page.screenshot({ path: screenshot, fullPage: true });
+            utilityAccessibility.push({ program, state, width, height, screenshot, overflow, violations: axe.violations.map(item => item.id) });
+            check(!overflow, `The actual ${name} ${state} has no horizontal overflow at ${width}px.`);
+            check(axe.violations.length === 0, `The actual ${name} ${state} has no automated WCAG A/AA violations at ${width}px (${axe.violations.map(item => item.id).join(", ") || "none"}).`);
+          }
+        } finally { if (viewport) await first.page.setViewportSize(viewport); }
+      };
+      try {
+        stage = `actual closed ${name} collection and grouped private intake`;
+        check(controls[`${control}_enabled`] === false, `Private ${name} collection is initially closed on the actual local runtime.`);
+        const now = new Date((await db.query("select clock_timestamp() value")).rows[0].value).getTime();
+        check(now >= Date.parse(source.sourceCheckedAt) && now < Date.parse(source.verifiedUntil), `The actual ${name} rehearsal stays inside its reviewed source window.`);
+        await first.page.clock.setSystemTime(new Date());
+        await first.page.goto(`${origin}/get-support?need=${need}`, { waitUntil: "networkidle" }); await choose();
+        check(await first.page.getByLabel(program === "pgw" ? "Customer first name" : "Applicant full name", { exact: true }).count() === 0,
+          `The actual closed ${name} purpose collects no private household answers.`);
+        check(await first.page.getByRole("link", { name: program === "pgw" ? /official PGW help/ : /official water.*help/i }).count() > 0,
+          `The actual closed ${name} purpose keeps official help available.`);
+        await db.query(`update parent_private.processing_controls set ${control}_enabled=true,${control}_approval_reference=$1,
+          ${control}_approved_until=now()+interval '1 hour',${control}_notice_version=$2 where singleton`, [`isolated synthetic Auth ${name} fixture`, notice]);
+        await first.page.reload({ waitUntil: "networkidle" }); await choose();
+        await first.page.getByLabel(program === "pgw" ? "Customer first name" : "Applicant full name", { exact: true }).waitFor();
+        const routingResponse = await first.page.request.get(`${origin}/api/parent/intake-defaults`), routing = (await routingResponse.json()).zip;
+        check(routingResponse.status() === 200 && routing?.value === "19104" && await first.page.getByLabel("Household ZIP code", { exact: true }).inputValue() === "19104" &&
+          await first.page.getByLabel(program === "pgw" ? "PGW service ZIP code" : "Water property address", { exact: true }).inputValue() === "",
+        `The actual ${name} intake reuses routing without retyping or inventing its private service address.`);
+        const authorization = (await (await first.page.request.get(`${origin}/api/parent/authorization-window`)).json()).authorization[`${program}Application`];
+        check(authorization.collectionEnabled && authorization.noticeVersion === notice && Date.parse(authorization.expiresAt) > Date.now() && Date.parse(authorization.expiresAt) <= Date.parse(source.verifiedUntil),
+          `The actual ${name} web deadline is independently approved and bounded by its source review.`);
+        await first.page.getByLabel("Preferred service language", { exact: true }).selectOption("en");
+        if (program === "pgw") {
+          await first.page.getByLabel("What PGW CRP help is needed?", { exact: true }).selectOption("new_enrollment");
+          await first.page.getByLabel("What is this account’s CRP enrollment?", { exact: true }).selectOption("not_enrolled");
+          for (const [label, value] of [["Customer first name", "AuthPgwCanary"], ["Customer last name", "Parent"], ["PGW account number", "FICT-AUTH-PGW-01"],
+            ["PGW service street address", "400 Synthetic Utility Lane"], ["PGW service city", "Philadelphia"], ["PGW service state", "PA"], ["PGW service ZIP code", "19147"], ["PGW contact phone", "215-555-0101"]])
+            await first.page.getByLabel(label, { exact: true }).fill(value);
+          await first.page.getByLabel("Is the customer of record under 18?", { exact: true }).selectOption("false");
+          await first.page.getByLabel("Customer income sources", { exact: true }).selectOption("sources");
+          await first.page.getByLabel("Add customer income source", { exact: true }).selectOption("employment");
+          await first.page.getByRole("button", { name: "Add a household member", exact: true }).click();
+          for (const [label, value] of [["Household member 1 first name", "AuthPgwChildCanary"], ["Household member 1 last name", "Child"],
+            ["Household member 1 date of birth", "2020-01-01"], ["Household member 1 relationship to customer", "Child"]]) await first.page.getByLabel(label, { exact: true }).fill(value);
+          await first.page.getByLabel("Household member 1 income sources", { exact: true }).selectOption("sources");
+          await first.page.getByLabel("Add household member 1 income source", { exact: true }).selectOption("social_security");
+          await first.page.getByLabel("Does someone outside this household provide financial support?", { exact: true }).selectOption("true");
+          for (const [label, value] of [["Outside supporter first name", "AuthPgwSupporterCanary"], ["Outside supporter last name", "Supporter"],
+            ["Outside supporter street address", "402 Synthetic Utility Lane"], ["Outside supporter city", "Philadelphia"], ["Outside supporter state", "PA"],
+            ["Outside supporter ZIP code", "19148"], ["Outside supporter phone", "215-555-0102"], ["Outside support monthly amount", "0.29"]]) await first.page.getByLabel(label, { exact: true }).fill(value);
+          await first.page.getByLabel("Did the entire household have no income in the past 30 days?", { exact: true }).selectOption("false");
+          await first.page.getByLabel("Does the household receive SNAP?", { exact: true }).selectOption("true");
+          await first.page.getByLabel("SNAP monthly amount", { exact: true }).fill("300.29");
+          await first.page.getByLabel("Does the household receive housing subsidy?", { exact: true }).selectOption("false");
+          check(await first.page.getByLabel("Customer date of birth", { exact: true }).count() === 0 && await first.page.getByLabel(/Social Security|passport|student ID|identifier number/i).count() === 0,
+            "The real PGW form preserves the customer exemption and keeps all required member identifiers outside ordinary inputs.");
+        } else {
+          await first.page.getByLabel("What water assistance help is needed?", { exact: true }).selectOption("new_application");
+          await first.page.getByLabel("Have you already started or sent a City water assistance application?", { exact: true }).selectOption("none_known");
+          for (const [label, value] of [["Applicant full name", "AuthWaterCanary Parent"], ["Applicant date of birth", "1990-01-01"], ["Applicant gross monthly income in dollars", "0"],
+            ["Water property address", "500 Synthetic Utility Lane, Philadelphia PA 19147"], ["Daytime phone number", "215-555-0101"]]) await first.page.getByLabel(label, { exact: true }).fill(value);
+          await first.page.getByLabel("Applicant income sources", { exact: true }).selectOption("none");
+          await first.page.getByLabel("Have you been approved for an Owner Occupied Payment Agreement (OOPA)?", { exact: true }).selectOption("unknown");
+          await first.page.getByRole("button", { name: "Add a household member", exact: true }).click();
+          for (const [label, value] of [["Household member 1 full name", "AuthWaterChildCanary Child"], ["Household member 1 date of birth", "2020-01-01"], ["Household member 1 relationship to applicant", "Child"]])
+            await first.page.getByLabel(label, { exact: true }).fill(value);
+          await first.page.getByLabel("Does someone in the household receive child support?", { exact: true }).selectOption("no");
+          await first.page.getByLabel("Does anyone in the household receive financial support from someone outside the household?", { exact: true }).selectOption("no");
+          for (const [label, value] of [["How does the applicant pay for food?", "Using savings\nHousehold savings buy groceries"], ["How does the applicant pay for housing?", "Using savings"], ["How does the applicant pay for utility service?", "Using savings"]])
+            await first.page.getByLabel(label, { exact: true }).fill(value);
+          check(await first.page.getByLabel("Does the applicant report zero income for this application?", { exact: true }).count() === 0 &&
+            await first.page.getByLabel(/water access code|application id|Social Security|tax ID/i).count() === 0,
+          "The real water form uses supplied applicant zero income without a repeat confirmation, optional identifiers or account recovery secrets.");
+        }
+        await first.page.getByLabel("Is this the full household list?", { exact: true }).selectOption("true");
+        await first.page.getByRole("checkbox", { name: /I’m 18 or older/ }).check(); await checkPage("intake");
+        await first.page.getByRole("button", { name: "Continue", exact: true }).click();
+        const consent = first.page.getByRole("checkbox", { name: /I authorize/ }), consentText = await consent.evaluate(input => input.closest("label")?.textContent ?? "");
+        check(await first.page.getByRole("checkbox").count() === 1 && consentText.includes(subjectStatement) && consentText.includes(accountStatement),
+          `The actual ${name} start has one authority act containing both exact declarations.`);
+        await consent.check();
+        const starting = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+        void starting.catch(() => {}); // The awaited UI action can fail before this observation finishes.
+        await first.page.getByRole("button", { name: "Start getting support", exact: true }).click(); const started = await starting;
+        check(started.status() === 201, `The actual ${name} grouped private form starts through Next, Auth and PostgreSQL.`);
+        const id = (await started.json()).request.id as string, startBody = started.request().postDataJSON();
+        await first.page.waitForURL(`${origin}/support/${id}`);
+        const url = `${origin}/api/parent/requests/${id}/${program}-application`;
+        const read = async (revision?: string) => {
+          const response = await first.page.request.get(`${url}${revision ? `?revision=${revision}` : ""}`);
+          check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", `Owned ${name} immutable history is private through the real web API.`);
+          const record = (await response.json()).snapshot;
+          return program === "pgw" ? pgwApplicationSnapshotSchema.parse(record) : waterApplicationSnapshotSchema.parse(record);
+        };
+        const state = async () => (await db.query(`select to_jsonb(r) request,to_jsonb(j) job,
+          (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]') from public.parent_events e where e.request_id=r.id) events,
+          (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
+          (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls
+          from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [id])).rows[0];
+        const original = await read(), originalState = await state();
+        assert.deepEqual(original.details, startBody.details); assert.deepEqual(original.source, source);
+        check(startBody.kind === `${program}_application` && startBody.subjectAuthorityDeclared && startBody.accountAuthorityDeclared &&
+          startBody.reusedZip?.sourceRequestId === routing.sourceRequestId && startBody.intake.zip === "19104" && startBody.intake.householdSize === null && startBody.intake.incomeAmount === null &&
+          startBody.mandate.mode === "prepare_only" && JSON.stringify(startBody.mandate.allowedData) === JSON.stringify(["household", "income", "utility", "documents"]) &&
+          original.revision === 1 && original.consent_evidence.actorId === first.id && originalState.job.request_version === original.request_version &&
+          originalState.request.intake_confirmed_at.zip === routing.confirmedAt && !/AuthPgw|AuthWater|Synthetic Utility|19147|1990-01-01|2020-01-01|FICT-AUTH/.test(JSON.stringify([originalState.request, originalState.job, originalState.events])),
+        `The actual ${name} revision keeps exact declarations and original routing dates while private canaries stay out of ordinary state and worker payloads.`);
+        check(!(await db.query("select has_table_privilege('parent_worker',$1,'SELECT') allowed", [`public.${table}`])).rows[0].allowed,
+          `The ordinary worker has no raw ${name} application table privilege.`);
+        const own = await rest(token, `${table}?request_id=eq.${id}`), foreign = await rest(secondToken, `${table}?request_id=eq.${id}`);
+        check(own.status === 200 && foreign.status === 200 && (await foreign.json()).length === 0 && (await second.page.request.get(url)).status() === 404,
+          `Actual Auth and PostgREST restrict private ${name} history to its household.`); assert.deepEqual(await own.json(), [original]);
+        check((await rest(secondToken, `rpc/parent_save_${program}_application_details`, { p_request_id: id, p_expected_version: original.request_version,
+          p_details: original.details, p_notice_version: notice, p_idempotency_key: randomUUID(), p_subject_authority_declared: true, p_account_authority_declared: true })).status === 403,
+        `Another actual household cannot correct private ${name} answers.`);
+        await showSection(first.page, "application-review"); await first.page.getByRole("button", { name: `Correct ${name} answers`, exact: true }).waitFor(); await checkPage("review");
+        await first.page.getByRole("button", { name: `Correct ${name} answers`, exact: true }).click();
+        const form = first.page.getByRole("form", { name: `Correct ${name} application answers`, exact: true });
+        check(await form.getByRole("checkbox").count() === 0, `The actual ${name} editor reuses saved answers without another permission checkbox.`);
+        await form.getByLabel(program === "pgw" ? "PGW service street address" : "Water property address", { exact: true }).fill(program === "pgw" ? "401 Synthetic Utility Lane" : "501 Synthetic Utility Lane, Philadelphia PA 19147");
+        await checkPage("correction");
+
+        stage = `actual uncertain ${name} save and exact reconciliation`;
+        const locker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 1000, statement_timeout: 2000, idle_in_transaction_session_timeout: 3000 });
+        let lockFailed = false;
+        locker.on("error", () => { lockFailed = true; });
+        let pendingRequest: BrowserRequest | undefined;
+        try {
+          await locker.connect(); await locker.query("begin"); await locker.query("select id from public.parent_requests where id=$1 for update", [id]);
+          const requested = first.page.waitForRequest(request => request.url() === url && request.method() === "POST");
+          void requested.catch(() => {}); // The awaited UI action can fail before this observation finishes.
+          await form.getByRole("button", { name: `Save ${name} changes`, exact: true }).click(); pendingRequest = await requested;
+          let waiting = false;
+          for (let probe = 0; probe < 24 && !waiting; probe++) {
+            waiting = (await db.query("select exists(select 1 from pg_stat_activity where wait_event_type='Lock' and query like $1) waiting", [`%parent_save_${program}_application_details%`])).rows[0].waiting;
+            if (!waiting) await delay(25);
+          }
+          check(waiting && !lockFailed, `The actual ${name} private write reaches PostgreSQL before the browser loses its save result.`);
+          await first.page.clock.setSystemTime(new Date(Date.parse(authorization.expiresAt) + 1000));
+          await first.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+          await first.page.getByText(/Your unsaved draft remains on this page/).waitFor({ timeout: 1000 });
+        } finally {
+          await locker.query("rollback").catch(() => {}); await locker.end().catch(() => {});
+          await first.page.clock.setSystemTime(new Date()); await first.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        }
+        check(pendingRequest, `The actual ${name} uncertain attempt retains its exact body and idempotency key.`);
+        const uncertainBody = pendingRequest.postData(), uncertainKey = pendingRequest.headers()["idempotency-key"];
+        check(uncertainBody && /^[0-9a-f-]{36}$/.test(uncertainKey), `The actual ${name} uncertain write has a body and request-specific key.`);
+        let committed = false;
+        for (let probe = 0; probe < 30 && !committed; probe++) {
+          committed = (await db.query(`select exists(select 1 from public.${table} where request_id=$1 and idempotency_key=$2) stored`, [id, uncertainKey])).rows[0].stored;
+          if (!committed) await delay(50);
+        }
+        check(committed, `The real ${name} write commits while the browser's acknowledgement remains unknown.`);
+        await first.page.getByText(program === "pgw" ? /Your private PGW CRP answers are saved as a new revision/ : /Your private water assistance answers are saved as a new revision/).waitFor({ timeout: 15000 });
+        check(await first.page.getByRole("button", { name: `Load latest saved ${name} answers`, exact: true }).count() === 0 && await form.count() === 0,
+          `The actual ${name} browser automatically recognizes its exact committed revision from the latest owned GET without another click.`);
+        const retried = await first.page.request.post(url, { headers: { origin, "content-type": "application/json", "Idempotency-Key": uncertainKey }, data: uncertainBody! });
+        check(retried.status() === 201,
+          `The actual ${name} API reconciles the same captured uncertain body and idempotency key without creating a second revision.`);
+        const corrected = await read(); check(corrected.revision === 2, `The actual ${name} uncertain retry creates exactly one new immutable revision.`);
+        assert.deepEqual(await read(original.id), original);
+        const changedPath = program === "pgw" ? "address.street" : "propertyAddress";
+        assert.deepEqual({ ...corrected.provenance, [changedPath]: original.provenance[changedPath] }, original.provenance);
+        await first.page.reload({ waitUntil: "networkidle" }); await showSection(first.page, "application-review");
+        await first.page.getByRole("button", { name: `Correct ${name} answers`, exact: true }).click();
+        await form.getByLabel(program === "pgw" ? "PGW account number" : "Daytime phone number", { exact: true }).fill(program === "pgw" ? "FICT-AUTH-PGW-02" : "215-555-0102");
+        const savingAgain = first.page.waitForResponse(response => response.url() === url && response.request().method() === "POST");
+        void savingAgain.catch(() => {}); // The awaited UI action can fail before this observation finishes.
+        await form.getByRole("button", { name: `Save ${name} changes`, exact: true }).click(); check((await savingAgain).status() === 201, `The actual ${name} editor saves the next exact in-scope correction.`);
+        const next = await read(), beforeStale = await state();
+        check((await first.page.request.post(url, { headers: { origin, "content-type": "application/json", "Idempotency-Key": uncertainKey }, data: uncertainBody! })).status() === 409,
+          `The actual ${name} API refuses a superseded uncertain attempt after a later correction.`); assert.deepEqual(await state(), beforeStale);
+        await first.page.reload({ waitUntil: "networkidle" }); await showSection(first.page, "application-controls");
+        const pausing = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests/${id}` && response.request().method() === "POST");
+        void pausing.catch(() => {}); // The awaited UI action can fail before this observation finishes.
+        await first.page.getByRole("button", { name: "Pause future work", exact: true }).click(); check((await pausing).status() === 200, `The actual ${name} request pauses through its owned control.`);
+        await first.page.getByRole("button", { name: "Resume support", exact: true }).waitFor(); await showSection(first.page, "application-review");
+        await first.page.getByRole("button", { name: `Correct ${name} answers`, exact: true }).click();
+        check(await form.getByRole("checkbox").count() === 0, `Paused ${name} correction requires no repeated approval checkbox.`);
+        await form.getByLabel(program === "pgw" ? "PGW contact phone" : "Daytime phone number", { exact: true }).fill("215-555-0103");
+        const pausedSaving = first.page.waitForResponse(response => response.url() === url && response.request().method() === "POST");
+        void pausedSaving.catch(() => {}); // The awaited UI action can fail before this observation finishes.
+        await form.getByRole("button", { name: `Save ${name} changes`, exact: true }).click(); check((await pausedSaving).status() === 201, `The actual paused ${name} editor saves without resuming work.`);
+        const paused = await read(), finalState = await state();
+        check(paused.revision === 4 && finalState.request.status === "paused" && finalState.job.state === "cancelled" && finalState.operations === 0 && finalState.model_calls === 0,
+          `The final ${name} request stays paused without a model call, provider operation or enrollment claim.`);
+        const upload = await first.page.request.post(`${origin}/api/parent/requests/${id}/documents`, { headers: { origin }, multipart: { consent: "1", file: { name: `synthetic-${program}.pdf`, mimeType: "application/pdf", buffer: Buffer.from("%PDF-SYNTHETIC") } } });
+        const documents = (await db.query(`select (select count(*)::int from public.parent_documents where request_id=$1) documents,
+          (select count(*)::int from storage.objects where bucket_id='parent-documents' and name like $2) objects`, [id, `${first.id}/${id}/%`])).rows[0];
+        check(upload.status() === 403 && documents.documents === 0 && documents.objects === 0, `The real ordinary ${name} upload path creates no private document metadata or Storage objects.`);
+        await db.query(`update parent_private.processing_controls set ${control}_enabled=false where singleton`); assert.deepEqual(await read(), paused);
+        check((await first.page.request.post(url, { headers: { origin, "Idempotency-Key": randomUUID() }, data: { expectedVersion: finalState.request.version, details: paused.details, noticeVersion: notice, subjectAuthorityDeclared: true, accountAuthorityDeclared: true } })).status() === 403,
+          `Closing only ${name} collection blocks writes while keeping owned history.`);
+        const exported = await first.page.request.get(`${origin}/api/parent/account/export`), exportBody = await exported.json();
+        check(exported.status() === 200 && exported.headers()["cache-control"] === "private, no-store", `The real ${name} owner export remains private after collection closes.`);
+        const history = exportBody.requests.find((request: { id: string }) => request.id === id)?.[`${program}ApplicationDetails`];
+        check(history?.length === 4, `The actual owner export contains every original and corrected ${name} revision.`);
+        for (const revision of [original, corrected, next, paused]) assert.deepEqual(history.find((row: { id: string }) => row.id === revision.id), revision);
+        check(!(await (await second.page.request.get(`${origin}/api/parent/account/export`)).text()).includes(id), `Another actual household's export excludes ${name} private history.`);
+        await first.page.reload({ waitUntil: "networkidle" }); await showSection(first.page, "application-review");
+        check(await first.page.getByRole("button", { name: `Correct ${name} answers`, exact: true }).count() === 0, `The real closed ${name} purpose offers no private editor.`); await checkPage("closed-history");
+      } finally {
+        await db.query(`update parent_private.processing_controls c set (${control}_enabled,${control}_approval_reference,${control}_approved_until,${control}_notice_version)=
+          (select r.${control}_enabled,r.${control}_approval_reference,r.${control}_approved_until,r.${control}_notice_version from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(controls)]);
+        assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, controls);
+        check((await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n === budget,
+          `All four ${name} purpose controls and the entire control row are restored exactly without a model-budget change.`);
+        await first.page.clock.setSystemTime(new Date());
+      }
     }
 
     stage = "actual browser sign-out and retained-token denial";
@@ -1828,7 +2077,8 @@ async function main() {
         );
       }
     } finally {
-      await db.end();
+      try { await fixtureApproval?.restore(); }
+      finally { await db.end(); }
     }
   }
   const result = {
@@ -1842,6 +2092,7 @@ async function main() {
     snapAccessibility,
     wicAccessibility,
     pecoAccessibility,
+    utilityAccessibility,
     limitations: [
       "Loopback HTTP cannot establish hosted Secure-cookie, domain, SMTP or redirect-allowlist behavior.",
       "Hosted shared-account migration, recovery/session coexistence and scheduled retention erasure require separate checks; the password case uses a synthetic school role only on the isolated parent service.",
@@ -1850,6 +2101,7 @@ async function main() {
       "The full SNAP form check establishes owned nonprotected intake, atomic start, revision correction and export, not protected identifiers/signatures, worker preparation or a genuine provider submission.",
       "The WIC form check establishes isolated private intake, correction and owned history, not provider submission, a booked appointment, enrollment or specialist assessment.",
       "The PECO form check establishes isolated private preparation, correction, account binding and owned history, not a trusted renderer/income adapter, provider submission, CAP enrollment, a payment change or shutoff protection.",
+      "PGW and water form checks establish owned private preparation, real interrupted-save reconciliation and immutable corrections/exports. They do not establish protected identifier insertion, validated proof assembly, signatures, financial assent, agency submission, enrollment or shutoff protection; water still uses a public sample reference, not an account-issued form.",
       "No external application or model provider was called.",
     ],
   };

@@ -11,6 +11,8 @@ const id = (number: number) =>
   `00000000-0000-4000-8000-${String(number).padStart(12, "0")}`;
 type Row = Record<string, unknown>;
 let tables: Record<string, Row[]>;
+let protectedReferences: unknown[];
+let profileReply: unknown;
 let pending = 0,
   maxPending = 0;
 const calls: {
@@ -20,6 +22,10 @@ const calls: {
 }[] = [];
 function client() {
   return {
+    rpc: async (name: string) => {
+      if (name === "parent_get_family_profile") return { data: profileReply, error: null };
+      if (name !== "parent_export_utility_protected_inputs") throw new Error("unexpected RPC"); return { data: protectedReferences, error: null };
+    },
     from(table: string) {
       const conditions: ((row: Row) => boolean)[] = [];
       const orders: { key: string; ascending: boolean }[] = [];
@@ -85,6 +91,9 @@ function client() {
   };
 }
 beforeEach(() => {
+  protectedReferences = [];
+  profileReply = { ownerId: id(2), revision: 0, lastMutationKey: null, profile: null,
+    collection: { collectionEnabled: false, noticeVersion: null, expiresAt: null, retentionDays: 45 } };
   pending = 0;
   maxPending = 0;
   calls.length = 0;
@@ -105,6 +114,19 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ user: { id: id(2) }, supabase: client() });
 });
 describe("complete parent data pagination", () => {
+  it("exports the current owned profile and original dates, rejecting foreign or malformed records", async () => {
+    const confirmedAt = new Date(Date.now() - 1000).toISOString(), expiresAt = new Date(Date.now() + 60000).toISOString();
+    const profile = { revision: 1, idempotencyKey: id(3), details: { primaryPerson: { id: id(4), firstName: "Saved family name" } },
+      provenance: { "primaryPerson.firstName": { confirmedAt, expiresAt } } };
+    const base = { ownerId: id(2), revision: 1, lastMutationKey: id(3), profile,
+      collection: { collectionEnabled: false, noticeVersion: null, expiresAt: null, retentionDays: 45 } };
+    profileReply = base;
+    expect((await exportParentInformation()).familyProfile).toEqual(profile);
+    for (const invalid of [{ ...base, ownerId: id(5) }, { ...base, rawIdentifier: "PRIVATE_CANARY" }]) {
+      profileReply = invalid;
+      await expect(exportParentInformation()).rejects.toThrow("CaseLink could not export your family profile.");
+    }
+  });
   it("lists beyond100 requests using stable sequential pages", async () => {
     tables.parent_requests = Array.from({ length: 105 }, (_, index) => ({
       ...fixtureRequest(),
@@ -164,6 +186,9 @@ describe("complete parent data pagination", () => {
       provenance: { accountNumber: { source: "parent", confirmedAt: "2026-11-13T20:06:00Z", asOf: "2026-11-13" } },
       consent_evidence: { revision: index + 1, accountAuthorityDeclared: true, subjectAuthorityDeclared: true },
     }));
+    for (const [table, name] of [["parent_pgw_application_details", "GasExportCanary"], ["parent_water_application_details", "WaterExportCanary"]])
+      tables[table] = Array.from({ length: 106 }, (_, index) => ({ id: id(index + 1), request_id: id(105), revision: index + 1,
+        details: { applicant: { name } }, provenance: { answer: { confirmedAt: "2026-11-13T22:10:00Z" } }, consent_evidence: { subjectAuthorityDeclared: true, accountAuthorityDeclared: true } }));
     const exported = await exportParentInformation();
     expect(exported.requests).toHaveLength(105);
     const last = exported.requests.find((request) => request.id === id(105))!;
@@ -181,6 +206,10 @@ describe("complete parent data pagination", () => {
     expect((last.wicApplicationDetails as Row[]).at(-1)?.provenance).toEqual(tables.parent_wic_application_details.at(-1)?.provenance);
     expect((last.wicApplicationDetails as Row[]).at(-1)?.consent_evidence).toEqual(tables.parent_wic_application_details.at(-1)?.consent_evidence);
     expect((last.snapApplicationDetails as Row[]).at(-1)?.provenance).toEqual(tables.parent_snap_application_details.at(-1)?.provenance);
+    for (const [key, table] of [["pgwApplicationDetails", "parent_pgw_application_details"], ["waterApplicationDetails", "parent_water_application_details"]]) {
+      expect(last[key]).toHaveLength(106); expect((last[key] as Row[]).at(-1)).toEqual(tables[table].at(-1));
+      expect(calls.filter(call => call.table === table)).toHaveLength(2);
+    }
     expect(maxPending).toBeLessThanOrEqual(2); // Only the established household/account pair runs together.
     expect(calls.filter((call) => call.table === "parent_events")).toHaveLength(
       3,
@@ -213,4 +242,22 @@ describe("complete parent data pagination", () => {
     expect(request?.events?.at(-1)?.id).toBe(id(205));
     expect(request).toHaveProperty("events_truncated", true);
   });
+});
+
+it.each([["parent_pgw_application_details", "has_pgw_application_details"], ["parent_water_application_details", "has_water_application_details"]])("returns only the retained purpose marker from %s after mandate changes", async (table, flag) => {
+  tables.parent_requests = [{ ...fixtureRequest(), id: id(1), mandate: { ...fixtureRequest().mandate, recipientIds: ["uesf-utilities"] } }];
+  tables[table] = [{ id: id(2), request_id: id(1), details: { accountNumber: "PrivateAccountCanary", name: "PrivateFamilyCanary" } }];
+  const saved = await getSupportRequest(id(1)); expect(saved).toHaveProperty(flag, true); expect(JSON.stringify(saved)).not.toMatch(/PrivateAccountCanary|PrivateFamilyCanary/);
+  tables[table] = []; expect(await getSupportRequest(id(1))).toHaveProperty(flag, false);
+});
+
+it("exports only owned opaque protected references, rejecting raw or cross-owner responses without echoing them", async () => {
+  tables.parent_requests = [{ ...fixtureRequest(), id: id(1) }];
+  const reference = { inputId: id(3), authorizationId: id(4), ownerId: id(2), requestId: id(1), requestVersion: 2, programId: "pgw-crp", snapshotId: id(5), snapshotRevision: 1, snapshotHash: "a".repeat(64),
+    purpose: "income_proof", targets: [{ subjectId: id(6), sourceId: id(7), field: "income" }], state: "stored", consentedAt: "2026-11-13T22:20:00Z", expiresAt: "2026-11-13T22:25:00Z", accountReference: null, validation: null };
+  protectedReferences = [reference];
+  expect((await exportParentInformation()).requests[0].utilityProtectedInputs).toEqual([reference]);
+  for (const invalid of [{ ...reference, raw: "PrivateInputCanary" }, { ...reference, ownerId: id(99) }, { ...reference, requestId: id(99) }]) {
+    protectedReferences = [invalid]; await expect(exportParentInformation()).rejects.toThrow("CaseLink could not export protected document references. Please try again.");
+  }
 });

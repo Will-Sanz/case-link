@@ -8,6 +8,7 @@ import styles from "./parent.module.css";
 const supportLinks = [
   { href: "/get-support", label: "Get support" },
   { href: "/my-support", label: "My support" },
+  { href: "/family-profile", label: "Family information" },
   { href: "/support/help", label: "Help" },
 ];
 

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { canCollectPecoApplication, type ParentAuthorizationWindow } from "./api";
+import { canCollectPecoApplication, canCollectPgwApplication, canCollectWaterApplication, type ParentAuthorizationWindow } from "./api";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_APPLICATION_SOURCE } from "@/lib/parent/peco-application-fields";
+import { PGW_APPLICATION_NOTICE_VERSION, PGW_APPLICATION_SOURCE } from "@/lib/parent/pgw-application-fields";
+import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE } from "@/lib/parent/water-application-fields";
 import { WIC_APPLICATION_NOTICE_VERSION } from "@/lib/parent/constants";
 
 const current = () => ({ authorization: {
@@ -28,4 +30,19 @@ describe("PECO private form availability", () => {
       expect(canCollectPecoApplication(current())).toBe(false);
     }
   });
+});
+
+it.each([
+  { key: "pgwApplication", canCollect: canCollectPgwApplication, notice: PGW_APPLICATION_NOTICE_VERSION, source: PGW_APPLICATION_SOURCE },
+  { key: "waterApplication", canCollect: canCollectWaterApplication, notice: WATER_APPLICATION_NOTICE_VERSION, source: WATER_APPLICATION_REFERENCE },
+] as const)("opens $key only under its own current notice and dated source", option => {
+  const collection = { collectionEnabled: true, noticeVersion: option.notice, expiresAt: option.source.verifiedUntil };
+  const input = { authorization: { issuedAt: option.source.sourceCheckedAt, expiresAt: option.source.verifiedUntil, [option.key]: collection } };
+  vi.setSystemTime(new Date(Date.parse(option.source.sourceCheckedAt) + 1)); expect(option.canCollect(input)).toBe(true);
+  expect(option.canCollect(current())).toBe(false);
+  for (const changed of [{ ...collection, noticeVersion: PECO_APPLICATION_NOTICE_VERSION }, { ...collection, collectionEnabled: false }, { ...collection, expiresAt: new Date(Date.now()).toISOString() }])
+    expect(option.canCollect({ authorization: { ...input.authorization, [option.key]: changed } })).toBe(false);
+  for (const at of [Date.parse(option.source.sourceCheckedAt) - 1, Date.parse(option.source.verifiedUntil)]) {
+    vi.setSystemTime(new Date(at)); expect(option.canCollect(input)).toBe(false);
+  }
 });

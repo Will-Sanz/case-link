@@ -382,7 +382,7 @@ function nextAgencyMidnight(now: Date) {
   return high;
 }
 
-async function inspectStaticProof(bytes: Uint8Array) {
+export async function inspectStaticProof(bytes: Uint8Array) {
   if (!bytes.length || bytes.length > MAX_DOCUMENT_BYTES) throw new Error();
   const proof = await PDFDocument.load(bytes, { updateMetadata: false, throwOnInvalidObject: true });
   await inspectDocument(bytes, "application/pdf");

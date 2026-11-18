@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { z } from "zod";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -22,11 +22,15 @@ import type {
   SupportAction,
 } from "@/lib/parent/domain";
 import { getProgramsForNeeds, SNAP_NEW_APPLICATION_URL, supportsInitialServiceDelivery } from "@/lib/parent/programs";
-import { boundedParentApi, canCollectSnapApplication, canCollectWicApplication, canCollectPecoApplication, ParentApiError, type ParentAuthorizationWindow } from "./api";
+import { boundedParentApi, canCollectSnapApplication, canCollectWicApplication, canCollectPecoApplication, canCollectPgwApplication, canCollectWaterApplication, ParentApiError, type ParentAuthorizationWindow } from "./api";
 import { SNAP_APPLICATION_NOTICE_VERSION, WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "@/lib/parent/constants";
 import { wicApplicationFieldsValueSchema, type WicApplicationFields } from "@/lib/parent/wic-application-fields";
 import { PECO_APPLICATION_NOTICE_VERSION, PECO_ACCOUNT_AUTHORITY_STATEMENT, PECO_SUBJECT_AUTHORITY_STATEMENT, pecoApplicationFieldsValueSchema, type PecoApplicationFields } from "@/lib/parent/peco-application-fields";
+import { PGW_APPLICATION_NOTICE_VERSION, PGW_ACCOUNT_AUTHORITY_STATEMENT, PGW_SUBJECT_AUTHORITY_STATEMENT, pgwApplicationFieldsValueSchema, type PgwApplicationFields } from "@/lib/parent/pgw-application-fields";
+import { WATER_APPLICATION_NOTICE_VERSION, WATER_ACCOUNT_AUTHORITY_STATEMENT, WATER_SUBJECT_AUTHORITY_STATEMENT, waterApplicationFieldsValueSchema, type WaterApplicationFields } from "@/lib/parent/water-application-fields";
 import { assessSnapApplicationFields, snapApplicationFieldsSchema, type SnapApplicationFields } from "@/lib/parent/snap-application-fields";
+import { familyProfileReadSchema, type FamilyProfileSnapshot, type FamilyProfileSource } from "@/lib/parent/family-profile";
+import { projectFamilyProfileApplication, matchingFamilyProfileFields, mergeFamilyProfileApplicationProjection, familyProfileApplicationValue, replaceFamilyProfileApplicationValue, sameFamilyProfileApplicationValue, type FamilyProfileApplicationDetails, type FamilyProfileApplicationProgram, type FamilyProfileApplicationOptions } from "@/lib/parent/family-profile-application";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { UrgentHelp } from "./landing";
@@ -35,6 +39,8 @@ import { SnapApplicationFormFields } from "./snap-application-form";
 import { SnapApplicationNotice } from "./snap-application-review";
 import { WicApplicationNotice, WicApplicationFormFields } from "./wic-application-form";
 import { PecoApplicationNotice, PecoApplicationFormFields, PECO_HELP_URL } from "./peco-application-form";
+import { PgwApplicationNotice, PgwApplicationFormFields, PGW_HELP_URL } from "./pgw-application-form";
+import { WaterApplicationNotice, WaterApplicationFormFields, WATER_HELP_URL } from "./water-application-form";
 import { usePermissionWindow } from "./use-permission-window";
 import styles from "./parent.module.css";
 
@@ -53,6 +59,28 @@ const utilityProviderChoices = [
   { id: "pwd", need: "water", label: "Philadelphia Water" }, { id: "other", need: null, label: "Another provider" },
   { id: "unknown", need: null, label: "Not sure" },
 ] as const;
+const utilityPreparationChoices = {
+  peco: {
+    need: "electricity", provider: "peco", programId: "peco-cap", label: "PECO CAP", short: "PECO", purpose: "private CAP preparation",
+    optIn: "Prepare PECO CAP help for this electricity account", kind: "peco_application", noticeVersion: PECO_APPLICATION_NOTICE_VERSION,
+    schema: pecoApplicationFieldsValueSchema, canCollect: canCollectPecoApplication, helpUrl: PECO_HELP_URL,
+    subjectStatement: PECO_SUBJECT_AUTHORITY_STATEMENT, accountStatement: PECO_ACCOUNT_AUTHORITY_STATEMENT,
+  },
+  pgw: {
+    need: "gas", provider: "pgw", programId: "pgw-crp", label: "PGW CRP", short: "PGW", purpose: "private CRP preparation",
+    optIn: "Prepare PGW CRP help for this gas account", kind: "pgw_application", noticeVersion: PGW_APPLICATION_NOTICE_VERSION,
+    schema: pgwApplicationFieldsValueSchema, canCollect: canCollectPgwApplication, helpUrl: PGW_HELP_URL,
+    subjectStatement: PGW_SUBJECT_AUTHORITY_STATEMENT, accountStatement: PGW_ACCOUNT_AUTHORITY_STATEMENT,
+  },
+  water: {
+    need: "water", provider: "pwd", programId: "pwd-tap", label: "Philadelphia water assistance", short: "water", purpose: "private water assistance preparation",
+    optIn: "Prepare Philadelphia water assistance for this water account", kind: "water_application", noticeVersion: WATER_APPLICATION_NOTICE_VERSION,
+    schema: waterApplicationFieldsValueSchema, canCollect: canCollectWaterApplication, helpUrl: WATER_HELP_URL,
+    subjectStatement: WATER_SUBJECT_AUTHORITY_STATEMENT, accountStatement: WATER_ACCOUNT_AUTHORITY_STATEMENT,
+  },
+} as const;
+type UtilityPreparation = keyof typeof utilityPreparationChoices;
+type UtilityDetails = PecoApplicationFields | PgwApplicationFields | WaterApplicationFields;
 const incomeNeeds: SupportNeed[] = ["snap_new", "snap_renewal", "snap_pending", "snap_problem", ...utilityNeeds];
 export const initialIntake: SupportIntake = {
   needs: [],
@@ -70,7 +98,7 @@ export const initialIntake: SupportIntake = {
   contactPreference: "in_app",
   adultConfirmed: true,
 };
-const authorizationReply=z.object({authorization:z.object({issuedAt:z.iso.datetime({offset:true}),expiresAt:z.iso.datetime({offset:true}),snapApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable()}).optional(),wicApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional(),pecoApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional()})});
+const authorizationReply=z.object({authorization:z.object({issuedAt:z.iso.datetime({offset:true}),expiresAt:z.iso.datetime({offset:true}),snapApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable()}).optional(),wicApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional(),pecoApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional(),pgwApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional(),waterApplication:z.object({collectionEnabled:z.boolean(),noticeVersion:z.string().nullable(),expiresAt:z.string().nullable()}).optional()})});
 
 async function readAuthorizationWindow(signal: AbortSignal) {
   const result = authorizationReply.parse(await boundedParentApi("/authorization-window", {}, signal, new Date(Date.now() + 30_000).toISOString()));
@@ -84,7 +112,8 @@ export function buildMandate(
   mode: ServiceMandate["mode"],
   bookingPreference: ServiceMandate["bookingPreference"],
   expiresAt: string,
-  privatePecoPreparation = false,
+  privateUtilityPreparation = false,
+  includeProtectedDocuments = false,
 ): ServiceMandate {
   return {
     version: 1,
@@ -96,13 +125,14 @@ export function buildMandate(
         : ["research", "prepare", "share", "submit", "schedule", "follow_up"],
     allowedData: [
       "household",
-      ...(privatePecoPreparation || intake.needs.every(need => need === "wic_new" || need === "wic_continuing") ? [] : ["documents" as const]),
+      ...(privateUtilityPreparation || intake.needs.every(need => need === "wic_new" || need === "wic_continuing") ? [] : ["documents" as const]),
       ...(intake.needs.some((need) => incomeNeeds.includes(need))
         ? ["income" as const]
         : []),
       ...(intake.needs.some((n) => utilityNeeds.includes(n))
         ? ["utility" as const]
         : []),
+      ...(privateUtilityPreparation && includeProtectedDocuments ? ["documents" as const] : []),
     ],
     expiresAt,
     maxAttempts: 12,
@@ -122,7 +152,7 @@ export function ParentIntake({ initialNeed }: { initialNeed?: string }) {
 
 function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const session = useParentResource<{
-    account: { email: string; preferences?: ParentPreferences };
+    account: { id?: string; email: string; preferences?: ParentPreferences };
   }>("/account");
   const preferencesApplied = useRef(false);
   const connections = useParentResource<{
@@ -133,6 +163,21 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     }[];
   }>("/capabilities");
   const authorization = useParentResource<ParentAuthorizationWindow>("/authorization-window");
+  const [familyProfile, setFamilyProfile] = useState<FamilyProfileSnapshot | null>(null);
+  const familyOwner = useRef<string | null>(null);
+  const [familyAccess, setFamilyAccess] = useState<"ready" | "checking" | "changed" | "unavailable">("ready");
+  const familyOwnerCheck = useRef<{ controller: AbortController; promise: Promise<void> } | null>(null);
+  const familyProfileRequested = useRef(false), familyProfileWork = useRef<AbortController | null>(null);
+  const languageChosen = useRef(false);
+  useEffect(() => () => { familyProfileWork.current?.abort(); familyOwnerCheck.current?.controller.abort(); }, []);
+  const familyApplied = useRef(new Set<FamilyProfileApplicationProgram>());
+  const familyTarget = useRef<{ program: FamilyProfileApplicationProgram; accountAuthority: SupportIntake["accountAuthority"] } | null>(null);
+  const [familyFilled, setFamilyFilled] = useState<Partial<Record<FamilyProfileApplicationProgram, boolean>>>({});
+  const familyDraftChanged = useRef({ snap: false, wic: false, utility: false });
+  const familySources = useRef<Partial<Record<FamilyProfileApplicationProgram, { projection: ReturnType<typeof projectFamilyProfileApplication>; options: Omit<FamilyProfileApplicationOptions, "now" | "accountAuthority" | "wicBeneficiaries"> }>>>({});
+  const [familyAccountPerson, setFamilyAccountPerson] = useState("");
+  const [familyHomeAddress, setFamilyHomeAddress] = useState(false);
+  const [familyPecoPhone, setFamilyPecoPhone] = useState<"home" | "cell" | "">("");
   const zipDefaultConsumed = useRef(false);
   const [reusedZip, setReusedZip] = useState<z.infer<typeof reusableZipSchema> | null>(null);
   const [intake, setIntake] = useState<SupportIntake>(() => ({
@@ -158,17 +203,17 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const [wicDetails, setWicDetails] = useState<WicApplicationFields>({});
   const [wicDetailsReady, setWicDetailsReady] = useState(false);
   const [wicBlocked, setWicBlocked] = useState(false);
-  const [pecoPreparation, setPecoPreparation] = useState(false);
-  const [pecoDetails, setPecoDetails] = useState<PecoApplicationFields>({});
-  const [pecoDetailsReady, setPecoDetailsReady] = useState(false);
-  const [pecoBlocked, setPecoBlocked] = useState(false);
+  const [utilityPreparation, setUtilityPreparation] = useState<UtilityPreparation | null>(null);
+  const [utilityDetails, setUtilityDetails] = useState<UtilityDetails>({});
+  const [utilityDetailsReady, setUtilityDetailsReady] = useState(false);
+  const [utilityBlocked, setUtilityBlocked] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application"; details?: SnapApplicationFields | WicApplicationFields | PecoApplicationFields; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
-  const scope=JSON.stringify({intake,snapDetails,detailsReady,wicDetails,wicDetailsReady,pecoPreparation,pecoDetails,pecoDetailsReady,recipientIds,mode,booking,accepted,reusedZip});
+  const scope=JSON.stringify({intake,snapDetails,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip});
   const pending = pendingWork?.scope === scope && !pendingWork.controller.signal.aborted;
   useLayoutEffect(()=>{
     const controller=new AbortController();work.current=controller;
@@ -199,12 +244,102 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   const wicWindowCurrent = usePermissionWindow(Date.parse(authorization.data?.authorization?.wicApplication?.expiresAt ?? ""));
   const fullWic = wicOnly && wicWindowCurrent && canCollectWicApplication(authorization.data) && !authorization.error && !wicBlocked;
   const selectedUtilities = intake.needs.filter(need => utilityNeeds.includes(need));
-  const pecoOnly = intake.needs.length === 1 && intake.needs[0] === "electricity" && intake.utilityProviders.length === 1 && intake.utilityProviders[0] === "peco";
-  const pecoWindowCurrent = usePermissionWindow(Date.parse(authorization.data?.authorization?.pecoApplication?.expiresAt ?? ""));
-  const fullPeco = pecoPreparation && pecoOnly && intake.accountAuthority !== "not_sure" && pecoWindowCurrent && canCollectPecoApplication(authorization.data) && !authorization.error && !pecoBlocked;
+  const utilityChoice = (Object.keys(utilityPreparationChoices) as UtilityPreparation[]).find(key => {
+    const option = utilityPreparationChoices[key];
+    return intake.needs.length === 1 && intake.needs[0] === option.need && intake.utilityProviders.length === 1 && intake.utilityProviders[0] === option.provider;
+  });
+  const utilityConfig = utilityPreparation ? utilityPreparationChoices[utilityPreparation] : null;
+  const utilityWindowKey = utilityPreparation ? `${utilityPreparation}Application` as const : "pecoApplication";
+  const utilityWindow = authorization.data?.authorization?.[utilityWindowKey];
+  const utilityWindowCurrent = usePermissionWindow(Date.parse(utilityWindow?.expiresAt ?? ""));
+  const fullUtility = !!utilityConfig && utilityChoice === utilityPreparation && intake.accountAuthority !== "not_sure" && utilityWindowCurrent && utilityConfig.canCollect(authorization.data) && !authorization.error && !utilityBlocked;
+  const closeChangedFamily = useCallback(() => {
+    work.current?.abort(); running.current?.abort(); familyProfileWork.current?.abort();
+    familyOwner.current = null; familySources.current = {}; familyApplied.current.clear();
+    setFamilyProfile(null); setFamilyFilled({}); setSnapDetails({}); setWicDetails({}); setUtilityDetails({});
+    setReusedZip(null); setIntake(current => ({ ...current, zip: "", householdSize: null, incomeAmount: null, incomeFrequency: "unknown", accountAuthority: "not_sure" }));
+    setAccepted(false); setError(null); setStartUncertain(false); startAttempt.current = null;
+    setFamilyAccess("changed");
+  }, []);
+  const readOwnedFamilyProfile = useCallback(async (signal: AbortSignal, deadline: string, receiptOnly = false) => {
+    const owner = familyOwner.current;
+    if (!owner) throw new Error("Saved family information needs a current owner.");
+    const account = z.object({ account: z.object({ id: z.uuid() }) }).parse(await boundedParentApi("/account", {}, signal, deadline));
+    if (account.account.id.toLowerCase() !== owner) { closeChangedFamily(); throw new Error("family_owner_changed"); }
+    if (receiptOnly) { signal.throwIfAborted(); return null; }
+    const value = await boundedParentApi("/family-profile", {}, signal, deadline);
+    const read = value && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {}; delete read.ok;
+    const current = familyProfileReadSchema.parse(read);
+    if (current.ownerId !== owner) { closeChangedFamily(); throw new Error("family_owner_changed"); }
+    signal.throwIfAborted(); return current;
+  }, [closeChangedFamily]);
+  const ensureFamilyOwner = useCallback(async () => {
+    const owner = familyOwner.current;
+    if (!owner) return;
+    if (familyOwnerCheck.current) return familyOwnerCheck.current.promise;
+    const controller = new AbortController(); setFamilyAccess("checking");
+    const promise = (async () => {
+      try {
+        const deadline = new Date(Date.now() + 30_000).toISOString();
+        const current = await readOwnedFamilyProfile(controller.signal, deadline, startUncertain && !!startAttempt.current);
+        if (current && (!current.profile || !current.collection.collectionEnabled || Date.parse(current.collection.expiresAt ?? "") <= Date.now())) throw new Error("family_access_unavailable");
+        controller.signal.throwIfAborted(); setFamilyAccess("ready");
+      } catch (failure) {
+        if (familyOwner.current && !controller.signal.aborted) {
+          if (failure instanceof ParentApiError && [401, 403].includes(failure.status)) closeChangedFamily();
+          else setFamilyAccess("unavailable");
+        }
+        throw new Error("Saved family information needs a fresh sign-in check before this request can continue.");
+      } finally { if (familyOwnerCheck.current?.controller === controller) familyOwnerCheck.current = null; }
+    })();
+    familyOwnerCheck.current = { controller, promise }; return promise;
+  }, [closeChangedFamily, readOwnedFamilyProfile, startUncertain]);
+  useEffect(() => {
+    const check = () => { if (familyOwner.current) void ensureFamilyOwner().catch(() => {}); };
+    const returned = (event: PageTransitionEvent) => { if (event.persisted) check(); };
+    window.addEventListener("focus", check); window.addEventListener("pageshow", returned); window.addEventListener("online", check);
+    return () => { window.removeEventListener("focus", check); window.removeEventListener("pageshow", returned); window.removeEventListener("online", check); };
+  }, [ensureFamilyOwner]);
+  const seedFamilyProfile = useCallback((profile: FamilyProfileSnapshot, program: FamilyProfileApplicationProgram, accountAuthority: SupportIntake["accountAuthority"]) => {
+    const changed = program === "snap-pa" ? familyDraftChanged.current.snap : program === "wic-pa" ? familyDraftChanged.current.wic : familyDraftChanged.current.utility;
+    if (changed || familyApplied.current.has(program) || !["snap-pa", "wic-pa"].includes(program) && accountAuthority === "not_sure") return;
+    const projection = projectFamilyProfileApplication(profile, program, { now: new Date(), accountAuthority });
+    familyApplied.current.add(program); familySources.current[program] = { projection, options: {} };
+    setFamilyFilled(current => ({ ...current, [program]: projection.fields.length > 0 }));
+    if (!projection.fields.length) return;
+    if (program === "snap-pa") {
+      const details = projection.details as SnapApplicationFields; setSnapDetails(details);
+      if (details.language) languageChosen.current = true;
+      setIntake(current => ({ ...current, ...(details.zip && !current.zip ? { zip: details.zip } : {}),
+        ...(details.language === "en" || details.language === "es" ? { language: details.language } : {}) }));
+    } else if (program === "wic-pa") setWicDetails(projection.details as WicApplicationFields);
+    else setUtilityDetails(projection.details as UtilityDetails);
+  }, []);
+  useEffect(() => {
+    const expectedOwner = z.uuid().safeParse(session.data?.account.id);
+    if ((!fullSnap && !fullWic && !fullUtility) || familyProfileRequested.current || !expectedOwner.success) return;
+    familyProfileRequested.current = true;
+    const controller = new AbortController(); familyProfileWork.current = controller;
+    boundedParentApi("/family-profile", {}, controller.signal, new Date(Date.now() + 30_000).toISOString())
+      .then(value => {
+        if (controller.signal.aborted || !value || typeof value !== "object") return;
+        const read = { ...(value as Record<string, unknown>) }; delete read.ok;
+        const parsed = familyProfileReadSchema.safeParse(read);
+        if (parsed.success && parsed.data.collection.collectionEnabled && Date.parse(parsed.data.collection.expiresAt ?? "") > Date.now()) {
+          if (parsed.data.ownerId !== expectedOwner.data.toLowerCase()) { closeChangedFamily(); return; }
+          familyOwner.current = parsed.data.profile ? parsed.data.ownerId : null;
+          setFamilyProfile(parsed.data.profile);
+          if (parsed.data.profile && familyTarget.current) seedFamilyProfile(parsed.data.profile, familyTarget.current.program, familyTarget.current.accountAuthority);
+        }
+      }).catch(() => { /* Saved family facts are optional; all manual application paths remain available. */ });
+  }, [fullSnap, fullWic, fullUtility, seedFamilyProfile, closeChangedFamily, session.data?.account.id]);
+  useEffect(() => {
+    const program: FamilyProfileApplicationProgram | undefined = fullSnap ? "snap-pa" : fullWic ? "wic-pa" : fullUtility ? utilityConfig?.programId : undefined;
+    familyTarget.current = program && step === 1 ? { program, accountAuthority: intake.accountAuthority } : null;
+  }, [fullSnap, fullWic, fullUtility, utilityConfig, intake.accountAuthority, step]);
   const snapValues={...(intake.zip?{zip:intake.zip}:{}),...snapDetails};
   const programs = getProgramsForNeeds(intake.needs).filter(program=>(!fullSnap||program.id==='snap-pa'||
-    program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need))) && (!fullWic || program.id === "wic-pa") && (!pecoPreparation || program.id === "peco-cap"));
+    program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need))) && (!fullWic || program.id === "wic-pa") && (!utilityPreparation || program.id === utilityConfig?.programId));
   const hasBenefits = intake.needs.some((need) =>
     [
       "snap_new",
@@ -223,7 +358,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
             program.needs.some(need=>intake.needs.includes(need)&&supportsInitialServiceDelivery(need,action))),
         ),
     ) ?? false;
-  const fullAvailable = !pecoPreparation && programs.some(
+  const fullAvailable = !utilityPreparation && programs.some(
     (p) => recipientIds.includes(p.id) && connected(p.id),
   );
   useEffect(() => {
@@ -235,7 +370,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       const preferences = session.data.account.preferences;
       setIntake((current) => ({
         ...current,
-        language: preferences.language,
+        language: languageChosen.current ? current.language : preferences.language,
         contactPreference: preferences.contactPreference,
       }));
     }
@@ -244,10 +379,18 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     key: K,
     value: SupportIntake[K],
   ) {
+    if (key === "language") languageChosen.current = true;
     if (key === "zip") { zipDefaultConsumed.current = true; setReusedZip(null); }
-    if (key === "utilityProviders") { setPecoPreparation(false); setPecoDetails({}); setPecoDetailsReady(false); setAccepted(false); }
-    if (key === "accountAuthority") { setPecoDetailsReady(false); setAccepted(false); }
+    if (key === "utilityProviders") { setUtilityPreparation(null); setUtilityDetails({}); setUtilityDetailsReady(false); setAccepted(false); }
+    if (key === "accountAuthority") { setUtilityDetailsReady(false); setAccepted(false); }
+    if (key === "utilityProviders") {
+      familyDraftChanged.current.utility = false;
+      for (const program of ["peco-cap", "pgw-crp", "pwd-tap"] as const) { familyApplied.current.delete(program); delete familySources.current[program]; }
+      setFamilyAccountPerson(""); setFamilyHomeAddress(false); setFamilyPecoPhone("");
+    }
     setIntake((current) => ({ ...current, [key]: value }));
+    if (key === "accountAuthority" && utilityConfig && familyProfile && utilityConfig.canCollect(authorization.data))
+      seedFamilyProfile(familyProfile, utilityConfig.programId, value as SupportIntake["accountAuthority"]);
     setError(null);
     startAttempt.current = null;
   }
@@ -266,26 +409,91 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     }));
     setError(null);
     if (!needs.includes("snap_new")) { setSnapDetails({}); setDetailsReady(false); }
+    familyDraftChanged.current.wic = false; familyApplied.current.delete("wic-pa"); delete familySources.current["wic-pa"];
+    familyDraftChanged.current.utility = false;
+    for (const program of ["peco-cap", "pgw-crp", "pwd-tap"] as const) { familyApplied.current.delete(program); delete familySources.current[program]; }
+    if (!needs.includes("snap_new")) { familyDraftChanged.current.snap = false; familyApplied.current.delete("snap-pa"); delete familySources.current["snap-pa"]; }
     setWicDetails({}); setWicDetailsReady(false); setAccepted(false);
-    setPecoPreparation(false); setPecoDetails({}); setPecoDetailsReady(false);
+    setUtilityPreparation(null); setUtilityDetails({}); setUtilityDetailsReady(false);
+    if (familyProfile) {
+      if (needs.includes("snap_new") && canCollectSnapApplication(authorization.data)) seedFamilyProfile(familyProfile, "snap-pa", intake.accountAuthority);
+      else if (needs.length === 1 && needs[0] === "wic_new" && canCollectWicApplication(authorization.data)) seedFamilyProfile(familyProfile, "wic-pa", intake.accountAuthority);
+    }
     startAttempt.current = null;
   }
   function changeWicDetails(details: WicApplicationFields) {
+    familyDraftChanged.current.wic = true;
     setWicDetails(details); setWicDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
   }
-  function changePecoDetails(details: PecoApplicationFields) {
-    setPecoDetails(details); setPecoDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
+  function changeUtilityDetails(details: UtilityDetails) {
+    familyDraftChanged.current.utility = true;
+    setUtilityDetails(details); setUtilityDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
   }
-  async function refreshPecoCollection() {
+  function chooseSavedUtility(options: { accountPersonId?: string; useHomeAddress?: boolean; pecoPhoneType?: "home" | "cell" }) {
+    if (!familyProfile || !utilityConfig) return;
+    const savedOptions = { ...familySources.current[utilityConfig.programId]?.options, ...options };
+    const projection = projectFamilyProfileApplication(familyProfile, utilityConfig.programId, { now: new Date(), accountAuthority: intake.accountAuthority, ...savedOptions });
+    const previous = familySources.current[utilityConfig.programId]?.projection;
+    const merged = structuredClone(utilityDetails) as Record<string, unknown>;
+    const holderKey = utilityPreparation === "pgw" ? "customer" : "applicant";
+    const oldHolder = merged[holderKey] as { id?: string } | undefined;
+    if (options.accountPersonId && options.accountPersonId !== oldHolder?.id && previous) {
+      for (const field of previous.fields) {
+        if (!["phone", "email", "mailingAddress", "homePhone", "cellPhone"].includes(field.applicationPath) && !field.applicationPath.endsWith(".relationship")) continue;
+        if (!sameFamilyProfileApplicationValue(familyProfileApplicationValue(merged, field.applicationPath), familyProfileApplicationValue(previous.details, field.applicationPath), field.applicationPath)) continue;
+        const parts = field.applicationPath.split("."), parent = parts.length === 1 ? merged : familyProfileApplicationValue(merged, parts.slice(0, -1).join("."));
+        if (parent && typeof parent === "object") delete (parent as Record<string, unknown>)[parts.at(-1)!];
+      }
+    }
+    const existingPeople = [merged[holderKey], ...((merged.householdMembers ?? []) as unknown[])].filter((person): person is Record<string, unknown> & { id: string } => !!person && typeof person === "object" && "id" in person);
+    const mergePerson = (person: Record<string, unknown> & { id: string }, member: boolean) => {
+      const prior = existingPeople.find(value => value.id === person.id);
+      const allowed = utilityPreparation === "pgw" ? ["firstName", "lastName", "income", ...(member ? ["dateOfBirth", "relationship"] : ["under18"])]
+        : utilityPreparation === "water" ? ["name", "dateOfBirth", "grossMonthlyIncome", "income", ...(member ? ["relationship"] : [])]
+        : ["firstName", "lastName", "middleInitial", "dateOfBirth", "income", ...(member ? ["relationship"] : [])];
+      return { ...person, ...Object.fromEntries(Object.entries(prior ?? {}).filter(([key]) => allowed.includes(key))) };
+    };
+    for (const [key, value] of Object.entries(projection.details)) {
+      if (key === "applicant" || key === "customer") {
+        if (options.accountPersonId !== undefined || merged[key] === undefined) {
+          merged[key] = mergePerson(value as Record<string, unknown> & { id: string }, false);
+        }
+      } else if (key === "householdMembers") {
+        const existing = (merged[key] ?? []) as { id: string }[], people = value as (Record<string, unknown> & { id: string })[];
+        merged[key] = [...people.map(person => mergePerson(person, true)), ...existing.filter(person => person.id !== options.accountPersonId && !people.some(saved => saved.id === person.id))];
+      } else if (key === "address" || key === "propertyAddress") {
+        if (options.useHomeAddress) merged[key] = value;
+      } else if (key === "homePhone" || key === "cellPhone") {
+        if (options.pecoPhoneType) merged[key] = value;
+      } else if (merged[key] === undefined) merged[key] = value;
+    }
+    familySources.current[utilityConfig.programId] = { projection: mergeFamilyProfileApplicationProjection(previous, projection), options: savedOptions };
+    changeUtilityDetails(merged as UtilityDetails);
+  }
+  function chooseSavedWicChild(id: string) {
+    if (!familyProfile) return;
+    const selected = [...new Set([...(wicDetails.children ?? []).filter(child => familyProfile.details.members?.some(person => person.id === child.id)).map(child => child.id), id])], projection = projectFamilyProfileApplication(familyProfile, "wic-pa", { now: new Date(), wicBeneficiaries: wicDetails.beneficiaries, wicChildIds: selected });
+    const children = (projection.details as WicApplicationFields).children ?? [];
+    changeWicDetails({ ...wicDetails, children: [...(wicDetails.children ?? []), ...children.filter(child => child.id === id && !wicDetails.children?.some(current => current.id === id))] });
+    const previous = familySources.current["wic-pa"];
+    familySources.current["wic-pa"] = { projection: mergeFamilyProfileApplicationProjection(previous?.projection, projection), options: { wicChildIds: selected } };
+  }
+  function familySource(program: FamilyProfileApplicationProgram, details: FamilyProfileApplicationDetails): FamilyProfileSource | undefined {
+    const saved = familySources.current[program];
+    if (!familyProfile || !saved || !familyOwner.current) return;
+    const fields = matchingFamilyProfileFields(details, saved.projection);
+    return fields.length ? { expectedOwnerId: familyOwner.current, revision: familyProfile.revision, fields, options: saved.options } : undefined;
+  }
+  async function refreshUtilityCollection() {
     const controller = work.current;
     if (!controller || controller.signal.aborted || running.current === controller) return;
     running.current = controller; setPendingWork({ scope, controller }); setError(null);
     try {
       const latest = await readAuthorizationWindow(controller.signal);
       if (controller.signal.aborted || work.current !== controller) return;
-      setPecoBlocked(!canCollectPecoApplication(latest)); authorization.reload();
+      setUtilityBlocked(!utilityConfig?.canCollect(latest)); authorization.reload();
     } catch (failure) {
-      if (!controller.signal.aborted && work.current === controller) { setPecoBlocked(true); setError(failure instanceof Error ? failure : new Error("PECO preparation access could not be checked. Your draft remains on this page.")); }
+      if (!controller.signal.aborted && work.current === controller) { setUtilityBlocked(true); setError(failure instanceof Error ? failure : new Error(`${utilityConfig?.short ?? "Utility"} preparation access could not be checked. Your draft remains on this page.`)); }
     } finally { if (running.current === controller) running.current = null; if (!controller.signal.aborted && work.current === controller) setPendingWork(null); }
   }
   async function refreshWicCollection() {
@@ -301,6 +509,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     } finally { if (running.current === controller) running.current = null; if (!controller.signal.aborted && work.current === controller) setPendingWork(null); }
   }
   function changeSnapDetails(details: SnapApplicationFields) {
+    familyDraftChanged.current.snap = true; languageChosen.current = true;
     zipDefaultConsumed.current = true; setReusedZip(null);
     setSnapDetails(details);setDetailsReady(false);setAccepted(false);setError(null);startAttempt.current=null;
     setIntake(current=>({...current,zip:details.zip??"",householdSize:details.household?.length??null,
@@ -336,7 +545,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if(pending)return;
+    if(pending || familyAccess !== "ready")return;
     setError(null);
     if (step === 0) {
       if (!intake.needs.length) {
@@ -351,12 +560,12 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       return;
     }
     if (step === 1) {
-      if ((snapSelected || wicOnly || pecoPreparation) && authorization.loading) return;
-      if (pecoPreparation && !fullPeco) {
-        setError(new Error("Private PECO CAP preparation is unavailable or account authority is unresolved. Your draft remains on this page; check access and account authority or use official PECO help.")); return;
+      if ((snapSelected || wicOnly || utilityPreparation) && authorization.loading) return;
+      if (utilityPreparation && !fullUtility) {
+        setError(new Error(`Private ${utilityConfig?.label ?? "utility"} preparation is unavailable or account authority is unresolved. Your draft remains on this page; check access and account authority or use official ${utilityConfig?.short ?? "utility"} help.`)); return;
       }
-      if (fullPeco && !pecoApplicationFieldsValueSchema.safeParse(pecoDetails).success) {
-        setError(new Error("Check the PECO account, names, dates, service address, phone numbers and income source lists. Unknown answers can stay blank.")); return;
+      if (fullUtility && !utilityConfig?.schema.safeParse(utilityDetails).success) {
+        setError(new Error(`Check the ${utilityConfig?.short ?? "utility"} account, names, dates, addresses, contact details, applicable financial answers and income source lists. Unknown answers can stay blank.`)); return;
       }
       if (wicOnly && Object.keys(wicDetails).length && !fullWic) {
         setError(new Error("Private WIC collection is unavailable. Your answers remain on this page; check access again or use official WIC help.")); return;
@@ -388,7 +597,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       setRecipientIds(programs.map((p) => p.id));
       setDetailsReady(fullSnap);
       setWicDetailsReady(fullWic);
-      setPecoDetailsReady(fullPeco);
+      setUtilityDetailsReady(fullUtility);
       setStep(2);
       return;
     }
@@ -408,17 +617,21 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
     if (fullWic && !wicDetailsReady && !startAttempt.current) {
       setStep(1); setAccepted(false); setError(new Error("Private WIC preparation is now available. Read its notice and provide any known answers before authorizing this request.")); return;
     }
-    if (pecoPreparation && !pecoDetailsReady && !startAttempt.current) {
-      setStep(1); setAccepted(false); setError(new Error("Read the PECO notice and provide known preparation answers before authorizing this request.")); return;
+    if (utilityPreparation && !utilityDetailsReady && !startAttempt.current) {
+      setStep(1); setAccepted(false); setError(new Error(`Read the ${utilityConfig?.short ?? "utility"} notice and provide known preparation answers before authorizing this request.`)); return;
     }
     const controller=work.current;
     if(!controller||controller.signal.aborted||running.current===controller)return;
     running.current=controller;setPendingWork({ scope, controller });
     let creationAttempted = false;
     let refreshedZip: z.infer<typeof reusableZipSchema> | null = null;
+    let refreshedFood: { program: "snap-pa" | "wic-pa"; profile: FamilyProfileSnapshot; details: SnapApplicationFields | WicApplicationFields;
+      projection: ReturnType<typeof projectFamilyProfileApplication>; intake: SupportIntake } | null = null;
     try {
+      await ensureFamilyOwner();
+      if (controller.signal.aborted || work.current !== controller) return;
       const retryingWic = startAttempt.current?.packet.kind === "wic_application";
-      const retryingPeco = startAttempt.current?.packet.kind === "peco_application";
+      const retryingUtility = ["peco_application", "pgw_application", "water_application"].includes(startAttempt.current?.packet.kind ?? "");
       if (!startAttempt.current) {
         const window = await readAuthorizationWindow(controller.signal);
         if(controller.signal.aborted||work.current!==controller)return;
@@ -440,16 +653,17 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           setWicBlocked(true); authorization.reload();
           throw new Error("Private WIC collection is unavailable. Your answers remain on this page; nothing new has been saved.");
         }
-        if (pecoDetailsReady && (!fullPeco || !canCollectPecoApplication(window))) {
-          setPecoBlocked(true); authorization.reload();
-          throw new Error("Private PECO CAP collection is unavailable. Your answers remain on this page; nothing new has been saved.");
+        if (utilityDetailsReady && (!fullUtility || !utilityConfig?.canCollect(window))) {
+          setUtilityBlocked(true); authorization.reload();
+          throw new Error(`Private ${utilityConfig?.label ?? "utility"} collection is unavailable. Your answers remain on this page; nothing new has been saved.`);
         }
-        const peco = pecoDetailsReady ? pecoApplicationFieldsValueSchema.parse(pecoDetails) : undefined;
-        if (peco && (recipientIds.length !== 1 || recipientIds[0] !== "peco-cap")) throw new Error("Private PECO CAP answers can be saved only for the named PECO program.");
+        const utility = utilityDetailsReady && utilityConfig ? utilityConfig.schema.parse(utilityDetails) : undefined;
+        if (utility && (recipientIds.length !== 1 || recipientIds[0] !== utilityConfig?.programId)) throw new Error("Private utility answers can be saved only for their exact named program.");
         const wic = wicDetailsReady ? wicApplicationFieldsValueSchema.parse(wicDetails) : undefined;
         if (wic && !recipientIds.includes("wic-pa")) throw new Error("Private WIC answers can be saved only for the named Pennsylvania WIC program.");
         const details=detailsReady?validatedSnapDetails():undefined;
         if (details && !recipientIds.includes("snap-pa")) throw new Error("SNAP application answers can be saved only for the named Pennsylvania SNAP program. Choose that program or return to change your support needs.");
+        const profileSource = details ? familySource("snap-pa", details) : wic ? familySource("wic-pa", wic) : utility && utilityConfig ? familySource(utilityConfig.programId, utility) : undefined;
         startAttempt.current = {
           key: crypto.randomUUID(),
           packet: {
@@ -460,11 +674,13 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
               fullAvailable ? mode : "prepare_only",
               booking,
               window.authorization.expiresAt,
-              !!peco,
+              !!utility,
+              !!utility,
             ),
             ...(details?{kind:"snap_application" as const,details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION}:{}),
             ...(wic ? { kind: "wic_application" as const, details: wic, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true as const } : {}),
-            ...(peco ? { kind: "peco_application" as const, details: peco, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true as const, accountAuthorityDeclared: true as const } : {}),
+            ...(utility && utilityConfig ? { kind: utilityConfig.kind, details: utility, noticeVersion: utilityConfig.noticeVersion, subjectAuthorityDeclared: true as const, accountAuthorityDeclared: true as const } : {}),
+            ...(profileSource ? { familyProfileSource: profileSource } : {}),
             ...(!details && reusedZip ? { reusedZip: { sourceRequestId: reusedZip.sourceRequestId, sourceVersion: reusedZip.sourceVersion } } : {}),
           },
         };
@@ -477,12 +693,12 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           throw new Error("Private WIC access is unavailable. Your exact saved attempt and draft are kept; check access again before retrying it.");
         }
       }
-      if (retryingPeco) {
+      if (retryingUtility) {
         const currentWindow = await readAuthorizationWindow(controller.signal);
         if (controller.signal.aborted || work.current !== controller) return;
-        if (!canCollectPecoApplication(currentWindow)) {
-          setPecoBlocked(true); authorization.reload();
-          throw new Error("Private PECO access is unavailable. Your exact saved attempt and draft are kept; check access again before retrying it.");
+        if (!utilityConfig?.canCollect(currentWindow)) {
+          setUtilityBlocked(true); authorization.reload();
+          throw new Error(`Private ${utilityConfig?.short ?? "utility"} access is unavailable. Your exact saved attempt and draft are kept; check access again before retrying it.`);
         }
       }
       let response: unknown;
@@ -496,7 +712,47 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
           }, controller.signal, startAttempt.current.packet.mandate.expiresAt);
           break;
         } catch (failure) {
-          if (!(failure instanceof ParentApiError) || failure.status !== 412 || !startAttempt.current.packet.reusedZip) throw failure;
+          if (!(failure instanceof ParentApiError) || failure.status !== 412 || startUncertain) throw failure;
+          const packet = startAttempt.current.packet;
+          const profileChanged = failure.message === "Your saved family answers changed or expired before this save. Check the current family profile before trying again.";
+          const program = packet.kind === "snap_application" ? "snap-pa" : packet.kind === "wic_application" ? "wic-pa" : undefined;
+          const previous = program && familySources.current[program];
+          if (profileChanged && program && previous && packet.familyProfileSource && packet.details) {
+            creationAttempted = false;
+            if (attempt === 1) throw new ParentApiError("Your saved family information is still changing. Your answers are kept; try starting again shortly.", 412);
+            const current = await readOwnedFamilyProfile(controller.signal, packet.mandate.expiresAt);
+            if (!current?.profile || !current.collection.collectionEnabled || Date.parse(current.collection.expiresAt ?? "") <= Date.now()) {
+              setFamilyAccess("unavailable"); throw new ParentApiError("Your saved family information is unavailable. Your draft is kept while access is checked.", 412);
+            }
+            const next = projectFamilyProfileApplication(current.profile, program, { now: new Date(), ...previous.options,
+              ...(program === "wic-pa" ? { wicBeneficiaries: (packet.details as WicApplicationFields).beneficiaries } : {}) });
+            const details = structuredClone(packet.details) as SnapApplicationFields | WicApplicationFields;
+            const fields: typeof next.fields = [], removed: string[] = [];
+            for (const old of matchingFamilyProfileFields(details, previous.projection)) {
+              const fresh = next.fields.find(field => field.applicationPath === old.applicationPath);
+              replaceFamilyProfileApplicationValue(details, old.applicationPath, fresh ? familyProfileApplicationValue(next.details, fresh.applicationPath) : undefined);
+              if (fresh) fields.push(fresh); else removed.push(old.applicationPath);
+            }
+            const projection = { details: next.details, fields };
+            const nextIntake = { ...packet.intake };
+            if (program === "snap-pa") {
+              if (previous.projection.fields.some(field => field.applicationPath === "zip") && packet.intake.zip === (packet.details as SnapApplicationFields).zip)
+                nextIntake.zip = (details as SnapApplicationFields).zip ?? "";
+              if (previous.projection.fields.some(field => field.applicationPath === "language") && packet.intake.language === (packet.details as SnapApplicationFields).language)
+                nextIntake.language = ["en", "es"].includes((details as SnapApplicationFields).language ?? "") ? (details as SnapApplicationFields).language as "en" | "es" : initialIntake.language;
+            }
+            refreshedFood = { program, profile: current.profile, details, projection, intake: nextIntake };
+            startAttempt.current.packet = { ...packet, intake: nextIntake, details };
+            if (fields.length) startAttempt.current.packet.familyProfileSource = { expectedOwnerId: current.ownerId, revision: current.profile.revision, fields, options: previous.options };
+            else delete startAttempt.current.packet.familyProfileSource;
+            if (program === "snap-pa" && (!intakeSchema.safeParse(nextIntake).success || !assessSnapApplicationFields(details as SnapApplicationFields, new Date()).nonProtectedDataReadyForReview)) {
+              const field = removed[0]?.split(".").at(-1), label = field === "dateOfBirth" ? "date of birth" : field === "zip" ? "household ZIP code" : field === "firstName" || field === "lastName" ? "name" : "application answer";
+              startAttempt.current = null; setStartUncertain(false); setDetailsReady(false); setStep(1);
+              throw new ParentApiError(`A current ${label} is needed. Your other application answers are kept.`, 412);
+            }
+            continue;
+          }
+          if (failure.message !== "Saved routing information changed before this request was created." || !packet.reusedZip) throw failure;
           creationAttempted = false;
           // This specific response proves no request was created; refresh once within the same mandate/key.
           const latest = z.object({ zip: reusableZipSchema.nullable() }).parse(await boundedParentApi("/intake-defaults", {}, controller.signal, startAttempt.current.packet.mandate.expiresAt));
@@ -524,16 +780,22 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       if(controller.signal.aborted||work.current!==controller)return;
       const status=err instanceof ParentApiError?err.status:0;
       setStartUncertain(!!startAttempt.current && (startUncertain || creationAttempted &&
-        (status<400||status>=500||status===409 || (wicOnly || pecoPreparation) && (status===401||status===403))));
+        (status<400||status>=500||status===409 || (wicOnly || !!utilityPreparation) && (status===401||status===403))));
       if(snapSelected && (status===401||status===403)){setCollectionBlocked(true);authorization.reload();}
       if(wicOnly && (status===401||status===403)){setWicBlocked(true);authorization.reload();}
-      if(pecoPreparation && (status===401||status===403)){setPecoBlocked(true);authorization.reload();}
+      if(utilityPreparation && (status===401||status===403)){setUtilityBlocked(true);authorization.reload();}
       setError(
         err instanceof Error
           ? err
           : new Error("We couldn’t save your request. Please try again."),
       );
     } finally {
+      if (refreshedFood && !controller.signal.aborted && work.current === controller) {
+        familySources.current[refreshedFood.program] = { projection: refreshedFood.projection, options: familySources.current[refreshedFood.program]?.options ?? {} };
+        setFamilyProfile(refreshedFood.profile); setIntake(refreshedFood.intake);
+        if (refreshedFood.program === "snap-pa") setSnapDetails(refreshedFood.details as SnapApplicationFields);
+        else setWicDetails(refreshedFood.details as WicApplicationFields);
+      }
       if (refreshedZip && !controller.signal.aborted && work.current === controller) {
         const zip = refreshedZip.value;
         setIntake(current => ({ ...current, zip }));
@@ -559,7 +821,8 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
       </p>}
       {session.loading ? (
         <ParentLoading label="Checking secure access" />
-      ) : session.error ? (
+      ) : familyAccess === "changed" ? <section className={styles.surface}><h2>Your sign-in changed</h2><p>This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>Start a fresh request</a></section>
+      : session.error ? (
         <ServiceError
           error={session.error}
           retry={session.reload}
@@ -567,6 +830,9 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
         />
       ) : (
         <>
+          {familyAccess === "checking" && <ParentLoading label="Checking secure access"/>}
+          {familyAccess === "unavailable" && <section className={styles.surface}><h2>We could not recheck your saved family information</h2><p>Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>Recheck secure access</button></section>}
+          <div hidden={familyAccess !== "ready"}>
           <ol className={styles.progress} aria-label="Support request steps">
             {(directSnap ? ["Application details", "Your permission"] : ["Your needs", "Household details", "Your permission"]).map(
               (label, index) => {
@@ -703,6 +969,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
               {step === 1 && (
                 <>
                   {snapSelected && authorization.loading ? <ParentLoading label="Checking SNAP application availability"/> : fullSnap ? <>
+                    {familyProfile && familyFilled["snap-pa"] ? <p className={styles.hint}>We filled current answers from your saved family information. Change anything that needs correcting. Reuse keeps its original dates. <Link href="/family-profile" className={styles.textLink}>Update family information</Link>.</p> : null}
                     <SnapApplicationNotice />
                     <SnapApplicationFormFields value={snapValues} onChange={changeSnapDetails} disabled={pending}/>
                   </> : <>
@@ -757,8 +1024,15 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                   </div>
                   </>}
                   {wicOnly && authorization.loading ? <ParentLoading label="Checking WIC application availability"/> : fullWic ? <>
+                    {familyProfile && <p className={styles.hint}>Current saved contact details can be reused here. Choose any child separately; your saved family information does not choose WIC beneficiaries. <Link href="/family-profile" className={styles.textLink}>Update family information</Link>.</p>}
                     <WicApplicationNotice/>
                     <WicApplicationFormFields value={wicDetails} onChange={changeWicDetails} disabled={pending}/>
+                    {familyProfile && ["children", "mother_and_children"].includes(wicDetails.beneficiaries ?? "") && <div className={styles.field}>
+                      <label htmlFor="wic-saved-child">Add a child from your saved family information</label><select id="wic-saved-child" className={styles.select} value="" disabled={pending} onChange={event => { if (event.target.value) chooseSavedWicChild(event.target.value); }}>
+                        <option value="">Choose a child, or add their details above</option>{(familyProfile.details.members ?? []).filter(person => !wicDetails.children?.some(child => child.id === person.id)).map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
+                      </select><p className={styles.hint}>Choose only the child or children this WIC request is for. This does not establish eligibility.</p>
+                    </div>}
+
                   </> : intake.needs.some(need => need === "wic_new" || need === "wic_continuing") ? <div className={styles.notice}><div>
                     <p>Private WIC questions are not available for this request. {wicOnly ? "Your unsaved WIC answers, if any, remain on this page. You can save minimum routing information when no private draft is pending." : "Combined and continuing requests keep their separate routing; this does not start a new WIC pre-application."}</p>
                     {wicOnly && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshWicCollection}>Check WIC availability again</button>}
@@ -777,19 +1051,33 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                       <option value="not_sure">Not sure / unanswered</option><option value="self">I hold every selected account</option><option value="authorized_caregiver">I hold or have permission to help with every selected account</option></select></div>
                     {selectedUtilities.length === 1 && <div className={styles.field}><label htmlFor="support-shutoff">Shutoff date, if on a notice</label><input id="support-shutoff" className={styles.input} type="date" value={intake.shutoffDate ?? ""} onChange={event => change("shutoffDate", event.target.value || null)}/></div>}
                     <p className={styles.hint}>Use official utility help now if service is at risk. Saving a request does not stop a shutoff or restore service.</p>
-                    {pecoOnly && <label className={styles.checkbox}><input type="checkbox" checked={pecoPreparation} onChange={event => {
-                      setPecoPreparation(event.target.checked); setPecoDetails({}); setPecoDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
-                      if (event.target.checked) setIntake(current => ({ ...current, householdSize: null, incomeAmount: null, incomeFrequency: "unknown" }));
-                    }}/><span>Prepare PECO CAP help for this electricity account. Keep this a separate, preparation-only PECO request.</span></label>}
-                    {pecoOnly && !pecoPreparation && <p className={styles.hint}>Ordinary electricity help does not start a CAP application. Choose CAP preparation only if you want CaseLink to save its private answers.</p>}
-                    {selectedUtilities.length > 0 && !pecoOnly && <p className={styles.hint}>Private CAP preparation is available only as a separate electricity request for a named PECO account. This request keeps its selected utility needs.</p>}
+                    {utilityChoice && <label className={styles.checkbox}><input type="checkbox" checked={utilityPreparation === utilityChoice} onChange={event => {
+                      familyDraftChanged.current.utility = false; familyApplied.current.delete(utilityPreparationChoices[utilityChoice].programId); delete familySources.current[utilityPreparationChoices[utilityChoice].programId];
+                      setFamilyAccountPerson(""); setFamilyHomeAddress(false); setFamilyPecoPhone("");
+                      setUtilityPreparation(event.target.checked ? utilityChoice : null); setUtilityDetails({}); setUtilityDetailsReady(false); setAccepted(false); setError(null); startAttempt.current = null;
+                      if (event.target.checked) {
+                        setIntake(current => ({ ...current, householdSize: null, incomeAmount: null, incomeFrequency: "unknown" }));
+                        if (familyProfile && utilityPreparationChoices[utilityChoice].canCollect(authorization.data)) seedFamilyProfile(familyProfile, utilityPreparationChoices[utilityChoice].programId, intake.accountAuthority);
+                      }
+                    }}/><span>{utilityPreparationChoices[utilityChoice].optIn}. Keep this a separate, preparation-only request for this named program.</span></label>}
+                    {utilityChoice && !utilityPreparation && <p className={styles.hint}>Ordinary utility help does not start a benefit application. Choose {utilityPreparationChoices[utilityChoice].label} preparation only if you want CaseLink to save its private answers.</p>}
+                    {!utilityChoice && <p className={styles.hint}>Private application preparation needs a separate request for one named utility account. This request keeps its selected utility needs.</p>}
                   </fieldset>}
-                  {pecoPreparation && (authorization.loading ? <ParentLoading label="Checking PECO preparation availability"/> : fullPeco ? <>
-                    <PecoApplicationNotice/>
-                    <PecoApplicationFormFields value={pecoDetails} onChange={changePecoDetails} disabled={pending}/>
-                  </> : <div className={styles.notice}><div><p>Private PECO CAP preparation is not available or account authority is unresolved. Your unsaved answers remain on this page. Confirm your account authority and check access before entering private answers.</p>
-                    <button type="button" className={styles.secondary} disabled={pending} onClick={refreshPecoCollection}>Check PECO preparation access again</button>
-                    <a className={styles.textLink} href={PECO_HELP_URL}>Open official PECO help</a>
+                  {utilityPreparation && utilityConfig && (authorization.loading ? <ParentLoading label={`Checking ${utilityConfig.short} preparation availability`}/> : fullUtility ? <>
+                    {familyProfile && <fieldset className={styles.fieldset}><legend className={styles.legend}>Use saved family information</legend>
+                      <p className={styles.hint}>{intake.accountAuthority === "self" ? "We filled current saved names and household details for your account." : "Choose the actual account holder below to reuse their saved details."} Check which address this account serves; an application still needs its specific answers. Reuse keeps original dates. <Link href="/family-profile" className={styles.textLink}>Update family information</Link>.</p>
+                      {intake.accountAuthority === "authorized_caregiver" && <div className={styles.field}><label htmlFor="utility-saved-holder">Account holder from your saved family information</label><select id="utility-saved-holder" className={styles.select} value={familyAccountPerson} disabled={pending} onChange={event => { setFamilyAccountPerson(event.target.value); if (event.target.value) chooseSavedUtility({ accountPersonId: event.target.value }); }}>
+                        <option value="">Choose the account holder, or enter their details below</option>{[familyProfile.details.primaryPerson, ...(familyProfile.details.members ?? [])].map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
+                      </select></div>}
+                      {familyProfile.details.homeAddress?.street && <button type="button" className={styles.secondary} disabled={pending || familyHomeAddress} onClick={() => { chooseSavedUtility({ useHomeAddress: true }); setFamilyHomeAddress(true); }}>Use saved home address for this utility account</button>}
+                      {utilityPreparation === "peco" && familyProfile.details.contact?.phone && <div className={styles.field}><label htmlFor="peco-saved-phone">Use your saved phone number as</label><select id="peco-saved-phone" className={styles.select} value={familyPecoPhone} disabled={pending} onChange={event => { const type = event.target.value as "home" | "cell" | ""; setFamilyPecoPhone(type); if (type) chooseSavedUtility({ pecoPhoneType: type }); }}><option value="">Choose a phone type, or enter a number below</option><option value="home">Home phone</option><option value="cell">Mobile phone</option></select></div>}
+                    </fieldset>}
+                    {utilityPreparation === "peco" ? <><PecoApplicationNotice/><PecoApplicationFormFields value={utilityDetails as PecoApplicationFields} onChange={changeUtilityDetails} disabled={pending}/></>
+                      : utilityPreparation === "pgw" ? <><PgwApplicationNotice/><PgwApplicationFormFields value={utilityDetails as PgwApplicationFields} onChange={changeUtilityDetails} disabled={pending}/></>
+                      : <><WaterApplicationNotice/><WaterApplicationFormFields value={utilityDetails as WaterApplicationFields} onChange={changeUtilityDetails} disabled={pending}/></>}
+                  </> : <div className={styles.notice}><div><p>Private {utilityConfig.label} preparation is not available or account authority is unresolved. Your unsaved answers remain on this page. Confirm your account authority and check access before entering private answers.</p>
+                    <button type="button" className={styles.secondary} disabled={pending} onClick={refreshUtilityCollection}>Check {utilityConfig.short} preparation access again</button>
+                    <a className={styles.textLink} href={utilityConfig.helpUrl}>Open official {utilityConfig.short} help</a>
                   </div></div>)}
                   {hasBenefits && !(snapSelected&&authorization.loading) && (!fullSnap || intake.needs.some(need=>need==='wic_new'||need==='wic_continuing')) ? (
                     <fieldset className={styles.fieldset}>
@@ -948,7 +1236,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                         : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly."}
                     </p>
                   </div>
-                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || pecoDetailsReady && recipientIds.length === 1 && recipientIds[0] === 'peco-cap') ? <p><strong>{pecoDetailsReady ? "PECO CAP" : fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP"}</strong> is the named program for your {pecoDetailsReady ? "private CAP preparation" : fullWic ? "prepared WIC answers" : "application"}.</p> : <fieldset className={styles.fieldset}>
+                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || utilityDetailsReady && recipientIds.length === 1 && recipientIds[0] === utilityConfig?.programId) ? <p><strong>{utilityDetailsReady ? utilityConfig?.label : fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP"}</strong> is the named program for your {utilityDetailsReady ? utilityConfig?.purpose : fullWic ? "prepared WIC answers" : "application"}.</p> : <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       Named programs for this request
                     </legend>
@@ -1055,11 +1343,11 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                       <div>
                         <h3>The information we can use</h3>
                         <p>
-                          {pecoDetailsReady ? "Your private PECO CAP answers described in the PECO notice, your needs, utility and routing information" : wicDetailsReady ? "Your private WIC preparation answers described in the WIC notice, your needs and routing information" : detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
+                          {utilityDetailsReady ? `Your private ${utilityConfig?.label} answers described in its notice, your household, income, utility and routing information` : wicDetailsReady ? "Your private WIC preparation answers described in the WIC notice, your needs and routing information" : detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details"}
                           {intake.needs.some((need) => incomeNeeds.includes(need))
                             ? ", income information when a named program requires it"
                             : ""}, only
-                          for this request. {pecoDetailsReady ? "Private PECO document uploads are not connected. " : wicNeedsOnly ? "WIC document uploads are not available. " : <>Any bills or notices you later
+                          for this request. {utilityDetailsReady ? "Documents for this named program are included in your preparation permission. Each document still needs separate processing consent in the protected step when available. Do not put documents or required identifiers or account secrets in this form or chat. " : wicNeedsOnly ? "WIC document uploads are not available. " : <>Any bills or notices you later
                           choose to add can be used for the verified needs and named programs, after separate document-processing
                           consent. {intake.needs.some(need => need === "wic_new" || need === "wic_continuing") && "Do not upload WIC documents here. "}</>}No passwords, EBT PINs or signatures.
                         </p>
@@ -1138,7 +1426,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                       work in My support.
                       {detailsReady && " I also agree to save and use my private SNAP application answers for this named program under the SNAP data notice."}
                       {wicDetailsReady && ` I agree to save and use my private WIC answers for Pennsylvania WIC under the WIC notice. ${WIC_SUBJECT_AUTHORITY_STATEMENT}`}
-                      {pecoDetailsReady && ` I agree to save and use my private PECO CAP answers for PECO CAP under the PECO notice. ${PECO_SUBJECT_AUTHORITY_STATEMENT} ${PECO_ACCOUNT_AUTHORITY_STATEMENT}`}
+                      {utilityDetailsReady && utilityConfig && ` I agree to save and use my private ${utilityConfig.label} answers for this named program under its notice. I authorize household, income, utility and document use for this preparation; each protected document needs its separate processing consent. ${utilityConfig.subjectStatement} ${utilityConfig.accountStatement}`}
                     </span>
                   </label>
                   <p className={styles.hint}>
@@ -1160,6 +1448,10 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                     type="button"
                     className={styles.quiet}
                     onClick={() => {
+                      if (step === 2 && familyProfile) {
+                        const program: FamilyProfileApplicationProgram | undefined = fullSnap ? "snap-pa" : fullWic ? "wic-pa" : fullUtility ? utilityConfig?.programId : undefined;
+                        if (program) seedFamilyProfile(familyProfile, program, intake.accountAuthority);
+                      }
                       setStep((current) => current - 1);
                       setError(null);
                       setAccepted(false);
@@ -1178,12 +1470,12 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
                 <button
                   className={styles.button}
                   type="submit"
-                  disabled={pending || (step===1 && (snapSelected || wicOnly || pecoPreparation) && authorization.loading)}
+                  disabled={pending || (step===1 && (snapSelected || wicOnly || !!utilityPreparation) && authorization.loading)}
                 >
                   {pending
                     ? "Saving your request…"
                     : wicOnly && startUncertain ? "Retry the same WIC request"
-                    : pecoPreparation && startUncertain ? "Retry the same PECO request"
+                    : utilityPreparation && startUncertain ? `Retry the same ${utilityConfig?.short} request`
                     : step === 2
                       ? "Start getting support"
                       : "Continue"}
@@ -1192,6 +1484,7 @@ function ParentIntakeForm({ initialNeed }: { initialNeed?: string }) {
               </div>
             </form>
           </section>
+          </div>
         </>
       )}
       <div className={styles.section}>

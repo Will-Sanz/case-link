@@ -103,10 +103,18 @@ describe.skipIf(!modulePath)("closed PECO private preparation against PostgreSQL
     ["gas request", { needs: ["gas"] }, {}], ["combined request", { needs: ["electricity", "water"] }, {}], ["wrong provider", { utilityProviders: ["pgw"] }, {}],
     ["unknown account authority", { accountAuthority: "not_sure" }, {}], ["wrong recipient", {}, { recipientIds: ["pwd-tap"] }],
     ["full execution mandate", {}, { mode: "full" }], ["missing prepare permission", {}, { allowedActions: ["research"] }],
-    ["missing utility permission", {}, { allowedData: ["household", "income"] }], ["unneeded document permission", {}, { allowedData: ["household", "income", "utility", "documents"] }],
+    ["missing utility permission", {}, { allowedData: ["household", "income"] }], ["duplicate data permission", {}, { allowedData: ["household", "income", "utility", "income"] }],
   ])("rejects %s without changing the request", async (_label, i, m) => {
     await gate(); const request = await start(i, m), before = await state(request);
     await expect(save(request, details())).rejects.toMatchObject({ code: "42501" }); expect(await read(request)).toEqual([]); expect(await state(request)).toEqual(before);
+  });
+
+  it("accepts an explicitly document-scoped private draft while ordinary document registration stays closed", async () => {
+    await gate(); const request = await start({}, { allowedData: ["household", "income", "utility", "documents"] });
+    await save(request, details());
+    expect((await read(request))[0].request_id).toBe(request);
+    await expect(query("select * from public.parent_register_document($1,'synthetic.pdf','application/pdf',100,1,'2026-10-25')", [request]))
+      .rejects.toMatchObject({ code: "42501", message: "PECO private document processing is unavailable" });
   });
 
   it.each(["closed", "expired", "wrong_control_notice", "missing_reference", "wrong_save_notice", "global_closed", "cancelled", "revoked", "expired_mandate", "inactive_account", "revoked_session", "no_subject", "no_account"])("rejects %s even for an exact retry", async condition => {
