@@ -44,7 +44,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/parent-sql-runtime" --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.3.14
           export CASELINK_PARENT_SQL_FIXTURE_MODULE="$RUNNER_TEMP/parent-sql-runtime/node_modules/@electric-sql/pglite/dist/index.js"
           test -f "$CASELINK_PARENT_SQL_FIXTURE_MODULE"
-          NODE_ENV=test npx vitest run src/lib/parent/*.sql.test.ts scripts/parent-test-approval.test.ts
+          NODE_ENV=test npx vitest run src/lib/parent/*.sql.test.ts scripts/parent-test-approval.test.ts scripts/parent-production-lineage.test.ts
 
       - name: Typecheck, lint, and production build
         run: npm run ci
@@ -92,6 +92,9 @@ jobs:
 
       - name: Rehearse legacy schema upgrade and transactional rollback
         run: npm run test:legacy-upgrade
+
+      - name: Rehearse observed parent production lineage with synthetic local records
+        run: node --import tsx scripts/test-parent-production-lineage.ts --synthetic-approval
 
       - name: Verify retained tokens and offboarding with real local Auth
         run: npm run test:auth-security

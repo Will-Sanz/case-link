@@ -1,0 +1,2350 @@
+{
+  "version": "parent-production-lineage-2026-11-18.v1",
+  "boundary": "Schema-only observed parent lineage; all runtime records and controls must be synthetic. No live data/login/activation SQL.",
+  "sourceBase": "86376444610e4de78038a8ab9e2016c7363ffd95",
+  "recordedMigrationHistory": [
+    {
+      "version": "20260321000000",
+      "name": "init_schema"
+    },
+    {
+      "version": "20260321120000",
+      "name": "family_rls"
+    },
+    {
+      "version": "20260321140000",
+      "name": "resource_matches_rls"
+    },
+    {
+      "version": "20260321160000",
+      "name": "family_intake_rpc"
+    },
+    {
+      "version": "20260321170000",
+      "name": "plans_rls"
+    },
+    {
+      "version": "20260321180000",
+      "name": "plan_steps_details"
+    },
+    {
+      "version": "20260321200000",
+      "name": "plan_steps_progression_and_workflow"
+    },
+    {
+      "version": "20260321210000",
+      "name": "workflow_execution"
+    },
+    {
+      "version": "20260322100000",
+      "name": "checklist_and_refinement"
+    },
+    {
+      "version": "20260323100000",
+      "name": "plan_step_action_items"
+    },
+    {
+      "version": "20260324100000",
+      "name": "plan_step_ai_helper"
+    },
+    {
+      "version": "20260325200000",
+      "name": "app_users_profile"
+    },
+    {
+      "version": "20260326120000",
+      "name": "barrier_plan_records"
+    },
+    {
+      "version": "20260327120000",
+      "name": "plans_client_display"
+    },
+    {
+      "version": "20260328120000",
+      "name": "plans_generation_state"
+    },
+    {
+      "version": "20260329120000",
+      "name": "families_archived_at"
+    },
+    {
+      "version": "20260405120000",
+      "name": "referrals_tasks_rls"
+    },
+    {
+      "version": "20260406120000",
+      "name": "rls_policy_hardening"
+    },
+    {
+      "version": "20260802120000",
+      "name": "demo_requests"
+    },
+    {
+      "version": "20260802143000",
+      "name": "replace_family_barriers_rpc"
+    },
+    {
+      "version": "20260804123000",
+      "name": "case_progress_updates"
+    },
+    {
+      "version": "20260804173443",
+      "name": "production_hardening"
+    },
+    {
+      "version": "20261013203641",
+      "name": "save_family_planning_context"
+    },
+    {
+      "version": "20261013204624",
+      "name": "enforce_active_accounts"
+    },
+    {
+      "version": "20261013205809",
+      "name": "require_live_sessions"
+    },
+    {
+      "version": "20261013211053",
+      "name": "require_initial_password"
+    },
+    {
+      "version": "20261013220007",
+      "name": "enforce_mfa_access_and_recovery"
+    },
+    {
+      "version": "20261013222316",
+      "name": "bind_plan_review_to_snapshot"
+    },
+    {
+      "version": "20261013224711",
+      "name": "atomic_plan_edits_and_progress"
+    },
+    {
+      "version": "20261013235624",
+      "name": "generation_resume_leases"
+    },
+    {
+      "version": "20261014000822",
+      "name": "atomic_ai_journey_budgets"
+    },
+    {
+      "version": "20261014002118",
+      "name": "bounded_family_next_work"
+    },
+    {
+      "version": "20261014002544",
+      "name": "reuse_authorized_parent_reads"
+    },
+    {
+      "version": "20261014003444",
+      "name": "confirm_school_calendar_dates"
+    },
+    {
+      "version": "20261014005053",
+      "name": "resource_directory_availability"
+    },
+    {
+      "version": "20261014010429",
+      "name": "identifier_variants"
+    },
+    {
+      "version": "20261014012912",
+      "name": "contact_provenance"
+    },
+    {
+      "version": "20261014174244",
+      "name": "restrict_platform_rls_trigger"
+    },
+    {
+      "version": "20261014203800",
+      "name": "explicit_application_privileges"
+    },
+    {
+      "version": "20261014230221",
+      "name": "password_only_pilot_accounts"
+    },
+    {
+      "version": "20261015143343",
+      "name": "materialize_plan_snapshot"
+    },
+    {
+      "version": "20261015185455",
+      "name": "compact_plan_generation"
+    },
+    {
+      "version": "20261015191247",
+      "name": "manual_plan_handoff"
+    },
+    {
+      "version": "20261026012733",
+      "name": "parent_support_foundation"
+    },
+    {
+      "version": "20261026014950",
+      "name": "parent_scoped_evidence_and_outcomes"
+    },
+    {
+      "version": "20261026015736",
+      "name": "parent_verified_form_artifacts"
+    },
+    {
+      "version": "20261026020521",
+      "name": "parent_facts_and_mandate_resumption"
+    },
+    {
+      "version": "20261026022658",
+      "name": "parent_notifications_and_resume_metadata"
+    },
+    {
+      "version": "20261026033815",
+      "name": "parent_existing_accounts"
+    },
+    {
+      "version": "20261026040540",
+      "name": "parent_preserve_corrected_facts"
+    },
+    {
+      "version": "20261026044443",
+      "name": "parent_storage_upload_preflight"
+    },
+    {
+      "version": "20261026052446",
+      "name": "parent_authoritative_mandate_window"
+    },
+    {
+      "version": "20261026155134",
+      "name": "parent_existing_identity_cutoff"
+    },
+    {
+      "version": "20261026162858",
+      "name": "parent_runtime_progress"
+    },
+    {
+      "version": "20261026163009",
+      "name": "parent_request_assistant"
+    },
+    {
+      "version": "20261026163028",
+      "name": "parent_partner_directory"
+    },
+    {
+      "version": "20261027135314",
+      "name": "parent_operation_purpose_binding"
+    },
+    {
+      "version": "20261027140357",
+      "name": "parent_assistant_context_authority"
+    },
+    {
+      "version": "20261027141312",
+      "name": "parent_intake_source_dates"
+    },
+    {
+      "version": "20261027142357",
+      "name": "parent_intake_need_scope"
+    },
+    {
+      "version": "20261027144122",
+      "name": "parent_intake_projection"
+    },
+    {
+      "version": "20261027150144",
+      "name": "parent_packet_source_guard"
+    },
+    {
+      "version": "20261027163941",
+      "name": "parent_current_route_authority"
+    },
+    {
+      "version": "20261027170820",
+      "name": "parent_personal_act_renewal"
+    },
+    {
+      "version": "20261027172429",
+      "name": "parent_preserve_exact_need_answers"
+    },
+    {
+      "version": "20261027174125",
+      "name": "parent_atomic_factual_answers"
+    },
+    {
+      "version": "20261103220623",
+      "name": "parent_preparation_only_forms"
+    },
+    {
+      "version": "20261103224633",
+      "name": "parent_preparation_mandate_guard"
+    },
+    {
+      "version": "20261104012940",
+      "name": "parent_snap_application_details"
+    },
+    {
+      "version": "20261104021316",
+      "name": "parent_snap_application_previews"
+    },
+    {
+      "version": "20261104173842",
+      "name": "parent_snap_submission_authorization"
+    },
+    {
+      "version": "20261104190911",
+      "name": "parent_snap_encrypted_packets"
+    },
+    {
+      "version": "20261104201514",
+      "name": "parent_storage_artifact_immutability"
+    },
+    {
+      "version": "20261104212630",
+      "name": "parent_snap_protected_capture_authority"
+    },
+    {
+      "version": "20261105011520",
+      "name": "parent_snap_capture_context"
+    },
+    {
+      "version": "20261105012309",
+      "name": "parent_snap_protected_operation_binding"
+    },
+    {
+      "version": "20261105013703",
+      "name": "parent_snap_protected_submission"
+    },
+    {
+      "version": "20261105020641",
+      "name": "parent_snap_protected_operation_projection"
+    },
+    {
+      "version": "20261105021926",
+      "name": "parent_snap_pending_capture"
+    },
+    {
+      "version": "20261105025504",
+      "name": "parent_snap_owned_review"
+    },
+    {
+      "version": "20261105195436",
+      "name": "parent_snap_direct_construction"
+    },
+    {
+      "version": "20261105203600",
+      "name": "parent_snap_direct_acquisition"
+    },
+    {
+      "version": "20261105211010",
+      "name": "parent_snap_direct_construction_acquisition"
+    },
+    {
+      "version": "20261105211853",
+      "name": "parent_snap_linked_packet_authority"
+    },
+    {
+      "version": "20261105212440",
+      "name": "parent_snap_direct_intent_recovery"
+    },
+    {
+      "version": "20261105220209",
+      "name": "parent_snap_verified_completion_route"
+    },
+    {
+      "version": "20261105220445",
+      "name": "parent_snap_linked_retention_cleanup"
+    },
+    {
+      "version": "20261106051250",
+      "name": "parent_food_journey_boundaries"
+    },
+    {
+      "version": "20261106051804",
+      "name": "parent_snap_deterministic_continuation"
+    },
+    {
+      "version": "20261107024524",
+      "name": "parent_snap_acquisition_expiry"
+    },
+    {
+      "version": "20261107181301",
+      "name": "parent_snap_direct_completion_continuation"
+    },
+    {
+      "version": "20261107181433",
+      "name": "parent_snap_delivery_intent"
+    },
+    {
+      "version": "20261108010000",
+      "name": "parent_snap_agency_next_steps"
+    },
+    {
+      "version": "20261108015124",
+      "name": "parent_deletion_after_processing_closure"
+    },
+    {
+      "version": "20261109182712",
+      "name": "parent_pilot_account_scope"
+    },
+    {
+      "version": "20261110141330",
+      "name": "parent_controlled_snap_test"
+    },
+    {
+      "version": "20261110161631",
+      "name": "parent_snap_review_continuation"
+    },
+    {
+      "version": "20261117183830",
+      "name": "parent_assistant_account_context"
+    },
+    {
+      "version": "20261117190812",
+      "name": "bounded_existing_assistant_worker_restore_20261117"
+    },
+    {
+      "version": "20261118004147",
+      "name": "parent_existing_services_ongoing_operation_20261117"
+    }
+  ],
+  "baselineSources": [
+    {
+      "name": "20260802120000_demo_requests.sql",
+      "sha256": "46c6acc080f5be68907345456d51917b898d1d82dd4381199347e1251a012f69"
+    },
+    {
+      "name": "20260802143000_replace_family_barriers_rpc.sql",
+      "sha256": "09eae120d1956f23943b6ea04a8f5b0ab7203e9585da8772f064326922c4d779"
+    },
+    {
+      "name": "20260804173443_production_hardening.sql",
+      "sha256": "e5322274892b437d4f0c54145b8c8f1f14eb61c295061adde17646465193538e"
+    },
+    {
+      "name": "20261013203641_save_family_planning_context.sql",
+      "sha256": "c94bb72337940205cf3aaf966b41e0695b64cdec3049d51cb5020d597315075d"
+    },
+    {
+      "name": "20261013204624_enforce_active_accounts.sql",
+      "sha256": "80eadaca6ff6693520eab858af683cd51983de348d8e57fba6e444e3cc20d50e"
+    },
+    {
+      "name": "20261013205809_require_live_sessions.sql",
+      "sha256": "ff9efb30c841ea1374fd3334e7a47342bf3c7c6ace7da97aebcf163f6bab5fc9"
+    },
+    {
+      "name": "20261013211053_require_initial_password.sql",
+      "sha256": "e838c4560b64fbcfa5d2a875e26509a911b73fa821713fb0e0da4c4840a3d95e"
+    },
+    {
+      "name": "20261013220007_enforce_mfa_access_and_recovery.sql",
+      "sha256": "69e0b807a9ebd155aafa05ce30d7ab01943351fe6468d4b878fbdd3b718834ce"
+    },
+    {
+      "name": "20261013222316_bind_plan_review_to_snapshot.sql",
+      "sha256": "99af470f61bdcc41b9ddfd2e9f4b417af7f5141cf93557316a9f322d91ecbb57"
+    },
+    {
+      "name": "20261013224711_atomic_plan_edits_and_progress.sql",
+      "sha256": "a6368bd8dbdae288aa677ca7f24a0148145a8953c7c835e7603cea5660c0db85"
+    },
+    {
+      "name": "20261013235624_generation_resume_leases.sql",
+      "sha256": "3ecce61a6a11d6704c1b807aa440271ae0926e190ae7614ffc3df7b44e6d0e7b"
+    },
+    {
+      "name": "20261014000822_atomic_ai_journey_budgets.sql",
+      "sha256": "4f14a9b2455e3a9b7226d4ae84113db574b4bad05efc322ed3cf759fe5f07eff"
+    },
+    {
+      "name": "20261014002118_bounded_family_next_work.sql",
+      "sha256": "602f00d7a7439e989ae07c08bf503797f7119cdd92d632c85954c26c07cbf9aa"
+    },
+    {
+      "name": "20261014002544_reuse_authorized_parent_reads.sql",
+      "sha256": "40ffd105b83ced1003c948272ec9d37c1edcb132d3c4c041d08e84c11fd73b13"
+    },
+    {
+      "name": "20261014003444_confirm_school_calendar_dates.sql",
+      "sha256": "537c404484b5749ed688f32d00a776d630734303363aaa79621e97bb2eadc3e8"
+    },
+    {
+      "name": "20261014005053_resource_directory_availability.sql",
+      "sha256": "f526016711364827a873ed1f2035a050ca578303266e2f1bd679ce24ccea8fc2"
+    },
+    {
+      "name": "20261014010429_identifier_variants.sql",
+      "sha256": "a70089a0104ef78264c29c0fff32c8874089928588ceb3e32ac74a7e126c0caa"
+    },
+    {
+      "name": "20261014012912_contact_provenance.sql",
+      "sha256": "d7f29ced0c2d9d78e3b511ee3c279739198df6cb0eda9ddbffe082257e65d7e8"
+    },
+    {
+      "name": "20261014174244_restrict_platform_rls_trigger.sql",
+      "sha256": "100080081d283918aecd31735b64bc14bc56f3a735db3bf164baa14a96e46bf5"
+    },
+    {
+      "name": "20261014203800_explicit_application_privileges.sql",
+      "sha256": "0cfb5d2cfa9e13b7415ec844ff85c427c6dbf3849a5eb5847aa5e1997ac81793"
+    },
+    {
+      "name": "20261014230221_password_only_pilot_accounts.sql",
+      "sha256": "d0ff2b2babd4cbd61ea4a2fd955e46f60381675e6ad4b6a777b453d08c102c4a"
+    },
+    {
+      "name": "20261015143343_materialize_plan_snapshot.sql",
+      "sha256": "129b82b78808518706235d4ef7a1b7848d2e0ebdf6edc1fc695e214fd8db6f35"
+    },
+    {
+      "name": "20261015185455_compact_plan_generation.sql",
+      "sha256": "a2c75f2f8a43505b0cd7cc9b3fba24281caa219839b14a18752079fabcebf7cd"
+    },
+    {
+      "name": "20261015191247_manual_plan_handoff.sql",
+      "sha256": "c7ca61f6745b98975b211c7f53a9466172aaff2f0b71dcfd26a07a0ba5ba0fca"
+    },
+    {
+      "name": "20261026012733_parent_support_foundation.sql",
+      "sha256": "c5abbde3ff5ab507ca69eb48d27e36763dea6f580b20fe18adead6886e40b59c"
+    },
+    {
+      "name": "20261026014950_parent_scoped_evidence_and_outcomes.sql",
+      "sha256": "ca1b9d12b1a1e44d6134150e22dd9a915405905a44cddf6db59d3ea5c5b0650d"
+    },
+    {
+      "name": "20261026015736_parent_verified_form_artifacts.sql",
+      "sha256": "08e1909838d1216e51e2b48ae0a56da43f492909c161e28f1c210200059e6cf0"
+    },
+    {
+      "name": "20261026020521_parent_facts_and_mandate_resumption.sql",
+      "sha256": "abcd741df6ea45c18e1a92535ed8b4c33beee42ffa0267894382f5479ac87cc0"
+    },
+    {
+      "name": "20261026022658_parent_notifications_and_resume_metadata.sql",
+      "sha256": "770ab324997d6bfb8d88ae6ed538beb123ba3ae2f1690e8db03b225232749740"
+    },
+    {
+      "name": "20261026033815_parent_existing_accounts.sql",
+      "sha256": "672cc71be375a5ac9c9f35a9277ec4986ed7f31ff20816d2fb003e56d57e188c"
+    },
+    {
+      "name": "20261026040540_parent_preserve_corrected_facts.sql",
+      "sha256": "c053032829e4bf91bbccb48a8a14feb152fbe3cb46eb3ce4ad5aaa1143788780"
+    },
+    {
+      "name": "20261026044443_parent_storage_upload_preflight.sql",
+      "sha256": "e18a707f52fd605728f2d346e4e5f6f3fb3c82dbaf35293aa350e7d2ced92de9"
+    },
+    {
+      "name": "20261026052446_parent_authoritative_mandate_window.sql",
+      "sha256": "7b4b16685b93611a13ecd59d708323d8cd86f6c51eff0fd0d44365a9ec651b67"
+    },
+    {
+      "name": "20261026155134_parent_existing_identity_cutoff.sql",
+      "sha256": "ddf5b96d20e5f98123cc5bb2d35505dcafe908ab378835ad88e71868b8e89c2a"
+    },
+    {
+      "name": "20261026162858_parent_runtime_progress.sql",
+      "sha256": "cb1b86170be00dc4099a590684b58cf8adbbe282a6a89cfc8cab9c947ea5d057"
+    },
+    {
+      "name": "20261026163009_parent_request_assistant.sql",
+      "sha256": "741de6315fe1a1f026aac60a5f326832a82a108a14d3917e5522038d57c677ed"
+    },
+    {
+      "name": "20261026163028_parent_partner_directory.sql",
+      "sha256": "c678263f5cdbea56477ff7bc9fafd7aeddaacb7a28afbac80bd28e6d5aad0d64"
+    },
+    {
+      "name": "20261027135314_parent_operation_purpose_binding.sql",
+      "sha256": "0cb299a42d74bb8264b3332938138bd57fb7e1bda4edaf6a3dd524348c19de5c"
+    },
+    {
+      "name": "20261027140357_parent_assistant_context_authority.sql",
+      "sha256": "e39fa75c4047bcaf7f24b5e8a905b731fe8f6727261a5cef0b982deecf10b30f"
+    },
+    {
+      "name": "20261027141312_parent_intake_source_dates.sql",
+      "sha256": "531825f213458131472031d5269f60764c19f67f57ce90144b77f21ee304b5c1"
+    },
+    {
+      "name": "20261027142357_parent_intake_need_scope.sql",
+      "sha256": "a5a463fb2c4bb1ada41dc6314c567fd39e167d301314846156855923c90d0367"
+    },
+    {
+      "name": "20261027144122_parent_intake_projection.sql",
+      "sha256": "a2d37eee4bf9191fffcf7c32ddf3e6b1444a30674f573f82a9eda4031ab6d30c"
+    },
+    {
+      "name": "20261027150144_parent_packet_source_guard.sql",
+      "sha256": "566740fbac67fdbb2bf0d860f371849bc9ea27d0a3df5ef428eec6bc31e764b7"
+    },
+    {
+      "name": "20261027163941_parent_current_route_authority.sql",
+      "sha256": "32ad1df151a2a58f88d3c449c38f7ebaf5453200546f91151c7eb1e05ff4dadb"
+    },
+    {
+      "name": "20261027170820_parent_personal_act_renewal.sql",
+      "sha256": "cecb7546994b27012cc8f3609908f51064542602f9d54c52aeec37760fc3b4f7"
+    },
+    {
+      "name": "20261027172429_parent_preserve_exact_need_answers.sql",
+      "sha256": "16679ae2b21005251c914685e4f6a115f2730df074bce6f8cf982e08f0194063"
+    },
+    {
+      "name": "20261027174125_parent_atomic_factual_answers.sql",
+      "sha256": "b3e56de6103e7116bdf3cd9d6078c4b7f252484c22591f4cfe9747ca51a382d7"
+    },
+    {
+      "name": "20261103220623_parent_preparation_only_forms.sql",
+      "sha256": "b7665f73a4a1d7bfa1865506ef84cb89f91c97e352e479632790ee02bd66bc88"
+    },
+    {
+      "name": "20261103224633_parent_preparation_mandate_guard.sql",
+      "sha256": "28c1e3d7f2e6e3c4dfa631c0903c936e15b901d3ca86dcd7da00812fedcd6c64"
+    },
+    {
+      "name": "20261104012940_parent_snap_application_details.sql",
+      "sha256": "69240be00ded82edfe8a30806566c972c6fe3d1f155a5463bfe2e4511b779a9d"
+    },
+    {
+      "name": "20261104021316_parent_snap_application_previews.sql",
+      "sha256": "7343e209dead6eb687d642189b3df7f3525aa31c16de173febcf09ab8c3a0a48"
+    },
+    {
+      "name": "20261104173842_parent_snap_submission_authorization.sql",
+      "sha256": "c8ce5f1fe21b656d94f0981870db238ecf7c5495815c03ae6ef6896b72cd12ae"
+    },
+    {
+      "name": "20261104190911_parent_snap_encrypted_packets.sql",
+      "sha256": "55be18a4ca82258aaa7297c1d628d74786e8c25337df410fdfd7ab2c8bdbc928"
+    },
+    {
+      "name": "20261104201514_parent_storage_artifact_immutability.sql",
+      "sha256": "02ecb4f3119feae50ab0dd68ac7fa09bd83e1b5dc517b2dcdfd3656a9eca353e"
+    },
+    {
+      "name": "20261104212630_parent_snap_protected_capture_authority.sql",
+      "sha256": "5a6939c00cf3cad34b38c71a1b63cdfc3dba05f7b26d06c9bf46afe32618358f"
+    },
+    {
+      "name": "20261105011520_parent_snap_capture_context.sql",
+      "sha256": "964ee3ad1770fbdb543a6302d2e1204f1ec3080af471025b82fe301ed70bdf8a"
+    },
+    {
+      "name": "20261105012309_parent_snap_protected_operation_binding.sql",
+      "sha256": "254f8d04c1e1d06e2ee32080d82279cf4ad2150e0088bd0fc1b363642db33e42"
+    },
+    {
+      "name": "20261105013703_parent_snap_protected_submission.sql",
+      "sha256": "cca0b639aa6d4c139e4ac7f06e06e3c9d321046cd4f0c66e2605c8e78b7e4998"
+    },
+    {
+      "name": "20261105020641_parent_snap_protected_operation_projection.sql",
+      "sha256": "0b0549009761c404c1596dc5b4a102f505ce5dd3926dbfb4fbeccf4a5dfa6c1d"
+    },
+    {
+      "name": "20261105021926_parent_snap_pending_capture.sql",
+      "sha256": "fcfbe567f84de401c0501c10561c957e3ca549ab2973337693c3f5c544b58fbb"
+    },
+    {
+      "name": "20261105025504_parent_snap_owned_review.sql",
+      "sha256": "7db8808b272494866a30f5bb42f76c5726be843656e164a5eb0c450fbdcc5f9e"
+    },
+    {
+      "name": "20261105195436_parent_snap_direct_construction.sql",
+      "sha256": "20ac7fada3df6cf3dcd905d7b3f8344e09b149fd4d1cd185d275b0656b350e11"
+    },
+    {
+      "name": "20261105203600_parent_snap_direct_acquisition.sql",
+      "sha256": "3c2e15ced271eaca6d9399158b77a401b7fafd77831881c81af301454889a521"
+    },
+    {
+      "name": "20261105211010_parent_snap_direct_construction_acquisition.sql",
+      "sha256": "c5cd2ca023e23be2d8589d39e5e1bb06df5c58330991741484c85fc33811a7ee"
+    },
+    {
+      "name": "20261105211853_parent_snap_linked_packet_authority.sql",
+      "sha256": "2be0f58c67b6a68425f9b24fa7b9d7652e4ed2e959876a77d4b4cc73c9b9c237"
+    },
+    {
+      "name": "20261105212440_parent_snap_direct_intent_recovery.sql",
+      "sha256": "a202809a4ca4172fd7b249a36ed9302208c95664ff88c16dd269970312a92c23"
+    },
+    {
+      "name": "20261105220209_parent_snap_verified_completion_route.sql",
+      "sha256": "233c2d69fa0b34a964c5798219744102b64c02871d7a9db60e10071079192756"
+    },
+    {
+      "name": "20261105220445_parent_snap_linked_retention_cleanup.sql",
+      "sha256": "7a485e4233852a6a51c991812fa352ddcab503f232a7e80d52ad58e55da0d7b4"
+    },
+    {
+      "name": "20261106051250_parent_food_journey_boundaries.sql",
+      "sha256": "0f2102b74a8abc1a61064dbbe66c5a5392de53b3cd0959a775723da97a507c1f"
+    },
+    {
+      "name": "20261106051804_parent_snap_deterministic_continuation.sql",
+      "sha256": "0a24a1e98284e3eb6c8b3e6dc2da09f4b8e4acf5ca5dcee7a6632b6702ae79b7"
+    },
+    {
+      "name": "20261107024524_parent_snap_acquisition_expiry.sql",
+      "sha256": "99678a5a1d81a4e32ce0a0e0a98c8be8b5ffc0ff1dd4c93d002eeef63e617c75"
+    },
+    {
+      "name": "20261107181301_parent_snap_direct_completion_continuation.sql",
+      "sha256": "4ca81d4772353f635d7c0bd83357ae07aeb04aad8e181d09caea13b630c56272"
+    },
+    {
+      "name": "20261107181433_parent_snap_delivery_intent.sql",
+      "sha256": "b148161028a115946f6142d6596a279d61aa93d3a36e1daa190eb3aab9ab925d"
+    },
+    {
+      "name": "20261108010000_parent_snap_agency_next_steps.sql",
+      "sha256": "cf244caa1a465fc76221379cfcf8bc35f4b5bbc0d636a252957b5fdcf95a0ac3"
+    },
+    {
+      "name": "20261108015124_parent_deletion_after_processing_closure.sql",
+      "sha256": "c2e0c93c7265ad95a9a4243200653b45b787228d1c9ee0cffc1fcc5860ed8335"
+    },
+    {
+      "name": "20261109182712_parent_pilot_account_scope.sql",
+      "sha256": "dc89a9dc048b1016a7e683cf854d7473ec35a66e7cc5dddc0dc1c80829738507"
+    }
+  ],
+  "pendingSources": [
+    {
+      "name": "20261113182609_parent_reusable_routing_information.sql",
+      "sha256": "1531392d2b946edd860800e2f775a99dee1243b2ce09985015cf3d8da18569ef"
+    },
+    {
+      "name": "20261113192838_parent_wic_private_application_details.sql",
+      "sha256": "74df78bd73fa48d69bf491cc41b7ab3c3716fecc2075e27d2fa641dfaf38a433"
+    },
+    {
+      "name": "20261113200717_parent_peco_private_application_details.sql",
+      "sha256": "64fab6022b2eaf86b1502fabdb0b5593b10839e4d338e67b733adafda537c86f"
+    },
+    {
+      "name": "20261113201714_parent_wic_document_boundary.sql",
+      "sha256": "566da84f7d5ce903d78fec5c793de46e80d11600e3b7c9600e15ee5949db1dcc"
+    },
+    {
+      "name": "20261113204551_parent_peco_private_document_boundary.sql",
+      "sha256": "f994470497c31d0ab613f3ac0b5dab8aa6ac58eba0f1d0172b8f4bd553b845e4"
+    },
+    {
+      "name": "20261113220718_parent_utility_preparation_document_scope.sql",
+      "sha256": "cfe8837a6530b3dc6e598ca825a1fc51cccb3b459fbf1033f784ff80b84df4b3"
+    },
+    {
+      "name": "20261113220747_parent_utility_protected_inputs.sql",
+      "sha256": "fce24baa251ef0455ae73ac81d44e019eb58d9bd807c3b2bb647c74ebfac24f8"
+    },
+    {
+      "name": "20261113221224_parent_water_private_application_details.sql",
+      "sha256": "6e0f02c0fe10dce258ec4cd584b4c123c58720ac74f52c1af96f01851d16ef69"
+    },
+    {
+      "name": "20261113222134_parent_pgw_private_application_details.sql",
+      "sha256": "25d7fa64be55476b891d03520446b06eba4a1231475cc77499f159d1124b61f6"
+    },
+    {
+      "name": "20261113231523_parent_utility_prepared_artifacts.sql",
+      "sha256": "bf85f48f5c349cde3d6ea15801d8d2fd30d41bf8f3e0dc56c3f6bf08d1742d46"
+    },
+    {
+      "name": "20261113231943_parent_utility_private_document_boundary.sql",
+      "sha256": "7f25ee8afeea9b844dc1bb159f816bd7cb4cc05a2fb9be8e8748e7c7c1c3edc8"
+    },
+    {
+      "name": "20261113234059_parent_utility_protected_reuse.sql",
+      "sha256": "a411ad6f425156d60f6988ad83c42678ec062f2c68fea00eb0b0ab0d97244722"
+    },
+    {
+      "name": "20261114013506_parent_utility_deterministic_preparation.sql",
+      "sha256": "51c4da125abbe0e1450aa0b1d92edacef3676c1eb655bd06e6c528b453d62a89"
+    },
+    {
+      "name": "20261114014202_parent_pgw_identifier_replacement.sql",
+      "sha256": "9fa84a4d5e7761de64eeb33e1260e90664a106fba3d77ccd356565c502390f12"
+    },
+    {
+      "name": "20261117175206_parent_family_profile.sql",
+      "sha256": "3642496bba06ea5aef36bc321ebec897cceb67cdda689b40c86c2ed95b9e8c7a"
+    },
+    {
+      "name": "20261117175622_parent_family_profile_application_reuse.sql",
+      "sha256": "70c94d14316e097aef873e0d641fa3fd782bf25044a1fbdf3d3cc74f05042a1c"
+    },
+    {
+      "name": "20261117184500_parent_assistant_account_context.sql",
+      "sha256": "68f71e42c96d9f0b133e1c9e7ae9a92fa0388aa701fab3bbe3ce3cce6d7e64bf"
+    },
+    {
+      "name": "20261117185443_parent_ordinary_private_text_guard.sql",
+      "sha256": "6647ed462240bb781c497f2464097929666b0d88abab12096c09bb1b8bb010e4"
+    },
+    {
+      "name": "20261118035851_parent_wic_application_reaffirmation.sql",
+      "sha256": "704fba3644aea0b219b0748bcb537d72b8b489f4f3e37166e24c918def503a23"
+    },
+    {
+      "name": "20261118043549_parent_job_plan_agency_observation_order.sql",
+      "sha256": "47e8932513212640ba945dd2944f73fb420a33561c2e1a8f93806a9f7896e21e"
+    },
+    {
+      "name": "20261118043758_parent_business_conflict_http_status.sql",
+      "sha256": "640d10a250043e8cb81088c428b9a9d1bf26c517623ca7576d3882b09c3f988e"
+    },
+    {
+      "name": "20261118050422_parent_public_food_access.sql",
+      "sha256": "bff804ca443c08f42ca83eb8f6a05545c58265ab00214806a504ace8e21c8882"
+    },
+    {
+      "name": "20261118080328_parent_public_food_snap_continuation.sql",
+      "sha256": "493ddbdcec095d1ef84ec22d601826e13c54f510d87167bb21a9dbffa81f34ca"
+    },
+    {
+      "name": "20261118080954_parent_snap_food_profile_sync.sql",
+      "sha256": "9f77e4004f1a982b610ebc919cfaae6a57104dd1b9e0514f6345b3531074182b"
+    },
+    {
+      "name": "20261118095752_parent_food_description_drafts.sql",
+      "sha256": "cec6c82530c392a9b875b6fd5b8eb18445f6519d41b6da15a0a2cc26e7566a17"
+    },
+    {
+      "name": "20261118113250_parent_food_description_resolution_and_start.sql",
+      "sha256": "6a8e4e49542071a55d31ae6a3823ec0afac69b88449552cce5630d57b94607b5"
+    },
+    {
+      "name": "20261118121535_parent_document_upload_recovery.sql",
+      "sha256": "ebf036092ce0160e1702b686f153734b4412dbd2578f54d102072bc321991ed1"
+    },
+    {
+      "name": "20261118121715_parent_snap_document_sources.sql",
+      "sha256": "389881b7c7a4e1072f0420d211083957b47b38f5dcb0f3843c472789b14abf37"
+    },
+    {
+      "name": "20261118121854_parent_job_claim_recheck.sql",
+      "sha256": "4667244aee8882c6f4f0b13d7ba9de991150d213e69602e176fd28785a286129"
+    },
+    {
+      "name": "20261118164420_parent_food_description_cache_usage.sql",
+      "sha256": "2cd28b2525d96f7e08b064b6e63704aa48a808f188615790bc68f03cd5ed58e8"
+    },
+    {
+      "name": "20261118185641_parent_preserve_snap_review_continuation.sql",
+      "sha256": "a25ac127259e0e5ae297d3da357b684c0ea3ee0e4f205cf696c82e9c8fc2fb6b"
+    },
+    {
+      "name": "20261118192225_parent_food_directory_report_binding.sql",
+      "sha256": "57e6b7204c69023dc238094b2490afc8023d32f79708b93375dc989b80cb2fa1"
+    },
+    {
+      "name": "20261118192417_parent_snap_ordinary_routing_reuse.sql",
+      "sha256": "c8a00cfdf7c9a7366a81d75a5247ec0bef4cf5d2f9ec786b03b592883d302d3d"
+    },
+    {
+      "name": "20261118192507_parent_support_update_receipts.sql",
+      "sha256": "91fc78f9ecb1979401cf7888d0553a3c01254cbd7f0b9ea87825e19edaae539b"
+    },
+    {
+      "name": "20261118194631_parent_food_directory_bounded_retry.sql",
+      "sha256": "9686cace69e59913d25c0d576210251566aa93fa1e1f0b5a6cfdb296fd073e32"
+    }
+  ],
+  "fixtureSql": {
+    "path": "tests/fixtures/parent/production-lineage-2026-11-18.sql",
+    "sha256": "0c02d2200c19b91cd8bb854a3b795fc5eb81dcb9775422962f5b9aa72033a68b"
+  },
+  "legacyFixtureSha256": "6cfeec08f296df754e9903ecd440780d00d18a78df7035a5152ff953a49a62ef",
+  "schemaEvidenceSha256": "80b8702e95b15e2bcdd86c6f7a69deb97005633592403f72d858028b7791ba1c",
+  "functionEvidenceSha256": "3dfffac5905d1a154b5f2535376528bbe173b4c6eac11f5ab51bd9e1fa450ccd",
+  "functions": [
+    {
+      "signature": "parent_authorization_window()",
+      "owner": "postgres",
+      "securityDefiner": false,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "authenticated=X/postgres"
+      ],
+      "sha256": "d783e5374c185eb5851ca3b952a053043c55f46dfa6a0f90668ceab32a277874"
+    },
+    {
+      "signature": "parent_capability_summary()",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "authenticated=X/postgres"
+      ],
+      "sha256": "bc234addbc152961f736758ebaadffdde1daad86b68fc48c4ba74c453a26611a"
+    },
+    {
+      "signature": "parent_private.current_grant(uuid,integer)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "sha256": "980b7378df01201e5e20fc732b2b3d5a6a308e060d1c24414d01f4e01bb48b52"
+    },
+    {
+      "signature": "parent_private.parent_authorize_storage(uuid,uuid,text,text,text)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_storage_broker=X/postgres"
+      ],
+      "sha256": "518e0dcc51e3e92bb9e602b09e06b5b4e2d1a5020b1439905826034f26222cf3"
+    },
+    {
+      "signature": "parent_private.parent_claim_assistant()",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_worker=X/postgres"
+      ],
+      "sha256": "604830fdbdd8722364eb85c04588abac2ca4d6a2d0971aa6c6101272b70bdf70"
+    },
+    {
+      "signature": "parent_private.parent_claim_cleanup(integer)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_retention_worker=X/postgres"
+      ],
+      "sha256": "c92bec2ed042cf9d3d8ed7a8dc41c3a5883e48c143b37dc2a5e941d3874fe290"
+    },
+    {
+      "signature": "parent_private.parent_claim_job(integer,boolean)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_worker=X/postgres"
+      ],
+      "sha256": "848ca32203567f00983f88a5c6081530f35418d1af47b2d8a10d35260790c35f"
+    },
+    {
+      "signature": "parent_private.parent_claim_job(integer)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_worker=X/postgres"
+      ],
+      "sha256": "7d596f8a49981fbbe34176a8847a280241c67c923d909f5735778f7412494d53"
+    },
+    {
+      "signature": "parent_private.parent_get_operations(uuid,uuid)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_worker=X/postgres"
+      ],
+      "sha256": "863ad3f463506574353ed49f095f3fabb4ebced1315798dbc327fe98e0bd731d"
+    },
+    {
+      "signature": "parent_private.parent_reserve_snap_delivery(jsonb)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "parent_snap_sender=X/postgres"
+      ],
+      "sha256": "25e8b99c127bafaf27a6e35217eb9f00e60db9be4d3d81d222c45e3e2d6c3b76"
+    },
+    {
+      "signature": "parent_private.processing_enabled()",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "sha256": "dbeb3d0fe73d420aa7685a4ccc74b14e1d509cbc9ec73e0d52d8a89bbc47f410"
+    },
+    {
+      "signature": "parent_private.request_progress(uuid)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "sha256": "28e803e32c5d5be35d984298ddb9567316b5d69f173ef64ffe6535a35dba16ce"
+    },
+    {
+      "signature": "parent_private.reserve_model_capacity()",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "sha256": "b8221b5b3cb35a6e63399786a180ccba32371e7ce937f317c76c77f9bf7e2226"
+    },
+    {
+      "signature": "parent_private.snap_delivery_check_route(parent_operations,parent_private.snap_delivery_intents)",
+      "owner": "postgres",
+      "securityDefiner": false,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "sha256": "736c594dd2fee11224330d670a60295f2314c0e1b8ad2875e91ccf7db3137238"
+    },
+    {
+      "signature": "parent_private.snap_details_collection_enabled()",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "authenticated=X/postgres"
+      ],
+      "sha256": "6b3d1ed4ba05d4e1f6af007574852437993cbf534af4c08e8ff90d96e1258815"
+    },
+    {
+      "signature": "parent_private.snap_direct_acquisition_authority(uuid,uuid,integer,uuid,text)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "sha256": "0b719a0a7e5f5fc2a7fb6abd10129fd648462d18a36206a1aaaeb2c5f837a850"
+    },
+    {
+      "signature": "parent_snap_application_collection()",
+      "owner": "postgres",
+      "securityDefiner": false,
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "acl": [
+        "postgres=X/postgres",
+        "authenticated=X/postgres"
+      ],
+      "sha256": "8990151c32a30b68bfecbdcb406dedda14d67ae03f5d3d0c1678f3fc57da08ff"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.guard_snap_test_authorization()",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": true,
+      "sha256": "5afaf98f3109f6531832bc06f73c3f09e2bc21459485381157fca205b9da5922"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.guard_snap_test_outcome()",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": true,
+      "sha256": "53740e53b126189c013f8d59f77b98c1883658aebb426843f73770fc895bcdfb"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "parent_snap_sender=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.parent_recheck_snap_test_delivery(jsonb)",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": true,
+      "sha256": "ed940a5f70bef830849c5614b9140fdac18cf3d49d687304b3c68a7335518dc0"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "parent_snap_sender=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.parent_reserve_snap_test_delivery(jsonb)",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": true,
+      "sha256": "8069c43cfd227b00187c7a94ca89bbf8c515b2100a5410baf899be5ff1e6d668"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "parent_snap_sender=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.parent_resume_snap_test_delivery(jsonb)",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": true,
+      "sha256": "1708b9b714580a9e2375f3bfacc08cfaa7331e72693f47cad447480e2bdc63bd"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.preserve_snap_test_request()",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": false,
+      "sha256": "a7072cfce3a64f35669b859f1eedc08f2c4735c99d7ed6fb1fb1e1510ff07dd9"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.snap_controlled_test_binding(uuid,uuid,text)",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": true,
+      "sha256": "51afffd9037c4b63f535f0792756a1ccf3e0600ddc57b333710d03906f42003f"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "owner": "postgres",
+      "signature": "parent_private.snap_test_delivery_check_route(parent_operations,parent_private.snap_delivery_intents)",
+      "searchPath": [
+        "search_path=\"\""
+      ],
+      "securityDefiner": false,
+      "sha256": "470eff037da12729b658c2d7c99a7a05450d2bfa555a62296861725e156d0e27"
+    }
+  ],
+  "controlledSchema": {
+    "tables": [
+      {
+        "acl": [
+          "postgres=arwdDxtm/postgres"
+        ],
+        "rls": true,
+        "name": "snap_controlled_tests",
+        "owner": "postgres",
+        "schema": "parent_private",
+        "forceRls": false
+      },
+      {
+        "acl": [
+          "postgres=arwdDxtm/postgres"
+        ],
+        "rls": true,
+        "name": "snap_delivery_intents",
+        "owner": "postgres",
+        "schema": "parent_private",
+        "forceRls": false
+      },
+      {
+        "acl": [
+          "postgres=arwdDxtm/postgres",
+          "authenticated=r/postgres"
+        ],
+        "rls": true,
+        "name": "parent_operations",
+        "owner": "postgres",
+        "schema": "public",
+        "forceRls": false
+      },
+      {
+        "acl": [
+          "postgres=arwdDxtm/postgres",
+          "authenticated=r/postgres"
+        ],
+        "rls": true,
+        "name": "parent_requests",
+        "owner": "postgres",
+        "schema": "public",
+        "forceRls": false
+      },
+      {
+        "acl": [
+          "postgres=arwdDxtm/postgres"
+        ],
+        "rls": true,
+        "name": "provider_capabilities",
+        "owner": "postgres",
+        "schema": "parent_private",
+        "forceRls": false
+      },
+      {
+        "acl": [
+          "postgres=arwdDxtm/postgres"
+        ],
+        "rls": true,
+        "name": "receipt_authority",
+        "owner": "postgres",
+        "schema": "parent_private",
+        "forceRls": false
+      }
+    ],
+    "columns": [
+      {
+        "acl": null,
+        "name": "request_id",
+        "type": "uuid",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 1,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "owner_id",
+        "type": "uuid",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 2,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "snapshot_id",
+        "type": "uuid",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 3,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "snapshot_hash",
+        "type": "text",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 4,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "project_id",
+        "type": "text",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 5,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "service_id",
+        "type": "text",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 6,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "from_number",
+        "type": "text",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 7,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "enabled",
+        "type": "boolean",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": "false",
+        "notNull": true,
+        "ordinal": 8,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "evidence_reference",
+        "type": "text",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 9,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": "clock_timestamp()",
+        "notNull": true,
+        "ordinal": 10,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 11,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "operation_id",
+        "type": "uuid",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 1,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "intent",
+        "type": "jsonb",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 2,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "route",
+        "type": "jsonb",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 3,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "reserved_lease_token",
+        "type": "uuid",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 4,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "attempted_at",
+        "type": "timestamp with time zone",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": "clock_timestamp()",
+        "notNull": true,
+        "ordinal": 5,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "dispatch_authorized_at",
+        "type": "timestamp with time zone",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": false,
+        "ordinal": 6,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "dispatch_expires_at",
+        "type": "timestamp with time zone",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 7,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "provider_id",
+        "type": "text",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": false,
+        "ordinal": 8,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "provider_status",
+        "type": "text",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": "'UNKNOWN'::text",
+        "notNull": true,
+        "ordinal": 9,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "table": "snap_delivery_intents",
+        "schema": "parent_private",
+        "default": "clock_timestamp()",
+        "notNull": true,
+        "ordinal": 10,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": "gen_random_uuid()",
+        "notNull": true,
+        "ordinal": 1,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "request_id",
+        "type": "uuid",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 2,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "request_version",
+        "type": "integer",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 3,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "program_id",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 4,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "need",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 5,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "action",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 6,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "packet",
+        "type": "jsonb",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 7,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "packet_hash",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 8,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "data_categories",
+        "type": "text[]",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 9,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "document_ids",
+        "type": "uuid[]",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": "'{}'::uuid[]",
+        "notNull": true,
+        "ordinal": 10,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "idempotency_key",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 11,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "permission_version",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 12,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "state",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": "'prepared'::text",
+        "notNull": true,
+        "ordinal": 13,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "evidence",
+        "type": "jsonb",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 14,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": "now()",
+        "notNull": true,
+        "ordinal": 15,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "executed_at",
+        "type": "timestamp with time zone",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 16,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": "now()",
+        "notNull": true,
+        "ordinal": 17,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "artifact_id",
+        "type": "uuid",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 18,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "mandate_hash",
+        "type": "text",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 19,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "authorization_snapshot",
+        "type": "jsonb",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 20,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "controlled_test",
+        "type": "boolean",
+        "table": "parent_operations",
+        "schema": "public",
+        "default": "false",
+        "notNull": true,
+        "ordinal": 21,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "gen_random_uuid()",
+        "notNull": true,
+        "ordinal": 1,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "household_id",
+        "type": "uuid",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 2,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "start_key",
+        "type": "uuid",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "gen_random_uuid()",
+        "notNull": true,
+        "ordinal": 3,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "status",
+        "type": "text",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'active'::text",
+        "notNull": true,
+        "ordinal": 4,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "intake",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 5,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "mandate",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": null,
+        "notNull": true,
+        "ordinal": 6,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "mandate_revoked_at",
+        "type": "timestamp with time zone",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 7,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "plan",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 8,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "required_actions",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'[]'::jsonb",
+        "notNull": true,
+        "ordinal": 9,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "version",
+        "type": "integer",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "1",
+        "notNull": true,
+        "ordinal": 10,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "next_actor",
+        "type": "text",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'caselink'::text",
+        "notNull": true,
+        "ordinal": 11,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "next_trigger",
+        "type": "text",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'job_due'::text",
+        "notNull": true,
+        "ordinal": 12,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "next_run_at",
+        "type": "timestamp with time zone",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "now()",
+        "notNull": false,
+        "ordinal": 13,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "now()",
+        "notNull": true,
+        "ordinal": 14,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "now()",
+        "notNull": true,
+        "ordinal": 15,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "facts",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'[]'::jsonb",
+        "notNull": true,
+        "ordinal": 16,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "closed_reason",
+        "type": "text",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": null,
+        "notNull": false,
+        "ordinal": 17,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "account_changed_at",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'{}'::jsonb",
+        "notNull": true,
+        "ordinal": 18,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "intake_confirmed_at",
+        "type": "jsonb",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'{}'::jsonb",
+        "notNull": true,
+        "ordinal": 19,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "intake_need_scoped_fields",
+        "type": "text[]",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "'{}'::text[]",
+        "notNull": true,
+        "ordinal": 20,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "controlled_test",
+        "type": "boolean",
+        "table": "parent_requests",
+        "schema": "public",
+        "default": "false",
+        "notNull": true,
+        "ordinal": 21,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "program_id",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 1,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "action",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 2,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "enabled",
+        "type": "boolean",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": "false",
+        "notNull": true,
+        "ordinal": 3,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "transport_verified",
+        "type": "boolean",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": "false",
+        "notNull": true,
+        "ordinal": 4,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "requires_form",
+        "type": "boolean",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": "false",
+        "notNull": false,
+        "ordinal": 5,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "permission_version",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 6,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "permission_reference",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 7,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "allowed_fields",
+        "type": "text[]",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": "'{}'::text[]",
+        "notNull": true,
+        "ordinal": 8,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "field_categories",
+        "type": "jsonb",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": "'{}'::jsonb",
+        "notNull": true,
+        "ordinal": 9,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "required_acts",
+        "type": "text[]",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": false,
+        "ordinal": 10,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "verified_until",
+        "type": "timestamp with time zone",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 11,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "snap_direct_completion_version",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": false,
+        "ordinal": 12,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "snap_direct_completion_evidence_reference",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": false,
+        "ordinal": 13,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "execution_kind",
+        "type": "text",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "default": "'live'::text",
+        "notNull": true,
+        "ordinal": 14,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "operation_id",
+        "type": "uuid",
+        "table": "receipt_authority",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 1,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "job_id",
+        "type": "uuid",
+        "table": "receipt_authority",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 2,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "lease_token",
+        "type": "uuid",
+        "table": "receipt_authority",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 3,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "packet_hash",
+        "type": "text",
+        "table": "receipt_authority",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 4,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "valid_until",
+        "type": "timestamp with time zone",
+        "table": "receipt_authority",
+        "schema": "parent_private",
+        "default": null,
+        "notNull": true,
+        "ordinal": 5,
+        "identity": "",
+        "generated": ""
+      }
+    ],
+    "indexes": [
+      {
+        "name": "parent_one_snap_controlled_test",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "definition": "CREATE UNIQUE INDEX parent_one_snap_controlled_test ON parent_private.snap_controlled_tests USING btree (enabled) WHERE enabled"
+      },
+      {
+        "name": "snap_controlled_tests_pkey",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "definition": "CREATE UNIQUE INDEX snap_controlled_tests_pkey ON parent_private.snap_controlled_tests USING btree (request_id)"
+      }
+    ],
+    "policies": null,
+    "triggers": [
+      {
+        "name": "parent_snap_test_authorization",
+        "table": "snap_final_packet_authorizations",
+        "schema": "parent_private",
+        "enabled": "O",
+        "function": "parent_private.guard_snap_test_authorization()",
+        "definition": "CREATE TRIGGER parent_snap_test_authorization BEFORE INSERT ON parent_private.snap_final_packet_authorizations FOR EACH ROW EXECUTE FUNCTION parent_private.guard_snap_test_authorization()"
+      },
+      {
+        "name": "parent_snap_test_outcome",
+        "table": "parent_operations",
+        "schema": "public",
+        "enabled": "O",
+        "function": "parent_private.guard_snap_test_outcome()",
+        "definition": "CREATE TRIGGER parent_snap_test_outcome BEFORE INSERT OR UPDATE ON parent_operations FOR EACH ROW EXECUTE FUNCTION parent_private.guard_snap_test_outcome()"
+      },
+      {
+        "name": "parent_preserve_snap_test_request",
+        "table": "parent_requests",
+        "schema": "public",
+        "enabled": "O",
+        "function": "parent_private.preserve_snap_test_request()",
+        "definition": "CREATE TRIGGER parent_preserve_snap_test_request BEFORE UPDATE ON parent_requests FOR EACH ROW EXECUTE FUNCTION parent_private.preserve_snap_test_request()"
+      }
+    ],
+    "constraints": [
+      {
+        "name": "snap_controlled_tests_check",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (expires_at > created_at)"
+      },
+      {
+        "name": "snap_controlled_tests_evidence_reference_check",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (length(btrim(evidence_reference)) >= 1 AND length(btrim(evidence_reference)) <= 2000)"
+      },
+      {
+        "name": "snap_controlled_tests_from_number_check",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (from_number ~ '^\\+1[2-9][0-9]{9}$'::text AND from_number <> '+19898989898'::text)"
+      },
+      {
+        "name": "snap_controlled_tests_owner_id_fkey",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "FOREIGN KEY (owner_id) REFERENCES parent_accounts(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "snap_controlled_tests_pkey",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "PRIMARY KEY (request_id)"
+      },
+      {
+        "name": "snap_controlled_tests_project_id_check",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (project_id ~ '^[A-Za-z0-9_-]{1,100}$'::text)"
+      },
+      {
+        "name": "snap_controlled_tests_request_id_fkey",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "FOREIGN KEY (request_id) REFERENCES parent_requests(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "snap_controlled_tests_service_id_check",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (service_id ~ '^[A-Za-z0-9_-]{1,100}$'::text)"
+      },
+      {
+        "name": "snap_controlled_tests_snapshot_hash_check",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (snapshot_hash ~ '^[a-f0-9]{64}$'::text)"
+      },
+      {
+        "name": "snap_controlled_tests_snapshot_id_fkey",
+        "table": "snap_controlled_tests",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "FOREIGN KEY (snapshot_id) REFERENCES parent_snap_application_details(id) ON DELETE CASCADE"
+      },
+      {
+        "name": "provider_capabilities_execution_kind_check",
+        "table": "provider_capabilities",
+        "schema": "parent_private",
+        "validated": true,
+        "definition": "CHECK (execution_kind = ANY (ARRAY['live'::text, 'sinch_emulation'::text]))"
+      }
+    ]
+  }
+}
