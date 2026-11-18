@@ -1255,6 +1255,9 @@
 .document > div {
   min-width: 0;
 }
+.documents .document > button {
+  flex: none;
+}
 .document strong {
   display: block;
   overflow-wrap: anywhere;
@@ -1280,6 +1283,25 @@
 }
 .upload svg {
   color: var(--color-accent);
+}
+@media (max-width: 35rem) {
+  /* Keep a useful reading width when text grows inside the document panel. */
+  .surface.documents,
+  .documents .upload,
+  .documents .notice,
+  .documents .error,
+  .documents .success {
+    padding: 12px;
+  }
+  .documents .document,
+  .documents .checkbox,
+  .documents .notice {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .documents .document > button {
+    align-self: flex-start;
+  }
 }
 .disclosure {
   border-top: 1px solid var(--color-rule);

@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { Camera, Lock, Page, Trash, Upload } from "iconoir-react";
 import type { ParentDocument } from "@/lib/parent/domain";
 import { parentApi, displayDate } from "./api";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 export function SupportDocuments({
@@ -18,6 +19,7 @@ export function SupportDocuments({
   inactive: boolean;
   onChange: () => void;
 }) {
+  const { locale, t } = useParentLocale();
   const [consent, setConsent] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
@@ -92,15 +94,16 @@ export function SupportDocuments({
     }
   }
   return (
-    <section className={styles.surface} aria-labelledby={`${uploadId}-title`}>
-      <h2 id={`${uploadId}-title`}>Bills & documents</h2>
+    <section lang={locale} className={`${styles.surface} ${styles.documents}`} aria-labelledby={`${uploadId}-title`}>
+      <h2 id={`${uploadId}-title`}>{t("Bills & documents")}</h2>
       <p className={`${styles.subtle} ${styles.small}`}>
-        Optional unless a selected program needs one. You can enter information
-        yourself instead.
+        {t("Optional unless a selected program needs one. You can enter information yourself instead.")}
       </p>
       {documents.length > 0 ? (
         <ul className={styles.documentList}>
-          {documents.map((document) => (
+          {documents.map((document) => {
+            const status = document.status.replaceAll("_", " ");
+            return (
             <li className={styles.document} key={document.id}>
               <div className={styles.inline}>
                 <Page width={22} height={22} aria-hidden="true" />
@@ -108,8 +111,8 @@ export function SupportDocuments({
                   <strong>{document.filename}</strong>
                   <span>
                     {document.status === "raw_deleted"
-                      ? "Original file removed; validated facts remain"
-                      : `${document.status.replaceAll("_", " ")} · Raw file expires ${displayDate(document.expires_at)}`}
+                      ? t("Original file removed; validated facts remain")
+                      : <><span lang={t(status) === status ? "en" : locale}>{t(status)}</span>{" · "}{t("Raw file expires")}{" "}{displayDate(document.expires_at, false, locale)}</>}
                   </span>
                 </div>
               </div>
@@ -117,31 +120,28 @@ export function SupportDocuments({
                 className={styles.quiet}
                 disabled={pending}
                 onClick={() => remove(document)}
-                aria-label={`Delete ${document.filename}`}
+                aria-label={`${t("Delete")} ${document.filename}`}
               >
                 <Trash width={18} height={18} aria-hidden="true" />
-                Delete
+                {t("Delete")}
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : (
         <p className={`${styles.hint} ${styles.space}`}>
-          No documents added. Optional uploads do not hold up your request.
+          {t("No documents added. Optional uploads do not hold up your request.")}
         </p>
       )}
       {!inactive && (
         <details className={styles.disclosure}>
-          <summary>Add a document or take a photo</summary>
+          <summary>{t("Add a document or take a photo")}</summary>
           <div>
             <div className={styles.notice}>
               <Lock width={20} height={20} aria-hidden="true" />
               <p>
-                Share only a bill, benefit notice or requested supporting
-                document. Do not upload passwords, EBT PINs or identity
-                documents. Your document may be read by AI to extract relevant
-                facts for this request. It stays private. Its initial expiry is
-                seven days after upload; you can request earlier deletion here.
+                {t("Share only a bill, benefit notice or requested supporting document. Do not upload passwords, EBT PINs or identity documents. Your document may be read by AI to extract relevant facts for this request. It stays private. Its initial expiry is seven days after upload; you can request earlier deletion here.")}
               </p>
             </div>
             <form
@@ -158,13 +158,12 @@ export function SupportDocuments({
                   }}
                 />
                 <span>
-                  I agree to private storage and AI processing of this document
-                  for this support request.{" "}
+                  {t("I agree to private storage and AI processing of this document for this support request.")}{" "}
                   <Link
                     className={styles.textLink}
                     href="/support/privacy#documents"
                   >
-                    Read document privacy details.
+                    {t("Read document privacy details.")}
                   </Link>
                 </span>
               </label>
@@ -173,7 +172,7 @@ export function SupportDocuments({
                   <div className={styles.upload}>
                     <Upload width={28} height={28} aria-hidden="true" />
                     <label htmlFor={`${uploadId}-file`}>
-                      Choose a bill or notice
+                      {t("Choose a bill or notice")}
                     </label>
                     <input
                       id={`${uploadId}-file`}
@@ -185,7 +184,7 @@ export function SupportDocuments({
                       }}
                     />
                     <p className={styles.hint}>
-                      JPEG, PNG or readable PDF · Up to 10 MB and five pages
+                      {t("JPEG, PNG or readable PDF · Up to 10 MB and five pages")}
                     </p>
                   </div>
                   <div className={styles.field}>
@@ -194,7 +193,7 @@ export function SupportDocuments({
                       htmlFor={`${uploadId}-camera`}
                     >
                       <Camera width={19} height={19} aria-hidden="true" />
-                      Take a photo
+                      {t("Take a photo")}
                     </label>
                     <input
                       id={`${uploadId}-camera`}
@@ -208,14 +207,12 @@ export function SupportDocuments({
                       }}
                     />
                     <p className={styles.hint}>
-                      Include the full page. Use good light, keep it flat, and
-                      make sure dates and amounts are readable. You can retake a
-                      photo before uploading.
+                      {t("Include the full page. Use good light, keep it flat, and make sure dates and amounts are readable. You can retake a photo before uploading.")}
                     </p>
                   </div>
                   {file && (
                     <p className={styles.hint}>
-                      Ready to upload: <strong>{file.name}</strong> (
+                      {t("Ready to upload:")} <strong>{file.name}</strong> (
                       {(file.size / 1024 / 1024).toFixed(1)} MB)
                     </p>
                   )}
@@ -224,7 +221,7 @@ export function SupportDocuments({
                     type="submit"
                     disabled={pending || !file}
                   >
-                    {pending ? "Uploading securely…" : "Upload privately"}
+                    {t(pending ? "Uploading securely…" : "Upload privately")}
                   </button>
                 </div>
               )}
@@ -234,12 +231,12 @@ export function SupportDocuments({
       )}
       {message && (
         <p className={`${styles.success} ${styles.space}`} role="status">
-          {message}
+          {t(message)}
         </p>
       )}
       {error && (
-        <p className={`${styles.error} ${styles.space}`} role="alert">
-          {error}
+        <p lang={t(error) === error ? "en" : locale} className={`${styles.error} ${styles.space}`} role="alert">
+          {t(error)}
         </p>
       )}
     </section>
