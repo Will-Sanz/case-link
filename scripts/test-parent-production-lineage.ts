@@ -13,10 +13,10 @@ const port=58422;
 export function assertNativeLineageTarget(value:string){
   const url=new URL(value);assert.equal(url.protocol,"postgresql:");assert.equal(url.hostname,"127.0.0.1");assert.equal(url.port,String(port));assert.equal(url.username,"postgres");assert.equal(url.password,"postgres");assert.equal(url.search+url.hash,"");assert.match(url.pathname,/^\/(?:postgres|caselink_parent_lineage_[a-f0-9]{32})$/);return value;
 }
-function canonical(value:unknown):unknown {if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)]));return value;}
+function canonical(value:unknown):unknown {if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)]));return value;}
 const encode=(value:unknown)=>JSON.stringify(canonical(value));
 type Inventory=Record<string,Record<string,unknown>[]>;
-function fingerprint(snapshot:Inventory){return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>{const sorted=(rows??[]).map(canonical).sort((a,b)=>encode(a).localeCompare(encode(b)));return[key,{count:sorted.length,sha256:lineageHash(encode(sorted))}];}));}
+export function fingerprint(snapshot:Inventory){return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>{const sorted=(rows??[]).map(canonical).sort((a,b)=>encode(a)<encode(b)?-1:encode(a)>encode(b)?1:0);return[key,{count:sorted.length,sha256:lineageHash(encode(sorted))}];}));}
 export function schoolInventory(snapshot:Inventory):Inventory{return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>[key,(rows??[]).filter(row=>{const name=String(row.table??row.name??(row.schemaname&&row.tablename?`${row.schemaname}.${row.tablename}`:""));return !/^public\.parent_/.test(name);})]));}
 
 /** No URL/configuration input: this script can create and remove only its own disposable loopback cluster. */

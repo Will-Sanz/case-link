@@ -2222,6 +2222,7 @@ async function main() {
       check(await first.page.getByLabel("Your last name").inputValue() === "Parent" && await first.page.getByLabel("Your date of birth").inputValue() === "1988-04-15" &&
         await first.page.locator('[data-snap-path="address.street"]').inputValue() === "125 Synthetic Lane" && await first.page.locator('[data-snap-path="zip"]').inputValue() === "19129",
       "The actual mixed private form reuses the owned fresh profile without asking for the supplied names, birth date or address again.");
+      await first.page.getByRole("button", { name: "Use applicant ZIP code for support routing", exact: true }).click();
       for (const [path, value] of Object.entries({ interpreter: "no", "income.hasIncome": "no",
         "screening.lowCashAndIncome": "no", "screening.migrantOrSeasonal": "no", "screening.belowShelterCosts": "no",
         "history.fleeingOrProbation.answer": "no", "history.welfareFraud.answer": "no", "history.otherStateDisqualification.answer": "no",
@@ -2253,6 +2254,8 @@ async function main() {
       const privateMixedId = (await committedStart.response.json()).request.id as string;
       const privateMixedBody = committedStart.request.postDataJSON(), privateMixedKey = committedStart.request.headers()["idempotency-key"];
       assert.deepEqual(privateMixedBody.intake.needs, ["food_now", "snap_new"]);
+      check(privateMixedBody.intake.zip === "19129" && privateMixedBody.details.zip === "19129" && !privateMixedBody.reusedZip,
+        "This Share-specific lifecycle explicitly chooses the known applicant ZIP for routing instead of silently replacing the earlier saved routing ZIP.");
       check(privateMixedBody.kind === "snap_application" && privateMixedBody.noticeVersion === SNAP_APPLICATION_NOTICE_VERSION &&
         privateMixedBody.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM) && privateMixedBody.mandate.recipientIds.includes("snap-pa") &&
         privateMixedBody.familyProfileSource.expectedOwnerId === first.id && privateMixedBody.familyProfileSource.revision === 1 && !!privateMixedKey,

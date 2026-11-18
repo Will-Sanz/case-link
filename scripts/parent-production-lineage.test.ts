@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { createParentSqlFixture } from "./parent-sql-fixture";
-import { executeLineageSql, installObservedProductionSchema, assertObservedProductionSchema, loadProductionLineage, validateProductionLineage, applyPendingProductionSources } from "./parent-production-lineage";
+import { lineageHash, executeLineageSql, installObservedProductionSchema, assertObservedProductionSchema, loadProductionLineage, validateProductionLineage, applyPendingProductionSources } from "./parent-production-lineage";
 import { rehearseParentProductionUpgrade } from "./parent-production-lineage-cases";
-import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory } from "./test-parent-production-lineage";
+import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory, fingerprint } from "./test-parent-production-lineage";
 
 const modulePath=process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
 let fixture:Awaited<ReturnType<typeof createParentSqlFixture>>;
@@ -47,4 +47,14 @@ it.skipIf(!modulePath)("refuses an observed schema missing the one-enabled-contr
 });
 it.skipIf(!modulePath)("upgrades all35 pending files from the observed parent lineage",async()=>{
   expect(await rehearseParentProductionUpgrade(fixture.admin,{embedded:true})).toMatchObject({observedFunctions:25,ongoingInfinityPreserved:true,preSubmitReviewWithoutDispatch:true,publicDirectoryAndMixedIsolation:true,modelCalls:0,providerCalls:0});
+});
+
+it("uses the existing byte order for historical schema fingerprints, independent of host locale",()=>{
+  const rows=[{name:"public.a"},{name:"public_A"},{name:"public.A"},{name:"public._function"}];
+  expect(fingerprint({policies:rows})).toEqual({policies:{count:4,sha256:lineageHash(JSON.stringify([rows[2],rows[3],rows[0],rows[1]]))}});
+});
+
+it("canonicalizes schema row keys with the historical byte order",()=>{
+  const row={a:1,A:2,_:3};
+  expect(fingerprint({policies:[row]})).toEqual({policies:{count:1,sha256:lineageHash('[{"A":2,"_":3,"a":1}]')}});
 });
