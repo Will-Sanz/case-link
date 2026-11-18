@@ -75,3 +75,11 @@ Initial CI on `5c1be26` failed before jobs because job-level `runner.temp` is un
 The automatic Vercel branch build is a protected preview, not the existing Azure production site; committed main auto-deployment is disabled. No production rollout occurred.
 
 Two broad local parent runs retain failure history: restricted listener setup caused47 HTTP-fixture failures plus the old all-support assertion (6,161 passes); permitted rerun passed6,209 and failed one newly added profile-collection regression against code loaded before its final repair. That run started23:07:02; the final repaired WIC198-case run started23:07:46. A fresh frozen-candidate whole run is still required; a targeted pass does not erase the broad result.
+
+## CI-discovered verification/security repairs
+
+The complete hosted-process fixture now includes its actual `tokens.css` startup dependency. All three real child-process/expiry/shutdown regressions pass, including an independent rerun with the fixed loopback port unoccupied. An attempted local run with the task's preview occupying3200 failed and was correctly repeated only after stopping that known synthetic process; production was untouched.
+
+Protected-page dynamic request/input/version URL components now use native percent encoding. Two actual-browser adversarial DOM-metadata regressions failed before the repair and pass afterward; all18 protected-page cases pass, including independent browser/privacy/recovery/accessibility checks. Normal and separate simplicity review found no remaining actionable finding. Actual GitHub CodeQL clearance is still required; no alert was dismissed or check bypassed.
+
+On published `f5164d0`, GitHub `database-security` completed successfully, including real isolated DB/Auth/restore/legacy/profile/protected/parent-chat/PDF checks. The parent-native job still failed the unchanged409 replay contract after its DB/build checks succeeded; the next source records the actual HTTP status for diagnosis. No green whole/native-release claim is made.

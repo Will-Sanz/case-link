@@ -15,7 +15,7 @@ function startProtectedPage() {
   type Attempt = { inputId: string; purpose: string; body?: string; bytes?: Uint8Array; file?: File; reuseId?: string };
   const data = JSON.parse(document.getElementById("protected-data")!.textContent!) as { workspace: UtilityProtectedWorkspace; route: { requestId: string; expectedVersion: number }; labels: Record<string, string> };
   const { workspace: workspace, route: route, labels } = data;
-  const base = `/protected/utilities/requests/${route.requestId}`, query = `?expectedVersion=${route.expectedVersion}`;
+  const base = `/protected/utilities/requests/${encodeURIComponent(route.requestId)}`, query = `?expectedVersion=${encodeURIComponent(route.expectedVersion)}`;
   const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T | null;
   const form = element<HTMLFormElement>("protected-form"), consent = element<HTMLInputElement>("protected-consent"), purpose = element<HTMLSelectElement>("protected-purpose"), target = element<HTMLSelectElement>("protected-target");
   let references = [...workspace.references], attempt: Attempt | null = null, busy = false, disposed = false;
@@ -24,8 +24,8 @@ function startProtectedPage() {
   const error = (text = "") => { const node = element("protected-error")!; node.hidden = !text; node.textContent = text; };
   const input = (id: string) => element<HTMLInputElement>(id)!;
   const descriptor = () => target && target.value !== "" ? workspace.targets[Number(target.value)] : undefined;
-  const inputUrl = (id: string, operation = "") => `${base}/inputs/${id}${operation}${query}`;
-  const refresh = (version = workspace.requestVersion) => location.replace(`${base}/workspace?expectedVersion=${version}`);
+  const inputUrl = (id: string, operation = "") => `${base}/inputs/${encodeURIComponent(id)}${operation}${query}`;
+  const refresh = (version = workspace.requestVersion) => location.replace(`${base}/workspace?expectedVersion=${encodeURIComponent(version)}`);
   const sameTarget = (a: Reference["targets"][number], b: Reference["targets"][number]) => a.subjectId === b.subjectId && a.sourceId === b.sourceId && a.field === b.field;
   const fieldsChecked = (reference: Reference) => !!reference.validation && Date.parse(reference.validation.validatedAt) <= Date.now() && Date.now() < Date.parse(reference.validation.expiresAt);
   const current = (reference: Reference) => !!workspace.scope && reference.requestVersion === workspace.scope.expectedVersion && reference.snapshotId === workspace.scope.snapshotId && reference.snapshotRevision === workspace.scope.snapshotRevision && reference.snapshotHash === workspace.scope.snapshotHash;

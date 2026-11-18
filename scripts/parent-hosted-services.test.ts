@@ -10,7 +10,7 @@ const paths: string[] = [], children: ChildProcess[] = [];
 afterEach(() => { for (const child of children.splice(0)) if (child.exitCode === null) child.kill("SIGKILL"); for (const path of paths.splice(0)) rmSync(path, { recursive: true, force: true }); });
 function launch(seconds: number, enabled = true) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "caselink-hosted-process-"))); paths.push(dir); chmodSync(dir, 0o700);
-  for (const name of ["node_modules", "src", "scripts", "tsconfig.json"]) symlinkSync(resolve(name), join(dir, name));
+  for (const name of ["node_modules", "src", "scripts", "tsconfig.json", "tokens.css"]) symlinkSync(resolve(name), join(dir, name));
   const config = join(dir, "profile.json");
   writeFileSync(config, JSON.stringify({ service: "frontdoor", enabled, publicOrigin: "https://pilot.thecaselink.com", projectOrigin: HOSTED_PROJECT,
     approvalReference: "synthetic process shutdown test", approvedUntil: new Date(Date.now() + seconds * 1000).toISOString() }), { mode: 0o600 });

@@ -172,6 +172,26 @@ async function identifier() { await choose(); await page.locator("#protected-ide
     expect(await page.locator("#protected-target option:checked").textContent()).toBe("Fresh owned person after return");
     expect(await page.locator("#protected-identifier-value").inputValue()).toBe(""); expect(await page.locator("#protected-consent").isChecked()).toBe(false); expect(calls).toHaveLength(0);
   });
+  it.each(["refresh", "download"])("keeps DOM metadata inside its URL components during %s", async action => {
+    workspace.references = [reference(id(16), "stored")];
+    const requestValue = `${requestId}/../../outside?unexpected=1#`, inputValue = `${id(16)}/../outside?unexpected=2#`;
+    actualHtml = renderUtilityProtectedPage(workspace, { requestId, expectedVersion: 2, nonce }).replace(
+      /(<script id="protected-data"[^>]*>)(.*?)(<\/script>)/,
+      (_match, opening, encoded, closing) => {
+        const data = JSON.parse(encoded); data.route.requestId = requestValue; data.workspace.references[0].inputId = inputValue;
+        return `${opening}${JSON.stringify(data)}${closing}`;
+      },
+    );
+    await load();
+    await page.route("**/protected/utilities/**", route => route.fulfill({ contentType: "text/html", body: "Navigation received." }));
+    const navigation = page.waitForRequest(request => request.isNavigationRequest());
+    if (action === "refresh") await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+    else await page.getByRole("button", { name: "Download private original" }).click();
+    const url = new URL((await navigation).url());
+    expect(url.origin).toBe(origin);
+    expect(url.pathname).toBe(`/protected/utilities/requests/${encodeURIComponent(requestValue)}/${action === "refresh" ? "workspace" : `inputs/${encodeURIComponent(inputValue)}/original`}`);
+    expect(url.search).toBe("?expectedVersion=2"); expect(url.hash).toBe("");
+  });
   it("uses the shared identity and passes responsive overflow and accessibility checks at 320 and 1280 pixels", async () => {
     await load(); await choose(); mkdirSync("tmp/parent-verification/utility-protected-page", { recursive: true });
     for (const width of [320, 1280]) {
