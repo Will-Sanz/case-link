@@ -640,7 +640,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         </section>
         <section
           id="application-programs"
-          className={`${styles.surface} ${workspace.section}`}
+          className={`${styles.surface} ${foodRoute ? styles.foodPrograms : ""} ${workspace.section}`}
           tabIndex={-1}
         >
         {foodRoute && <FoodAccess request={request} plan={foodRoute.foodAccess} report={foodRoute.foodAccessReport} onChange={reload} readError={error} />}

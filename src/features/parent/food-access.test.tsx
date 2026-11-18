@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bindFoodAccessReport, buildFoodAccessPlanBody, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM, type FoodAccessPlan, type FoodAccessReport } from "@/lib/parent/food-access";
 import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test-fixtures";
 import { FoodAccess, FoodAccessReportSummary } from "./food-access";
+import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
 
 const now = new Date("2026-11-18T12:00:00Z"), reportAt = "2026-11-18T12:05:00Z";
 const request = () => fixtureRequest({ version: 2, created_at: now.toISOString(), updated_at: now.toISOString(),
@@ -26,6 +28,48 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now)
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("saved public food access plan and report", () => {
+  it("shows Spanish guidance and attributed reports while preserving the named site, source and exact report body", async () => {
+    const source = plan(), changed = vi.fn();
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<ParentLocaleProvider initialLocale="es"><FoodAccess request={request()} plan={source} onChange={changed} /></ParentLocaleProvider>);
+    expect(screen.getByRole("heading", { name: "Su opción para obtener alimentos" }).closest("section")?.lang).toBe("es");
+    expect(screen.getByText(/No se sabe si hay alimentos y no hay nada reservado/)).toBeTruthy();
+    expect(screen.getByText(/Guía de Share revisada el 17 nov 2026/)).toBeTruthy();
+    expect(screen.getByText("2901 W Hunting Park Ave, Philadelphia, PA 19129").lang).toBe("en");
+    expect(screen.getByRole("link", { name: "Leer las instrucciones de acceso de Share" }).getAttribute("href")).toBe(source.source.operatorUrl);
+    fireEvent.change(screen.getByLabelText("¿Esta opción de alimentos le sirvió?"), { target: { value: "some_food_still_needed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar lo ocurrido" }));
+    await screen.findByRole("heading", { name: "Su necesidad de alimentos sigue abierta" });
+    expect(screen.getByRole("status").textContent).toBe("Se guardó su informe: Recogí algunos alimentos y aún necesito ayuda.");
+    expect(screen.getByText(/Este es su informe; Share no lo ha confirmado/)).toBeTruthy();
+    expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toMatchObject({ action: "food_visit", result: "some_food_still_needed", siteId: source.site.id, planHash: source.planHash });
+    expect(changed).toHaveBeenCalledOnce();
+  });
+  it("keeps an unknown report and its exact retry when the family changes screen language", async () => {
+    const source = plan(), fetcher = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockImplementation(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<ParentLocaleProvider initialLocale="en"><ParentLanguageSelector /><FoodAccess request={request()} plan={source} onChange={vi.fn()} /></ParentLocaleProvider>);
+    select(); submit(); await screen.findByRole("button", { name: "Retry same report" });
+    fireEvent.change(screen.getByLabelText("Screen language / Idioma de pantalla"), { target: { value: "es" } });
+    expect((screen.getByLabelText("¿Esta opción de alimentos le sirvió?") as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.getByText("Informe pendiente de confirmar: No había alimentos")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar el mismo informe" }));
+    await screen.findByRole("heading", { name: "Su necesidad de alimentos sigue abierta" });
+    expect(fetcher.mock.calls[1][1].body).toBe(fetcher.mock.calls[0][1].body);
+    fireEvent.change(screen.getByLabelText("Idioma de pantalla / Screen language"), { target: { value: "en" } });
+    expect(screen.getByRole("status").textContent).toBe("Your food report is saved: There was no food available.");
+  });
+  it("does not carry a saved announcement into a different request", async () => {
+    const source = plan(), fetcher = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetcher); const view = render(<FoodAccess request={request()} plan={source} onChange={vi.fn()} />);
+    select(); submit(); await screen.findByRole("heading", { name: "Your food need remains open" });
+    const other = { ...request(), id: "44444444-4444-4444-8444-444444444444" };
+    view.rerender(<FoodAccess request={other} plan={plan(other)} onChange={vi.fn()} />);
+    expect(screen.getByRole("status").textContent).toBe("");
+    expect(screen.queryByText(/Food access report:/)).toBeNull();
+  });
   it.each(["active", "closed"] as const)("allows an intentional correction while %s without a routine confirmation or silent restart", async status => {
     const original=request(), source=plan(original), current={ ...original,status,...(status === "closed" ? { version:original.version+1,closed_reason:"completed" } : {}) };
     const positive=recorded(source,JSON.stringify({ expectedVersion:original.version,siteId:source.site.id,planHash:source.planHash,reportKey:"22222222-2222-4222-8222-222222222222",result:"received_enough_food" }));

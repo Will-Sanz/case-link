@@ -9,6 +9,7 @@ import {
 } from "@/lib/parent/food-access";
 import { boundedParentApi, displayDate, ParentApiError } from "./api";
 import { ServiceError } from "./feedback";
+import { useParentLocale } from "./parent-locale";
 import { permissionWindowCurrent, usePermissionWindow } from "./use-permission-window";
 import styles from "./parent.module.css";
 
@@ -35,25 +36,27 @@ function sameReport(report: FoodAccessReport, attempt: Attempt) {
 }
 
 export function FoodAccessReportSummary({ report: value, requestId }: { report: unknown; requestId: string }) {
+  const { t, locale } = useParentLocale();
   const report = ownedReport(value, requestId);
   if (!report) return null;
-  return <div className={styles.space}>
-    <p><strong>Food access report: {resultLabels[report.result]}</strong></p>
-    <p>{SHARE_FOOD_ACCESS_SITE.name} · {SHARE_FOOD_ACCESS_SITE.address}</p>
-    <p className={styles.hint}>Parent reported {displayDate(report.reportedAt, true)}. Share access guidance reviewed {displayDate(SHARE_FOOD_ACCESS_SOURCE.reviewedOn)}. This is your report; Share has not confirmed it.</p>
+  return <div lang={locale} className={styles.space}>
+    <p><strong>{t("Food access report:")} {t(resultLabels[report.result])}</strong></p>
+    <p lang="en">{SHARE_FOOD_ACCESS_SITE.name} · {SHARE_FOOD_ACCESS_SITE.address}</p>
+    <p className={styles.hint}>{t("Parent reported")} {displayDate(report.reportedAt, true, locale)}. {t("Share access guidance reviewed")} {displayDate(SHARE_FOOD_ACCESS_SOURCE.reviewedOn, false, locale)}. {t("This is your report; Share has not confirmed it.")}</p>
   </div>;
 }
 
 export function FoodAccess({ request, plan: value, report: reportValue, onChange, readError }: {
   request: SupportRequest; plan: unknown; report?: unknown; onChange: () => void; readError?: Error | null;
 }) {
+  const { t, locale } = useParentLocale();
   const parsed = foodAccessPlanSchema.safeParse(value);
   const plan = parsed.success && parsed.data.requestId === request.id ? parsed.data : null;
   const [result, setResult] = useState<ReportInput["result"] | "">("");
   const [correcting, setCorrecting] = useState(false);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [saved, setSaved] = useState<FoodAccessReport | null>(null), [error, setError] = useState<Error | null>(null);
-  const [announcement,setAnnouncement]=useState("");
+  const [announcement,setAnnouncement]=useState<FoodAccessReport|null>(null);
   const resultInput=useRef<HTMLSelectElement|null>(null), status=useRef<HTMLParagraphElement|null>(null);
   const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
   const work = useRef<AbortController | null>(null), running = useRef<AbortController | null>(null);
@@ -64,7 +67,7 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
     .sort((a, b) => Date.parse(b.reportedAt) - Date.parse(a.reportedAt));
   const latest = reports[0] ?? null;
   const acknowledged = attempt ? reports.find(report => sameReport(report, attempt)) : null;
-  if (attempt && acknowledged) { setAttempt(null); setSaved(acknowledged); setError(null); setResult(""); setCorrecting(false); setAnnouncement(`Your food report is saved: ${resultLabels[acknowledged.result]}.`); }
+  if (attempt && acknowledged) { setAttempt(null); setSaved(acknowledged); setError(null); setResult(""); setCorrecting(false); setAnnouncement(acknowledged); }
   const uncertain = !!attempt && !acknowledged;
   const scope = JSON.stringify([request.id, request.version, request.status, request.mandate, plan?.planHash]);
   useLayoutEffect(() => {
@@ -87,7 +90,7 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
     const controller = work.current;
     if (!controller || controller.signal.aborted || running.current === controller || pending || !plan
       || (attempt ? !canRetry : !current || !result || (received && !correcting) || (!factualCorrection && !permissionWindowCurrent(Date.parse(request.mandate.expiresAt))))) return;
-    running.current = controller; setPendingWork({ scope, controller }); setError(null); setAnnouncement("");
+    running.current = controller; setPendingWork({ scope, controller }); setError(null); setAnnouncement(null);
     try {
       const exact = attempt ?? (() => {
         const input = foodAccessReportInputSchema.parse({ expectedVersion: request.version, siteId: plan.site.id, planHash: plan.planHash,
@@ -100,7 +103,7 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
       if (controller.signal.aborted || work.current !== controller) return;
       if (!reply.success || !sameReport(reply.data.report, exact))
         throw new ParentApiError("Your report is not confirmed yet. Retry this same report before choosing a different answer.", 0);
-      setSaved(reply.data.report); setAttempt(null); setResult(""); setCorrecting(false); setAnnouncement(`Your food report is saved: ${resultLabels[reply.data.report.result]}.`); onChange();
+      setSaved(reply.data.report); setAttempt(null); setResult(""); setCorrecting(false); setAnnouncement(reply.data.report); onChange();
     } catch (failure) {
       if (controller.signal.aborted || work.current !== controller) return;
       setError(failure instanceof Error ? failure : new Error("Your report is not confirmed. Retry the same report."));
@@ -111,47 +114,48 @@ export function FoodAccess({ request, plan: value, report: reportValue, onChange
       if (!controller.signal.aborted && work.current === controller) setPendingWork(null);
     }
   }
-  if (!plan) return <section className={styles.space} aria-label="Food access plan">
-    <p className={styles.notice}>This food access plan needs a current service check. Your food need remains open.</p>
-    <Link className={styles.textLink} href="/support/help">See direct support options</Link>
+  if (!plan) return <section lang={locale} className={`${styles.space} ${styles.foodAccess}`} aria-label={t("Food access plan")}>
+    <p className={styles.notice}>{t("This food access plan needs a current service check. Your food need remains open.")}</p>
+    <Link className={styles.textLink} href="/support/help">{t("See direct support options")}</Link>
   </section>;
-  return <section className={styles.space} aria-labelledby="food-access-title">
-    <h2 id="food-access-title">{received ? "Your food report is recorded" : failed ? "Your food need remains open" : "Your food access plan"}</h2>
-    <p ref={status} role="status" aria-live="polite" tabIndex={-1} className={styles.hint}>{announcement}</p>
-    <h3>{plan.site.name}</h3>
-    <p>{plan.site.address}</p>
+  return <section lang={locale} className={`${styles.space} ${styles.foodAccess}`} aria-labelledby="food-access-title">
+    <h2 id="food-access-title">{t(received ? "Your food report is recorded" : failed ? "Your food need remains open" : "Your food access plan")}</h2>
+    <p ref={status} role="status" aria-live="polite" tabIndex={-1} className={styles.hint}>{announcement?.requestId === request.id ? `${t("Your food report is saved:")} ${t(resultLabels[announcement.result])}.` : ""}</p>
+    <h3 lang="en">{plan.site.name}</h3>
+    <p lang="en">{plan.site.address}</p>
     {plan.state === "prepared" && !failed && !received ? <>
-      <p>{plan.site.location}</p>
-      <p>{plan.site.publishedHours} {plan.site.paperwork}</p>
-      <p>Food depends on donations. Stock is unknown and nothing is reserved. You or a helper would need to collect food in person.</p>
-    </> : !received && <p>{failed ? "The reported visit did not meet your immediate food need. Check the current City listings below for other unconfirmed options." : "CaseLink needs to check the source information before recommending a walk-up visit. Use the current City listings below or direct support options."}</p>}
-    <p className={styles.hint}>Share guidance reviewed {displayDate(plan.source.reviewedOn)}. Delivery, language service and physical-access arrangements are not verified.</p>
-    {plan.cityObservation && <p className={styles.hint}>City directory checked {displayDate(plan.cityObservation.checkedAt, true)}. A directory check does not confirm stock or access.</p>}
+      <p>{t(plan.site.location)}</p>
+      <p>{t(plan.site.publishedHours)} {t(plan.site.paperwork)}</p>
+      <p>{t("Food depends on donations. Stock is unknown and nothing is reserved. You or a helper would need to collect food in person.")}</p>
+    </> : !received && <p>{t(failed ? "The reported visit did not meet your immediate food need. Check the current City listings below for other unconfirmed options." : "CaseLink needs to check the source information before recommending a walk-up visit. Use the current City listings below or direct support options.")}</p>}
+    <p className={styles.hint}>{t("Share guidance reviewed")} {displayDate(plan.source.reviewedOn, false, locale)}. {t("Delivery, language service and physical-access arrangements are not verified.")}</p>
+    {plan.cityObservation && <p className={styles.hint}>{t("City directory checked")} {displayDate(plan.cityObservation.checkedAt, true, locale)}. {t("A directory check does not confirm stock or access.")}</p>}
     <div className={`${styles.serviceLinks} ${styles.space}`}>
-      <a className={styles.textLink} href={plan.source.operatorUrl}>Read Share’s access instructions</a>
-      <a className={styles.textLink} href={plan.source.cityUrl}>Open the City’s full food finder</a>
-      <Link className={styles.textLink} href="/support/help">See direct support options</Link>
+      <a className={styles.textLink} href={plan.source.operatorUrl}>{t("Read Share’s access instructions")}</a>
+      <a className={styles.textLink} href={plan.source.cityUrl}>{t("Open the City’s full food finder")}</a>
+      <Link className={styles.textLink} href="/support/help">{t("See direct support options")}</Link>
     </div>
     {latest && <FoodAccessReportSummary report={latest} requestId={request.id} />}
-    {factualCorrection && <p className={styles.notice}>This request stays closed and no work has restarted. A correction updates your factual report only. Start a new request with current permission if you need further food support.</p>}
-    {received && <p className={styles.success}>You reported enough food for this immediate need. Other support requests keep their own progress.</p>}
-    {(received || factualCorrection) && current && !uncertain && !correcting && <button className={styles.quiet} onClick={() => { setCorrecting(true); setResult(""); }}>Correct this food report</button>}
+    {factualCorrection && <p className={styles.notice}>{t("This request stays closed and no work has restarted. A correction updates your factual report only. Start a new request with current permission if you need further food support.")}</p>}
+    {received && <p className={styles.success}>{t("You reported enough food for this immediate need. Other support requests keep their own progress.")}</p>}
+    {(received || factualCorrection) && current && !uncertain && !correcting && <button className={styles.quiet} onClick={() => { setCorrecting(true); setResult(""); }}>{t("Correct this food report")}</button>}
     {(!received && !factualCorrection) || uncertain || correcting ? <form className={`${styles.form} ${styles.space}`} onSubmit={submit}>
       <div className={styles.field}>
-        <label htmlFor="food-access-result">Did this food option work for you?</label>
+        <label htmlFor="food-access-result">{t("Did this food option work for you?")}</label>
         <select ref={resultInput} id="food-access-result" className={styles.select} required value={attempt?.input.result ?? result}
           disabled={!current || pending || uncertain} onChange={event => { setResult(event.target.value as ReportInput["result"] | ""); setError(null); }}>
-          <option value="">Choose what happened</option>
-          {Object.entries(resultLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          <option value="">{t("Choose what happened")}</option>
+          {Object.entries(resultLabels).map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}
         </select>
+        {uncertain && attempt && <p className={styles.hint}>{t("Report awaiting confirmation:")} {t(resultLabels[attempt.input.result])}</p>}
       </div>
-      {uncertain && <p className={styles.notice}>Your report is not confirmed yet. Retry the same report or refresh saved activity before changing your answer.</p>}
-      {!current && !uncertain && <p className={styles.hint}>New reports need the current active request and permission. Refresh your support to check the latest saved plan.</p>}
+      {uncertain && <p className={styles.notice}>{t("Your report is not confirmed yet. Retry the same report or refresh saved activity before changing your answer.")}</p>}
+      {!current && !uncertain && <p className={styles.hint}>{t("New reports need the current active request and permission. Refresh your support to check the latest saved plan.")}</p>}
       <div className={styles.inline}>
-        <button className={styles.button} disabled={pending || (uncertain ? !canRetry : !current || !result)}>{pending ? "Saving report…" : uncertain ? "Retry same report" : "Save food report"}</button>
-        <button type="button" className={styles.quiet} disabled={pending} onClick={onChange}>Refresh saved activity</button>
+        <button className={styles.button} disabled={pending || (uncertain ? !canRetry : !current || !result)}>{t(pending ? "Saving report…" : uncertain ? "Retry same report" : "Save food report")}</button>
+        <button type="button" className={styles.quiet} disabled={pending} onClick={onChange}>{t("Refresh saved activity")}</button>
       </div>
-    </form> : <p className={styles.space}><Link className={styles.textLink} href="/get-support?need=food_now">Ask for food support again</Link></p>}
+    </form> : <p className={styles.space}><Link className={styles.textLink} href="/get-support?need=food_now">{t("Ask for food support again")}</Link></p>}
     {error && <div className={styles.space}><ServiceError error={error} returnTo={`/support/${request.id}`} /></div>}
   </section>;
 }

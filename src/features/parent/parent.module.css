@@ -77,7 +77,8 @@
 }
 .skip {
   position: fixed;
-  top: -100px;
+  top: 0;
+  transform: translateY(-100%);
   left: 1rem;
   z-index: 100;
   background: var(--color-ink);
@@ -86,6 +87,7 @@
 }
 .skip:focus {
   top: 1rem;
+  transform: none;
 }
 .header {
   background: var(--color-surface);
@@ -317,6 +319,16 @@
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-feature);
   padding: 2rem;
+}
+.foodAccess {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 35rem) {
+  .surface.foodPrograms,
+  .foodAccess :is(.notice, .error, .success) {
+    padding: 12px;
+  }
 }
 .section {
   margin-top: 2.5rem;
