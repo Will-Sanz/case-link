@@ -306,6 +306,21 @@
   background: var(--color-error-bg);
   color: var(--color-error);
 }
+.serviceError > div {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .serviceError {
+    flex-direction: column;
+    padding: 0.75rem 0.4rem;
+  }
+  .serviceError :is(button, a) {
+    max-width: 100%;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}
 .success {
   background: var(--color-positive-bg);
   color: var(--color-positive);
@@ -1012,18 +1027,22 @@
 .progress {
   list-style: none;
   display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
   padding: 0;
   margin-bottom: 2rem !important;
 }
 .progress li {
   display: flex;
+  overflow-wrap: normal;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
   color: var(--color-ink-muted);
 }
 .progress span {
+  flex-shrink: 0;
+  line-height: 1;
   width: 25px;
   height: 25px;
   border-radius: 50%;
@@ -1099,6 +1118,12 @@
 }
 .programChoices .choice:has(input:checked) {
   box-shadow: inset 0 0 0 1px var(--color-accent-rule);
+}
+@media (max-width: 35rem) {
+  .programChoices .choice {
+    flex-direction: column;
+    padding: 12px;
+  }
 }
 .programDetails {
   font-size: 0.875rem;

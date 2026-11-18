@@ -22,6 +22,15 @@ function snapshot(): AssistantSnapshot {
 const content = (display: ReturnType<typeof assistantParagraphDisplay>) => display.parts.map(part => part.text).join("");
 describe("source-bound deterministic assistant display, with no model or mutable request context", () => {
   const facts = buildAssistantFacts(snapshot(), fixtureNow).facts;
+  it("translates the actual source-bound Share producer fact while retaining its original bytes",()=>{
+    const program=PROGRAMS.find(program=>program.id==='share-community-fridge-19129')!;
+    const fact=buildAssistantFacts(snapshot(),new Date('2026-11-18T12:00:00Z')).facts.find(fact=>fact.id===`program-${program.id}`);
+    expect(fact).toMatchObject({sourceLabel:'Official program information',sourceUrl:program.sourceUrl,recordedAt:`${program.sourceCheckedAt}T00:00:00Z`});
+    const display=assistantParagraphDisplay(fact!,'es');
+    expect(display.translated).toBe(true);expect(content(display)).toContain(parentText('es',program.description));expect(display.original?.text).toBe(fact!.text);
+    expect(content(assistantParagraphDisplay(fact!,'en'))).toBe(fact!.text);
+    expect(assistantParagraphDisplay({...fact!,sourceUrl:'https://example.invalid'},'es').translated).toBe(false);
+  });
   it.each(["philly-food", "share-community-fridge-19129", "snap-pa"])("reuses the shared program explanation for %s", id => {
     const program = PROGRAMS.find(program => program.id === id)!;
     const fact = { text: `${program.name}: ${program.description} Program eligibility, capacity and approval are determined by the program.`, sourceLabel: "Official program information", sourceUrl: program.sourceUrl };

@@ -7,6 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { withSupportUpdateReceipts } from "./support-update-test-server";
 import { NecessaryAnswer } from "./necessary-answer";
 import { PermissionEditor } from "./permission-editor";
 import { fixtureNow, fixtureRequest } from "@/lib/parent/test-fixtures";
@@ -43,7 +44,7 @@ describe("necessary personal input", () => {
         json: async () => ({ ok: true, request: { ...request, version: 2 } }),
       })
       .mockResolvedValue(success);
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(
       <NecessaryAnswer
         request={request}
@@ -81,7 +82,7 @@ describe("necessary personal input", () => {
   it("saves zero current income and its frequency with the exact request version", async () => {
     const fetch = vi.fn().mockResolvedValue(success),
       onChange = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(
       <NecessaryAnswer
         request={fixtureRequest({ version: 3 })}
@@ -130,8 +131,9 @@ describe("necessary personal input", () => {
         ),
       onChange = vi.fn();
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2028-01-01T00:00:00Z"));
-    vi.stubGlobal("fetch", fetch);
-    const request = fixtureRequest(),
+    const request = fixtureRequest();
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch, request, { permission: true }));
+    const
       { rerender } = render(
         <PermissionEditor request={request} onChange={onChange} />,
       );
@@ -160,7 +162,7 @@ describe("necessary personal input", () => {
   });
   it("preserves an existing income period and original answer version during polling", async () => {
     const fetch = vi.fn().mockResolvedValue(success);
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     const request = fixtureRequest();
     request.intake.incomeAmount = 300;
     request.intake.incomeFrequency = "weekly";
@@ -253,7 +255,7 @@ describe("necessary personal input", () => {
       .mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ error: "Request changed." }) })
       .mockResolvedValueOnce({ ...success, json: async () => ({ request: latest }) })
       .mockResolvedValue(success);
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswer request={request} action={{ id: "review-snap-income", need: "snap_new", field: "income", reason: "missing_fact", title: "Income", explanation: "Required" }} onChange={() => {}} />);
     const amount = screen.getByLabelText("Household income before taxes ($)") as HTMLInputElement;
     const frequency = screen.getByLabelText("How often is this income received?") as HTMLSelectElement;

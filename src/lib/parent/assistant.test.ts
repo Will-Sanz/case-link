@@ -8,6 +8,9 @@ import {
   type AssistantSnapshot,
 } from "./assistant";
 import { fixtureRequest, fixtureNow } from "./test-fixtures";
+import { PROGRAMS } from "./programs";
+import * as programCatalog from "./programs";
+import { findLikelyIdentifiers } from "../privacy/no-pii";
 const snapshot = (
   overrides: Partial<AssistantSnapshot> = {},
 ): AssistantSnapshot => ({
@@ -33,6 +36,45 @@ const response = (selected: unknown) =>
   });
 
 describe("request-grounded parent assistant", () => {
+  it("retains every exact published program description and guidance with its original source", () => {
+    const request=fixtureRequest();request.intake.needs=[...new Set(PROGRAMS.flatMap(program=>program.needs))];
+    request.mandate.recipientIds=PROGRAMS.map(program=>program.id);request.mandate.maxRecipients=PROGRAMS.length;
+    const {facts}=buildAssistantFacts(snapshot({request}),new Date('2026-11-18T12:00:00Z'));
+    expect(facts.filter(fact=>fact.id.startsWith('program-'))).toHaveLength(PROGRAMS.length);
+    for(const program of PROGRAMS){
+      expect(facts.find(fact=>fact.id===`program-${program.id}`)).toMatchObject({text:expect.stringContaining(program.description),sourceLabel:'Official program information',sourceUrl:program.sourceUrl,recordedAt:`${program.sourceCheckedAt}T00:00:00Z`});
+      expect(facts.find(fact=>fact.id===`personal-${program.id}`)).toMatchObject({text:expect.stringContaining(program.personalSteps.join(' ')),sourceLabel:'Official program guidance',sourceUrl:program.sourceUrl});
+    }
+  });
+  it("can select the exact published Share explanation without creating an action or claiming availability",async()=>{
+    const program=PROGRAMS.find(program=>program.id==='share-community-fridge-19129')!,request=fixtureRequest();
+    request.intake.needs=['food_now'];request.mandate.recipientIds=[program.id];
+    const fetcher=vi.fn(async()=>response({intro:'programs',factIds:[`program-${program.id}`],actionIds:[]})) as typeof fetch;
+    const result=await answerParentQuestion({snapshot:snapshot({request}),question:'What is the community fridge option?',apiKey:'synthetic',now:new Date('2026-11-18T12:00:00Z'),fetcher,beforeCall:async()=>{}});
+    expect(result.answer.paragraphs).toContainEqual(expect.objectContaining({text:expect.stringContaining(program.description),sourceUrl:program.sourceUrl}));
+    expect(result.answer.actionIds).toEqual([]);expect(program.description).toContain('stock is unknown and nothing is reserved');
+  });
+  it.each(['2901 W Hunting Park Ave','person@example.invalid','123-45-6789'])("keeps %s blocked in family questions and dynamic status or action text",async text=>{
+    expect(findLikelyIdentifiers(text).length).toBeGreaterThan(0);
+    expect(assistantQuestionSchema.safeParse({question:`My home is ${text}`,idempotencyKey:randomUUID(),consented:true}).success).toBe(false);
+    const request=fixtureRequest({required_actions:[{id:'private-address',need:'food_now',field:'zip',reason:'missing_fact',title:'An address update',explanation:`My home is ${text}`}]}),fetcher=vi.fn(),beforeCall=vi.fn();
+    const {facts,actionIds}=buildAssistantFacts(snapshot({request,progress:{summary:`My home is ${text}`},documents:[{status:`uploaded at ${text}`,total:1}]}),fixtureNow);
+    expect(facts.some(fact=>['progress-summary','action-private-address','documents'].includes(fact.id))).toBe(false);expect(actionIds).not.toContain('private-address');
+    await expect(answerParentQuestion({snapshot:snapshot(),question:`My home is ${text}`,apiKey:'synthetic',now:fixtureNow,fetcher,beforeCall})).rejects.toThrow('assistant_private_input');
+    expect(beforeCall).not.toHaveBeenCalled();expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("still rejects a private dynamic routing qualifier beside published catalog text",()=>{
+    const spy=vi.spyOn(programCatalog,'programRoutingIssue').mockReturnValue('Contact person@example.invalid for a private update.');
+    try {
+      const request=fixtureRequest();request.intake.needs=['food_now'];request.mandate.recipientIds=['philly-food','share-community-fridge-19129'];
+      const facts=buildAssistantFacts(snapshot({request}),fixtureNow).facts;
+      expect(facts.some(fact=>fact.id.startsWith('program-'))).toBe(false);expect(JSON.stringify(facts)).not.toContain('person@example.invalid');
+    }finally{spy.mockRestore();}
+  });
+  it("keeps the full published program fact within the existing1500-character bound",()=>{
+    const program=PROGRAMS.find(program=>program.id==='philly-food')!,description=program.description;program.description='x'.repeat(1500);
+    try{expect(buildAssistantFacts(snapshot(),fixtureNow).facts.some(fact=>fact.id==='program-philly-food')).toBe(false);}finally{program.description=description;}
+  });
   it("includes validated owner preferences alongside the selected request in model context", async () => {
     const account = { language: "es", contactPreference: "email", quietHoursStart: 20, quietHoursEnd: 8, updatedAt: "2026-10-25T16:00:00Z" };
     const fetcher = vi.fn(async () => response({ intro: "status", factIds: ["account-language", "account-updates", "household-size"], actionIds: [] })) as typeof fetch;

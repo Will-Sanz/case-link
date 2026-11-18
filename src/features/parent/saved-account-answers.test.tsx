@@ -10,6 +10,7 @@ import {
 import { afterEach, expect, it, vi } from "vitest";
 import { SavedAccountAnswers } from "./saved-account-answers";
 import { fixtureRequest, fixtureIntake } from "@/lib/parent/test-fixtures";
+import { withSupportUpdateReceipts } from "./support-update-test-server";
 
 afterEach(() => {
   cleanup();
@@ -58,7 +59,7 @@ it("prefills account-specific facts and permits repeated corrections while keepi
       status: 200,
       json: async () => ({ ok: true, request: { ...request, version: 3 } }),
     });
-  vi.stubGlobal("fetch", fetch);
+  vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch, request));
   render(<SavedAccountAnswers request={request} onChange={() => {}} />);
   screen
     .getByText("Review or correct account answers")
@@ -93,6 +94,8 @@ it("prefills account-specific facts and permits repeated corrections while keepi
   );
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   expect(JSON.parse(fetch.mock.calls[1][1].body).version).toBe(2);
+  expect(fetch.mock.calls[0][1].headers["Idempotency-Key"]).toMatch(/^[a-f0-9-]{36}$/);
+  expect(fetch.mock.calls[1][1].headers["Idempotency-Key"]).not.toBe(fetch.mock.calls[0][1].headers["Idempotency-Key"]);
   fireEvent.change(electricity.getByLabelText("Account detail to update"), {
     target: { value: "utilityProvider" },
   });

@@ -70,7 +70,110 @@ async function completeSnap(){
   const adult=screen.getByLabelText(/I’m 18 or older/) as HTMLInputElement;
   if(!adult.checked)fireEvent.click(adult);
 }
+const routingOwner = '55555555-5555-4555-8555-555555555555';
+const routingSource = () => ({sourceRequestId:'44444444-4444-4444-8444-444444444444',sourceVersion:3,value:'19129',confirmedAt:new Date(Date.now()-86400000).toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()});
+function routingSnapApi(defaults = () => routingSource() as ReturnType<typeof routingSource> | null, post?: (init:RequestInit)=>unknown, owner = () => routingOwner) {
+  const fetch = snapApi(undefined, post), original = fetch.getMockImplementation()!;
+  fetch.mockImplementation(async(url:string,init?:RequestInit)=>url.endsWith('/intake-defaults')?response({ownerId:owner(),zip:defaults()}):url.endsWith('/account')?response({account:{id:owner(),email:'synthetic@example.test'}}):original(url,init));
+  return fetch;
+}
+async function startSnap() {
+  fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));
+  fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));
+}
 describe('full SNAP intake before background work',()=>{
+  it('reuses an owned routing ZIP without filling or replacing the private applicant ZIP',async()=>{
+    const source={sourceRequestId:'44444444-4444-4444-8444-444444444444',sourceVersion:3,value:'19129',confirmedAt:new Date(Date.now()-86400000).toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()};
+    const fetch=snapApi(),original=fetch.getMockImplementation()!;
+    const ownerId='55555555-5555-4555-8555-555555555555';
+    fetch.mockImplementation(async(url:string,init?:RequestInit)=>url.endsWith('/intake-defaults')?response({ownerId,zip:source}):url.endsWith('/account')?response({account:{id:ownerId,email:'synthetic@example.test'}}):original(url,init));
+    render(<ParentIntake initialNeed="snap_new"/>);await screen.findByLabelText('Your first name');
+    await waitFor(()=>expect(fetch.mock.calls.some(([url])=>url.endsWith('/intake-defaults'))).toBe(true));
+    expect((document.querySelector('[data-snap-path="zip"]') as HTMLInputElement).value).toBe('');
+    await completeSnap();fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));
+    fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
+    const posted=JSON.parse(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string);
+    expect(posted.intake.zip).toBe('19129');expect(posted.details.zip).toBe('19104');
+    expect(posted.reusedZip).toEqual({sourceRequestId:source.sourceRequestId,sourceVersion:source.sourceVersion});
+  });
+  it('allows the known applicant ZIP for routing without retyping or changing private answers',async()=>{
+    const fetch=routingSnapApi();render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();
+    await screen.findByText(/We will use your saved ZIP/);
+    fireEvent.click(screen.getByRole('button',{name:'Use applicant ZIP code for support routing'}));
+    await startSnap();await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
+    const body=JSON.parse(String(fetch.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body));
+    expect(body.intake.zip).toBe('19104');expect(body.details.zip).toBe('19104');expect(body).not.toHaveProperty('reusedZip');expect(body.expectedOwnerId).toBe(routingOwner);
+  });
+  it('refreshes saved routing once with the same private answers, owner, mandate and key',async()=>{
+    let reads=0,posts=0;const attempts:RequestInit[]=[];
+    const fetch=routingSnapApi(()=>({...routingSource(),value:++reads===1?'19129':'19103',sourceVersion:reads+2}),init=>{
+      attempts.push(init);return ++posts===1?{ok:false,status:412,json:async()=>({error:'Saved routing information changed before this request was created.'})}:response({request:{id:'11111111-1111-4111-8111-111111111111'}});
+    });render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();await screen.findByText(/We will use your saved ZIP/);await startSnap();
+    await waitFor(()=>expect(navigation.push).toHaveBeenCalled());expect(attempts).toHaveLength(2);
+    const first=JSON.parse(String(attempts[0].body)),second=JSON.parse(String(attempts[1].body));
+    expect(second).toEqual({...first,intake:{...first.intake,zip:'19103'},reusedZip:{sourceRequestId:routingSource().sourceRequestId,sourceVersion:4}});
+    expect(second.details.zip).toBe('19104');expect(attempts[1].headers).toEqual(attempts[0].headers);expect(fetch.mock.calls.filter(([url])=>url.endsWith('/intake-defaults'))).toHaveLength(2);
+  });
+  it('keeps the applicant ZIP available after the saved routing source is withdrawn',async()=>{
+    let reads=0,posts=0;const attempts:RequestInit[]=[];
+    routingSnapApi(()=>++reads===1?routingSource():null,init=>{
+      attempts.push(init);return ++posts===1?{ok:false,status:412,json:async()=>({error:'Saved routing information changed before this request was created.'})}:response({request:{id:'11111111-1111-4111-8111-111111111111'}});
+    });render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();await startSnap();
+    await screen.findByText(/A current household ZIP code is needed/);expect(attempts).toHaveLength(1);
+    expect((document.querySelector('[data-snap-path="zip"]') as HTMLInputElement).value).toBe('19104');
+    fireEvent.click(screen.getByRole('button',{name:'Use applicant ZIP code for support routing'}));await startSnap();
+    await waitFor(()=>expect(navigation.push).toHaveBeenCalled());const body=JSON.parse(String(attempts[1].body));
+    expect(body.intake.zip).toBe('19104');expect(body.details).toEqual(JSON.parse(String(attempts[0].body)).details);expect(body).not.toHaveProperty('reusedZip');expect(body.expectedOwnerId).toBe(routingOwner);
+  });
+  it('clears the earlier family draft after a sign-in change even after choosing the applicant ZIP',async()=>{
+    let owner=routingOwner;const fetch=routingSnapApi(undefined,undefined,()=>owner);
+    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();await screen.findByText(/We will use your saved ZIP/);
+    fireEvent.click(screen.getByRole('button',{name:'Use applicant ZIP code for support routing'}));
+    fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));owner='66666666-6666-4666-8666-666666666666';
+    fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await screen.findByRole('heading',{name:'Your sign-in changed'});
+    expect(screen.queryByLabelText('Your first name')).toBeNull();expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+  });
+  it('keeps a manually entered private draft with its account when there is no saved routing ZIP',async()=>{
+    let owner=routingOwner;const fetch=routingSnapApi(()=>null,undefined,()=>owner);
+    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();
+    fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));owner='66666666-6666-4666-8666-666666666666';
+    fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await screen.findByRole('heading',{name:'Your sign-in changed'});
+    expect(screen.queryByLabelText('Your first name')).toBeNull();expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+  });
+  it('does not reopen the old form when an earlier account check completes after confirmed owner loss',async()=>{
+    let accounts=0;let resolveAccount!:(value:unknown)=>void,resolveProfile!:(value:unknown)=>void;
+    const fetch=snapApi(),normal=fetch.getMockImplementation()!;
+    fetch.mockImplementation(async(url:string,init?:RequestInit)=>{
+      if(url.endsWith('/account'))return ++accounts===1?response({account:{id:routingOwner,email:'synthetic@example.test'}}):await new Promise(done=>{resolveAccount=done;});
+      if(url.endsWith('/intake-defaults'))return response({ownerId:routingOwner,zip:null});
+      if(url.endsWith('/family-profile'))return await new Promise(done=>{resolveProfile=done;});
+      return normal(url,init);
+    });
+    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();await startSnap();await waitFor(()=>expect(accounts).toBe(2));
+    await act(async()=>resolveProfile(response({ownerId:'66666666-6666-4666-8666-666666666666',revision:0,lastMutationKey:null,profile:null,
+      collection:{collectionEnabled:true,noticeVersion:'family-profile-2026-11-17.v1',expiresAt:new Date(Date.now()+86400000).toISOString(),retentionDays:45}})));
+    await screen.findByRole('heading',{name:'Your sign-in changed'});
+    await act(async()=>resolveAccount(response({account:{id:routingOwner,email:'synthetic@example.test'}})));
+    expect(screen.getByRole('heading',{name:'Your sign-in changed'})).toBeTruthy();expect(screen.queryByLabelText('Your first name')).toBeNull();
+    expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+  });
+  it('redacts an earlier private draft when the account changes between its owner check and rejected POST',async()=>{
+    let owner=routingOwner;const fetch=routingSnapApi(undefined,init=>{
+      expect(JSON.parse(String(init.body)).expectedOwnerId).toBe(routingOwner);owner='66666666-6666-4666-8666-666666666666';
+      return {ok:false,status:403,json:async()=>({error:'This request is unavailable, or its permission has changed.'})};
+    },()=>owner);
+    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();await startSnap();
+    await screen.findByRole('heading',{name:'Your sign-in changed'});
+    expect(screen.queryByLabelText('Your first name')).toBeNull();expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+  });
+  it('retains the exact possibly committed SNAP start after a same-owner403 and retries without a new key',async()=>{
+    let count=0;const fetch=routingSnapApi(undefined,()=>++count===1?{ok:false,status:403,json:async()=>({error:'This request is unavailable, or its permission has changed.'})}:response({request:{id:'11111111-1111-4111-8111-111111111111'}}));
+    render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();await startSnap();
+    await screen.findByText(/The save result has not been confirmed/);expect((screen.getByRole('button',{name:'Back'}) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
+    const posts=fetch.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(2);
+    expect(posts[1][1]!.body).toBe(posts[0][1]!.body);expect(posts[1][1]!.headers).toEqual(posts[0][1]!.headers);
+  });
   it('shows only the two remaining steps when SNAP was already chosen',async()=>{
     snapApi();render(<ParentIntake initialNeed="snap_new"/>);await screen.findByLabelText('Your first name');
     expect(screen.getByRole('heading',{level:1,name:'Apply for SNAP'})).toBeTruthy();
@@ -251,9 +354,9 @@ describe('full SNAP intake before background work',()=>{
   it.each([401,403])('closes private entry immediately after a start is denied with %s, even if cached collection was open',async status=>{
     snapApi(snapWindow(),()=>({ok:false,status,json:async()=>({ok:false,error:'Permission changed.'})}));
     render(<ParentIntake initialNeed="snap_new"/>);await completeSnap();fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByLabelText(/I authorize/));
-    fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await waitFor(()=>expect((screen.getByRole('button',{name:'Back'}) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole('button',{name:'Back'}));expect(screen.queryByLabelText('Your first name')).toBeNull();expect(screen.queryByLabelText('Your date of birth')).toBeNull();
-    expect(screen.getByRole('button',{name:'Check application availability again'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'Start getting support'}));await screen.findByText(/The save result has not been confirmed/);
+    expect((screen.getByRole('button',{name:'Back'}) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByLabelText('Your first name')).toBeNull();expect(screen.queryByLabelText('Your date of birth')).toBeNull();
   });
 });
 afterEach(() => {

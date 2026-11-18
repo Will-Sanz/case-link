@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import HelpPage, * as help from "./help/page";
 import PrivacyPage, * as privacy from "./privacy/page";
 import TermsPage, * as terms from "./terms/page";
@@ -30,6 +32,23 @@ it("preserves policy/contact/program destinations and anchor IDs in both languag
     expect([...spanish.container.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(before);
     expect([...spanish.container.querySelectorAll("[id]")].map(element => element.id)).toEqual(anchors);
     spanish.unmount();
+  }
+});
+
+it.each(["en", "es"] as const)("links policy and Help controls to existing parent routes (%s)", async value => {
+  locale.value = value;
+  const routes = ["/support/help", "/support/privacy", "/account", "/my-support", "/sign-in", "/forgot-password"];
+  for (const path of routes) {
+    const group = path === "/forgot-password" ? "" : "/(parent)";
+    expect(existsSync(resolve(process.cwd(), `src/app${group}${path}/page.tsx`)), path).toBe(true);
+  }
+  for (const Page of [HelpPage, PrivacyPage, TermsPage]) {
+    const view = render(await Page());
+    for (const link of view.container.querySelectorAll('a[href^="/"]')) {
+      expect(routes, link.textContent ?? "").toContain(new URL(link.getAttribute("href")!, "https://caselink.test").pathname);
+    }
+    expect(view.container.querySelector('a[href="/support/help"], a[href="/support/privacy"]')).not.toBeNull();
+    view.unmount();
   }
 });
 

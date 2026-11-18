@@ -25,6 +25,20 @@ beforeEach(() => {
 });
 
 describe("private SNAP details data boundary", () => {
+  it("keeps an independent ordinary routing source alongside private home, profile and exact document choice", async () => {
+    const intake = fixtureIntake({ needs: ["food_now", "snap_new"], zip: "19129" }), mandate = fixtureMandate({ recipientIds: ["share-community-fridge-19129", "snap-pa"] });
+    const source = { sourceRequestId: requestId, sourceVersion: 2 }, profile = familySource();
+    await startSnapApplication(intake, mandate, { zip: "19104" }, SNAP_APPLICATION_NOTICE_VERSION, key, profile, SNAP_ES_TEMPLATE_ID, source);
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("parent_start_snap_application_with_routing", { p_intake: intake, p_mandate: mandate, p_details: { zip: "19104" }, p_notice_version: SNAP_APPLICATION_NOTICE_VERSION,
+      p_idempotency_key: key, p_source_request_id: requestId, p_source_version: 2, p_family_profile_source: profile, p_template_id: SNAP_ES_TEMPLATE_ID });
+  });
+  it.each([
+    { sourceRequestId: requestId, sourceVersion: 0 }, { sourceRequestId: requestId, sourceVersion: 1.5 },
+    { sourceRequestId: "not-an-owned-id", sourceVersion: 1 }, { sourceRequestId: requestId, sourceVersion: 1, confirmedAt: "2026-11-18T12:00:00Z" },
+  ])("rejects malformed routing metadata before Auth and never accepts caller freshness: %j", async source => {
+    await expect(startSnapApplication(fixtureIntake({ needs: ["snap_new"] }), fixtureMandate({ recipientIds: ["snap-pa"] }), {}, SNAP_APPLICATION_NOTICE_VERSION, key, undefined, undefined, source)).rejects.toThrow("parent_invalid_input");
+    expect(mocks.session).not.toHaveBeenCalled(); expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("reads an exact owned revision with original historical values and provenance", async () => {
     const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: saved, error: null }) };
     mocks.from.mockReturnValue(query);
@@ -130,6 +144,7 @@ describe("private SNAP details data boundary", () => {
   });
   it.each([
     ["P0001", "parent_family_profile_source_changed", "parent_family_profile_source_changed"],
+    ["P0001", "parent_reuse_source_changed", "parent_reuse_source_changed"],
     ["XX000", "parent_family_profile_source_changed", "CaseLink could not save or load this information. Please try again."],
     ["P0001", "parent_family_profile_source_changed PrivateCanary", "CaseLink could not save or load this information. Please try again."],
     ["42501", "PrivateCanary foreign owner", "This request is unavailable, or its permission has changed."],
@@ -139,6 +154,12 @@ describe("private SNAP details data boundary", () => {
     await expect(startSnapApplication(fixtureIntake({ needs: ["snap_new"] }), fixtureMandate({ recipientIds: ["snap-pa"] }), {}, SNAP_APPLICATION_NOTICE_VERSION, key, source)).rejects.toThrow(expected);
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("parent_start_application_with_family_profile", expect.objectContaining({ p_family_profile_source: source }));
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+  it("does not classify a malformed RPC error as a proved pre-creation source change", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: ["parent_reuse_source_changed"] } });
+    await expect(startSnapApplication(fixtureIntake({ needs: ["snap_new"] }), fixtureMandate({ recipientIds: ["snap-pa"] }), {}, SNAP_APPLICATION_NOTICE_VERSION, key, undefined, undefined,
+      { sourceRequestId: requestId, sourceVersion: 1 })).rejects.toThrow("CaseLink could not save or load this information. Please try again.");
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
   it("requires the current parent session even for a well-formed saved source", async () => {
     mocks.session.mockRejectedValue(new AuthenticationRequiredError());

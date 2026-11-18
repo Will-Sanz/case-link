@@ -49,3 +49,10 @@ it("routes the exact source/private SNAP/document-choice packet to one owned ato
   expect(await startFoodDescriptionRequest(input,key)).toBe(key);
   expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("parent_start_food_description_request",{p_description_source:input.descriptionSource,p_intake:input.intake,p_mandate:input.mandate,p_idempotency_key:key,p_snap_details:input.details,p_snap_notice_version:input.noticeVersion,p_snap_template_id:SNAP_ES_TEMPLATE_ID});
 });
+it("keeps independent routing metadata in the same description/private SNAP RPC",async()=>{
+  mocks.rpc.mockResolvedValue({data:key,error:null});
+  const input={descriptionSource:{draftId:key,revision:2},intake:fixtureIntake({needs:["food_now","snap_new"],zip:"19129"}),mandate:fixtureMandate({recipientIds:["philly-food","snap-pa"]}),kind:"snap_application",details:{zip:"19104"},noticeVersion:SNAP_APPLICATION_NOTICE_VERSION,
+    reusedZip:{sourceRequestId:owner,sourceVersion:3},documentTemplateId:SNAP_ES_TEMPLATE_ID};
+  expect(await startFoodDescriptionRequest(input,key)).toBe(key);
+  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("parent_start_food_description_request",{p_description_source:input.descriptionSource,p_intake:input.intake,p_mandate:input.mandate,p_idempotency_key:key,p_snap_details:input.details,p_snap_notice_version:input.noticeVersion,p_snap_template_id:SNAP_ES_TEMPLATE_ID,p_zip_source:input.reusedZip});
+});

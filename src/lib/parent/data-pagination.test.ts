@@ -197,6 +197,9 @@ describe("complete parent data pagination", () => {
     for (const [table, name] of [["parent_pgw_application_details", "GasExportCanary"], ["parent_water_application_details", "WaterExportCanary"]])
       tables[table] = Array.from({ length: 106 }, (_, index) => ({ id: id(index + 1), request_id: id(105), revision: index + 1,
         details: { applicant: { name } }, provenance: { answer: { confirmedAt: "2026-11-13T22:10:00Z" } }, consent_evidence: { subjectAuthorityDeclared: true, accountAuthorityDeclared: true } }));
+    tables.parent_support_update_receipts = Array.from({ length: 103 }, (_, index) => ({
+      id: id(index + 1), request_id: id(105), idempotency_key: id(index + 200), action: "answer_fact", base_version: index + 1, result_version: index + 2, payload_hash: "a".repeat(64), created_at: "2026-11-18T12:00:00Z",
+    }));
     const exported = await exportParentInformation();
     expect(exported.requests).toHaveLength(105);
     const last = exported.requests.find((request) => request.id === id(105))!;
@@ -205,6 +208,8 @@ describe("complete parent data pagination", () => {
     expect(last.operations).toHaveLength(1);
     expect(last.receipts).toHaveLength(1);
     expect(last.mandates).toHaveLength(1);
+    expect(last.supportUpdates).toEqual(tables.parent_support_update_receipts);
+    expect(calls.filter(call => call.table === "parent_support_update_receipts")).toHaveLength(2);
     expect(last.forms).toHaveLength(1);
     expect(last.assistant).toHaveLength(1);
     expect(last.snapApplicationDetails).toHaveLength(102);

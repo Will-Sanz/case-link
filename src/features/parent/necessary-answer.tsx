@@ -1,9 +1,10 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState, useRef, useLayoutEffect, type FormEvent } from "react";
 import type { NecessaryAction, SupportRequest } from "@/lib/parent/domain";
 import { ANSWER_FIELDS, factAnswerSchema } from "@/lib/parent/answers";
 import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
-import { parentApi, ParentApiError } from "./api";
+import { useSupportUpdate } from "./use-support-update";
+import { SupportUpdateRecovery } from "./support-update-recovery";
 import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
@@ -200,7 +201,10 @@ export function NecessaryAnswerFields({
   );
 }
 
-export function NecessaryAnswer({
+export function NecessaryAnswer(props: { action: NecessaryAction; request: SupportRequest; onChange: () => void; correction?: boolean }) {
+  return <NecessaryAnswerContent key={`${props.request.id}:${props.action.id}`} {...props}/>;
+}
+function NecessaryAnswerContent({
   action,
   request,
   onChange,
@@ -214,15 +218,28 @@ export function NecessaryAnswer({
   const { t, locale } = useParentLocale();
   const [{ value, frequency }, setAnswer] = useState(() => currentAnswer(request, action));
   const [baseVersion, setBaseVersion] = useState(request.version);
-  const [conflict, setConflict] = useState(false);
-  const [pending, setPending] = useState(false);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const recovery = useSupportUpdate(request.id, (saved, superseded) => {
+    setBaseVersion(saved.version);
+    setMessage(superseded ? "Your update was recorded. Newer changes are now in effect; check the current saved information."
+      : saved.status === "paused" ? "Your answer is saved. This request remains paused." : "Your answer is saved. Permitted work can continue.");
+    onChange();
+  }, onChange);
+  const pending = recovery.pending, focusNext = useRef(false);
+  useLayoutEffect(() => {
+    if (!focusNext.current || pending) return;
+    focusNext.current = false;
+    const input = document.getElementById(`answer-${action.id}`);
+    (input && !input.matches(":disabled") ? input : document.getElementById("your-next-steps"))?.focus();
+  }, [pending, baseVersion, action.id]);
   const field = action.field;
   const booking = field === "bookingPreference";
   if (!booking && !ANSWER_FIELDS.includes(field as (typeof ANSWER_FIELDS)[number])) return null;
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (recovery.locked || !["active", "paused"].includes(request.status) || (!correction && request.status === "paused")) return;
     setError("");
     setMessage("");
     if (!value.trim()) {
@@ -237,76 +254,27 @@ export function NecessaryAnswer({
         return;
       }
     }
-    setPending(true);
-    try {
-      const saved = await parentApi<{ request: SupportRequest }>(
-        `/requests/${request.id}`,
-        {
-          method: "POST",
-          body: JSON.stringify(
-            booking
-              ? {
-                  action: "booking_preference",
-                  preference: value,
-                  version: baseVersion,
-                }
-              : { action: "answer_fact", ...answer },
-          ),
-        },
-      );
-      if (correction) setBaseVersion(saved.request.version);
-      setMessage(
-        request.status === "paused"
-          ? "Your answer is saved. This request remains paused."
-          : "Your answer is saved. Permitted work can continue.",
-      );
-      onChange();
-    } catch (err) {
-      setConflict(err instanceof ParentApiError && err.status === 409);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Your answer could not be saved. Try again.",
-      );
-    } finally {
-      setPending(false);
-    }
+    await recovery.save(() => booking
+      ? { action: "booking_preference", preference: value as SupportRequest["mandate"]["bookingPreference"], version: baseVersion }
+      : { action: "answer_fact", ...factAnswerSchema.parse(answer) });
   }
   async function reviewLatest() {
-    setPending(true);
-    try {
-      const latest = await parentApi<{ request: SupportRequest }>(
-        `/requests/${request.id}`,
-      );
-      setBaseVersion(latest.request.version);
-      setAnswer(currentAnswer(latest.request, action));
-      setError("");
-      setConflict(false);
-      setMessage(
-        "The latest saved information is loaded. Review this question before answering again.",
-      );
-      onChange();
-      document.getElementById(`answer-${action.id}`)?.focus();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "We couldn’t load the latest information. Try again.",
-      );
-    } finally {
-      setPending(false);
-    }
+    await recovery.review(latest => {
+      focusNext.current = true; setAnswer(currentAnswer(latest, action)); setBaseVersion(latest.version); setError("");
+      setMessage("The latest saved information is loaded. Check your answer before saving."); onChange();
+    });
   }
+  if (recovery.accessLost) return <div lang={locale} className={styles.supportControls}><SupportUpdateRecovery recovery={recovery} onReview={reviewLatest}/></div>;
   return (
     <form lang={locale} className={`${styles.form} ${styles.supportControls}`} onSubmit={submit}>
       <NecessaryAnswerFields action={action} draft={{ value, frequency }} onChange={setAnswer}
-        correction={correction} disabled={pending} />
+        correction={correction} disabled={recovery.locked || !["active", "paused"].includes(request.status) || (!correction && request.status === "paused")} />
       <button
         className={styles.button}
-        disabled={pending || (!correction && request.status === "paused")}
+        disabled={recovery.locked || !["active", "paused"].includes(request.status) || (!correction && request.status === "paused")}
       >
         {t(pending
-          ? "Saving…"
+          ? recovery.checking ? "Checking saved result…" : "Saving…"
           : correction
             ? "Save account answer"
             : "Save and continue")}
@@ -321,16 +289,7 @@ export function NecessaryAnswer({
           {t(error)}
         </p>
       )}
-      {conflict && (
-        <button
-          className={styles.secondary}
-          type="button"
-          disabled={pending}
-          onClick={reviewLatest}
-        >
-          {t(pending ? "Loading latest information…" : "Review latest question")}
-        </button>
-      )}
+      <SupportUpdateRecovery recovery={recovery} onReview={reviewLatest} reviewLabel="Review latest question"/>
     </form>
   );
 }

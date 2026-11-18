@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -25,7 +26,9 @@ try {
     const c = copy[locale], suffix = `${locale}-${width}${largeText ? '-large-text' : ''}`;
     const context = await browser.newContext({ viewport: { width, height: 900 } }), page = await context.newPage();
     const errors = [], blockedOrigins = [], writes = [];
-    let questions = initialQuestions(), version = 1, mode = 'group', saveMode = 'success', readFails = false, releaseSave;
+    let questions = initialQuestions(), version = 1, mode = 'group', saveMode = 'success', readFails = false, ownedReadDenied = 0, releaseSave;
+    const receipts = new Map(), attempts = [];
+    const ownerId = '11111111-1111-4111-8111-111111111111';
     let mandate = fixtureMandate({ recipientIds: ['snap-pa'], expiresAt: new Date(Date.now() + 86400000).toISOString(), maxRecipients: 1 });
     const current = () => fixtureRequest({ id: requestId, version, status: mode === 'correction' ? 'paused' : 'active', intake: fixtureIntake({ needs: mode === 'correction' ? ['electricity'] : mode === 'booking' ? ['food_now'] : ['snap_pending'], utilityProviders: mode === 'correction' ? ['peco'] : [], householdSize: null }), mandate,
       intake_confirmed_at: { zip: stale, householdSize: stale, incomeAmount: stale, incomeFrequency: stale }, required_actions: questions });
@@ -38,24 +41,34 @@ try {
     });
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/api/parent/**', async route => {
-      const path = new URL(route.request().url()).pathname, method = route.request().method();
+      const target = new URL(route.request().url()), path = target.pathname, method = route.request().method();
       const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'Cache-Control': 'private, no-store' }, body: JSON.stringify(body) });
       if (path === '/api/parent/account') return json({ account: { id: '11111111-1111-4111-8111-111111111111', email: 'synthetic@example.invalid', preferences: { language: 'en', contactPreference: 'in_app' } } });
       if (path === '/api/parent/authorization-window') return json({ authorization: { expiresAt: new Date(Date.now() + 86400000).toISOString() } });
       if (path === `/api/parent/requests/${requestId}` && method === 'POST') {
-        const body = route.request().postDataJSON(); writes.push(body); assert.equal(body.version, version);
+        const body = route.request().postDataJSON(), key = route.request().headers()['idempotency-key'];
+        assert.match(key, /^[0-9a-f-]{36}$/i); attempts.push({ key, bytes: route.request().postData() });
+        const known = receipts.get(key);
+        if (known) { assert.equal(known.bytes, route.request().postData()); return json({ update: { ownerId, receipt: known.receipt } }); }
+        writes.push(body); assert.equal(body.version, version);
         assert.ok(['answer_facts', 'answer_fact', 'replace_mandate', 'booking_preference'].includes(body.action));
         if (saveMode === 'pending') await new Promise(resolve => { releaseSave = resolve; });
-        if (saveMode === 'conflict') return json({ ok: false, error: changed }, 409);
+        if (saveMode === 'conflict') { version++; return json({ ok: false, error: changed }, 409); }
         if (saveMode === 'unknown') return json({ ok: false, error: 'Unrecognized synthetic service issue' }, 503);
-        version++;
+        version += body.action === 'answer_facts' ? body.answers.length : 1;
         if (body.action === 'answer_facts') questions = questions.filter(action => !body.answers.some(answer => answer.field === action.field));
         if (body.action === 'replace_mandate') mandate = body.mandate;
-        return json(body.action === 'replace_mandate' ? { ok: true } : { request: current() });
+        if (body.action === 'booking_preference') mandate = { ...mandate, bookingPreference: body.preference };
+        const receipt = { id: randomUUID(), key, requestId, action: body.action, baseVersion: body.version, resultVersion: version, recordedAt: new Date().toISOString() };
+        receipts.set(key, { receipt, bytes: route.request().postData() });
+        if (saveMode === 'post_then_forbidden') { ownedReadDenied = 403; saveMode = 'success'; }
+        if (saveMode === 'lost_ack') { saveMode = 'success'; return json({ ok: false, error: 'Unrecognized synthetic service issue' }, 503); }
+        return json({ update: { ownerId, receipt } });
       }
       assert.equal(method, 'GET', 'Only explicit synthetic control actions are allowed.');
       if (path.endsWith('/operations')) return json({ operations: [], historyLimited: false });
-      if (path === `/api/parent/requests/${requestId}`) return readFails ? json({ ok: false, error: 'We couldn’t load the latest questions. Your draft is still here.' }, 503) : json({ request: current(), progress: { state: 'waiting', summary: 'Synthetic controls only; no real program or model work.', canContinueAfterClosing: false, nextRunAt: null } });
+      if (path === `/api/parent/requests/${requestId}` && ownedReadDenied) return json({ ok: false, error: 'This support request is unavailable, or its permission has changed.' }, ownedReadDenied);
+      if (path === `/api/parent/requests/${requestId}`) return readFails ? json({ ok: false, error: 'We couldn’t load the latest questions. Your draft is still here.' }, 503) : json({ request: current(), ...(target.searchParams.has('updateKey') ? { update: { ownerId, receipt: receipts.get(target.searchParams.get('updateKey'))?.receipt ?? null, issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now()+86400000).toISOString() } } : {}), progress: { state: 'waiting', summary: 'Synthetic controls only; no real program or model work.', canContinueAfterClosing: false, nextRunAt: null } });
       if (path === '/api/parent/food-sites') return json({ sites: [], sourceUrl: 'https://www.phila.gov/food/', checkedAt: new Date().toISOString(), availability: 'city_listed_unconfirmed', moreSitesAvailable: false });
       return json({ capabilities: [] });
     });
@@ -154,7 +167,10 @@ try {
       assert.equal(typeof releaseSave, 'function'); saveMode = 'conflict'; releaseSave(); releaseSave = undefined;
       await controls.getByRole('alert').waitFor(); await check(editor.locator('..'), 'permission-conflict');
       assert.equal(await editor.getByLabel(c.accept).isChecked(), true); assert.equal(await editor.getByRole('radio', { name: new RegExp(c.only) }).isChecked(), true);
-      saveMode = 'success'; await editor.getByRole('button', { name: c.permissionSave, exact: true }).click();
+      saveMode = 'success'; await controls.getByRole('button', { name: locale === 'es' ? 'Revisar la información guardada actual' : 'Review current saved information', exact: true }).click();
+      await controls.getByRole('button', { name: locale === 'es' ? 'Revisar la información guardada actual' : 'Review current saved information', exact: true }).waitFor({ state: 'hidden' });
+      await editor.getByRole('radio', { name: new RegExp(c.only) }).check(); await editor.getByLabel(c.documents, { exact: true }).uncheck(); await editor.getByLabel(c.accept).check();
+      await editor.getByRole('button', { name: c.permissionSave, exact: true }).click();
       await controls.getByRole('status').filter({ hasText: c.permissionSaved }).waitFor();
       assert.deepEqual(writes.at(-1).mandate.allowedActions, ['research', 'prepare']); assert.ok(!writes.at(-1).mandate.allowedData.includes('documents'));
       editor = controls.getByRole('button', { name: c.permission, exact: true }).locator('..'); await check(editor, 'permission-saved');
@@ -165,17 +181,33 @@ try {
       assert.equal(await controls.getByRole('button', { name: c.permission, exact: true }).count(), 1);
       await controls.getByRole('button',{name:c.permission,exact:true}).click();editor=controls.locator('form').filter({has:page.getByRole('checkbox',{name:c.accept})});
       await editor.getByLabel(c.accept).check();saveMode='unknown';await editor.getByRole('button',{name:c.permissionSave,exact:true}).click();
-      await controls.getByRole('alert').filter({hasText:'Unrecognized synthetic service issue'}).waitFor();assert.equal(await controls.getByRole('alert').getAttribute('lang'),'');await check(editor.locator('..'),'permission-unknown-display');
-      await editor.getByRole('button',{name:c.keep,exact:true}).click();
+      await controls.getByRole('alert').filter({hasText:'Unrecognized synthetic service issue'}).waitFor();assert.equal(await controls.getByRole('alert').locator('span[lang]').getAttribute('lang'),'');await check(editor.locator('..'),'permission-unknown-display');
+      await editor.getByRole('button',{name:locale==='es'?'Cerrar el editor; se sigue comprobando este cambio':'Close editor; this save is still being checked',exact:true}).click();
+      await controls.getByRole('button',{name:c.permission,exact:true}).click(); assert.equal(await editor.getByLabel(c.accept).isDisabled(),true);
+      await check(editor.locator('..'),'permission-unknown-reopened');
+      await open('application-controls'); controls=page.locator('#application-controls'); await controls.getByRole('button',{name:c.permission,exact:true}).click();
+      editor=controls.locator('form').filter({has:page.getByRole('checkbox',{name:c.accept})});await editor.getByLabel(c.accept).check();saveMode='lost_ack';
+      const beforeLost=writes.length;await editor.getByRole('button',{name:c.permissionSave,exact:true}).click();
+      await controls.getByRole('alert').waitFor();await check(editor.locator('..'),'permission-committed-unknown');
+      await controls.getByRole('button',{name:locale==='es'?'Comprobar el resultado guardado':'Check saved result',exact:true}).click();
+      await controls.getByRole('status').filter({hasText:c.permissionSaved}).waitFor();assert.equal(writes.length,beforeLost+1);assert.deepEqual(attempts.at(-1),attempts.at(-2));
+      await check(controls.getByRole('button',{name:c.permission,exact:true}).locator('..'),'permission-reconciled-exact');
       mode='correction';questions=[];saveMode='success';version++;mandate=fixtureMandate({recipientIds:['peco-cap'],expiresAt:new Date(Date.now()+86400000).toISOString(),maxRecipients:1});
       await open('application-controls');controls=page.locator('#application-controls');await controls.getByText('Review or correct account answers',{exact:true}).click();
       const correction=controls.locator('form').filter({has:page.getByRole('button',{name:c.correctionSave,exact:true})});
       await correction.getByLabel('Amount due ($)',{exact:true}).fill('0');await check(correction,'correction-zero');
       saveMode='conflict';await correction.getByRole('button',{name:c.correctionSave,exact:true}).click();await correction.getByRole('alert').waitFor();assert.equal(await correction.getByLabel('Amount due ($)',{exact:true}).inputValue(),'0');await check(correction,'correction-conflict');
-      saveMode='success';await correction.getByRole('button',{name:c.correctionSave,exact:true}).click();
+      saveMode='success';await correction.getByRole('button',{name:locale==='es'?'Revisar la pregunta más reciente':'Review latest question',exact:true}).click();
+      await correction.getByLabel('Amount due ($)',{exact:true}).fill('0');await correction.getByRole('button',{name:c.correctionSave,exact:true}).click();
       await correction.getByRole('status').waitFor();assert.deepEqual(writes.at(-1),{action:'answer_fact',need:'electricity',field:'amountDue',value:0,version:version-1});assert.equal(current().status,'paused');
       assert.ok((await correction.getByRole('status').innerText()).includes(locale==='es'?'sigue en pausa':'remains paused'));await check(correction,'correction-saved-paused');
-      mode='booking';version++;mandate=fixtureMandate({recipientIds:['philly-food'],bookingPreference:'ask_me',expiresAt:new Date(Date.now()+86400000).toISOString(),maxRecipients:1});
+      await correction.getByLabel('Amount due ($)',{exact:true}).fill('867.53');saveMode='post_then_forbidden';
+      const deniedRead=page.waitForResponse(response=>new URL(response.url()).pathname===`/api/parent/requests/${requestId}`&&new URL(response.url()).searchParams.has('updateKey')&&response.status()===403);
+      await correction.getByRole('button',{name:c.correctionSave,exact:true}).click();await deniedRead;
+      await page.waitForFunction(()=>![...document.querySelectorAll('input')].some(input=>input.value==='867.53'));
+      assert.equal(await page.locator('input').evaluateAll(inputs=>inputs.some(input=>input.value==='867.53')),false);
+      await page.getByRole('alert').first().waitFor();await check(page.getByRole('alert').first().locator('..'),'correction-access-lost');
+      ownedReadDenied=0;mode='booking';version++;mandate=fixtureMandate({recipientIds:['philly-food'],bookingPreference:'ask_me',expiresAt:new Date(Date.now()+86400000).toISOString(),maxRecipients:1});
       questions=[{id:'fixture-booking',need:'food_now',reason:'meaningful_choice',resolver:'parent',field:'bookingPreference',title:'Choose an appointment time',explanation:'A confirmed appointment choice is required before booking. Other permitted preparation can continue.'}];
       await open('your-next-steps');const booking=page.locator('#your-next-steps form');await booking.getByLabel(c.bookingLabel,{exact:true}).selectOption('weekday_afternoon');await check(booking,'booking-choice');
       await booking.getByRole('button',{name:c.bookingSave,exact:true}).click();await booking.getByRole('status').waitFor();assert.deepEqual(writes.at(-1),{action:'booking_preference',preference:'weekday_afternoon',version:version-1});await check(booking,'booking-choice-saved');
@@ -183,6 +215,6 @@ try {
       console.log(JSON.stringify({ context: suffix, checks: results.filter(result => result.locale === locale && result.width === width && result.largeText === largeText).length }));
     } finally { if (releaseSave) releaseSave(); await context.close(); }
   }
-  await writeFile(`${evidence}/results.json`, JSON.stringify({ kind: 'Built Next UI + explicit synthetic HTTP fixtures; no native Auth/database/provider/model claim; unknown permission-save recovery remains unproved.', checks: results, keyboardChecks }, null, 2));
+  await writeFile(`${evidence}/results.json`, JSON.stringify({ kind: 'Built Next UI + explicit synthetic HTTP fixtures; no native Auth/database/provider/model claim; metadata/exact-attempt recovery is synthetic HTTP proof only; actual native Auth/database concurrency remains separate.', checks: results, keyboardChecks }, null, 2));
   console.log(JSON.stringify({ checks: results.length, axeViolations: 0, evidence }));
 } finally { await browser.close(); }

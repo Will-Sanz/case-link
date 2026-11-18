@@ -20,8 +20,8 @@ const access = (option: Option, override: Record<string, unknown> = {}) => ({ au
 function api(option: Option, post: (init: RequestInit) => unknown = () => reply({ request: { id } }), window: () => unknown = () => access(option), defaults: () => unknown = () => ({ zip: null })) {
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.includes("/authorization-window")) return reply(window());
-    if (url.endsWith("/account")) return reply({ account: { email: "fixture@example.invalid", preferences: { language: "en", contactPreference: "in_app" } } });
-    if (url.endsWith("/intake-defaults")) return reply(defaults());
+    if (url.endsWith("/account")) return reply({ account: { id, email: "fixture@example.invalid", preferences: { language: "en", contactPreference: "in_app" } } });
+    if (url.endsWith("/intake-defaults")) return reply({ ...defaults() as object, ownerId: id });
     if (url.endsWith("/requests") && init?.method === "POST") return post(init);
     return reply({ capabilities: [] });
   });

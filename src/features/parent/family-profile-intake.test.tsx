@@ -35,7 +35,7 @@ function api(profile: () => unknown | Promise<unknown> = saved) {
       pecoApplication: { collectionEnabled: true, noticeVersion: PECO_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" },
       pgwApplication: { collectionEnabled: true, noticeVersion: PGW_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" },
       waterApplication: { collectionEnabled: true, noticeVersion: WATER_APPLICATION_NOTICE_VERSION, expiresAt: "2026-11-18T18:00:00Z" } } });
-    if (url.endsWith("/intake-defaults")) return reply({ zip: null });
+    if (url.endsWith("/intake-defaults")) return reply({ ownerId: personId, zip: null });
     if (url.endsWith("/food-assessment")) {
       const body = JSON.parse(String(init?.body));
       return reply({ ownerId: personId, candidates: assessFoodSupport(body.answers).filter(path => body.needs.includes(path.need)).map(path => ({ ...path,
@@ -252,7 +252,7 @@ describe("saved family information in actual application intake", () => {
     const latest = saved(); latest.revision = latest.profile.revision = 3; latest.profile.details.primaryPerson.firstName = "Newer";
     const fetcher = api(() => posted ? latest : saved()), usual = fetcher.getMockImplementation()!;
     fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (source === "ZIP" && url.endsWith("/intake-defaults")) return reply({ zip: { value: posted ? "19103" : "19104", sourceRequestId: requestId, sourceVersion: posted ? 2 : 1,
+      if (source === "ZIP" && url.endsWith("/intake-defaults")) return reply({ ownerId: personId, zip: { value: posted ? "19103" : "19104", sourceRequestId: requestId, sourceVersion: posted ? 2 : 1,
         confirmedAt: "2026-11-16T18:00:00Z", expiresAt: "2026-12-01T18:00:00Z" } });
       if (url.endsWith("/requests") && init?.method === "POST") {
         posted++;

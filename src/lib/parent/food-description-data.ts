@@ -77,18 +77,19 @@ export async function authorizeFoodDescriptionCollection(draftId: string | null)
 
 /** One actual start, through the existing atomic service/private SNAP ports; no description content is copied. */
 export async function startFoodDescriptionRequest(input: unknown, idempotencyKey: string): Promise<string> {
-  const common = { descriptionSource: foodDescriptionSourceSchema, intake: intakeSchema, mandate: mandateSchema };
+  const common = { descriptionSource: foodDescriptionSourceSchema, intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() };
   const value = z.union([
-    z.object({ ...common, reusedZip: reusedZipSourceSchema.optional() }).strict(),
+    z.object(common).strict(),
     z.object({ ...common, kind: z.literal("snap_application"), details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION),
       familyProfileSource: familyProfileSourceSchema.optional(), documentTemplateId: snapFormTemplateIdSchema.optional() }).strict(),
   ]).parse(input);
   const { supabase } = await requireParentSession();
   const { data, error } = await supabase.rpc("parent_start_food_description_request", {
     p_description_source: value.descriptionSource, p_intake: value.intake, p_mandate: value.mandate, p_idempotency_key: z.uuid().parse(idempotencyKey),
+    ...(value.reusedZip ? { p_zip_source: value.reusedZip } : {}),
     ...("kind" in value ? { p_snap_details: value.details, p_snap_notice_version: value.noticeVersion,
       ...(value.familyProfileSource ? { p_family_profile_source: value.familyProfileSource } : {}), ...(value.documentTemplateId ? { p_snap_template_id: value.documentTemplateId } : {}) }
-      : value.reusedZip ? { p_zip_source: value.reusedZip } : {}),
+      : {}),
   });
   check(error); return z.uuid().parse(data);
 }

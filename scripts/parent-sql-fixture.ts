@@ -147,6 +147,8 @@ export async function createParentSqlFixture(
     "20261118164420_parent_food_description_cache_usage.sql",
     "20261118185641_parent_preserve_snap_review_continuation.sql",
     "20261118192225_parent_food_directory_report_binding.sql",
+    "20261118192417_parent_snap_ordinary_routing_reuse.sql",
+    "20261118192507_parent_support_update_receipts.sql",
     "20261118194631_parent_food_directory_bounded_retry.sql",
   ];
   try {

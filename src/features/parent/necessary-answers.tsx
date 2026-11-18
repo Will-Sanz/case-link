@@ -2,7 +2,8 @@
 import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { ANSWER_FIELDS, factAnswerBundleSchema } from "@/lib/parent/answers";
 import { NEED_LABELS, type NecessaryAction, type SupportNeed, type SupportRequest } from "@/lib/parent/domain";
-import { parentApi, ParentApiError } from "./api";
+import { useSupportUpdate } from "./use-support-update";
+import { SupportUpdateRecovery } from "./support-update-recovery";
 import { useParentLocale } from "./parent-locale";
 import {
   canonicalFactField, currentAnswer, factualAnswer, factualAnswerError, NecessaryAnswerFields, type AnswerDraft,
@@ -47,15 +48,32 @@ function currentQuestions(request: SupportRequest, saved: ReturnType<typeof snap
   }) };
 }
 
-export function NecessaryAnswers({ request, onChange }: { request: SupportRequest; onChange: () => void }) {
+export function NecessaryAnswers(props: { request: SupportRequest; onChange: () => void }) {
+  return <NecessaryAnswersContent key={props.request.id} {...props}/>;
+}
+function NecessaryAnswersContent({ request, onChange }: { request: SupportRequest; onChange: () => void }) {
   const { t, locale } = useParentLocale();
   const [savedBundle, setBundle] = useState(() => snapshot(request));
-  const [pending, setPending] = useState(false);
-  const bundle = pending ? savedBundle : currentQuestions(request, savedBundle);
-  const [conflict, setConflict] = useState(false);
+
   const [error, setError] = useState<{ message: string; action?: NecessaryAction } | null>(null);
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState<SupportNeed | null>(null);
+  const submitted = useRef<{ bundle: ReturnType<typeof snapshot>; provided: Question[] } | null>(null);
+  const recovery = useSupportUpdate(request.id, (saved, superseded) => {
+    const accepted = submitted.current;
+    const remaining = snapshot(saved);
+    const omitted = new Map(accepted?.bundle.questions.filter(question => !accepted.provided.includes(question)).map(question => [question.key, question.draft]));
+    remaining.questions = remaining.questions.map(question => ({ ...question, draft: omitted.get(question.key) ?? question.draft }));
+    setBundle(remaining); setNotice(null);
+    setMessage(superseded ? "Your update was recorded. Newer changes are now in effect; check the current saved information."
+      : remaining.questions.length ? saved.status === "paused"
+        ? "Your provided answers are saved. Unanswered questions stay open; this request remains paused."
+        : "Your provided answers are saved. Unanswered questions stay open; other permitted work can continue."
+      : saved.status === "paused" ? "All your answers are saved. This request remains paused." : "All your answers are saved. Permitted work can continue.");
+    onChange();
+  }, onChange);
+  const pending = recovery.pending, conflict = recovery.conflict;
+  const bundle = recovery.locked ? savedBundle : currentQuestions(request, savedBundle);
   const focusNext = useRef(false);
   useLayoutEffect(() => {
     if (!focusNext.current || pending) return;
@@ -81,7 +99,7 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending || conflict || request.status !== "active" || bundle.status !== "active" || bundle.requestId !== request.id) return;
+    if (recovery.locked || request.status !== "active" || bundle.status !== "active" || bundle.requestId !== request.id) return;
     setError(null); setMessage("");
     const provided = bundle.questions.filter((question) => question.draft.value.trim() ||
       (question.action.field === "income" && question.draft.frequency));
@@ -109,50 +127,16 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
       )?.focus();
       return;
     }
-    setBundle(bundle);
-    setPending(true);
-    try {
-      const saved = await parentApi<{ request: SupportRequest }>(`/requests/${request.id}`, {
-        method: "POST", body: JSON.stringify({ action: "answer_facts", ...parsed.data }),
-      });
-      if (!saved.request || saved.request.id !== bundle.requestId)
-        throw new Error("We couldn’t confirm the saved answers. Load the latest questions before trying again.");
-      const remaining = snapshot(saved.request);
-      const omitted = new Map(bundle.questions.filter((question) => !provided.includes(question))
-        .map((question) => [question.key, question.draft]));
-      remaining.questions = remaining.questions.map((question) => ({ ...question,
-        draft: omitted.get(question.key) ?? question.draft,
-      }));
-      setBundle(remaining);
-      setConflict(false); setNotice(null);
-      setMessage(remaining.questions.length
-        ? saved.request.status === "paused"
-          ? "Your provided answers are saved. Unanswered questions stay open; this request remains paused."
-          : "Your provided answers are saved. Unanswered questions stay open; other permitted work can continue."
-        : saved.request.status === "paused"
-        ? "All your answers are saved. This request remains paused."
-        : "All your answers are saved. Permitted work can continue.");
-      onChange();
-    } catch (err) {
-      setConflict(!(err instanceof ParentApiError) || err.status < 400 || err.status === 409 || err.status >= 500);
-      setError({ message: err instanceof Error ? err.message : "Your answers could not be saved. Try again." });
-    } finally { setPending(false); }
+    setBundle(bundle); submitted.current = { bundle, provided };
+    await recovery.save(() => ({ action: "answer_facts", ...parsed.data }));
   }
   async function reviewLatest() {
-    setPending(true);
-    try {
-      const latest = await parentApi<{ request: SupportRequest }>(`/requests/${request.id}`);
-      if (!latest.request || latest.request.id !== bundle.requestId)
-        throw new Error("The latest questions are unavailable. Your draft is still here.");
-      focusNext.current = true;
-      setBundle(snapshot(latest.request));
-      setError(null); setConflict(false); setNotice(null);
-      setMessage("The latest saved answers and questions are loaded. Check them before saving.");
-      onChange();
-    } catch (err) {
-      setError({ message: err instanceof Error ? err.message : "We couldn’t load the latest questions. Your draft is still here." });
-    } finally { setPending(false); }
+    await recovery.review(latest => {
+      focusNext.current = true; setBundle(snapshot(latest)); setError(null); setNotice(null);
+      setMessage("The latest saved answers and questions are loaded. Check them before saving."); onChange();
+    });
   }
+  if (recovery.accessLost) return <div lang={locale} className={styles.supportControls}><SupportUpdateRecovery recovery={recovery} onReview={reviewLatest}/></div>;
   if (bundle.requestId !== request.id || (!bundle.questions.length && !message)) return null;
   const changed = conflict || request.version > bundle.version;
   return (
@@ -166,15 +150,16 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
         {question.sources.map((source, index) => <p key={source.id}
           lang={t(source.explanation) === source.explanation ? "" : locale} id={index ? `step-${source.id}` : undefined} tabIndex={index ? -1 : undefined}>{t(source.explanation)}</p>)}
         <NecessaryAnswerFields action={question.action} draft={question.draft}
-          onChange={(draft) => change(question, draft)} required={false} disabled={pending || request.status !== "active" || bundle.status !== "active"} />
+          onChange={(draft) => change(question, draft)} required={false} disabled={recovery.locked || request.status !== "active" || bundle.status !== "active"} />
       </section>)}
       {notice && <p className={styles.notice} role="status">{t("The provider changed for {need}. Enter this account’s current details below; other answers are kept.").replace("{need}", t(NEED_LABELS[notice]).toLocaleLowerCase(locale))}</p>}
-      {bundle.questions.length > 0 && <button className={styles.button} disabled={pending || conflict || request.status !== "active" || bundle.status !== "active"}>
-        {t(pending ? "Saving answers…" : "Save all answers and continue")}
+      {bundle.questions.length > 0 && <button className={styles.button} disabled={recovery.locked || request.status !== "active" || bundle.status !== "active"}>
+        {t(pending ? recovery.checking ? "Checking saved result…" : "Saving answers…" : "Save all answers and continue")}
       </button>}
       {message && <p className={styles.success} role="status">{t(message)}</p>}
       {error && <p className={styles.error} role="alert"><span>{error.action && <>{t(NEED_LABELS[error.action.need])}: <span lang={t(error.action.title) === error.action.title ? "" : locale}>{t(error.action.title)}</span>. </>}<span lang={t(error.message) === error.message ? "" : locale}>{t(error.message)}</span></span></p>}
-      {changed && <div>
+      <SupportUpdateRecovery recovery={recovery} onReview={reviewLatest} reviewLabel="Review latest questions"/>
+      {changed && !recovery.unresolved && <div>
         <p className={styles.hint}>{t("Loading the latest questions replaces your unsaved answers with the current saved information.")}</p>
         <button className={styles.secondary} type="button" disabled={pending} onClick={reviewLatest}>
           {t(pending ? "Loading latest questions…" : "Review latest questions")}

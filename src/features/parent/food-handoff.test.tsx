@@ -21,7 +21,7 @@ function api(options: { assessment?: (body: unknown) => unknown | Promise<unknow
     if (url.endsWith("/auth")) { state.signedIn = true; return reply({ ok: true }); }
     if (url.endsWith("/account")) return state.signedIn ? reply({ account: { id: state.owner, email: "fixture@example.invalid", preferences: { language: "en", contactPreference: "in_app" } } }) : reply({ ok: false, error: "Sign in to continue." }, 401);
     if (url.endsWith("/authorization-window")) return reply({ authorization: { issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), snapApplication: { collectionEnabled: false, noticeVersion: null } } });
-    if (url.endsWith("/intake-defaults")) return reply({ zip: null });
+    if (url.endsWith("/intake-defaults")) return reply({ ownerId: state.owner, zip: null });
     if (url.endsWith("/food-assessment")) {
       const body = JSON.parse(String(init?.body));
       if (options.assessment) return reply(await options.assessment(body));
@@ -204,6 +204,25 @@ describe("guided food recovery and keyboard handoff", () => {
     const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
     expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment"))).toHaveLength(checks);
+  });
+  it.each([401, 403])("keeps a dispatched ordinary start fixed after an uncertain %s response", async status => {
+    let first = true;
+    const { fetcher } = api({ post: () => {
+      if (first) { first = false; return reply({ error: "Sign in again to continue." }, status); }
+      return reply({ request: { id: owner } });
+    } });
+    renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts(); await permission();
+    fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+    await screen.findByLabelText(/Password|Contraseña/);
+    fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "fixture@example.invalid" } });
+    fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
+    await screen.findByRole("button", { name: "Start getting support" });
+    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalled());
+    const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
+    expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
   });
 });
 

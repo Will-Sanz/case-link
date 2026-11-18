@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireParentSession } from "@/lib/parent/auth";
 import { foodDescriptionSourceSchema } from "@/lib/parent/food-assessment";
 import { startFoodDescriptionRequest } from "@/lib/parent/food-description-data";
 import { FoodDescriptionError } from "@/lib/parent/food-description-draft";
@@ -37,7 +38,7 @@ import { waterApplicationWriteSchema } from "@/lib/parent/water-application-snap
 const startSchema = z.union([
   z.object({ descriptionSource: foodDescriptionSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
   z.object({ descriptionSource: foodDescriptionSourceSchema.optional(), kind: z.literal("snap_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema,
-    details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION), documentTemplateId: snapFormTemplateIdSchema.optional() }).strict(),
+    details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION), documentTemplateId: snapFormTemplateIdSchema.optional(), reusedZip: reusedZipSourceSchema.optional() }).strict(),
   z.object({ kind: z.literal("wic_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: wicInitialIntakeSchema, mandate: mandateSchema,
     details: wicApplicationFieldsValueSchema, noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), reusedZip: reusedZipSourceSchema.optional() }).strict(),
   pecoApplicationWriteSchema.omit({ expectedVersion: true }).extend({ kind: z.literal("peco_application"),
@@ -64,7 +65,13 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const authorization = await getParentAuthorizationWindow();
-    const input = await readParentJson(request, 131072);
+    let input = await readParentJson(request, 131072);
+    if (input && typeof input === "object" && "expectedOwnerId" in input) {
+      const owner = z.uuid().parse(input.expectedOwnerId);
+      if ((await requireParentSession()).user.id.toLowerCase() !== owner.toLowerCase())
+        throw new Error("This request is unavailable, or its permission has changed.");
+      const body = { ...input } as Record<string, unknown>; delete body.expectedOwnerId; input = body;
+    }
     if (input && typeof input === "object" && "kind" in input && input.kind === "snap_application" &&
       !authorization.snapApplication?.collectionEnabled)
       throw new Error("This request is unavailable, or its permission has changed.");
@@ -109,7 +116,7 @@ export async function POST(request: Request) {
         : value.kind === "wic_application"
         ? await startWicApplication(value.intake, value.mandate, value.details, value.noticeVersion, value.subjectAuthorityDeclared, idempotencyKey, value.reusedZip, ...(value.familyProfileSource ? [value.familyProfileSource] : []))
         : await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey,
-          ...(value.documentTemplateId ? [value.familyProfileSource, value.documentTemplateId] : value.familyProfileSource ? [value.familyProfileSource] : []))
+          ...(value.reusedZip ? [value.familyProfileSource, value.documentTemplateId, value.reusedZip] : value.documentTemplateId ? [value.familyProfileSource, value.documentTemplateId] : value.familyProfileSource ? [value.familyProfileSource] : []))
       : value.reusedZip
         ? await startSupportRequest(value.intake, value.mandate, idempotencyKey, value.reusedZip)
         : await startSupportRequest(value.intake, value.mandate, idempotencyKey);

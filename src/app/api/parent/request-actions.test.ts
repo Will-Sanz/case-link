@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   facts: vi.fn(),
   mandate: vi.fn(),
   booking: vi.fn(),
+  update: vi.fn(),
+  updateContext: vi.fn(),
+  progress: vi.fn(),
 }));
 vi.mock("@/lib/parent/data", () => ({
   getSupportRequest: mocks.get,
@@ -23,9 +26,11 @@ vi.mock("@/lib/parent/mutations", () => ({
   updateParentBooking: mocks.booking,
 }));
 vi.mock("@/lib/parent/progress-data", () => ({
-  getSupportProgress: vi.fn().mockResolvedValue({ state: "service_offline" }),
+  getSupportProgress: mocks.progress,
 }));
-import { POST } from "./requests/[id]/route";
+vi.mock("@/lib/parent/support-update-data", () => ({ applySupportUpdate: mocks.update, getSupportUpdateContext: mocks.updateContext, SupportUpdateRejectedError: class extends Error { constructor() { super("parent_invalid_input"); } } }));
+import { GET, POST } from "./requests/[id]/route";
+import { SupportUpdateRejectedError } from "@/lib/parent/support-update-data";
 const id = fixtureRequest().id,
   context = { params: Promise.resolve({ id }) };
 const request = (body: unknown, origin = "https://app.example.test") =>
@@ -46,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.facts.mockReset().mockResolvedValue(undefined);
   mocks.get.mockResolvedValue(fixtureRequest());
+  mocks.progress.mockReset().mockResolvedValue({ state: "service_offline" });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -165,4 +171,64 @@ describe("versioned parent actions", () => {
     expect((await POST(request(body), context)).status).toBe(409);
     expect(mocks.mandate).toHaveBeenCalledWith(id, body.mandate, 2);
   });
+});
+
+
+describe("exact owned support-update API", () => {
+  const key = "22222222-2222-4222-8222-222222222222";
+  const ack = { ownerId: "33333333-3333-4333-8333-333333333333", receipt: { id: key, key, requestId: id, action: "answer_facts", baseVersion: 2, resultVersion: 4, recordedAt: "2026-11-18T12:00:00Z" } };
+  const keyed = (body: unknown) => { const value = request(body); value.headers.set("Idempotency-Key", key); return value; };
+  it.each([
+    { action: "answer_facts", ...bundle },
+    { action: "answer_fact", ...bundle.answers[0], version: 2 },
+    { action: "replace_mandate", mandate: fixtureMandate({ expiresAt: "2020-01-01T00:00:00Z" }), version: 2 },
+    { action: "booking_preference", preference: "any_weekday", version: 2 },
+  ])("routes $action through one exact atomic update without pre-calling legacy mutation/current-expiry validation", async body => {
+    mocks.update.mockResolvedValueOnce(ack);
+    const result = await POST(keyed(body), context);
+    expect(result.status).toBe(200); expect(await result.json()).toEqual({ ok: true, update: ack });
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith(id, key, body);
+    for (const legacy of [mocks.fact, mocks.facts, mocks.mandate, mocks.booking, mocks.get]) expect(legacy).not.toHaveBeenCalled();
+  });
+  it("rejects unsupported keyed actions, malformed keys, cross-origin and invalid body before any mutation", async () => {
+    for (const body of [{ action: "cancel" }, { action: "pause" }, { action: "answer_facts", ...bundle, answers: [] }, { action: "answer_facts", ...bundle, extra: true }])
+      expect(await (await POST(keyed(body), context)).json()).toMatchObject({ ok: false, supportUpdateRejected: true });
+    const malformed = keyed({ action: "answer_facts", ...bundle }); malformed.headers.set("Idempotency-Key", "wrong");
+    expect((await POST(malformed, context)).status).toBe(400);
+    const foreign = keyed({ action: "answer_facts", ...bundle }); foreign.headers.set("Origin", "https://wrong.example.test");
+    expect((await POST(foreign, context)).status).toBe(403); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.control).not.toHaveBeenCalled();
+  });
+  it("reads metadata only after the owned request is readable, without mutating or caching it", async () => {
+    mocks.updateContext.mockResolvedValueOnce({ ...ack, expiresAt: null, issuedAt: null });
+    const result = await GET(new Request(`https://app.example.test/api/parent/requests/${id}?updateKey=${key}`), context);
+    expect(result.status).toBe(200); expect(result.headers.get("Cache-Control")).toBe("private, no-store");
+    expect((await result.json()).update).toEqual({ ...ack, expiresAt: null, issuedAt: null });
+    expect(mocks.updateContext).toHaveBeenCalledExactlyOnceWith(id, key); expect(mocks.update).not.toHaveBeenCalled();
+    mocks.get.mockResolvedValueOnce(null); mocks.updateContext.mockClear();
+    expect((await GET(new Request(`https://app.example.test/api/parent/requests/${id}?updateKey=${key}`), context)).status).toBe(404);
+    expect(mocks.updateContext).not.toHaveBeenCalled();
+  });
+  it("keeps an owned receipt read independent of progress-only failure while preserving ordinary progress reads", async () => {
+    mocks.updateContext.mockResolvedValueOnce({ ...ack, expiresAt: null, issuedAt: null });
+    mocks.progress.mockRejectedValueOnce(new Error("This request is unavailable, or its permission has changed."));
+    const read = await GET(new Request(`https://app.example.test/api/parent/requests/${id}?updateKey=${key}`), context);
+    expect(read.status).toBe(200); expect((await read.json()).update.receipt).toEqual(ack.receipt);
+    expect(mocks.get).toHaveBeenCalledWith(id); expect(mocks.progress).not.toHaveBeenCalled();
+    expect((await GET(new Request(`https://app.example.test/api/parent/requests/${id}`), context)).status).toBe(403);
+    expect(mocks.progress).toHaveBeenCalledExactlyOnceWith(id);
+  });
+  it("rejects invalid or duplicate recovery query keys before reading private information", async () => {
+    for (const query of ["updateKey=wrong", `updateKey=${key}&updateKey=${key}`])
+      expect((await GET(new Request(`https://app.example.test/api/parent/requests/${id}?${query}`), context)).status).toBe(400);
+    expect(mocks.get).not.toHaveBeenCalled(); expect(mocks.updateContext).not.toHaveBeenCalled();
+  });
+});
+
+it("marks a rolled-back keyed RPC validation failure while leaving all legacy error bodies unchanged", async () => {
+ const id=fixtureRequest().id, ctx={params:Promise.resolve({id})}, body={action:"booking_preference",preference:"any_weekday",version:1};
+ const keyed=new Request(`https://app.example.test/api/parent/requests/${id}`,{method:"POST",headers:{Origin:"https://app.example.test","Content-Type":"application/json","Idempotency-Key":"22222222-2222-4222-8222-222222222222"},body:JSON.stringify(body)});
+ mocks.update.mockRejectedValueOnce(new SupportUpdateRejectedError());
+ const rejected=await POST(keyed,ctx);expect(rejected.status).toBe(400);expect((await rejected.json()).supportUpdateRejected).toBe(true);
+ const legacy=new Request(`https://app.example.test/api/parent/requests/${id}`,{method:"POST",headers:{Origin:"https://app.example.test","Content-Type":"application/json"},body:JSON.stringify({action:"answer_facts",answers:[],version:1})});
+ expect((await(await POST(legacy,ctx)).json()).supportUpdateRejected).toBeUndefined();
 });

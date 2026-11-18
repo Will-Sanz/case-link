@@ -2,7 +2,8 @@
 import { useState, useImperativeHandle, type FormEvent, type Ref } from "react";
 import type { ServiceMandate, SupportRequest } from "@/lib/parent/domain";
 import { getProgramsForNeeds } from "@/lib/parent/programs";
-import { parentApi } from "./api";
+import { useSupportUpdate } from "./use-support-update";
+import { SupportUpdateRecovery } from "./support-update-recovery";
 import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
@@ -10,7 +11,10 @@ export type PermissionEditorHandle = { open: () => void };
 function focusFirstField(form: HTMLFormElement | null) {
   form?.querySelector<HTMLInputElement>("input")?.focus();
 }
-export function PermissionEditor({
+export function PermissionEditor(props: { request: SupportRequest; onChange: () => void; ref?: Ref<PermissionEditorHandle> }) {
+  return <PermissionEditorContent key={props.request.id} {...props}/>;
+}
+function PermissionEditorContent({
   request,
   onChange,
   ref,
@@ -24,53 +28,32 @@ export function PermissionEditor({
   const [draft, setDraft] = useState(request.mandate);
   const [version, setVersion] = useState(request.version);
   const [accepted, setAccepted] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+
   const [message, setMessage] = useState("");
+  const recovery = useSupportUpdate(request.id, (_saved, superseded) => {
+    setEditing(false);
+    setMessage(superseded ? "Your update was recorded. Newer changes are now in effect; check the current saved information."
+      : "Your updated permission is saved. Future work uses these limits.");
+    onChange();
+  }, onChange);
+  const pending = recovery.pending;
   function open() {
+    if (recovery.locked) { setEditing(true); return; }
     setDraft(request.mandate);
     setVersion(request.version);
     setAccepted(false);
-    setError("");
     setMessage("");
     setEditing(true);
   }
   useImperativeHandle(ref, () => ({ open }));
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!accepted) return;
-    setPending(true);
-    setError("");
-    try {
-      const { authorization } = await parentApi<{
-        authorization: { expiresAt: string };
-      }>("/authorization-window");
-      await parentApi(`/requests/${request.id}`, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "replace_mandate",
-          version,
-          mandate: {
-            ...draft,
-            expiresAt: authorization.expiresAt,
-            maxRecipients: draft.recipientIds.length,
-          },
-        }),
-      });
-      setEditing(false);
-      setMessage(
-        "Your updated permission is saved. Future work uses these limits.",
-      );
-      onChange();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Your permission could not be saved. Try again.",
-      );
-    } finally {
-      setPending(false);
-    }
+    if (!accepted || recovery.locked) return;
+    await recovery.save((expiresAt) => ({ action: "replace_mandate", version,
+      mandate: { ...draft, expiresAt, maxRecipients: draft.recipientIds.length } }));
+  }
+  async function reviewLatest() {
+    await recovery.review(latest => { setDraft(latest.mandate); setVersion(latest.version); setAccepted(false); onChange(); });
   }
   const toggleRecipient = (id: string) => {
     setDraft((value) => ({
@@ -101,6 +84,7 @@ export function PermissionEditor({
     }));
     setAccepted(false);
   };
+  if (recovery.accessLost) return <div lang={locale} className={styles.supportControls}><SupportUpdateRecovery recovery={recovery} onReview={reviewLatest}/></div>;
   return (
     <div lang={locale} className={`${styles.space} ${styles.hidePrint} ${styles.supportControls}`}>
       {!editing ? (
@@ -111,7 +95,7 @@ export function PermissionEditor({
           <h3>{t("Permission for up to 30 days")}</h3>
           <p className={styles.small}>
             {t("Choose exactly who can receive information and what CaseLink can use. Removing permission stops new uses; information already delivered may remain with its recipient.")}</p>
-          <fieldset className={styles.fieldset}>
+          <fieldset className={styles.fieldset} disabled={recovery.locked}>
             <legend className={styles.legend}>{t("Named programs")}</legend>
             <div className={styles.choices}>
               {getProgramsForNeeds(request.intake.needs).map((program) => (
@@ -126,7 +110,7 @@ export function PermissionEditor({
               ))}
             </div>
           </fieldset>
-          <fieldset className={styles.fieldset}>
+          <fieldset className={styles.fieldset} disabled={recovery.locked}>
             <legend className={styles.legend}>
               {t("Information CaseLink may use")}</legend>
             <div className={styles.choices}>
@@ -151,7 +135,7 @@ export function PermissionEditor({
               ))}
             </div>
           </fieldset>
-          <fieldset className={styles.fieldset}>
+          <fieldset className={styles.fieldset} disabled={recovery.locked}>
             <legend className={styles.legend}>
               {t("Actions within these limits")}</legend>
             <div className={styles.choices}>
@@ -190,6 +174,7 @@ export function PermissionEditor({
             <input
               type="checkbox"
               checked={accepted}
+              disabled={recovery.locked}
               onChange={(event) => setAccepted(event.target.checked)}
               required
             />
@@ -199,13 +184,13 @@ export function PermissionEditor({
           <button
             className={styles.button}
             disabled={
-              pending ||
+              recovery.locked ||
               !accepted ||
               !draft.recipientIds.length ||
               !draft.allowedData.length
             }
           >
-            {t(pending ? "Saving…" : "Save updated permission")}
+            {t(pending ? recovery.checking ? "Checking saved result…" : "Saving…" : "Save updated permission")}
           </button>
           <button
             className={styles.quiet}
@@ -213,7 +198,7 @@ export function PermissionEditor({
             disabled={pending}
             onClick={() => setEditing(false)}
           >
-            {t("Keep existing permission")}</button>
+            {t(recovery.unresolved ? "Close editor; this save is still being checked" : "Keep existing permission")}</button>
         </form>
       )}
       {message && (
@@ -221,11 +206,7 @@ export function PermissionEditor({
           {t(message)}
         </p>
       )}
-      {error && (
-        <p lang={t(error) === error ? "" : locale} role="alert" className={styles.error}>
-          {t(error)}
-        </p>
-      )}
+      <SupportUpdateRecovery recovery={recovery} onReview={reviewLatest}/>
     </div>
   );
 }

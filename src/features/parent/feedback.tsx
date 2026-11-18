@@ -34,7 +34,7 @@ export function ServiceError({
       </div>
     );
   return (
-    <div lang={locale} className={styles.error} role="alert">
+    <div lang={locale} className={`${styles.error} ${styles.serviceError}`} role="alert">
       <WarningTriangle width={23} height={23} aria-hidden="true" />
       <div>
         <strong>

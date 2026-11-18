@@ -55,7 +55,7 @@ No complete upgrade rehearsal, native concurrent run, live upgrade, new processi
 
 ## Portable source inventory
 
-These31 bodies are reviewed upgrade inputs, not a command to apply them or an activation record. Reconcile actual target drift, complete the production-lineage/native rehearsal and backup/rollback checks above before rollout. Preserve each original source version and record its actual installed history version if the deployment tool assigns another one.
+These35 bodies are reviewed upgrade inputs, not a command to apply them or an activation record. Reconcile actual target drift, complete the production-lineage/native rehearsal and backup/rollback checks above before rollout. Preserve each original source version and record its actual installed history version if the deployment tool assigns another one.
 
 | Source migration | SHA-256 |
 | --- | --- |
@@ -90,6 +90,15 @@ These31 bodies are reviewed upgrade inputs, not a command to apply them or an ac
 | `20261118121854_parent_job_claim_recheck.sql` | `4667244aee8882c6f4f0b13d7ba9de991150d213e69602e176fd28785a286129` |
 | `20261118164420_parent_food_description_cache_usage.sql` | `2cd28b2525d96f7e08b064b6e63704aa48a808f188615790bc68f03cd5ed58e8` |
 | `20261118185641_parent_preserve_snap_review_continuation.sql` | `a25ac127259e0e5ae297d3da357b684c0ea3ee0e4f205cf696c82e9c8fc2fb6b` |
+
+The following four reviewed forward bodies follow185641 in timestamp order. They preserve exact report binding, independent ordinary/private routing starts, metadata-only update receipts and the existing bounded directory retry. Their new purposes remain closed; the complete lineage/native rehearsal is still required.
+
+| Source migration | SHA-256 |
+| --- | --- |
+| `20261118192225_parent_food_directory_report_binding.sql` | `57e6b7204c69023dc238094b2490afc8023d32f79708b93375dc989b80cb2fa1` |
+| `20261118192417_parent_snap_ordinary_routing_reuse.sql` | `c8a00cfdf7c9a7366a81d75a5247ec0bef4cf5d2f9ec786b03b592883d302d3d` |
+| `20261118192507_parent_support_update_receipts.sql` | `91fc78f9ecb1979401cf7888d0553a3c01254cbd7f0b9ea87825e19edaae539b` |
+| `20261118194631_parent_food_directory_bounded_retry.sql` | `9686cace69e59913d25c0d576210251566aa93fa1e1f0b5a6cfdb296fd073e32` |
 
 Read-only preflight definition fingerprints (November18;17 functions) provide drift checks. Actual owners, security-definer flags, ACLs and search paths were also inspected in the ignored metadata artifact. Re-fetch and compare all metadata at rollout; a matching body alone does not prove matching grants or ongoing control values.
 

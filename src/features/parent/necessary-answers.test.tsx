@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NEED_LABELS, type NecessaryAction, type SupportNeed, type SupportRequest } from "@/lib/parent/domain";
 import { fixtureIntake, fixtureNow, fixtureRequest } from "@/lib/parent/test-fixtures";
+import { withSupportUpdateReceipts } from "./support-update-test-server";
 import { NecessaryAnswers } from "./necessary-answers";
 
 const question = (field: string, need: SupportNeed = "electricity"): NecessaryAction => ({
@@ -41,7 +42,7 @@ describe("one save for the family's known factual questions", () => {
       ...action, resolved: action.field === "amountDue",
     })) };
     const fetch = vi.fn().mockResolvedValue(reply(saved));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     const { rerender } = render(<NecessaryAnswers request={current} onChange={onChange} />);
     expect(input("householdSize").value).toBe("3");
     change("householdSize", ""); change("amountDue", "15");
@@ -63,7 +64,7 @@ describe("one save for the family's known factual questions", () => {
     current.required_actions.push(question("amountDue", "water"));
     const saved = { ...current, version: 2, required_actions: [] };
     const fetch = vi.fn().mockResolvedValue(reply(saved)), onChange = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={onChange} />);
     expect(screen.getAllByLabelText("Household income before taxes ($)")).toHaveLength(1);
     expect((screen.getByLabelText("Household income before taxes ($)") as HTMLInputElement).value).toBe("0");
@@ -99,7 +100,7 @@ describe("one save for the family's known factual questions", () => {
   it.each(["paused", "cancelled"] as const)("does not save known facts while the request is %s", (status) => {
     const current = { ...request(), status };
     const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={() => {}} />);
     expect((save() as HTMLButtonElement).disabled).toBe(true);
     expect(input("amountDue").matches(":disabled")).toBe(true);
@@ -110,7 +111,7 @@ describe("one save for the family's known factual questions", () => {
   it.each(["amount", "frequency"] as const)("blocks every write for partial income missing its %s", (missing) => {
     const current = request(["amountDue", "income"]);
     const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("amountDue", "15");
     expect(input("income").value).toBe("");
@@ -127,7 +128,7 @@ describe("one save for the family's known factual questions", () => {
 
   it("does not send an entirely unanswered question list", () => {
     const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={request(["amountDue"])} onChange={() => {}} />);
     fireEvent.click(save());
     expect(fetch).not.toHaveBeenCalled();
@@ -141,7 +142,7 @@ describe("one save for the family's known factual questions", () => {
     current.required_actions = [question("householdSize", "food_now"), question("amountDue"), question("income")];
     const saved = { ...current, version: 2, required_actions: [question("amountDue"), question("income")] };
     const fetch = vi.fn().mockResolvedValue(reply(saved)), onChange = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={onChange} />);
     change("householdSize", "4", "food_now");
     expect(input("amountDue").required).toBe(false);
@@ -158,7 +159,7 @@ describe("one save for the family's known factual questions", () => {
 
   it("validates every input before sending any part of the bundle", () => {
     const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={request()} onChange={() => {}} />);
     change("amountDue", "-1");
     change("householdSize", "4");
@@ -170,7 +171,7 @@ describe("one save for the family's known factual questions", () => {
   it("names and focuses the invalid question when two needs use the same input label", () => {
     const current = request([]), fetch = vi.fn();
     current.required_actions = [question("zip"), question("zip", "water")];
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("zip", "19104");
     change("zip", "abcde", "water");
@@ -183,7 +184,7 @@ describe("one save for the family's known factual questions", () => {
 
   it("preserves all dirty drafts and the original version during progress refresh", async () => {
     const current = request(), fetch = vi.fn().mockResolvedValue(reply({ ...current, version: 2, required_actions: [] }));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     const { rerender } = render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("amountDue", "15");
     change("householdSize", "4");
@@ -201,7 +202,7 @@ describe("one save for the family's known factual questions", () => {
   it("adds a newly known same-version question without replacing the existing draft", async () => {
     const current = request(["amountDue"]);
     const fetch = vi.fn().mockResolvedValue(reply({ ...current, version: 2, required_actions: [] }));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     const { rerender } = render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("amountDue", "15");
     rerender(<NecessaryAnswers request={{ ...current, required_actions: [...current.required_actions, question("householdSize")] }} onChange={() => {}} />);
@@ -219,7 +220,7 @@ describe("one save for the family's known factual questions", () => {
     const current = request([]);
     const next = { ...request(["amountDue"]), version: 2 };
     const fetch = vi.fn().mockResolvedValue(reply({ ...next, version: 3, required_actions: [] }));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     const { rerender } = render(<NecessaryAnswers request={current} onChange={() => {}} />);
     expect(screen.queryByRole("button", { name: "Save all answers and continue" })).toBeNull();
     rerender(<NecessaryAnswers request={next} onChange={() => {}} />);
@@ -234,7 +235,7 @@ describe("one save for the family's known factual questions", () => {
     let finish!: (value: ReturnType<typeof reply>) => void;
     const fetch = vi.fn(() => new Promise<ReturnType<typeof reply>>((resolve) => { finish = resolve; }));
     const onChange = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={onChange} />);
     change("amountDue", "15");
     change("householdSize", "4");
@@ -244,7 +245,7 @@ describe("one save for the family's known factual questions", () => {
     expect(input("amountDue").matches(":disabled")).toBe(true);
     expect(input("householdSize").matches(":disabled")).toBe(true);
     fireEvent.click(button);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(packet(fetch).answers[0].value).toBe(15);
     finish(reply({ ...current, version: 2, required_actions: [] }));
     await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
@@ -259,7 +260,7 @@ describe("one save for the family's known factual questions", () => {
     latest.intake_need_scoped_fields = ["incomeAmount", "incomeFrequency"];
     latest.facts = [{ need: "electricity", field: "income", value: { amount: 250, frequency: "weekly" }, source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" }];
     const fetch = vi.fn().mockResolvedValueOnce(reply(current, 409)).mockResolvedValueOnce(reply(latest)).mockResolvedValue(reply({ ...latest, version: 3, required_actions: [] }));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("amountDue", "15");
     change("income", "444");
@@ -283,7 +284,7 @@ describe("one save for the family's known factual questions", () => {
 
   it("keeps all typed values if the explicit latest-question reload fails", async () => {
     const current = request(), fetch = vi.fn().mockResolvedValueOnce(reply(current, 409)).mockRejectedValueOnce(new Error("Disconnected"));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("amountDue", "15");
     change("householdSize", "4");
@@ -304,7 +305,7 @@ describe("one save for the family's known factual questions", () => {
       if (source === "upstream_503") return reply(current, 503);
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     }).mockResolvedValue(reply({ ...current, version: 2, required_actions: [] }));
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch, current, { commitUnknown: true }));
     render(<NecessaryAnswers request={current} onChange={() => {}} />);
     change("amountDue", "15");
     change("householdSize", "4");
@@ -316,9 +317,8 @@ describe("one save for the family's known factual questions", () => {
     fireEvent.click(save());
     fireEvent.submit(save().closest("form")!);
     expect(fetch).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Review latest questions" }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(fetch.mock.calls[1][1]?.method ?? "GET").toBe("GET");
+    fireEvent.click(screen.getByRole("button", { name: "Check saved result" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save all answers and continue" })).toBeNull());
   });
 
@@ -326,7 +326,7 @@ describe("one save for the family's known factual questions", () => {
     const current = request(["amountDue"]);
     const saved = { ...current, status: "paused" as const, version: 2, required_actions: [question("householdSize")] };
     const fetch = vi.fn().mockResolvedValue(reply(saved)), onChange = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={onChange} />);
     change("amountDue", "15");
     fireEvent.click(save());
@@ -346,7 +346,7 @@ describe("one save for the family's known factual questions", () => {
     current.facts = [{ need: "electricity", field: "utilityProvider", value: "peco", source: "parent", confirmedAt: fixtureNow.toISOString(), asOf: "2026-10-25" }];
     const fetch = vi.fn().mockResolvedValue(reply({ ...current, version: 2, required_actions: dependent.map((field) => question(field)) }));
     const onChange = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetch));
     render(<NecessaryAnswers request={current} onChange={onChange} />);
     for (const [field, value] of [["amountDue", "15"], ["totalBalance", "30"], ["dueDate", "2026-10-30"], ["shutoffDate", "2026-10-31"], ["accountAuthority", "self"]]) change(field, value);
     change("amountDue", "77", "water");

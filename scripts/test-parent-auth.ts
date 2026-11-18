@@ -35,6 +35,8 @@ import { fixtureIntake, fixtureMandate, fixtureSnapApplication } from "../src/li
 import type { SupportRequest } from "../src/lib/parent/domain";
 import { runOneParentJob } from "../src/lib/parent/worker-runtime";
 import { assertSyntheticParentAuthTargets, beginParentTestApproval } from "./parent-test-approval";
+import { verifyNativeSupportUpdates } from "./parent-support-update-native";
+import { verifyNativeFoodDirectory } from "./parent-food-directory-native-proof";
 
 const origin = process.env.PARENT_TEST_ORIGIN ?? "http://127.0.0.1:3200";
 const checks: string[] = [];
@@ -358,6 +360,9 @@ async function main() {
     );
     await first.page.reload({ waitUntil: "networkidle" });
     const token = await accessToken(first.context);
+    stage = "actual keyed support-update acknowledgement and two-connection CAS";
+    await verifyNativeSupportUpdates({ origin, databaseUrl: local.DB_URL, api: first.page.request, token, ownerId: first.id, admin: db, check });
+    stage = "checking actual parent-only membership";
     const membership = (
       await db.query(
         "select (select count(*)::int from public.parent_accounts where id=$1) accounts,(select count(*)::int from public.parent_households where owner_id=$1) households,(select count(*)::int from public.app_users where id=$1) school_roles,(select count(*)::int from public.families where created_by_id=$1) school_families",
@@ -610,6 +615,9 @@ async function main() {
         && mixedCompleted.model_calls === 0 && mixedCompleted.model_reservations === foodBudgetBefore,
       "Both attributed reports close the combined request exactly once without a second worker attempt, model call or provider-status claim.");
       completedFoodRoutingIds.push(mixedId);
+      stage = "native failed-food directory persistence, scheduled retry and corrected-report race";
+      completedFoodRoutingIds.push(...await verifyNativeFoodDirectory({ origin, local, page: first.page, ownerId: first.id, db, worker: foodWorker,
+        syntheticApproval, approvedUntil: fixtureApproval!.approvedUntil, check }));
     } finally {
       const foodOutcomeStage = stage;
       try { await foodSetupStep("closing the isolated native public food worker", () => foodWorker.end()); }

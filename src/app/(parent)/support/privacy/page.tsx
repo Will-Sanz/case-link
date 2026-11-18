@@ -3,6 +3,7 @@ import { readParentLocale } from "@/lib/parent/locale-server";
 import { publicInfoText } from "@/lib/parent/public-info-copy";
 import Link from "next/link";
 import styles from "@/features/parent/parent.module.css";
+import infoStyles from "@/features/parent/public-info.module.css";
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await readParentLocale();
   return { title: publicInfoText(locale, "Privacy & data policy"), description: publicInfoText(locale, "How CaseLink uses household information, documents and AI, and how you control your support.") };
@@ -11,7 +12,7 @@ export default async function ParentPrivacyPage() {
   const locale = await readParentLocale();
   const t = (english: string) => publicInfoText(locale, english);
   return (
-    <article lang={locale} className={`${styles.container} ${styles.legal}`}>
+    <article lang={locale} className={`${styles.container} ${styles.legal} ${infoStyles.page}`}>
       <p>{t("Privacy & data policy")}</p>
       <h1>{t("Your information. Your control.")}</h1>
       <p>{t("Last updated November 13, 2026 · Parent service")}</p>

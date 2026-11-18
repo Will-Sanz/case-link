@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test-fixtures";
-const mocks = vi.hoisted(() => ({ description: vi.fn(), start: vi.fn(), startSnap: vi.fn(), startWic: vi.fn(), startPeco: vi.fn(), startPgw: vi.fn(), startWater: vi.fn(), get: vi.fn(), list: vi.fn(), getProgress: vi.fn(), listProgress: vi.fn(), window: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), description: vi.fn(), start: vi.fn(), startSnap: vi.fn(), startWic: vi.fn(), startPeco: vi.fn(), startPgw: vi.fn(), startWater: vi.fn(), get: vi.fn(), list: vi.fn(), getProgress: vi.fn(), listProgress: vi.fn(), window: vi.fn() }));
+vi.mock("@/lib/parent/auth", () => ({ requireParentSession: mocks.session }));
 vi.mock("@/lib/parent/food-description-data", () => ({ startFoodDescriptionRequest: mocks.description }));
 vi.mock("@/lib/parent/data", () => ({ startSupportRequest: mocks.start, getSupportRequest: mocks.get, listSupportRequests: mocks.list }));
 vi.mock("@/lib/parent/snap-application-data", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/parent/snap-application-data")>(), startSnapApplication: mocks.startSnap }));
@@ -32,6 +33,7 @@ function request(value: unknown, origin = "https://caselink.test") {
   return new Request("https://caselink.test/api/parent/requests", { method: "POST", headers: { origin, "content-type": "application/json", "idempotency-key": key }, body: JSON.stringify(value) });
 }
 beforeEach(() => {
+  mocks.session.mockResolvedValue({ user: { id: key } });
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://caselink.test");
   mocks.window.mockResolvedValue({ issuedAt: "2026-10-25T16:00:00Z", expiresAt: "2026-11-24T16:00:00Z", snapApplication: { collectionEnabled: true, noticeVersion: SNAP_APPLICATION_NOTICE_VERSION } });
   mocks.description.mockResolvedValue(fixtureRequest().id);
@@ -41,6 +43,35 @@ beforeEach(() => {
 });
 
 describe("existing request creation and atomic SNAP variant", () => {
+  it("can return403 after the atomic start succeeded when the following owned progress read is denied", async () => {
+    mocks.getProgress.mockRejectedValueOnce(new Error("This request is unavailable, or its permission has changed."));
+    expect((await POST(request(snap()))).status).toBe(403);
+    expect(mocks.startSnap).toHaveBeenCalledOnce();expect(mocks.get).toHaveBeenCalledWith(fixtureRequest().id);
+  });
+  it("forwards independent routing metadata with private SNAP without relabeling the applicant home ZIP", async () => {
+    const value = { ...snap(), intake: fixtureIntake({ needs: ["food_now", "snap_new"], zip: "19129" }), mandate: fixtureMandate({ recipientIds: ["share-community-fridge-19129", "snap-pa"] }),
+      reusedZip: { sourceRequestId: fixtureRequest().id, sourceVersion: 2 }, documentTemplateId: SNAP_ES_TEMPLATE_ID };
+    expect((await POST(request(value))).status).toBe(201);
+    expect(mocks.startSnap).toHaveBeenCalledExactlyOnceWith(value.intake, value.mandate, value.details, value.noticeVersion, key, undefined, SNAP_ES_TEMPLATE_ID, value.reusedZip);
+    expect(mocks.start).not.toHaveBeenCalled();
+  });
+  it("returns the existing no-write412 source-change response for private SNAP and never falls back to ordinary creation", async () => {
+    mocks.startSnap.mockRejectedValueOnce(new Error("parent_reuse_source_changed"));
+    const response = await POST(request({ ...snap(), reusedZip: { sourceRequestId: fixtureRequest().id, sourceVersion: 2 } }));
+    expect(response.status).toBe(412); expect(await response.json()).toEqual({ ok: false, error: "Saved routing information changed before this request was created." });
+    expect(mocks.start).not.toHaveBeenCalled();
+  });
+  it("checks a frozen draft owner before any creation and keeps the owner envelope out of saved facts", async () => {
+    const value = { ...snap(), expectedOwnerId: key };
+    expect((await POST(request(value))).status).toBe(201);
+    expect(mocks.startSnap).toHaveBeenCalledExactlyOnceWith(value.intake, value.mandate, value.details, value.noticeVersion, key);
+    mocks.startSnap.mockClear();
+    mocks.session.mockResolvedValue({ user: { id: "22222222-2222-4222-8222-222222222222" } });
+    expect((await POST(request(value))).status).toBe(403);
+    expect(mocks.startSnap).not.toHaveBeenCalled();
+    expect((await POST(request({ ...value, expectedOwnerId: "invalid" }))).status).toBe(400);
+    expect(mocks.startSnap).not.toHaveBeenCalled();
+  });
   it("starts complementary food and SNAP once through the existing private atomic boundary and key", async () => {
     const value = { ...snap(), intake: fixtureIntake({ needs: ["food_now", "snap_new"] }), mandate: fixtureMandate({ recipientIds: ["philly-food", "snap-pa"] }) };
     expect((await POST(request(value))).status).toBe(201);

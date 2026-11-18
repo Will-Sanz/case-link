@@ -52,6 +52,7 @@ export class ParentApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly supportUpdateRejected = false,
   ) {
     super(message);
     this.name = "ParentApiError";
@@ -80,9 +81,10 @@ export async function parentApi<T>(
       0,
     );
   }
-  let body: T & { ok?: boolean; error?: string };
+  let body: T & { ok?: boolean; error?: string; supportUpdateRejected?: unknown };
   try {
     body = await response.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
   } catch {
     throw new ParentApiError(
       "We couldn’t read the response. Your information is still on this page. Please try again.",
@@ -95,6 +97,7 @@ export async function parentApi<T>(
         ? body.error
         : "We couldn’t finish that step. Please try again.",
       response.status,
+      response.status === 400 && body.supportUpdateRejected === true,
     );
   return body;
 }

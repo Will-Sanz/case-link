@@ -7,6 +7,7 @@ import { ArrowRight } from "iconoir-react";
 import { PROGRAMS } from "@/lib/parent/programs";
 import { parentEmailCodeEnabled } from "@/lib/parent/configuration";
 import styles from "@/features/parent/parent.module.css";
+import infoStyles from "@/features/parent/public-info.module.css";
 import { FoodSites } from "@/features/parent/food-sites";
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await readParentLocale();
@@ -24,7 +25,7 @@ export default async function HelpPage() {
       ? `${process.env.CASELINK_PARENT_RECOVERY_SITE_URL}/forgot-password`
       : "/forgot-password";
   return (
-    <div lang={locale} className={`${styles.container} ${styles.infoPage}`}>
+    <div lang={locale} className={`${styles.container} ${styles.infoPage} ${infoStyles.page}`}>
       <header className={styles.infoIntro}>
       <h1>{t("Help, without another hurdle.")}</h1>
       <p className={styles.lead}>
@@ -34,7 +35,7 @@ export default async function HelpPage() {
         <h2>{t("Need food or utility help now?")}</h2>
         <p>
           {t("For food today, use the City’s food and meal finder. Check the location’s current hours and access requirements before traveling.")}</p>
-        <a className={styles.button} href="https://www.phila.gov/food/">
+        <a className={`${styles.button} ${infoStyles.directFood}`} href="https://www.phila.gov/food/">
           {t("Find food in Philadelphia")}{" "}
           <ArrowRight width={18} height={18} aria-hidden="true" />
         </a>

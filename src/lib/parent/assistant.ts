@@ -263,13 +263,13 @@ export function buildAssistantFacts(
         : null);
     });
     const issue = [...new Set(issues.filter((issue): issue is string => issue !== null))].join(" ");
-    add(
-      `program-${program.id}`,
-      `${program.name}: ${program.description}${issue ? ` ${issue}` : " Program eligibility, capacity and approval are determined by the program."}`,
-      "Official program information",
-      `${program.sourceCheckedAt}T00:00:00Z`,
-      program.sourceUrl,
-    );
+    const qualifier = issue ? ` ${issue}` : " Program eligibility, capacity and approval are determined by the program.";
+    const text = `${program.name}: ${program.description}${qualifier}`;
+    // The static published catalog can contain public addresses; dynamic qualifiers retain the private-data guard.
+    if (text.length <= 1500 && safeText(qualifier)) facts.push({
+      id: `program-${program.id}`, text, sourceLabel: "Official program information",
+      recordedAt: `${program.sourceCheckedAt}T00:00:00Z`, sourceUrl: program.sourceUrl,
+    });
     add(
       `personal-${program.id}`,
       `${program.name}: ${program.personalSteps.join(" ")} Required personal authentication, signatures and declarations must be completed by the appropriate person.`,

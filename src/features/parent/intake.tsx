@@ -148,6 +148,7 @@ export function buildMandate(
   };
 }
 
+const reusableZipReadSchema = z.object({ ownerId: z.uuid(), zip: reusableZipSchema.nullable() });
 export type ParentIntakeSignInOptions = { existingAccountRecovery?: boolean; recoveryHref?: string; emailCodeAvailable?: boolean };
 export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: string; signInOptions?: ParentIntakeSignInOptions }) {
   const [guide, setGuide] = useState<{ handoff: FoodAssessmentHandoff; editing: boolean } | null>(null);
@@ -173,6 +174,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const session = useParentResource<{
     account: { id?: string; email: string; preferences?: ParentPreferences };
   }>("/account");
+  const reloadSession = session.reload;
   const preferencesApplied = useRef(false);
   const connections = useParentResource<{
     capabilities: {
@@ -205,6 +207,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const [familyHomeAddress, setFamilyHomeAddress] = useState(false);
   const [familyPecoPhone, setFamilyPecoPhone] = useState<"home" | "cell" | "">("");
   const zipDefaultConsumed = useRef(false);
+  const intakeOwner = useRef<string | null>(null);
   const [reusedZip, setReusedZip] = useState<z.infer<typeof reusableZipSchema> | null>(null);
   const [intake, setIntake] = useState<SupportIntake>(() => ({
     ...initialIntake,
@@ -239,7 +242,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const heading = useRef<HTMLHeadingElement>(null);
   const startAttempt = useRef<{
     key: string;
-    packet: { intake: SupportIntake; mandate: ServiceMandate; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource; descriptionSource?: FoodAssessmentHandoff["descriptionSource"]; documentTemplateId?: SnapFormTemplateId };
+    packet: { intake: SupportIntake; mandate: ServiceMandate; expectedOwnerId?: string; kind?: "snap_application" | "wic_application" | "peco_application" | "pgw_application" | "water_application"; details?: SnapApplicationFields | WicApplicationFields | UtilityDetails; noticeVersion?: typeof SNAP_APPLICATION_NOTICE_VERSION | typeof WIC_APPLICATION_NOTICE_VERSION | typeof PECO_APPLICATION_NOTICE_VERSION | typeof PGW_APPLICATION_NOTICE_VERSION | typeof WATER_APPLICATION_NOTICE_VERSION; subjectAuthorityDeclared?: true; accountAuthorityDeclared?: true; reusedZip?: ReusedZipSource; familyProfileSource?: FamilyProfileSource; descriptionSource?: FoodAssessmentHandoff["descriptionSource"]; documentTemplateId?: SnapFormTemplateId };
   } | null>(null);
   const work=useRef<AbortController|null>(null),running=useRef<AbortController|null>(null);
   const scope=JSON.stringify({intake,snapDetails,snapDocument,snapDocumentChosen,detailsReady,wicDetails,wicDetailsReady,utilityPreparation,utilityDetails,utilityDetailsReady,recipientIds,mode,booking,accepted,reusedZip,handoff});
@@ -299,22 +302,6 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     return () => { controller.abort(); window.removeEventListener("focus", check); window.removeEventListener("online", check); window.removeEventListener("pageshow", returned); };
   });
   const snapSelected = intake.needs.includes("snap_new");
-  useEffect(() => {
-    if (snapSelected || zipDefaultConsumed.current) return;
-    const controller = new AbortController();
-    boundedParentApi("/intake-defaults", {}, controller.signal, new Date(Date.now() + 30_000).toISOString())
-      .then(value => {
-        if (controller.signal.aborted || zipDefaultConsumed.current) return;
-        const parsed = z.object({ zip: reusableZipSchema.nullable() }).safeParse(value);
-        const saved = parsed.success ? parsed.data.zip : null;
-        if (!saved || Date.parse(saved.expiresAt) <= Date.now() || Date.parse(saved.confirmedAt) > Date.now()) return;
-        zipDefaultConsumed.current = true;
-        setIntake(current => current.zip ? current : { ...current, zip: saved.value });
-        setReusedZip(saved);
-      })
-      .catch(() => { /* Saved defaults are optional; manual entry remains available. */ });
-    return () => controller.abort();
-  }, [snapSelected]);
   const directSnap = initialNeed === "snap_new" && step > 0 && snapSelected && intake.needs.length === 1;
   const fullSnap = snapSelected && canCollectSnapApplication(authorization.data) && !authorization.error && !collectionBlocked;
   const wicOnly = intake.needs.length === 1 && intake.needs[0] === "wic_new";
@@ -333,18 +320,20 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const fullUtility = !!utilityConfig && utilityChoice === utilityPreparation && intake.accountAuthority !== "not_sure" && utilityWindowCurrent && utilityConfig.canCollect(authorization.data) && !authorization.error && !utilityBlocked;
   const closeChangedFamily = useCallback(() => {
     work.current?.abort(); running.current?.abort(); familyProfileWork.current?.abort();
+    familyOwnerCheck.current?.controller.abort(); familyOwnerCheck.current = null;
     familyOwner.current = null; familySources.current = {}; familyApplied.current.clear();
     setFamilyProfile(null); setFamilyFilled({}); setSnapDetails({}); setSnapDocument(SNAP_EN_TEMPLATE_ID); setSnapDocumentChosen(false); setWicDetails({}); setUtilityDetails({});
-    setReusedZip(null); setIntake(current => ({ ...current, zip: "", householdSize: null, incomeAmount: null, incomeFrequency: "unknown", accountAuthority: "not_sure" }));
+    intakeOwner.current = null; setReusedZip(null); setIntake(current => ({ ...current, zip: "", householdSize: null, incomeAmount: null, incomeFrequency: "unknown", accountAuthority: "not_sure" }));
     setAccepted(false); setError(null); setStartUncertain(false); startAttempt.current = null;
     setFamilyAccess("changed");
-  }, []);
+    onFoodOwnerChanged?.();
+  }, [onFoodOwnerChanged]);
   const readOwnedFamilyProfile = useCallback(async (signal: AbortSignal, deadline: string, receiptOnly = false) => {
-    const owner = familyOwner.current;
+    const owner = familyOwner.current ?? intakeOwner.current;
     if (!owner) throw new Error("Saved family information needs a current owner.");
     const account = z.object({ account: z.object({ id: z.uuid() }) }).parse(await boundedParentApi("/account", {}, signal, deadline));
     if (account.account.id.toLowerCase() !== owner) { closeChangedFamily(); throw new Error("family_owner_changed"); }
-    if (receiptOnly) { signal.throwIfAborted(); return null; }
+    if (receiptOnly || !familyOwner.current) { signal.throwIfAborted(); return null; }
     const value = await boundedParentApi("/family-profile", {}, signal, deadline);
     const read = value && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {}; delete read.ok;
     const current = familyProfileReadSchema.parse(read);
@@ -352,7 +341,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     signal.throwIfAborted(); return current;
   }, [closeChangedFamily]);
   const ensureFamilyOwner = useCallback(async () => {
-    const owner = familyOwner.current;
+    const owner = familyOwner.current ?? intakeOwner.current;
     if (!owner) return;
     if (familyOwnerCheck.current) return familyOwnerCheck.current.promise;
     const controller = new AbortController(); setFamilyAccess("checking");
@@ -363,21 +352,44 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
         if (current && (!current.profile || !current.collection.collectionEnabled || Date.parse(current.collection.expiresAt ?? "") <= Date.now())) throw new Error("family_access_unavailable");
         controller.signal.throwIfAborted(); setFamilyAccess("ready");
       } catch (failure) {
-        if (familyOwner.current && !controller.signal.aborted) {
-          if (failure instanceof ParentApiError && [401, 403].includes(failure.status)) closeChangedFamily();
+        if ((familyOwner.current || intakeOwner.current) && !controller.signal.aborted) {
+          if (handoff && failure instanceof ParentApiError && failure.status === 401) {
+            setGuideSignIn(true); setFamilyAccess("ready"); reloadSession();
+          } else if (failure instanceof ParentApiError && [401, 403].includes(failure.status)) closeChangedFamily();
           else setFamilyAccess("unavailable");
         }
         throw new Error("Saved family information needs a fresh sign-in check before this request can continue.");
       } finally { if (familyOwnerCheck.current?.controller === controller) familyOwnerCheck.current = null; }
     })();
     familyOwnerCheck.current = { controller, promise }; return promise;
-  }, [closeChangedFamily, readOwnedFamilyProfile, startUncertain]);
+  }, [closeChangedFamily, readOwnedFamilyProfile, startUncertain, handoff, reloadSession]);
   useEffect(() => {
-    const check = () => { if (familyOwner.current) void ensureFamilyOwner().catch(() => {}); };
+    const check = () => { if (familyOwner.current || intakeOwner.current) void ensureFamilyOwner().catch(() => {}); };
     const returned = (event: PageTransitionEvent) => { if (event.persisted) check(); };
     window.addEventListener("focus", check); window.addEventListener("pageshow", returned); window.addEventListener("online", check);
     return () => { window.removeEventListener("focus", check); window.removeEventListener("pageshow", returned); window.removeEventListener("online", check); };
   }, [ensureFamilyOwner]);
+  useEffect(() => {
+    if (familyAccess === "changed") return;
+    const expected = z.uuid().safeParse(session.data?.account.id);
+    if (intakeOwner.current && expected.success && expected.data.toLowerCase() !== intakeOwner.current) { closeChangedFamily(); return; }
+    if (expected.success && !intakeOwner.current) intakeOwner.current = expected.data.toLowerCase();
+    if (zipDefaultConsumed.current || familyAccess !== "ready") return;
+    const controller = new AbortController();
+    boundedParentApi("/intake-defaults", {}, controller.signal, new Date(Date.now() + 30_000).toISOString())
+      .then(value => {
+        if (controller.signal.aborted || zipDefaultConsumed.current) return;
+        const parsed = reusableZipReadSchema.safeParse(value);
+        if (!parsed.success) return;
+        if (expected.success && parsed.data.ownerId.toLowerCase() !== expected.data.toLowerCase()) { closeChangedFamily(); return; }
+        const saved = parsed.data.zip;
+        if (!saved || Date.parse(saved.expiresAt) <= Date.now() || Date.parse(saved.confirmedAt) > Date.now()) return;
+        zipDefaultConsumed.current = true; intakeOwner.current = parsed.data.ownerId.toLowerCase();
+        setIntake(current => ({ ...current, zip: saved.value })); setReusedZip(saved);
+      })
+      .catch(() => { /* Saved defaults are optional; manual entry remains available. */ });
+    return () => controller.abort();
+  }, [closeChangedFamily, session.data?.account.id, familyAccess]);
   const seedFamilyProfile = useCallback((profile: FamilyProfileSnapshot, program: FamilyProfileApplicationProgram, accountAuthority: SupportIntake["accountAuthority"]) => {
     const changed = program === "snap-pa" ? familyDraftChanged.current.snap : program === "wic-pa" ? familyDraftChanged.current.wic : familyDraftChanged.current.utility;
     if (changed || familyApplied.current.has(program) || !["snap-pa", "wic-pa"].includes(program) && accountAuthority === "not_sure") return;
@@ -415,7 +427,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     const program: FamilyProfileApplicationProgram | undefined = fullSnap ? "snap-pa" : fullWic ? "wic-pa" : fullUtility ? utilityConfig?.programId : undefined;
     familyTarget.current = program && step === 1 ? { program, accountAuthority: intake.accountAuthority } : null;
   }, [fullSnap, fullWic, fullUtility, utilityConfig, intake.accountAuthority, step]);
-  const snapValues={...(intake.zip?{zip:intake.zip}:{}),...snapDetails};
+  const snapValues={...(!reusedZip && intake.zip?{zip:intake.zip}:{}),...snapDetails};
   const programs = getProgramsForNeeds(intake.needs).filter(program=>(!fullSnap||program.id==='snap-pa'||
     program.needs.some(need=>need!=='snap_new'&&intake.needs.includes(need))) && (!fullWic || program.id === "wic-pa") && (!utilityPreparation || program.id === utilityConfig?.programId));
   const hasBenefits = intake.needs.some((need) =>
@@ -568,6 +580,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     if (!controller || controller.signal.aborted || running.current === controller) return;
     running.current = controller; setPendingWork({ scope, controller }); setError(null);
     try {
+      await ensureFamilyOwner();
+      if (controller.signal.aborted || work.current !== controller) return;
       const latest = await readAuthorizationWindow(controller.signal);
       if (controller.signal.aborted || work.current !== controller) return;
       setUtilityBlocked(!utilityConfig?.canCollect(latest)); authorization.reload();
@@ -580,6 +594,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     if (!controller || controller.signal.aborted || running.current === controller) return;
     running.current = controller; setPendingWork({ scope, controller }); setError(null);
     try {
+      await ensureFamilyOwner();
+      if (controller.signal.aborted || work.current !== controller) return;
       const latest = await readAuthorizationWindow(controller.signal);
       if (controller.signal.aborted || work.current !== controller) return;
       setWicBlocked(!canCollectWicApplication(latest)); authorization.reload();
@@ -590,9 +606,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   function changeSnapDetails(details: SnapApplicationFields) {
     familyDraftChanged.current.snap = true; languageChosen.current = true;
     if (details.language === "en" || details.language === "es") explicitLanguage.current = details.language;
-    zipDefaultConsumed.current = true; setReusedZip(null);
     setSnapDetails(details);setDetailsReady(false);setAccepted(false);setError(null);startAttempt.current=null;
-    setIntake(current=>({...current,zip:details.zip??"",householdSize:details.household?.length??null,
+    setIntake(current=>({...current,zip:reusedZip ? current.zip : details.zip??"",householdSize:details.household?.length??null,
       ...(details.language==='en'||details.language==='es'?{language:details.language}:{}),
       incomeAmount:null,incomeFrequency:"unknown",
     }));
@@ -603,6 +618,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     running.current=controller;
     setPendingWork({ scope, controller });setError(null);
     try {
+      await ensureFamilyOwner();
+      if(controller.signal.aborted||work.current!==controller)return;
       const latest=await readAuthorizationWindow(controller.signal);
       if(controller.signal.aborted||work.current!==controller)return;
       setCollectionBlocked(!canCollectSnapApplication(latest));authorization.reload();
@@ -726,6 +743,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       await ensureFamilyOwner();
       if (controller.signal.aborted || work.current !== controller) return;
       if (handoff && startAttempt.current) await checkGuideOwner(controller.signal, startAttempt.current.packet.mandate.expiresAt);
+      const retryingSnap = startAttempt.current?.packet.kind === "snap_application";
       const retryingWic = startAttempt.current?.packet.kind === "wic_application";
       const retryingUtility = ["peco_application", "pgw_application", "water_application"].includes(startAttempt.current?.packet.kind ?? "");
       if (!startAttempt.current) {
@@ -762,10 +780,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
         const details=detailsReady?validatedSnapDetails():undefined;
         if (details && !recipientIds.includes("snap-pa")) throw new Error("SNAP application answers can be saved only for the named Pennsylvania SNAP program. Choose that program or return to change your support needs.");
         const profileSource = details ? familySource("snap-pa", details) : wic ? familySource("wic-pa", wic) : utility && utilityConfig ? familySource(utilityConfig.programId, utility) : undefined;
+        const owner = z.uuid().safeParse(familyOwner.current ?? intakeOwner.current ?? session.data?.account.id);
         startAttempt.current = {
           key: crypto.randomUUID(),
           packet: {
             intake,
+            ...(owner.success ? { expectedOwnerId: owner.data.toLowerCase() } : {}),
             ...(handoff?.descriptionSource ? { descriptionSource: handoff.descriptionSource } : {}),
             mandate: buildMandate(
               intake,
@@ -780,9 +800,18 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
             ...(wic ? { kind: "wic_application" as const, details: wic, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true as const } : {}),
             ...(utility && utilityConfig ? { kind: utilityConfig.kind, details: utility, noticeVersion: utilityConfig.noticeVersion, subjectAuthorityDeclared: true as const, accountAuthorityDeclared: true as const } : {}),
             ...(profileSource ? { familyProfileSource: profileSource } : {}),
-            ...(!details && reusedZip ? { reusedZip: { sourceRequestId: reusedZip.sourceRequestId, sourceVersion: reusedZip.sourceVersion } } : {}),
+            ...(reusedZip ? { reusedZip: { sourceRequestId: reusedZip.sourceRequestId, sourceVersion: reusedZip.sourceVersion } } : {}),
           },
         };
+      }
+      if (retryingSnap) {
+        const currentWindow = await readAuthorizationWindow(controller.signal);
+        if (controller.signal.aborted || work.current !== controller) return;
+        if (!canCollectSnapApplication(currentWindow)) {
+          setCollectionBlocked(true); authorization.reload();
+          throw new Error("Private SNAP access is unavailable. Your draft and original save attempt stay in this tab. Check access before retrying the same request.");
+        }
+        setCollectionBlocked(false);
       }
       if (retryingWic) {
         const currentWindow = await readAuthorizationWindow(controller.signal);
@@ -835,7 +864,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
             const projection = { details: next.details, fields };
             const nextIntake = { ...packet.intake };
             if (program === "snap-pa") {
-              if (previous.projection.fields.some(field => field.applicationPath === "zip") && packet.intake.zip === (packet.details as SnapApplicationFields).zip)
+              if (!packet.reusedZip && previous.projection.fields.some(field => field.applicationPath === "zip") && packet.intake.zip === (packet.details as SnapApplicationFields).zip)
                 nextIntake.zip = (details as SnapApplicationFields).zip ?? "";
               if (previous.projection.fields.some(field => field.applicationPath === "language") && packet.intake.language === (packet.details as SnapApplicationFields).language)
                 nextIntake.language = ["en", "es"].includes((details as SnapApplicationFields).language ?? "") ? (details as SnapApplicationFields).language as "en" | "es" : initialIntake.language;
@@ -854,7 +883,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
           if (failure.message !== "Saved routing information changed before this request was created." || !packet.reusedZip) throw failure;
           creationAttempted = false;
           // This specific response proves no request was created; refresh once within the same mandate/key.
-          const latest = z.object({ zip: reusableZipSchema.nullable() }).parse(await boundedParentApi("/intake-defaults", {}, controller.signal, startAttempt.current.packet.mandate.expiresAt));
+          const latest = reusableZipReadSchema.parse(await boundedParentApi("/intake-defaults", {}, controller.signal, startAttempt.current.packet.mandate.expiresAt));
+          if (intakeOwner.current !== latest.ownerId.toLowerCase()) { closeChangedFamily(); throw new ParentApiError("Your sign-in changed. Start a fresh request for your current account.", 403); }
           if (!latest.zip) {
             zipDefaultConsumed.current = true;
             refreshedZip = null;
@@ -878,9 +908,13 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     } catch (err) {
       if(controller.signal.aborted||work.current!==controller)return;
       const status=err instanceof ParentApiError?err.status:0;
+      if ((status===401||status===403) && (familyOwner.current || intakeOwner.current)) {
+        await ensureFamilyOwner().catch(() => {});
+        if(controller.signal.aborted||work.current!==controller)return;
+      }
       if(handoff && (status===401||status===403)){setGuideSignIn(true);session.reload();}
       setStartUncertain(!!startAttempt.current && (startUncertain || creationAttempted &&
-        (status<400||status>=500||status===409 || (wicOnly || !!utilityPreparation) && (status===401||status===403))));
+        (status<400||status>=500||status===409||status===401||status===403)));
       if(snapSelected && (status===401||status===403)){setCollectionBlocked(true);authorization.reload();}
       if(wicOnly && (status===401||status===403)){setWicBlocked(true);authorization.reload();}
       if(utilityPreparation && (status===401||status===403)){setUtilityBlocked(true);authorization.reload();}
@@ -1076,6 +1110,13 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     {familyProfile && familyFilled["snap-pa"] ? <p className={styles.hint}>{st("We filled current answers from your saved family information. Change anything that needs correcting. Reuse keeps its original dates.")}{" "}<Link href="/family-profile" className={styles.textLink}>{st("Update family information")}</Link>.</p> : null}
                     <SnapApplicationNotice templateId={snapDocument}/>
                     <SnapDocumentLanguage value={snapDocument} disabled={pending || startUncertain} onChange={value => { setSnapDocument(value); setSnapDocumentChosen(true); setDetailsReady(false); setAccepted(false); setError(null); startAttempt.current=null; }}/>
+                    {reusedZip && <div className={styles.notice}>
+                      <p>{st("We will use your saved ZIP for support routing:")} {reusedZip.value}.</p>
+                      <p>{st("Provided")} {new Date(reusedZip.confirmedAt).toLocaleDateString(locale === "es" ? "es-US" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}. {st("This does not fill or change your applicant address. Reuse keeps the original date and expiry.")}</p>
+                    </div>}
+                    {(reusedZip || intake.zip !== snapValues.zip) && /^\d{5}$/.test(snapValues.zip ?? "") && <button type="button" className={styles.secondary} disabled={pending || startUncertain} onClick={() => { change("zip", snapValues.zip!); setAccepted(false); }}>
+                      {st("Use applicant ZIP code for support routing")}
+                    </button>}
                     <SnapApplicationFormFields value={snapValues} onChange={changeSnapDetails} disabled={pending}/>
                   </> : <>
                   {snapSelected && <div className={styles.notice}>

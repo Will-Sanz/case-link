@@ -1,5 +1,11 @@
 /** Reviewed screen copy only. It never selects an official source or changes contact preferences. */
 export const SNAP_SPANISH_COPY: Readonly<Record<string, string>> = {
+  "Provided": "Proporcionado",
+  "A current household ZIP code is needed. Your other answers are kept.": "Se necesita un código postal vigente del hogar. Sus otras respuestas se conservan.",
+  "Private SNAP access is unavailable. Your draft and original save attempt stay in this tab. Check access before retrying the same request.": "El acceso privado a SNAP no está disponible. Su borrador y el intento original de guardado se conservan en esta pestaña. Compruebe el acceso antes de reintentar la misma solicitud.",
+  "We will use your saved ZIP for support routing:": "Usaremos su código postal guardado para orientar el apoyo:",
+  "This does not fill or change your applicant address. Reuse keeps the original date and expiry.": "Esto no completa ni cambia la dirección del solicitante. La reutilización conserva la fecha y el vencimiento originales.",
+  "Use applicant ZIP code for support routing": "Usar el código postal del solicitante para orientar el apoyo",
   "Private personal-step permission is unavailable. Your saved answers are kept.": "El permiso para los pasos personales privados no está disponible. Sus respuestas guardadas se conservan.",
   "Allow private SNAP personal steps": "Permitir los pasos personales privados de SNAP",
   "The application needs Social Security numbers for the people applying, plus your own signatures and dates on form pages 1 and 5.": "La solicitud pide los números de Seguro Social de las personas que solicitan SNAP, además de sus propias firmas y fechas en las páginas 1 y 5 del formulario.",

@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { fixtureIntake, fixtureMandate, fixtureNow, fixtureRequest } from '@/lib/parent/test-fixtures';
 import { ParentLocaleProvider, useParentLocale } from './parent-locale';
 import { PermissionEditor } from './permission-editor';
+import { withSupportUpdateReceipts } from "./support-update-test-server";
 import { NecessaryAnswers } from './necessary-answers';
 import { NecessaryAnswer, NecessaryAnswerFields } from './necessary-answer';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -22,7 +23,7 @@ it('marks untranslated utility options without changing their exact saved values
 });
 
 it('keeps full current selected captions connected to native controls without saving or changing machine values', () => {
-  const request = { ...current(), required_actions: [action] }, fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  const request = { ...current(), required_actions: [action] }, fetch = vi.fn(); vi.stubGlobal('fetch', withSupportUpdateReceipts(fetch));
   render(<ParentLocaleProvider initialLocale="es"><Switch/><NecessaryAnswers request={request} onChange={vi.fn()}/><NecessaryAnswerFields action={{ ...action, id: 'booking-caption', field: 'bookingPreference' }} draft={{ value: 'weekday_morning', frequency: '' }} onChange={vi.fn()}/></ParentLocaleProvider>);
   const frequency = screen.getByLabelText('¿Con qué frecuencia recibe estos ingresos?');
   fireEvent.change(frequency, { target: { value: 'biweekly' } });
@@ -36,7 +37,7 @@ it('keeps full current selected captions connected to native controls without sa
 
 it('shows exact Spanish permission and preserves original version, bounded server deadline and data choice', async () => {
   const request = current(), onChange = vi.fn(), expiresAt = '2026-11-20T12:00:00Z';
-  const fetch = vi.fn().mockResolvedValueOnce(response({ authorization: { expiresAt } })).mockResolvedValueOnce(response({ ok: true })); vi.stubGlobal('fetch', fetch);
+  const fetch = vi.fn().mockResolvedValueOnce(response({ authorization: { expiresAt } })).mockResolvedValueOnce(response({ ok: true })); vi.stubGlobal('fetch', withSupportUpdateReceipts(fetch, request, { permission: true }));
   render(<ParentLocaleProvider initialLocale="es"><PermissionEditor request={request} onChange={onChange}/></ParentLocaleProvider>);
   fireEvent.click(screen.getByRole('button', { name: 'Cambiar o renovar el permiso' }));
   expect(screen.getByText(/La información ya entregada puede permanecer con su destinatario/)).toBeTruthy();
@@ -51,7 +52,7 @@ it('shows exact Spanish permission and preserves original version, bounded serve
 it('saves Spanish grouped income with zero, preserving its machine fields, scope and version', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(fixtureNow.getTime());
   const request = { ...current(), required_actions: [action] }, onChange = vi.fn();
-  const fetch = vi.fn().mockResolvedValue(response({ request: { ...request, version: request.version + 1, required_actions: [] } })); vi.stubGlobal('fetch', fetch);
+  const fetch = vi.fn().mockResolvedValue(response({ request: { ...request, version: request.version + 1, required_actions: [] } })); vi.stubGlobal('fetch', withSupportUpdateReceipts(fetch));
   render(<ParentLocaleProvider initialLocale="es"><Switch/><NecessaryAnswers request={request} onChange={onChange}/></ParentLocaleProvider>);
   fireEvent.change(screen.getByLabelText('Ingresos del hogar antes de impuestos ($)'), { target: { value: '0' } });
   fireEvent.change(screen.getByLabelText('¿Con qué frecuencia recibe estos ingresos?'), { target: { value: 'weekly' } });
@@ -65,7 +66,7 @@ it('saves Spanish grouped income with zero, preserving its machine fields, scope
 });
 
 it('keeps a Spanish correction failure and unsaved income visible without claiming a saved answer', async () => {
-  const request = current(), fetch = vi.fn().mockResolvedValue(response({ error: 'This request changed.' }, 409)); vi.stubGlobal('fetch', fetch);
+  const request = current(), fetch = vi.fn().mockResolvedValue(response({ error: 'This request changed.' }, 409)); vi.stubGlobal('fetch', withSupportUpdateReceipts(fetch));
   render(<ParentLocaleProvider initialLocale="es"><NecessaryAnswer request={request} action={action} onChange={vi.fn()} correction/></ParentLocaleProvider>);
   fireEvent.change(screen.getByLabelText('Ingresos del hogar'), { target: { value: '12' } });
   fireEvent.change(screen.getByLabelText('¿Con qué frecuencia recibe estos ingresos?'), { target: { value: 'monthly' } });
@@ -77,7 +78,7 @@ it('keeps a Spanish correction failure and unsaved income visible without claimi
 });
 
 it.each([false, true])('explains an invalid income in the selected language without a write (grouped=%s)', grouped => {
-  const request = { ...current(), required_actions: [action] }, fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  const request = { ...current(), required_actions: [action] }, fetch = vi.fn(); vi.stubGlobal('fetch', withSupportUpdateReceipts(fetch));
   render(<ParentLocaleProvider initialLocale="es"><Switch/>{grouped ? <NecessaryAnswers request={request} onChange={vi.fn()}/> : <NecessaryAnswer request={request} action={action} onChange={vi.fn()}/>}</ParentLocaleProvider>);
   const amount = screen.getByLabelText('Ingresos del hogar antes de impuestos ($)');
   fireEvent.change(amount, { target: { value: '-1' } });
@@ -93,7 +94,7 @@ it.each([
   ['zip', 'abcde', 'Ingrese un código postal de cinco dígitos.'],
   ['householdSize', '0', 'Ingrese una cantidad entera de personas de 1 a 30.'],
 ])('explains invalid %s before any grouped fact is sent', (field, value, message) => {
-  const request = { ...current(), required_actions: [{ ...action, field, title: field }] }, fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  const request = { ...current(), required_actions: [{ ...action, field, title: field }] }, fetch = vi.fn(); vi.stubGlobal('fetch', withSupportUpdateReceipts(fetch));
   render(<ParentLocaleProvider initialLocale="es"><NecessaryAnswers request={request} onChange={vi.fn()}/></ParentLocaleProvider>);
   const input = screen.getByLabelText('Su respuesta'); fireEvent.change(input, { target: { value } }); fireEvent.submit(input.closest('form')!);
   expect(screen.getByRole('alert').textContent).toContain(message); expect(document.activeElement).toBe(input); expect(fetch).not.toHaveBeenCalled();

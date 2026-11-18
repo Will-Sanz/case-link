@@ -85,7 +85,7 @@ describe("parent data boundary", () => {
     mock.rpc.mockResolvedValue({ data: { value: "private-invalid-value" }, error: null });
     await expect(getReusableZip()).rejects.toThrow("could not load saved routing information");
     mock.rpc.mockResolvedValue({ data: null, error: null });
-    expect(await getReusableZip()).toBeNull();
+    expect(await getReusableZip()).toEqual({ ownerId: "owner", zip: null });
     mock.rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "parent_reuse_source_changed" } });
     await expect(startSupportRequest(intake, mandate, documentId, source)).rejects.toThrow("parent_reuse_source_changed");
   });

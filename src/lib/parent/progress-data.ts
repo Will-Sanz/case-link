@@ -8,11 +8,10 @@ export async function getSupportProgress(id: string): Promise<SupportProgress> {
   const { data, error } = await supabase.rpc("parent_request_progress", {
     p_request_id: z.uuid().parse(id),
   });
-  if (error)
-    throw new Error(
-      "This request is unavailable, or its permission has changed.",
-    );
-  return supportProgressSchema.parse(data);
+  if (error?.code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
+  const progress = supportProgressSchema.safeParse(data);
+  if (error || !progress.success) throw new Error("CaseLink could not load support progress. Please try again.");
+  return progress.data;
 }
 
 export async function listSupportProgress(): Promise<
@@ -20,6 +19,9 @@ export async function listSupportProgress(): Promise<
 > {
   const { supabase } = await requireParentSession();
   const { data, error } = await supabase.rpc("parent_all_request_progress");
-  if (error) throw new Error("Parent service progress is not available.");
-  return z.record(z.uuid(), supportProgressSchema).parse(data);
+  if (error?.code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
+  if (error) throw new Error("CaseLink could not load support progress. Please try again.");
+  const progress = z.record(z.uuid(), supportProgressSchema).safeParse(data);
+  if (!progress.success) throw new Error("CaseLink could not load support progress. Please try again.");
+  return progress.data;
 }

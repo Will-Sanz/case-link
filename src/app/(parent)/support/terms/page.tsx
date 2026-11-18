@@ -3,6 +3,7 @@ import { readParentLocale } from "@/lib/parent/locale-server";
 import { publicInfoText } from "@/lib/parent/public-info-copy";
 import Link from "next/link";
 import styles from "@/features/parent/parent.module.css";
+import infoStyles from "@/features/parent/public-info.module.css";
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await readParentLocale();
   return { title: publicInfoText(locale, "Terms of service"), description: publicInfoText(locale, "Clear expectations for using CaseLink’s parent food and utility support service.") };
@@ -11,7 +12,7 @@ export default async function ParentTermsPage() {
   const locale = await readParentLocale();
   const t = (english: string) => publicInfoText(locale, english);
   return (
-    <article lang={locale} className={`${styles.container} ${styles.legal}`}>
+    <article lang={locale} className={`${styles.container} ${styles.legal} ${infoStyles.page}`}>
       <p>{t("Terms of service")}</p>
       <h1>{t("Clear expectations for support.")}</h1>
       <p>{t("Last updated October 25, 2026 · Parent service")}</p>

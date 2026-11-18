@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ParentIntake } from "./intake";
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
+const ownerId = "33333333-3333-4333-8333-333333333333";
 const sourceId = "22222222-2222-4222-8222-222222222222";
 const requestId = "11111111-1111-4111-8111-111111111111";
 const savedZip = () => ({ sourceRequestId: sourceId, sourceVersion: 1, value: "19104", confirmedAt: new Date(Date.now() - 86400000).toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
@@ -12,8 +13,8 @@ afterEach(cleanup);
 beforeEach(() => { vi.clearAllMocks(); });
 function api(defaults: () => unknown | Promise<unknown>, post?: (input: RequestInit) => unknown) {
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
-    if (url.endsWith("/intake-defaults")) return reply({ zip: await defaults() });
-    if (url.endsWith("/account")) return reply({ account: { email: "synthetic@example.invalid", preferences: { language: "en", contactPreference: "in_app" } } });
+    if (url.endsWith("/intake-defaults")) return reply({ ownerId, zip: await defaults() });
+    if (url.endsWith("/account")) return reply({ account: { id: ownerId, email: "synthetic@example.invalid", preferences: { language: "en", contactPreference: "in_app" } } });
     if (url.endsWith("/authorization-window")) return reply({ authorization: { issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() } });
     if (url.endsWith("/requests") && init?.method === "POST") return post ? post(init) : reply({ request: { id: requestId } });
     return reply({ capabilities: [] });

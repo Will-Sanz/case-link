@@ -2,7 +2,7 @@ import "server-only";
 import { familyProfileSourceSchema } from "./family-profile";
 import { z } from "zod";
 import { requireParentSession } from "./auth";
-import { intakeSchema, mandateSchema, type ServiceMandate, type SupportIntake } from "./domain";
+import { intakeSchema, mandateSchema, reusedZipSourceSchema, type ReusedZipSource, type ServiceMandate, type SupportIntake } from "./domain";
 import { snapApplicationFieldsValueSchema } from "./snap-application-fields";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "./constants";
 import { snapApplicationLeaves, snapApplicationSnapshotSchema } from "./snap-application-snapshot";
@@ -34,7 +34,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 function check(error: unknown) {
   if (!error) return;
   const code = typeof error === "object" && "code" in error ? error.code : undefined;
-  if (code === "P0001" && typeof error === "object" && error && "message" in error && error.message === "parent_family_profile_source_changed") throw new Error("parent_family_profile_source_changed");
+  if (code === "P0001" && typeof error === "object" && error && "message" in error && typeof error.message === "string" && ["parent_family_profile_source_changed", "parent_reuse_source_changed"].includes(error.message)) throw new Error(error.message);
   if (code === "40001" || code === "PT409") throw new Error("This request changed. Reload it before saving your update.");
   if (code === "42501") throw new Error("This request is unavailable, or its permission has changed.");
   if (code === "23514" || code === "22023") throw new Error("parent_invalid_input");
@@ -71,12 +71,13 @@ export async function saveSnapApplicationDetails(requestId: string, input: unkno
   return parse(uuid, data);
 }
 
-export async function startSnapApplication(intake: SupportIntake, mandate: ServiceMandate, details: unknown, noticeVersion: string, idempotencyKey: string, familyProfileSource?: unknown, documentTemplateId?: unknown): Promise<string> {
+export async function startSnapApplication(intake: SupportIntake, mandate: ServiceMandate, details: unknown, noticeVersion: string, idempotencyKey: string, familyProfileSource?: unknown, documentTemplateId?: unknown, reusedZip?: ReusedZipSource): Promise<string> {
   const value = parse(z.object({ intake: intakeSchema, mandate: mandateSchema, details: snapApplicationFieldsValueSchema,
-    noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION), familyProfileSource: familyProfileSourceSchema.optional(), documentTemplateId: snapFormTemplateIdSchema.optional(), idempotencyKey: uuid }).strict(), { intake, mandate, details, noticeVersion, idempotencyKey, familyProfileSource, documentTemplateId });
+    noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION), familyProfileSource: familyProfileSourceSchema.optional(), documentTemplateId: snapFormTemplateIdSchema.optional(), reusedZip: reusedZipSourceSchema.optional(), idempotencyKey: uuid }).strict(), { intake, mandate, details, noticeVersion, idempotencyKey, familyProfileSource, documentTemplateId, reusedZip });
   const { supabase } = await requireParentSession();
-  const { data, error } = await supabase.rpc(value.documentTemplateId ? "parent_start_snap_application_source" : value.familyProfileSource ? "parent_start_application_with_family_profile" : "parent_start_snap_application", {
-    ...(value.documentTemplateId ? { p_template_id: value.documentTemplateId } : value.familyProfileSource ? { p_kind: "snap_application" } : {}),
+  const { data, error } = await supabase.rpc(value.reusedZip ? "parent_start_snap_application_with_routing" : value.documentTemplateId ? "parent_start_snap_application_source" : value.familyProfileSource ? "parent_start_application_with_family_profile" : "parent_start_snap_application", {
+    ...(value.reusedZip ? { p_source_request_id: value.reusedZip.sourceRequestId, p_source_version: value.reusedZip.sourceVersion } : {}),
+    ...(value.documentTemplateId ? { p_template_id: value.documentTemplateId } : value.familyProfileSource && !value.reusedZip ? { p_kind: "snap_application" } : {}),
     ...(value.familyProfileSource ? { p_family_profile_source: value.familyProfileSource } : {}),
     p_intake: value.intake, p_mandate: value.mandate, p_details: value.details,
     p_notice_version: value.noticeVersion, p_idempotency_key: value.idempotencyKey,

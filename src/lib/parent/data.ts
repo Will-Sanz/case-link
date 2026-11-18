@@ -159,6 +159,8 @@ export async function exportParentInformation() {
       "parent_receipts",
       "id,request_id,operation_id,state,attribution,evidence,evidence_hash,created_at",
     ],
+    ["supportUpdates", "parent_support_update_receipts",
+      "id,request_id,idempotency_key,action,base_version,result_version,payload_hash,created_at"],
     [
       "mandates",
       "parent_mandates",
@@ -283,13 +285,13 @@ export async function startSupportRequest(
   return uuid.parse(data);
 }
 export async function getReusableZip() {
-  const { supabase } = await requireParentSession();
+  const { supabase, user } = await requireParentSession();
   const { data, error } = await supabase.rpc("parent_reusable_zip");
   check(error);
-  if (data === null) return null;
+  if (data === null) return { ownerId: user.id, zip: null };
   const parsed = reusableZipSchema.safeParse(data);
   if (!parsed.success) throw new Error("CaseLink could not load saved routing information. Please try again.");
-  return parsed.data;
+  return { ownerId: user.id, zip: parsed.data };
 }
 export async function controlSupportRequest(
   id: string,

@@ -3,7 +3,7 @@ import { parentError, parentJson } from "@/lib/parent/http";
 
 export async function GET() {
   try {
-    return parentJson({ ok: true, zip: await getReusableZip() });
+    return parentJson({ ok: true, ...await getReusableZip() });
   } catch (error) {
     return parentError(error);
   }

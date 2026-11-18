@@ -82,7 +82,7 @@ try {
         return json({ ownerId: owner, candidates: assessFoodSupport(input.answers).filter(path => input.needs.includes(path.need)).map(path => ({ ...path,
           programs: getProgramsForNeeds([path.need]).map(program => ({ programId: program.id, actions: [] })) })) });
       }
-      if (path.endsWith('/intake-defaults')) return json({ zip: { value: '19129', sourceRequestId: zipSource, sourceVersion: 1, confirmedAt: new Date(now - 86400000).toISOString(), expiresAt: new Date(now + 44 * 86400000).toISOString() } });
+      if (path.endsWith('/intake-defaults')) return json({ ownerId: owner, zip: { value: '19129', sourceRequestId: zipSource, sourceVersion: 1, confirmedAt: new Date(now - 86400000).toISOString(), expiresAt: new Date(now + 44 * 86400000).toISOString() } });
       if (path.endsWith('/requests') && method === 'POST') {
         starts.push({ body: route.request().postData(), key: route.request().headers()['idempotency-key'] });
         if (starts.length === 1) return route.abort(); assert.deepEqual(starts[0], starts[1]); return json({ request: { id: requestId } });

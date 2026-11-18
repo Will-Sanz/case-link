@@ -13,6 +13,7 @@ import type { SupportRequest } from "@/lib/parent/domain";
 import { initialIntake, buildMandate } from "./intake";
 import { ParentLocaleProvider } from "./parent-locale";
 import { SupportDetail } from "./support-detail";
+import { withSupportUpdateReceipts } from "./support-update-test-server";
 import { buildSupportPlan } from "@/lib/parent/planning";
 import { getProgram, SNAP_NEW_APPLICATION_URL } from "@/lib/parent/programs";
 import { fixtureNow, fixtureProtectedSnapOperation } from "@/lib/parent/test-fixtures";
@@ -784,7 +785,7 @@ describe("support detail", () => {
           }
         : response(request),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSupportUpdateReceipts(fetchMock, request, { permission: true }));
     render(<SupportDetail requestId={requestId} />); await openSection(/Details & controls/);
     fireEvent.click(
       await screen.findByRole("button", { name: "Change or renew permission" }),

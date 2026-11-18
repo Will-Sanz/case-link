@@ -181,6 +181,34 @@ describe.skipIf(!modulePath)("description deterministic clarification and immuta
     await expect(query("select public.parent_start_food_description_request($1,$2,$3,$4,$5,$6)",[JSON.stringify(source),JSON.stringify(body.intake),JSON.stringify(body.mandate),randomUUID(),JSON.stringify({zip:"19104"}),SNAP_APPLICATION_NOTICE_VERSION])).rejects.toMatchObject({code:"42501"});
     expect((await fixture.admin.query("select count(*)::integer n from public.parent_requests r join public.parent_households h on h.id=r.household_id where h.owner_id=$1",[owner])).rows[0].n).toBe(0);
   });
+  it.each([false,true])("keeps ordinary ZIP and private home separate through the actual description start (profile=%s)",async useProfile=>{
+    const ordinary=packet(["food_now"]);ordinary.intake.zip="19129";
+    const routing=(await query("select public.parent_start_request($1,$2,$3) id",[JSON.stringify(ordinary.intake),JSON.stringify(ordinary.mandate),randomUUID()])).rows[0].id;
+    // A synthetic historical source must not pretend to cover the new current need.
+    await fixture.admin.query("update public.parent_requests set status='closed',closed_reason='completed',intake_confirmed_at=jsonb_set(intake_confirmed_at,'{zip}','\"2026-11-16T12:00:00Z\"') where id=$1",[routing]);
+    await fixture.admin.query("update parent_private.processing_controls set snap_details_enabled=true,snap_details_approval_reference='synthetic only',snap_details_approved_until=now()+interval '2 days',snap_details_notice_version=$1,family_profile_enabled=true,family_profile_approval_reference='synthetic only',family_profile_approved_until=now()+interval '2 days',family_profile_notice_version=$2",[SNAP_APPLICATION_NOTICE_VERSION,FAMILY_PROFILE_NOTICE_VERSION]);
+    let familySource:unknown=null;
+    if(useProfile){
+      await query("select public.parent_save_family_profile($1,0,$2,$3,true,true,'{}',$4)",[owner,JSON.stringify({primaryPerson:{id:randomUUID()},homeAddress:{zip:"19104"}}),FAMILY_PROFILE_NOTICE_VERSION,randomUUID()]);
+      familySource={expectedOwnerId:owner,revision:1,fields:[{applicationPath:"zip",profilePaths:["homeAddress.zip"]}],options:{useHomeAddress:true}};
+    }
+    const source=await readySource(),body=packet(),key=randomUUID();body.intake.zip="19129";
+    const zipSource={sourceRequestId:routing,sourceVersion:1};
+    const args=[JSON.stringify(source),JSON.stringify(body.intake),JSON.stringify(body.mandate),key,JSON.stringify({zip:"19104"}),SNAP_APPLICATION_NOTICE_VERSION,familySource?JSON.stringify(familySource):null,JSON.stringify(zipSource),SNAP_ES_TEMPLATE_ID];
+    const execute=()=>query("select public.parent_start_food_description_request($1,$2,$3,$4,$5,$6,$7,$8,$9) id",args);
+    const id=(await execute()).rows[0].id;
+    const read=async()=>(await fixture.admin.query("select to_jsonb(r) value from public.parent_requests r where id=$1",[id])).rows[0].value;
+    const snapshots=async()=>(await fixture.admin.query("select to_jsonb(s) value from public.parent_snap_application_details s where request_id=$1 order by revision",[id])).rows;
+    expect((await read()).intake.zip).toBe("19129");expect((await read()).description_source).toEqual(source);
+    expect(new Date((await read()).intake_confirmed_at.zip).toISOString()).toBe("2026-11-16T12:00:00.000Z");
+    expect((await snapshots())[0].value).toMatchObject({details:{zip:"19104"},source:SNAP_SPANISH_APPLICATION_SOURCE});
+    const current=await read();await query("select public.parent_save_application_with_family_profile('snap_application',$1,$2,$3,$4,$5,null)",[id,current.version,JSON.stringify({zip:"19103"}),SNAP_APPLICATION_NOTICE_VERSION,randomUUID()]);
+    await query("select public.parent_cancel_food_description($1,$2)",[source.draftId,owner]);
+    await fixture.admin.query("update parent_private.processing_controls set food_description_enabled=false,family_profile_enabled=false");
+    const before={request:await read(),snapshots:await snapshots()};expect((await execute()).rows[0].id).toBe(id);expect({request:await read(),snapshots:await snapshots()}).toEqual(before);
+    expect((await fixture.admin.query("select count(*)::int n from public.parent_jobs where request_id=$1",[id])).rows[0].n).toBe(1);
+    args[7]=JSON.stringify({...zipSource,sourceVersion:2});await expect(execute()).rejects.toMatchObject({code:"PT409"});
+  });
   it("clears an obsolete model issue assertion when a parent corrects receiving history to never applied without another model call",async()=>{
     const description="No food. I receive SNAP and need renewal.";
     const span=(text:string)=>({start:description.indexOf(text),end:description.indexOf(text)+text.length,text});
