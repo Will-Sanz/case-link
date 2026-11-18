@@ -23,9 +23,10 @@ describe("parent account deletion during processing closure", () => {
     expect(button.disabled).toBe(true);
     fireEvent.change(input,{target:{value:"DELETE"}});fireEvent.click(button);
     const result=await screen.findByRole("heading",{name:"Your deletion request is recorded"});
-    await waitFor(()=>expect(document.activeElement).toBe(result));
+    expect(result).toBeTruthy();
     expect(screen.getByText(/Private files and eligible parent records enter the deletion process/)).toBeTruthy();
     await waitFor(()=>expect(screen.getByRole("alert").textContent).toContain("couldn’t confirm sign-out"));
+    expect(document.activeElement).toBe(screen.getByRole("alert"));
     expect(fetchMock.mock.calls.map(call=>call[0])).toEqual(["/api/parent/account/deletion","/api/parent/account","/api/parent/auth"]);
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({action:"delete",confirmation:"DELETE",expectedOwnerId:"11111111-1111-4111-8111-111111111111"});
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({action:"sign_out"});
@@ -55,7 +56,8 @@ describe("parent account deletion during processing closure", () => {
   it("recovers an already recorded deletion from metadata without repeating deletion or extending retention",async()=>{
     const fetchMock=vi.fn().mockResolvedValue(response({ok:true,ownerId:"11111111-1111-4111-8111-111111111111",status:"deletion_requested"}));vi.stubGlobal("fetch",fetchMock);
     render(<ParentAccount deletionOnly/>);
-    await screen.findByRole("heading",{name:"Your deletion request is recorded"});
+    const heading = await screen.findByRole("heading",{name:"Your deletion request is recorded"});
+    expect(document.activeElement).toBe(heading);
     expect(fetchMock).toHaveBeenCalledOnce();expect(screen.queryByLabelText("Type DELETE to confirm")).toBeNull();
   });
   it("does not expose a deletion form for unrecognized ownership metadata",async()=>{

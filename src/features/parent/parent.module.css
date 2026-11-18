@@ -324,10 +324,24 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.account .surface {
+  min-width: 0;
+}
 @media (max-width: 35rem) {
   .surface.foodPrograms,
-  .foodAccess :is(.notice, .error, .success) {
+  .foodAccess :is(.notice, .error, .success),
+  .container.account,
+  .account :is(.surface, .trustLine, .error, .success, .fieldset, a.secondary) {
     padding: 12px;
+  }
+  .account .trustLine {
+    flex-direction: column;
+  }
+  .account :is(.error, .success) {
+    display: block;
+  }
+  .account .fieldset {
+    min-inline-size: 0;
   }
 }
 .section {

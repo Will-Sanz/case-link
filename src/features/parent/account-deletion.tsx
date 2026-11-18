@@ -8,19 +8,25 @@ import { Download } from "iconoir-react";
 import { parentApi, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
+import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 export function AccountDeletion({ ownerId, initiallyRecorded = false, showExport = false, onRecorded }: {
   ownerId: string; initiallyRecorded?: boolean; showExport?: boolean; onRecorded?: () => void;
 }) {
+  const { t, locale } = useParentLocale();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const errorMessage = useRef<HTMLParagraphElement>(null);
   const [deleteOpen, setDeleteOpen] = useState(!showExport);
   const [confirmation, setConfirmation] = useState("");
   const [deleted, setDeleted] = useState(initiallyRecorded);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const router = useRouter();
-  useEffect(() => { if (deleted) resultHeading.current?.focus(); }, [deleted]);
+  useEffect(() => {
+    if (error) errorMessage.current?.focus();
+    else if (deleted) resultHeading.current?.focus();
+  }, [deleted, error]);
   async function remove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending || confirmation !== "DELETE") return;
@@ -57,64 +63,54 @@ export function AccountDeletion({ ownerId, initiallyRecorded = false, showExport
   if (!z.uuid().safeParse(ownerId).success) return <ServiceError error={new Error("Deletion access could not be confirmed. Please try again.")} />;
   if (deleted)
     return (
-      <section className={styles.surface}>
-        <h2 ref={resultHeading} tabIndex={-1}>Your deletion request is recorded</h2>
+      <section lang={locale} className={styles.surface}>
+        <h2 ref={resultHeading} tabIndex={-1}>{t("Your deletion request is recorded")}</h2>
         <p className={`${styles.subtle} ${styles.space}`}>
-          Future parent-support work is stopped and parent access is disabled.
-          Private files and eligible parent records enter the deletion process.
-          Your existing CaseLink sign-in and school records are kept separate.
-          Information already sent to a program may remain under that program’s
-          retention rules.
+          {t("Future parent-support work is stopped and parent access is disabled. Private files and eligible parent records enter the deletion process. Your existing CaseLink sign-in and school records are kept separate. Information already sent to a program may remain under that program’s retention rules.")}
         </p>
         <p className={`${styles.hint} ${styles.space}`}>
-          Deletion does not withdraw an application already held by an agency.
-          Contact that program directly for its options.
+          {t("Deletion does not withdraw an application already held by an agency. Contact that program directly for its options.")}
         </p>
         {error && (
-          <p className={styles.error} role="alert">
-            {error}
+          <p ref={errorMessage} tabIndex={-1} lang={t(error) === error ? "en" : locale} className={styles.error} role="alert">
+            {t(error)}
           </p>
         )}
         <Link className={`${styles.button} ${styles.space}`} href="/">
-          Return home
+          {t("Return home")}
         </Link>
       </section>
     );
   return (
-      <section className={styles.surface}>
-        <h2>Your information & control</h2>
+      <section lang={locale} className={styles.surface}>
+        <h2>{t("Your information & control")}</h2>
         {showExport && <>
         <p className={`${styles.subtle} ${styles.small}`}>
-          Download your account information and recorded support history.
-          Individual request pages also include printable summaries.
+          {t("Download your account information and recorded support history. Individual request pages also include printable summaries.")}
         </p>
         <a
           className={`${styles.secondary} ${styles.space}`}
           href="/api/parent/account/export"
         >
           <Download width={18} height={18} aria-hidden="true" />
-          Download my information
+          {t("Download my information")}
         </a>
         </>}
         <div className={styles.disclosure}>
           <Link className={styles.textLink} href="/support/privacy">
-            Read privacy, retention and sharing details
+            {t("Read privacy, retention and sharing details")}
           </Link>
         </div>
-        {error && <p className={styles.error} role="alert">{error}</p>}
+        {error && <p ref={errorMessage} tabIndex={-1} lang={t(error) === error ? "en" : locale} className={styles.error} role="alert">{t(error)}</p>}
         <details
           className={styles.disclosure}
           open={deleteOpen}
           onToggle={(event) => setDeleteOpen(event.currentTarget.open)}
         >
-          <summary>Delete my parent-support data & stop future work</summary>
+          <summary>{t("Delete my parent-support data & stop future work")}</summary>
           <div>
             <p className={`${styles.small} ${styles.subtle}`}>
-              This stops parent-support work, blocks parent access and records a
-              deletion request. It keeps your existing CaseLink sign-in and
-              school records. Minimal service evidence and information already
-              delivered to a program have separate retention rules. Download
-              anything you need first.
+              {t("This stops parent-support work, blocks parent access and records a deletion request. It keeps your existing CaseLink sign-in and school records. Minimal service evidence and information already delivered to a program have separate retention rules. Download anything you need first.")}
             </p>
             <form
               className={`${styles.form} ${styles.space}`}
@@ -122,7 +118,7 @@ export function AccountDeletion({ ownerId, initiallyRecorded = false, showExport
             >
               <div className={styles.field}>
                 <label htmlFor="delete-confirmation">
-                  Type DELETE to confirm
+                  {t("Type DELETE to confirm")}
                 </label>
                 <input
                   id="delete-confirmation"
@@ -140,9 +136,9 @@ export function AccountDeletion({ ownerId, initiallyRecorded = false, showExport
                 type="submit"
                 disabled={pending || confirmation !== "DELETE"}
               >
-                {pending
+                {t(pending
                   ? "Recording deletion…"
-                  : "Delete parent-support data & stop work"}
+                  : "Delete parent-support data & stop work")}
               </button>
               <button
                 className={styles.quiet}
@@ -153,7 +149,7 @@ export function AccountDeletion({ ownerId, initiallyRecorded = false, showExport
                   setConfirmation("");
                 }}
               >
-                Keep my parent-support data
+                {t("Keep my parent-support data")}
               </button>
             </form>
           </div>
@@ -164,14 +160,15 @@ export function AccountDeletion({ ownerId, initiallyRecorded = false, showExport
 
 /** This metadata-only fallback does not reopen account reads, enrollment or support work. */
 export function AccountDeletionAccess() {
+  const { t, locale } = useParentLocale();
   const { data, error, loading, reload } = useParentResource<{ ownerId: string; status: "active" | "deletion_requested" }>("/account/deletion");
   if (loading) return <ParentLoading label="Checking deletion access" />;
   if (error instanceof ParentApiError && error.status === 401)
-    return <section className={styles.surface}>
-      <h2>Sign in to manage deletion</h2>
-      <p>Use your existing CaseLink account to request deletion of your parent-support data. This does not reopen support work or create an account.</p>
-      <Link className={`${styles.button} ${styles.space}`} href="/sign-in?purpose=delete-parent-data">Sign in for deletion</Link>
-      <p className={styles.space}>For account recovery or a privacy request you cannot complete here, <Link className={styles.textLink} href="/support/privacy">contact the privacy operator</Link>.</p>
+    return <section lang={locale} className={styles.surface}>
+      <h2>{t("Sign in to manage deletion")}</h2>
+      <p>{t("Use your existing CaseLink account to request deletion of your parent-support data. This does not reopen support work or create an account.")}</p>
+      <Link className={`${styles.button} ${styles.space}`} href="/sign-in?purpose=delete-parent-data">{t("Sign in for deletion")}</Link>
+      <p className={styles.space}>{t("For account recovery or a privacy request you cannot complete here,")} <Link className={styles.textLink} href="/support/privacy">{t("contact the privacy operator")}</Link>.</p>
     </section>;
   if (error || !data || !z.uuid().safeParse(data.ownerId).success || !["active", "deletion_requested"].includes(data.status))
     return <ServiceError error={error ?? new Error("Deletion access could not be confirmed. Please try again.")} retry={reload} returnTo="/account" />;
