@@ -239,8 +239,16 @@ describe.skipIf(!modulePath)("closed SNAP completion method/route authority (SQL
       expect((await fixture.admin.query("select state,attempts from public.parent_jobs where request_id=$1", [scope.request])).rows[0]).toEqual({ state: "queued", attempts: 0 });
       expect((await call("parent_worker", "select parent_private.parent_claim_job(300) job")).rows[0].job.request.id).toBe(scope.request);
     });
-    it.each(["missing Submit", "provider closed", "personal act expired", "mandate revoked"])("does not claim prepared work with %s", async missing => {
-      await park(); const scope = await ready(missing !== "missing Submit");
+    it("keeps the installed two-argument pre-Submit review claim while denying dispatch", async () => {
+      await park(); const scope = await ready(false);
+      const job = (await claim()).rows[0].job;
+      expect(job.request.id).toBe(scope.request);
+      expect(await noActsOrSubmit(scope)).toEqual({ acts: 0, submits: 0 });
+      await expect(call("parent_worker", "select parent_private.parent_begin_operation($1,$2,$3)", [scope.operationId, job.jobId, job.leaseToken])).rejects.toMatchObject({ code: "42501" });
+      expect((await fixture.admin.query("select state from public.parent_operations where id=$1", [scope.operationId])).rows[0].state).toBe("prepared");
+    });
+    it.each(["provider closed", "personal act expired", "mandate revoked"])("does not claim prepared work with %s", async missing => {
+      await park(); const scope = await ready();
       if (missing === "provider closed") await fixture.admin.query("update parent_private.provider_capabilities set enabled=false where program_id='snap-pa' and action='submit'");
       if (missing === "personal act expired") await fixture.admin.query("update parent_private.personal_act_evidence set expires_at=now()-interval '1 second' where operation_id=$1", [scope.operationId]);
       if (missing === "mandate revoked") await fixture.admin.query("update public.parent_requests set mandate_revoked_at=now() where id=$1", [scope.request]);

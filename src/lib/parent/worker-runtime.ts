@@ -511,7 +511,7 @@ export async function runOneParentJob(
     const canonical = operation.protectedSnap;
     return canonical?.requestId === request.id && request.intake.needs.includes("snap_new") &&
       (canonical.state === "delivery_unknown" || canonical.state === "prepared" && canonical.requestVersion === request.version &&
-        canonical.protectedPacketCurrent && canonical.protectedParentSubmitReady && canonical.personalActsComplete && canonical.snapSubmissionAuthorized)
+        canonical.protectedPacketCurrent && canonical.protectedParentSubmitReady && (!canonical.snapSubmissionAuthorized || canonical.personalActsComplete))
       ? [canonical] : [];
   });
   const continuation = continuations.length > 0;

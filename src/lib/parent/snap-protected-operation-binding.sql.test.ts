@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createParentSqlFixture } from "../../../scripts/parent-sql-fixture";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "./constants";
 import { fixtureIntake, fixtureMandate, fixtureSnapApplication } from "./test-fixtures";
+import { runOneParentJob } from "./worker-runtime";
 
 const modulePath = process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
 type Scope = { owner: string; request: string; version: number; snapshot: string; snapshotHash: string; packet: string; authorization: string; verification?: string };
@@ -43,7 +45,7 @@ describe.skipIf(!modulePath)("protected SNAP canonical operation binding SQL (sy
     });
     return { ...scope, packet, authorization };
   }
-  async function setup(verified = true, retentionSeconds = 300): Promise<Scope> {
+  async function setup(verified = true, retentionSeconds = 300, mixed = false): Promise<Scope> {
     const owner = randomUUID(), session = randomUUID(); sessions.set(owner, session);
     await fixture.admin.query(`update parent_private.processing_controls set enabled=true,approval_reference='synthetic binding SQL only',approved_until=now()+interval '1 day',
       snap_details_enabled=true,snap_details_approval_reference='synthetic only',snap_details_approved_until=now()+interval '1 day',snap_details_notice_version=$1,
@@ -53,7 +55,7 @@ describe.skipIf(!modulePath)("protected SNAP canonical operation binding SQL (sy
       snap_protected_approved_until=now()+interval '3 days',snap_protected_max_retention_seconds=$1`, [retentionSeconds]);
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [session, owner]);
-    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"],
+    const request = (await role("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: mixed ? ["food_now", "snap_new"] : ["snap_new"], zip: mixed ? "19129" : "19104", utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: mixed ? ["share-community-fridge-19129", "snap-pa"] : ["snap-pa"],
       expiresAt: new Date(Date.now() + (retentionSeconds !== 300 ? 3 : 1) * 86400000).toISOString(),
     })), randomUUID()], owner)).rows[0].id as string;
     const snapshot = (await role("authenticated", "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(fixtureSnapApplication(new Date())), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], owner)).rows[0].id as string;
@@ -91,6 +93,74 @@ describe.skipIf(!modulePath)("protected SNAP canonical operation binding SQL (sy
   const submitted = async (s: Scope) => (await fixture.admin.query("select * from parent_private.snap_submission_authorizations where operation_id=(select operation_id from parent_private.snap_final_packets where id=$1)", [s.packet])).rows;
   async function personalComplete(s: Scope) { return (await fixture.admin.query("select parent_private.personal_acts_complete(o) complete from public.parent_operations o where id=(select operation_id from parent_private.snap_final_packets where id=$1)", [s.packet])).rows[0].complete; }
 
+  it("preserves the installed pre-Submit continuation without recording personal acts or permitting dispatch", async () => {
+    const s = await setup(), id = (await prepare(s)).rows[0].id;
+    const before = await operation(s);
+    expect(await personalComplete(s)).toBe(false); expect(await submitted(s)).toEqual([]);
+    await fixture.admin.query("update public.parent_jobs set state='waiting',run_at='infinity' where request_id<>$1", [s.request]);
+    const job = (await role("parent_worker", "select parent_private.parent_claim_job(300,true,true,false) value")).rows[0].value;
+    expect(job).toMatchObject({ request: { id: s.request, version: s.version } });
+    expect(await operation(s)).toEqual(before); expect(await reports(s)).toEqual([]); expect(await submitted(s)).toEqual([]);
+    await expect(role("parent_worker", "select parent_private.parent_begin_operation($1,$2,$3)", [id, job.jobId, job.leaseToken])).rejects.toMatchObject({ code: "42501" });
+  });
+  it.each([false, true])("prepares the exact parent review through the leased no-key worker without model/provider calls or a new reservation (mixed=%s)", async mixed => {
+    const s = await setup(true, 300, mixed), id = (await prepare(s)).rows[0].id;
+    await fixture.admin.query("update public.parent_jobs set state='waiting',run_at='infinity' where request_id<>$1", [s.request]);
+    const before = await operation(s), reservations = (await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n;
+    let externalCalls = 0;
+    const forbidden = async () => { externalCalls++; throw new Error("No external call is permitted in this synthetic continuation regression"); };
+    const result = await runOneParentJob({ database: { query: (sql, values) => role("parent_worker", sql, values) }, continuationOnly: true,
+      brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "synthetic-only-no-live-secret-32-characters", supabaseOrigin: "http://127.0.0.1:55321",
+      fetcher: async input => {
+        const url = new URL(String(input));
+        if (!mixed || url.origin !== "https://services.arcgis.com") return forbidden();
+        expect(url.searchParams.get("where")).toBe("objectid=122");
+        return Response.json({ features: [{ attributes: { objectid: 122, site_name: "Share Community Fridge", address: "2901 W Hunting Park Ave", zip_code: "19129", status: "Active", category_type: "Food Site" } }] });
+      }, coordinate: forbidden, protectedSnapSubmission: { execute: forbidden, reconcile: forbidden } });
+    expect(result).toEqual({ state: "saved" });
+    expect((await fixture.admin.query("select required_actions from public.parent_requests where id=$1", [s.request])).rows[0].required_actions)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ need: "snap_new", reason: "submission_review", field: "snap_final_submit", resolver: "parent" })]));
+    expect(await operation(s)).toEqual(before); expect(await reports(s)).toEqual([]); expect(await submitted(s)).toEqual([]);
+    expect((await fixture.admin.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n).toBe(reservations);
+    expect((await fixture.admin.query("select count(*)::int n from parent_private.ai_calls where request_id=$1", [s.request])).rows[0].n).toBe(0);
+    expect(externalCalls).toBe(0); expect((await operation(s)).id).toBe(id);
+    if (mixed) expect((await fixture.admin.query("select status,plan->'routes' routes from public.parent_requests where id=$1", [s.request])).rows[0])
+      .toMatchObject({ status: "active", routes: [{ need: "food_now", foodAccess: { state: "prepared" } }, { need: "snap_new" }] });
+  });
+  it.each(["snap_port_unavailable", "cancelled", "changed_snapshot", "withdrawn_personal_act"])("keeps pre-Submit continuation closed for %s", async change => {
+    const s = await setup(); await prepare(s);
+    await fixture.admin.query("update public.parent_jobs set state='waiting',run_at='infinity' where request_id<>$1", [s.request]);
+    if (change === "cancelled") await role("authenticated", "select public.parent_control_request($1,'cancel')", [s.request], s.owner);
+    if (change === "changed_snapshot") {
+      const details = fixtureSnapApplication(new Date()); details.phone = "215-555-0104";
+      await role("authenticated", "select public.parent_save_snap_application_details($1,$2,$3,$4,$5)", [s.request, s.version, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], s.owner);
+    }
+    if (change === "withdrawn_personal_act") {
+      await submit(s);
+      await fixture.admin.query("update parent_private.personal_act_evidence set expires_at=now()-interval '1 second' where operation_id=(select operation_id from parent_private.snap_final_packets where id=$1)", [s.packet]);
+      expect(await personalComplete(s)).toBe(false);
+    }
+    expect((await role("parent_worker", "select parent_private.parent_claim_job(300,true,$1,false) value", [change !== "snap_port_unavailable"])).rows[0].value).toBeNull();
+  });
+  it("changes only the final claim predicates and keeps other installed definitions, owners, grants and controls exact", async () => {
+    const isolated = await createParentSqlFixture(modulePath!, "20261118164420_parent_food_description_cache_usage.sql");
+    const functions = async () => (await isolated.admin.query("select p.oid::regprocedure::text signature,pg_get_functiondef(p.oid) definition,p.proowner owner,p.proacl::text acl from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','parent_private') and p.prokind='f' order by p.oid")).rows;
+    try {
+      const before = await functions(), controls = (await isolated.admin.query("select to_jsonb(c) value from parent_private.processing_controls c")).rows;
+      const old = "and parent_private.personal_acts_complete(o) and parent_private.snap_submission_authorized(o.id)";
+      const replacement = "and (not parent_private.snap_submission_authorized(o.id) or parent_private.personal_acts_complete(o))";
+      const signature = "parent_private.parent_claim_job(integer,boolean,boolean,boolean)", original = before.find(row => row.signature === signature)!;
+      expect(String(original.definition).split(old)).toHaveLength(3);
+      const migration = readFileSync("supabase/migrations/20261118185641_parent_preserve_snap_review_continuation.sql", "utf8");
+      await isolated.admin.query("do $review$ begin execute $patch$" + migration + "$patch$;end $review$");
+      const after = await functions();
+      expect(after.map(row => row.signature)).toEqual(before.map(row => row.signature));
+      for (const [index, row] of after.entries()) expect(row).toEqual(row.signature === signature ? { ...before[index], definition: String(original.definition).replaceAll(old, replacement) } : before[index]);
+      expect((await isolated.admin.query("select to_jsonb(c) value from parent_private.processing_controls c")).rows).toEqual(controls);
+      await expect(isolated.admin.query("do $review$ begin execute $patch$" + migration + "$patch$;end $review$")).rejects.toThrow("SNAP review continuation definition changed");
+      expect(await functions()).toEqual(after);
+    } finally { await isolated.admin.end(); }
+  });
   it("does not turn stored or structurally valid state into a trusted completed application", async () => {
     const s = await setup(false); await expect(prepare(s)).rejects.toMatchObject({ code: "42501" }); expect(await operation(s)).toBeUndefined();
   });

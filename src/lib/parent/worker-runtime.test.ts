@@ -1119,11 +1119,9 @@ describe("synthetic reference-only protected SNAP worker", () => {
       test.options.snapCapturePreparation = checker;
       return { ...test, pending, checker, intent };
     }
-    it("automatically saves exact review after direct completion through the real coordinator without dispatch or protected model input", async () => {
+    it("automatically saves exact review after finishing pending direct completion through the real coordinator without dispatch or protected model input", async () => {
       const test = pendingSetup();
       test.state.claim.request.intake.zip = "19104";
-      test.state.pendingCapture = { ...test.pending, state: "checked" };
-      test.state.operations = [test.raw];
       delete test.options.coordinate;
       const model = vi.fn<typeof fetch>(async (url, init): Promise<Response> => {
         expect(url).toBe("https://api.openai.com/v1/responses");
@@ -1141,7 +1139,7 @@ describe("synthetic reference-only protected SNAP worker", () => {
       test.options.fetcher = model;
       expect(await runOneParentJob(test.options)).toEqual({ state: "saved" });
       expect(model).toHaveBeenCalledTimes(2);
-      expect(test.checker.prepareCapture).not.toHaveBeenCalled();
+      expect(test.checker.prepareCapture).toHaveBeenCalledOnce();
       expect(test.port.execute).not.toHaveBeenCalled(); expect(test.port.reconcile).not.toHaveBeenCalled();
       expect(test.execute).not.toHaveBeenCalled(); expect(test.state.prepared).toEqual([]);
       expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_begin_operation"))).toBe(false);
