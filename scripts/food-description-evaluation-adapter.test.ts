@@ -5,6 +5,16 @@ import { FOOD_DESCRIPTION_EVALUATION_BINDING } from "../src/lib/parent/food-desc
 import { descriptionEvaluationHash } from "./food-description-evaluation-budget";
 const corpus = loadDescriptionEvaluationCorpus();
 describe("hash-pinned actual description DTO adapter, without model or network", () => {
+  it("changes only the two explicit unknown-history question oracles, retaining their archived expectations", () => {
+    const rows = descriptionEvaluationPlan(corpus).cases;
+    const changed = rows.filter(item => JSON.stringify(item.turns[0].archived.questionIds) !== JSON.stringify(item.turns[0].current.questionIds));
+    expect(changed.map(item => item.id)).toEqual(["description-ambiguity-3-en", "description-ambiguity-3-es"]);
+    for (const item of changed) {
+      expect(item.turns[0].archived.questionIds).toEqual(["foodForTwoDays", "benefitHistory"]);
+      expect(item.turns[0].current.questionIds).toEqual(["foodForTwoDays"]);
+      expect(item.turns[0].differences).toContain("The description explicitly supplies unknown SNAP history; honor that Not sure answer without asking the same benefit question again.");
+    }
+  });
   it("preserves all60/240/80/24 rows and both language denominators", () => {
     const plan=descriptionEvaluationPlan(corpus); expect(plan.caseCount).toBe(60);expect(plan.turnCount).toBe(240);expect(plan.maximumModelCalls).toBe(80);expect(plan.zeroCallGuardCases).toBe(24);
     expect(plan.cases.flatMap(item=>item.turns)).toHaveLength(240);expect(plan.cases.flatMap(item=>item.turns).reduce((n,t)=>n+t.maximumModelCalls,0)).toBe(80);

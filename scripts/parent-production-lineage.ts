@@ -18,7 +18,7 @@ export function validateProductionLineage(value:ProductionLineage) {
   assert.equal(versions.size,100);assert.equal(value.recordedMigrationHistory.length,100);
   assert.equal(lineageHash(JSON.stringify(value.recordedMigrationHistory)),"49f7440455f9c463d8e51ee8aaa92b0b4dabc53ccda1d060f24296ea6f4a4dd7","Observed migration history must stay exact");
   assert.deepEqual([...versions].filter(version=>!names.some(name=>name.startsWith(version+"_"))).sort(),remoteOnly);
-  assert.equal(value.pendingSources.length,35);
+  assert.equal(value.pendingSources.length,36);
   assert.deepEqual(value.pendingSources.map(source=>source.name),names.filter(name=>!versions.has(name.slice(0,14))));
   const missingEarlier=["20260802120000_demo_requests.sql","20260802143000_replace_family_barriers_rpc.sql"];
   assert.deepEqual(value.baselineSources.map(source=>source.name),names.filter(name=>versions.has(name.slice(0,14))&&(missingEarlier.includes(name)||name>="20260804173443")));

@@ -850,6 +850,10 @@
     {
       "name": "20261118194631_parent_food_directory_bounded_retry.sql",
       "sha256": "9686cace69e59913d25c0d576210251566aa93fa1e1f0b5a6cfdb296fd073e32"
+    },
+    {
+      "name": "20261118230000_parent_food_description_unknown_resolution.sql",
+      "sha256": "c27858dd4a0878541fc62c9c0323faed168726572fa3d876829fb23841437828"
     }
   ],
   "fixtureSql": {

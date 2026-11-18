@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import {z}from"zod";
 import { foodDescriptionInputSchema } from "../src/lib/parent/food-description";
 import { descriptionEvaluationAdapterHash, descriptionEvaluationPlan, loadDescriptionEvaluationCorpus } from "./food-description-evaluation-adapter";
-import { descriptionEvaluationAccounting, descriptionEvaluationApprovalSchema, descriptionEvaluationHash, readDescriptionEvaluationEvidence, withFoodDescriptionEvaluationBudget, writeDescriptionEvaluationEvidence } from "./food-description-evaluation-budget";
+import { descriptionEvaluationAccounting, descriptionEvaluationApprovalSchema, descriptionEvaluationHash, readDescriptionEvaluationEvidence, sealedDescriptionEvaluationPriorAccounting, withFoodDescriptionEvaluationBudget, writeDescriptionEvaluationEvidence } from "./food-description-evaluation-budget";
 import { descriptionEvaluationBatches, descriptionEvaluationSourceManifest, runDescriptionEvaluationCase } from "./food-description-evaluation";
 
 const generic = "Description evaluation did not dispatch or could not complete. Reconcile the same approved run; private errors are not printed.";
@@ -36,11 +36,12 @@ export async function foodDescriptionEvaluationCommand(args: string[], env: Reco
   const envelope = privateApproval(args[1], env.CASELINK_FOOD_DESCRIPTION_EVAL_APPROVAL_SHA256) as { sourceSha256?: unknown; approval?: unknown };
   if (envelope.sourceSha256 !== sourceSha256) throw new Error(generic);
   const approval = descriptionEvaluationApprovalSchema.parse(envelope.approval);
-  if (approval.adapterSha256 !== adapterSha256 || !approval.aggregate) throw new Error(generic);
+  if (approval.adapterSha256 !== adapterSha256 || approval.aggregate?.maximumCalls !== 93) throw new Error(generic);
   const apiKey = env.CASELINK_FOOD_DESCRIPTION_EVAL_API_KEY;
   if (!apiKey) throw new Error(generic); // No ordinary OPENAI_API_KEY or legacy allowance fallback.
   const batch = Number(args[2]), selected = batches[batch], results: Awaited<ReturnType<typeof runDescriptionEvaluationCase>>[] = [];
   return withFoodDescriptionEvaluationBudget({ approval, apiKey, fetcher }, async budget => {
+    const prior = sealedDescriptionEvaluationPriorAccounting(approval);
     if(descriptionEvaluationAccounting(approval.runDirectory).reservedCaseIds.some(id=>!existsSync(join(approval.runDirectory,`${id}-result.json`))))throw new Error(generic);
     for (const id of selected) {
       const item = corpus.cases.find(value => value.id === id)!;
@@ -52,16 +53,18 @@ export async function foodDescriptionEvaluationCommand(args: string[], env: Reco
     }
     const recorded = readdirSync(approval.runDirectory).filter(name=>/^description-[a-z0-9_-]+-result\.json$/.test(name)).map(name=>readDescriptionEvaluationEvidence(join(approval.runDirectory,name)) as Awaited<ReturnType<typeof runDescriptionEvaluationCase>>);
     if(recorded.some(result=>!corpus.cases.some(item=>item.id===result.id)||result.turns.length!==4))throw new Error(generic);
+    const accounting=descriptionEvaluationAccounting(approval.runDirectory);
     const output = { mode: "live_synthetic", claim: "Synthetic interpretation evidence only; no provider action, request, mandate or family-ready approval.",
       corpusCases: 60, corpusTurns: 240, maximumGenerationCalls: 80, maximumCountRequests: 80, zeroCallGuards: blocked,
       batch, batchIds: selected, results, unrunBatchCases: selected.filter(id => !results.some(result => result.id === id)),
       unrunCorpusCases: corpus.cases.filter(item => !recorded.some(result => result.id === item.id)).map(item => item.id),
       unrunCorpusTurns: (60-recorded.length)*4+recorded.flatMap(result=>result.turns).filter(turn=>turn.status==="unrun_after_failure").length,
       authorityTurnsStillRequiringNativeEvidence:recorded.flatMap(result=>result.turns).filter(turn=>turn.status==="requires_native_evidence").length,
-      reservedAttemptsAcrossRun: budget.attempts(), accounting:descriptionEvaluationAccounting(approval.runDirectory), sourceSha256, adapterSha256, modelQualityApproved: false, humanReviewedCases: 0,
+      reservedAttemptsAcrossRun: budget.attempts(), accounting, sourceSha256, adapterSha256, modelQualityApproved: false, humanReviewedCases: 0,
       maximumAggregateGenerationCalls: approval.aggregate!.maximumCalls, maximumAggregateCountRequests: approval.aggregate!.maximumCountRequests,
-      aggregateReservedAttempts: approval.aggregate!.priorRuns.reduce((total, prior) => total + prior.reservedPairs, budget.attempts()),
-      aggregateReservedNanoDollars: approval.aggregate!.priorRuns.reduce((total, prior) => total + prior.reservedPairs, budget.attempts()) * 55_000_000 };
+      aggregateReservedAttempts: prior.pairs + budget.attempts(), aggregateReservedNanoDollars: prior.reservedNanoDollars + accounting.reservedNanoDollars,
+      sealedPriorAccounting: prior, aggregateKnownMeasuredNanoDollars: prior.knownMeasuredNanoDollars + accounting.knownMeasuredNanoDollars,
+      aggregateBudgetBoundNanoDollars: prior.budgetedNanoDollars + accounting.reservedNanoDollars };
     const savedReport=join(approval.runDirectory,`batch-${batch}-report.json`);if(!existsSync(savedReport))writeDescriptionEvaluationEvidence(savedReport,output);return output;
   });
 }

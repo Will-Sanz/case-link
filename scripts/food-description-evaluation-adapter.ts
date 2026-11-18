@@ -66,6 +66,10 @@ export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, ind
   const archived = record(item.turns[index].expected ?? item.turns[index]), current = { ...archived }, differences: string[] = [];
   if (index === 0) {
     differences.push("Archived ZIP stays at the typed handoff boundary; it is absent from the actual model DTO.");
+    if (["description-ambiguity-3-en", "description-ambiguity-3-es"].includes(item.id)) {
+      current.questionIds = ["foodForTwoDays"];
+      differences.push("The description explicitly supplies unknown SNAP history; honor that Not sure answer without asking the same benefit question again.");
+    }
     if (z.array(z.unknown()).parse(record(item.turns[0].input).excludedNeeds).length) differences.push("Archived excludedNeeds is not a public queue input; source-anchored exclusions and the explicit terminal choice remain authoritative.");
     if (archived.state === "outside_supported_geography") {
       current.state = "manual"; current.outOfScope = "other";
@@ -116,7 +120,7 @@ export function descriptionEvaluationPlan(corpus = loadDescriptionEvaluationCorp
     languageCounts: { en: 30, es: 30 }, modelFingerprint: FOOD_DESCRIPTION_FINGERPRINT, logicalNow: DESCRIPTION_EVALUATION_NOW };
 }
 export function descriptionEvaluationAdapterHash() {
-  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v7-adapter.json","utf8"));
+  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v8-adapter.json","utf8"));
   if(descriptionEvaluationHash(saved)!==descriptionEvaluationHash(plan))throw new Error("description_evaluation_adapter_changed");
   return descriptionEvaluationHash(plan);
 }

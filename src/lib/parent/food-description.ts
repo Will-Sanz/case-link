@@ -128,7 +128,7 @@ export function validateFoodDescriptionSelection(input: {
   const values: Partial<FoodAssessmentAnswers> = Object.fromEntries(Object.entries(facts).filter(([field]) => field !== "zip").map(([field, fact]) => [field, fact.value]));
   for (const assertion of selection.assertions) {
     const field = assertion.questionId;
-    if (values[field] !== undefined) {
+    if (values[field] !== undefined && values[field] !== "not_sure") {
       if (values[field] !== assertion.value) conflicts.push(field);
     } else Object.assign(values, { [field]: assertion.value });
   }

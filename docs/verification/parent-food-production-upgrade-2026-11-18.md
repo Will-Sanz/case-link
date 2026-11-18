@@ -55,7 +55,7 @@ No complete upgrade rehearsal, native concurrent run, live upgrade, new processi
 
 ## Portable source inventory
 
-These35 bodies are reviewed upgrade inputs, not a command to apply them or an activation record. Reconcile actual target drift, complete the production-lineage/native rehearsal and backup/rollback checks above before rollout. Preserve each original source version and record its actual installed history version if the deployment tool assigns another one.
+These36 bodies are reviewed upgrade inputs, not a command to apply them or an activation record. Reconcile actual target drift, complete the production-lineage/native rehearsal and backup/rollback checks above before rollout. Preserve each original source version and record its actual installed history version if the deployment tool assigns another one.
 
 | Source migration | SHA-256 |
 | --- | --- |
@@ -121,3 +121,9 @@ Read-only preflight definition fingerprints (November18;17 functions) provide dr
 | `parent_private.snap_details_collection_enabled()` | `6b3d1ed4ba05d4e1f6af007574852437993cbf534af4c08e8ff90d96e1258815` |
 | `parent_private.snap_direct_acquisition_authority(uuid,uuid,integer,uuid,text)` | `0b719a0a7e5f5fc2a7fb6abd10129fd648462d18a36206a1aaaeb2c5f837a850` |
 | `parent_snap_application_collection()` | `8990151c32a30b68bfecbdcb406dedda14d67ae03f5d3d0c1678f3fc57da08ff` |
+
+## Unknown-resolution forward body and current rehearsal
+
+A final36th body follows194631: `20261118230000_parent_food_description_unknown_resolution.sql`, SHA256`c27858dd4a0878541fc62c9c0323faed168726572fa3d876829fb23841437828`. It patches exactly the current unknown-only answer-precedence helper and removes the redundant raw-model need subset from description start. Supported needs still come from validated answers with independent exclusion/history/current-request/candidate/program/source/version/mandate/expiry checks. Existing definite values, facts/dates and function ownership/ACLs remain unchanged. No processing switch or allowance is enabled.
+
+The portable observed-lineage fixture now pins all36 inputs. Root’s current23 lineage plus15 new connected-description SQL checks pass; the native entry will additionally exercise real installed unknown/definite/unresolved/expired precedence with four read-only synthetic composite records, preserving closed purposes and the original exhausted budget. The real worker→result→resolve→start/receipt tests remain separately recorded. Actual final native CI and a fresh real production backup/restore remain prerequisites; this is not permission or evidence of live DDL.
