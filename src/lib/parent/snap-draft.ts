@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
-import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts, rgb, PDFString, type PDFPage, type PDFFont } from "pdf-lib";
 import { z } from "zod";
 import contract from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import spanishMap from "../../../data/verified-forms/snap-pa600fs-es-2019.fields.json";
+import { SNAP_EN_TEMPLATE_ID, snapFormSource } from "./snap-form-source";
 import {
   assessSnapApplicationFields, snapApplicationFieldsSchema,
   snapPreparationInputSchema as schema,
@@ -32,7 +34,8 @@ type Box = [number, number, number, number];
 const frequencyText = { weekly: "Weekly", biweekly: "Every two weeks", twice_monthly: "Twice monthly", monthly: "Monthly", yearly: "Yearly" };
 const agencyDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
 
-function validated(input: unknown, now: Date) {
+function validated(input: unknown, now: Date, form: ReturnType<typeof snapFormSource>) {
+  const contract = form.contract;
   if (!Number.isFinite(now.getTime()) || now.getTime() < Date.parse(`${contract.sourceCheckedAt}T00:00:00Z`) || now.getTime() >= Date.parse(contract.verifiedUntil)) throw new Error();
   const value = schema.parse(input);
   if (value.kind === "synthetic_rehearsal") {
@@ -59,7 +62,8 @@ function validated(input: unknown, now: Date) {
   return value;
 }
 
-function readiness(value: SnapDraftInput): SnapDraftReadiness {
+function readiness(value: SnapDraftInput, form: ReturnType<typeof snapFormSource>): SnapDraftReadiness {
+  const contract = form.contract;
   const full = value.kind === "synthetic_rehearsal" ? value : undefined;
   const expenses=full?.expenses;
   const expenseMissing=!expenses||expenses.utilities===undefined||[expenses.childSupport,expenses.mealsIncludedInRent,expenses.heat,expenses.housingAssistance,expenses.outsidePayer,expenses.airConditioning,expenses.care].some(v=>v===undefined)||
@@ -94,8 +98,8 @@ function readiness(value: SnapDraftInput): SnapDraftReadiness {
   };
 }
 
-export function assessSnapPreparationDraft(input: unknown, now: Date): SnapDraftReadiness {
-  try { return readiness(validated(input, now)); }
+export function assessSnapPreparationDraft(input: unknown, now: Date, templateId: unknown = SNAP_EN_TEMPLATE_ID): SnapDraftReadiness {
+  try { const form = snapFormSource(templateId); return readiness(validated(input, now, form), form); }
   catch { throw new Error(SNAP_DRAFT_ERROR); }
 }
 
@@ -117,92 +121,102 @@ const name = (p: Person | undefined) => p && [p.lastName, p.firstName, p.middleI
 const address = (p: SnapApplicationFields["address"], zip?: string) => [p?.street, p?.city, [p?.state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || undefined;
 const printedDate = (value: string) => `${value.slice(5,7)}/${value.slice(8)}/${value.slice(0,4)}`;
 
-function fillRouting(page: PDFPage, font: PDFFont, value: Pick<SnapApplicationFields, "zip" | "language" | "otherLanguage">) {
-  draw(page,font,value.zip,[526,585,54,15]);
-  if(value.language)mark(page,true,[value.language==='en'?243.87:value.language==='es'?315.6:398.16,675.14,9.36,9.36]);
-  draw(page,font,value.otherLanguage,[531,677,50,11],7.5);
+function fieldBox(form: ReturnType<typeof snapFormSource>, key: string, english: Box, row = 0, rowHeight = 0): Box {
+  if (form.language === "en") return english;
+  const box = (spanishMap.fields as Record<string, number[]>)[key];
+  if (!box || box.length !== 4) throw new FieldRenderingError();
+  return [box[0], box[1] - row * rowHeight, box[2], box[3]];
+}
+function fillRouting(page: PDFPage, font: PDFFont, value: Pick<SnapApplicationFields, "zip" | "language" | "otherLanguage">, form: ReturnType<typeof snapFormSource>) {
+  draw(page,font,value.zip,fieldBox(form,"zip",[526,585,54,15]));
+  if(value.language)mark(page,true,fieldBox(form,`language.${value.language}`,[value.language==='en'?243.87:value.language==='es'?315.6:398.16,675.14,9.36,9.36]));
+  draw(page,font,value.otherLanguage,fieldBox(form,"otherLanguage",[531,677,50,11]),7.5);
 }
 
-function fillFormFields(pages: PDFPage[], font: PDFFont, value: FormFields) {
-  const first = pages[2], incomePage = pages[3], expensesPage = pages[4];
-  draw(first,font,value.applicant?.lastName,[26,617,219,15]);
-  draw(first,font,value.applicant?.firstName,[254,617,199,15]);
-  draw(first,font,value.applicant?.middleInitial,[465,617,120,15]);
-  draw(first,font,address(value.address),[26,585,480,15]);
-  draw(first,font,value.county,[26,554,121,15]); draw(first,font,value.phone,[160,554,130,15]);
-  draw(first,font,value.otherPhone,[313,554,100,15]); draw(first,font,value.bestTimeToCall,[425,554,160,15]);
-  mark(first,value.interpreter,[243.87,658.98,9.36,9.36],[286.66,658.98,9.36,9.36]);
-  draw(first,font,value.interpreterLanguage,[531,661,50,11],7.5);
+function fillFormFields(pages: PDFPage[], font: PDFFont, value: FormFields, form: ReturnType<typeof snapFormSource>) {
+  const first = pages[2], incomePage = pages[3], expensesPage = pages[4], es = form.language === "es";
+  const at = (key: string, english: Box, row = 0, rowHeight = 0) => fieldBox(form,key,english,row,rowHeight);
+  draw(first,font,value.applicant?.lastName,at("applicant.lastName",[26,617,219,15]));
+  draw(first,font,value.applicant?.firstName,at("applicant.firstName",[254,617,199,15]));
+  draw(first,font,value.applicant?.middleInitial,at("applicant.middleInitial",[465,617,120,15]));
+  draw(first,font,address(value.address),at("address",[26,585,480,15]));
+  draw(first,font,value.county,at("county",[26,554,121,15])); draw(first,font,value.phone,at("phone",[160,554,130,15]));
+  draw(first,font,value.otherPhone,at("otherPhone",[313,554,100,15])); draw(first,font,value.bestTimeToCall,at("bestTimeToCall",[425,554,160,15]));
+  mark(first,value.interpreter,at("interpreter.yes",[243.87,658.98,9.36,9.36]),at("interpreter.no",[286.66,658.98,9.36,9.36]));
+  draw(first,font,value.interpreterLanguage,at("interpreterLanguage",[531,661,50,11]),7.5);
   for(const [i,answer] of [value.screening?.lowCashAndIncome,value.screening?.migrantOrSeasonal,value.screening?.belowShelterCosts].entries())
-    mark(first,answer,[98.49,476.72-i*25.02,17,8.36],[141.37,476.72-i*25.02,17,8.36]);
+    mark(first,answer,at(`screening.${i}.yes`,[98.49,476.72-i*25.02,17,8.36]),at(`screening.${i}.no`,[141.37,476.72-i*25.02,17,8.36]));
   value.household?.forEach((person,i)=>{
-    const y=307.5-i*23.4;
-    draw(first,font,name(person),[26,y,178,12],8);
-    if(person.sex)mark(first,true,[person.sex==='male'?212.59:234.56,308.22-i*23.4,8.68,8.36]);
-    mark(first,person.student,[259.5,308.22-i*23.4,8.68,8.36],[287.16,308.22-i*23.4,8.68,8.36]);
-    draw(first,font,person.dateOfBirth ? printedDate(person.dateOfBirth) : undefined,[315,y,56,12],8);
-    if(i>0)draw(first,font,person.relationship,[377,y,63,12],8);
-    if(person.requestingSnap)mark(first,person.citizen,[531.69,308.22-i*23.4,8.68,8.36],[559.36,308.22-i*23.4,8.68,8.36]);
+    const y=307.5-i*23.4, rowHeight=spanishMap.householdRowHeight;
+    draw(first,font,name(person),at("household.name",[26,y,178,12],i,rowHeight),8);
+    if(person.sex)mark(first,true,at(`household.${person.sex}`,[person.sex==='male'?212.59:234.56,308.22-i*23.4,8.68,8.36],i,rowHeight));
+    mark(first,person.student,at("household.student.yes",[259.5,308.22-i*23.4,8.68,8.36],i,rowHeight),at("household.student.no",[287.16,308.22-i*23.4,8.68,8.36],i,rowHeight));
+    draw(first,font,person.dateOfBirth ? printedDate(person.dateOfBirth) : undefined,at("household.dateOfBirth",[315,y,56,12],i,rowHeight),8);
+    if(i>0)draw(first,font,person.relationship,at("household.relationship",[377,y,63,12],i,rowHeight),8);
+    if(person.requestingSnap)mark(first,person.citizen,at("household.citizen.yes",[531.69,308.22-i*23.4,8.68,8.36],i,rowHeight),at("household.citizen.no",[559.36,308.22-i*23.4,8.68,8.36],i,rowHeight));
   });
-  mark(incomePage,value.income?.entries?.length ? true : value.income?.hasIncome,[166.96,741.59,17,8.36],[209.84,741.59,17,8.36]);
+  mark(incomePage,value.income?.entries?.length ? true : value.income?.hasIncome,at("income.yes",[166.96,741.59,17,8.36]),at("income.no",[209.84,741.59,17,8.36]));
   value.income?.entries?.forEach((entry,i)=>{
-    const y=591-i*26.93;
-    draw(incomePage,font,name(entry.person),[26,y,181,19],8);
-    draw(incomePage,font,entry.source,[217,y,111,19],8);
-    draw(incomePage,font,money(entry.amount),[346,y,72,19],8);
-    draw(incomePage,font,entry.frequency,[426,y,75,19],8);
+    const y=591-i*26.93, rowHeight=spanishMap.incomeRowHeight;
+    draw(incomePage,font,name(entry.person),at("income.person",[26,y,181,19],i,rowHeight),8);
+    draw(incomePage,font,entry.source,at("income.source",[217,y,111,19],i,rowHeight),8);
+    draw(incomePage,font,money(entry.amount),at("income.amount",[346,y,72,19],i,rowHeight),8);
+    draw(incomePage,font,entry.frequency,at("income.frequency",[426,y,75,19],i,rowHeight),8);
     if(entry.date) {
-      if(entry.status !== 'received')draw(incomePage,font,entry.status==='expected'?'EXPECTED':'STATUS UNKNOWN',[508,y+10,77,9],7);
-      draw(incomePage,font,printedDate(entry.date),[508,y,77,entry.status==='received'?19:9],8);
+      if(entry.status !== 'received')draw(incomePage,font,entry.status==='expected'?(es?'PREVISTO':'EXPECTED'):(es?'ESTADO DESCONOCIDO':'STATUS UNKNOWN'),at("income.status",[508,y+10,77,9],i,rowHeight),es?6.3:7);
+      draw(incomePage,font,printedDate(entry.date),at(`income.date.${entry.status==='received'?'received':'other'}`,[508,y,77,entry.status==='received'?19:9],i,rowHeight),8);
     }
   });
   const history=[value.history?.fleeingOrProbation,value.history?.welfareFraud,value.history?.otherStateDisqualification];
   const historyYs=[379.81,260.96,163.04];
   for(const [i,answer] of history.entries()){
-    mark(incomePage,answer?.answer,[31.96,historyYs[i],17,8.36],[74.84,historyYs[i],17,8.36]);
+    mark(incomePage,answer?.answer,at(`history.${i}.yes`,[31.96,historyYs[i],17,8.36]),at(`history.${i}.no`,[74.84,historyYs[i],17,8.36]));
     if(answer?.answer){
-      draw(incomePage,font,answer.names,[i===2?209:270,i===0?317:i===1?221:134,i===2?357:296,13],8);
-      if('date' in answer && typeof answer.date==='string')draw(incomePage,font,printedDate(answer.date),[154,i===0?296:200,90,13],8);
-      if('state' in answer && typeof answer.state==='string')draw(incomePage,font,answer.state,[300,i===0?296:200,58,13],8);
+      draw(incomePage,font,answer.names,at(`history.${i}.names`,[i===2?209:270,i===0?317:i===1?221:134,i===2?357:296,13]),8);
+      if('date' in answer && typeof answer.date==='string')draw(incomePage,font,printedDate(answer.date),at(`history.${i}.date`,[154,i===0?296:200,90,13]),8);
+      if('state' in answer && typeof answer.state==='string')draw(incomePage,font,answer.state,at(`history.${i}.state`,[300,i===0?296:200,58,13]),8);
     }
   }
   const e=value.expenses;if(!e)return;
-  const yesNo=(answer:boolean|undefined,y:number)=>mark(expensesPage,answer,[31.96,y,17,8.36],[74.84,y,17,8.36]);
-  yesNo(e.childSupport,716.28);if(e.childSupport)mark(expensesPage,e.courtOrdered,[246.1,700.16,17,8.36],[288.98,700.16,17,8.36]);
-  yesNo(e.mealsIncludedInRent,676.85);yesNo(e.heat,651.98);yesNo(e.housingAssistance,626.42);
-  if(e.housingAssistance){draw(expensesPage,font,e.housingAssistanceKind,[205,608,370,13]);mark(expensesPage,e.utilityAllowance,[269.18,584.67,17,8.36],[312.06,584.67,17,8.36]);}
-  yesNo(e.outsidePayer,558.74);
-  if(e.outsidePayer){draw(expensesPage,font,e.outsideExpenses,[230,540,342,13]);draw(expensesPage,font,money(e.outsideAmount),[182,519,151,13]);draw(expensesPage,font,e.outsideFrequency,[437,519,134,13]);draw(expensesPage,font,e.outsidePayee,[174,498,396,13]);}
-  yesNo(e.airConditioning,471.2);
+  const yesNo=(key:string,answer:boolean|undefined,y:number)=>mark(expensesPage,answer,at(`${key}.yes`,[31.96,y,17,8.36]),at(`${key}.no`,[74.84,y,17,8.36]));
+  yesNo("childSupport",e.childSupport,716.28);if(e.childSupport)mark(expensesPage,e.courtOrdered,at("courtOrdered.yes",[246.1,700.16,17,8.36]),at("courtOrdered.no",[288.98,700.16,17,8.36]));
+  yesNo("mealsIncludedInRent",e.mealsIncludedInRent,676.85);yesNo("heat",e.heat,651.98);yesNo("housingAssistance",e.housingAssistance,626.42);
+  if(e.housingAssistance){draw(expensesPage,font,e.housingAssistanceKind,at("housingAssistanceKind",[205,608,370,13]));mark(expensesPage,e.utilityAllowance,at("utilityAllowance.yes",[269.18,584.67,17,8.36]),at("utilityAllowance.no",[312.06,584.67,17,8.36]));}
+  yesNo("outsidePayer",e.outsidePayer,558.74);
+  if(e.outsidePayer){draw(expensesPage,font,e.outsideExpenses,at("outsideExpenses",[230,540,342,13]));draw(expensesPage,font,money(e.outsideAmount),at("outsideAmount",[182,519,151,13]));draw(expensesPage,font,e.outsideFrequency,at("outsideFrequency",[437,519,134,13]));draw(expensesPage,font,e.outsidePayee,at("outsidePayee",[174,498,396,13]));}
+  yesNo("airConditioning",e.airConditioning,471.2);
   const utilityBoxes={telephone:[31.96,431.19],water:[115.96,431.19],garbage:[179.96,431.19],installation:[258.96,431.19],electric:[379.96,431.19],oil:[451.96,431.19],sewer:[31.96,410.19],gas:[115.96,410.19],propane:[179.96,410.19],other:[258.96,410.19]};
-  for(const utility of e.utilities??[]){const[x,y]=utilityBoxes[utility];mark(expensesPage,true,[x,y,17,8.36]);}
-  draw(expensesPage,font,e.otherUtility,[309,413,263,13]);yesNo(e.care,385.28);
-  if(e.care){draw(expensesPage,font,money(e.careMonthlyAmount),[272,360,73,13]);draw(expensesPage,font,e.careRecipient,[214,339,361,13]);}
-  for(const [amount,box] of [[e.rent,[65,295,75,13]],[e.condoFees,[255,295,76,13]],[e.mortgage,[87,278,75,13]],[e.propertyFees,[265,278,75,13]],[e.homeownersInsurance,[492,278,74,13]]] as [number|undefined,Box][])
-    draw(expensesPage,font,money(amount),box);
+  for(const utility of e.utilities??[]){const[x,y]=utilityBoxes[utility];mark(expensesPage,true,at(`utility.${utility}`,[x,y,17,8.36]));}
+  draw(expensesPage,font,e.otherUtility,at("otherUtility",[309,413,263,13]));yesNo("care",e.care,385.28);
+  if(e.care){draw(expensesPage,font,money(e.careMonthlyAmount),at("careMonthlyAmount",[272,360,73,13]));draw(expensesPage,font,e.careRecipient,at("careRecipient",[214,339,361,13]));}
+  for(const [key,amount,box] of [["rent",e.rent,[65,295,75,13]],["condoFees",e.condoFees,[255,295,76,13]],["mortgage",e.mortgage,[87,278,75,13]],["propertyFees",e.propertyFees,[265,278,75,13]],["homeownersInsurance",e.homeownersInsurance,[492,278,74,13]]] as [string,number|undefined,Box][])
+    draw(expensesPage,font,money(amount),at(key,box));
   const medicalBoxes={dental:[26.96,186.59],doctor:[122.96,186.59],equipment:[217.96,186.59],premiums:[347.96,186.59],hospital:[26.96,170.09],prescriptions:[122.96,170.09],homeAide:[261.96,170.09],supplies:[26.96,153.59],transport:[26.96,137.09],other:[26.96,108.59]};
-  for(const medical of e.medical??[]){const[x,y]=medicalBoxes[medical];mark(expensesPage,true,[x,y,17,8.36]);}
-  draw(expensesPage,font,e.otherMedical,[80,111,492,13]);
+  for(const medical of e.medical??[]){const[x,y]=medicalBoxes[medical];mark(expensesPage,true,at(`medical.${medical}`,[x,y,17,8.36]));}
+  draw(expensesPage,font,e.otherMedical,at("otherMedical",[80,111,492,13]));
 }
 
-async function loadTemplate(template: Uint8Array) {
+async function loadTemplate(template: Uint8Array, form: ReturnType<typeof snapFormSource>) {
+  const contract = form.contract;
   if(template.length!==contract.byteLength||createHash('sha256').update(template).digest('hex')!==contract.sha256)throw new Error();
   const source=await PDFDocument.load(Uint8Array.from(template),{updateMetadata:false});
   if(source.getPageCount()!==12||source.getPages().some(p=>p.getWidth()!==612||p.getHeight()!==792||p.getRotation().angle!==0)||source.getForm().getFields().length)throw new Error();
   return source;
 }
 
-async function wrappedPages(pages: PDFPage[], now: Date, applicationPreview = false) {
+async function wrappedPages(pages: PDFPage[], now: Date, applicationPreview = false, form = snapFormSource()) {
   // Embedding pages does not flush their source document's pending fonts.
   await pages[0].doc.flush();
   const result=await PDFDocument.create();result.setCreationDate(now);result.setModificationDate(now);
   result.setTitle(applicationPreview ? 'Unsigned SNAP application preview - protected fields incomplete - not sent' : 'Incomplete unsigned SNAP preparation - not sent');
+  const es = form.language === 'es';
+  if (es) { result.catalog.set(PDFName.of('Lang'), PDFString.of('es-ES')); result.setTitle(applicationPreview ? 'Vista previa de SNAP SIN FIRMAR - campos protegidos incompletos - SIN ENVIAR' : 'Preparación incompleta de SNAP SIN FIRMAR - SIN ENVIAR'); }
   const font=await result.embedFont(StandardFonts.Helvetica);
   for(const [i,page]of pages.entries()){
     const output=result.addPage([612,792]);
     if(page.node.Contents())output.drawPage(await result.embedPage(page),{x:24.48,y:32,width:612*.92,height:792*.92});
-    draw(output,font,applicationPreview ? 'UNSIGNED SNAP PREVIEW - PROTECTED FIELDS INCOMPLETE - NOT SENT' : 'INCOMPLETE UNSIGNED PREPARATION - NOT SENT',[29,777,554,11],9);
-    draw(output,font,applicationPreview
+    draw(output,font,es ? (applicationPreview ? 'VISTA PREVIA SIN FIRMAR - CAMPOS PROTEGIDOS INCOMPLETOS - SIN ENVIAR' : 'PREPARACIÓN INCOMPLETA SIN FIRMAR - SIN ENVIAR') : applicationPreview ? 'UNSIGNED SNAP PREVIEW - PROTECTED FIELDS INCOMPLETE - NOT SENT' : 'INCOMPLETE UNSIGNED PREPARATION - NOT SENT',[29,777,554,11],es?8:9);
+    draw(output,font,es ? `Formulario oficial de SNAP ${i+1} de 12 | ${i===6 && applicationPreview ? 'Los datos del representante no son una designación firmada.' : 'Identificadores, firmas y fechas de certificación en blanco.'}` : applicationPreview
       ? `Official SNAP form ${i+1} of 12 | ${i===6?'Representative details are not a signed designation.':'Identifiers and certification signatures/dates remain blank.'}`
       : `Official SNAP form ${i+1} of 12 | Identity and signature fields remain blank.`,[29,13,554,11],8);
   }
@@ -210,19 +224,19 @@ async function wrappedPages(pages: PDFPage[], now: Date, applicationPreview = fa
 }
 
 /** Full private-field mapping is an offline synthetic proof; workers may project only current_scoped_facts. */
-export async function renderSnapPreparationDraft(template: Uint8Array, input: unknown, now: Date): Promise<{bytes:Uint8Array;readiness:SnapDraftReadiness}> {
+export async function renderSnapPreparationDraft(template: Uint8Array, input: unknown, now: Date, templateId: unknown = SNAP_EN_TEMPLATE_ID): Promise<{bytes:Uint8Array;readiness:SnapDraftReadiness}> {
   try {
-    const value=validated(input,now);
-    const source=await loadTemplate(template);
+    const form=snapFormSource(templateId), value=validated(input,now,form);
+    const source=await loadTemplate(template,form);
     const font=await source.embedFont(StandardFonts.Helvetica);
     const pages=source.getPages();
-    fillRouting(pages[2],font,value);
+    fillRouting(pages[2],font,value,form);
     if(value.kind==='synthetic_rehearsal')fillFormFields(pages,font,{
       ...value, income: value.income && { ...value.income, entries: value.income.entries.map(entry => ({
-        ...entry, person: value.household![entry.personIndex], frequency: frequencyText[entry.frequency], date: entry.receivedOn, status: 'received',
+        ...entry, person: value.household![entry.personIndex], frequency: form.language === "es" ? ({weekly:"Semanal",biweekly:"Cada dos semanas",twice_monthly:"Dos veces al mes",monthly:"Mensual",yearly:"Anual"})[entry.frequency] : frequencyText[entry.frequency], date: entry.receivedOn, status: 'received',
       })) },
-    });
-    return {bytes:await wrappedPages(pages,now),readiness:readiness(value)};
+    },form);
+    return {bytes:await wrappedPages(pages,now,false,form),readiness:readiness(value,form)};
   }catch{throw new Error(SNAP_DRAFT_ERROR);}
 }
 
@@ -235,12 +249,12 @@ export type SnapApplicationPreviewReadiness = SnapApplicationPageReadiness & {
 };
 
 /** Shared nonprotected mapping only; no identifiers, signatures or delivery authority. */
-export async function prepareSnapApplicationPages(template: Uint8Array, input: unknown, now: Date): Promise<{document:PDFDocument|null;readiness:SnapApplicationPageReadiness}> {
+export async function prepareSnapApplicationPages(template: Uint8Array, input: unknown, now: Date, templateId: unknown = SNAP_EN_TEMPLATE_ID): Promise<{document:PDFDocument|null;readiness:SnapApplicationPageReadiness}> {
   try {
-    const value=snapApplicationFieldsSchema(now).parse(input);
-    const assessment=assessSnapApplicationFields(value,now);
+    const form=snapFormSource(templateId), value=snapApplicationFieldsSchema(now).parse(input);
+    const assessment=assessSnapApplicationFields(value,now,form.contract.id);
     if(!assessment.sourceReviewCurrent)throw new Error();
-    const source=await loadTemplate(template);
+    const source=await loadTemplate(template,form);
     const readiness: SnapApplicationPageReadiness={
       ...assessment, protectedIncomplete:true,
       renderingRequirements:assessment.renderingRequirements.filter(item=>item!=='explicit_expected_income_rendering'&&item!=='other_language_field_mapping'),
@@ -252,17 +266,18 @@ export async function prepareSnapApplicationPages(template: Uint8Array, input: u
     if(readiness.renderingRequirements.length)return {document:null,readiness};
     try {
       const font=await source.embedFont(StandardFonts.Helvetica),pages=source.getPages();
-      fillRouting(pages[2],font,value);
+      fillRouting(pages[2],font,value,form);
       fillFormFields(pages,font,{
         ...value, income:value.income && { ...value.income,entries:value.income.entries?.map(entry=>({
           ...entry,person:value.household?.find(person=>person.id===entry.personId),
         })) },
-      });
+      },form);
+      if (form.language === "es") source.catalog.set(PDFName.of("Lang"), PDFString.of("es-ES"));
       const representative=value.authorizedRepresentative;
       if(representative){
-        draw(pages[6],font,representative.name,[26,161,212,18],8);
-        draw(pages[6],font,address(representative.address,representative.address?.zip),[247,161,220,18],8);
-        draw(pages[6],font,representative.phone,[477,161,108,18],8);
+        draw(pages[6],font,representative.name,fieldBox(form,"representative.name",[26,161,212,18]),8);
+        draw(pages[6],font,address(representative.address,representative.address?.zip),fieldBox(form,"representative.address",[247,161,220,18]),8);
+        draw(pages[6],font,representative.phone,fieldBox(form,"representative.phone",[477,161,108,18]),8);
       }
       return {document:source,readiness};
     }catch(error){
@@ -273,11 +288,11 @@ export async function prepareSnapApplicationPages(template: Uint8Array, input: u
 }
 
 /** Pure preview only; this does not acquire protected values, establish designation or permit delivery. */
-export async function renderSnapApplicationPreview(template: Uint8Array, input: unknown, now: Date): Promise<{bytes:Uint8Array|null;readiness:SnapApplicationPreviewReadiness}> {
+export async function renderSnapApplicationPreview(template: Uint8Array, input: unknown, now: Date, templateId: unknown = SNAP_EN_TEMPLATE_ID): Promise<{bytes:Uint8Array|null;readiness:SnapApplicationPreviewReadiness}> {
   try {
-    const result=await prepareSnapApplicationPages(template,input,now);
+    const form=snapFormSource(templateId), result=await prepareSnapApplicationPages(template,input,now,form.contract.id);
     return {
-      bytes:result.document ? await wrappedPages(result.document.getPages(),now,true) : null,
+      bytes:result.document ? await wrappedPages(result.document.getPages(),now,true,form) : null,
       readiness:{...result.readiness,kind:'unsigned_nonprotected_application_preview'},
     };
   }catch{throw new Error(SNAP_DRAFT_ERROR);}

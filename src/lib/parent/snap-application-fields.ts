@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isOrdinaryText } from "./ordinary-text";
-import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import { SNAP_EN_TEMPLATE_ID, snapFormSource } from "./snap-form-source";
+export { SNAP_APPLICATION_SOURCE } from "./snap-form-source";
 
 const text = (max = 160, snapPhone = false) => z.string().trim().min(1).max(max).refine(value => value.length <= max && isOrdinaryText(value, snapPhone));
 const amount = z.number().finite().min(0).max(1000000);
@@ -90,11 +91,6 @@ const applicationFields = z.object({
 }).strict();
 
 export type SnapApplicationFields = z.infer<typeof applicationFields>;
-export const SNAP_APPLICATION_SOURCE = {
-  templateId: source.id, templateVersion: source.version, templateSha256: source.sha256,
-  inventoryId: "pa-snap-pa600fs-sg-2019-field-inventory", inventoryVersion: "2026-11-03.v1",
-  inventorySha256: "5db4a308b834836d2fb4681e77e13c2834a0ff70b08dbcd5c6188fb7c05d88ee",
-} as const;
 const agencyDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
 
 /** Historical values stay readable; permission and original per-field provenance remain server-owned. */
@@ -166,7 +162,8 @@ export function snapApplicationFieldsSchema(now: Date) {
   });
 }
 
-export function assessSnapApplicationFields(input: unknown, now: Date) {
+export function assessSnapApplicationFields(input: unknown, now: Date, templateId: unknown = SNAP_EN_TEMPLATE_ID) {
+  const { contract: source, source: applicationSource } = snapFormSource(templateId);
   const value = snapApplicationFieldsValueSchema.parse(input);
   const current = snapApplicationFieldsSchema(now).safeParse(value);
   const invalidCurrentFields = current.success ? [] : current.error.issues.map(issue => {
@@ -232,7 +229,7 @@ export function assessSnapApplicationFields(input: unknown, now: Date) {
   const sourceReviewCurrent = now.getTime() >= Date.parse(`${source.sourceCheckedAt}T00:00:00Z`) && now.getTime() < Date.parse(source.verifiedUntil);
   if (!sourceReviewCurrent) serviceQuestions.push("current_form_source_review");
   return {
-    source: SNAP_APPLICATION_SOURCE, sourceReviewCurrent, missingFields, serviceQuestions, invalidCurrentFields,
+    source: applicationSource, sourceReviewCurrent, missingFields, serviceQuestions, invalidCurrentFields,
     optionalContactNotes: value.phone ? [] : ["phone_not_supplied"],
     nonProtectedDataReadyForReview: !missingFields.length && !serviceQuestions.length && !invalidCurrentFields.length,
     minimumFilingNameAndAddressPresent: !!value.applicant?.firstName && !!value.applicant.lastName && !!value.address?.street && !!value.address.city && !!value.address.state && !!value.zip,

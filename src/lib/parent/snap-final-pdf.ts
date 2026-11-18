@@ -3,11 +3,9 @@ import { createRequire } from "node:module";
 import { finished } from "node:stream/promises";
 import { Worker } from "node:worker_threads";
 import { z } from "zod";
-import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import { snapFormSource, snapFormTemplateSourceSchema } from "./snap-form-source";
 
-const sourceSchema = z.object({
-  templateId: z.literal(source.id), templateVersion: z.literal(source.version), templateSha256: z.literal(source.sha256),
-}).strict();
+const sourceSchema = snapFormTemplateSourceSchema;
 const inputSchema = z.object({
   bytes: z.instanceof(Uint8Array).refine(bytes => bytes.length > 0 && bytes.length <= 10 * 1024 * 1024),
   contentSha256: z.string().regex(/^[a-f0-9]{64}$/), byteLength: z.number().int().min(1).max(10 * 1024 * 1024), source: sourceSchema,
@@ -28,7 +26,7 @@ export async function inspectSnapFinalPdf(input: unknown, options: { deadline: D
       return { ok: false, reason: "inspection_interrupted" };
     const checked = inputSchema.safeParse(input);
     if (!checked.success) return { ok: false, reason: "binding_mismatch" };
-    const value = checked.data;
+    const value = checked.data, source = snapFormSource(checked.data.source.templateId).contract;
     bytes = Uint8Array.from(value.bytes);
     if (bytes.length !== value.byteLength || createHash("sha256").update(bytes).digest("hex") !== value.contentSha256)
       return { ok: false, reason: "binding_mismatch" };

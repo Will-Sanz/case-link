@@ -1,5 +1,7 @@
 import { z } from "zod";
 import contract from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import spanishMap from "../../../data/verified-forms/snap-pa600fs-es-2019.fields.json";
+import { snapFormSource } from "./snap-form-source";
 import { snapCaptureContextSchema } from "./snap-capture-context";
 import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema } from "./snap-application-snapshot";
 import { SNAP_PARENT_CERTIFICATION_ACTS } from "./snap-protected-operation";
@@ -78,18 +80,21 @@ export const SNAP_DIRECT_CERTIFICATION_REGIONS = {
 } as const;
 
 
+export function snapDirectCertificationRegions(templateId: unknown = contract.id) {
+  return snapFormSource(templateId).language === "es" ? spanishMap.certifications : SNAP_DIRECT_CERTIFICATION_REGIONS;
+}
+
 /** Copies private input synchronously; a claimed scope is not database authority or proof of human origin. */
 export function parseSnapDirectCompletionInputs(trustedInput: unknown, completionInput: unknown, now: Date) {
   const fail = (reason: Reason) => ({ ok: false as const, result: snapDirectCompletionUnavailable(reason) });
   try {
     if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return fail("invalid_completion");
     const trusted = trustedSchema.parse(trustedInput), completion = completionSchema.parse(completionInput), context = trusted.context;
-    // The snapshot's custom source schema does not clone this object.
-    trusted.snapshot.source = { ...trusted.snapshot.source };
     const { snapshot, readiness: assessment } = assessSnapApplicationSnapshot(trusted.snapshot, now);
     const preparedAt = new Date(trusted.preparedAt);
     if (trusted.requestId !== snapshot.request_id.toLowerCase() || snapshot.id.toLowerCase() !== context.snapshotId
       || snapshot.request_version > context.requestVersion || Date.parse(snapshot.created_at) > preparedAt.getTime() || preparedAt > now
+      || JSON.stringify(snapshot.source) !== JSON.stringify(context.source)
       || completion.requestId !== trusted.requestId || completion.requestVersion !== context.requestVersion || completion.snapshotId !== context.snapshotId
       || completion.snapshotHash !== context.snapshotHash || JSON.stringify(completion.source) !== JSON.stringify(context.source)
       || completion.unsignedContentSha256 !== trusted.unsignedContentSha256) return fail("scope_changed");
@@ -127,7 +132,7 @@ export async function completeSnapDirectCompletionCopy(unsignedInput: Uint8Array
       return snapDirectCompletionUnavailable("invalid_completion");
     const input = parseSnapDirectCompletionInputs(trustedInput, completionInput, now);
     if (!input.ok) return input.result;
-    const { trusted, completion, people } = input, context = trusted.context;
+    const { trusted, completion, people } = input, context = trusted.context, form = snapFormSource(context.source.templateId);
     unsigned = Uint8Array.from(unsignedInput);
     if (await digest(unsigned) !== trusted.unsignedContentSha256) return snapDirectCompletionUnavailable("scope_changed");
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
@@ -140,10 +145,10 @@ export async function completeSnapDirectCompletionCopy(unsignedInput: Uint8Array
       // A missing number does not block initial filing; never invent or print a substitute identifier.
       if (identifier.kind === "provide_to_agency_later") continue;
       if (identifier.kind !== "ssn") return snapDirectCompletionUnavailable("identifier_rule_unresolved");
-      first.drawText(identifier.value, { x: 445, y: 309.5 - row * 23.4, size: 8, font, color: rgb(0, 0, 0) });
+      first.drawText(identifier.value, { x: form.language === "es" ? spanishMap.ssn.x : 445, y: (form.language === "es" ? spanishMap.ssn.y : 309.5) - row * 23.4, size: 8, font, color: rgb(0, 0, 0) });
     }
     for (const act of completion.certifications) {
-      const region = SNAP_DIRECT_CERTIFICATION_REGIONS[act.actId], page = document.getPage(region.page), [x0, y0, x1, y1] = region.ink;
+      const region = snapDirectCertificationRegions(form.contract.id)[act.actId], page = document.getPage(region.page), [x0, y0, x1, y1] = region.ink;
       for (const points of act.strokes) for (let index = 1; index < points.length; index++) {
         const position = (p: z.infer<typeof point>) => ({ x: x0 + 1 + p.x * (x1 - x0 - 2), y: y0 + 1 + p.y * (y1 - y0 - 2) });
         page.drawLine({ start: position(points[index - 1]), end: position(points[index]), thickness: 1.2, color: rgb(0, 0, 0) });
@@ -156,6 +161,11 @@ export async function completeSnapDirectCompletionCopy(unsignedInput: Uint8Array
     const outstandingIdentifierSubjectIds = completion.identifiers.filter(identifier => identifier.kind === "provide_to_agency_later").map(identifier => identifier.personId);
     document.setSubject("Closed candidate for exact private review; signature-method acceptance remains unconfirmed. Not sent."
       + (outstandingIdentifierSubjectIds.length ? " Initial filing: applicant identifiers remain to be provided to the agency." : ""));
+    if (form.language === "es") {
+      document.setTitle("Candidato privado de SNAP con pasos personales");
+      document.setSubject("Candidato cerrado para revisión privada exacta; la aceptación del método de firma sigue sin confirmarse. SIN ENVIAR."
+        + (outstandingIdentifierSubjectIds.length ? " Presentación inicial: faltan identificadores que se proporcionarán a la agencia." : ""));
+    }
     document.setKeywords([SNAP_DIRECT_COMPLETION_VERSION, "closed_direct_completion_candidate"]);
     output = Uint8Array.from(await document.save());
     if (!output.length || output.length > MAX_SNAP_PACKET_BYTES) return snapDirectCompletionUnavailable("unsupported_layout");

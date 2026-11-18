@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { SNAP_DRAFT_CONTRACT } from "./snap-draft";
-import { SNAP_PERSONAL_PAGE_MAP } from "./snap-personal-pages";
+import { snapFormSource } from "./snap-form-source";
 import { renderSnapSigningCopy } from "./snap-signing-copy";
 import { completeSnapDirectCompletionCopy, parseSnapDirectCompletionInputs, snapDirectCompletionUnavailable, type SnapDirectCompletionResult } from "./snap-direct-completion-core";
 
@@ -13,13 +12,15 @@ const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 export async function renderSnapDirectCompletion(template: Uint8Array, trustedInput: unknown, completionInput: unknown, now: Date): Promise<SnapDirectCompletionResult> {
   let templateCopy: Uint8Array | undefined, unsigned: Uint8Array | undefined;
   try {
-    if (!(now instanceof Date) || !Number.isFinite(now.getTime()) || !(template instanceof Uint8Array)
-      || template.length !== SNAP_DRAFT_CONTRACT.byteLength) return snapDirectCompletionUnavailable("invalid_completion");
-    templateCopy = Uint8Array.from(template);
-    if (digest(templateCopy) !== SNAP_PERSONAL_PAGE_MAP.source.templateSha256) return snapDirectCompletionUnavailable("scope_changed");
+    if (!(now instanceof Date) || !Number.isFinite(now.getTime()) || !(template instanceof Uint8Array))
+      return snapDirectCompletionUnavailable("invalid_completion");
     const at = new Date(now.getTime()), input = parseSnapDirectCompletionInputs(trustedInput, completionInput, at);
     if (!input.ok) return input.result;
-    const copy = await renderSnapSigningCopy(templateCopy, input.snapshot.details, input.preparedAt);
+    const form = snapFormSource(input.trusted.context.source.templateId);
+    if (template.length !== form.contract.byteLength) return snapDirectCompletionUnavailable("invalid_completion");
+    templateCopy = Uint8Array.from(template);
+    if (digest(templateCopy) !== form.contract.sha256) return snapDirectCompletionUnavailable("scope_changed");
+    const copy = await renderSnapSigningCopy(templateCopy, input.snapshot.details, input.preparedAt, form.contract.id);
     unsigned = copy.bytes ?? undefined;
     if (!unsigned || !copy.readiness.nonProtectedDataReadyForReview) return snapDirectCompletionUnavailable("unsupported_layout");
     if (digest(unsigned) !== input.trusted.unsignedContentSha256) return snapDirectCompletionUnavailable("scope_changed");

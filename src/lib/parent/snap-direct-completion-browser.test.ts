@@ -12,6 +12,7 @@ import { SNAP_PARENT_CERTIFICATION_ACTS } from "./snap-protected-operation";
 import { renderSnapSigningCopy } from "./snap-signing-copy";
 import { snapApplicationSnapshotSchema } from "./snap-application-snapshot";
 import { fixtureSnapApplication, fixtureSnapSnapshot } from "./test-fixtures";
+import { SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 
 const template = readFileSync("data/verified-forms/snap-pa600fs-2019.pdf"), now = new Date("2026-11-04T22:00:00.000Z"), preparedAt = new Date("2026-11-04T21:59:00.000Z");
 const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -95,6 +96,22 @@ describe("closed direct completion browser worker", () => {
     const value = input(), before = structuredClone(value), result = await run(value);
     expect(result).toEqual(baseline); expect(value).toEqual(before); expect(workers).toHaveLength(1);
     expect(workers[0].terminated).toBe(true);
+  });
+  it("keeps exact server bytes for an explicitly source-bound Spanish candidate through the bundled worker", async () => {
+    currentWorkerCode = browserCompiledWorkerCode;
+    const at = new Date("2026-11-18T12:01:00.000Z"), prepared = new Date("2026-11-18T12:00:00.000Z");
+    const spanish = readFileSync("data/verified-forms/snap-pa600fs-es-2019.pdf"), value = input();
+    const details = fixtureSnapApplication(prepared);
+    value.trusted.snapshot = snapApplicationSnapshotSchema.parse({ ...fixtureSnapSnapshot(prepared, details), source: SNAP_SPANISH_APPLICATION_SOURCE });
+    value.trusted.context.source = value.completion.source = SNAP_SPANISH_APPLICATION_SOURCE;
+    value.trusted.preparedAt = prepared.toISOString();
+    value.unsigned = (await renderSnapSigningCopy(spanish, details, prepared, SNAP_ES_TEMPLATE_ID)).bytes!;
+    value.trusted.unsignedContentSha256 = value.completion.unsignedContentSha256 = sha(value.unsigned);
+    value.completion.certifications.forEach((act, index) => { act.startedAt = `2026-11-18T12:00:${index ? "30" : "10"}.000Z`; act.completedAt = `2026-11-18T12:00:${index ? "40" : "20"}.000Z`; act.date = "2026-11-18"; });
+    const server = await renderSnapDirectCompletion(spanish, value.trusted, value.completion, at);
+    expect(server.bytes).not.toBeNull();
+    const browser = await completeSnapDirectCompletionInBrowser(value.unsigned, value.trusted, value.completion, at);
+    expect(browser).toEqual(server); expect(workers).toHaveLength(1);
   });
   it("preserves explicit identifier deferral and exact server bytes through the real browser bundle", async () => {
     const value = input(), personId = value.completion.identifiers[0].personId;

@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { snapApplicationSourceSchema } from "./snap-form-source";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "./constants";
-import { SNAP_APPLICATION_SOURCE, snapApplicationFieldsValueSchema, assessSnapApplicationFields } from "./snap-application-fields";
+import { snapApplicationFieldsValueSchema, assessSnapApplicationFields } from "./snap-application-fields";
 
 export const SNAP_PREVIEW_TEMPLATE_ID = "pa-snap-pa600fs-sg-2019-preview";
 export const SNAP_PREVIEW_TEMPLATE_VERSION = "application-preview-2026-11-03.v1";
@@ -12,9 +13,7 @@ export const snapApplicationSnapshotSchema = z.object({
     source: z.literal("parent"), confirmedAt: z.iso.datetime({ offset: true }), asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
   }).strict()),
-  source: z.custom<typeof SNAP_APPLICATION_SOURCE>((value) =>
-    !!value && typeof value === "object" && Object.keys(value).length === Object.keys(SNAP_APPLICATION_SOURCE).length &&
-    Object.entries(SNAP_APPLICATION_SOURCE).every(([key, expected]) => (value as Record<string, unknown>)[key] === expected)),
+  source: snapApplicationSourceSchema,
   notice_version: z.literal(SNAP_APPLICATION_NOTICE_VERSION), created_at: z.iso.datetime({ offset: true }), idempotency_key: uuid,
   confirmed_paths: z.array(z.string().min(1).max(200)).max(2000).optional(),
 }).strict();
@@ -34,7 +33,7 @@ export function assessSnapApplicationSnapshot(input: unknown, now: Date) {
   const parsed = snapApplicationSnapshotSchema.safeParse(input);
   if (!parsed.success) throw new Error("snap_snapshot_invalid");
   const snapshot = parsed.data;
-  const assessment = assessSnapApplicationFields(snapshot.details, now);
+  const assessment = assessSnapApplicationFields(snapshot.details, now, snapshot.source.templateId);
   const paths = Object.keys(snapApplicationLeaves(snapshot.details));
   if (paths.length !== Object.keys(snapshot.provenance).length || paths.some(path => !Object.hasOwn(snapshot.provenance, path)))
     throw new Error("snap_provenance_invalid");
