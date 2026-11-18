@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import ParentPrivacyPage from "@/app/(parent)/support/privacy/page";
 import ParentTermsPage from "@/app/(parent)/support/terms/page";
+vi.mock("@/lib/parent/locale-server", () => ({ readParentLocale: async () => "en" }));
 
 afterEach(cleanup);
 
 describe("parent policy commitments", () => {
-  it("preserves the published contact and data policy while explaining shared-identity erasure", () => {
-    render(<ParentPrivacyPage />);
+  it("preserves the published contact and data policy while explaining shared-identity erasure", async () => {
+    render(await ParentPrivacyPage());
     expect(
       screen
         .getByRole("link", { name: "willsanz23@gmail.com" })
@@ -33,8 +34,8 @@ describe("parent policy commitments", () => {
     ).toBe("https://developers.openai.com/api/docs/guides/your-data");
   });
 
-  it("preserves contact, personal acts and honest limits without inventing OpenAI endorsement", () => {
-    render(<ParentTermsPage />);
+  it("preserves contact, personal acts and honest limits without inventing OpenAI endorsement", async () => {
+    render(await ParentTermsPage());
     expect(
       screen
         .getByRole("link", { name: "willsanz23@gmail.com" })
@@ -48,8 +49,8 @@ describe("parent policy commitments", () => {
       screen.getByText(/Mandatory consumer rights remain in place/),
     ).toBeTruthy();
   });
-  it("explains the narrow private SNAP purpose and retention without enabling real-family processing or treating save as submission",()=>{
-    render(<ParentPrivacyPage/>);
+  it("explains the narrow private SNAP purpose and retention without enabling real-family processing or treating save as submission",async()=>{
+    render(await ParentPrivacyPage());
     expect(document.getElementById("snap-application")?.textContent).toBe("Private SNAP application details");
     expect(screen.getByText(/current-month income received or expected/)).toBeTruthy();
     expect(screen.getByText(/Saving these answers does not send all of them to an AI service or submit an agency application/)).toBeTruthy();

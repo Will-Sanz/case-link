@@ -265,8 +265,9 @@ async function main() {
     const assessment = await assessed;
     const options = await assessment.json();
     check(assessment.status() === 200 && assessment.headers()["cache-control"] === "private, no-store" &&
-      JSON.stringify(options.candidates.map((candidate: { need: string }) => candidate.need)) === JSON.stringify(["food_now", "snap_pending"]),
-    "The real authenticated web and Data API recompute the food paths before the exact mandate, without starting the proposed SNAP sibling.");
+      JSON.stringify(assessment.request().postDataJSON().needs) === JSON.stringify(["food_now"]) &&
+      JSON.stringify(options.candidates.map((candidate: { need: string }) => candidate.need)) === JSON.stringify(["food_now"]),
+    "The real authenticated web and Data API recompute only the selected food path before the exact mandate, without starting the proposed SNAP sibling.");
     await page.getByText("We can prepare. Applications are not connected yet.", { exact: true }).waitFor();
     check(
       await page
@@ -406,6 +407,7 @@ async function main() {
       && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(foodCreated.request.id),
     "The actual creation response contains the owned food request identifier.");
     const foodRequestId = foodCreated.request.id as string;
+    const completedFoodRoutingIds = [foodRequestId];
     const foodUrl = `${origin}/api/parent/requests/${foodRequestId}`;
     check((await foodSetupStep("checking the native Share request household ownership", () => db.query("select count(*)::int n from public.parent_requests r join public.parent_households h on h.id=r.household_id where r.id=$1 and h.owner_id=$2", [foodRequestId, first.id]))).rows[0].n === 1,
       "The native food request belongs only to the enrolled parent household.");
@@ -417,13 +419,13 @@ async function main() {
       check(request.id === foodRequestId, "The food-plan response remains bound to this owned request.");
       return request;
     }
-    const foodState = async () => (await db.query(`select r.version,r.status,r.closed_reason,r.next_actor,r.next_trigger,r.next_run_at,r.updated_at request_updated_at,
+    const foodState = async (id = foodRequestId) => (await db.query(`select r.version,r.status,r.closed_reason,r.next_actor,r.next_trigger,r.next_run_at,r.updated_at request_updated_at,
       j.state job_state,j.request_version,j.run_at,j.updated_at job_updated_at,
       (select count(*)::int from public.parent_events e where e.request_id=r.id and e.kind='parent.outcome_reported') reports,
       (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
       (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls,
       (select count(*)::int from parent_private.model_call_reservations) model_reservations
-      from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [foodRequestId])).rows[0];
+      from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [id])).rows[0];
     const foodViewer = await foodSetupStep("creating the owned native food request viewer", () => first.context.newPage());
     const foodPage = await foodSetupStep("opening the owned native food request viewer", () => foodViewer.goto(`${origin}/support/${foodRequestId}`, { waitUntil: "networkidle" }));
     check(foodPage?.status() === 200, "The enrolled parent can open the actual owned food request viewer.");
@@ -457,12 +459,12 @@ async function main() {
       check((await foodSetupStep("verifying the restricted native public food worker role", () => foodWorker.query("select current_user as role"))).rows[0].role === "parent_worker",
         "The native public food continuation runs under the actual restricted parent_worker role.");
       let cityChecks = 0;
-      async function foodTurn() {
+      async function foodTurn(requestId = foodRequestId) {
         const before = cityChecks;
         const result = await runOneParentJob({
           database: { query: async (sql, values) => {
             const result = await foodWorker.query(sql, values);
-            if (sql.includes("parent_claim_job(")) check(result.rows[0]?.job?.request?.id === foodRequestId,
+            if (sql.includes("parent_claim_job(")) check(result.rows[0]?.job?.request?.id === requestId,
               "The isolated continuation claims only this run's owned public food request.");
             return result;
           } },
@@ -523,6 +525,83 @@ async function main() {
       "The attributed enough-food report completes only this synthetic request and retains both distinct visit reports.");
       check(completedFoodState.operations === 0 && completedFoodState.model_calls === 0 && completedFoodState.model_reservations === foodBudgetBefore,
         "The complete native public food lifecycle creates no provider operation, request model call or model-budget reservation.");
+
+      stage = "actual guided combined food and pending SNAP start";
+      const mixedPage = await first.context.newPage();
+      await mixedPage.goto(`${origin}/get-support?need=food`, { waitUntil: "networkidle" });
+      await mixedPage.getByLabel(/enough food for today and tomorrow/).selectOption("no");
+      await mixedPage.getByLabel(/help paying for groceries/).selectOption("applied");
+      await mixedPage.getByRole("button", { name: "See my options", exact: true }).click();
+      await mixedPage.getByRole("button", { name: "Continue with both options", exact: true }).click();
+      await mixedPage.getByLabel("Household ZIP code").fill("19129");
+      await mixedPage.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+      const mixedAssessing = mixedPage.waitForResponse(response => response.url() === `${origin}/api/parent/food-assessment` && response.request().method() === "POST");
+      await mixedPage.getByRole("button", { name: "Continue", exact: true }).click();
+      const mixedAssessment = await mixedAssessing;
+      check(mixedAssessment.status() === 200 && mixedAssessment.headers()["cache-control"] === "private, no-store"
+        && JSON.stringify(mixedAssessment.request().postDataJSON().needs) === JSON.stringify(["food_now", "snap_pending"])
+        && JSON.stringify((await mixedAssessment.json()).candidates.map((path: { need: string }) => path.need)) === JSON.stringify(["food_now", "snap_pending"]),
+      "The actual guide validates both selected compatible paths without turning an existing SNAP case into a new application.");
+      await mixedPage.getByRole("checkbox", { name: /I authorize research and preparation only/ }).check();
+      const mixedStarting = mixedPage.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+      await mixedPage.getByRole("button", { name: "Start getting support" }).click();
+      const mixedStarted = await mixedStarting, mixedStartBody = mixedStarted.request().postDataJSON();
+      check(mixedStarted.status() === 201 && mixedStartBody.kind === undefined && !Object.hasOwn(mixedStartBody, "answers")
+        && JSON.stringify(mixedStartBody.intake.needs) === JSON.stringify(["food_now", "snap_pending"])
+        && mixedStartBody.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM) && mixedStartBody.mandate.recipientIds.includes("snap-pa")
+        && mixedStartBody.mandate.mode === "prepare_only",
+      "One actual Start records the named preparation-only food/SNAP mandate without raw guide answers or private new-application data.");
+      const mixedId = (await mixedStarted.json()).request.id as string, mixedUrl = `${origin}/api/parent/requests/${mixedId}`;
+      await mixedPage.waitForURL(`${origin}/support/${mixedId}`);
+      const mixedReplay = await first.page.request.post(`${origin}/api/parent/requests`, {
+        headers: { origin, "Idempotency-Key": mixedStarted.request().headers()["idempotency-key"] }, data: mixedStartBody });
+      check(mixedReplay.status() === 201 && (await mixedReplay.json()).request.id === mixedId
+        && (await db.query("select count(*)::int n from public.parent_jobs where request_id=$1", [mixedId])).rows[0].n === 1,
+      "The actual exact combined start retry returns one request and one durable job.");
+      await mixedPage.close();
+
+      stage = "actual independent worker claim race and expired-lease recovery";
+      const racingWorker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
+      let racedLease: { jobId: string; leaseToken: string; request: SupportRequest };
+      try {
+        await racingWorker.connect();
+        await racingWorker.query("set role parent_worker");
+        const claims = await Promise.all([foodWorker, racingWorker].map(client => client.query("select parent_private.parent_claim_job(15,true,false,false) job")));
+        const admitted = claims.map(reply => reply.rows[0].job).filter(Boolean);
+        check(admitted.length === 1 && admitted[0].request.id === mixedId && claims.filter(reply => reply.rows[0].job === null).length === 1,
+          "Two actual restricted database connections admit only one lease for the same combined request.");
+        racedLease = admitted[0];
+      } finally { await racingWorker.end(); }
+      await delay(15_100);
+      await assert.rejects(foodWorker.query("select parent_private.parent_renew_job_lease($1,$2)", [racedLease.jobId, racedLease.leaseToken]), { code: "42501" });
+      checks.push("An expired native worker lease cannot renew itself after the simulated process stops.");
+      await foodTurn(mixedId);
+      const mixedReply = await first.page.request.get(mixedUrl);
+      check(mixedReply.status() === 200 && mixedReply.headers()["cache-control"] === "private, no-store",
+        "The combined owned request remains privately readable after its viewer closes and a worker lease expires.");
+      const mixedRequest = (await mixedReply.json()).request as SupportRequest, mixedState = await foodState(mixedId);
+      const mixedPlan = foodAccessPlanSchema.parse(mixedRequest.plan?.routes.find(route => route.need === "food_now")?.foodAccess);
+      check(mixedRequest.status === "active" && mixedRequest.version === racedLease.request.version
+        && JSON.stringify(mixedRequest.plan?.routes.map(route => route.need)) === JSON.stringify(["food_now", "snap_pending"])
+        && mixedPlan.state === "prepared" && mixedState.job_state === "waiting" && mixedState.request_version === mixedRequest.version
+        && mixedState.operations === 0 && mixedState.model_calls === 0 && mixedState.model_reservations === foodBudgetBefore,
+      "The recovered actual worker preserves both paths and prepares public food independently while the unavailable SNAP driver waits without model/provider work.");
+
+      stage = "actual concurrent attributed food and SNAP completion reports";
+      const mixedFoodBody = { action: "food_visit", expectedVersion: mixedRequest.version, siteId: mixedPlan.site.id,
+        planHash: mixedPlan.planHash, reportKey: randomUUID(), result: "received_enough_food" };
+      const reportReplies = await Promise.all([
+        first.page.request.post(`${mixedUrl}/outcome`, { headers: { origin }, data: mixedFoodBody }),
+        first.page.request.post(`${mixedUrl}/outcome`, { headers: { origin }, data: {
+          need: "snap_pending", outcome: "support_received", reference: "Synthetic parent report; not agency confirmation." } }),
+      ]);
+      check(reportReplies.every(reply => reply.status() === 200), "Concurrent actual owned report APIs both finish without a lock-order deadlock.");
+      const mixedCompleted = await foodState(mixedId);
+      check(mixedCompleted.status === "closed" && mixedCompleted.closed_reason === "completed" && mixedCompleted.version === mixedRequest.version + 1
+        && mixedCompleted.job_state === "cancelled" && mixedCompleted.reports === 2 && mixedCompleted.operations === 0
+        && mixedCompleted.model_calls === 0 && mixedCompleted.model_reservations === foodBudgetBefore,
+      "Both attributed reports close the combined request exactly once without a second worker attempt, model call or provider-status claim.");
+      completedFoodRoutingIds.push(mixedId);
     } finally {
       const foodOutcomeStage = stage;
       try { await foodSetupStep("closing the isolated native public food worker", () => foodWorker.end()); }
@@ -605,13 +684,15 @@ async function main() {
       && (await conflictingDefaults.json()).zip === null,
     "The actual API does not choose between the completed 19129 food visit and the current 19104 routing fact.");
     // Age only the completed synthetic fixture's ZIP before testing reuse of an unambiguous current fact.
-    const foodBeforeExpiry = await foodState();
-    const expiredFoodZip = await db.query(`update public.parent_requests r
-      set intake_confirmed_at=jsonb_set(intake_confirmed_at,'{zip}',to_jsonb(now()-interval '46 days'))
-      where r.id=$1 and r.status='closed' and r.closed_reason='completed'
-        and exists(select 1 from public.parent_households h where h.id=r.household_id and h.owner_id=$2)`, [foodRequestId, first.id]);
-    check(expiredFoodZip.rowCount === 1 && JSON.stringify(await foodState()) === JSON.stringify(foodBeforeExpiry),
-      "Aging only the owned synthetic ZIP fixture preserves the food receipts, completion, version, job and retention clock.");
+    for (const completedId of completedFoodRoutingIds) {
+      const foodBeforeExpiry = await foodState(completedId);
+      const expiredFoodZip = await db.query(`update public.parent_requests r
+        set intake_confirmed_at=jsonb_set(intake_confirmed_at,'{zip}',to_jsonb(now()-interval '46 days'))
+        where r.id=$1 and r.status='closed' and r.closed_reason='completed'
+          and exists(select 1 from public.parent_households h where h.id=r.household_id and h.owner_id=$2)`, [completedId, first.id]);
+      check(expiredFoodZip.rowCount === 1 && JSON.stringify(await foodState(completedId)) === JSON.stringify(foodBeforeExpiry),
+        "Aging only an owned synthetic ZIP fixture preserves the food receipts, completion, version, job and retention clock.");
+    }
     const reusePage = await first.context.newPage();
     const reuseSource = await startFoodRequest(reusePage);
     const defaultsReply = await reusePage.request.get(`${origin}/api/parent/intake-defaults`);
