@@ -151,9 +151,11 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
     const recorded = await row(s); expect((await discover(s)).rows[0].value).toEqual(stored); expect(await row(s)).toEqual(recorded);
     expect(JSON.stringify(stored)).not.toMatch(/keyBase64|ciphertext|firstName|strokes|submissionReady/);
   });
-  it("transitions real constructed SQL metadata through the ordinary worker to first review", async () => {
+  it("transitions constructed SQL metadata to first review without model calls or dispatch", async () => {
     await fixture.admin.query("update public.parent_jobs set run_at='infinity' where state in ('queued','waiting')");
-    const s = await setup(); await complete(s);
+    const s = await setup(), completed = await complete(s), before = await counts();
+    const usage = async () => (await fixture.admin.query("select (select count(*)::int from parent_private.model_call_reservations) reservations,(select count(*)::int from parent_private.ai_calls where request_id=$1) calls", [s.request])).rows[0];
+    const usageBefore = await usage();
     let modelCalls = 0, senderCalls = 0, firstClaim = true;
     const options: Parameters<typeof runOneParentJob>[0] = {
       database: { query: async (sql, values) => {
@@ -166,16 +168,19 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
         return result;
       } },
       protectedSnapSubmission: createSnapProtectedSubmissionClient({ origin: "http://127.0.0.1:3216", secret: "SYNTHETIC_RECORDING_ONLY_00000000000000000000", fetcher: async () => { senderCalls++; throw new Error("First review must not contact sender"); } }),
-      apiKey: "SYNTHETIC-NOT-A-CREDENTIAL", brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "SYNTHETIC_BROKER_NEVER_USED_00000000", supabaseOrigin: "http://127.0.0.1:55321", transports: new Map(),
-      fetcher: async (url) => {
-        expect(url).toBe("https://api.openai.com/v1/responses"); modelCalls++;
-        return Response.json({ status: "completed", output: modelCalls === 1 ? [{ type: "function_call", name: "select_programs", call_id: "synthetic-first-review", arguments: JSON.stringify({ selections: [{ need: "snap_new", programId: "snap-pa" }] }) }] : [] });
-      },
+      brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "SYNTHETIC_BROKER_NEVER_USED_00000000", supabaseOrigin: "http://127.0.0.1:55321", transports: new Map(),
+      fetcher: async () => { modelCalls++; throw new Error("First review must not call a model"); },
     };
     expect(await runOneParentJob(options)).toEqual({ state: "idle" }); expect(modelCalls).toBe(0);
-    expect(await runOneParentJob(options)).toEqual({ state: "saved" }); expect(modelCalls).toBe(2); expect(senderCalls).toBe(0);
+    expect(await runOneParentJob(options)).toEqual({ state: "saved" }); expect(modelCalls).toBe(0); expect(senderCalls).toBe(0);
     const request = (await fixture.admin.query("select required_actions from public.parent_requests where id=$1", [s.request])).rows[0];
     expect(request.required_actions).toEqual(expect.arrayContaining([expect.objectContaining({ field: "snap_final_submit", reason: "submission_review" })]));
+    const review = (await call("authenticated", "select public.parent_get_snap_review($1,$2) value", [s.request, s.version], s.owner)).rows[0].value;
+    expect(review).toMatchObject({ operationId: completed.operation, state: "prepared", protectedPacketCurrent: true, protectedParentSubmitReady: true,
+      personalActsComplete: false, snapSubmissionAuthorized: false, packet: { protectedSnapPacket: { packetId: s.packet } } });
+    expect(await counts()).toEqual(before); expect(await usage()).toEqual(usageBefore);
+    expect((await fixture.admin.query("select 1 from parent_private.personal_act_evidence where operation_id=$1", [completed.operation])).rows).toEqual([]);
+    expect((await fixture.admin.query("select 1 from parent_private.snap_submission_authorizations where operation_id=$1", [completed.operation])).rows).toEqual([]);
   });
   it("atomically makes the exact constructed packet checked and reviewable, without recording Submit or a personal-act claim", async () => {
     const s = await setup(); await fixture.admin.query("update public.parent_jobs set state='waiting',run_at='infinity' where request_id=$1", [s.request]);
