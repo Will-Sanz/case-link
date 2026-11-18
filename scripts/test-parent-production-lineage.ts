@@ -20,6 +20,11 @@ const encode=(value:unknown)=>JSON.stringify(canonical(value));
 type Inventory=Record<string,Record<string,unknown>[]>;
 export function fingerprint(snapshot:Inventory){return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>{const sorted=(rows??[]).map(canonical).sort((a,b)=>encode(a)<encode(b)?-1:encode(a)>encode(b)?1:0);return[key,{count:sorted.length,sha256:lineageHash(encode(sorted))}];}));}
 export function schoolInventory(snapshot:Inventory):Inventory{return Object.fromEntries(Object.entries(snapshot).map(([key,rows])=>[key,(rows??[]).filter(row=>{const name=String(row.table??row.name??(row.schemaname&&row.tablename?`${row.schemaname}.${row.tablename}`:""));return !/^public\.parent_/.test(name);})]));}
+export function nativeLineageAssertionLocation(error:unknown){
+  if(!(error instanceof Error)||!("code" in error)||error.code!=="ERR_ASSERTION")return "";
+  const line=error.stack?.match(/^\s+at [^\n]*[/\\]parent-production-lineage-cases\.ts:([1-9]\d{0,5}):[1-9]\d{0,5}\)?$/m)?.[1];
+  return line?`; assertion case line ${line}`:"";
+}
 
 /** Only the owned native fixture temporarily uses its existing ADMIN grants; source roles stay restricted. */
 export async function withNativeLineageRoleAccess<T>(db:WorkerDatabase,work:()=>Promise<T>):Promise<T>{
@@ -103,7 +108,7 @@ export async function runNativeParentProductionLineage(args:string[]){
     if(started)try{platform(["stop","--project-id",project,"--no-backup"]);assert.equal(execFileSync("docker",["ps","-aq","--filter",`label=com.supabase.cli.project=${project}`],{encoding:"utf8"}).trim(),"");}catch(error){cleanup.push(error);}
     try{rmSync(directory,{recursive:true,force:true});}catch(error){cleanup.push(error);}
   }
-  if(failure||cleanup.length){const cause=failure&&typeof failure==="object"&&"code" in failure?String(failure.code):"unknown";throw new Error(`Parent lineage rehearsal failed at ${stage}; code ${/^[A-Z0-9_]{1,30}$/.test(cause)?cause:"unknown"}; cleanup failures ${cleanup.length}.`);}
+  if(failure||cleanup.length){const cause=failure&&typeof failure==="object"&&"code" in failure?String(failure.code):"unknown";throw new Error(`Parent lineage rehearsal failed at ${stage}; code ${/^[A-Z0-9_]{1,30}$/.test(cause)?cause:"unknown"}${nativeLineageAssertionLocation(failure)}; cleanup failures ${cleanup.length}.`);}
   mkdirSync("tmp/parent-verification/production-lineage",{recursive:true});writeFileSync("tmp/parent-verification/production-lineage/latest.json",JSON.stringify({...evidence,cleanupPassed:true},null,2)+"\n");return{...evidence,cleanupPassed:true};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))void runNativeParentProductionLineage(process.argv.slice(2)).then(result=>process.stdout.write(JSON.stringify(result,null,2)+"\n")).catch(error=>{process.stderr.write(error instanceof Error?error.message+"\n":"Parent lineage rehearsal failed.\n");process.exitCode=1;});

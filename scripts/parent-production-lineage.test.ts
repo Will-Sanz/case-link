@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { AssertionError } from "node:assert";
 import { createParentSqlFixture } from "./parent-sql-fixture";
 import { lineageHash, executeLineageSql, installObservedProductionSchema, assertObservedProductionSchema, loadProductionLineage, validateProductionLineage, applyPendingProductionSources } from "./parent-production-lineage";
 import { rehearseParentProductionUpgrade } from "./parent-production-lineage-cases";
-import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory, fingerprint, withNativeLineageRoleAccess } from "./test-parent-production-lineage";
+import { assertNativeLineageTarget, runNativeParentProductionLineage, schoolInventory, fingerprint, withNativeLineageRoleAccess, nativeLineageAssertionLocation } from "./test-parent-production-lineage";
 
 const modulePath=process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
 let fixture:Awaited<ReturnType<typeof createParentSqlFixture>>;
@@ -57,6 +58,23 @@ it("uses the existing byte order for historical schema fingerprints, independent
 it("canonicalizes schema row keys with the historical byte order",()=>{
   const row={a:1,A:2,_:3};
   expect(fingerprint({policies:[row]})).toEqual({policies:{count:1,sha256:lineageHash('[{"A":2,"_":3,"a":1}]')}});
+});
+
+it("reports only an allowlisted assertion source line without private messages, values or paths",()=>{
+  const error=new AssertionError({actual:{privateFact:"SyntheticPrivateCanary"},expected:null,operator:"deepEqual"});
+  error.stack="AssertionError: SyntheticPrivateCanary /parent-production-lineage-cases.ts:999:1\n    at rehearseParentProductionUpgrade (/private/SyntheticPrivateCanary/scripts/parent-production-lineage-cases.ts:113:18)";
+  expect(nativeLineageAssertionLocation(error)).toBe("; assertion case line 113");
+  error.stack="AssertionError: /parent-production-lineage-cases.ts:999:1\n    at other (/private/other.ts:7:8)";
+  expect(nativeLineageAssertionLocation(error)).toBe("");
+  const other=new Error("SyntheticPrivateCanary");other.stack="Error\n    at other (/private/parent-production-lineage-cases.ts:113:18)";
+  expect(nativeLineageAssertionLocation(other)).toBe("");expect(nativeLineageAssertionLocation({code:"ERR_ASSERTION",stack:other.stack})).toBe("");
+});
+
+it("locates an actual shared-rehearsal assertion in the runtime source-mapped stack",async()=>{
+  const db={query:vi.fn(async()=>({rows:[{value:null}]}))};
+  try{await rehearseParentProductionUpgrade(db,{embedded:false});expect.fail("The absent synthetic Vault must fail before fixture writes");}
+  catch(error){expect(error).toMatchObject({code:"ERR_ASSERTION"});expect(nativeLineageAssertionLocation(error)).toMatch(/^; assertion case line [1-9]\d*$/);}
+  expect(db.query).toHaveBeenCalledTimes(1);
 });
 
 it.skipIf(!modulePath).each(["success","failed work","missing ADMIN"])("restores exact native fixture memberships after %s",async mode=>{
