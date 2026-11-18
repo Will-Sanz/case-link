@@ -17,6 +17,7 @@ import { parentApi, displayDate, ParentApiError } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { SnapReviewPdf } from "./snap-review-pdf";
 import styles from "./parent.module.css";
+import wicStyles from "./wic.module.css";
 import { usePermissionWindow } from "./use-permission-window";
 import { hasTypedFoodAccessPath } from "@/lib/parent/food-access";
 import { currentIntakeFields } from "@/lib/parent/current-intake-fields";
@@ -150,7 +151,9 @@ export function SupportActivity({
   onChange: () => void;
   history: OperationHistory;
 }) {
-  const { t, locale } = useParentLocale();
+  const { t: parentText, locale } = useParentLocale();
+  const wicOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need.startsWith("wic_"));
+  const t = (text: string) => wicOnly ? parentText(text) : text;
   const { data, error, reload } = history;
   const typedFood = hasTypedFoodAccessPath(request,currentIntakeFields(request,new Date(),"food_now").zip);
   const reportableNeeds = request.intake.needs.filter(need => need !== "food_now" || !typedFood);
@@ -190,12 +193,9 @@ export function SupportActivity({
   return (
     <>
       {!!data?.operations?.length && (
-        <section className={styles.surface}>
-          <h2>Recorded packets & receipts</h2>
-          <p className={styles.hint}>
-            Each download keeps the exact information and evidence recorded for
-            that attempt.
-          </p>
+        <section lang={wicOnly ? locale : "en"} className={`${styles.surface} ${wicOnly ? wicStyles.activity : ""}`}>
+          <h2>{t("Recorded packets & receipts")}</h2>
+          <p className={styles.hint}>{t("Each download keeps the exact information and evidence recorded for that attempt.")}</p>
           <ul className={styles.packetList}>
             {data.operations.map((operation) => (
               <li key={operation.id}>
@@ -203,32 +203,31 @@ export function SupportActivity({
                   {getProgram(operation.program_id)?.name ?? "Named program"}
                 </strong>
                 <p className={styles.hint}>
-                  {operation.state === "prepared" && protectedRecordedSnapPacket(operation)
+                  {t(operation.state === "prepared" && protectedRecordedSnapPacket(operation)
                     ? "SNAP application prepared · not submitted"
                     : operation.state === "prepared" && protectedRecordedUtilityPacket(operation)
                     ? protectedRecordedUtilityPacket(operation)!.sourceKind === "local_test_issued_form" ? "LOCAL TEST water draft · not submitted" : "Unsigned utility draft · not submitted"
                     : operation.state === "prepared" && operation.form?.preparation_only
                     ? "Incomplete unsigned draft · not submitted"
                     : OUTCOME_LABELS[operation.state as OutcomeState] ??
-                      "Needs verification"}{" "}
-                  · {displayDate(operation.created_at)}
+                      "Needs verification")}{" "}{t("·")}{" "}{displayDate(operation.created_at, false, wicOnly ? locale : "en")}
                 </p>
                 <a
                   className={styles.textLink}
-                  lang={operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
+                  lang={operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
                   href={`/api/parent/requests/${request.id}/operations/${operation.id}/export`}
                 >
-                  {operation.need === "snap_new" && operation.program_id === "snap-pa" ? t("Download recorded information") : "Download recorded information"}
+                  {operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? parentText("Download recorded information") : "Download recorded information"}
                 </a>
                 <UtilityDraftDownload request={request} operation={operation}/>
                 {operation.artifact_id && (
                   <p className={styles.space}>
                     <a
                       className={styles.textLink}
-                      lang={operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
+                      lang={operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
                       href={`/api/parent/requests/${request.id}/forms/${operation.artifact_id}`}
                     >
-                      {operation.need === "snap_new" && operation.program_id === "snap-pa" ? t(operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form") : operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form"}
+                      {operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? parentText(operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form") : operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form"}
                     </a>
                   </p>
                 )}
@@ -236,71 +235,54 @@ export function SupportActivity({
             ))}
           </ul>
           {data.historyLimited && (
-            <p className={`${styles.hint} ${styles.space}`}>
-              Showing the latest 100 recorded operations. Earlier submissions or
-              uncertain deliveries may not appear here.{" "}
-              <a className={styles.textLink} href="/api/parent/account/export">
-                Download your retained information
-              </a>{" "}
-              to review earlier history before starting another application.
-            </p>
+            <p className={`${styles.hint} ${styles.space}`}>{t("Showing the latest 100 recorded operations. Earlier submissions or uncertain deliveries may not appear here.")}{" "}
+              <a className={styles.textLink} href="/api/parent/account/export">{t("Download your retained information")}</a>{" "}{t("to review earlier history before starting another application.")}</p>
           )}
         </section>
       )}
       {error && (
         <div className={styles.notice}>
-          <p>Recorded packet history could not be loaded.</p>
-          <button className={styles.quiet} onClick={reload}>
-            Try packet history again
-          </button>
+          <p>{t("Recorded packet history could not be loaded.")}</p>
+          <button className={styles.quiet} onClick={reload}>{t("Try packet history again")}</button>
         </div>
       )}
-      {reportableNeeds.length > 0 && <details className={styles.disclosure}>
-        <summary>Tell us about an outcome</summary>
+      {reportableNeeds.length > 0 && <details lang={wicOnly ? locale : "en"} className={`${styles.disclosure} ${wicOnly ? wicStyles.activity : ""}`}>
+        <summary>{t("Tell us about an outcome")}</summary>
         <div>
-          <p className={styles.hint}>
-            Record help you received or a program response. Never include an
-            account number, government ID, password or sign-in code.
-          </p>
+          <p className={styles.hint}>{t("Record help you received or a program response. Never include an account number, government ID, password or sign-in code.")}</p>
           <form className={`${styles.form} ${styles.space}`} onSubmit={report}>
             <div className={styles.field}>
-              <label htmlFor="report-need">Which support?</label>
+              <label htmlFor="report-need">{t("Which support?")}</label>
               <select
                 id="report-need"
                 className={styles.select}
                 value={reportNeed ?? ""}
                 onChange={(e) => setNeed(e.target.value as typeof need)}
               >
-                {!reportNeed && <option value="">Choose support</option>}
+                {!reportNeed && <option value="">{t("Choose support")}</option>}
                 {reportableNeeds.map((n) => (
                   <option key={n} value={n}>
-                    {NEED_LABELS[n]}
+                    {t(NEED_LABELS[n])}
                   </option>
                 ))}
               </select>
             </div>
             <div className={styles.field}>
-              <label htmlFor="report-outcome">What happened?</label>
+              <label htmlFor="report-outcome">{t("What happened?")}</label>
               <select
                 id="report-outcome"
                 className={styles.select}
                 value={outcome}
                 onChange={(e) => setOutcome(e.target.value)}
               >
-                <option value="support_received">I received support</option>
-                <option value="assistance_approved">
-                  The program told me assistance was approved
-                </option>
-                <option value="declined">
-                  The program declined assistance
-                </option>
-                <option value="unresolved">I still need help</option>
+                <option value="support_received">{t("I received support")}</option>
+                <option value="assistance_approved">{t("The program told me assistance was approved")}</option>
+                <option value="declined">{t("The program declined assistance")}</option>
+                <option value="unresolved">{t("I still need help")}</option>
               </select>
             </div>
             <div className={styles.field}>
-              <label htmlFor="report-reference">
-                What did you receive or hear, and when?
-              </label>
+              <label htmlFor="report-reference">{t("What did you receive or hear, and when?")}</label>
               <textarea
                 id="report-reference"
                 className={styles.input}
@@ -311,16 +293,16 @@ export function SupportActivity({
               />
             </div>
             <button type="submit" className={styles.button} disabled={pending || !reportNeed}>
-              {pending ? "Saving…" : "Save my report"}
+              {t(pending ? "Saving…" : "Save my report")}
             </button>
             {message && (
               <p role="status" className={styles.success}>
-                {message}
+                {t(message)}
               </p>
             )}
             {reportError && (
-              <p role="alert" className={styles.error}>
-                {reportError}
+              <p role="alert" lang={t(reportError) === reportError ? "en" : locale} className={styles.error}>
+                {t(reportError)}
               </p>
             )}
           </form>

@@ -1,3 +1,4 @@
+import { spanishWic } from "./wic-locale";
 import { SNAP_SPANISH_COPY } from "./snap-copy";
 export type ParentLocale = "en" | "es";
 export const PARENT_LOCALE_COOKIE = "caselink-parent-ui-locale";
@@ -20,6 +21,7 @@ export function parentText(locale: ParentLocale, english: string): string {
 
 // shortcut: Translate remaining family surfaces before advertising a full Spanish journey.
 const spanish = {
+  ...spanishWic,
   "City listings for {zip} · checked {date}. This is a directory check, not confirmation from a location.": "Lugares de la lista municipal para {zip} · consulta realizada el {date}. Es una consulta del directorio, no una confirmación del lugar.",
   "Location names and notes appear as published by the source.": "Los nombres y las notas de los lugares aparecen tal como los publicó la fuente.",
   "Call {phone}": "Llamar al {phone}",

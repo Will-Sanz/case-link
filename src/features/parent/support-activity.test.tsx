@@ -204,3 +204,16 @@ describe("inline prepared SNAP draft review", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
+
+it("records a Spanish WIC family report without turning it into provider confirmation", async () => {
+  const fetcher = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true }) });
+  vi.stubGlobal("fetch", fetcher);
+  const request = fixtureRequest(); request.intake.needs = ["wic_new"]; request.mandate.recipientIds = ["wic-pa"];
+  render(<ParentLocaleProvider initialLocale="es"><SupportActivity request={request} onChange={vi.fn()} history={{ data: { operations: [], historyLimited: false }, loading: false, error: null, reload: vi.fn() }}/></ParentLocaleProvider>);
+  fireEvent.click(screen.getByText("Cuéntenos qué ocurrió"));
+  fireEvent.change(screen.getByLabelText("¿Qué ocurrió?"), { target: { value: "unresolved" } });
+  fireEvent.change(screen.getByLabelText("¿Qué recibió o qué le dijeron, y cuándo?"), { target: { value: "El 6 de noviembre pedí que me llamaran; aún no hay cita." } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Guardar mi informe" })); });
+  expect(screen.getByRole("status").textContent).toContain("No sustituye el comprobante ni la decisión registrados por un programa");
+  expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toEqual({ need: "wic_new", outcome: "unresolved", reference: "El 6 de noviembre pedí que me llamaran; aún no hay cita." });
+});

@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WicApplicationFormFields, WicApplicationNotice } from "./wic-application-form";
 import type { WicApplicationFields } from "@/lib/parent/wic-application-fields";
+
+import { ParentLocaleProvider } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
 
 afterEach(cleanup);
 function Form({ initial = {} }: { initial?: WicApplicationFields }) {
@@ -61,4 +64,16 @@ describe("WIC grouped private fields", () => {
     for (const control of within(screen.getByRole("group", { name: "WIC pre-application answers" })).getAllByRole("textbox")) expect(control.matches(":disabled")).toBe(true);
     expect(screen.getByRole("button", { name: "Add a child" }).matches(":disabled")).toBe(true);
   });
+});
+
+
+it("presents Spanish private WIC controls while preserving accented names and exact dates", () => {
+  render(<ParentLocaleProvider initialLocale="es"><Form initial={{ beneficiaries: "mother", mother: { status: "pregnant" } }}/></ParentLocaleProvider>);
+  const notice = screen.getByRole("region", { name: "Aviso sobre la información privada de WIC" });
+  expect(notice.getAttribute("lang")).toBe("es");
+  fireEvent.change(screen.getByLabelText("Nombre de la persona de contacto"), { target: { value: "María José" } });
+  fireEvent.change(screen.getByLabelText("Fecha de nacimiento de la persona de contacto"), { target: { value: "1992-04-06" } });
+  fireEvent.change(screen.getByLabelText("Fecha prevista del parto"), { target: { value: "2027-04-06" } });
+  expect(JSON.parse(screen.getByTestId("saved-value").textContent!)).toMatchObject({ contact: { firstName: "María José", dateOfBirth: "1992-04-06" }, mother: { expectedDeliveryDate: "2027-04-06" } });
+  expect(screen.getByRole("link", { name: "ayuda oficial de WIC" }).getAttribute("href")).toContain("pre-application");
 });

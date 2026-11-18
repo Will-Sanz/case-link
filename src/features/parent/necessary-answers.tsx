@@ -153,7 +153,7 @@ export function NecessaryAnswers({ request, onChange }: { request: SupportReques
   if (bundle.requestId !== request.id || (!bundle.questions.length && !message)) return null;
   const changed = conflict || request.version > bundle.version;
   return (
-    <form className={styles.form} aria-label="Household questions" onSubmit={submit}>
+    <form lang="en" className={styles.form} aria-label="Household questions" onSubmit={submit}>
       {bundle.questions.length > 0 && <p className={styles.hint}>
         Save the answers you know together. Leave a question blank if you’re not sure yet; that step stays open.
       </p>}

@@ -47,6 +47,7 @@ import { ApplicationWorkspace, isPrivateUtilityPreparationRequest, supportTitle 
 import workspace from "./application-workspace.module.css";
 import { UrgentHelp } from "./landing";
 import styles from "./parent.module.css";
+import wicStyles from "./wic.module.css";
 
 function officialLink(value?: string): string | null {
   return value && PROGRAMS.some((program) => program.officialUrl === value)
@@ -74,7 +75,9 @@ function RequiredStep({
   onReviewPermission: () => void;
   onSnapDetails: () => void;
 }) {
-  const { t, locale } = useParentLocale();
+  const { t: parentText, locale } = useParentLocale();
+  const localized = action.need.startsWith("wic_") || action.need.startsWith("snap_");
+  const t = (text: string) => localized ? parentText(text) : text;
   const snapDetails = action.need === "snap_new" && request.intake.needs.includes("snap_new") &&
     action.reason === "missing_fact" && action.field === "snap_application_details";
   const snapSubmit = action.need === "snap_new" && request.intake.needs.includes("snap_new") && action.reason === "submission_review" && action.field === "snap_final_submit";
@@ -85,16 +88,16 @@ function RequiredStep({
     action.field === "bookingPreference";
   return (
     <section
-      className={styles.actionBox}
+      className={`${styles.actionBox} ${action.need.startsWith("wic_") ? wicStyles.personalStep : ""}`}
       aria-labelledby={snapSubmit ? `step-${action.id}` : `context-${action.id} step-${action.id}`}
     >
       {!snapSubmit && <p id={`context-${action.id}`} className={styles.small}>
-        <strong>{NEED_LABELS[action.need]}</strong>
+        <strong lang={t(NEED_LABELS[action.need]) === NEED_LABELS[action.need] ? "en" : locale}>{t(NEED_LABELS[action.need])}</strong>
       </p>}
-      <h2 id={`step-${action.id}`} tabIndex={-1}>
+      <h2 lang="" id={`step-${action.id}`} tabIndex={-1}>
         {action.title}
       </h2>
-      <p>{action.explanation}</p>
+      <p lang="">{action.explanation}</p>
       {snapSubmit ? <a lang={locale} className={styles.button} href="#snap-final-review">{t("Review application and Submit")}</a> : snapDetails ? <a lang={locale} className={styles.button} href="#application-answers" onClick={onSnapDetails}>{t("Answer SNAP application questions")}</a> : canAnswer ? (
         <NecessaryAnswer
           action={action}
@@ -102,35 +105,34 @@ function RequiredStep({
           onChange={onChange}
         />
       ) : (
-        <div className={styles.space}>
+        <div lang={localized ? locale : "en"} className={styles.space}>
           {action.reason === "expanded_permission" && (
             <>
               <p className={styles.small}>
-                Choose the named programs and information for this step. We’ll
-                resume only the work you authorize.
+                {t("Choose the named programs and information for this step. We’ll resume only the work you authorize.")}
               </p>
               <a
                 className={`${styles.button} ${styles.space}`}
                 href="#application-controls"
                 onClick={onReviewPermission}
               >
-                Review permission
+                {t("Review permission")}
               </a>
             </>
           )}
           {url && (
             <a className={styles.secondary} href={url}>
-              Open the official program{" "}
+              {t("Open the official program")}{" "}
               <ArrowRight width={17} height={17} aria-hidden="true" />
             </a>
           )}
           <p className={`${styles.small} ${styles.space}`}>
-            {action.reason === "personal_step"
+            {t(action.reason === "personal_step"
               ? "Complete required personal steps directly with the program. Opening a link does not confirm completion; the program must record the required evidence."
-              : "This step needs confirmed information or qualified help. We won’t mark it complete without evidence."}
+              : "This step needs confirmed information or qualified help. We won’t mark it complete without evidence.")}
           </p>
           <Link className={styles.textLink} href="/support/help">
-            See help and direct program contacts
+            {t("See help and direct program contacts")}
           </Link>
         </div>
       )}
@@ -379,6 +381,7 @@ function CorrectDetails({
 }
 
 export function SupportDetail({ requestId }: { requestId: string }) {
+  const { t, locale } = useParentLocale();
   const { data, error, loading, reload, reloadIfIdle } = useParentResource<{
     request: SupportRequest;
     progress?: SupportProgress;
@@ -472,6 +475,8 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         />
       </div>
     );
+  const wicOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need.startsWith("wic_"));
+  const wt = (text: string) => wicOnly ? t(text) : text;
   const inactive = ["cancelled", "closed"].includes(request.status);
   const acceptingActions = request.status === "active";
   const foodRoute = request.plan?.routes.find(route => route.need === "food_now" && route.foodAccess);
@@ -527,7 +532,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         <ArrowLeft width={17} height={17} aria-hidden="true" />
         <span className={workspace.caseBackLabel}>My support</span>
       </Link>
-      <h1>{supportTitle(request)}</h1>
+      <h1 lang={t(supportTitle(request)) === supportTitle(request) ? "en" : locale}>{t(supportTitle(request))}</h1>
         {outdatedParentWait ? <span className={styles.badge}>{submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded"}</span> : data?.progress && !error ? (
           <ProgressBadge progress={data.progress} />
         ) : (
@@ -579,21 +584,22 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         )}
         <section
           id="your-next-steps"
+          lang={wicOnly ? locale : "en"}
           className={workspace.section}
           tabIndex={-1}
           aria-labelledby="your-steps-heading"
         >
           <h2 id="your-steps-heading" className={workspace.sectionHeading}>
-            Your next steps
+            {wt("Your next steps")}
           </h2>
           {acceptingActions && actions.length > 0 && (
             <p className={styles.subtle}>
-              These are the saved household steps for this request. Open the official website section for any website verification.
+              {wt("These are the saved household steps for this request. Open the official website section for any website verification.")}
             </p>
           )}
           {(!actions.length || !acceptingActions) && (
             <p className={styles.subtle}>
-              {!acceptingActions
+              {wt(!acceptingActions
                 ? "No new personal steps are requested while this request is paused or finished."
                 : reviewFinished && !submittedNeeds.includes("snap_new")
                   ? attemptRecorded
@@ -601,7 +607,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                     : "Your Submit decision is saved. CaseLink owns the delivery check; you do not need to repeat the review."
                 : submittedNeeds.length === request.intake.needs.length
                   ? "Use the recorded submission and any official notices above for your next step. No household update is currently requested."
-                : "No household updates are requested in this section. Check the official website and overview sections for any website verification or other next step."}
+                : "No household updates are requested in this section. Check the official website and overview sections for any website verification or other next step.")}
             </p>
           )}
           {acceptingActions && (
@@ -620,18 +626,17 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             ))}
           {!inactive && serviceActions.length > 0 && (
             <details className={styles.disclosure}>
-              <summary>A CaseLink service step is unresolved</summary>
+              <summary>{wt("A CaseLink service step is unresolved")}</summary>
               <div>
                 <p className={`${styles.subtle} ${styles.small}`}>
-                  These steps belong to CaseLink or the program. You don’t need
-                  to resolve a service connection or repeat your information.
+                  {wt("These steps belong to CaseLink or the program. You don’t need to resolve a service connection or repeat your information.")}
                 </p>
                 <ul className={`${styles.list} ${styles.space}`}>
                   {serviceActions.map((action) => (
                     <li key={action.id}>
-                      <strong>{action.title}</strong>
+                      <strong lang="">{action.title}</strong>
                       <p className={`${styles.hint} ${styles.space}`}>
-                        {action.explanation}
+                        <span lang="">{action.explanation}</span>
                       </p>
                     </li>
                   ))}
@@ -760,20 +765,20 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         </section>
         <section
           id="application-receipts"
-          className={`${styles.surface} ${workspace.section}`}
+          lang={wicOnly ? locale : "en"}
+          className={`${styles.surface} ${workspace.section} ${wicOnly ? wicStyles.receipts : ""}`}
           tabIndex={-1}
         >
-          <h2>Activity & receipts</h2>
+          <h2>{wt("Activity & receipts")}</h2>
           <p className={`${styles.subtle} ${styles.small}`}>
-            Prepared, sent, received, approved and support actually received are
-            different steps. We show only recorded evidence.
+            {wt("Prepared, sent, received, approved and support actually received are different steps. We show only recorded evidence.")}
           </p>
           {request.events?.length ? (
             <ol className={`${styles.timeline} ${styles.space}`}>
               {request.events.map((event) => (
                 <li key={event.id}>
                   <div>
-                    <strong>{event.summary}</strong>
+                    <strong lang="">{event.summary}</strong>
                     {event.kind === "parent.outcome_reported" &&
                       event.actor === "parent" && (
                         <>
@@ -783,33 +788,33 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                               event.evidence.outcome,
                             ) && (
                               <p>
-                                Reported outcome:{" "}
-                                {
+                                {wt("Reported outcome:")}{" "}
+                                {wt(
                                   OUTCOME_LABELS[
                                     event.evidence
                                       .outcome as keyof typeof OUTCOME_LABELS
                                   ]
-                                }
+                                )}
                               </p>
                             )}
                           {typeof event.evidence?.reference === "string" && (
-                            <p>{event.evidence.reference}</p>
+                            <p lang="">{event.evidence.reference}</p>
                           )}
                           {event.evidence?.foodAccessReport && <FoodAccessReportSummary report={event.evidence.foodAccessReport} requestId={request.id} />}
                         </>
                       )}
                     <p>
-                      {event.actor === "parent"
-                        ? "Parent reported"
+                      {wt(event.actor === "parent"
+                        ? wicOnly ? "Reported by parent" : "Parent reported"
                         : event.actor === "operator"
                           ? "Operator confirmed"
                           : event.actor === "agency" ||
                               event.actor === "partner"
                             ? "Program update"
-                            : "CaseLink activity"}
+                            : "CaseLink activity")}
                     </p>
                     <time dateTime={event.created_at}>
-                      {displayDate(event.created_at, true)}
+                      {displayDate(event.created_at, true, wicOnly ? locale : "en")}
                     </time>
                   </div>
                 </li>
@@ -817,8 +822,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             </ol>
           ) : (
             <p className={`${styles.hint} ${styles.space}`}>
-              No additional activity recorded yet. We won’t mark a request sent
-              or received without evidence.
+              {wt("No additional activity recorded yet. We won’t mark a request sent or received without evidence.")}
             </p>
           )}
           {request.events_truncated && (
@@ -835,11 +839,10 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             href={`/api/parent/requests/${requestId}/export`}
           >
             <Download width={18} height={18} aria-hidden="true" />
-            Download current summary
+            {wt("Download current summary")}
           </a>
           <p className={`${styles.hint} ${styles.space}`}>
-            Your download reflects the recorded state. Submitted packet versions
-            and receipts are preserved when a permitted channel produces them.
+            {wt("Your download reflects the recorded state. Submitted packet versions and receipts are preserved when a permitted channel produces them.")}
           </p>
           <SupportActivity
             request={request}
@@ -852,10 +855,10 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           className={workspace.section}
           tabIndex={-1}
         >
-          {request.intake.needs.some(need => need.startsWith("wic_")) && <p className={styles.notice}>
-            {request.intake.needs.every(need => need.startsWith("wic_"))
+          {request.intake.needs.some(need => need.startsWith("wic_")) && <p lang={locale} className={`${styles.notice} ${wicStyles.notice}`}>
+            {t(request.intake.needs.every(need => need.startsWith("wic_"))
               ? "Private WIC document intake is not connected. Existing document history remains available; do not upload WIC health or family documents through this route. Use official WIC help for required documents."
-              : "This document route covers only the verified other support needs in this request. WIC private or health documents are not accepted here; use official WIC help for those documents."}
+              : "This document route covers only the verified other support needs in this request. WIC private or health documents are not accepted here; use official WIC help for those documents.")}
           </p>}
           {isPrivateUtilityPreparationRequest(request) && <div className={styles.notice}><div>
             <p>Utility application documents and required identifiers use a separate protected step. Read its processing notice before adding anything. CaseLink checks and prepares permitted information automatically; saved documents do not confirm agency acceptance or stop a shutoff.</p>

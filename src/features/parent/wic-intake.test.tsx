@@ -6,6 +6,7 @@ import { WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from 
 import { fixtureIntake } from "@/lib/parent/test-fixtures";
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
+import { ParentLocaleProvider } from "./parent-locale";
 const now = new Date("2026-11-13T20:00:00Z");
 const requestId = "11111111-1111-4111-8111-111111111111";
 const reply = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
@@ -43,6 +44,7 @@ describe("gated WIC family intake", () => {
     await permission();
     expect(screen.getByRole("checkbox", { name: /I authorize/ }).closest("label")?.textContent).toContain(WIC_SUBJECT_AUTHORITY_STATEMENT);
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(screen.getByText(/Limited to the 1 named program\./)).toBeTruthy();
     expect(screen.getByText(/is the named program for your prepared WIC answers/).textContent).toContain("Pennsylvania WIC");
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith(`/support/${requestId}`));
@@ -91,4 +93,31 @@ describe("gated WIC family intake", () => {
     expect(buildMandate(fixtureIntake({ needs: ["wic_new", "electricity"] }), ["wic-pa", "peco-cap"], "prepare_only", "ask_me", "2026-11-14T20:00:00Z").allowedData).toContain("documents");
     expect(buildMandate(fixtureIntake({ needs: ["electricity"] }), ["peco-cap"], "prepare_only", "ask_me", "2026-11-14T20:00:00Z").allowedData).toContain("income");
   });
+});
+
+
+it("takes a Spanish WIC draft through its named permission and exact unknown-start retry", async () => {
+  let count = 0; const fetcher = api(() => ++count === 1 ? reply({ ok: false, error: "This support request is unavailable, or its permission has changed." }, 403) : reply({ request: { id: requestId } }));
+  render(<ParentLocaleProvider initialLocale="es"><ParentIntake initialNeed="wic_new"/></ParentLocaleProvider>);
+  fireEvent.change(await screen.findByLabelText("Nombre de la persona de contacto"), { target: { value: "María José" } });
+  fireEvent.change(screen.getByLabelText("Código postal del hogar"), { target: { value: "19104" } });
+  fireEvent.click(screen.getByLabelText(/Tengo 18 años o más/));
+  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+  await screen.findByText(/es el programa específico para sus respuestas preparadas de WIC/);
+  expect(screen.getByText(/Programas elegidos: 1\./)).toBeTruthy();
+  fireEvent.click(screen.getByRole("checkbox", { name: /^Autorizo/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Comenzar a recibir apoyo" }));
+  await screen.findByText(/El resultado del guardado no está confirmado/);
+  fireEvent.click(screen.getByRole("button", { name: "Reintentar la misma solicitud de WIC" }));
+  await waitFor(() => expect(navigation.push).toHaveBeenCalledWith(`/support/${requestId}`));
+  const posts = fetcher.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(posts).toHaveLength(2); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers); expect(posts[1][1]?.body).toBe(posts[0][1]?.body);
+  expect(JSON.parse(String(posts[0][1]?.body))).toMatchObject({ kind: "wic_application", subjectAuthorityDeclared: true, details: { contact: { firstName: "María José" } }, mandate: { recipientIds: ["wic-pa"] } });
+});
+
+it("keeps an empty generic intake outside the WIC language and layout scope", async () => {
+  api();
+  render(<ParentLocaleProvider initialLocale="es"><ParentIntake/></ParentLocaleProvider>);
+  const heading = await screen.findByRole("heading", { name: "Let’s make the next steps easier." });
+  expect(heading.closest("[lang]")?.getAttribute("lang")).toBe("en");
 });

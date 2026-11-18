@@ -7,6 +7,8 @@ import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test
 import { WIC_APPLICATION_SOURCE, wicApplicationLeaves } from "@/lib/parent/wic-application-fields";
 import { FAMILY_PROFILE_NOTICE_VERSION } from "@/lib/parent/family-profile";
 import { WIC_APPLICATION_NOTICE_VERSION, WIC_SUBJECT_AUTHORITY_STATEMENT } from "@/lib/parent/constants";
+import { ParentLocaleProvider, ParentLanguageSelector } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
 const now = new Date("2026-11-13T20:00:00Z"), snapshotId = "22222222-2222-4222-8222-222222222222";
 const childId = "33333333-3333-4333-8333-333333333333", actorId = "44444444-4444-4444-8444-444444444444";
 const savedDetails = { applicationType: "new", beneficiaries: "children", contact: { firstName: "SavedCanary", lastName: "Example", zip: "19147" }, children: [{ id: childId, firstName: "ChildCanary" }] };
@@ -88,6 +90,19 @@ describe("owned WIC saved answers", () => {
     expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
     expect(JSON.parse(String(posts[0][1]?.body)).confirmedPaths).toEqual(["contact.firstName", `children.${childId}.firstName`]);
     expect(JSON.parse(String(posts[0][1]?.body)).familyProfileSource).toBeUndefined();
+  });
+  it("uses Spanish labels for individual unchanged-answer declarations without renewing siblings", async () => {
+    const fetcher = clearedFamily();
+    render(<ParentLocaleProvider initialLocale="es"><WicSavedApplication request={support()}/></ParentLocaleProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir respuestas de WIC" }));
+    const selected = await screen.findByRole("checkbox", { name: /^Sigue siendo correcto para esta solicitud de WIC hoy: Contacto nombre/ });
+    expect((selected as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(selected);
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios de WIC" }));
+    await screen.findByText(/Sus respuestas privadas de WIC se guardaron como una nueva versión/);
+    const body = JSON.parse(String(fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1]!.body));
+    expect(body.confirmedPaths).toEqual(["contact.firstName"]); expect(body.familyProfileSource).toBeUndefined();
+    expect(body.details).toEqual(savedDetails); expect(body.noticeVersion).toBe(WIC_APPLICATION_NOTICE_VERSION);
   });
   it("removes a selected declaration when its answer changes or its child is removed", async () => {
     const fetcher = clearedFamily(); render(<WicSavedApplication request={support()}/>); await edit();
@@ -249,4 +264,22 @@ describe("owned WIC saved answers", () => {
     const result = await axe.run(container, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] }, rules: { "color-contrast": { enabled: false } } });
     expect(result.violations.map(finding => finding.id)).toEqual([]);
   });
+});
+
+
+it.each([false, true])("keeps Spanish WIC lost-reply recovery exact when switching screen language: %s", async switchLanguage => {
+  let first = true;
+  const fetcher = api(() => { if (first) { first = false; throw new Error("synthetic lost acknowledgement"); } return response({ snapshotId }); });
+  render(<ParentLocaleProvider initialLocale="es"><ParentLanguageSelector/><WicSavedApplication request={support()}/></ParentLocaleProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: "Corregir respuestas de WIC" }));
+  fireEvent.change(await screen.findByLabelText("Nombre de la persona de contacto"), { target: { value: "María" } });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios de WIC" }));
+  await screen.findByRole("button", { name: "Reintentar el mismo guardado de WIC" });
+  if (switchLanguage) fireEvent.change(screen.getByLabelText(/Idioma de pantalla/), { target: { value: "en" } });
+  fireEvent.click(screen.getByRole("button", { name: switchLanguage ? "Retry the same WIC save" : "Reintentar el mismo guardado de WIC" }));
+  await screen.findByText(switchLanguage ? /Your private WIC answers are saved as a new revision/ : /Sus respuestas privadas de WIC se guardaron como una nueva versión/);
+  const posts = fetcher.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
+  expect(JSON.parse(String(posts[0][1]?.body))).toMatchObject({ expectedVersion: 2, noticeVersion: WIC_APPLICATION_NOTICE_VERSION, subjectAuthorityDeclared: true, details: { contact: { firstName: "María" } } });
+  expect(screen.getByRole("region", { name: switchLanguage ? "Your private WIC answers" : "Sus respuestas privadas de WIC" }).getAttribute("lang")).toBe(switchLanguage ? "en" : "es");
 });

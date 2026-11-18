@@ -10,6 +10,7 @@ describe("parent interface locale without service facts", () => {
     expect(parentText("en", "Sign in")).toBe("Sign in");
     expect(parentText("es", "Sign in")).toBe("Iniciar sesión");
     expect(parentText("es", "Terms of service")).toBe("Términos del servicio");
+    expect(parentText("es", "Application submitted")).toBe("Solicitud presentada");
   });
   it.each(["__proto__", "constructor", "toString", "hasOwnProperty", "Original recorded evidence"])("preserves unknown recorded text as text: %s", value => {
     expect(parentText("es", value)).toBe(value);

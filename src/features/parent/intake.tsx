@@ -48,6 +48,7 @@ import { PgwApplicationNotice, PgwApplicationFormFields, PGW_HELP_URL } from "./
 import { WaterApplicationNotice, WaterApplicationFormFields, WATER_HELP_URL } from "./water-application-form";
 import { usePermissionWindow } from "./use-permission-window";
 import styles from "./parent.module.css";
+import wicStyles from "./wic.module.css";
 
 const foodNeeds: SupportNeed[] = [
   "food_now",
@@ -317,7 +318,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const directSnap = initialNeed === "snap_new" && step > 0 && snapSelected && intake.needs.length === 1;
   const fullSnap = snapSelected && canCollectSnapApplication(authorization.data) && !authorization.error && !collectionBlocked;
   const wicOnly = intake.needs.length === 1 && intake.needs[0] === "wic_new";
-  const wicNeedsOnly = intake.needs.every(need => need === "wic_new" || need === "wic_continuing");
+  const wicNeedsOnly = intake.needs.length > 0 && intake.needs.every(need => need === "wic_new" || need === "wic_continuing");
   const wicWindowCurrent = usePermissionWindow(Date.parse(authorization.data?.authorization?.wicApplication?.expiresAt ?? ""));
   const fullWic = wicOnly && wicWindowCurrent && canCollectWicApplication(authorization.data) && !authorization.error && !wicBlocked;
   const selectedUtilities = intake.needs.filter(need => utilityNeeds.includes(need));
@@ -904,10 +905,11 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);
     }
   }
-  const st = (copy: string) => snapSelected ? t(copy) : copy;
+  const localizedIntake = snapSelected || wicNeedsOnly;
+  const st = (copy: string) => localizedIntake ? t(copy) : copy;
   return (
-    <div className={`${styles.container} ${snapSelected ? styles.snapIntake : ""}`}>
-      <div lang={snapSelected ? locale : "en"} className={styles.pageTop}>
+    <div className={`${styles.container} ${snapSelected ? styles.snapIntake : ""} ${wicNeedsOnly ? wicStyles.intake : ""}`}>
+      <div lang={localizedIntake ? locale : "en"} className={styles.pageTop}>
         <div>
           <h1>{st(directSnap ? "Apply for SNAP" : "Let’s make the next steps easier.")}</h1>
           <p>
@@ -918,7 +920,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
         {st("You can")}{" "}<a className={styles.textLink} href={SNAP_NEW_APPLICATION_URL} target="_blank" rel="noreferrer">{st("apply directly with Pennsylvania SNAP")}</a> {st("at any time, including before completing these questions. The official application opens in a new tab.")}{" "}</p>}
       {session.loading ? (
         <ParentLoading label="Checking secure access" />
-      ) : familyAccess === "changed" ? <section lang={snapSelected ? locale : "en"} className={styles.surface}><h2>{st("Your sign-in changed")}</h2><p>{st("This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.")}</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>{st("Start a fresh request")}</a></section>
+      ) : familyAccess === "changed" ? <section lang={localizedIntake ? locale : "en"} className={styles.surface}><h2>{st("Your sign-in changed")}</h2><p>{st("This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.")}</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>{st("Start a fresh request")}</a></section>
       : handoff && (guideSignIn || session.error instanceof ParentApiError && [401, 403].includes(session.error.status)) ? <ParentSignIn {...signInOptions} onSignedIn={async () => {
         const controller = work.current;
         if (!controller || controller.signal.aborted) throw new Error("The request changed. Return to the food questions before continuing.");
@@ -934,7 +936,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       ) : (
         <>
           {familyAccess === "checking" && <ParentLoading label="Checking secure access"/>}
-          {familyAccess === "unavailable" && <section lang={snapSelected ? locale : "en"} className={styles.surface}><h2>{st("We could not recheck your saved family information")}</h2><p>{st("Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.")}</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>{st("Recheck secure access")}</button></section>}
+          {familyAccess === "unavailable" && <section lang={localizedIntake ? locale : "en"} className={styles.surface}><h2>{st("We could not recheck your saved family information")}</h2><p>{st("Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.")}</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>{st("Recheck secure access")}</button></section>}
           <div hidden={familyAccess !== "ready"}>
           {handoff && step === 1 && <fieldset className={styles.fieldset} disabled={pending || startUncertain}>
             <legend className={styles.legend}>{st("When should CaseLink prioritize this request?")}</legend>
@@ -944,7 +946,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
             </select>
           </fieldset>}
           {handoff && step === 2 && guideCheck && <p className={styles.hint}>{st("Food options checked for this account.")}{" "}{st(guideCheck.candidates.some(candidate => candidate.programs.some(program => program.actions.some(action => supportsInitialServiceDelivery(candidate.need, action)))) ? "Any connected action still needs the exact permission below and a current service check." : "No connected sending or booking action was confirmed for these options. The permission below describes preparation; official help stays available.")} {st("Unselected food options have not started.")}</p>}
-          <ol lang={snapSelected ? locale : "en"} className={styles.progress} aria-label={st("Support request steps")}>
+          <ol lang={localizedIntake ? locale : "en"} className={styles.progress} aria-label={st("Support request steps")}>
             {(directSnap ? ["Application details", "Your permission"] : ["Your needs", "Household details", "Your permission"]).map(
               (label, index) => {
                 const i = directSnap ? index + 1 : index;
@@ -963,8 +965,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
               },
             )}
           </ol>
-          <section lang={snapSelected ? locale : "en"} className={styles.surface}>
-            <form lang={snapSelected ? locale : "en"} className={styles.form} onSubmit={submit}>
+          <section lang={localizedIntake ? locale : "en"} className={`${styles.surface} ${wicNeedsOnly ? wicStyles.intakeSurface : ""}`}>
+            <form lang={snapSelected || wicNeedsOnly && step > 0 ? locale : "en"} className={styles.form} onSubmit={submit}>
               <div className={styles.formHeader}>
                 <h2 ref={heading} tabIndex={-1}>
                   {
@@ -1097,7 +1099,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       />
                       <p className={styles.hint}>
                         {st("Philadelphia is our first service area. We’ll explain any coverage limits.")}{" "}</p>
-                      {reusedZip && <p className={styles.hint}>{st("We filled your ZIP code from your saved information, provided")}{" "}{new Date(reusedZip.confirmedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}{st(". You can change it here. Reuse keeps its original date and expiry.")}</p>}
+                      {reusedZip && <p className={styles.hint}>{st("We filled your ZIP code from your saved information, provided")}{" "}{new Date(reusedZip.confirmedAt).toLocaleDateString(wicNeedsOnly && locale === "es" ? "es-US" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}{st(". You can change it here. Reuse keeps its original date and expiry.")}</p>}
                     </div>
                     <div className={styles.field}>
                       <label htmlFor="support-language">
@@ -1115,7 +1117,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       </select>
                       {intake.language === "es" && (
                         <p className={styles.hint}>
-                          {snapSelected ? st("Your service language preference is separate from the screen and official document languages. Language services depend on the program.") : "We’ll record your Spanish preference. This interface is currently in English; Spanish service availability depends on the program."}{" "}</p>
+                          {localizedIntake ? st("Your service language preference is separate from the screen and official document languages. Language services depend on the program.") : "We’ll record your Spanish preference. This interface is currently in English; Spanish service availability depends on the program."}{" "}</p>
                       )}
                     </div>
                   </div>
@@ -1126,11 +1128,11 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     <WicApplicationFormFields value={wicDetails} onChange={changeWicDetails} disabled={pending}/>
                     {familyProfile && ["children", "mother_and_children"].includes(wicDetails.beneficiaries ?? "") && <div className={styles.field}>
                       <label htmlFor="wic-saved-child">{st("Add a child from your saved family information")}</label><select id="wic-saved-child" className={styles.select} value="" disabled={pending} onChange={event => { if (event.target.value) chooseSavedWicChild(event.target.value); }}>
-                        <option value="">{st("Choose a child, or add their details above")}</option>{(familyProfile.details.members ?? []).filter(person => !wicDetails.children?.some(child => child.id === person.id)).map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Saved household member"}</option>)}
+                        <option value="">{st("Choose a child, or add their details above")}</option>{(familyProfile.details.members ?? []).filter(person => !wicDetails.children?.some(child => child.id === person.id)).map(person => <option key={person.id} value={person.id}>{[person.firstName, person.lastName].filter(Boolean).join(" ") || st("Saved household member")}</option>)}
                       </select><p className={styles.hint}>{st("Choose only the child or children this WIC request is for. This does not establish eligibility.")}</p>
                     </div>}
 
-                  </> : intake.needs.some(need => need === "wic_new" || need === "wic_continuing") ? <div className={styles.notice}><div>
+                  </> : intake.needs.some(need => need === "wic_new" || need === "wic_continuing") ? <div className={`${styles.notice} ${wicNeedsOnly ? wicStyles.notice : ""}`}><div className={wicNeedsOnly ? wicStyles.availability : undefined}>
                     <p>{st("Private WIC questions are not available for this request.")}{" "}{st(wicOnly ? "Your unsaved WIC answers, if any, remain on this page. You can save minimum routing information when no private draft is pending." : "Combined and continuing requests keep their separate routing; this does not start a new WIC pre-application.")}</p>
                     {wicOnly && <button type="button" className={styles.secondary} disabled={pending} onClick={refreshWicCollection}>{st("Check WIC availability again")}</button>}
                     <a className={styles.textLink} href={getProgramsForNeeds(["wic_new"])[0].officialUrl}>{st("Open official WIC help")}</a>
@@ -1299,7 +1301,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
               )}
               {step === 2 && (
                 <fieldset className={`${styles.fieldset} ${styles.form}`} disabled={pending || startUncertain}>
-                  <div className={styles.notice}>
+                  <div className={`${styles.notice} ${wicNeedsOnly ? wicStyles.mandateNotice : ""}`}>
                     <ShieldCheck width={23} height={23} aria-hidden="true" />
                     <p>
                       <strong>
@@ -1312,7 +1314,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                         : "Your permission covers research and preparation. Nothing is sent, booked or submitted. Official programs remain available directly.")}
                     </p>
                   </div>
-                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || utilityDetailsReady && recipientIds.length === 1 && recipientIds[0] === utilityConfig?.programId) ? <p><strong>{utilityDetailsReady ? utilityConfig?.label : st(fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP")}</strong> {st("is the named program for your")}{" "}{utilityDetailsReady ? utilityConfig?.purpose : st(fullWic ? "prepared WIC answers" : "application")}.</p> : <fieldset className={styles.fieldset}>
+                  {(fullSnap && recipientIds.length===1 && recipientIds[0]==='snap-pa' || fullWic && recipientIds.length===1 && recipientIds[0]==='wic-pa' || utilityDetailsReady && recipientIds.length === 1 && recipientIds[0] === utilityConfig?.programId) ? <p><strong>{utilityDetailsReady ? utilityConfig?.label : st(fullWic ? "Pennsylvania WIC" : "Pennsylvania SNAP")}</strong>{" "}{fullWic ? st("is the named program for your prepared WIC answers.") : <>{st("is the named program for your")}{" "}{utilityDetailsReady ? utilityConfig?.purpose : st("application")}.</>}</p> : <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       {st("Named programs for this request")}{" "}</legend>
                     <div
@@ -1351,7 +1353,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       {programs.map((program) => (
                         <li key={program.id}>
                           <strong>{program.name}</strong>
-                          <p lang={st(program.description) === program.description ? "en" : locale}>{st(program.description)}</p>
+                        <p lang={wicNeedsOnly || st(program.description) === program.description ? "en" : locale}>{wicNeedsOnly ? program.description : st(program.description)}</p>
                           <a
                             className={styles.textLink}
                             href={program.officialUrl}
@@ -1413,14 +1415,14 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                           {st(utilityDetailsReady ? `Your private ${utilityConfig?.label} answers described in its notice, your household, income, utility and routing information` : wicDetailsReady ? "Your private WIC preparation answers described in the WIC notice, your needs and routing information" : detailsReady ? "Your private SNAP application answers described in the SNAP data notice, your needs and household details" : "Your needs, household details")}
                           {st(intake.needs.some((need) => incomeNeeds.includes(need))
                             ? ", income information when a named program requires it"
-                            : "")}{st(", only for this request.")}{" "}{utilityDetailsReady ? "Documents for this named program are included in your preparation permission. Each document still needs separate processing consent in the protected step when available. Do not put documents or required identifiers or account secrets in this form or chat. " : wicNeedsOnly ? "WIC document uploads are not available. " : <>{st("Any bills or notices you later choose to add can be used for the verified needs and named programs, after separate document-processing consent.")}{" "}{intake.needs.some(need => need === "wic_new" || need === "wic_continuing") && "Do not upload WIC documents here. "}</>}{st("No passwords, EBT PINs or signatures.")}{" "}</p>
+                            : "")}{st(", only for this request.")}{" "}{utilityDetailsReady ? "Documents for this named program are included in your preparation permission. Each document still needs separate processing consent in the protected step when available. Do not put documents or required identifiers or account secrets in this form or chat. " : wicNeedsOnly ? `${st("WIC document uploads are not available.")} ` : <>{st("Any bills or notices you later choose to add can be used for the verified needs and named programs, after separate document-processing consent.")}{" "}{intake.needs.some(need => need === "wic_new" || need === "wic_continuing") && "Do not upload WIC documents here. "}</>}{st("No passwords, EBT PINs or signatures.")}{" "}</p>
                       </div>
                     </div>
                     <div className={styles.mandateItem}>
                       <Clock width={22} height={22} aria-hidden="true" />
                       <div>
                         <h3>{st("Up to 30 days · up to 12 attempts")}</h3>
-                        <p>{st(recipientIds.length === 1 ? "Limited to one named program. We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable." : "Limited to {count} named programs. We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable.").replace("{count}", String(recipientIds.length || st("selected")))}</p>
+                        <p>{wicNeedsOnly ? <>{locale === "es" ? st("Named programs selected: {count}").replace("{count}", String(recipientIds.length)) : `Limited to the ${recipientIds.length || "selected"} named program${recipientIds.length === 1 ? "" : "s"}`}{st(". We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable.")}</> : st(recipientIds.length === 1 ? "Limited to one named program. We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable." : "Limited to {count} named programs. We stop future work if you pause, cancel or withdraw permission. Already delivered information may not be recallable.").replace("{count}", String(recipientIds.length || st("selected")))}</p>
                       </div>
                     </div>
                     <div className={styles.mandateItem}>
@@ -1473,7 +1475,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                         ? "the permitted steps described above"
                         : "research and preparation only")}{" "}
                       {st("for this request within these limits. I can stop future work in My support.")}{" "}{detailsReady && st(" I also agree to save and use my private SNAP application answers for this named program under the SNAP data notice.")}
-                      {wicDetailsReady && ` I agree to save and use my private WIC answers for Pennsylvania WIC under the WIC notice. ${WIC_SUBJECT_AUTHORITY_STATEMENT}`}
+                      {wicDetailsReady && <> {st("I agree to save and use my private WIC answers for Pennsylvania WIC under the WIC notice.")} {st(WIC_SUBJECT_AUTHORITY_STATEMENT)}{locale === "es" && <span lang="en"> ({WIC_SUBJECT_AUTHORITY_STATEMENT})</span>}</>}
                       {utilityDetailsReady && utilityConfig && ` I agree to save and use my private ${utilityConfig.label} answers for this named program under its notice. I authorize household, income, utility and document use for this preparation; each protected document needs its separate processing consent. ${utilityConfig.subjectStatement} ${utilityConfig.accountStatement}`}
                     </span>
                   </label>
@@ -1484,7 +1486,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     {st("are always available.")}{" "}</p>
                 </fieldset>
               )}
-              {error && <ServiceError error={error} />}
+              {error && (wicNeedsOnly ? <div className={wicStyles.feedback}><ServiceError error={error} /></div> : <ServiceError error={error} />)}
               {startUncertain && <p className={styles.notice}><span>{st("The save result has not been confirmed. Retry the same request before changing answers or starting another request.")}{" "}<Link className={styles.textLink} href="/my-support">{st("Check My support for the saved request")}</Link>.</span></p>}
               <div className={styles.formFooter}>
                 {step > 0 ? (

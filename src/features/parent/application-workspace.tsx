@@ -18,6 +18,7 @@ import { isUtilityPreparationMandate } from "@/lib/parent/utility-preparation-sc
 import { SnapFinalReview } from "./snap-final-review";
 import styles from "./parent.module.css";
 import layout from "./application-workspace.module.css";
+import wicStyles from "./wic.module.css";
 
 export function supportTitle(request: SupportRequest): string {
   if (request.intake.needs.length > 1) return "Your family’s support";
@@ -216,9 +217,10 @@ export function ApplicationWorkspace({
   }, [request.id]);
   const needsVerification = verification.requestId === request.id && verification.needed;
   const { data, error, loading, reload } = history;
-  const { t, locale } = useParentLocale();
+  const { t: parentText, locale } = useParentLocale();
   const snap = request.intake.needs.includes("snap_new");
-  const st = (copy: string) => snap ? t(copy) : copy;
+  const wicInterface = request.intake.needs.some(need => need.startsWith("wic_"));
+  const t = (text: string) => snap || wicInterface ? parentText(text) : text;
   const wic = request.intake.needs.includes("wic_new");
   const peco = isPecoPreparationRequest(request), pgw = request.has_pgw_application_details === true, water = request.has_water_application_details === true;
   const utility = peco || pgw || water;
@@ -292,12 +294,13 @@ export function ApplicationWorkspace({
               : application.submitted
                 ? "Next: The program"
                 : "Next: CaseLink’s application connection";
+  const localizedPersonalStepDetail = !inactive && !needsVerification && actions.length > 0 && locale === "es" && wicInterface;
   const nextDetail = inactive
     ? "Your recorded information and history stay available below. Your permission controls show whether this request can resume."
     : needsVerification
       ? "COMPASS needs a verification step in the Official website section. CaseLink will check the result and continue the supported connection steps automatically."
     : actions.length
-      ? `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Open Your next steps to continue.`
+      ? (localizedPersonalStepDetail ? t("{count} personal step(s) need your attention. Open Your next steps to continue.").replace("{count}", String(actions.length)) : `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Open Your next steps to continue.`)
       : application.outcome === "support_received"
         ? "Support received is recorded. Your receipt and any remaining support steps are below. This outcome does not start another application."
         : application.outcome === "assistance_approved"
@@ -339,10 +342,11 @@ export function ApplicationWorkspace({
     {
       id: "your-next-steps",
       label: "Your next steps",
+      detailLocale: snap || wicInterface ? locale : "en",
       detail: inactive
         ? "History"
         : actions.length
-          ? st("{n} need you").replace("{n}", String(actions.length))
+          ? t("{n} need you").replace("{n}", String(actions.length))
           : needsVerification
             ? "COMPASS step above"
           : "Nothing requested",
@@ -366,7 +370,8 @@ export function ApplicationWorkspace({
     {
       id: "application-documents",
       label: "Your documents",
-      detail: st("{n} saved").replace("{n}", String(request.documents?.length ?? 0)),
+      detailLocale: snap || wicInterface ? locale : "en",
+      detail: t("{n} saved").replace("{n}", String(request.documents?.length ?? 0)),
       done: !!request.documents?.length,
     },
     {
@@ -391,8 +396,8 @@ export function ApplicationWorkspace({
         if (window.location.hash !== link.hash) window.history.pushState(null, "", link.hash);
       }
     }}>
-      <nav lang={snap ? locale : "en"} className={layout.checklist} aria-label={st("Your application checklist")}>
-        <h2>{st(snap ? "Your SNAP request" : "Your support request")}</h2>
+      <nav lang={snap || wicInterface ? locale : "en"} className={layout.checklist} aria-label={t("Your application checklist")}>
+        <h2>{t(snap ? "Your SNAP request" : "Your support request")}</h2>
         <ol>
           {steps.map((step) => (
             <li key={step.id}>
@@ -410,23 +415,24 @@ export function ApplicationWorkspace({
                   {step.done ? <Check width={15} height={15} /> : <Clock width={14} height={14} />}
                 </span>
                 <span>
-                  <strong lang={st(step.label) === step.label ? "en" : locale}>{st(step.label)}</strong>
-                  <small lang={st(step.detail) === step.detail ? "en" : locale}>{st(step.detail)}</small>
+                  <strong lang={t(step.label) === step.label ? "en" : locale}>{t(step.label)}</strong>
+                  <small lang={step.detailLocale ?? (t(step.detail) === step.detail ? "en" : locale)}>{t(step.detail)}</small>
                 </span>
               </a>
             </li>
           ))}
         </ol>
         <div className={layout.helpLinks}>
-          <Link href="/support/help">{st("Get help")}</Link>
-          <Link href="/support/privacy">{st("Privacy & data")}</Link>
-          <Link href="/support/terms">{st("Terms")}</Link>
-          <a href="mailto:willsanz23@gmail.com">{st("Contact CaseLink")}</a>
+          <Link href="/support/help">{t("Get help")}</Link>
+          <Link href="/support/privacy">{t("Privacy & data")}</Link>
+          <Link href="/support/terms">{t("Terms")}</Link>
+          <a href="mailto:willsanz23@gmail.com">{t("Contact CaseLink")}</a>
         </div>
       </nav>
       <div className={layout.content}>
         <section
-          className={layout.overview}
+          lang={snap || wicInterface ? locale : "en"}
+          className={`${layout.overview} ${wicInterface ? wicStyles.overview : ""}`}
           data-workspace-panel="application-overview"
           hidden={activeSection !== "application-overview"}
           id="application-overview"
@@ -434,11 +440,11 @@ export function ApplicationWorkspace({
           aria-labelledby="application-state"
         >
           <h2 id="application-state">
-            {snap
+            {t(snap
               ? "Where your application stands"
-              : "Where your support stands"}
+              : "Where your support stands")}
           </h2>
-          <div className={layout.statusLine}>
+          <div className={`${layout.statusLine} ${wicInterface ? wicStyles.state : ""}`}>
             {application.submitted && !error ? (
               <Check width={22} height={22} aria-hidden="true" />
             ) : (
@@ -446,7 +452,7 @@ export function ApplicationWorkspace({
             )}
             <div>
               <strong>
-                {error
+                {t(error
                   ? "Application records unavailable"
                   : loading
                     ? "Checking application records…"
@@ -456,10 +462,10 @@ export function ApplicationWorkspace({
                         ? "Submit decision recorded"
                       : snapSubmissionComplete
                         ? "SNAP application complete"
-                        : application.label}
+                        : application.label)}
               </strong>
               <p>
-                {error
+                {t(error
                   ? "We can’t confirm the latest submission record. Check again before starting a new attempt."
                   : loading
                     ? "We use recorded operations and receipts to confirm what actually happened."
@@ -469,7 +475,7 @@ export function ApplicationWorkspace({
                         ? "The decision to send your exact application is saved. Delivery and an agency confirmation are separate records."
                       : snapSubmissionComplete && !application.outcome && !historyLimited
                         ? "Submission confirmed · benefits decision pending. Open your recorded receipt for the exact application and who confirmed it."
-                        : application.detail}
+                        : application.detail)}
               </p>
             </div>
           </div>
@@ -507,11 +513,11 @@ export function ApplicationWorkspace({
             </p>
           )}
           <div className={layout.nextAction}>
-            <strong>{nextActor}</strong>
-            <p>{nextDetail}</p>
+            <strong>{t(nextActor)}</strong>
+            <p lang={localizedPersonalStepDetail ? locale : t(nextDetail) === nextDetail ? "en" : locale}>{t(nextDetail)}</p>
             {!inactive && (actions.length > 0 || needsVerification) && (
-              <a lang={snap ? locale : "en"} className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
-                {st(needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps")}{" "}
+              <a lang={snap || wicInterface ? locale : "en"} className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
+                {t(needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps")}{" "}
                 <ArrowRight width={17} height={17} aria-hidden="true" />
               </a>
             )}
@@ -547,7 +553,7 @@ export function ApplicationWorkspace({
         )}
         {Children.map(children, child => {
           const section = isValidElement<{ id?: string }>(child) && child.props.id || "application-overview";
-          return <div className={layout.panel} data-workspace-panel={section} hidden={activeSection !== section}>{child}</div>;
+          return <div lang="en" className={layout.panel} data-workspace-panel={section} hidden={activeSection !== section}>{child}</div>;
         })}
       </div>
     </div>

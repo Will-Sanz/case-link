@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -24,6 +25,8 @@ import {
   isPecoPreparationRequest,
   isPrivateUtilityPreparationRequest,
 } from "./application-workspace";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
 
 const requestId = "11111111-1111-4111-8111-111111111111";
 const receiptEvidence = { source: "agency_receipt", reference: "SNAP receipt for this test", recordedAt: "2026-10-25T12:00:00Z" };
@@ -103,6 +106,17 @@ function renderWorkspace(request = fixture()) {
   return render(<WorkspaceFixture request={request} />);
 }
 const finalReviewAction = { id: "snap-final-review", need: "snap_new" as const, reason: "submission_review" as const, field: "snap_final_submit", resolver: "parent" as const, title: "Review the exact SNAP application", explanation: "Review before choosing Submit." };
+it.each((["en", "es"] as const).flatMap(locale => (["wic_new", "wic_continuing"] as const).flatMap(need => [1, 2].map(count => ({ locale, need, count })))))("marks $count $need personal-step counts in their displayed $locale language", async ({ locale, need, count }) => {
+    const request = fixture(); request.intake.needs = [need]; request.mandate.recipientIds = ["wic-pa"];
+    request.required_actions = Array.from({ length: count }, (_, index) => ({ id: `personal-${index}`, need, reason: "personal_step", resolver: "parent", title: "Original required step", explanation: "Original source explanation" }));
+    mockApi();
+    await act(async () => { render(<ParentLocaleProvider initialLocale={locale}><ApplicationWorkspace request={request} history={{ data: { operations: [], historyLimited: false }, loading: false, error: null, reload: vi.fn() }}><section id="your-next-steps">Original required step</section></ApplicationWorkspace></ParentLocaleProvider>); });
+    const sentence = locale === "es" ? `Pasos personales que requieren su atención: ${count}. Abra Sus próximos pasos para continuar.` : `${count === 1 ? "One personal step needs" : `${count} personal steps need`} your attention. Open Your next steps to continue.`;
+    expect(screen.getByText(sentence).closest("[lang]")?.getAttribute("lang")).toBe(locale);
+    const pending = locale === "es" ? `Pasos que necesitan su atención: ${count}` : `${count} need you`;
+    const saved = locale === "es" ? "Documentos guardados: 0" : "0 saved";
+    for (const detail of [pending, saved]) expect(screen.getByText(detail).closest("[lang]")?.getAttribute("lang")).toBe(locale);
+});
 describe("canonical application continuity", () => {
   it("opens exact private PECO preparation in the checklist without claiming an application or provider session", async () => {
     const request = fixture(); request.intake = { ...request.intake, needs: ["electricity"], utilityProviders: ["peco"], accountAuthority: "self" };

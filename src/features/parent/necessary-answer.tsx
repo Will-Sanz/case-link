@@ -283,7 +283,7 @@ export function NecessaryAnswer({
     }
   }
   return (
-    <form className={styles.form} onSubmit={submit}>
+    <form lang="en" className={styles.form} onSubmit={submit}>
       <NecessaryAnswerFields action={action} draft={{ value, frequency }} onChange={setAnswer}
         correction={correction} disabled={pending} />
       <button
