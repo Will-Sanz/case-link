@@ -133,6 +133,7 @@ export async function createParentSqlFixture(
     "20261117184500_parent_assistant_account_context.sql",
     "20261117185443_parent_ordinary_private_text_guard.sql",
     "20261118035851_parent_wic_application_reaffirmation.sql",
+    "20261118043549_parent_job_plan_agency_observation_order.sql",
   ];
   try {
     for (const migration of migrations)
