@@ -1,12 +1,11 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { z } from "zod";
 import { getSnapCaptureContext } from "@/lib/parent/snap-capture-data";
 import { snapCaptureQuery } from "@/lib/parent/snap-capture-context";
 import { getSnapApplicationDetails } from "@/lib/parent/snap-application-data";
 import { assessSnapApplicationSnapshot } from "@/lib/parent/snap-application-snapshot";
 import { renderSnapSigningCopy } from "@/lib/parent/snap-signing-copy";
+import { readSnapFormFile } from "@/lib/parent/snap-form-file";
 import { parentError, parentJson, requireSameOrigin, uuidSchema } from "@/lib/parent/http";
 
 export const runtime = "nodejs";
@@ -18,7 +17,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const id = uuidSchema.parse((await params).id).toLowerCase(), scope = snapCaptureQuery(new URL(request.url));
     const context = await getSnapCaptureContext(id, scope);
     const snapshot = await getSnapApplicationDetails(id, context.snapshotId), now = new Date();
-    if (!snapshot || snapshot.request_id !== id || snapshot.id !== context.snapshotId || snapshot.request_version > context.requestVersion)
+    if (!snapshot || snapshot.request_id !== id || snapshot.id !== context.snapshotId || snapshot.request_version > context.requestVersion
+      || Object.entries(context.source).some(([key, value]) => snapshot.source[key as keyof typeof snapshot.source] !== value))
       throw new Error("This request changed. Reload it before using the prepared application.");
     const preparedAt = new Date(snapshot.created_at);
     if (!Number.isFinite(preparedAt.getTime()) || preparedAt > now)
@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       throw new Error("This request changed. Reload it before using the prepared application.");
     if (!assessment.readiness.nonProtectedDataReadyForReview)
       return parentJson({ ok: false, error: "Your application needs an answer or correction before the official signing copy can be prepared." }, 409);
-    const result = await renderSnapSigningCopy(await readFile(join(process.cwd(), "data/verified-forms/snap-pa600fs-2019.pdf")), assessment.snapshot.details, preparedAt);
+    const result = await renderSnapSigningCopy(await readSnapFormFile(snapshot.source.templateId), assessment.snapshot.details, preparedAt, snapshot.source.templateId);
     bytes = result.bytes ?? undefined;
     if (!bytes || !result.readiness.nonProtectedDataReadyForReview)
       return parentJson({ ok: false, error: "CaseLink needs to resolve the official form layout before preparing this signing copy." }, 409);

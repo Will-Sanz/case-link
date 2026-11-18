@@ -1,3 +1,4 @@
+import { SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE, snapFormPreview, snapFormSource } from "./snap-form-source";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { PDFDocument } from "pdf-lib";
@@ -1341,6 +1342,15 @@ describe("private full-answer SNAP worker preview", () => {
     expect(JSON.stringify(test.state.events)).not.toContain("Private Canary");
     expect(test.execute).not.toHaveBeenCalled();
     expect(test.database.query.mock.calls.some(([sql]) => sql.includes("parent_register_form_artifact"))).toBe(false);
+  });
+  it("renders the server-selected Spanish preview and refuses cross-variant registry/artifact bindings",async()=>{
+    const test=previewSetup(),now=new Date("2026-11-18T11:00:00Z"),snapshot={...fixtureSnapSnapshot(now),source:SNAP_SPANISH_APPLICATION_SOURCE},form=snapFormSource(SNAP_ES_TEMPLATE_ID).contract,preview=snapFormPreview(SNAP_ES_TEMPLATE_ID);
+    test.state.preview!.snapshot=snapshot;test.state.preview!.template={...preview,program_id:"snap-pa",needs:["snap_new"],content_sha256:form.sha256,object_path:"snap-preview-source.pdf",field_map:{},required_fields:[],personal_fields:[],required_acts:[],active:true,preparation_only:true,verified_until:form.verifiedUntil};
+    test.state.templateBytes=readFileSync("data/verified-forms/snap-pa600fs-es-2019.pdf");test.options.now=()=>now;test.state.leaseExpiresAt="2026-11-18T11:05:00Z";
+    expect(await runOneParentJob(test.options)).toEqual({state:"saved"});expect(test.state.uploaded.length).toBeGreaterThan(400000);expect(test.state.privatePrepared).toHaveLength(1);
+    expect(JSON.stringify(vi.mocked(test.options.coordinate!).mock.calls)).not.toContain("Private Canary");expect(test.execute).not.toHaveBeenCalled();
+    test.state.privatePrepared.length=0;test.state.uploaded=new Uint8Array();test.state.preview!.artifact={...previousPreview(test),snap_snapshot_id:snapshot.id};
+    await runOneParentJob(test.options);expect(test.state.privatePrepared).toHaveLength(0);expect(test.state.uploaded).toHaveLength(0);
   });
   it("reuses only the exact leased binding after reassessing original evidence", async () => {
     const test = previewSetup();

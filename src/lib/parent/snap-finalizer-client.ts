@@ -6,7 +6,7 @@ import { snapFinalizerIntentSchema, type SnapFinalizerIntent } from "./snap-pack
 import { snapCaptureContextSchema } from "./snap-capture-context";
 import { snapApplicationSnapshotSchema } from "./snap-application-snapshot";
 import { renderSnapDirectCompletion, SNAP_DIRECT_COMPLETION_VERSION } from "./snap-direct-completion";
-import { SNAP_DRAFT_CONTRACT } from "./snap-draft";
+import { snapFormSource } from "./snap-form-source";
 import { SNAP_PARENT_CERTIFICATION_ACTS } from "./snap-protected-operation";
 export { snapFinalizerIntentSchema, type SnapFinalizerIntent } from "./snap-packet-contract";
 
@@ -180,7 +180,9 @@ function validateConstruction(value: unknown, intent: SnapFinalizerIntent, bindi
   session.check();
   const construction = constructionSchema.parse(value);
   if (construction.packetId !== intent.packetId || construction.snapshotId !== intent.snapshotId || construction.snapshotHash !== intent.snapshotHash
-    || construction.contentSha256 !== intent.contentSha256 || Date.parse(construction.verifiedAt) > Date.now()
+    || construction.contentSha256 !== intent.contentSha256
+    || Object.entries(snapFormSource(intent.templateId).source).some(([key,value]) => construction.source[key as keyof typeof construction.source] !== value)
+    || Date.parse(construction.verifiedAt) > Date.now()
     || Date.parse(construction.expiresAt) <= Date.now() || Date.parse(construction.expiresAt) <= Date.parse(construction.verifiedAt)
     || Date.parse(construction.expiresAt) > Date.parse(binding.expiresAt)) throw new Error(SNAP_FINALIZER_ERROR);
   return construction;
@@ -204,6 +206,8 @@ async function directContext(intent: SnapFinalizerIntent, session: Session) {
   if (Object.entries(intent).some(([name, value]) => context.intent[name as keyof SnapFinalizerIntent] !== value)
     || context.context.requestVersion !== intent.requestVersion || context.context.snapshotId !== intent.snapshotId || context.context.snapshotHash !== intent.snapshotHash
     || context.snapshot.request_id.toLowerCase() !== intent.requestId || context.snapshot.id.toLowerCase() !== intent.snapshotId
+    || Object.entries(snapFormSource(intent.templateId).source).some(([key,value]) => context.context.source[key as keyof typeof context.context.source] !== value
+      || context.snapshot.source[key as keyof typeof context.snapshot.source] !== value)
     || !Number.isFinite(preparedAt.getTime()) || context.preparedAt !== preparedAt.toISOString() || preparedAt.getTime() > Date.now()) throw new Error(SNAP_FINALIZER_ERROR);
   return context;
 }
@@ -213,7 +217,7 @@ export async function finalizeSnapDirectCompletion(input: unknown, completionInp
   let source: Uint8Array | undefined, bytes: Uint8Array | undefined, key: Buffer | undefined, discard = false;
   try {
     const intent = snapFinalizerIntentSchema.parse(input), completion = structuredClone(completionInput);
-    if (!(template instanceof Uint8Array) || template.length !== SNAP_DRAFT_CONTRACT.byteLength) throw new Error(SNAP_FINALIZER_ERROR);
+    if (!(template instanceof Uint8Array) || template.length !== snapFormSource(intent.templateId).contract.byteLength) throw new Error(SNAP_FINALIZER_ERROR);
     source = Uint8Array.from(template);
     return await withFinalizer<SnapDirectFinalizerResult>(options, async session => {
       let transaction = false, commitDispatched = false;

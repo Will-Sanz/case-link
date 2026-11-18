@@ -3,8 +3,7 @@ import { snapApplicationSourceSchema } from "./snap-form-source";
 import { SNAP_APPLICATION_NOTICE_VERSION } from "./constants";
 import { snapApplicationFieldsValueSchema, assessSnapApplicationFields } from "./snap-application-fields";
 
-export const SNAP_PREVIEW_TEMPLATE_ID = "pa-snap-pa600fs-sg-2019-preview";
-export const SNAP_PREVIEW_TEMPLATE_VERSION = "application-preview-2026-11-03.v1";
+export { SNAP_PREVIEW_TEMPLATE_ID, SNAP_PREVIEW_TEMPLATE_VERSION } from "./snap-form-source";
 const uuid = z.uuid();
 export const snapApplicationSnapshotSchema = z.object({
   id: uuid, request_id: uuid, revision: z.number().int().positive(), base_version: z.number().int().positive(), request_version: z.number().int().positive(),

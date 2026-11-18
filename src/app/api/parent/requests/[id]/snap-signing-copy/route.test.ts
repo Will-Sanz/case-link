@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
+import { SNAP_SPANISH_APPLICATION_SOURCE } from "@/lib/parent/snap-form-source";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureSnapSnapshot } from "@/lib/parent/test-fixtures";
 import { assessSnapApplicationSnapshot } from "@/lib/parent/snap-application-snapshot";
@@ -40,6 +41,19 @@ describe("current official SNAP signing-copy download", () => {
     expect(pdf.getTitle()).toContain("protected fields blank - not submission-ready - not sent");
     expect(mocks.details).toHaveBeenCalledExactlyOnceWith(requestId, saved.id);
     expect(mocks.context).toHaveBeenNthCalledWith(1, requestId, scope); expect(mocks.context).toHaveBeenCalledTimes(2);
+  });
+  it("renders the exact saved Spanish source without changing English contact preference, with stable later replay",async()=>{
+    const at=new Date("2026-11-18T11:00:00Z"),snapshot={...fixtureSnapSnapshot(at),source:SNAP_SPANISH_APPLICATION_SOURCE};
+    vi.setSystemTime(at);mocks.details.mockResolvedValue(snapshot);mocks.context.mockResolvedValue({...context,source:snapshot.source});
+    const response=await GET(request(),params),bytes=new Uint8Array(await response.arrayBuffer());expect(response.status).toBe(200);
+    const pdf=await PDFDocument.load(bytes);expect(pdf.getTitle()).toMatch(/solicitud|campos/i);expect(snapshot.details.language).toBe("en");
+    vi.setSystemTime(new Date(at.getTime()+3600000));const retry=await GET(request(),params);expect(new Uint8Array(await retry.arrayBuffer())).toEqual(bytes);
+  });
+  it.each(["snapshot","context"])("rejects a cross-variant %s before returning official bytes",async field=>{
+    const at=new Date("2026-11-18T11:00:00Z");vi.setSystemTime(at);
+    if(field==="snapshot")mocks.details.mockResolvedValue({...fixtureSnapSnapshot(at),source:SNAP_SPANISH_APPLICATION_SOURCE});
+    else mocks.context.mockResolvedValue({...context,source:SNAP_SPANISH_APPLICATION_SOURCE});
+    expect((await GET(request(),params)).status).toBe(409);
   });
   it("keeps actual PDF bytes, preparation time and unsigned hash stable after the clock advances", async () => {
     const first = await GET(request(), params), firstBytes = new Uint8Array(await first.arrayBuffer());

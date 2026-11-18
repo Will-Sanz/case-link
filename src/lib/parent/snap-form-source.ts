@@ -5,6 +5,13 @@ import spanishMap from "../../../data/verified-forms/snap-pa600fs-es-2019.fields
 
 export const SNAP_EN_TEMPLATE_ID = "pa-snap-pa600fs-sg-2019";
 export const SNAP_ES_TEMPLATE_ID = "pa-snap-pa600fs-sg-2019-es";
+export const SNAP_PREVIEW_TEMPLATE_ID = "pa-snap-pa600fs-sg-2019-preview";
+export const SNAP_PREVIEW_TEMPLATE_VERSION = "application-preview-2026-11-03.v1";
+export function snapFormPreview(templateId: unknown = SNAP_EN_TEMPLATE_ID) {
+  return snapFormSource(templateId).language === "es"
+    ? { id: "pa-snap-pa600fs-sg-2019-es-preview", version: "application-preview-2026-11-18.v1" }
+    : { id: SNAP_PREVIEW_TEMPLATE_ID, version: SNAP_PREVIEW_TEMPLATE_VERSION };
+}
 export const SNAP_APPLICATION_SOURCE = {
   templateId: english.id, templateVersion: english.version, templateSha256: english.sha256,
   inventoryId: "pa-snap-pa600fs-sg-2019-field-inventory", inventoryVersion: "2026-11-03.v1",

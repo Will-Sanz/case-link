@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SNAP_APPLICATION_SOURCE } from "./snap-application-fields";
+import { SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 import { fixtureIntake, fixtureMandate, fixtureSnapApplication } from "./test-fixtures";
 import { AuthenticationRequiredError } from "@/lib/auth/session-errors";
 const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), from: vi.fn() }));
@@ -32,6 +33,22 @@ describe("private SNAP details data boundary", () => {
     expect(query.eq.mock.calls).toEqual([["request_id", requestId], ["id", snapshotId]]);
     expect(query.order).toHaveBeenCalledWith("revision", { ascending: false });
     expect(query.limit).toHaveBeenCalledWith(1);
+  });
+  it("keeps explicit document choice in the atomic start/save boundary without altering contact facts", async () => {
+    const intake=fixtureIntake({needs:["snap_new"],language:"en"}), mandate=fixtureMandate({recipientIds:["snap-pa"]});
+    await startSnapApplication(intake,mandate,{language:"en"},SNAP_APPLICATION_NOTICE_VERSION,key,undefined,SNAP_ES_TEMPLATE_ID);
+    expect(mocks.rpc).toHaveBeenLastCalledWith("parent_start_snap_application_source", {p_intake:intake,p_mandate:mandate,p_details:{language:"en"},p_notice_version:SNAP_APPLICATION_NOTICE_VERSION,p_idempotency_key:key,p_template_id:SNAP_ES_TEMPLATE_ID});
+    await saveSnapApplicationDetails(requestId,{expectedVersion:3,details:saved.details,noticeVersion:SNAP_APPLICATION_NOTICE_VERSION,documentTemplateId:SNAP_ES_TEMPLATE_ID,familyProfileSource:familySource()},key);
+    expect(mocks.rpc).toHaveBeenLastCalledWith("parent_save_snap_application_source",expect.objectContaining({p_template_id:SNAP_ES_TEMPLATE_ID,p_family_profile_source:familySource(),p_details:saved.details}));
+  });
+  it("reads the exact Spanish source without converting the stored packet to English", async () => {
+    const value={...saved,source:SNAP_SPANISH_APPLICATION_SOURCE};
+    const query={select:vi.fn().mockReturnThis(),eq:vi.fn().mockReturnThis(),order:vi.fn().mockReturnThis(),limit:vi.fn().mockReturnThis(),maybeSingle:vi.fn().mockResolvedValue({data:value,error:null})};mocks.from.mockReturnValue(query);
+    expect(await getSnapApplicationDetails(requestId)).toEqual(value);
+  });
+  it.each(["es","../../private",{templateId:SNAP_ES_TEMPLATE_ID},null])("rejects arbitrary source selection before Auth",async documentTemplateId=>{
+    await expect(saveSnapApplicationDetails(requestId,{expectedVersion:3,details:{},noticeVersion:SNAP_APPLICATION_NOTICE_VERSION,documentTemplateId},key)).rejects.toThrow("parent_invalid_input");
+    expect(mocks.rpc).not.toHaveBeenCalled();expect(mocks.session).not.toHaveBeenCalled();
   });
   it("returns no data for an unavailable owned revision", async () => {
     const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) };

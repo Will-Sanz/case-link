@@ -1,3 +1,4 @@
+import { SNAP_EN_TEMPLATE_ID, SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createParentSqlFixture } from "../../../scripts/parent-sql-fixture";
@@ -84,6 +85,18 @@ describe.skipIf(!modulePath)("atomic fixed programme reuse of owned family basic
     await fixture.admin.query("update parent_private.processing_controls set family_profile_enabled=false");
     expect(await save(value, id, 2, value.source, key)).toBe(result);
     expect((await snapshot(value, id)).id).toBe(saved.id);
+  });
+  it("binds an explicit document choice to profile start receipts while preserving historical acknowledgement and later no-choice source",async()=>{
+    vi.setSystemTime(new Date("2026-11-18T12:00:00Z"));const value=await input("snap-pa");
+    const selected=(template=SNAP_ES_TEMPLATE_ID)=>query("select public.parent_start_snap_application_source($1,$2,$3,$4,$5,$6,$7) id",[JSON.stringify(value.intake),JSON.stringify(value.mandate),JSON.stringify(value.details),value.meta.notice,value.key,template,JSON.stringify(value.source)]);
+    const id=(await selected()).rows[0].id,saved=await snapshot(value,id);expect(saved.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);
+    await expect(selected(SNAP_EN_TEMPLATE_ID)).rejects.toMatchObject({code:"PT409"});
+    const current=await profile();await query("select public.parent_save_family_profile($1,1,$2,$3,true,true,'{}',$4)",[owner,JSON.stringify({...current.details,primaryPerson:{...current.details.primaryPerson,firstName:"Corrected"}}),FAMILY_PROFILE_NOTICE_VERSION,randomUUID()]);
+    const corrected=await snapshot(value,id);expect(corrected.details.applicant.firstName).toBe("Corrected");expect(corrected.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);expect(corrected.request_version).toBe(saved.request_version+2);
+    expect((await selected()).rows[0].id).toBe(id);expect(await snapshot(value,id)).toEqual(corrected);
+    const oldReceipt=(await fixture.admin.query("select write_hash from parent_private.family_profile_application_receipts where owner_id=$1 and idempotency_key=$2 and mutation='start'",[owner,value.key])).rows[0].write_hash;
+    await query("select public.parent_clear_family_profile($1,2,$2)",[owner,randomUUID()]);await fixture.admin.query("update parent_private.processing_controls set family_profile_enabled=false");
+    expect((await selected()).rows[0].id).toBe(id);expect((await fixture.admin.query("select write_hash from parent_private.family_profile_application_receipts where owner_id=$1 and idempotency_key=$2 and mutation='start'",[owner,value.key])).rows[0].write_hash).toBe(oldReceipt);
   });
   it("acknowledges an owned committed start after family reuse closes, without starting new work", async () => {
     const value = await input("snap-pa"), id = await start(value);

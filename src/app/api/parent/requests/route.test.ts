@@ -18,6 +18,7 @@ import { POST } from "./route";
 import { AuthenticationRequiredError } from "@/lib/auth/session-errors";
 import { familyProfileLeaves, familyProfileSourceSchema } from "@/lib/parent/family-profile";
 import { projectFamilyProfileApplication } from "@/lib/parent/family-profile-application";
+import { SNAP_ES_TEMPLATE_ID } from "@/lib/parent/snap-form-source";
 import { snapApplicationFieldsValueSchema } from "@/lib/parent/snap-application-fields";
 const key = "33333333-3333-4333-8333-333333333333";
 const legacy = () => ({ intake: fixtureIntake(), mandate: fixtureMandate() });
@@ -115,6 +116,14 @@ describe("existing request creation and atomic SNAP variant", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ ok: false, error: "Check the information and try again." });
     expect(mocks.start).not.toHaveBeenCalled(); expect(mocks.startSnap).not.toHaveBeenCalled();
+  });
+  it("forwards only an explicit registered SNAP document variant, independently of contact language",async()=>{
+    const value={...snap(),documentTemplateId:SNAP_ES_TEMPLATE_ID};
+    expect((await POST(request(value))).status).toBe(201);
+    expect(mocks.startSnap).toHaveBeenCalledExactlyOnceWith(value.intake,value.mandate,value.details,value.noticeVersion,key,undefined,SNAP_ES_TEMPLATE_ID);
+  });
+  it.each(["es","../../private",null,{templateId:SNAP_ES_TEMPLATE_ID}])("rejects arbitrary document choice without creating a request",async documentTemplateId=>{
+    expect((await POST(request({...snap(),documentTemplateId}))).status).toBe(400);expect(mocks.startSnap).not.toHaveBeenCalled();
   });
   it("creates and saves initial SNAP answers through the atomic wrapper only", async () => {
     const value = snap();

@@ -1,7 +1,5 @@
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { Readable } from "node:stream";
 import { isIP } from "node:net";
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
@@ -13,6 +11,7 @@ import { fetchWithTimeout } from "@/lib/supabase/fetch-with-timeout";
 import { MAX_SNAP_PACKET_BYTES, snapFinalPacketBindingSchema, snapPacketAuthorizationResultSchema } from "./snap-packet-contract";
 import { finalizeSnapDirectCompletion, openSnapFinalPacketForIsolatedReview, reconcileSnapDirectCompletion, reconcileSnapFinalPacket, stageSnapFinalPacket, validateSnapFinalizerConnection, type SnapFinalizerResult } from "./snap-finalizer-client";
 import { inspectSnapFinalPdf } from "./snap-final-pdf";
+import { readSnapFormFile } from "./snap-form-file";
 
 const configFields = {
   publicOrigin: z.string().max(100),
@@ -138,7 +137,7 @@ export function createSnapProtectedReviewHandler(input: unknown) {
           // A complete authorized upload survives navigation within its original deadline; database permission is rechecked before storage.
           completionSignal = deadlineSignal;
           // Only the isolated renderer gets private input; it obtains all trusted context from the database.
-          const template = await readFile(join(process.cwd(), "data/verified-forms/snap-pa600fs-2019.pdf"), { signal: completionSignal });
+          const template = await readSnapFormFile(intent.templateId, { signal: completionSignal });
           try {
             completionSignal.throwIfAborted();
             result = await finalizeSnapDirectCompletion(intent, completion, template, { connectionString: config.finalizerDatabaseUrl, deadline, signal: completionSignal });

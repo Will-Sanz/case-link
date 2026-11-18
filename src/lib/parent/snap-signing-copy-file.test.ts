@@ -1,3 +1,4 @@
+import { SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
@@ -37,6 +38,13 @@ describe("current unsigned signing-copy browser descriptor", () => {
       expect.objectContaining({ credentials: "same-origin", mode: "same-origin", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
         headers: { Accept: "application/pdf" }, signal: expect.any(AbortSignal) }));
     result.bytes.fill(0); expect(paper.some(byte => byte !== 0)).toBe(true); expect(value).toEqual(before);
+  });
+  it("retains the exact Spanish source in the verified browser descriptor without changing contact language",async()=>{
+    const at=new Date("2026-11-18T11:00:00Z");vi.setSystemTime(at);const value=input();value.snapshot=saved(new Date(at.getTime()-60000));value.snapshot.source=SNAP_SPANISH_APPLICATION_SOURCE;
+    value.context={...value.context,snapshotId:value.snapshot.id,source:SNAP_SPANISH_APPLICATION_SOURCE,applyingSubjectIds:value.snapshot.details.household!.filter(person=>person.requestingSnap).map(person=>person.id)};value.mandate.expiresAt=new Date(at.getTime()+60000).toISOString();
+    fetcher.mockResolvedValue(response(undefined,{"X-CaseLink-SNAP-Prepared-At":new Date(value.snapshot.created_at).toISOString()}));
+    const result=await load(value);expect(result.trusted.context.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);expect(result.trusted.snapshot.details.language).toBe("en");result.bytes.fill(0);
+    value.context.source={...saved(savedAt).source};fetcher.mockClear();await expect(load(value)).rejects.toThrow(SNAP_SIGNING_COPY_FILE_ERROR);expect(fetcher).not.toHaveBeenCalled();
   });
   it("verifies the decoded bytes when Next omits transport Content-Length", async () => {
     const reply = response(); reply.headers.delete("Content-Length"); fetcher.mockResolvedValue(reply);

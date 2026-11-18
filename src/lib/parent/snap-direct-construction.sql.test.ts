@@ -1,3 +1,4 @@
+import { SNAP_ES_TEMPLATE_ID, SNAP_EN_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -52,7 +53,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
   const read = (s: Scope, values = tuple(s)) => call("parent_snap_finalizer", readSql, values);
   const row = async (s: Scope) => (await fixture.admin.query("select to_jsonb(v) value from parent_private.snap_final_packet_verifications v where packet_id=$1", [s.packet])).rows[0]?.value;
   const counts = async () => (await fixture.admin.query("select (select count(*)::int from vault.secrets) keys,(select count(*)::int from parent_private.snap_final_packets) packets,(select count(*)::int from parent_private.snap_final_packet_verifications) receipts")).rows[0];
-  async function setup(retention = 300, details = fixtureSnapApplication(new Date()), linked = true, reserve = true): Promise<Scope> {
+  async function setup(retention = 300, details = fixtureSnapApplication(new Date()), linked = true, reserve = true, template = SNAP_EN_TEMPLATE_ID): Promise<Scope> {
     const owner = randomUUID(), session = randomUUID(); sessions.set(owner, session);
     // Synthetic route/method evidence only; no Pennsylvania acceptance or real delivery is asserted.
     await fixture.admin.query(`insert into parent_private.provider_capabilities(program_id,action,enabled,transport_verified,requires_form,permission_version,permission_reference,allowed_fields,field_categories,required_acts,verified_until,snap_direct_completion_version,snap_direct_completion_evidence_reference)
@@ -60,6 +61,8 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
       on conflict(program_id,action) do update set enabled=true,transport_verified=true,requires_form=true,permission_version=excluded.permission_version,permission_reference=excluded.permission_reference,
         allowed_fields=excluded.allowed_fields,field_categories=excluded.field_categories,required_acts=excluded.required_acts,verified_until=excluded.verified_until,
         snap_direct_completion_version=excluded.snap_direct_completion_version,snap_direct_completion_evidence_reference=excluded.snap_direct_completion_evidence_reference`, [acts, version]);
+    await fixture.admin.query(`update parent_private.provider_capabilities set snap_spanish_completion_validator_version=$1,snap_spanish_completion_evidence_reference=$2,snap_spanish_completion_verified_until=$3 where program_id='snap-pa' and action='submit'`, template===SNAP_ES_TEMPLATE_ID
+      ? [version,'synthetic exact Spanish method fixture only; NOT PA acceptance',new Date(Date.now()+3600000).toISOString()] : [null,null,null]);
     await fixture.admin.query(`update parent_private.processing_controls set enabled=true,approval_reference='synthetic construction SQL only',approved_until=now()+interval '1 day',
       snap_details_enabled=true,snap_details_approval_reference='synthetic only',snap_details_approved_until=now()+interval '1 day',snap_details_notice_version=$1,
       snap_protected_enabled=true,snap_protected_approval_reference='synthetic only; no published policy',snap_protected_approved_until=now()+interval '1 day',
@@ -67,7 +70,7 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
     await fixture.admin.query("insert into auth.users(id,email,email_confirmed_at) values($1,$2,now())", [owner, `${owner}@example.invalid`]);
     await fixture.admin.query("insert into auth.sessions(id,user_id,created_at,updated_at,not_after) values($1,$2,now(),now(),now()+interval '1 hour')", [session, owner]);
     const request = (await call("authenticated", "select public.parent_start_request($1,$2,$3) id", [JSON.stringify(fixtureIntake({ needs: ["snap_new"], utilityProviders: [] })), JSON.stringify(fixtureMandate({ recipientIds: ["snap-pa"], expiresAt: new Date(Date.now() + 86400000).toISOString() })), randomUUID()], owner)).rows[0].id as string;
-    const snapshot = (await call("authenticated", "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID()], owner)).rows[0].id as string;
+    const snapshot = (await call("authenticated", template===SNAP_ES_TEMPLATE_ID ? "select public.parent_save_snap_application_source($1,1,$2,$3,$4,$5) id" : "select public.parent_save_snap_application_details($1,1,$2,$3,$4) id", [request, JSON.stringify(details), SNAP_APPLICATION_NOTICE_VERSION, randomUUID(),...(template===SNAP_ES_TEMPLATE_ID?[template]:[])], owner)).rows[0].id as string;
     const requestVersion = (await fixture.admin.query("select version from public.parent_requests where id=$1", [request])).rows[0].version as number;
     const snapshotHash = (await fixture.admin.query("select parent_private.snap_application_binding($1,$2)->>'snapshotHash' hash", [request, requestVersion])).rows[0].hash as string;
     const packet = randomUUID(), acquisition = randomUUID(), subjects = details.household!.filter(person => person.requestingSnap).map(person => person.id);
@@ -100,6 +103,42 @@ describe.skipIf(!modulePath)("closed SNAP construction SQL (non-PDF bytes and no
   const replace = (s: Scope, packet = s.packet) => call("authenticated", "select public.parent_replace_snap_personal_pages($1,$2,$3) version", [s.request, s.version, packet], s.owner);
   const authorizePacket = (s: Scope, packet = s.packet, digest = contentHash) => call("authenticated", "select public.parent_authorize_snap_direct_packet($1,$2,$3,$4,$5,$6,$7,$8) value", [s.request, s.version, s.snapshot, s.snapshotHash, packet, digest, payload.length, s.acquisition], s.owner);
 
+  it("carries exact Spanish source through acquired metadata, construction, owned review and packet intent",async()=>{
+    const s=await setup(300,fixtureSnapApplication(new Date()),true,true,SNAP_ES_TEMPLATE_ID),result=await complete(s);
+    expect(result.construction.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);
+    const review=(await call("authenticated","select public.parent_get_snap_review($1,$2) value",[s.request,s.version],s.owner)).rows[0].value;
+    expect(review).toMatchObject({operationId:result.operation,state:"prepared",protectedPacketCurrent:true,personalActsComplete:false,snapSubmissionAuthorized:false});
+    const intent=(await discover(s)).rows[0].value.intent;expect(intent).toMatchObject({templateId:SNAP_ES_TEMPLATE_ID,templateVersion:SNAP_SPANISH_APPLICATION_SOURCE.templateVersion,templateSha256:SNAP_SPANISH_APPLICATION_SOURCE.templateSha256});
+    expect((await row(s))?.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);
+    expect((await counts()).packets).toBeGreaterThan(0);
+    await fixture.admin.query("update parent_private.provider_capabilities set snap_spanish_completion_evidence_reference=null,snap_spanish_completion_validator_version=null,snap_spanish_completion_verified_until=null where program_id='snap-pa' and action='submit'");
+    await expect(context(s)).rejects.toMatchObject({code:"42501"});
+    await expect(call("authenticated","select public.parent_get_snap_review($1,$2)",[s.request,s.version],s.owner)).rejects.toMatchObject({code:"42501"});
+  });
+  it("bounds new Spanish protected permission by its separate method deadline and denies expired evidence",async()=>{
+    const s=await setup(300,fixtureSnapApplication(new Date()),false,false,SNAP_ES_TEMPLATE_ID),until=new Date(Date.now()+30000).toISOString();
+    await fixture.admin.query("update parent_private.provider_capabilities set snap_spanish_completion_verified_until=$1 where program_id='snap-pa' and action='submit'",[until]);
+    const permission=(await call("authenticated","select public.parent_get_snap_direct_acquisition($1,$2,$3,$4) value",[s.request,s.version,s.snapshot,s.snapshotHash],s.owner)).rows[0].value;
+    expect(permission.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);expect(Date.parse(permission.expiresAt)).toBeLessThanOrEqual(Date.parse(until));
+    await fixture.admin.query("update parent_private.provider_capabilities set snap_spanish_completion_verified_until=now()-interval '1 second' where program_id='snap-pa' and action='submit'");
+    await expect(call("authenticated","select public.parent_get_snap_direct_acquisition($1,$2,$3,$4)",[s.request,s.version,s.snapshot,s.snapshotHash],s.owner)).rejects.toMatchObject({code:"42501"});
+  });
+  it("does not reuse English consent, signature evidence or unknown delivery bytes for a source-only correction",async()=>{
+    const s=await setup(),completed=await complete(s),packetBefore=(await fixture.admin.query("select to_jsonb(p) value from parent_private.snap_final_packets p where id=$1",[s.packet])).rows[0].value;
+    await fixture.admin.query("update public.parent_operations set state='delivery_unknown' where id=$1",[completed.operation]);
+    const details=(await fixture.admin.query("select details from public.parent_snap_application_details where id=$1",[s.snapshot])).rows[0].details;
+    const currentId=(await call("authenticated","select public.parent_save_snap_application_source($1,$2,$3,$4,$5,$6) id",[s.request,s.version,JSON.stringify(details),SNAP_APPLICATION_NOTICE_VERSION,randomUUID(),SNAP_ES_TEMPLATE_ID],s.owner)).rows[0].id;
+    const binding=(await fixture.admin.query("select parent_private.snap_application_binding($1,$2) value",[s.request,s.version+1])).rows[0].value;
+    expect(binding.snapshot.id).toBe(currentId);expect(binding.snapshot.source).toEqual(SNAP_SPANISH_APPLICATION_SOURCE);
+    expect((await fixture.admin.query("select to_jsonb(p) value from parent_private.snap_final_packets p where id=$1",[s.packet])).rows[0].value).toEqual(packetBefore);
+    expect((await fixture.admin.query("select state,packet from public.parent_operations where id=$1",[completed.operation])).rows[0]).toMatchObject({state:"delivery_unknown",packet:{protectedSnapPacket:{packetId:s.packet}}});
+    await expect(discover({...s,version:s.version+1,snapshot:currentId,snapshotHash:binding.snapshotHash})).rejects.toMatchObject({code:"42501"});
+    await expect(call("authenticated","select public.parent_get_snap_direct_acquisition($1,$2,$3,$4)",[s.request,s.version+1,currentId,binding.snapshotHash],s.owner)).rejects.toMatchObject({code:"42501"});
+    await fixture.admin.query("update parent_private.provider_capabilities set snap_spanish_completion_validator_version=$1,snap_spanish_completion_evidence_reference='synthetic exact ES only',snap_spanish_completion_verified_until=now()+interval '1 hour' where program_id='snap-pa' and action='submit'",[version]);
+    const permission=(await call("authenticated","select public.parent_get_snap_direct_acquisition($1,$2,$3,$4) value",[s.request,s.version+1,currentId,binding.snapshotHash],s.owner)).rows[0].value;
+    expect(permission).toMatchObject({state:"permission_needed",acquisitionId:null,source:SNAP_SPANISH_APPLICATION_SOURCE});
+    await expect(authorizePacket({...s,version:s.version+1,snapshot:currentId,snapshotHash:binding.snapshotHash})).rejects.toMatchObject({code:"42501"});
+  });
   it("returns NULL only for no registered direct intent, then rediscovers the exact intent and sealed pointer without writes", async () => {
     const s = await setup(300, fixtureSnapApplication(new Date()), true, false), before = await counts();
     expect((await discover(s)).rows[0].value).toBeNull(); expect((await capture(s)).rows[0].value).toBeNull(); expect(await counts()).toEqual(before);

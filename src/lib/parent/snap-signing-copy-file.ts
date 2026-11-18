@@ -1,5 +1,5 @@
 import { z } from "zod";
-import source from "../../../data/verified-forms/snap-pa600fs-2019.json";
+import { snapFormSource } from "./snap-form-source";
 import { mandateSchema } from "./domain";
 import { snapCaptureContextSchema } from "./snap-capture-context";
 import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema } from "./snap-application-snapshot";
@@ -28,8 +28,7 @@ export async function loadSnapSigningCopyFile(input: unknown, signal: AbortSigna
   try {
     bounded.throwIfAborted();
     const value = inputSchema.parse(input), { context, snapshot, mandate } = value;
-    // The snapshot's custom source schema does not copy this object.
-    snapshot.source = { ...snapshot.source };
+    const source = snapFormSource(snapshot.source.templateId).contract;
     const preparedAt = new Date(snapshot.created_at).toISOString();
     const current = () => {
       bounded.throwIfAborted();

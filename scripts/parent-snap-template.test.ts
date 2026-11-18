@@ -1,3 +1,4 @@
+import { SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "../src/lib/parent/snap-form-source";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
@@ -18,6 +19,13 @@ describe("local SNAP template installation", () => {
     expect(preview.id).not.toBe(draft.id); expect(preview.version).not.toBe(draft.version);
     expect(preview).toMatchObject({ preparation_only: true, field_map: {}, required_fields: [], required_acts: [] });
     expect(preview.content_sha256).toBe(draft.content_sha256); expect(preview.object_path).toBe(draft.object_path);
+  });
+  it("describes an exact Spanish private preview without installing it or extending its source ceiling",()=>{
+    const spanish=readFileSync("data/verified-forms/snap-pa600fs-es-2019.pdf"),record=snapTemplateRecord(spanish,new Date("2026-11-18T11:00:00Z"),"application-preview",SNAP_ES_TEMPLATE_ID);
+    expect(record).toMatchObject({id:"pa-snap-pa600fs-sg-2019-es-preview",version:"application-preview-2026-11-18.v1",content_sha256:SNAP_SPANISH_APPLICATION_SOURCE.templateSha256,field_map:{},preparation_only:true,verified_until:"2026-12-03T05:00:00.000Z"});
+    expect(()=>snapTemplateRecord(source,new Date("2026-11-18"),"application-preview",SNAP_ES_TEMPLATE_ID)).toThrow("differs");
+    expect(()=>snapTemplateRecord(spanish,new Date("2026-11-18"),"zip-draft",SNAP_ES_TEMPLATE_ID)).toThrow("full private application");
+    expect(()=>snapTemplateRecord(spanish,new Date("2026-11-18"),"application-preview","../../private")).toThrow("source_invalid");
   });
   it.each([
     { API_URL: "https://example.supabase.co" },

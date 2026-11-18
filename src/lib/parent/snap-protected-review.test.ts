@@ -1,3 +1,4 @@
+import { SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 import { createHash } from "node:crypto";
 import { request as httpRequest, type Server } from "node:http";
 import { readFileSync } from "node:fs";
@@ -315,6 +316,11 @@ describe("closed isolated direct construction channel (synthetic finalizer repli
       headers: { Host: new URL(config.publicOrigin).host, Origin: config.publicOrigin, Cookie: "caselink-parent-auth=synthetic-cookie",
         "Content-Type": "application/json", "Content-Length": String(typeof body === "string" ? Buffer.byteLength(body) : JSON.stringify(syntheticInput).length), ...headers } });
   }
+  it("loads only the fixed Spanish asset selected by the exact authorized intent",async()=>{
+    metadata.state="authorized";Object.assign(metadata.intent,{templateId:SNAP_SPANISH_APPLICATION_SOURCE.templateId,templateVersion:SNAP_SPANISH_APPLICATION_SOURCE.templateVersion,templateSha256:SNAP_SPANISH_APPLICATION_SOURCE.templateSha256});
+    let seenHash="";mocks.direct.mockImplementation(async(_intent,_input,template)=>{seenHash=hash(template);return {state:"stored",binding:{...metadata.intent,expiresAt:new Date(Date.now()+60000).toISOString()}};});
+    expect((await createSnapProtectedReviewHandler(config)(completion())).status).toBe(201);expect(seenHash).toBe(SNAP_SPANISH_APPLICATION_SOURCE.templateSha256);
+  });
   it("checks current owned authority before reading JSON and supplies only the pinned public template to the isolated finalizer", async () => {
     metadata.state = "authorized";
     const raw = Buffer.from(JSON.stringify(syntheticInput));

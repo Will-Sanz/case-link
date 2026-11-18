@@ -35,7 +35,8 @@ import { canonicalProjectOrigin } from "./project-origin";
 import { parentStorageDownloadAllowed } from "./storage-download";
 import { getProgram, programRoutingIssue } from "./programs";
 import { renderSnapPreparationDraft, renderSnapApplicationPreview, SNAP_DRAFT_CONTRACT } from "./snap-draft";
-import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema, SNAP_PREVIEW_TEMPLATE_ID, SNAP_PREVIEW_TEMPLATE_VERSION } from "./snap-application-snapshot";
+import { assessSnapApplicationSnapshot, snapApplicationSnapshotSchema } from "./snap-application-snapshot";
+import { snapFormSource, snapFormPreview } from "./snap-form-source";
 import {
   runSupportService,
   type ServiceCapability,
@@ -671,8 +672,8 @@ export async function runOneParentJob(
     dataCategories: z.array(z.enum(["household", "income"])).min(1).max(2),
     template: templateSchema, artifact: artifactSchema.extend({
       request_id: z.uuid(), request_version: z.number().int().positive(), snap_snapshot_id: z.uuid(), snap_snapshot_hash: z.string().regex(/^[a-f0-9]{64}$/),
-      template_id: z.literal(SNAP_PREVIEW_TEMPLATE_ID), template_version: z.literal(SNAP_PREVIEW_TEMPLATE_VERSION),
-      template_hash: z.literal(SNAP_DRAFT_CONTRACT.sha256), preparation_only: z.literal(true), status: z.literal("stored"), expires_at: iso,
+      template_id: z.string(), template_version: z.string(),
+      template_hash: z.string().regex(/^[a-f0-9]{64}$/), preparation_only: z.literal(true), status: z.literal("stored"), expires_at: iso,
     }).nullable(),
   }).strict();
   let snapPreviewUnavailable=false;
@@ -687,15 +688,17 @@ export async function runOneParentJob(
     }
     if (raw == null) return null;
     const state = snapPreviewSchema.parse(raw), template = state.template;
-    if (state.snapshot.request_id !== request.id || template.id !== SNAP_PREVIEW_TEMPLATE_ID ||
-      template.version !== SNAP_PREVIEW_TEMPLATE_VERSION || template.program_id !== "snap-pa" ||
+    const source = snapFormSource(state.snapshot.source.templateId).contract, preview = snapFormPreview(source.id);
+    if (state.snapshot.request_id !== request.id || template.id !== preview.id ||
+      template.version !== preview.version || template.program_id !== "snap-pa" ||
       template.needs.length !== 1 || template.needs[0] !== "snap_new" || !template.preparation_only ||
       Object.keys(template.field_map).length || template.required_fields.length || template.personal_fields.length || template.required_acts.length ||
-      template.content_sha256 !== SNAP_DRAFT_CONTRACT.sha256 || Date.parse(template.verified_until) <= now().getTime() ||
-      Date.parse(template.verified_until) > Date.parse(SNAP_DRAFT_CONTRACT.verifiedUntil))
+      template.content_sha256 !== source.sha256 || Date.parse(template.verified_until) <= now().getTime() ||
+      Date.parse(template.verified_until) > Date.parse(source.verifiedUntil))
       throw new Error("snap_preview_contract_changed");
     if (state.artifact && (state.artifact.request_id !== request.id || state.artifact.request_version !== request.version ||
       state.artifact.snap_snapshot_id !== state.snapshot.id || state.artifact.snap_snapshot_hash !== state.snapshotHash ||
+      state.artifact.template_id !== preview.id || state.artifact.template_version !== preview.version || state.artifact.template_hash !== source.sha256 ||
       Date.parse(state.artifact.expires_at) <= now().getTime())) throw new Error("snap_preview_binding_changed");
     return state;
   };
@@ -1116,7 +1119,7 @@ export async function runOneParentJob(
             snapApplication: { ...metadata, state: "service_blocked", serviceQuestions: [...metadata.serviceQuestions, "service_area_review"] } };
           if (preview.artifact) return { ...common, artifactId: preview.artifact.id, contentSha256: preview.artifact.content_sha256 };
           const source = await download("parent-known-forms", preview.template.object_path);
-          const rendered = await renderSnapApplicationPreview(source, snapshot.details, now());
+          const rendered = await renderSnapApplicationPreview(source, snapshot.details, now(), snapshot.source.templateId);
           if (!rendered.bytes) return { ...common, snapApplication: { ...metadata, state: "service_blocked",
             renderingRequirements: rendered.readiness.renderingRequirements } };
           const artifact = artifactSchema.parse(await rpc(

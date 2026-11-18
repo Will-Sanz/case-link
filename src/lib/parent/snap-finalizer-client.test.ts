@@ -1,3 +1,4 @@
+import { SNAP_ES_TEMPLATE_ID, SNAP_SPANISH_APPLICATION_SOURCE } from "./snap-form-source";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -213,6 +214,29 @@ describe("isolated SNAP finalizer client (synthetic pg replies; no live database
 
 describe("closed direct construction (actual renderer, synthetic scoped SQL replies)",()=>{
  beforeEach(()=>{vi.useRealTimers();vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(time);});
+ it("constructs, encrypts and reconciles exact Spanish bytes without redispatch or converting English evidence",async()=>{
+  const at=new Date("2026-11-18T11:00:00Z"),prepared=new Date(at.getTime()-60000);vi.setSystemTime(at);
+  const template=readFileSync("data/verified-forms/snap-pa600fs-es-2019.pdf"),fields=fixtureSnapApplication(prepared);
+  const snapshot={...fixtureSnapSnapshot(prepared,fields),id:intent().snapshotId,request_id:intent().requestId,source:SNAP_SPANISH_APPLICATION_SOURCE};
+  const unsigned=(await renderSnapSigningCopy(template,fields,prepared,SNAP_ES_TEMPLATE_ID)).bytes!;
+  const trusted={...directData.trusted,snapshot,preparedAt:prepared.toISOString(),unsignedContentSha256:createHash("sha256").update(unsigned).digest("hex"),context:{...directData.trusted.context,source:SNAP_SPANISH_APPLICATION_SOURCE}};
+  const completion={...structuredClone(directData.completion),source:SNAP_SPANISH_APPLICATION_SOURCE,unsignedContentSha256:trusted.unsignedContentSha256,certifications:directData.completion.certifications.map((act,i)=>({...act,startedAt:new Date(prepared.getTime()+10000+i*20000).toISOString(),completedAt:new Date(prepared.getTime()+20000+i*20000).toISOString(),date:"2026-11-18"}))};
+  const rendered=await directRenderer.renderSnapDirectCompletion(template,trusted,completion,at);expect(rendered.bytes!==null).toBe(true);if(!rendered.bytes)throw new Error("Synthetic Spanish construction unavailable");
+  const selected={...intent(),templateId:SNAP_ES_TEMPLATE_ID,templateVersion:SNAP_SPANISH_APPLICATION_SOURCE.templateVersion,templateSha256:SNAP_SPANISH_APPLICATION_SOURCE.templateSha256,contentSha256:rendered.contentSha256,byteLength:rendered.byteLength};
+  const bound={...selected,expiresAt:new Date(at.getTime()+60000).toISOString()},proof={...construction(),source:SNAP_SPANISH_APPLICATION_SOURCE,contentSha256:selected.contentSha256,verifiedAt:at.toISOString(),expiresAt:bound.expiresAt},store:Store={};
+  const context={intent:selected,context:trusted.context,snapshot,preparedAt:trusted.preparedAt,state:"authorized"};
+  mocked.plans.push({binding:bound,directContext:context,construction:proof,store,lostCommit:true});
+  expect(await finalizeSnapDirectCompletion(selected,completion,template,options())).toEqual({state:"commit_unknown",intent:selected});
+  expect(store.construction).toEqual(proof);const envelope=store.value!,clear=packetCrypto.openSnapFinalPacket({binding:envelope.binding,iv:Buffer.from(envelope.iv,"base64"),tag:Buffer.from(envelope.tag,"base64"),ciphertext:Buffer.from(envelope.ciphertext,"base64")},fixtureKey,at);
+  expect(Buffer.from(clear).equals(Buffer.from(rendered.bytes!))).toBe(true);clear.fill(0);rendered.bytes?.fill(0);unsigned.fill(0);
+  mocked.plans.push({binding:bound,store,directContext:{...context,state:"stored"}});expect(await reconcileSnapDirectCompletion(selected,options())).toEqual({state:"stored",binding:bound,construction:proof});
+  expect(queries(1).some(sql=>/parent_begin_snap|parent_seal_snap|parent_record_snap/.test(sql))).toBe(false);
+  for(const canary of ["900000001","strokes"])expect(JSON.stringify(mocked.clients.map(client=>client.calls))).not.toContain(canary);
+ });
+ it("rejects a valid Spanish construction proof attached to an English exact intent",async()=>{
+  mocked.plans.push(directPlan({construction:{...construction(),source:SNAP_SPANISH_APPLICATION_SOURCE}}));
+  await expect(finalize()).rejects.toThrow(SNAP_FINALIZER_ERROR);expect(queries()).not.toContain("commit");expect(queries()).toContain("rollback");
+ });
  it("constructs from DB facts, seals/evidences once atomically and copies caller inputs before awaits",async()=>{
   const store:Store={},value=directInput();mocked.plans.push(directPlan({store}));
   const pending=finalize(value);value.intent.requestVersion++;value.template.fill(0);value.completion.certifications[0].strokes[0][0].x=0.99;

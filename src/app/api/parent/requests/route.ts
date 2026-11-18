@@ -21,6 +21,7 @@ import {
 } from "@/lib/parent/progress-data";
 import { SNAP_APPLICATION_NOTICE_VERSION, startSnapApplication } from "@/lib/parent/snap-application-data";
 import { snapApplicationFieldsValueSchema } from "@/lib/parent/snap-application-fields";
+import { snapFormTemplateIdSchema } from "@/lib/parent/snap-form-source";
 import { WIC_APPLICATION_NOTICE_VERSION, startWicApplication, wicInitialIntakeSchema } from "@/lib/parent/wic-application-data";
 import { wicApplicationFieldsValueSchema } from "@/lib/parent/wic-application-fields";
 import { startPecoApplication, pecoInitialIntakeSchema } from "@/lib/parent/peco-application-data";
@@ -33,7 +34,7 @@ import { waterApplicationWriteSchema } from "@/lib/parent/water-application-snap
 const startSchema = z.union([
   z.object({ intake: intakeSchema, mandate: mandateSchema, reusedZip: reusedZipSourceSchema.optional() }).strict(),
   z.object({ kind: z.literal("snap_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: intakeSchema, mandate: mandateSchema,
-    details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION) }).strict(),
+    details: snapApplicationFieldsValueSchema, noticeVersion: z.literal(SNAP_APPLICATION_NOTICE_VERSION), documentTemplateId: snapFormTemplateIdSchema.optional() }).strict(),
   z.object({ kind: z.literal("wic_application"), familyProfileSource: familyProfileSourceSchema.optional(), intake: wicInitialIntakeSchema, mandate: mandateSchema,
     details: wicApplicationFieldsValueSchema, noticeVersion: z.literal(WIC_APPLICATION_NOTICE_VERSION), subjectAuthorityDeclared: z.literal(true), reusedZip: reusedZipSourceSchema.optional() }).strict(),
   pecoApplicationWriteSchema.omit({ expectedVersion: true }).extend({ kind: z.literal("peco_application"),
@@ -104,7 +105,8 @@ export async function POST(request: Request) {
           subjectAuthorityDeclared: value.subjectAuthorityDeclared, accountAuthorityDeclared: value.accountAuthorityDeclared }, idempotencyKey, value.reusedZip)
         : value.kind === "wic_application"
         ? await startWicApplication(value.intake, value.mandate, value.details, value.noticeVersion, value.subjectAuthorityDeclared, idempotencyKey, value.reusedZip, ...(value.familyProfileSource ? [value.familyProfileSource] : []))
-        : await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey, ...(value.familyProfileSource ? [value.familyProfileSource] : []))
+        : await startSnapApplication(value.intake, value.mandate, value.details, value.noticeVersion, idempotencyKey,
+          ...(value.documentTemplateId ? [value.familyProfileSource, value.documentTemplateId] : value.familyProfileSource ? [value.familyProfileSource] : []))
       : value.reusedZip
         ? await startSupportRequest(value.intake, value.mandate, idempotencyKey, value.reusedZip)
         : await startSupportRequest(value.intake, value.mandate, idempotencyKey);

@@ -5,17 +5,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
-import { SNAP_DRAFT_CONTRACT } from "../src/lib/parent/snap-draft";
-import { SNAP_PREVIEW_TEMPLATE_ID, SNAP_PREVIEW_TEMPLATE_VERSION } from "../src/lib/parent/snap-application-snapshot";
+import { SNAP_EN_TEMPLATE_ID, snapFormSource, snapFormPreview } from "../src/lib/parent/snap-form-source";
 
-export function snapTemplateRecord(bytes: Uint8Array, now: Date, profile: "zip-draft" | "application-preview" = "zip-draft") {
-  const form = SNAP_DRAFT_CONTRACT;
+export function snapTemplateRecord(bytes: Uint8Array, now: Date, profile: "zip-draft" | "application-preview" = "zip-draft", templateId: unknown = SNAP_EN_TEMPLATE_ID) {
+  const form = snapFormSource(templateId).contract, preview = snapFormPreview(form.id);
+  assert.ok(profile === "application-preview" || form.id === SNAP_EN_TEMPLATE_ID, "Spanish needs a full private application snapshot.");
   assert.ok(Number.isFinite(now.getTime()) && now.getTime() >= Date.parse(`${form.sourceCheckedAt}T00:00:00Z`) && now.getTime() < Date.parse(form.verifiedUntil), "The official form needs a current review.");
   assert.equal(bytes.length, form.byteLength, "The official form differs from its reviewed source.");
   assert.equal(createHash("sha256").update(bytes).digest("hex"), form.sha256, "The official form differs from its reviewed source.");
   return {
-    id: profile === "application-preview" ? SNAP_PREVIEW_TEMPLATE_ID : form.id,
-    version: profile === "application-preview" ? SNAP_PREVIEW_TEMPLATE_VERSION : form.version, program_id: "snap-pa", needs: ["snap_new"],
+    id: profile === "application-preview" ? preview.id : form.id,
+    version: profile === "application-preview" ? preview.version : form.version, program_id: "snap-pa", needs: ["snap_new"],
     content_sha256: form.sha256, object_path: `snap-pa/${form.version}.pdf`,
     field_map: profile === "application-preview" ? {} : { ZIP: "zip" }, required_acts: [],
     required_fields: profile === "application-preview" ? [] : ["zip"], personal_fields: [],
