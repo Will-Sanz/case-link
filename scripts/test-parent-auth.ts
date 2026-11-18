@@ -1,11 +1,11 @@
-/** Actual local Auth, email, browser and Data API checks. No API interception or remote targets. */
+/** Actual local Auth, email, browser and Data API checks. One labeled lost ACK follows a real server write; no remote targets. */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { chromium, type BrowserContext, type Page, type Request as BrowserRequest } from "@playwright/test";
+import { chromium, type BrowserContext, type Page, type Request as BrowserRequest, type APIResponse, type Route } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
@@ -23,6 +23,7 @@ import { pgwApplicationSnapshotSchema } from "../src/lib/parent/pgw-application-
 import { WATER_APPLICATION_NOTICE_VERSION, WATER_APPLICATION_REFERENCE, WATER_SUBJECT_AUTHORITY_STATEMENT, WATER_ACCOUNT_AUTHORITY_STATEMENT } from "../src/lib/parent/water-application-fields";
 import { waterApplicationSnapshotSchema } from "../src/lib/parent/water-application-snapshot";
 import { foodAccessPlanSchema, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM } from "../src/lib/parent/food-access";
+import { FAMILY_PROFILE_NOTICE_VERSION, familyProfileReadSchema } from "../src/lib/parent/family-profile";
 import { fixtureIntake, fixtureMandate } from "../src/lib/parent/test-fixtures";
 import type { SupportRequest } from "../src/lib/parent/domain";
 import { runOneParentJob } from "../src/lib/parent/worker-runtime";
@@ -432,6 +433,31 @@ async function main() {
     await foodSetupStep("closing the owned native food request viewer before work", () => foodViewer.close());
     check(foodViewer.isClosed(), "The owned request viewer closes before its durable food continuation runs.");
     const foodWorker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
+    let cityChecks = 0;
+    async function foodTurn(requestId = foodRequestId, worker = foodWorker) {
+      const before = cityChecks;
+      const result = await runOneParentJob({
+        database: { query: async (sql, values) => {
+          const result = await worker.query(sql, values);
+          if (sql.includes("parent_claim_job(")) check(result.rows[0]?.job?.request?.id === requestId,
+            "The isolated continuation claims only this run's owned public food request.");
+          return result;
+        } },
+        continuationOnly: true,
+        brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "isolated-public-food-fixture-no-real-broker", supabaseOrigin: local.API_URL,
+        fetcher: async (input, init) => {
+          const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+          check(url.origin === "https://services.arcgis.com" && url.pathname === "/fLeGjb7u4uXqeF9q/arcgis/rest/services/free_meal_sites/FeatureServer/0/query"
+            && url.searchParams.get("where") === "objectid=122" && (init?.method ?? "GET") === "GET",
+          "The worker's only fetch is the fixed synthetic City122 public-record check; no broker, provider or model can be contacted.");
+          cityChecks++;
+          return Response.json({ features: [{ attributes: { objectid: 122, site_name: "Share Community Fridge", address: "2901 W Hunting Park Ave",
+            zip_code: "19129", status: "Active", category_type: "Food Site", temporary_closure: null, seasonally_closed: null } }] });
+        },
+      });
+      check(result.state === "saved" && cityChecks === before + 1,
+        "A no-key native continuation saves one food turn using only the explicit City fixture.");
+    }
     type FoodMembership = { role_name: string; grantor: string; admin_option: boolean; inherit_option: boolean; set_option: boolean };
     const foodMemberships = async () => (await db.query("select granted.rolname role_name,grantor.rolname grantor,m.admin_option,m.inherit_option,m.set_option from pg_auth_members m join pg_roles member on member.oid=m.member join pg_roles granted on granted.oid=m.roleid join pg_roles grantor on grantor.oid=m.grantor where member.rolname=current_user order by granted.rolname,grantor.rolname")).rows as FoodMembership[];
     const foodIdentifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -458,31 +484,6 @@ async function main() {
       await foodSetupStep("selecting the restricted native public food worker role", () => foodWorker.query("set role parent_worker"));
       check((await foodSetupStep("verifying the restricted native public food worker role", () => foodWorker.query("select current_user as role"))).rows[0].role === "parent_worker",
         "The native public food continuation runs under the actual restricted parent_worker role.");
-      let cityChecks = 0;
-      async function foodTurn(requestId = foodRequestId) {
-        const before = cityChecks;
-        const result = await runOneParentJob({
-          database: { query: async (sql, values) => {
-            const result = await foodWorker.query(sql, values);
-            if (sql.includes("parent_claim_job(")) check(result.rows[0]?.job?.request?.id === requestId,
-              "The isolated continuation claims only this run's owned public food request.");
-            return result;
-          } },
-          continuationOnly: true,
-          brokerOrigin: "http://127.0.0.1:3310", brokerSecret: "isolated-public-food-fixture-no-real-broker", supabaseOrigin: local.API_URL,
-          fetcher: async (input, init) => {
-            const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
-            check(url.origin === "https://services.arcgis.com" && url.pathname === "/fLeGjb7u4uXqeF9q/arcgis/rest/services/free_meal_sites/FeatureServer/0/query"
-              && url.searchParams.get("where") === "objectid=122" && (init?.method ?? "GET") === "GET",
-            "The worker's only fetch is the fixed synthetic City122 public-record check; no broker, provider or model can be contacted.");
-            cityChecks++;
-            return Response.json({ features: [{ attributes: { objectid: 122, site_name: "Share Community Fridge", address: "2901 W Hunting Park Ave",
-              zip_code: "19129", status: "Active", category_type: "Food Site", temporary_closure: null, seasonally_closed: null } }] });
-          },
-        });
-        check(result.state === "saved" && cityChecks === before + 1,
-          "A no-key native continuation saves one food turn using only the explicit City fixture.");
-      }
       stage = "native food preparation without the request viewer";
       await foodTurn();
       const preparedFood = await readFoodRequest();
@@ -1317,8 +1318,8 @@ async function main() {
       await first.page.getByRole("button", { name: "Correct application answers" }).waitFor();
       await checkSnapPage("review");
       const snapUrl = `${origin}/api/parent/requests/${snapRequestId}/snap-application`;
-      const readSnap = async (revision?: string) => {
-        const response = await first.page.request.get(`${snapUrl}${revision ? `?revision=${revision}` : ""}`);
+      const readSnap = async (revision?: string, requestId = snapRequestId) => {
+        const response = await first.page.request.get(`${origin}/api/parent/requests/${requestId}/snap-application${revision ? `?revision=${revision}` : ""}`);
         check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "Owned SNAP revision reads succeed privately through the real web API.");
         return (await response.json()).snapshot as SnapApplicationSnapshot;
       };
@@ -1331,12 +1332,12 @@ async function main() {
       const ownerSnap = await rest(token, `parent_snap_application_details?request_id=eq.${snapRequestId}`);
       check(ownerSnap.status === 200, "The issued owner Auth token reads its own private SNAP snapshot through actual PostgREST.");
       assert.deepEqual(await ownerSnap.json(), [originalSnap]);
-      const snapState = async () => (await db.query(`select to_jsonb(r) request,to_jsonb(j) job,
+      const snapState = async (requestId = snapRequestId) => (await db.query(`select to_jsonb(r) request,to_jsonb(j) job,
         (select jsonb_agg(to_jsonb(d) order by d.revision) from public.parent_snap_application_details d where d.request_id=r.id) snapshots,
         (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]') from public.parent_events e where e.request_id=r.id) events,
         (select count(*)::int from public.parent_operations o where o.request_id=r.id) operations,
         (select count(*)::int from parent_private.ai_calls a where a.request_id=r.id) model_calls
-        from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [snapRequestId])).rows[0];
+        from public.parent_requests r join public.parent_jobs j on j.request_id=r.id where r.id=$1`, [requestId])).rows[0];
       const snapBeforeRetry = await snapState();
       check(snapBeforeRetry.job.request_version === originalSnap.request_version && snapBeforeRetry.job.state === "queued" &&
         !JSON.stringify([snapBeforeRetry.request, snapBeforeRetry.job, snapBeforeRetry.events]).includes("AuthSnapCanary"),
@@ -1441,6 +1442,209 @@ async function main() {
       assert.deepEqual(await readSnap(originalSnap.id), originalSnap);
       assert.deepEqual(await readSnap(correctedSnap.id), correctedSnap);
       assert.deepEqual(await readSnap(staleSnap.id), staleSnap);
+      stage = "actual mixed private SNAP, family reuse and lost start acknowledgement";
+      await db.query(`update parent_private.processing_controls set family_profile_enabled=true,
+        family_profile_approval_reference='isolated synthetic Auth family-profile fixture',family_profile_approved_until=now()+interval '1 hour',family_profile_notice_version=$1 where singleton`,
+      [FAMILY_PROFILE_NOTICE_VERSION]);
+      const profileUrl = `${origin}/api/parent/family-profile`;
+      const readProfile = async () => {
+        const response = await first.page.request.get(profileUrl);
+        check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "The actual owned family profile is read privately.");
+        const { ok, ...value } = await response.json();
+        check(ok === true, "The actual family-profile API confirms an owned read.");
+        return familyProfileReadSchema.parse(value);
+      };
+      const emptyProfile = await readProfile();
+      check(emptyProfile.ownerId === first.id && emptyProfile.revision === 0 && emptyProfile.profile === null && emptyProfile.collection.collectionEnabled,
+        "This isolated owner has no saved profile before the explicitly approved synthetic write.");
+      const profileDetails = { primaryPerson: { id: randomUUID(), firstName: "AuthProfileCanary", lastName: "Parent", dateOfBirth: "1988-04-15" },
+        homeAddress: { street: "125 Synthetic Lane", city: "Philadelphia", state: "PA", zip: "19129", county: "Philadelphia" }, preferredLanguage: "en" };
+      const profileWrite = { expectedOwnerId: first.id, expectedRevision: 0, details: profileDetails, noticeVersion: FAMILY_PROFILE_NOTICE_VERSION,
+        consentAccepted: true, subjectAuthorityDeclared: true };
+      const profileSaved = await first.page.request.post(profileUrl, { headers: { origin, "Idempotency-Key": randomUUID() }, data: profileWrite });
+      check(profileSaved.status() === 201 && (await profileSaved.json()).revision === 1, "The real owned API saves explicitly consented reusable family basics.");
+      const originalProfile = (await readProfile()).profile!;
+      await first.page.goto(`${origin}/get-support?need=food`, { waitUntil: "networkidle" });
+      await first.page.getByLabel("Do you have enough food for today and tomorrow?").selectOption("no");
+      await first.page.getByLabel(/Do you get help paying for groceries/).selectOption("never");
+      await first.page.getByRole("button", { name: "See my options", exact: true }).click();
+      await first.page.getByRole("button", { name: "Continue with both options", exact: true }).click();
+      await first.page.waitForFunction(() => (document.querySelector('[data-snap-path="applicant.firstName"]') as HTMLInputElement | null)?.value === "AuthProfileCanary");
+      check(await first.page.getByLabel("Your last name").inputValue() === "Parent" && await first.page.getByLabel("Your date of birth").inputValue() === "1988-04-15" &&
+        await first.page.locator('[data-snap-path="address.street"]').inputValue() === "125 Synthetic Lane" && await first.page.locator('[data-snap-path="zip"]').inputValue() === "19129",
+      "The actual mixed private form reuses the owned fresh profile without asking for the supplied names, birth date or address again.");
+      for (const [path, value] of Object.entries({ interpreter: "no", "income.hasIncome": "no",
+        "screening.lowCashAndIncome": "no", "screening.migrantOrSeasonal": "no", "screening.belowShelterCosts": "no",
+        "history.fleeingOrProbation.answer": "no", "history.welfareFraud.answer": "no", "history.otherStateDisqualification.answer": "no",
+        "expenseClaims.household": "do_not_claim", "expenseClaims.medical": "not_applicable" }))
+        await first.page.locator(`[data-snap-path="${path}"]`).selectOption(value);
+      for (const [label, value] of [["Your sex, as requested on the form", "female"], ["Are you a student?", "no"], ["Are you applying for SNAP?", "yes"], ["Are you a U.S. citizen?", "yes"]])
+        await first.page.getByLabel(label).selectOption(value);
+      await first.page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
+      await first.page.getByRole("button", { name: "Continue", exact: true }).click();
+      await first.page.getByRole("checkbox", { name: /I authorize/ }).check();
+      let resolveLostStart!: (value: { response: APIResponse; request: BrowserRequest }) => void, rejectLostStart!: (error: unknown) => void;
+      const lostStart = new Promise<{ response: APIResponse; request: BrowserRequest }>((resolve, reject) => { resolveLostStart = resolve; rejectLostStart = reject; });
+      const dropCommittedStartAck = async (route: Route) => {
+        if (route.request().method() !== "POST") { await route.continue(); return; }
+        try {
+          const response = await route.fetch();
+          // Only the browser acknowledgement is dropped; Auth, API and database work have actually finished.
+          await route.abort("connectionreset");
+          resolveLostStart({ response, request: route.request() });
+        } catch (error) { rejectLostStart(error); await route.abort().catch(() => {}); }
+      };
+      await first.page.route(`${origin}/api/parent/requests`, dropCommittedStartAck);
+      let committedStart: { response: APIResponse; request: BrowserRequest };
+      try {
+        const [, written] = await Promise.all([first.page.getByRole("button", { name: "Start getting support", exact: true }).click(), lostStart]);
+        committedStart = written;
+      } finally { await first.page.unroute(`${origin}/api/parent/requests`, dropCommittedStartAck); }
+      check(committedStart.response.status() === 201, "The actual mixed private start commits successfully before only its browser acknowledgement is lost.");
+      const privateMixedId = (await committedStart.response.json()).request.id as string;
+      const privateMixedBody = committedStart.request.postDataJSON(), privateMixedKey = committedStart.request.headers()["idempotency-key"];
+      assert.deepEqual(privateMixedBody.intake.needs, ["food_now", "snap_new"]);
+      check(privateMixedBody.kind === "snap_application" && privateMixedBody.noticeVersion === SNAP_APPLICATION_NOTICE_VERSION &&
+        privateMixedBody.mandate.recipientIds.includes(SHARE_FOOD_ACCESS_PROGRAM) && privateMixedBody.mandate.recipientIds.includes("snap-pa") &&
+        privateMixedBody.familyProfileSource.expectedOwnerId === first.id && privateMixedBody.familyProfileSource.revision === 1 && !!privateMixedKey,
+      "The actual lost-acknowledgement packet contains the selected mixed needs, named programs, reviewed private purpose and exact owned profile source.");
+      check(privateMixedBody.familyProfileSource.fields.some((field: { applicationPath: string; profilePaths: string[] }) => field.applicationPath === "applicant.firstName" && field.profilePaths.includes("primaryPerson.firstName")),
+        "The actual browser binds its reused applicant name to the selected family-profile leaf.");
+      await first.page.getByText(/The save result has not been confirmed/).waitFor();
+      check(await first.page.getByRole("button", { name: "Back", exact: true }).isDisabled(), "An unknown committed start keeps Back disabled until the exact attempt is reconciled.");
+      const privateMixedOriginal = await readSnap(undefined, privateMixedId), privateMixedBeforeRetry = await snapState(privateMixedId);
+      check(privateMixedOriginal.revision === 1 && privateMixedOriginal.request_version === 2 && privateMixedOriginal.idempotency_key === privateMixedKey &&
+        privateMixedBeforeRetry.job.request_version === 2 && privateMixedBeforeRetry.job.state === "queued" && privateMixedBeforeRetry.operations === 0 && privateMixedBeforeRetry.model_calls === 0,
+      "The lost acknowledgement leaves exactly one current immutable private revision and queued job without a model or provider operation.");
+      check((await db.query("select count(*)::int n from public.parent_requests where start_key=$1", [privateMixedKey])).rows[0].n === 1 &&
+        (await db.query("select count(*)::int n from public.parent_jobs where request_id=$1", [privateMixedId])).rows[0].n === 1,
+      "The real committed start creates one request and one durable job for its stable key.");
+      const retriedMixed = first.page.waitForResponse(response => response.url() === `${origin}/api/parent/requests` && response.request().method() === "POST");
+      await first.page.getByRole("button", { name: "Start getting support", exact: true }).click();
+      const retriedMixedResponse = await retriedMixed;
+      check(retriedMixedResponse.status() === 201 && (await retriedMixedResponse.json()).request.id === privateMixedId &&
+        retriedMixedResponse.request().postData() === committedStart.request.postData() && retriedMixedResponse.request().headers()["idempotency-key"] === privateMixedKey,
+      "The actual browser retries the identical mixed private body and key and acknowledges the original request.");
+      await first.page.waitForURL(`${origin}/support/${privateMixedId}`);
+      assert.deepEqual(await snapState(privateMixedId), privateMixedBeforeRetry);
+      assert.deepEqual(await readSnap(undefined, privateMixedId), privateMixedOriginal);
+      const privateMixedUrl = `${origin}/api/parent/requests/${privateMixedId}`;
+      const readPrivateMixed = async () => {
+        const response = await first.page.request.get(privateMixedUrl);
+        check(response.status() === 200 && response.headers()["cache-control"] === "private, no-store", "The actual mixed request remains privately readable by its owner.");
+        return (await response.json()).request as SupportRequest;
+      };
+      const profileSources = async (version: number) => (await db.query("select * from parent_private.family_profile_request_sources where request_id=$1 and request_version=$2 order by application_path,profile_path", [privateMixedId, version])).rows;
+      const originalBindings = await profileSources(2);
+      check(originalBindings.length > 0 && originalBindings.every(binding => binding.profile_revision === 1), "The committed mixed revision has actual versioned profile bindings.");
+      const privateWorker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
+      const privateMemberships = await foodMemberships();
+      let privateMembershipChange: { existed: boolean; set: boolean } | undefined;
+      const pausedNativeRequests: { id: string; version: number }[] = [];
+      try {
+        for (const id of [requestId, reusedRequestId]) {
+          const url = `${origin}/api/parent/requests/${id}`, read = await first.page.request.get(url);
+          check(read.status() === 200, "The worker fixture reads only its earlier owned request before temporary isolation.");
+          const current = (await read.json()).request as SupportRequest;
+          if (current.status !== "active") continue;
+          const paused = await first.page.request.post(url, { headers: { origin }, data: { action: "pause" } });
+          check(paused.status() === 200, "The actual parent API temporarily pauses an earlier active fixture before the mixed worker can claim it.");
+          pausedNativeRequests.push({ id, version: current.version });
+          const value = (await paused.json()).request as SupportRequest;
+          check(value.status === "paused" && value.version === current.version + 1, "Temporary fixture isolation advances only its own current version once.");
+        }
+        check(syntheticApproval && !!fixtureApproval && Date.parse(fixtureApproval.approvedUntil) > Date.now(), "Mixed private leased work requires the current isolated synthetic fixture approval.");
+        assertSyntheticParentAuthTargets(origin, local);
+        const existing = privateMemberships.filter(membership => membership.role_name === "parent_worker");
+        check(existing.some(membership => membership.admin_option), "The mixed fixture uses the existing ADMIN worker membership before temporarily changing SET.");
+        if (!existing.some(membership => membership.set_option)) {
+          const own = existing.find(membership => membership.grantor === foodOperator);
+          privateMembershipChange = { existed: !!own, set: own?.set_option ?? false };
+          await db.query(`grant parent_worker to ${foodIdentifier(foodOperator)} with ${own ? "" : "admin false, inherit false, "}set true`);
+        }
+        await privateWorker.connect(); await privateWorker.query("set role parent_worker");
+        check((await privateWorker.query("select current_user role")).rows[0].role === "parent_worker", "Mixed continuation uses the real restricted parent_worker role.");
+        await foodTurn(privateMixedId, privateWorker);
+        const privateMixedPrepared = await readPrivateMixed(), privateMixedPreparedState = await snapState(privateMixedId);
+        const privateFoodPlan = foodAccessPlanSchema.parse(privateMixedPrepared.plan?.routes.find(route => route.need === "food_now")?.foodAccess);
+        check(privateFoodPlan.state === "prepared" && privateFoodPlan.requestVersion === 2 && privateMixedPrepared.status === "active" &&
+          privateMixedPreparedState.job.state === "waiting" && privateMixedPreparedState.operations === 0 && privateMixedPreparedState.model_calls === 0,
+        "Actual no-key leased work prepares the public subpath while retaining the private SNAP journey and its single job.");
+        assert.deepEqual(privateMixedPrepared.plan?.routes.map(route => route.need), ["food_now", "snap_new"]);
+        check(!/AuthProfileCanary|125 Synthetic Lane/.test(JSON.stringify(privateMixedPrepared.plan?.routes.find(route => route.need === "food_now"))), "The public food route contains no reused private name or application address.");
+        assert.deepEqual(await readSnap(undefined, privateMixedId), privateMixedOriginal);
+        const profileCorrectionBody = { ...profileWrite, expectedRevision: 1, details: { ...profileDetails, primaryPerson: { ...profileDetails.primaryPerson, firstName: "AuthProfileCorrected" } } };
+        const profileCorrected = await first.page.request.post(profileUrl, { headers: { origin, "Idempotency-Key": randomUUID() }, data: profileCorrectionBody });
+        check(profileCorrected.status() === 201 && (await profileCorrected.json()).revision === 2, "The real family-profile API accepts an owned correction without new service authorization.");
+        const correctedProfile = (await readProfile()).profile!, privateMixedCorrected = await readSnap(undefined, privateMixedId), privateMixedCorrectionState = await snapState(privateMixedId);
+        check(privateMixedCorrected.revision === 2 && privateMixedCorrected.request_version === 3 && privateMixedCorrected.base_version === 2 &&
+          privateMixedCorrected.details.applicant?.firstName === "AuthProfileCorrected" && privateMixedCorrectionState.request.version === 3 &&
+          privateMixedCorrectionState.job.request_version === 3 && privateMixedCorrectionState.job.state === "queued",
+        "A real profile correction atomically creates the next immutable mixed SNAP revision and queues only its current request version.");
+        assert.deepEqual(privateMixedCorrectionState.request.mandate, privateMixedPreparedState.request.mandate);
+        assert.deepEqual(privateMixedCorrectionState.request.plan, privateMixedPreparedState.request.plan);
+        assert.deepEqual(privateMixedCorrectionState.request.intake, privateMixedPreparedState.request.intake);
+        assert.deepEqual(privateMixedCorrectionState.request.facts, privateMixedPreparedState.request.facts);
+        assert.deepEqual(await readSnap(privateMixedOriginal.id, privateMixedId), privateMixedOriginal);
+        assert.deepEqual(await profileSources(2), originalBindings);
+        const changedNamePaths = ["applicant.firstName", `household.${profileDetails.primaryPerson.id}.firstName`];
+        for (const [path, evidence] of Object.entries(privateMixedOriginal.provenance))
+          if (!changedNamePaths.includes(path)) assert.deepEqual(privateMixedCorrected.provenance[path], evidence);
+        assert.deepEqual(correctedProfile.provenance["primaryPerson.lastName"], originalProfile.provenance["primaryPerson.lastName"]);
+        assert.equal(new Date(privateMixedCorrected.provenance["applicant.firstName"].confirmedAt).toISOString(), new Date(correctedProfile.provenance["primaryPerson.firstName"].confirmedAt).toISOString());
+        const currentBindings = await profileSources(3);
+        check(currentBindings.some(binding => binding.application_path === "applicant.firstName" && binding.profile_revision === 2) &&
+          (await db.query("select parent_private.current_grant($1,3) allowed", [privateMixedId])).rows[0].allowed,
+        "The corrected mixed work retains current owned source bindings and its existing bounded mandate.");
+        const stalePrivateStart = await first.page.request.post(`${origin}/api/parent/requests`, { headers: { origin, "Idempotency-Key": privateMixedKey }, data: privateMixedBody });
+        check(stalePrivateStart.status() === 409, "A superseded lost-start packet cannot overwrite the subsequent profile correction.");
+        const staleFoodReport = await first.page.request.post(`${privateMixedUrl}/outcome`, { headers: { origin }, data: { action: "food_visit", expectedVersion: 2,
+          siteId: privateFoodPlan.site.id, planHash: privateFoodPlan.planHash, reportKey: randomUUID(), result: "no_food" } });
+        check(staleFoodReport.status() === 409, "The older food plan cannot accept a report after the shared request version changed.");
+        assert.deepEqual(await snapState(privateMixedId), privateMixedCorrectionState);
+        await foodTurn(privateMixedId, privateWorker);
+        const currentPrivateMixed = await readPrivateMixed(), currentPrivateFood = foodAccessPlanSchema.parse(currentPrivateMixed.plan?.routes.find(route => route.need === "food_now")?.foodAccess);
+        check(currentPrivateMixed.version === 3 && currentPrivateMixed.status === "active" && currentPrivateFood.state === "prepared" && currentPrivateFood.requestVersion === 3,
+          "The real worker resumes at the corrected version and rebuilds only current public directions without losing SNAP work.");
+        assert.deepEqual(currentPrivateMixed.plan?.routes.map(route => route.need), ["food_now", "snap_new"]);
+        assert.deepEqual(await readSnap(undefined, privateMixedId), privateMixedCorrected);
+        const resumedPrivateState = await snapState(privateMixedId);
+        check(resumedPrivateState.operations === 0 && resumedPrivateState.model_calls === 0 && !/AuthProfileCanary|AuthProfileCorrected|125 Synthetic Lane/.test(JSON.stringify(currentPrivateMixed.plan?.routes.find(route => route.need === "food_now"))),
+          "Corrected public continuation keeps both private names and the application address out of the food route and creates no provider operation or model call.");
+        check((await second.page.request.get(`${privateMixedUrl}/snap-application`)).status() === 404, "A second actual household cannot read the mixed private application.");
+        const mixedExportResponse = await first.page.request.get(`${origin}/api/parent/account/export`);
+        check(mixedExportResponse.status() === 200 && mixedExportResponse.headers()["cache-control"] === "private, no-store", "The actual owner can export the mixed private revision history privately.");
+        const mixedExport = (await mixedExportResponse.json()).requests.find((row: { id: string }) => row.id === privateMixedId);
+        assert.deepEqual(mixedExport.snapApplicationDetails.find((row: SnapApplicationSnapshot) => row.id === privateMixedOriginal.id), privateMixedOriginal);
+        assert.deepEqual(mixedExport.snapApplicationDetails.find((row: SnapApplicationSnapshot) => row.id === privateMixedCorrected.id), privateMixedCorrected);
+        const cancelledMixed = await first.page.request.post(privateMixedUrl, { headers: { origin }, data: { action: "cancel" } });
+        check(cancelledMixed.status() === 200 && (await cancelledMixed.json()).request.status === "cancelled" &&
+          !(await db.query("select parent_private.current_grant(id,version) allowed from public.parent_requests where id=$1", [privateMixedId])).rows[0].allowed &&
+          (await snapState(privateMixedId)).job.state === "cancelled", "Cancellation stops the current combined mandate and its only durable job.");
+      } finally {
+        try { await privateWorker.end(); }
+        finally {
+          try {
+            if (privateMembershipChange) await db.query(privateMembershipChange.existed
+              ? `grant parent_worker to ${foodIdentifier(foodOperator)} with set ${privateMembershipChange.set ? "true" : "false"}`
+              : `revoke parent_worker from ${foodIdentifier(foodOperator)} granted by ${foodIdentifier(foodOperator)}`);
+            assert.deepEqual(await foodMemberships(), privateMemberships);
+          } finally {
+            for (const previous of pausedNativeRequests) {
+              const resumed = await first.page.request.post(`${origin}/api/parent/requests/${previous.id}`, { headers: { origin }, data: { action: "resume" } });
+              check(resumed.status() === 200, "The actual parent API restores each earlier fixture that this mixed test paused.");
+              const value = (await resumed.json()).request as SupportRequest;
+              const job = (await db.query("select state,request_version from public.parent_jobs where request_id=$1", [previous.id])).rows[0];
+              check(value.status === "active" && value.version === previous.version + 2 && job.state === "queued" && job.request_version === value.version,
+                "Each earlier fixture regains its original active status with a current versioned job; no old version is reused.");
+            }
+          }
+        }
+      }
+      const clearedProfile = await first.page.request.delete(profileUrl, { headers: { origin, "Idempotency-Key": randomUUID() }, data: { expectedOwnerId: first.id, expectedRevision: 2 } });
+      check(clearedProfile.status() === 200 && (await clearedProfile.json()).revision === 3 && (await readProfile()).profile === null,
+        "The real owner clears this run's seeded profile before later standalone application tests.");
+
       await db.query("update parent_private.processing_controls set snap_details_enabled=false where singleton");
       assert.deepEqual(await readSnap(), latestSnap);
       check((await first.page.request.post(snapUrl, { headers: { origin, "Idempotency-Key": reaffirmKey }, data: reaffirmBody })).status() === 403,
@@ -1469,12 +1673,14 @@ async function main() {
       throw error;
     } finally {
       await db.query(`update parent_private.processing_controls c set
-        (snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version)=
-        (select r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version
+        (snap_details_enabled,snap_details_approval_reference,snap_details_approved_until,snap_details_notice_version,
+         family_profile_enabled,family_profile_approval_reference,family_profile_approved_until,family_profile_notice_version)=
+        (select r.snap_details_enabled,r.snap_details_approval_reference,r.snap_details_approved_until,r.snap_details_notice_version,
+         r.family_profile_enabled,r.family_profile_approval_reference,r.family_profile_approved_until,r.family_profile_notice_version
         from jsonb_populate_record(null::parent_private.processing_controls,$1::jsonb) r) where singleton`, [JSON.stringify(snapControls)]);
       assert.deepEqual((await db.query("select to_jsonb(c) value from parent_private.processing_controls c where singleton")).rows[0].value, snapControls);
       check((await db.query("select count(*)::int n from parent_private.model_call_reservations")).rows[0].n === snapBudgetBefore,
-        "All four SNAP-purpose controls are restored exactly and model-budget reservations are unchanged.");
+        "All SNAP and family-profile purpose controls are restored exactly and model-budget reservations are unchanged.");
     }
 
     stage = "actual private WIC intake, owned history and correction";
