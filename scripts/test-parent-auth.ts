@@ -430,7 +430,28 @@ async function main() {
     await foodSetupStep("closing the owned native food request viewer before work", () => foodViewer.close());
     check(foodViewer.isClosed(), "The owned request viewer closes before its durable food continuation runs.");
     const foodWorker = new Client({ connectionString: local.DB_URL, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
+    type FoodMembership = { role_name: string; grantor: string; admin_option: boolean; inherit_option: boolean; set_option: boolean };
+    const foodMemberships = async () => (await db.query("select granted.rolname role_name,grantor.rolname grantor,m.admin_option,m.inherit_option,m.set_option from pg_auth_members m join pg_roles member on member.oid=m.member join pg_roles granted on granted.oid=m.roleid join pg_roles grantor on grantor.oid=m.grantor where member.rolname=current_user order by granted.rolname,grantor.rolname")).rows as FoodMembership[];
+    const foodIdentifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    let originalFoodMemberships: FoodMembership[] | undefined, foodOperator = "";
+    let changedFoodMembership: { existed: boolean; set: boolean } | undefined;
     try {
+      stage = "checking the isolated native public food fixture approval";
+      check(syntheticApproval && !!fixtureApproval && Date.parse(fixtureApproval.approvedUntil) > Date.now(),
+        "Temporary worker SET access requires the explicit current synthetic fixture approval.");
+      assertSyntheticParentAuthTargets(origin, local);
+      foodOperator = (await foodSetupStep("reading the native food fixture operator", () => db.query("select current_user name"))).rows[0].name as string;
+      originalFoodMemberships = await foodSetupStep("reading the original native food fixture memberships", foodMemberships);
+      const existing = originalFoodMemberships.filter(membership => membership.role_name === "parent_worker");
+      check(existing.some(membership => membership.admin_option),
+        "The local food fixture requires an existing ADMIN worker membership before temporarily changing SET.");
+      if (!existing.some(membership => membership.set_option)) {
+        const own = existing.find(membership => membership.grantor === foodOperator);
+        changedFoodMembership = { existed: !!own, set: own?.set_option ?? false };
+        await foodSetupStep("temporarily enabling existing native food fixture worker SET access", () => db.query(
+          `grant parent_worker to ${foodIdentifier(foodOperator)} with ${own ? "" : "admin false, inherit false, "}set true`,
+        ));
+      }
       await foodSetupStep("connecting the isolated native public food worker", () => foodWorker.connect());
       await foodSetupStep("selecting the restricted native public food worker role", () => foodWorker.query("set role parent_worker"));
       check((await foodSetupStep("verifying the restricted native public food worker role", () => foodWorker.query("select current_user as role"))).rows[0].role === "parent_worker",
@@ -502,7 +523,24 @@ async function main() {
       "The attributed enough-food report completes only this synthetic request and retains both distinct visit reports.");
       check(completedFoodState.operations === 0 && completedFoodState.model_calls === 0 && completedFoodState.model_reservations === foodBudgetBefore,
         "The complete native public food lifecycle creates no provider operation, request model call or model-budget reservation.");
-    } finally { await foodWorker.end(); }
+    } finally {
+      const foodOutcomeStage = stage;
+      try { await foodSetupStep("closing the isolated native public food worker", () => foodWorker.end()); }
+      finally {
+        const changed = changedFoodMembership;
+        if (changed) await foodSetupStep("restoring the original native food fixture worker SET access", () => db.query(
+          changed.existed
+            ? `grant parent_worker to ${foodIdentifier(foodOperator)} with set ${changed.set ? "true" : "false"}`
+            : `revoke parent_worker from ${foodIdentifier(foodOperator)} granted by ${foodIdentifier(foodOperator)}`,
+        ));
+        if (originalFoodMemberships) {
+          const restored = await foodSetupStep("verifying complete native food fixture membership restoration", foodMemberships);
+          check(JSON.stringify(restored) === JSON.stringify(originalFoodMemberships),
+            "The native food fixture restores every original role, grantor, ADMIN, INHERIT and SET membership value exactly.");
+        }
+      }
+      stage = foodOutcomeStage;
+    }
 
     stage = "real data ownership and a preparation-only support request";
     await first.page.clock.setFixedTime(new Date(Date.now() + 2 * 86400000));
