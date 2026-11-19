@@ -4,6 +4,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import fixtures from '../../src/lib/parent/test-fixtures.ts';
+import localeCopy from '../../src/lib/parent/locale.ts';
+const { parentText } = localeCopy;
 import food from '../../src/lib/parent/food-access.ts';
 const { fixtureIntake, fixtureMandate, fixtureRequest } = fixtures;
 const { buildFoodAccessPlanBody, bindFoodAccessReport, SHARE_FOOD_ACCESS_PROGRAM } = food;
@@ -70,7 +72,7 @@ try {
       await page.keyboard.press('Tab'); assert.equal(await skip.evaluate(element => document.activeElement === element), true);
       assert.ok(await skip.evaluate(element => element.getBoundingClientRect().top >= 0), `${suffix} keyboard skip link is visible`);
       await page.keyboard.press('Tab');
-      try { await page.getByText('Program progress', { exact: true }).first().click(); }
+      try { await page.getByText(parentText(await page.locator('html').getAttribute('lang'), 'Program progress'), { exact: true }).first().click(); }
       catch (error) { await page.screenshot({ path: `${evidence}/${suffix}-fixture-error.png`, fullPage: true }); await writeFile(`${evidence}/${suffix}-fixture-error.txt`, `${errors.join('\n')}\n${await page.locator('body').innerText()}`); throw error; }
       await panel.waitFor(); assert.equal(await panel.getAttribute('lang'), locale);
     }

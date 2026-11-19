@@ -3,6 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import fixtures from '../../src/lib/parent/test-fixtures.ts';
+import localeCopy from '../../src/lib/parent/locale.ts';
+const { parentText } = localeCopy;
 const { fixtureIntake, fixtureMandate, fixtureRequest } = fixtures;
 // Run against the secret-free local parent preview; this script supplies every application/Auth response.
 const origin = process.env.PARENT_TEST_ORIGIN ?? 'http://127.0.0.1:3295', evidence = 'tmp/parent-verification/interface-locale/browser', authOrigin = 'http://127.0.0.1:55321';
@@ -91,10 +93,10 @@ try {
         await page.getByLabel('Su dirección de correo electrónico').fill('synthetic@example.invalid');
         await page.getByLabel('Contraseña', { exact: true }).fill('synthetic-password');
         await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
-        await page.getByLabel('Household ZIP code').waitFor();
-        assert.equal(await page.getByLabel('Household ZIP code').evaluate(input => input.closest('[lang]')?.lang), 'en');
-        assert.equal(await page.getByLabel('Preferred service language').inputValue(), 'en');
-        await page.getByLabel('Household ZIP code').fill('19129');
+        await page.locator('#support-zip').waitFor();
+        const handoffLocale = await page.locator('#support-zip').evaluate(input => input.closest('[lang]')?.getAttribute('lang')); assert.equal(handoffLocale, 'es');
+        assert.equal(await page.getByLabel(parentText(handoffLocale, 'Preferred service language')).inputValue(), 'en');
+        await page.getByLabel(parentText(handoffLocale, 'Household ZIP code')).fill('19129');
         await page.getByLabel('Idioma de pantalla / Screen language').selectOption('en');
         await page.waitForFunction(() => document.documentElement.lang === 'en');
         await settle();

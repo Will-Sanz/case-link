@@ -137,12 +137,14 @@ try {
     }
     if (mode !== 'new') {
       await page.goto(origin + '/get-support'); await page.getByText(c.history, { exact: true }).click(); await page.getByRole('button', { name: new RegExp(c.resume) }).click();
-      const need = result.needIds[0], intakeText = text => need === 'snap_new' ? parentText(locale, text) : text;
+      const need = result.needIds[0];
       await page.getByRole('button', { name: q.titles[need], exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: q.both, exact: true }).count(), 0);
       assert.equal(await page.getByRole('link', { name: c.viewExisting, exact: true }).getAttribute('href'), '/support/55555555-5555-4555-8555-555555555555');
       await check('existing-covered-and-uncovered');
-      await page.getByRole('button', { name: q.titles[need], exact: true }).click(); await page.getByLabel(intakeText('Household ZIP code'), { exact: true }).waitFor();
+      await page.getByRole('button', { name: q.titles[need], exact: true }).click(); await page.locator('#support-zip').waitFor();
+      const screenLocale = await page.locator('#support-zip').evaluate(node => node.closest('[lang]')?.getAttribute('lang')); assert.equal(screenLocale, locale);
+      const intakeText = text => parentText(screenLocale, text); await page.getByLabel(intakeText('Household ZIP code'), { exact: true }).waitFor();
       // Private SNAP/profile collection is closed in this fixture, so no permitted private ZIP projection is supplied.
       if (need === 'snap_new') await page.getByLabel(intakeText('Household ZIP code'), { exact: true }).fill('19129');
       else await page.waitForFunction(() => document.querySelector('#support-zip')?.value === '19129');
@@ -174,11 +176,13 @@ try {
     await page.getByRole('button', { name: c.resolveRetry, exact: true }).click(); await page.getByRole('button', { name: q.both, exact: true }).waitFor(); assert.equal(resolves.length, 2); await check('vetted-options', width === 320);
     await page.getByRole('button', { name: c.changeAnswers, exact: true }).click(); await page.getByLabel(q.enough, { exact: true }).waitFor(); await check('change-understood-answers');
     await page.getByRole('button', { name: c.resolve, exact: true }).click(); await page.getByRole('button', { name: q.both, exact: true }).waitFor(); assert.equal(resolves.length, 3);
-    await page.getByRole('button', { name: q.both, exact: true }).click(); await page.getByLabel('Household ZIP code', { exact: true }).waitFor();
-    await page.waitForFunction(() => document.querySelector('#support-zip')?.value === '19129'); assert.equal(await page.getByLabel('Household ZIP code', { exact: true }).inputValue(), '19129'); assert.equal(await page.getByLabel('Preferred service language').inputValue(), 'en');
-    await page.getByLabel(/I’m 18 or older/).check(); await page.getByRole('button', { name: 'Continue', exact: true }).click(); await page.getByRole('checkbox', { name: /I authorize/ }).check(); await check('named-mandate');
-    await page.getByRole('button', { name: 'Start getting support', exact: true }).click(); await page.getByText(/save result has not been confirmed/).waitFor(); await check('start-unknown', width === 320);
-    const before = preflights.length; await page.getByRole('button', { name: 'Start getting support', exact: true }).click(); await page.waitForURL(origin + '/support/' + requestId);
+    await page.getByRole('button', { name: q.both, exact: true }).click(); await page.locator('#support-zip').waitFor();
+    const screenLocale = await page.locator('#support-zip').evaluate(node => node.closest('[lang]')?.getAttribute('lang')); assert.equal(screenLocale, locale);
+    const intakeText = text => parentText(screenLocale, text); await page.getByLabel(intakeText('Household ZIP code'), { exact: true }).waitFor();
+    await page.waitForFunction(() => document.querySelector('#support-zip')?.value === '19129'); assert.equal(await page.getByLabel(intakeText('Household ZIP code'), { exact: true }).inputValue(), '19129'); assert.equal(await page.getByLabel(intakeText('Preferred service language')).inputValue(), 'en');
+    await page.getByLabel(intakeText('I’m 18 or older and requesting support for my household or as an authorized caregiver.'), { exact: true }).check(); await page.getByRole('button', { name: intakeText('Continue'), exact: true }).click(); await page.getByRole('checkbox', { name: new RegExp(`^${intakeText('I authorize')}(?:\\s|$)`) }).check(); await check('named-mandate');
+    await page.getByRole('button', { name: intakeText('Start getting support'), exact: true }).click(); await page.getByText(intakeText('The save result has not been confirmed. Retry the same request before changing answers or starting another request.')).waitFor(); await check('start-unknown', width === 320);
+    const before = preflights.length; await page.getByRole('button', { name: intakeText('Start getting support'), exact: true }).click(); await page.waitForURL(origin + '/support/' + requestId);
     assert.equal(preflights.length, before); assert.deepEqual(starts[0], starts[1]); const packet = JSON.parse(starts[0].body);
     assert.deepEqual(packet.descriptionSource, { draftId, revision: 2 }); assert.deepEqual(packet.intake.needs, ['food_now', 'snap_pending']); assert.deepEqual(packet.reusedZip, { sourceRequestId: zipSource, sourceVersion: 1 });
     assert.ok(!starts[0].body.includes('Today we have no food')); assert.equal(queues.length, 2); assert.deepEqual(outside, []); assert.deepEqual(errors, []);

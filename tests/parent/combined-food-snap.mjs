@@ -5,9 +5,11 @@ import AxeBuilder from '@axe-core/playwright';
 import assessment from '../../src/lib/parent/food-assessment.ts';
 import programs from '../../src/lib/parent/programs.ts';
 import profile from '../../src/lib/parent/family-profile.ts';
+import localeCopy from '../../src/lib/parent/locale.ts';
 const { foodAssessmentInputSchema, assessFoodSupport } = assessment;
 const { getProgramsForNeeds } = programs;
 const { familyProfileLeaves } = profile;
+const { parentText } = localeCopy;
 const origin = process.env.PARENT_TEST_ORIGIN ?? 'http://127.0.0.1:3298';
 const target = new URL(origin), evidence = 'tmp/parent-verification/combined-food-snap/browser';
 const recoveryOnly = process.argv.includes('--unknown-mobile-only');
@@ -19,7 +21,8 @@ try {
   for (const width of recoveryOnly ? [320] : [320, 390, 1280]) for (const locale of ['en', 'es']) {
     const context = await browser.newContext({ viewport: { width, height: 900 } }), page = await context.newPage();
     const errors = [], blockedOrigins = [], posts = [], assessments = [];
-    let privateSnap = false, profileReads = 0;
+    let privateSnap = false, profileReads = 0, screenLocale = locale;
+    const intakeText = text => parentText(screenLocale, text);
     const now = Date.now(), expiresAt = new Date(now + 86400000).toISOString(), confirmedAt = new Date(now - 86400000).toISOString();
     const details = { primaryPerson: { id: owner, firstName: 'Saved', lastName: 'Parent', dateOfBirth: '1990-01-01' },
       members: [{ id: child, firstName: 'Saved', lastName: 'Child', dateOfBirth: '2023-01-01', relationship: 'Child' }],
@@ -78,16 +81,18 @@ try {
       await page.getByRole('button', { name: locale === 'en' ? 'See my options' : 'Ver mis opciones' }).click();
       await check('compatible-options-' + history);
       await page.getByRole('button', { name: locale === 'en' ? 'Continue with both options' : 'Continuar con ambas opciones' }).click();
-      await page.getByLabel(history === 'never' ? 'Your first name' : 'Household ZIP code', { exact: true }).waitFor();
+      await page.locator('#main-content form:visible').waitFor();
+      screenLocale = await page.locator('#main-content form:visible').getAttribute('lang'); assert.equal(screenLocale, locale);
+      await page.getByLabel(intakeText(history === 'never' ? 'Your first name' : 'Household ZIP code'), { exact: true }).waitFor();
     }
     async function startUnknown(needs) {
-      await page.getByLabel(/I’m 18 or older/).check();
-      await page.getByRole('button', { name: 'Continue', exact: true }).click();
-      await page.getByRole('checkbox', { name: /I authorize/ }).check();
+      await page.getByLabel(intakeText('I’m 18 or older and requesting support for my household or as an authorized caregiver.'), { exact: true }).check();
+      await page.getByRole('button', { name: intakeText('Continue'), exact: true }).click();
+      await page.getByRole('checkbox', { name: new RegExp(`^${intakeText('I authorize')}(?:\\s|$)`) }).check();
       await check('combined-permission-' + needs[1]);
-      await page.getByRole('button', { name: 'Start getting support' }).click();
-      await page.getByText(/save result has not been confirmed/).waitFor();
-      const fractured = await page.getByRole('link', { name: 'Check My support for the saved request' }).evaluate(link => {
+      await page.getByRole('button', { name: intakeText('Start getting support') }).click();
+      await page.getByText(intakeText('The save result has not been confirmed. Retry the same request before changing answers or starting another request.')).waitFor();
+      const fractured = await page.getByRole('link', { name: intakeText('Check My support for the saved request') }).evaluate(link => {
         const text = link.firstChild, words = [];
         for (const match of text.textContent.matchAll(/\S+/g)) {
           const range = document.createRange(); range.setStart(text, match.index); range.setEnd(text, match.index + match[0].length);
@@ -96,35 +101,35 @@ try {
         return words;
       });
       assert.deepEqual(fractured, [], 'Unknown-start recovery must keep complete words readable.');
-      assert.ok(await page.getByRole('button', { name: 'Back', exact: true }).isDisabled());
+      assert.ok(await page.getByRole('button', { name: intakeText('Back'), exact: true }).isDisabled());
       const reads = assessments.length, familyReads = profileReads, first = posts.at(-1), packet = JSON.parse(first.body);
       assert.deepEqual(packet.intake.needs, needs);
       assert.deepEqual(packet.mandate.recipientIds, ['philly-food', 'share-community-fridge-19129', 'snap-pa', ...(needs[1] === 'snap_pending' ? ['uesf-benefits'] : [])]);
       assert.equal(packet.mandate.accepted, true); assert.equal(packet.mandate.mode, 'prepare_only');
       await check('unknown-start-' + needs[1]);
       assert.equal(profileReads, familyReads);
-      await page.getByRole('button', { name: 'Start getting support' }).click();
+      await page.getByRole('button', { name: intakeText('Start getting support') }).click();
       await page.waitForURL(origin + '/support/' + requestId);
       assert.deepEqual(posts.at(-1), first); assert.equal(assessments.length, reads);
       return packet;
     }
-    await choose('applied'); await page.getByLabel('Household ZIP code').fill('19104');
-    assert.equal(await page.getByLabel('Preferred service language').inputValue(), 'en');
+    await choose('applied'); await page.getByLabel(intakeText('Household ZIP code')).fill('19104');
+    assert.equal(await page.getByLabel(intakeText('Preferred service language')).inputValue(), 'en');
     const pending = await startUnknown(['food_now', 'snap_pending']);
     assert.equal(pending.kind, undefined); assert.equal(profileReads, 0);
     privateSnap = true; await choose('never');
-    await page.getByLabel('Your first name', { exact: true }).fill('Manual');
+    await page.getByLabel(intakeText('Your first name'), { exact: true }).fill('Manual');
     const answer = (path, value) => page.locator(`[data-snap-path="${path}"]`).selectOption(value);
     await answer('interpreter', 'no');
     for (const [label, value] of [['Your sex, as requested on the form', 'female'], ['Are you a student?', 'no'], ['Are you applying for SNAP?', 'yes'], ['Are you a U.S. citizen?', 'yes'],
-      ['Person 2 sex, as requested on the form', 'male'], ['Is person 2 a student?', 'no'], ['Is person 2 applying for SNAP?', 'no']]) await page.getByLabel(label, { exact: true }).selectOption(value);
+      ['Person {n} sex, as requested on the form', 'male'], ['Is person {n} a student?', 'no'], ['Is person {n} applying for SNAP?', 'no']]) await page.getByLabel(intakeText(label).replace('{n}', '2'), { exact: true }).selectOption(value);
     await answer('income.hasIncome', 'no');
     for (const path of ['screening.lowCashAndIncome', 'screening.migrantOrSeasonal', 'screening.belowShelterCosts', 'history.fleeingOrProbation.answer', 'history.welfareFraud.answer', 'history.otherStateDisqualification.answer']) await answer(path, 'no');
     await answer('expenseClaims.household', 'do_not_claim'); await answer('expenseClaims.medical', 'not_applicable');
     for (const name of [locale === 'en' ? 'Apply for SNAP' : 'Solicitar SNAP', locale === 'en' ? 'Continue with both options' : 'Continuar con ambas opciones']) {
-      await page.getByRole('button', { name: 'Back', exact: true }).click();
+      await page.getByRole('button', { name: intakeText('Back'), exact: true }).click();
       await page.getByRole('button', { name, exact: true }).click();
-      assert.equal(await page.getByLabel('Your first name', { exact: true }).inputValue(), 'Manual');
+      assert.equal(await page.getByLabel(intakeText('Your first name'), { exact: true }).inputValue(), 'Manual');
       assert.equal(await page.locator('[data-snap-path="income.hasIncome"]').inputValue(), 'no');
     }
     assert.equal(profileReads, 1);

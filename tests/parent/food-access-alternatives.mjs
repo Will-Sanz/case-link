@@ -4,6 +4,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import fixtures from '../../src/lib/parent/test-fixtures.ts';
+import localeCopy from '../../src/lib/parent/locale.ts';
+const { parentText } = localeCopy;
 import food from '../../src/lib/parent/food-access.ts';
 import directory from '../../src/lib/parent/food-access-alternatives.ts';
 const { fixtureIntake, fixtureMandate, fixtureRequest } = fixtures;
@@ -61,7 +63,7 @@ try {
         result: state === 'unavailable' ? null : { sites: state === 'empty' ? [] : sites, sourceUrl: 'https://www.phila.gov/food/', checkedAt: at, availability: 'city_listed_unconfirmed', moreSitesAvailable: state === 'listed' } });
       await page.goto(`${origin}/support/${id}`, { waitUntil: 'networkidle' });
       if (largeText) await page.addStyleTag({ content: 'html { font-size:200%; } [class*="shell"] { font-size:32px; }' });
-      await page.getByText('Program progress', { exact: true }).first().click(); await panel.waitFor();
+      await page.getByText(parentText(await page.locator('html').getAttribute('lang'), 'Program progress'), { exact: true }).first().click(); await panel.waitFor();
     }
     async function check(state) {
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -124,7 +126,7 @@ try {
     assert.equal(await panel.getByRole('heading', { name: heading, exact: true }).count(), 0); await check('corrected-positive');
     await page.reload({ waitUntil: 'networkidle' });
     if (largeText) await page.addStyleTag({ content: 'html { font-size:200%; } [class*="shell"] { font-size:32px; }' });
-    await page.getByText('Program progress', { exact: true }).first().click(); await panel.waitFor();
+    await page.getByText(parentText(await page.locator('html').getAttribute('lang'), 'Program progress'), { exact: true }).first().click(); await panel.waitFor();
     assert.equal(await panel.getByRole('heading', { name: heading, exact: true }).count(), 0); assert.equal(writes.length, 1); await check('positive-reentry');
     await context.close();
   }
