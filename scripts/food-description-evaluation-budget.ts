@@ -11,7 +11,7 @@ export const DESCRIPTION_EVAL_LIMITS = { calls: 80, counts: 80, batchCalls: 16, 
 export const DESCRIPTION_EVAL_RATE_CARD = { checkedAt: "2026-11-19", model: "gpt-6.1-sol", tier: "default", region: "global", ordinary: 2000, cached: 100, write30m: 2500, write12h: 5000, output: 10000 } as const;
 const ref = z.string().trim().min(1).max(300), sha = z.string().regex(/^[a-f0-9]{64}$/);
 const sealedPriorRunSchema = z.object({ runDirectory: z.string().refine(isAbsolute), configurationPath: z.string().refine(isAbsolute), configurationSha256: sha,
-  evidenceSha256: sha, reservedPairs: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(7), z.literal(20), z.literal(13), z.literal(39), z.literal(10), z.literal(22), z.literal(63), z.literal(2), z.literal(5), z.literal(37)]) }).strict();
+  evidenceSha256: sha, reservedPairs: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(7), z.literal(20), z.literal(13), z.literal(39), z.literal(10), z.literal(22), z.literal(63), z.literal(2), z.literal(5), z.literal(37), z.literal(19)]) }).strict();
 const legacyAggregateSchema = z.object({ maximumCalls: z.literal(87), maximumCountRequests: z.literal(87), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(2) }).strict();
 export const descriptionEvaluationApprovalSchema = z.object({
   purpose: z.literal("optional_food_description_synthetic_evaluation_v1"), syntheticOnly: z.literal(true), approvalReference: ref,
@@ -33,7 +33,8 @@ export const descriptionEvaluationApprovalSchema = z.object({
     z.object({ maximumCalls: z.literal(269), maximumCountRequests: z.literal(269), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(11) }).strict(),
     z.object({ maximumCalls: z.literal(274), maximumCountRequests: z.literal(274), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(12) }).strict(),
     z.object({ maximumCalls: z.literal(278), maximumCountRequests: z.literal(278), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(13) }).strict(),
-    z.object({ maximumCalls: z.literal(315), maximumCountRequests: z.literal(315), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(14) }).strict()]).optional(),
+    z.object({ maximumCalls: z.literal(315), maximumCountRequests: z.literal(315), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(14) }).strict(),
+    z.object({ maximumCalls: z.literal(334), maximumCountRequests: z.literal(334), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(15) }).strict()]).optional(),
 }).strict();
 export type DescriptionEvaluationApproval = z.infer<typeof descriptionEvaluationApprovalSchema>;
 export type DescriptionEvaluationBudget = { fetch: (caseId: string, turn: number) => typeof fetch; attempts: () => number; halt: () => void };
@@ -70,7 +71,7 @@ function reservedIntents(approval: LedgerIdentity & Pick<DescriptionEvaluationAp
   const prefix = basename(ledgerPrefix(approval));
   return readdirSync(dirname(approval.runDirectory)).filter(name => name.startsWith(`${prefix}-attempt-`) && /^attempt-\d{3}-intent\.json$/.test(name.slice(prefix.length + 1))).sort().map((name, index) => {
     const value = intentSchema.parse(readDescriptionEvaluationEvidence(join(dirname(approval.runDirectory), name)));
-    if (value.attempt !== index + 1 || value.reservedNanoDollars !== (approval.aggregate?.maximumCalls === 315 ? 30_000_000 : (approval.aggregate?.maximumCalls === 274 || approval.aggregate?.maximumCalls === 278) ? 47_500_000 : approval.aggregate?.maximumCalls === 204 || approval.aggregate?.maximumCalls === 267 || approval.aggregate?.maximumCalls === 269 ? 50_000_000 : 55_000_000)) throw safeError();
+    if (value.attempt !== index + 1 || value.reservedNanoDollars !== ((approval.aggregate?.maximumCalls === 315 || approval.aggregate?.maximumCalls === 334) ? 30_000_000 : (approval.aggregate?.maximumCalls === 274 || approval.aggregate?.maximumCalls === 278) ? 47_500_000 : approval.aggregate?.maximumCalls === 204 || approval.aggregate?.maximumCalls === 267 || approval.aggregate?.maximumCalls === 269 ? 50_000_000 : 55_000_000)) throw safeError();
     return value;
   });
 }
@@ -97,8 +98,8 @@ export function sealedDescriptionEvaluationEvidenceHash(directory: string) {
 export function sealedDescriptionEvaluationPriorAccounting(approval: DescriptionEvaluationApproval) {
   if (!approval.aggregate) return { pairs: 0, reservedNanoDollars: 0, knownMeasuredNanoDollars: 0, budgetedNanoDollars: 0 };
   const refs = approval.aggregate.priorRuns;
-  const nextDay=approval.aggregate.maximumCalls===120||approval.aggregate.maximumCalls===133||approval.aggregate.maximumCalls===172||approval.aggregate.maximumCalls===182||approval.aggregate.maximumCalls===204||approval.aggregate.maximumCalls===267||approval.aggregate.maximumCalls===269||approval.aggregate.maximumCalls===274||approval.aggregate.maximumCalls===278||approval.aggregate.maximumCalls===315;
-  const measured = approval.aggregate.maximumCalls !== 87, counts = approval.aggregate.maximumCalls===315 ? [3,4,6,7,20,13,39,10,22,63,2,5,4,37] : approval.aggregate.maximumCalls===278 ? [3,4,6,7,20,13,39,10,22,63,2,5,4] : approval.aggregate.maximumCalls===274 ? [3,4,6,7,20,13,39,10,22,63,2,5] : approval.aggregate.maximumCalls===269 ? [3,4,6,7,20,13,39,10,22,63,2] : approval.aggregate.maximumCalls===267 ? [3,4,6,7,20,13,39,10,22,63] : approval.aggregate.maximumCalls===204 ? [3,4,6,7,20,13,39,10,22] : approval.aggregate.maximumCalls===182 ? [3,4,6,7,20,13,39,10] : approval.aggregate.maximumCalls===172 ? [3,4,6,7,20,13,39] : approval.aggregate.maximumCalls===133 ? [3,4,6,7,20,13] : nextDay ? [3,4,6,7,20] : approval.aggregate.maximumCalls === 100 ? [3,4,6,7] : measured ? [3,4,6] : [3,4];
+  const nextDay=approval.aggregate.maximumCalls===120||approval.aggregate.maximumCalls===133||approval.aggregate.maximumCalls===172||approval.aggregate.maximumCalls===182||approval.aggregate.maximumCalls===204||approval.aggregate.maximumCalls===267||approval.aggregate.maximumCalls===269||approval.aggregate.maximumCalls===274||approval.aggregate.maximumCalls===278||approval.aggregate.maximumCalls===315||approval.aggregate.maximumCalls===334;
+  const measured = approval.aggregate.maximumCalls !== 87, counts = approval.aggregate.maximumCalls===334 ? [3,4,6,7,20,13,39,10,22,63,2,5,4,37,19] : approval.aggregate.maximumCalls===315 ? [3,4,6,7,20,13,39,10,22,63,2,5,4,37] : approval.aggregate.maximumCalls===278 ? [3,4,6,7,20,13,39,10,22,63,2,5,4] : approval.aggregate.maximumCalls===274 ? [3,4,6,7,20,13,39,10,22,63,2,5] : approval.aggregate.maximumCalls===269 ? [3,4,6,7,20,13,39,10,22,63,2] : approval.aggregate.maximumCalls===267 ? [3,4,6,7,20,13,39,10,22,63] : approval.aggregate.maximumCalls===204 ? [3,4,6,7,20,13,39,10,22] : approval.aggregate.maximumCalls===182 ? [3,4,6,7,20,13,39,10] : approval.aggregate.maximumCalls===172 ? [3,4,6,7,20,13,39] : approval.aggregate.maximumCalls===133 ? [3,4,6,7,20,13] : nextDay ? [3,4,6,7,20] : approval.aggregate.maximumCalls === 100 ? [3,4,6,7] : measured ? [3,4,6] : [3,4];
   if (new Set(refs.map(ref => ref.runDirectory)).size !== counts.length
     || descriptionEvaluationHash(refs.map(ref=>ref.reservedPairs)) !== descriptionEvaluationHash(counts)) throw safeError();
   const historical = descriptionEvaluationApprovalSchema.extend({ fingerprint: sha, adapterSha256: sha });
@@ -106,7 +107,7 @@ export function sealedDescriptionEvaluationPriorAccounting(approval: Description
   for (const [index, ref] of refs.entries()) {
     const prior = historical.parse(readDescriptionEvaluationEvidence(join(ref.runDirectory, "approval.json"))), prefix = ledgerPrefix(prior);
     const config = z.object({ approval: historical }).passthrough().parse(readDescriptionEvaluationEvidence(ref.configurationPath));
-    if ((index < 2 ? !!prior.aggregate : !prior.aggregate || prior.aggregate.maximumCalls !== [87,93,100,120,133,172,182,204,267,269,274,278][index-2] || descriptionEvaluationHash(prior.aggregate.priorRuns) !== descriptionEvaluationHash(refs.slice(0,index)))
+    if ((index < 2 ? !!prior.aggregate : !prior.aggregate || prior.aggregate.maximumCalls !== [87,93,100,120,133,172,182,204,267,269,274,278,315][index-2] || descriptionEvaluationHash(prior.aggregate.priorRuns) !== descriptionEvaluationHash(refs.slice(0,index)))
       || prior.runDirectory !== ref.runDirectory || prior.runDirectory === approval.runDirectory || prior.approvalReference === approval.approvalReference
       || prior.projectId !== approval.projectId || descriptionEvaluationHash(config.approval) !== descriptionEvaluationHash(prior)
       || descriptionEvaluationFileHash(ref.configurationPath) !== ref.configurationSha256
@@ -114,7 +115,7 @@ export function sealedDescriptionEvaluationPriorAccounting(approval: Description
       || descriptionEvaluationFileHash(join(ref.runDirectory, "halted.json")) !== descriptionEvaluationFileHash(`${prefix}-halted.json`)
       || sealedDescriptionEvaluationEvidenceHash(ref.runDirectory) !== ref.evidenceSha256) throw safeError();
     const oldWindow=nextDay&&index<5;
-    const priorExpiry=oldWindow?"2026-11-18T23:59:59Z":(approval.aggregate.maximumCalls===182||approval.aggregate.maximumCalls===204||approval.aggregate.maximumCalls===267||approval.aggregate.maximumCalls===269||approval.aggregate.maximumCalls===274||approval.aggregate.maximumCalls===278||approval.aggregate.maximumCalls===315)&&index<8?"2026-11-19T04:59:59Z":approval.approvedUntil;
+    const priorExpiry=oldWindow?"2026-11-18T23:59:59Z":(approval.aggregate.maximumCalls===182||approval.aggregate.maximumCalls===204||approval.aggregate.maximumCalls===267||approval.aggregate.maximumCalls===269||approval.aggregate.maximumCalls===274||approval.aggregate.maximumCalls===278||approval.aggregate.maximumCalls===315||approval.aggregate.maximumCalls===334)&&index<8?"2026-11-19T04:59:59Z":approval.approvedUntil;
     if (measured && (prior.approvedUntil !== priorExpiry || prior.processorReference !== approval.processorReference
       || prior.noticeRetentionReference !== approval.noticeRetentionReference || prior.projectMetadataReference !== approval.projectMetadataReference
       || prior.approvedResponseModelId !== approval.approvedResponseModelId || prior.rateCardDate !== (oldWindow?"2026-11-18":approval.rateCardDate))) throw safeError();
@@ -156,11 +157,11 @@ export async function withFoodDescriptionEvaluationBudget<T>(input: {
   const approval = descriptionEvaluationApprovalSchema.parse(input.approval), now = input.now ?? (() => new Date());
   let permitted = true;
   // The corrected run narrows input only; its model/output settings and all prior reservations stay intact.
-  const maximumInputTokens = approval.aggregate?.maximumCalls === 315 ? 3000 : (approval.aggregate?.maximumCalls === 274 || approval.aggregate?.maximumCalls === 278) ? 6500 : approval.aggregate?.maximumCalls === 204 || approval.aggregate?.maximumCalls === 267 || approval.aggregate?.maximumCalls === 269 ? 7000 : approval.maximumInputTokens;
+  const maximumInputTokens = (approval.aggregate?.maximumCalls === 315 || approval.aggregate?.maximumCalls === 334) ? 3000 : (approval.aggregate?.maximumCalls === 274 || approval.aggregate?.maximumCalls === 278) ? 6500 : approval.aggregate?.maximumCalls === 204 || approval.aggregate?.maximumCalls === 267 || approval.aggregate?.maximumCalls === 269 ? 7000 : approval.maximumInputTokens;
   const reservationNanoDollars = maximumInputTokens * DESCRIPTION_EVAL_RATE_CARD.write12h + approval.maximumOutputTokens * DESCRIPTION_EVAL_RATE_CARD.output;
   const current = () => {
     const time = now().getTime();
-    if(approval.aggregate?.maximumCalls===182||approval.aggregate?.maximumCalls===204||approval.aggregate?.maximumCalls===267||approval.aggregate?.maximumCalls===269||approval.aggregate?.maximumCalls===274||approval.aggregate?.maximumCalls===278||approval.aggregate?.maximumCalls===315
+    if(approval.aggregate?.maximumCalls===182||approval.aggregate?.maximumCalls===204||approval.aggregate?.maximumCalls===267||approval.aggregate?.maximumCalls===269||approval.aggregate?.maximumCalls===274||approval.aggregate?.maximumCalls===278||approval.aggregate?.maximumCalls===315||approval.aggregate?.maximumCalls===334
       ? approval.rateCardDate!=="2026-11-19"||approval.approvedUntil!=="2026-11-20T04:59:59Z"
       : approval.aggregate?.maximumCalls===120||approval.aggregate?.maximumCalls===133||approval.aggregate?.maximumCalls===172
       ? approval.rateCardDate!=="2026-11-19"||approval.approvedUntil!=="2026-11-19T04:59:59Z"
@@ -187,12 +188,13 @@ export async function withFoodDescriptionEvaluationBudget<T>(input: {
   try { lock = openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
   catch { throw safeError(); }
   try {
+    const haltPath = join(dir, "halted.json"), outsideHalt = `${ledger}-halted.json`;
+    if (existsSync(haltPath) || existsSync(outsideHalt)) throw safeError();
     const prior = sealedDescriptionEvaluationPriorAccounting(approval);
     const manifestPath = join(dir, "approval.json");
     if (!first && !existsSync(manifestPath)) throw safeError();
     if (existsSync(manifestPath)) { if (descriptionEvaluationHash(readDescriptionEvaluationEvidence(manifestPath)) !== descriptionEvaluationHash(approval)) throw safeError(); }
     else durable(manifestPath, approval);
-    const haltPath = join(dir, "halted.json"), outsideHalt = `${ledger}-halted.json`;
     const intents = reservedIntents(approval);
     // Any unobserved prior reservation is unknown, including a crash before its dispatch marker.
     if (existsSync(haltPath) || existsSync(outsideHalt) || readdirSync(dir).filter(name => /^attempt-\d{3}-intent\.json$/.test(name)).length !== intents.length
@@ -263,7 +265,7 @@ export function descriptionEvaluationAccounting(dir: string) {
   const files = readdirSync(dirname(dir)).filter(name => name.startsWith(`${filename}-attempt-`)).map(name => name.slice(filename.length + 1));
   const intents = reservedIntents(approval);
   if(readdirSync(dir).filter(name=>/^attempt-\d{3}-intent\.json$/.test(name)).length>intents.length)throw safeError();
-  const known = files.filter(name => /^attempt-\d{3}-observation\.json$/.test(name)).map(name => z.object({ measuredNanoDollars: z.number().int().nonnegative().max(approval.aggregate?.maximumCalls === 315 ? 30_000_000 : (approval.aggregate?.maximumCalls === 274 || approval.aggregate?.maximumCalls === 278) ? 47_500_000 : approval.aggregate?.maximumCalls === 204 || approval.aggregate?.maximumCalls === 267 || approval.aggregate?.maximumCalls === 269 ? 50_000_000 : 55_000_000) }).passthrough().parse(readDescriptionEvaluationEvidence(`${prefix}-${name}`)));
+  const known = files.filter(name => /^attempt-\d{3}-observation\.json$/.test(name)).map(name => z.object({ measuredNanoDollars: z.number().int().nonnegative().max((approval.aggregate?.maximumCalls === 315 || approval.aggregate?.maximumCalls === 334) ? 30_000_000 : (approval.aggregate?.maximumCalls === 274 || approval.aggregate?.maximumCalls === 278) ? 47_500_000 : approval.aggregate?.maximumCalls === 204 || approval.aggregate?.maximumCalls === 267 || approval.aggregate?.maximumCalls === 269 ? 50_000_000 : 55_000_000) }).passthrough().parse(readDescriptionEvaluationEvidence(`${prefix}-${name}`)));
   const countAttempts = files.filter(name => /^attempt-\d{3}-count-dispatch\.json$/.test(name)).length, countReceipts = files.filter(name => /^attempt-\d{3}-count\.json$/.test(name)).length;
   const generationAttempts = files.filter(name => /^attempt-\d{3}-dispatch\.json$/.test(name)).length;
   return { reservedPairs: intents.length, reservedCaseIds: [...new Set(intents.map(intent=>intent.caseId))], countHttpAttemptMarkers: countAttempts, completedCountReceipts: countReceipts, generationHttpAttemptMarkers: generationAttempts, completeUsageReceipts: known.length,

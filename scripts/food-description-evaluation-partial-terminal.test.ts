@@ -49,7 +49,7 @@ describe("independently ready terminal paths, with synthetic transport only", ()
     expect(result.turns[3].oracleCoverage.retainedUnmeasuredFields).toContain("nativeActionEvidence");
     expect(result.turns).toHaveLength(4);
   });
-  it.each(["en", "es"])("opens an owned application without inventing a supplied history answer (%s)", async language => {
+  it.each(["en", "es"].flatMap(language => [false, true].map(inventHistory => ({ language, inventHistory }))))("opens an owned application without inventing a supplied history answer ($language, invented $inventHistory)", async ({ language, inventHistory }) => {
     const item = corpus.cases.find(value => value.id === `description-owned_history-3-${language}`)!;
     let requests = 0;
     const halt = vi.fn(), fetcher = vi.fn<typeof fetch>().mockImplementation(async () => {
@@ -57,13 +57,19 @@ describe("independently ready terminal paths, with synthetic transport only", ()
       const selection = { needIds: first ? [] : ["snap_pending"], selections: [],
         assertions: [{ questionId: first ? "foodForTwoDays" : "benefitHistory", value: first ? "yes" : "applied",
           span: { text: first ? language === "en" ? "food for this week" : "comida para esta semana"
-            : language === "en" ? "my SNAP application is already pending" : "mi solicitud de SNAP ya está pendiente" } }],
+            : language === "en" ? "my SNAP application is already pending" : "mi solicitud de SNAP ya está pendiente" } },
+          ...(first && inventHistory ? [{ questionId: "benefitHistory", value: "never", span: { text: language === "en" ? "I think I need a first SNAP application." : "Creo que necesito una primera solicitud de SNAP." } }] : [])],
         exclusions: [], questionIds: [], outOfScope: null };
       return Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2,
         input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } },
         output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selection) }] }] });
     });
     const result = await runDescriptionEvaluationCase(item, { budget: { fetch: () => fetcher, halt, attempts: () => requests }, projectId: "proj_synthetic", apiKey: "synthetic" });
+    if (inventHistory) {
+      expect(fetcher).toHaveBeenCalledOnce();expect(halt).toHaveBeenCalled();expect(result.criticalFailure).toBe(true);
+      expect(result.turns[1]).toMatchObject({checks:expect.arrayContaining([{code:"answers",passed:false,severity:"critical",basis:"vetted_result"}])});
+      expect(result.turns[2].status).toBe("unrun_after_failure");expect(result.modelQualityApproved).toBe(false);return;
+    }
     expect(fetcher).toHaveBeenCalledTimes(2); expect(halt).not.toHaveBeenCalled();
     expect(result).toMatchObject({ criticalFailure: false, qualityFailures: 0, modelQualityApproved: false });
     expect(result.turns[1]).toMatchObject({ result: { state: "open_existing", needIds: [], proposedAnswers: { foodForTwoDays: "yes", benefitHistory: "not_sure", existingIssue: null },

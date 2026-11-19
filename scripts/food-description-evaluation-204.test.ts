@@ -9,23 +9,23 @@ import { sealedDescriptionEvaluationPriors } from "./food-description-evaluation
 
 const roots: string[] = [], endpoint = "https://api.openai.com/v1/responses";
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
-async function setup(maximumCalls: 204 | 267 | 269 | 274 | 278 | 315 = 204) {
+async function setup(maximumCalls: 204 | 267 | 269 | 274 | 278 | 315 | 334 = 204) {
   const root = mkdtempSync(join(tmpdir(), "description-204-")); roots.push(root);
   const base = { purpose: "optional_food_description_synthetic_evaluation_v1", syntheticOnly: true, approvalReference: "SYNTHETIC204 ONLY", approvedUntil: "2026-11-20T04:59:59Z", processorReference: "synthetic", noticeRetentionReference: "synthetic", billingReference: "original5 synthetic", projectId: "proj_synthetic", projectMetadataReference: "synthetic Standard global", approvedResponseModelId: "gpt-6.1-sol", region: "global", serviceTier: "default", fingerprint: FOOD_DESCRIPTION_FINGERPRINT, corpusSha256: FOOD_DESCRIPTION_CORPUS_SHA, adapterSha256: "a".repeat(64), rateCardDate: "2026-11-19", maximumCalls: 80, maximumCountRequests: 80, maximumInputTokens: 8000, maximumOutputTokens: 1500, maximumNanoDollars: 5_000_000_000, runDirectory: join(root, "run") };
   const init = { method: "POST", redirect: "error" as const, headers: { Authorization: "Bearer synthetic", "Content-Type": "application/json", "OpenAI-Project": "proj_synthetic" }, body: JSON.stringify({ ...FOOD_DESCRIPTION_EVALUATION_BINDING.request, input: [{ role: "user", content: JSON.stringify(descriptionEvaluationPlan().cases[0].turns[0].projection) }] }) };
-  const priorRuns = await sealedDescriptionEvaluationPriors(base, init, maximumCalls === 315 ? 14 : maximumCalls === 278 ? 13 : maximumCalls === 274 ? 12 : maximumCalls === 269 ? 11 : maximumCalls === 267 ? 10 : 9);
+  const priorRuns = await sealedDescriptionEvaluationPriors(base, init, maximumCalls === 334 ? 15 : maximumCalls === 315 ? 14 : maximumCalls === 278 ? 13 : maximumCalls === 274 ? 12 : maximumCalls === 269 ? 11 : maximumCalls === 267 ? 10 : 9);
   const approval = { ...base, aggregate: { maximumCalls, maximumCountRequests: maximumCalls, maximumNanoDollars: 5_000_000_000, priorRuns } };
-  const tokens = maximumCalls === 315 ? 3000 : maximumCalls >= 274 ? 6500 : 7000;
+  const tokens = maximumCalls >= 315 ? 3000 : maximumCalls >= 274 ? 6500 : 7000;
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => Response.json(String(url).endsWith("/input_tokens") ? { object: "response.input_tokens", input_tokens: tokens } : { id: "resp_synthetic204", model: "gpt-6.1-sol", service_tier: "default", status: "completed", usage: { input_tokens: tokens, output_tokens: 1500, total_tokens: tokens + 1500, input_tokens_details: { cached_tokens: 0, cache_write_tokens: tokens, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: tokens } }, output_tokens_details: { reasoning_tokens: 0 } } }));
   return { tokens, reservation: tokens * 5000 + 15_000_000, root, approval, priorRuns, init, fetcher, options: { approval, apiKey: "synthetic", now: () => new Date("2026-11-19T16:00:00Z"), fetcher } };
 }
 
-for (const maximum of [204, 267, 269, 274, 278, 315] as const) describe(`sealed cumulative boundary ${maximum}`, () => {
+for (const maximum of [204, 267, 269, 274, 278, 315, 334] as const) describe(`sealed cumulative boundary ${maximum}`, () => {
   let s: Awaited<ReturnType<typeof setup>>;
   beforeAll(async () => { s = await setup(maximum); });
   it("keeps all sealed pairs and worst-case charges inside original5, then denies the next", async () => {
     const before = s.priorRuns.map(ref => ref.evidenceSha256);
-    expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(s.approval))).toMatchObject({ pairs: maximum - 80, reservedNanoDollars: maximum === 315 ? 12_267_500_000 : maximum === 278 ? 10_510_000_000 : maximum === 274 ? 10_320_000_000 : maximum === 269 ? 10_070_000_000 : maximum === 267 ? 9_970_000_000 : 6_820_000_000, budgetedNanoDollars: maximum === 315 ? 141_000_000 : maximum === 278 ? 118_800_000 : maximum === 274 ? 116_400_000 : maximum === 269 ? 113_400_000 : maximum === 267 ? 112_200_000 : 74_400_000 });
+    expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(s.approval))).toMatchObject({ pairs: maximum - 80, reservedNanoDollars: maximum === 334 ? 12_837_500_000 : maximum === 315 ? 12_267_500_000 : maximum === 278 ? 10_510_000_000 : maximum === 274 ? 10_320_000_000 : maximum === 269 ? 10_070_000_000 : maximum === 267 ? 9_970_000_000 : 6_820_000_000, budgetedNanoDollars: maximum === 334 ? 152_400_000 : maximum === 315 ? 141_000_000 : maximum === 278 ? 118_800_000 : maximum === 274 ? 116_400_000 : maximum === 269 ? 113_400_000 : maximum === 267 ? 112_200_000 : 74_400_000 });
     await withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-first-en", 1)(endpoint, s.init));
     const prefix = join(s.root, `.food-description-evaluation-${descriptionEvaluationHash(s.approval.approvalReference)}`);
     for (let attempt = 2; attempt <= 79; attempt++) for (const suffix of ["intent", "count-dispatch", "count", "dispatch", "observation", "response"]) {
@@ -41,7 +41,7 @@ for (const maximum of [204, 267, 269, 274, 278, 315] as const) describe(`sealed 
   });
 });
 
-it.each([204, 267, 269, 274, 278, 315] as const)("records an over-ceiling count but never generates or refunds its50m reservation (%s)", async maximum => {
+it.each([204, 267, 269, 274, 278, 315, 334] as const)("records an over-ceiling count but never generates or refunds its50m reservation (%s)", async maximum => {
   const s = await setup(maximum); s.fetcher.mockResolvedValue(Response.json({ object: "response.input_tokens", input_tokens: s.tokens + 1 }));
   await expect(withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-over-ceiling-en", 1)(endpoint, s.init))).rejects.toThrow();
   expect(s.fetcher).toHaveBeenCalledOnce();
@@ -50,7 +50,7 @@ it.each([204, 267, 269, 274, 278, 315] as const)("records an over-ceiling count 
   await expect(withFoodDescriptionEvaluationBudget(s.options, async () => {})).rejects.toThrow(); expect(s.fetcher).toHaveBeenCalledOnce();
 });
 
-it.each([204, 267, 269, 274, 278, 315] as const)("rejects a readback charge above the narrowed reservation (%s)", async maximum => {
+it.each([204, 267, 269, 274, 278, 315, 334] as const)("rejects a readback charge above the narrowed reservation (%s)", async maximum => {
   const s = await setup(maximum);
   await withFoodDescriptionEvaluationBudget(s.options, budget => budget.fetch("description-readback-en", 1)(endpoint, s.init));
   const prefix = join(dirname(s.approval.runDirectory), `.food-description-evaluation-${descriptionEvaluationHash(s.approval.approvalReference)}`);
@@ -72,8 +72,8 @@ it.each(["missing ninth", "wrong count", "changed seal"])("blocks204 with%s befo
 });
 
 
-it.each(([267, 269, 274, 278, 315] as const).flatMap(maximum => ["missing last", "wrong count", "changed seal", "old50m repriced"].map(kind => ({ maximum, kind }))))("blocks$maximum with$kind before either endpoint", async ({ maximum, kind }) => {
-  const s = await setup(maximum), ref = s.priorRuns[maximum === 315 ? 13 : maximum === 278 ? 12 : maximum === 274 ? 11 : maximum === 269 ? 10 : 9];
+it.each(([267, 269, 274, 278, 315, 334] as const).flatMap(maximum => ["missing last", "wrong count", "changed seal", "old50m repriced"].map(kind => ({ maximum, kind }))))("blocks$maximum with$kind before either endpoint", async ({ maximum, kind }) => {
+  const s = await setup(maximum), ref = s.priorRuns[maximum === 334 ? 14 : maximum === 315 ? 13 : maximum === 278 ? 12 : maximum === 274 ? 11 : maximum === 269 ? 10 : 9];
   if (kind === "missing last") s.priorRuns.pop();
   if (kind === "wrong count") ref.reservedPairs = 22;
   if (kind === "changed seal") writeFileSync(join(ref.runDirectory, "attempt-001-response.json"), "{}");
