@@ -153,7 +153,9 @@ export function SupportActivity({
 }) {
   const { t: parentText, locale } = useParentLocale();
   const wicOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need.startsWith("wic_"));
-  const t = (text: string) => wicOnly ? parentText(text) : text;
+  const foodOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_") || need.startsWith("wic_"));
+  const localized = wicOnly || foodOnly;
+  const t = (text: string) => localized ? parentText(text) : text;
   const { data, error, reload } = history;
   const typedFood = hasTypedFoodAccessPath(request,currentIntakeFields(request,new Date(),"food_now").zip);
   const reportableNeeds = request.intake.needs.filter(need => need !== "food_now" || !typedFood);
@@ -193,13 +195,13 @@ export function SupportActivity({
   return (
     <>
       {!!data?.operations?.length && (
-        <section lang={wicOnly ? locale : "en"} className={`${styles.surface} ${wicOnly ? wicStyles.activity : ""}`}>
+        <section lang={localized ? locale : "en"} className={`${styles.surface} ${wicOnly ? wicStyles.activity : ""}`}>
           <h2>{t("Recorded packets & receipts")}</h2>
           <p className={styles.hint}>{t("Each download keeps the exact information and evidence recorded for that attempt.")}</p>
           <ul className={styles.packetList}>
             {data.operations.map((operation) => (
               <li key={operation.id}>
-                <strong>
+                <strong lang="en">
                   {getProgram(operation.program_id)?.name ?? "Named program"}
                 </strong>
                 <p className={styles.hint}>
@@ -210,24 +212,24 @@ export function SupportActivity({
                     : operation.state === "prepared" && operation.form?.preparation_only
                     ? "Incomplete unsigned draft · not submitted"
                     : OUTCOME_LABELS[operation.state as OutcomeState] ??
-                      "Needs verification")}{" "}{t("·")}{" "}{displayDate(operation.created_at, false, wicOnly ? locale : "en")}
+                      "Needs verification")}{" "}{t("·")}{" "}{displayDate(operation.created_at, false, localized ? locale : "en")}
                 </p>
                 <a
                   className={styles.textLink}
-                  lang={operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
+                  lang={operation.need?.startsWith("wic_") || operation.need?.startsWith("snap_") || operation.need === "food_now" ? locale : "en"}
                   href={`/api/parent/requests/${request.id}/operations/${operation.id}/export`}
                 >
-                  {operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? parentText("Download recorded information") : "Download recorded information"}
+                  {operation.need?.startsWith("wic_") || operation.need?.startsWith("snap_") || operation.need === "food_now" ? parentText("Download recorded information") : "Download recorded information"}
                 </a>
                 <UtilityDraftDownload request={request} operation={operation}/>
                 {operation.artifact_id && (
                   <p className={styles.space}>
                     <a
                       className={styles.textLink}
-                      lang={operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? locale : "en"}
+                      lang={operation.need?.startsWith("wic_") || operation.need?.startsWith("snap_") || operation.need === "food_now" ? locale : "en"}
                       href={`/api/parent/requests/${request.id}/forms/${operation.artifact_id}`}
                     >
-                      {operation.need?.startsWith("wic_") || operation.need === "snap_new" && operation.program_id === "snap-pa" ? parentText(operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form") : operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form"}
+                      {operation.need?.startsWith("wic_") || operation.need?.startsWith("snap_") || operation.need === "food_now" ? parentText(operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form") : operation.form?.preparation_only ? "Download incomplete unsigned draft" : "Download this prepared form"}
                     </a>
                   </p>
                 )}
@@ -246,7 +248,7 @@ export function SupportActivity({
           <button className={styles.quiet} onClick={reload}>{t("Try packet history again")}</button>
         </div>
       )}
-      {reportableNeeds.length > 0 && <details lang={wicOnly ? locale : "en"} className={`${styles.disclosure} ${wicOnly ? wicStyles.activity : ""}`}>
+      {reportableNeeds.length > 0 && <details lang={localized ? locale : "en"} className={`${styles.disclosure} ${wicOnly ? wicStyles.activity : ""}`}>
         <summary>{t("Tell us about an outcome")}</summary>
         <div>
           <p className={styles.hint}>{t("Record help you received or a program response. Never include an account number, government ID, password or sign-in code.")}</p>
@@ -285,6 +287,7 @@ export function SupportActivity({
               <label htmlFor="report-reference">{t("What did you receive or hear, and when?")}</label>
               <textarea
                 id="report-reference"
+                lang=""
                 className={styles.input}
                 required
                 maxLength={500}

@@ -1,5 +1,6 @@
 "use client";
 import { useParentLocale } from "./parent-locale";
+import { parentText as translateParentText } from "@/lib/parent/locale";
 import Link from "next/link";
 import { Children, isValidElement, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Clock } from "iconoir-react";
@@ -220,7 +221,9 @@ export function ApplicationWorkspace({
   const { t: parentText, locale } = useParentLocale();
   const snap = request.intake.needs.includes("snap_new");
   const wicInterface = request.intake.needs.some(need => need.startsWith("wic_"));
-  const t = (text: string) => snap || wicInterface ? parentText(text) : text;
+  const foodOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_"));
+  const localizedInterface = snap || wicInterface || foodOnly;
+  const t = (text: string) => localizedInterface ? parentText(text) : text;
   const wic = request.intake.needs.includes("wic_new");
   const peco = isPecoPreparationRequest(request), pgw = request.has_pgw_application_details === true, water = request.has_water_application_details === true;
   const utility = peco || pgw || water;
@@ -294,7 +297,8 @@ export function ApplicationWorkspace({
               : application.submitted
                 ? "Next: The program"
                 : "Next: CaseLink’s application connection";
-  const localizedPersonalStepDetail = !inactive && !needsVerification && actions.length > 0 && locale === "es" && wicInterface;
+  const localizedPersonalStepDetail = !inactive && !needsVerification && actions.length > 0 && locale === "es" && localizedInterface;
+  const progressSummary = progress && <span lang={translateParentText("es", progress.summary) === progress.summary ? "" : localizedInterface ? locale : "en"}>{t(progress.summary)}</span>;
   const nextDetail = inactive
     ? "Your recorded information and history stay available below. Your permission controls show whether this request can resume."
     : needsVerification
@@ -312,9 +316,9 @@ export function ApplicationWorkspace({
                 ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry. No repeat Submit decision is requested."
                 : "Your Submit decision is saved. CaseLink must check delivery and record any agency confirmation. You do not need to choose Submit again."
             : progress?.state === "running"
-              ? `${progress.summary} The Official website section shows the official site connection and any recorded blocker.`
+              ? <>{progressSummary}{" "}{t(localizedInterface && !snap ? "Program progress shows recorded next steps. Opening a public website does not mean CaseLink is filling in or submitting an application." : "The Official website section shows the official site connection and any recorded blocker.")}</>
               : progress?.state === "queued"
-                ? progress.summary
+                ? progressSummary
                 : application.submitted
                   ? "Check Activity & receipts for the actual agency record and any interview, document or follow-up requirement."
                   : wic && !snap
@@ -342,7 +346,7 @@ export function ApplicationWorkspace({
     {
       id: "your-next-steps",
       label: "Your next steps",
-      detailLocale: snap || wicInterface ? locale : "en",
+      detailLocale: localizedInterface ? locale : "en",
       detail: inactive
         ? "History"
         : actions.length
@@ -370,7 +374,7 @@ export function ApplicationWorkspace({
     {
       id: "application-documents",
       label: "Your documents",
-      detailLocale: snap || wicInterface ? locale : "en",
+      detailLocale: localizedInterface ? locale : "en",
       detail: t("{n} saved").replace("{n}", String(request.documents?.length ?? 0)),
       done: !!request.documents?.length,
     },
@@ -396,7 +400,7 @@ export function ApplicationWorkspace({
         if (window.location.hash !== link.hash) window.history.pushState(null, "", link.hash);
       }
     }}>
-      <nav lang={snap || wicInterface ? locale : "en"} className={layout.checklist} aria-label={t("Your application checklist")}>
+      <nav lang={localizedInterface ? locale : "en"} className={layout.checklist} aria-label={t("Your application checklist")}>
         <h2>{t(snap ? "Your SNAP request" : "Your support request")}</h2>
         <ol>
           {steps.map((step) => (
@@ -431,7 +435,7 @@ export function ApplicationWorkspace({
       </nav>
       <div className={layout.content} tabIndex={0}>
         <section
-          lang={snap || wicInterface ? locale : "en"}
+          lang={localizedInterface ? locale : "en"}
           className={`${layout.overview} ${wicInterface ? wicStyles.overview : ""}`}
           data-workspace-panel="application-overview"
           hidden={activeSection !== "application-overview"}
@@ -485,7 +489,7 @@ export function ApplicationWorkspace({
               href="#application-receipts"
 
             >
-              View application receipt <ArrowRight width={17} height={17} aria-hidden="true" />
+              {t("View application receipt")} <ArrowRight width={17} height={17} aria-hidden="true" />
             </a>
           )}
           {!loading && !error && snapSubmission && snapReceipt && (
@@ -498,25 +502,23 @@ export function ApplicationWorkspace({
           )}
           {error && (
             <button type="button" className={styles.quiet} onClick={reload}>
-              Check application records again
+              {t("Check application records again")}
             </button>
           )}
           {relatedSnapAttempt && (
             <p className={styles.hint}>
-              A separate SNAP journey also has recorded activity in this
-              request.{" "}
+              {t("A separate SNAP journey also has recorded activity in this request.")}{" "}
               <a className={styles.textLink} href="#application-receipts">
-                Review Activity & receipts
+                {t("Review Activity & receipts")}
               </a>{" "}
-              before starting a new application. You can still check the public
-              website view below; it does not start or duplicate an application.
+              {t("before starting a new application. You can still check the public website view below; it does not start or duplicate an application.")}
             </p>
           )}
           <div className={layout.nextAction}>
             <strong>{t(nextActor)}</strong>
-            <p lang={localizedPersonalStepDetail ? locale : t(nextDetail) === nextDetail ? "en" : locale}>{t(nextDetail)}</p>
+            <p lang={typeof nextDetail === "string" ? localizedPersonalStepDetail ? locale : t(nextDetail) === nextDetail ? "en" : locale : localizedInterface ? locale : "en"}>{typeof nextDetail === "string" ? t(nextDetail) : nextDetail}</p>
             {!inactive && (actions.length > 0 || needsVerification) && (
-              <a lang={snap || wicInterface ? locale : "en"} className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
+              <a lang={localizedInterface ? locale : "en"} className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
                 {t(needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps")}{" "}
                 <ArrowRight width={17} height={17} aria-hidden="true" />
               </a>

@@ -1,3 +1,4 @@
+import { SPANISH_FOOD_INTERFACE_COPY } from "./food-interface-copy";
 import { SPANISH_ASSISTANT_COPY } from "./assistant-copy";
 import { spanishWic } from "./wic-locale";
 import { SNAP_SPANISH_COPY } from "./snap-copy";
@@ -22,6 +23,7 @@ export function parentText(locale: ParentLocale, english: string): string {
 
 // shortcut: Translate remaining family surfaces before advertising a full Spanish journey.
 const spanish = {
+  ...SPANISH_FOOD_INTERFACE_COPY,
   "Recorded City directory check, unconfirmed": "Consulta registrada del directorio municipal, sin confirmar",
   "CaseLink needs to verify a usable food option": "CaseLink necesita verificar una opción de alimentos que le sirva",
   "The food need remains open. CaseLink must verify another practical access option; saved City listings are unconfirmed and do not establish food availability or delivery.": "La necesidad de alimentos sigue abierta. CaseLink debe verificar otra opción de acceso que le sirva; los lugares guardados del directorio municipal no están confirmados y no garantizan alimentos ni entregas.",

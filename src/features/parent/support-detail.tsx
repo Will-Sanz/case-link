@@ -76,7 +76,7 @@ function RequiredStep({
   onSnapDetails: () => void;
 }) {
   const { t: parentText, locale } = useParentLocale();
-  const localized = action.need.startsWith("wic_") || action.need.startsWith("snap_");
+  const localized = action.need === "food_now" || action.need.startsWith("wic_") || action.need.startsWith("snap_");
   const t = (text: string) => localized ? parentText(text) : text;
   const snapDetails = action.need === "snap_new" && request.intake.needs.includes("snap_new") &&
     action.reason === "missing_fact" && action.field === "snap_application_details";
@@ -147,6 +147,9 @@ function CorrectDetails({
   request: SupportRequest;
   onChange: () => void;
 }) {
+  const { t: parentText, locale } = useParentLocale();
+  const localized = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_") || need.startsWith("wic_"));
+  const t = (copy: string) => localized ? parentText(copy) : copy;
   const [intake, setIntake] = useState(request.intake);
   const [baseVersion, setBaseVersion] = useState(request.version);
   const [editing, setEditing] = useState(false);
@@ -210,13 +213,13 @@ function CorrectDetails({
     setIntake((current) => ({ ...current, [field]: value }));
     setSaved(false);
   }
-  if(legacyPrivate)return <div className={styles.space}>
-    <p className={styles.notice} role="status">CaseLink needs a safe update for your previously saved private WIC answers before household corrections can be made here. Your saved request and answers are unchanged. You can still pause or cancel work and use the <a className={styles.textLink} href={getProgram('wic-pa')!.officialUrl}>official WIC service</a>.</p>
-    <dl className={styles.factList}><dt>Previously saved child-under-five answer</dt><dd>{request.intake.childrenUnderFive===null?'Not provided':request.intake.childrenUnderFive?'Yes':'No'}</dd>
-      <dt>Previously saved pregnancy or postpartum answer</dt><dd>{request.intake.pregnantOrPostpartum===null?'Not provided':request.intake.pregnantOrPostpartum?'Yes':'No'}</dd></dl>
+  if(legacyPrivate)return <div lang={localized ? locale : "en"} className={styles.space}>
+    <p className={styles.notice} role="status">{t("CaseLink needs a safe update for your previously saved private WIC answers before household corrections can be made here. Your saved request and answers are unchanged. You can still pause or cancel work and use the")}{" "}<a className={styles.textLink} href={getProgram('wic-pa')!.officialUrl}>{t("official WIC service")}</a>.</p>
+    <dl className={styles.factList}><dt>{t("Previously saved child-under-five answer")}</dt><dd>{t(request.intake.childrenUnderFive===null?'Not provided':request.intake.childrenUnderFive?'Yes':'No')}</dd>
+      <dt>{t("Previously saved pregnancy or postpartum answer")}</dt><dd>{t(request.intake.pregnantOrPostpartum===null?'Not provided':request.intake.pregnantOrPostpartum?'Yes':'No')}</dd></dl>
   </div>;
   return (
-    <details className={styles.disclosure} open={editing}>
+    <details lang={localized ? locale : "en"} className={styles.disclosure} open={editing}>
       <summary
         onClick={(event) => {
           event.preventDefault();
@@ -229,20 +232,14 @@ function CorrectDetails({
           }
           setEditing((current) => !current);
         }}
-      >
-        Correct household or bill information
-      </summary>
+      >{t("Correct household or bill information")}</summary>
       <div>
-        <p className={`${styles.hint} ${styles.space}`}>
-          We stop queued uses of changed facts and check whether already
-          delivered information needs a correction. Submitted history stays
-          intact.
-        </p>
+        <p className={`${styles.hint} ${styles.space}`}>{t("We stop queued uses of changed facts and check whether already delivered information needs a correction. Submitted history stays intact.")}</p>
         <form className={`${styles.form} ${styles.space}`} onSubmit={submit}>
-          <fieldset className={`${styles.fieldset} ${styles.form}`} aria-label="Household and bill corrections" disabled={pending}>
+          <fieldset className={`${styles.fieldset} ${styles.form}`} aria-label={t("Household and bill corrections")} disabled={pending}>
           <div className={styles.row}>
             <div className={styles.field}>
-              <label htmlFor="correct-zip">ZIP code</label>
+              <label htmlFor="correct-zip">{t("ZIP code")}</label>
               <input
                 id="correct-zip"
                 className={styles.input}
@@ -255,7 +252,7 @@ function CorrectDetails({
               />
             </div>
             {!privateUtility && <div className={styles.field}>
-              <label htmlFor="correct-size">Household size</label>
+              <label htmlFor="correct-size">{t("Household size")}</label>
               <input
                 id="correct-size"
                 className={styles.input}
@@ -274,7 +271,7 @@ function CorrectDetails({
           </div>
           {!privateUtility && <div className={styles.row}>
             <div className={styles.field}>
-              <label htmlFor="correct-income">Income before taxes ($)</label>
+              <label htmlFor="correct-income">{t("Income before taxes ($)")}</label>
               <input
                 id="correct-income"
                 className={styles.input}
@@ -292,7 +289,7 @@ function CorrectDetails({
               />
             </div>
             <div className={styles.field}>
-              <label htmlFor="correct-frequency">How often</label>
+              <label htmlFor="correct-frequency">{t("How often")}</label>
               <select
                 id="correct-frequency"
                 className={styles.select}
@@ -304,17 +301,17 @@ function CorrectDetails({
                   )
                 }
               >
-                <option value="unknown">Not sure / not provided</option>
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Every two weeks</option>
-                <option value="twice_monthly">Twice a month</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
+                <option value="unknown">{t("Not sure / not provided")}</option>
+                <option value="weekly">{t("Weekly")}</option>
+                <option value="biweekly">{t("Every two weeks")}</option>
+                <option value="twice_monthly">{t("Twice a month")}</option>
+                <option value="monthly">{t("Monthly")}</option>
+                <option value="yearly">{t("Yearly")}</option>
               </select>
             </div>
           </div>}
           {privateUtility && <p className={styles.hint}>Names, birth dates, account details, addresses and income source lists are corrected in <a className={styles.textLink} href="#application-review">Your utility application answers</a>. Household routing ZIP and any shutoff date stay separate.</p>}
-          {intake.needs.some(need=>need.startsWith('wic_')) && <p className={styles.hint}>Private WIC questions are not available here yet. Ordinary routing changes do not collect those answers.</p>}
+          {intake.needs.some(need=>need.startsWith('wic_')) && <p className={styles.hint}>{t("Private WIC questions are not available here yet. Ordinary routing changes do not collect those answers.")}</p>}
           {request.intake.needs.some((need) =>
             ["electricity", "gas", "water"].includes(need),
           ) && (
@@ -361,17 +358,15 @@ function CorrectDetails({
             </div>
           )}
           {error && (
-            <p className={styles.error} role="alert">
-              {error}
+            <p lang={t(error) === error ? "" : locale} className={styles.error} role="alert">
+              {t(error)}
             </p>
           )}
           {saved && (
-            <p className={styles.success} role="status">
-              Your correction is saved. We’re checking the affected work.
-            </p>
+            <p className={styles.success} role="status">{t("Your correction is saved. We’re checking the affected work.")}</p>
           )}
           <button className={styles.button} disabled={pending} type="submit">
-            {pending ? "Saving correction…" : "Save correction"}
+            {t(pending ? "Saving correction…" : "Save correction")}
           </button>
           </fieldset>
         </form>
@@ -476,7 +471,9 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       </div>
     );
   const wicOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need.startsWith("wic_"));
-  const wt = (text: string) => wicOnly ? t(text) : text;
+  const foodOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_") || need.startsWith("wic_"));
+  const localized = wicOnly || foodOnly;
+  const wt = (text: string) => localized ? t(text) : text;
   const inactive = ["cancelled", "closed"].includes(request.status);
   const acceptingActions = request.status === "active";
   const foodRoute = request.plan?.routes.find(route => route.need === "food_now" && route.foodAccess);
@@ -522,30 +519,30 @@ export function SupportDetail({ requestId }: { requestId: string }) {
       !action.resolved && action.resolver && action.resolver !== "parent",
   );
   return (
-    <div className={workspace.caseView} data-case-workspace>
+    <div lang={localized ? locale : "en"} className={workspace.caseView} data-case-workspace>
       <div className={workspace.caseHeader}>
       <Link
         className={`${styles.quiet} ${styles.hidePrint}`}
         href="/my-support"
-        aria-label="My support"
+        aria-label={wt("My support")}
       >
         <ArrowLeft width={17} height={17} aria-hidden="true" />
-        <span className={workspace.caseBackLabel}>My support</span>
+        <span className={workspace.caseBackLabel}>{wt("My support")}</span>
       </Link>
       <h1 lang={t(supportTitle(request)) === supportTitle(request) ? "en" : locale}>{t(supportTitle(request))}</h1>
-        {outdatedParentWait ? <span className={styles.badge}>{submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded"}</span> : data?.progress && !error ? (
+        {outdatedParentWait ? <span className={styles.badge}>{wt(submittedNeeds.includes("snap_new") ? "Application submitted" : attemptRecorded ? "Delivery check with CaseLink" : "Submit decision recorded")}</span> : data?.progress && !error ? (
           <ProgressBadge progress={data.progress} />
         ) : (
           <span
             className={`${styles.badge} ${actions.length ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
           >
-            {requestStatus(request)}
+            {wt(requestStatus(request))}
           </span>
         )}
       </div>
       {notice && (
         <p className={`${styles.success} ${styles.space}`} role="status">
-          {notice}
+          {wt(notice)}
         </p>
       )}
       {actionError && <ServiceError error={actionError} />}
@@ -560,8 +557,8 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         onReviewChange={onSnapReviewChange}
         onChange={()=>{reload();reloadHistory();}}
       >
-        {!outdatedParentWait && <details className={styles.disclosure}>
-          <summary>Work status & updates</summary>
+        {!outdatedParentWait && <details lang={localized ? locale : "en"} className={styles.disclosure}>
+          <summary>{wt("Work status & updates")}</summary>
           <div><SupportProgressPanel
             progress={error ? undefined : data?.progress}
             onRefresh={reload}
@@ -573,18 +570,15 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           </div>
         )}
         {request.status === "paused" && (
-          <div className={styles.notice}>
+          <div lang={localized ? locale : "en"} className={styles.notice}>
             <Pause width={22} height={22} aria-hidden="true" />
             <p>
-              <strong>Paused by you.</strong> No future actions will run while
-              paused. Resume when you’re ready; expired permission may need
-              renewal.
-            </p>
+              <strong>{wt("Paused by you.")}</strong>{" "}{wt("No future actions will run while paused. Resume when you’re ready; expired permission may need renewal.")}</p>
           </div>
         )}
         <section
           id="your-next-steps"
-          lang={wicOnly ? locale : "en"}
+          lang={localized ? locale : "en"}
           className={workspace.section}
           tabIndex={-1}
           aria-labelledby="your-steps-heading"
@@ -647,6 +641,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         </section>
         <section
           id="application-programs"
+          lang={localized ? locale : "en"}
           className={`${styles.surface} ${foodRoute ? styles.foodPrograms : ""} ${workspace.section}`}
           tabIndex={-1}
         >
@@ -654,7 +649,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         {request.intake.needs.includes("food_now") && foodRoute?.foodAccessReport?.outcome !== "unresolved" && (
           <FoodSites zip={currentIntakeFields(request, new Date(), "food_now").zip} />
         )}
-          <h2>Program progress</h2>
+          <h2>{wt("Program progress")}</h2>
           {request.plan?.routes.length ? (
             request.plan.routes.map((route, i) => {
               const program = getProgram(route.programId);
@@ -667,28 +662,29 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                   key={`${route.need}-${route.programId}-${i}`}
                 >
                   <div className={styles.between}>
-                    <h3>{NEED_LABELS[route.need]}</h3>
+                    <h3>{wt(NEED_LABELS[route.need])}</h3>
                     <span
                       className={`${styles.badge} ${["checking", "unresolved"].includes(state) ? styles.badgeWait : ""}`}
                     >
-                      {receipt ? OUTCOME_LABELS[receipt.state] : snapDeliveryCheck ? attemptRecorded ? "Delivery result not confirmed" : "Submit decision recorded" : supportRouteLabel(route, currentOperations)}
+                      {wt(receipt ? OUTCOME_LABELS[receipt.state] : snapDeliveryCheck ? attemptRecorded ? "Delivery result not confirmed" : "Submit decision recorded" : supportRouteLabel(route, currentOperations))}
                     </span>
                   </div>
+                  {localized && locale === "es" && (wt(route.summary) === route.summary || route.steps.some(step => wt(step) === step)) && <p className={styles.hint}>{wt("Original recorded wording remains in its source language.")}</p>}
                   <p>
-                    <strong>{route.title}</strong>
+                    <strong lang={program && route.title === program.name ? "en" : wt(route.title) === route.title ? "" : locale}>{program && route.title === program.name ? program.name : wt(route.title)}</strong>
                     {program && route.title !== program.name && (
-                      <> · {program.name}</>
+                      <> · <span lang="en">{program.name}</span></>
                     )}
                   </p>
-                  <p>{receipt
-                    ? `${OUTCOME_LABELS[receipt.state]} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`
+                  <p lang={receipt || snapDeliveryCheck || wt(route.summary) !== route.summary ? localized ? locale : "en" : ""}>{wt(receipt
+                    ? wt("{state} is recorded. Open Activity & receipts for the exact evidence and any program instructions.").replace("{state}", wt(OUTCOME_LABELS[receipt.state]))
                     : snapDeliveryCheck
                       ? attemptRecorded ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry." : "Your decision to send the exact SNAP application is recorded. CaseLink must check delivery and any agency confirmation."
-                      : route.summary}</p>
-                  {!receipt && !snapDeliveryCheck && route.limitation && <p>{route.limitation}</p>}
+                      : route.summary)}</p>
+                  {!receipt && !snapDeliveryCheck && route.limitation && <p lang={wt(route.limitation) === route.limitation ? "" : locale}>{wt(route.limitation)}</p>}
                   <p>
-                    <strong>Next:</strong>{" "}
-                    {receipt
+                    <strong>{wt("Next:")}</strong>{" "}
+                    {wt(receipt
                       ? receiptNextStep(state)
                       : snapDeliveryCheck || route.nextActor === "caselink"
                       ? "CaseLink"
@@ -696,16 +692,16 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                         ? "Your personal step"
                         : route.nextActor === "agency"
                           ? "Agency response"
-                          : "Program response"}
+                          : "Program response")}
                   </p>
                   {!receipt && !snapDeliveryCheck && route.steps.length > 0 && (
                     <details className={styles.disclosure}>
-                      <summary>See the planned steps</summary>
+                      <summary>{wt("See the planned steps")}</summary>
                       <div>
                         <ol>
                           {route.steps.map((step, index) => (
-                            <li key={index} className={styles.small}>
-                              {step}
+                            <li key={index} lang={wt(step) === step ? "" : locale} className={styles.small}>
+                              {wt(step)}
                             </li>
                           ))}
                         </ol>
@@ -716,47 +712,45 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                     <a
                       className={`${styles.textLink} ${styles.small}`}
                       href={program.officialUrl}
-                    >
-                      Official program & direct access
-                    </a>
+                    >{wt("Official program & direct access")}</a>
                   )}
                 </article>
               );
             })
           ) : (
             <div className={styles.stack}>
-              <p className={styles.subtle}>Your selected needs are saved:</p>
+              <p className={styles.subtle}>{wt("Your selected needs are saved:")}</p>
               <ul>
                 {request.intake.needs.map((need) => (
                   <li key={need}>
-                    {NEED_LABELS[need]}
-                    {need === "snap_new" && currentSnapReceipt ? ` · ${OUTCOME_LABELS[currentSnapReceipt.state]}` : submittedNeeds.includes(need) ? " · Application submitted" : need === "snap_new" && reviewFinished ? attemptRecorded ? " · Delivery result not confirmed" : " · Submit decision recorded" : need === "snap_new" && preparedSnapReview ? " · Application prepared" : ""}
+                    {wt(NEED_LABELS[need])}
+                    {need === "snap_new" && currentSnapReceipt ? <> · {wt(OUTCOME_LABELS[currentSnapReceipt.state])}</> : wt(submittedNeeds.includes(need) ? " · Application submitted" : need === "snap_new" && reviewFinished ? attemptRecorded ? " · Delivery result not confirmed" : " · Submit decision recorded" : need === "snap_new" && preparedSnapReview ? " · Application prepared" : "")}
                   </li>
                 ))}
               </ul>
               {showSnapProgress && <div className={styles.trustLine}>
                 <Clock width={21} height={21} aria-hidden="true" />
                 <div>
-                  <p>{currentSnapReceipt
-                    ? `${OUTCOME_LABELS[currentSnapReceipt.state]} is recorded. Open Activity & receipts for the exact evidence and any program instructions.`
+                  <p>{wt(currentSnapReceipt
+                    ? wt("{state} is recorded. Open Activity & receipts for the exact evidence and any program instructions.").replace("{state}", wt(OUTCOME_LABELS[currentSnapReceipt.state]))
                     : !acceptingActions
                       ? "Future SNAP application work is stopped. Open Activity & receipts for anything already attempted or confirmed."
                       : attemptRecorded ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry."
                         : decisionRecorded ? "Your decision to send the exact SNAP application is recorded. CaseLink must check delivery and any agency confirmation."
                           : snapReviewRequired ? "The exact SNAP application is prepared. Review it above before choosing Submit."
-                            : "The exact SNAP application is prepared. CaseLink must resolve its remaining submission requirements before Submit can be offered."}</p>
-                  {currentSnapReceipt?.state === "agency_submitted" && <p>A submission is separate from approval or receiving support.</p>}
-                  <p><strong>Next:</strong>{" "}{currentSnapReceipt ? receiptNextStep(currentSnapReceipt.state) : !acceptingActions ? <a className={styles.textLink} href="#application-receipts">Activity &amp; receipts</a> : !reviewFinished && snapReviewRequired ? <a className={styles.textLink} href="#snap-final-review">Your application review</a> : "CaseLink"}</p>
+                            : "The exact SNAP application is prepared. CaseLink must resolve its remaining submission requirements before Submit can be offered.")}</p>
+                  {currentSnapReceipt?.state === "agency_submitted" && <p>{wt("A submission is separate from approval or receiving support.")}</p>}
+                  <p><strong>{wt("Next:")}</strong>{" "}{currentSnapReceipt ? wt(receiptNextStep(currentSnapReceipt.state)) : !acceptingActions ? <a className={styles.textLink} href="#application-receipts">{wt("Activity & receipts")}</a> : !reviewFinished && snapReviewRequired ? <a className={styles.textLink} href="#snap-final-review">{wt("Your application review")}</a> : "CaseLink"}</p>
                 </div>
               </div>}
               {(!showSnapProgress || request.intake.needs.some(need => need !== "snap_new")) && <div className={styles.trustLine}>
                 <Clock width={21} height={21} aria-hidden="true" />
                 <p>
-                  {submittedNeeds.some(need => need !== "snap_new" || !showSnapProgress)
+                  {wt(submittedNeeds.some(need => need !== "snap_new" || !showSnapProgress)
                     ? "An agency submission is recorded for the support marked above. Open Activity & receipts for the exact application and any follow-up requirements. A submission is separate from approval or receiving support."
                     : showSnapProgress
                       ? "Preparation is pending for your other selected support. A saved request is not an application or a confirmed appointment. You can use official programs directly while you wait."
-                    : "Preparation is pending. A saved request is not an application or a confirmed appointment. You can use official programs directly while you wait."}
+                    : "Preparation is pending. A saved request is not an application or a confirmed appointment. You can use official programs directly while you wait.")}
                 </p>
               </div>}
             </div>
@@ -765,7 +759,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         </section>
         <section
           id="application-receipts"
-          lang={wicOnly ? locale : "en"}
+          lang={localized ? locale : "en"}
           className={`${styles.surface} ${workspace.section} ${wicOnly ? wicStyles.receipts : ""}`}
           tabIndex={-1}
         >
@@ -814,7 +808,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                             : "CaseLink activity")}
                     </p>
                     <time dateTime={event.created_at}>
-                      {displayDate(event.created_at, true, wicOnly ? locale : "en")}
+                      {displayDate(event.created_at, true, localized ? locale : "en")}
                     </time>
                   </div>
                 </li>
@@ -826,13 +820,8 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             </p>
           )}
           {request.events_truncated && (
-            <p className={`${styles.hint} ${styles.space}`}>
-              Showing the latest 200 updates.{" "}
-              <a className={styles.textLink} href="/api/parent/account/export">
-                Download your information
-              </a>{" "}
-              for retained earlier history.
-            </p>
+            <p className={`${styles.hint} ${styles.space}`}>{wt("Showing the latest 200 updates.")}{" "}
+              <a className={styles.textLink} href="/api/parent/account/export">{wt("Download your information")}</a>{" "}{wt("for retained earlier history.")}</p>
           )}
           <a
             className={`${styles.secondary} ${styles.space} ${styles.hidePrint}`}
@@ -872,45 +861,44 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           />
         </div>
         <div
+          lang={localized ? locale : "en"}
           id="application-controls"
           className={workspace.section}
           tabIndex={-1}
         >
           <section className={styles.surface}>
-            <h2>Your details</h2>
+            <h2>{wt("Your details")}</h2>
             <dl className={styles.factList}>
-              <dt>Household ZIP</dt>
+              <dt>{wt("Household ZIP")}</dt>
               <dd>
-                {request.intake.zip ?? "Current ZIP code needed"}
-                <small>You provided</small>
+                {request.intake.zip ?? wt("Current ZIP code needed")}
+                <small>{wt("You provided")}</small>
               </dd>
-              <dt>Household size</dt>
-              <dd>{request.intake.householdSize ?? "Not provided"}</dd>
-              <dt>Language preference</dt>
+              <dt>{wt("Household size")}</dt>
+              <dd>{request.intake.householdSize ?? wt("Not provided")}</dd>
+              <dt>{wt("Language preference")}</dt>
               <dd>
-                {request.intake.language === "es" ? "Spanish" : "English"}
+                {wt(request.intake.language === "es" ? "Spanish" : "English")}
               </dd>
-              <dt>Updates</dt>
+              <dt>{wt("Updates")}</dt>
               <dd>
-                {request.intake.contactPreference === "email"
+                {wt(request.intake.contactPreference === "email"
                   ? "Email & My support"
-                  : "My support only"}
+                  : "My support only")}
               </dd>
               {request.intake.incomeAmount !== null && (
                 <>
-                  <dt>Income before taxes</dt>
+                  <dt>{wt("Income before taxes")}</dt>
                   <dd>
-                    ${request.intake.incomeAmount.toLocaleString("en-US")}
+                    ${request.intake.incomeAmount.toLocaleString(localized && locale === "es" ? "es-US" : "en-US")}
                     <small>
-                      {request.intake.incomeFrequency.replaceAll("_", " ")} ·
-                      You provided
-                    </small>
+                      {localized ? wt(request.intake.incomeFrequency === "unknown" ? "Not sure / not provided" : ({ weekly: "Weekly", biweekly: "Every two weeks", twice_monthly: "Twice a month", monthly: "Monthly", yearly: "Yearly" } as const)[request.intake.incomeFrequency]) : request.intake.incomeFrequency.replaceAll("_", " ")}{" "}{wt("· You provided")}</small>
                   </dd>
                 </>
               )}
               {request.intake.shutoffDate && (
                 <>
-                  <dt>Reported shutoff date</dt>
+                  <dt>{wt("Reported shutoff date")}</dt>
                   <dd>{displayDate(request.intake.shutoffDate)}</dd>
                 </>
               )}
@@ -923,32 +911,24 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             )}
           </section>
           <section className={styles.surface}>
-            <h2>Your permission</h2>
+            <h2>{wt("Your permission")}</h2>
             <div className={`${styles.inline} ${styles.small}`}>
               <ShieldCheck width={22} height={22} aria-hidden="true" />
               <strong>
-                {request.mandate.mode === "prepare_only"
+                {wt(request.mandate.mode === "prepare_only"
                   ? "Research & preparation only"
-                  : "Permitted actions within your limits"}
+                  : "Permitted actions within your limits")}
               </strong>
             </div>
-            <p className={`${styles.hint} ${styles.space}`}>
-              Expires {displayDate(request.mandate.expiresAt)} · Up to{" "}
-              {request.mandate.maxAttempts} attempts ·{" "}
-              {request.mandate.recipientIds.length} named program
-              {request.mandate.recipientIds.length === 1 ? "" : "s"}
-            </p>
+            <p className={`${styles.hint} ${styles.space}`}>{wt(request.mandate.recipientIds.length === 1 ? "Expires {date} · Up to {attempts} attempts · {count} named program" : "Expires {date} · Up to {attempts} attempts · {count} named programs").replace("{date}", displayDate(request.mandate.expiresAt, false, localized ? locale : "en")).replace("{attempts}", String(request.mandate.maxAttempts)).replace("{count}", String(request.mandate.recipientIds.length))}</p>
             <ul className={styles.recipientList}>
               {request.mandate.recipientIds.map((id) => (
-                <li key={id}>
-                  {getProgram(id)?.name ?? "Named program unavailable"}
+                <li key={id} lang={getProgram(id) ? "en" : localized ? locale : "en"}>
+                  {getProgram(id)?.name ?? wt("Named program unavailable")}
                 </li>
               ))}
             </ul>
-            <p className={`${styles.hint} ${styles.space}`}>
-              No signatures, passwords, EBT PINs or binding financial
-              commitments. Documents need their own processing consent.
-            </p>
+            <p className={`${styles.hint} ${styles.space}`}>{wt("No signatures, passwords, EBT PINs or binding financial commitments. Documents need their own processing consent.")}</p>
             {!inactive && (
               <PermissionEditor
                 ref={permissionEditor}
@@ -974,40 +954,31 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                   ) : (
                     <Pause width={18} height={18} aria-hidden="true" />
                   )}
-                  {pending
+                  {wt(pending
                     ? "Updating…"
                     : request.status === "paused"
                       ? "Resume support"
-                      : "Pause future work"}
+                      : "Pause future work")}
                 </button>
                 {cancelConfirm ? (
                   <div className={styles.stack}>
-                    <p className={styles.small}>
-                      Cancel this request and stop future work? Already sent
-                      information cannot always be recalled.
-                    </p>
+                    <p className={styles.small}>{wt("Cancel this request and stop future work? Already sent information cannot always be recalled.")}</p>
                     <button
                       className={styles.danger}
                       disabled={pending}
                       onClick={() => changeState("cancel")}
-                    >
-                      Yes, cancel this request
-                    </button>
+                    >{wt("Yes, cancel this request")}</button>
                     <button
                       className={styles.quiet}
                       disabled={pending}
                       onClick={() => setCancelConfirm(false)}
-                    >
-                      Keep this request
-                    </button>
+                    >{wt("Keep this request")}</button>
                   </div>
                 ) : (
                   <button
                     className={styles.quiet}
                     onClick={() => setCancelConfirm(true)}
-                  >
-                    Cancel request & withdraw permission
-                  </button>
+                  >{wt("Cancel request & withdraw permission")}</button>
                 )}
               </div>
             )}
@@ -1015,16 +986,12 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           <div className={styles.trustLine}>
             <Lock width={22} height={22} aria-hidden="true" />
             <div>
-              <strong>Need a person or another way?</strong>
-              <Link className={styles.textLink} href="/support/help">
-                Find help and direct program options.
-              </Link>{" "}
-              No program outcome is guaranteed.
-              <nav className={`${styles.inline} ${styles.space} ${styles.small}`} aria-label="Case policies and contact">
-                <Link className={styles.textLink} href="/support/privacy#data-policy">Data policy</Link>
-                <Link className={styles.textLink} href="/support/privacy">Privacy</Link>
-                <Link className={styles.textLink} href="/support/terms">Terms</Link>
-                <a className={styles.textLink} href="mailto:willsanz23@gmail.com">Contact CaseLink</a>
+              <strong>{wt("Need a person or another way?")}</strong>
+              <Link className={styles.textLink} href="/support/help">{wt("Find help and direct program options.")}</Link>{" "}{wt("No program outcome is guaranteed.")}<nav className={`${styles.inline} ${styles.space} ${styles.small}`} aria-label={wt("Case policies and contact")}>
+                <Link className={styles.textLink} href="/support/privacy#data-policy">{wt("Data policy")}</Link>
+                <Link className={styles.textLink} href="/support/privacy">{wt("Privacy")}</Link>
+                <Link className={styles.textLink} href="/support/terms">{wt("Terms")}</Link>
+                <a className={styles.textLink} href="mailto:willsanz23@gmail.com">{wt("Contact CaseLink")}</a>
               </nav>
             </div>
           </div>

@@ -108,11 +108,12 @@ it("automatically confirms a lost committed acknowledgement with an owned read, 
   expect(queuedBodies).toHaveLength(1);expect(onProposed).not.toHaveBeenCalled();
 });
 
-it("asks only unresolved routing questions, focuses them and reconciles the same zero-call clarification across locale changes",async()=>{
+it("keeps optional unresolved questions available without taking focus from ready food and reconciles the same zero-call clarification across locale changes",async()=>{
+  const selectFocus=vi.spyOn(HTMLSelectElement.prototype,"focus");
   archive.drafts=[{...draft(),state:"result",revision:1,input:{description:"Food help",screenLocale:"en"}}];
   resultView={...resultView,state:"needs_clarification",proposedAnswers:{foodForTwoDays:"no",benefitHistory:"not_sure",existingIssue:null},needIds:["food_now"],questionIds:["benefitHistory"]};
   renderTool();fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
-  const history=await screen.findByLabelText(/Do you get help paying/);await waitFor(()=>expect(document.activeElement).toBe(history));
+  const history=await screen.findByLabelText(/Do you get help paying/);expect(selectFocus).not.toHaveBeenCalled();
   expect(screen.queryByLabelText(/Do you have enough food/)).toBeNull();
   expect(onProposed).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ needIds: ["food_now"], questionIds: ["benefitHistory"], source: { draftId: id, revision: 1 } }));
   fireEvent.change(history,{target:{value:"never"}});loseResolveAck=true;fireEvent.click(screen.getByRole("button",{name:"Use these routing answers"}));
@@ -122,6 +123,14 @@ it("asks only unresolved routing questions, focuses them and reconciles the same
   await waitFor(()=>expect(onProposed).toHaveBeenCalledWith(expect.objectContaining({source:{draftId:id,revision:2},needIds:["food_now","snap_new"]})));
   expect(resolveBodies).toHaveLength(2);expect(resolveBodies[0]).toBe(resolveBodies[1]);expect(queuedBodies).toHaveLength(0);
   expect(JSON.parse(resolveBodies[0]).changedQuestionIds).toEqual(["benefitHistory"]);
+});
+
+it("still focuses the first indispensable question when no selected work is ready",async()=>{
+  archive.drafts=[{...draft(),state:"result",revision:1,input:{description:"Food help",screenLocale:"en"}}];
+  resultView={...resultView,state:"needs_clarification",proposedAnswers:{foodForTwoDays:"not_sure",benefitHistory:"not_sure",existingIssue:null},needIds:["food_now"],questionIds:["foodForTwoDays","benefitHistory"]};
+  renderTool();fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
+  const food=await screen.findByLabelText(/Do you have enough food/);await waitFor(()=>expect(document.activeElement).toBe(food));
+  expect(onProposed).not.toHaveBeenCalled();expect(resolveBodies).toEqual([]);expect(queuedBodies).toEqual([]);
 });
 
 it("does not resend unchanged charged prose for only a new key or screen locale",async()=>{
@@ -286,6 +295,7 @@ it.each(["en", "es"] as const)("shows the existing public outside-area food fall
 });
 
 it.each(["en", "es"] as const)("exposes the ready SNAP path through the actual guide without inventing a food answer or an extra click (%s)", async language => {
+  const selectFocus = vi.spyOn(HTMLSelectElement.prototype, "focus");
   archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description: language === "en" ? "My first SNAP application and food today." : "Mi primera solicitud de SNAP y comida para hoy.", screenLocale: language } }];
   resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: ["foodForTwoDays"] };
   const onChoose = vi.fn();
@@ -295,6 +305,7 @@ it.each(["en", "es"] as const)("exposes the ready SNAP path through the actual g
   expect(screen.getByText(foodDescriptionCopy[language].readyOptions)).toBeTruthy();
   const resultHeading = screen.getByRole("heading", { name: foodAssessmentCopy[language].results });
   await waitFor(() => expect(document.activeElement).toBe(resultHeading));
+  expect(selectFocus).not.toHaveBeenCalled();
   const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
   expect((within(tool).getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
   expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].both })).toBeNull();

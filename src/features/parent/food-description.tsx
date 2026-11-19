@@ -67,7 +67,7 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
   useEffect(() => { if (opened && writable) editor.current?.focus(); }, [opened, writable, selected?.id]);
   const onActiveRef = useRef(onActive); useLayoutEffect(() => { onActiveRef.current = onActive; }, [onActive]);
   useEffect(() => { onActiveRef.current?.(visible && opened && !hasReadyNeeds); }, [visible, opened, hasReadyNeeds]);
-  useEffect(() => { if (proposal?.state === "needs_clarification") firstQuestion.current?.focus(); }, [proposal]);
+  useEffect(() => { if (proposal?.state === "needs_clarification" && !hasReadyNeeds) firstQuestion.current?.focus(); }, [proposal, hasReadyNeeds]);
   useEffect(() => { if (manualOnly) manualGuidance.current?.focus(); }, [manualOnly, proposal?.source.draftId, proposal?.source.revision]);
   const onResetRef = useRef(onReset); useLayoutEffect(() => { onResetRef.current = onReset; }, [onReset]);
   useEffect(() => {

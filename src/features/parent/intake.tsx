@@ -151,6 +151,7 @@ export function buildMandate(
 const reusableZipReadSchema = z.object({ ownerId: z.uuid(), zip: reusableZipSchema.nullable() });
 export type ParentIntakeSignInOptions = { existingAccountRecovery?: boolean; recoveryHref?: string; emailCodeAvailable?: boolean };
 export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: string; signInOptions?: ParentIntakeSignInOptions }) {
+  const { t, locale } = useParentLocale();
   const [guide, setGuide] = useState<{ handoff: FoodAssessmentHandoff; editing: boolean } | null>(null);
   const [guideOwnerChanged, setGuideOwnerChanged] = useState(false);
   const guidePanel = useRef<HTMLDivElement>(null);
@@ -160,7 +161,7 @@ export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: str
   const guideNeed = guide?.handoff.needs.find(need => need !== "food_now") ?? guide?.handoff.needs[0];
   return initialNeed === "food" ? (
     <><div ref={guidePanel} hidden={guide?.editing}><FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} signInOptions={signInOptions} onOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }} onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/></div>
-      {guideOwnerChanged && <p role="status">Your sign-in changed. The earlier answers were cleared; begin with your current household.</p>}
+      {guideOwnerChanged && <p lang={locale} role="status">{t("Your sign-in changed. The earlier answers were cleared; begin with your current household.")}</p>}
       {guide && <div hidden={!guide.editing}><ParentIntakeForm key={guideNeed} active={guide.editing} initialNeed={guideNeed} handoff={guide.handoff} signInOptions={signInOptions}
       onFoodBack={() => setGuide({ ...guide, editing: false })}
       onFoodOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }}/></div>}</>
@@ -939,10 +940,11 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       if(!controller.signal.aborted&&work.current===controller)setPendingWork(null);
     }
   }
-  const localizedIntake = snapSelected || wicNeedsOnly;
+  const foodNeedsOnly = intake.needs.length > 0 && intake.needs.every(need => foodNeeds.includes(need));
+  const localizedIntake = snapSelected || foodNeedsOnly;
   const st = (copy: string) => localizedIntake ? t(copy) : copy;
   return (
-    <div className={`${styles.container} ${snapSelected ? styles.snapIntake : ""} ${wicNeedsOnly ? wicStyles.intake : ""}`}>
+    <div className={`${styles.container} ${snapSelected || foodNeedsOnly && !wicNeedsOnly ? styles.snapIntake : ""} ${wicNeedsOnly ? wicStyles.intake : ""}`}>
       <div lang={localizedIntake ? locale : "en"} className={styles.pageTop}>
         <div>
           <h1>{st(directSnap ? "Apply for SNAP" : "Let’s make the next steps easier.")}</h1>
@@ -1000,7 +1002,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
             )}
           </ol>
           <section lang={localizedIntake ? locale : "en"} className={`${styles.surface} ${wicNeedsOnly ? wicStyles.intakeSurface : ""}`}>
-            <form lang={snapSelected || wicNeedsOnly && step > 0 ? locale : "en"} className={styles.form} onSubmit={submit}>
+            <form lang={localizedIntake ? locale : "en"} className={styles.form} onSubmit={submit}>
               <div className={styles.formHeader}>
                 <h2 ref={heading} tabIndex={-1}>
                   {
@@ -1140,7 +1142,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       />
                       <p className={styles.hint}>
                         {st("Philadelphia is our first service area. We’ll explain any coverage limits.")}{" "}</p>
-                      {reusedZip && <p className={styles.hint}>{st("We filled your ZIP code from your saved information, provided")}{" "}{new Date(reusedZip.confirmedAt).toLocaleDateString(wicNeedsOnly && locale === "es" ? "es-US" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}{st(". You can change it here. Reuse keeps its original date and expiry.")}</p>}
+                      {reusedZip && <p className={styles.hint}>{st("We filled your ZIP code from your saved information, provided")}{" "}{new Date(reusedZip.confirmedAt).toLocaleDateString(localizedIntake && locale === "es" ? "es-US" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" })}{st(". You can change it here. Reuse keeps its original date and expiry.")}</p>}
                     </div>
                     <div className={styles.field}>
                       <label htmlFor="support-language">

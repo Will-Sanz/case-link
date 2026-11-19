@@ -40,24 +40,24 @@ async function choose({ enough = "no", language = "en", both = false }: { enough
   fireEvent.click(screen.getByRole("button", { name: language === "es" ? "Ver mis opciones" : "See my options" }));
   fireEvent.click(screen.getByRole("button", { name: both ? language === "es" ? "Continuar con ambas opciones" : "Continue with both options" : language === "es" ? "Consultar una solicitud pendiente" : "Check a pending application" }));
 }
-async function facts() {
-  fireEvent.change(await screen.findByLabelText("Household ZIP code"), { target: { value: "19104" } });
-  fireEvent.click(screen.getByLabelText(/I’m 18 or older/));
+async function facts(language: "en" | "es" = "en") {
+  fireEvent.change(await screen.findByLabelText(language === "es" ? "Código postal del hogar" : "Household ZIP code"), { target: { value: "19104" } });
+  fireEvent.click(screen.getByLabelText(language === "es" ? /Tengo 18 años/ : /I’m 18 or older/));
 }
-async function permission() {
-  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  fireEvent.click(await screen.findByRole("checkbox", { name: /I authorize/ }));
+async function permission(language: "en" | "es" = "en") {
+  fireEvent.click(screen.getByRole("button", { name: language === "es" ? "Continuar" : "Continue" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: language === "es" ? /Autorizo/ : /I authorize/ }));
 }
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("guided food handoff into the owned typed request", () => {
   it("carries a declared shortage and Spanish interface without changing service language without inventing another SNAP application", async () => {
-    const { fetcher } = api(); renderGuide(<main><ParentIntake initialNeed="food"/></main>); await choose({ language: "es" }); await facts();
-    expect((screen.getByLabelText("Request timing") as HTMLSelectElement).value).toBe("today");
-    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("en");
-    expect(screen.getByText(/Today is the proposed priority/)).toBeTruthy();
+    const { fetcher } = api(); renderGuide(<main><ParentIntake initialNeed="food"/></main>); await choose({ language: "es" }); await facts("es");
+    expect((screen.getByLabelText("Prioridad de la solicitud") as HTMLSelectElement).value).toBe("today");
+    expect((screen.getByLabelText("Idioma preferido para el servicio") as HTMLSelectElement).value).toBe("en");
+    expect(screen.getByText(/Se propone dar prioridad hoy/)).toBeTruthy();
     expect((await axe.run(document.body, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
-    await permission(); fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+    await permission("es"); fireEvent.click(screen.getByRole("button", { name: "Comenzar a recibir apoyo" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const packet = JSON.parse(String(fetcher.mock.calls.find(([url, init]) => url.endsWith("/requests") && init?.method === "POST")![1]!.body));
     expect(packet.intake).toMatchObject({ needs: ["snap_pending"], urgency: "today", language: "en" });
@@ -96,12 +96,13 @@ describe("guided food handoff into the owned typed request", () => {
     expect(fetcher.mock.calls.some(([url, init]) => url.endsWith("/requests") && init?.method === "POST")).toBe(false);
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
   });
-  it("clears the earlier household when account ownership changes without a profile", async () => {
-    const { state, fetcher } = api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose(); await facts();
+  it.each(["en", "es"] as const)("clears the earlier household when account ownership changes without a profile (%s)", async language => {
+    const { state, fetcher } = api(); renderGuide(<ParentIntake initialNeed="food"/>); await choose({ language }); await facts(language);
     state.owner = other; fireEvent(window, new Event("focus"));
-    expect(await screen.findByText(/earlier answers were cleared/)).toBeTruthy();
+    const notice = await screen.findByText(language === "es" ? /Se borraron las respuestas anteriores/ : /earlier answers were cleared/);
+    expect(notice.closest("[lang]")?.getAttribute("lang")).toBe(language);
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
-    expect((screen.getByLabelText(/enough food/) as HTMLSelectElement).value).toBe("");
+    expect((screen.getByLabelText(/enough food|suficiente comida/) as HTMLSelectElement).value).toBe("");
     expect(fetcher.mock.calls.some(([url, init]) => url.endsWith("/requests") && init?.method === "POST")).toBe(false);
   });
   it("reconciles a combined uncertain start with its complete exact body and key without rerunning assessment", async () => {
@@ -112,7 +113,7 @@ describe("guided food handoff into the owned typed request", () => {
     expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     const checks = fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment")).length;
-    fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comenzar a recibir apoyo" }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
     expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
@@ -135,9 +136,9 @@ describe("guided food handoff into the owned typed request", () => {
     fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "existing@example.invalid" } });
     fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
     fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
-    await screen.findByLabelText("Household ZIP code");
-    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("en");
-    expect((screen.getByLabelText("Request timing") as HTMLSelectElement).value).toBe("today");
+    await screen.findByLabelText("Código postal del hogar");
+    expect((screen.getByLabelText("Idioma preferido para el servicio") as HTMLSelectElement).value).toBe("en");
+    expect((screen.getByLabelText("Prioridad de la solicitud") as HTMLSelectElement).value).toBe("today");
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 });
@@ -184,9 +185,9 @@ describe("guided food recovery and keyboard handoff", () => {
     fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
     expect(await screen.findByRole("alert")).toBeTruthy();
     unavailable = false; fireEvent.click(screen.getByRole("button", { name: /Retry account check|Reintentar la comprobación/ }));
-    await screen.findByLabelText("Household ZIP code");
+    await screen.findByLabelText("Código postal del hogar");
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/auth"))).toHaveLength(1);
-    expect((screen.getByLabelText("Preferred service language") as HTMLSelectElement).value).toBe("en");
+    expect((screen.getByLabelText("Idioma preferido para el servicio") as HTMLSelectElement).value).toBe("en");
     expect(navigation.replace).not.toHaveBeenCalled();
   });
   it("preserves an unknown start's exact packet through inline authentication recovery", async () => {
@@ -196,11 +197,11 @@ describe("guided food recovery and keyboard handoff", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start getting support" })); await screen.findByText(/save result has not been confirmed/);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
     const checks = fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment")).length;
-    state.signedIn = false; fireEvent.click(screen.getByRole("button", { name: "Start getting support" })); await screen.findByLabelText(/Password|Contraseña/);
+    state.signedIn = false; fireEvent.click(screen.getByRole("button", { name: "Comenzar a recibir apoyo" })); await screen.findByLabelText(/Password|Contraseña/);
     fireEvent.change(screen.getByLabelText(/Your email address|Su dirección de correo/), { target: { value: "fixture@example.invalid" } });
     fireEvent.change(screen.getByLabelText(/Password|Contraseña/), { target: { value: "synthetic-password" } });
     fireEvent.click(screen.getByRole("button", { name: /^(Sign in|Iniciar sesión)$/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Start getting support" })); await waitFor(() => expect(navigation.push).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole("button", { name: "Comenzar a recibir apoyo" })); await waitFor(() => expect(navigation.push).toHaveBeenCalled());
     const posts = fetcher.mock.calls.filter(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
     expect(posts).toHaveLength(2); expect(posts[1][1]?.body).toBe(posts[0][1]?.body); expect(posts[1][1]?.headers).toEqual(posts[0][1]?.headers);
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/food-assessment"))).toHaveLength(checks);
@@ -232,7 +233,7 @@ it("carries only the opaque owned description pair through preflight and the com
   fireEvent.click(await screen.findByRole("button",{name:"Continue with both options"}));await facts();await permission();
   fireEvent.click(screen.getByRole("button",{name:"Start getting support"}));await screen.findByText(/save result has not been confirmed/);
   const checks=fetcher.mock.calls.filter(([url])=>url.endsWith("/food-assessment")).length;
-  fireEvent.change(screen.getByLabelText(/Screen language/),{target:{value:"es"}});fireEvent.click(screen.getByRole("button",{name:"Start getting support"}));
+  fireEvent.change(screen.getByLabelText(/Screen language/),{target:{value:"es"}});fireEvent.click(screen.getByRole("button",{name:"Comenzar a recibir apoyo"}));
   await waitFor(()=>expect(navigation.push).toHaveBeenCalled());
   const posts=fetcher.mock.calls.filter(([url,init])=>url.endsWith("/requests")&&init?.method==="POST");
   expect(posts).toHaveLength(2);expect(posts[0][1]?.body).toBe(posts[1][1]?.body);expect(posts[0][1]?.headers).toEqual(posts[1][1]?.headers);
