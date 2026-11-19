@@ -1,0 +1,275 @@
+{
+  "startedAt": "2026-10-14T15:45:33.018Z",
+  "completedAt": "2026-10-14T15:45:55.035Z",
+  "syntheticOnly": true,
+  "source": "local CaseLink schema; newly seeded isolated database",
+  "migrationCount": 37,
+  "latestMigration": "20261014012912",
+  "schemaSha256": "cf5437940363cc62cbef5a387b195a8bdb89e6a4627a9403a395c0656829f471",
+  "backupSha256": "121b7e99344c432a0d4aaa55f39b96fb9f488dab461c095b515ab510c8488792",
+  "backupBytes": 392318,
+  "backupAt": "2026-10-14T15:45:33.790Z",
+  "restoreStartedAt": "2026-10-14T15:45:33.969Z",
+  "recoverySeconds": 21.066,
+  "syntheticDataLossSeconds": 0,
+  "restoredTables": [
+    {
+      "table": "auth.audit_log_entries",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.custom_oauth_providers",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.flow_state",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.identities",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.instances",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.mfa_amr_claims",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.mfa_challenges",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.mfa_factors",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.oauth_authorizations",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.oauth_client_states",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.oauth_clients",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.oauth_consents",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.one_time_tokens",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.refresh_tokens",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.saml_providers",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.saml_relay_states",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.schema_migrations",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.sessions",
+      "rows": 2,
+      "sha256": "d2cdcb28606fab37c2a644d07fa865160c68631b0f9478ac6640d015356ea78e"
+    },
+    {
+      "table": "auth.sso_domains",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.sso_providers",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.users",
+      "rows": 2,
+      "sha256": "cfa74b0abe11803b51e49305345fe74c760553ed1ff8bdff937ff2e8d689d319"
+    },
+    {
+      "table": "auth.webauthn_challenges",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "auth.webauthn_credentials",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "private.ai_job_claims",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "private.ai_rate_counters",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "private.production_controls",
+      "rows": 1,
+      "sha256": "1e0d1724f9854a5e01b90f85f4f26d544a0368309f0b08c1f61100d7ba9a1d9a"
+    },
+    {
+      "table": "public.activity_log",
+      "rows": 1,
+      "sha256": "da356eb5be2b5cf8942de0d0e985102b920b8801fa0d1ae325a7f5d468c16fbd"
+    },
+    {
+      "table": "public.app_users",
+      "rows": 2,
+      "sha256": "f8ea1d9e30762b09f23f353095f3e32cf3b0fbcab8f67ac620eb1788ca836d73"
+    },
+    {
+      "table": "public.barrier_plan_records",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.case_notes",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.case_progress_updates",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.demo_requests",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.families",
+      "rows": 1,
+      "sha256": "d315e71a423301371d495555d9542730bb1177f3ec986b97cace01e94c372bea"
+    },
+    {
+      "table": "public.family_barriers",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.family_case_managers",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.family_goals",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.family_members",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.plan_step_action_items",
+      "rows": 1,
+      "sha256": "87d77f3097648460fcb234bef55768ff060eb921d5a999c650e23fc9202a798b"
+    },
+    {
+      "table": "public.plan_step_activity",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.plan_step_resources",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.plan_steps",
+      "rows": 1,
+      "sha256": "955af2334a68af7295c7127021bd8c9be7e17b7c7da009d2b97fa8c9f5b95785"
+    },
+    {
+      "table": "public.plans",
+      "rows": 1,
+      "sha256": "a04c5d08cdbad3ed5384fbc834ab2c412528aa9f18fdf40818bfb8ad75e3ef1c"
+    },
+    {
+      "table": "public.referrals",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.resource_import_runs",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.resource_matches",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.resources",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.security_audit_log",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "public.tasks",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "supabase_migrations.schema_migrations",
+      "rows": 37,
+      "sha256": "f247719f7c9497936d32bf9d3df9323e452abffc820d5f5b1366441883df731c"
+    }
+  ],
+  "corruptBackupRejected": true,
+  "reviewedRevisionPreserved": true,
+  "unauthorizedReadDenied": true,
+  "staleExportDenied": true,
+  "fullDatabaseRegressionPassed": true,
+  "limits": "Local logical app/Auth restore using existing cluster roles. Does not test hosted PITR, storage objects, SMTP, provider configuration, role recovery, or real outage RPO/RTO.",
+  "cleanupPassed": true,
+  "recordedFailures": [
+    "Ownership restoration requires the local backup administrator, not the ordinary database role.",
+    "A full dump expects the default public schema in the empty target; a schema-selected bootstrap creates it explicitly.",
+    "Schema-only bootstrap must seed the private application control row; a missing row safely denies AI.",
+    "The database budget suite requires its test control enabled, after verifying the restored disabled state."
+  ]
+}

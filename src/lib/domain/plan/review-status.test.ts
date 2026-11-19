@@ -52,20 +52,44 @@ function plan(overrides: Partial<PlanWithSteps> = {}): PlanWithSteps {
 }
 
 describe("getPlanReviewStatus", () => {
+  it("blocks review and export after directory sources change or become unavailable", () => {
+    const reviewed = plan({resource_contacts_current:false,material_revision:"a".repeat(64),client_display:{reviewedAt:"2026-10-13T12:00:00Z",reviewedById:"owner",reviewedRevision:"a".repeat(64)}});
+    expect(isPlanReviewed(reviewed)).toBe(false);
+    expect(getPlanReviewStatus(reviewed)).toMatchObject({state:"needs_attention",issue:expect.stringContaining("directory contacts")});
+  });
   it("keeps a complete generated plan in needs-review until explicit approval", () => {
     expect(getPlanReviewStatus(plan()).state).toBe("needs_review");
     expect(isPlanReviewed(plan())).toBe(false);
   });
 
+  it("allows manual handoff to proceed through normal action validation and explicit review", () => {
+    const manual = plan({ generation_source: "manual", generation_state: {
+      v: 1, status: "complete", completion_method: "manual", pending_phase: null,
+      phases_complete: { "30": false, "60": false, "90": false }, models_used: [], stage_timings_ms: {},
+    } });
+    expect(getPlanReviewStatus(manual).state).toBe("needs_review");
+    expect(isPlanReviewed(manual)).toBe(false);
+    manual.steps[0].action_items![0].target_date = null;
+    expect(getPlanReviewStatus(manual).issue).toContain("target date");
+    manual.steps = [];
+    expect(getPlanReviewStatus(manual).issue).toContain("at least one dated action");
+  });
+
   it("recognizes explicit case-manager approval", () => {
     const reviewed = plan({
+      material_revision: "a".repeat(64),
       client_display: {
         reviewedAt: "2026-08-03T13:00:00.000Z",
         reviewedById: "00000000-0000-4000-8000-000000000005",
+        reviewedRevision: "a".repeat(64),
       },
     });
     expect(getPlanReviewStatus(reviewed).label).toBe("Reviewed");
     expect(isPlanReviewed(reviewed)).toBe(true);
+    reviewed.material_revision = "b".repeat(64);
+    expect(isPlanReviewed(reviewed)).toBe(false);
+    delete reviewed.material_revision;
+    expect(isPlanReviewed(reviewed)).toBe(false);
   });
 
   it("requires an exact date on every open action", () => {
@@ -131,4 +155,13 @@ describe("getPlanReviewStatus", () => {
     waiting.steps[0].action_items![0].follow_up_date = "2026-08-12";
     expect(getPlanReviewStatus(waiting).state).toBe("needs_review");
   });
+  it("accepts a human-selected date outside generation windows and completed work without dates", () => {
+    const manual = plan();
+    manual.steps[0].action_items![0].target_date = "2028-02-29";
+    expect(getPlanReviewStatus(manual).state).toBe("needs_review");
+    manual.steps[0].action_items![0].status = "completed";
+    manual.steps[0].action_items![0].target_date = null;
+    expect(getPlanReviewStatus(manual).state).toBe("needs_review");
+  });
+
 });

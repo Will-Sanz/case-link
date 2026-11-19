@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-10-14T15:12:18.143Z",
+  "syntheticOnly": true,
+  "baseCommit": "cc0db88d7dc610e2deeccd66604f51a199aa638b",
+  "changes": "CL-08 browser completion commit",
+  "browser": "Chromium full headless",
+  "aiProvider": "deterministic test fixture",
+  "authDatabaseMail": "isolated real local Supabase",
+  "serverAdminCredential": false,
+  "stats": {
+    "startTime": "2026-10-14T15:12:18.143Z",
+    "duration": 67265.041,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "file": "accessibility.spec.ts",
+      "title": "inline plan fields have names and the workflow reflows on narrow and zoomed screens",
+      "status": "expected",
+      "durationMs": 6550
+    },
+    {
+      "file": "auth.spec.ts",
+      "title": "invitation, password setup, sign-in, separate-browser recovery, and reused link denial",
+      "status": "expected",
+      "durationMs": 4016
+    },
+    {
+      "file": "concurrency.spec.ts",
+      "title": "stale edits need an explicit comparison and changes invalidate an already-open PDF",
+      "status": "expected",
+      "durationMs": 11103
+    },
+    {
+      "file": "intake.spec.ts",
+      "title": "all intake barriers retain their wording and matching category when drafting a plan",
+      "status": "expected",
+      "durationMs": 3676
+    },
+    {
+      "file": "mfa.spec.ts",
+      "title": "administrators enroll and verify an authenticator, including bad codes and returning sign-in",
+      "status": "expected",
+      "durationMs": 13672
+    },
+    {
+      "file": "session.spec.ts",
+      "title": "a lost session recovers this account's draft while sign-out and account switching clear it",
+      "status": "expected",
+      "durationMs": 6214
+    },
+    {
+      "file": "workflow.spec.ts",
+      "title": "case intake through resumed generation, recovered edits, AI review, and the exact PDF download",
+      "status": "expected",
+      "durationMs": 18635
+    }
+  ]
+}

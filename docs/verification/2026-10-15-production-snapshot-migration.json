@@ -1,0 +1,32 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "target": "production",
+  "filename": "20261015143343_materialize_plan_snapshot.sql",
+  "startedAt": "2026-10-15T14:49:59.141Z",
+  "migrationSha256": "129b82b78808518706235d4ef7a1b7848d2e0ebdf6edc1fc695e214fd8db6f35",
+  "passed": true,
+  "countsPreserved": {
+    "families": 0,
+    "resources": 54,
+    "app_accounts": 11,
+    "auth_accounts": 13
+  },
+  "grantsSecuritySearchPathOwnerUnchanged": true,
+  "transactionCommitted": true,
+  "migrations": {
+    "count": 41,
+    "latest": "20261015143343"
+  },
+  "finishedAt": "2026-10-15T14:50:03.124Z",
+  "credentialsPersistedOrPrinted": false,
+  "securityAdvisors": {
+    "errors": 0,
+    "warnings": 31,
+    "categories": {
+      "authenticated_security_definer_function_executable": 29,
+      "auth_leaked_password_protection": 1,
+      "auth_insufficient_mfa_options": 1
+    },
+    "interpretation": "Same 31 known warnings as staging: guarded authenticated operator RPCs, user-approved password-only policy and leaked-password screening unavailable on Free. No new advisor error."
+  }
+}

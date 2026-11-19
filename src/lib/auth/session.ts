@@ -1,9 +1,11 @@
 import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
+import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logServerError } from "@/lib/logger/server-error";
 import {
   AuthenticationRequiredError,
   SessionUnavailableError,
+  PasswordSetupRequiredError,
 } from "@/lib/auth/session-errors";
 import type { AppUserRow } from "@/types/database";
 import type { UserRole as UserRoleType } from "@/types/user-role";
@@ -15,6 +17,9 @@ export type AppUser = {
 };
 
 function rowToAppUser(row: AppUserRow): AppUser {
+  if (row.is_active !== true) {
+    throw new Error("This account no longer has workspace access. Contact your school administrator.");
+  }
   return {
     id: row.id,
     email: row.email,
@@ -53,7 +58,7 @@ export async function ensureAppUserWithClient(
 
   const { data: existing, error: fetchError } = await supabase
     .from("app_users")
-    .select("id, email, role, created_at, updated_at")
+    .select("id, email, role, is_active, created_at, updated_at")
     .eq("id", supabaseUser.id)
     .maybeSingle();
 
@@ -63,6 +68,10 @@ export async function ensureAppUserWithClient(
   }
 
   if (existing) {
+    const account = rowToAppUser(existing as AppUserRow);
+    const passwordSession = await supabase.rpc("has_password_session");
+    if (passwordSession.error) throw new SessionUnavailableError();
+    if (passwordSession.data !== true) throw new PasswordSetupRequiredError();
     if (existing.email !== email) {
       const { data: synced, error: syncError } = await supabase.rpc("ensure_app_user");
       if (syncError || !synced) {
@@ -71,7 +80,7 @@ export async function ensureAppUserWithClient(
       }
       return rowToAppUser(synced as AppUserRow);
     }
-    return rowToAppUser(existing as AppUserRow);
+    return account;
   }
 
   const { data: inserted, error: insertError } = await supabase.rpc("ensure_app_user");
@@ -90,11 +99,12 @@ export async function ensureAppUser(supabaseUser: SupabaseUser): Promise<AppUser
 }
 
 export async function getAppUser(): Promise<AppUser | null> {
-  const authUser = await getSessionUser();
-  if (!authUser) {
-    return null;
+  try {
+    return (await requireAppUserWithClient()).user;
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) return null;
+    throw error;
   }
-  return ensureAppUser(authUser);
 }
 
 export async function requireAppUser(): Promise<AppUser> {
@@ -106,10 +116,10 @@ export async function requireAppUser(): Promise<AppUser> {
 }
 
 /** One Supabase client for auth + DB in the same request (required for reliable RLS JWT). */
-export async function requireAppUserWithClient(): Promise<{
+export const requireAppUserWithClient = cache(async (): Promise<{
   user: AppUser;
   supabase: SupabaseClient;
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user: authUser },
@@ -127,4 +137,4 @@ export async function requireAppUserWithClient(): Promise<{
   }
   const user = await ensureAppUserWithClient(supabase, authUser);
   return { user, supabase };
-}
+});

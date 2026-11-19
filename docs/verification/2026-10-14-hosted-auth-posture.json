@@ -1,0 +1,23 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "syntheticOnly": true,
+  "settingsStatus": 200,
+  "disableSignup": true,
+  "emailEnabled": true,
+  "publicSignup": {
+    "status": 422,
+    "errorCode": "signup_disabled"
+  },
+  "unknownUserPasswordLogin": {
+    "status": 400,
+    "errorCode": "invalid_credentials"
+  },
+  "browserInvalidLogin": "Clear generic retry message; synthetic nonexistent .test account; inputs cleared afterward",
+  "databaseCountsBeforeAndAfter": {
+    "authUsers": 0,
+    "appUsers": 0,
+    "families": 0
+  },
+  "realEmailSent": false,
+  "limits": "Anonymous posture only; does not establish invited-user, recovery, MFA or authenticated casework behavior."
+}

@@ -198,7 +198,7 @@ export function ResourceMatchesPanel({
                   <div>
                     {r ? (
                       <>
-                        <Link
+                        <Link prefetch={false}
                           href={`/resources/${r.id}`}
                           className="font-semibold text-[var(--color-ink)] underline-offset-2 hover:text-[var(--color-accent)] hover:underline"
                         >

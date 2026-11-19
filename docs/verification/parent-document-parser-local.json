@@ -1,0 +1,229 @@
+{
+  "recordedAt": "2026-10-26T04:35:46.223Z",
+  "scope": "real_local_isolated_parser_synthetic_fixtures_only",
+  "image": {
+    "name": "caselink-document-parser:local",
+    "id": "sha256:8d40b107157d4ba9bd60d6633c34b963ae1167187bd6afbf8f04bab5a146f90f",
+    "defaultUser": "65534:65534"
+  },
+  "checks": [
+    {
+      "name": "native-pdf-english-page-order",
+      "passed": true,
+      "durationMs": 576.418834,
+      "pageCount": 2,
+      "characterCounts": [
+        74,
+        72
+      ],
+      "exactTextMatch": true
+    },
+    {
+      "name": "native-pdf-spanish",
+      "passed": true,
+      "durationMs": 449.0893329999999,
+      "pageCount": 1,
+      "characterCounts": [
+        101
+      ],
+      "exactTextMatch": true
+    },
+    {
+      "name": "png-ocr-english",
+      "passed": true,
+      "durationMs": 713.5686670000002,
+      "pageCount": 1,
+      "characterCounts": [
+        73
+      ],
+      "exactTextMatch": true
+    },
+    {
+      "name": "jpeg-ocr-english",
+      "passed": true,
+      "durationMs": 596.0868329999998,
+      "pageCount": 1,
+      "characterCounts": [
+        73
+      ],
+      "exactTextMatch": true
+    },
+    {
+      "name": "scanned-pdf-ocr-english",
+      "passed": true,
+      "durationMs": 844.4719579999996,
+      "pageCount": 1,
+      "characterCounts": [
+        73
+      ],
+      "exactTextMatch": true
+    },
+    {
+      "name": "png-ocr-spanish",
+      "passed": true,
+      "durationMs": 659.3003329999997,
+      "pageCount": 1,
+      "characterCounts": [
+        99
+      ],
+      "exactTextMatch": false
+    },
+    {
+      "name": "jpeg-ocr-spanish",
+      "passed": true,
+      "durationMs": 636.8388750000004,
+      "pageCount": 1,
+      "characterCounts": [
+        99
+      ],
+      "exactTextMatch": false
+    },
+    {
+      "name": "scanned-pdf-ocr-spanish",
+      "passed": true,
+      "durationMs": 807.5795000000007,
+      "pageCount": 1,
+      "characterCounts": [
+        99
+      ],
+      "exactTextMatch": false
+    },
+    {
+      "name": "five-page-limit-accepted",
+      "passed": true,
+      "durationMs": 472.0403329999999,
+      "pageCount": 5,
+      "characterCounts": [
+        88,
+        88,
+        88,
+        88,
+        88
+      ],
+      "exactTextMatch": true
+    },
+    {
+      "name": "six-page-limit-rejected",
+      "passed": true,
+      "durationMs": 587.9636250000003
+    },
+    {
+      "name": "zero-page-pdf-rejected",
+      "passed": true,
+      "durationMs": 430.32858399999986
+    },
+    {
+      "name": "malformed-pdf-rejected",
+      "passed": true,
+      "durationMs": 433.61325000000033
+    },
+    {
+      "name": "malformed-png-rejected",
+      "passed": true,
+      "durationMs": 433.1240000000007
+    },
+    {
+      "name": "malformed-jpeg-rejected",
+      "passed": true,
+      "durationMs": 411.0747089999986
+    },
+    {
+      "name": "pdf-claimed-as-image-rejected",
+      "passed": true,
+      "durationMs": 463.0400419999987
+    },
+    {
+      "name": "image-claimed-as-pdf-rejected",
+      "passed": true,
+      "durationMs": 427.8004999999994
+    },
+    {
+      "name": "png-claimed-as-jpeg-rejected",
+      "passed": true,
+      "durationMs": 420.87424999999894
+    },
+    {
+      "name": "unsupported-media-type-rejected",
+      "passed": true,
+      "durationMs": 0.18737500000133878
+    },
+    {
+      "name": "empty-document-rejected",
+      "passed": true,
+      "durationMs": 0.09933300000011513
+    },
+    {
+      "name": "oversized-document-rejected",
+      "passed": true,
+      "durationMs": 0.0749999999989086
+    },
+    {
+      "name": "oversized-image-pixel-budget-rejected",
+      "passed": true,
+      "durationMs": 448.6900000000005
+    },
+    {
+      "name": "active-pdf-rejected",
+      "passed": true,
+      "durationMs": 1294.271499999999
+    },
+    {
+      "name": "embedded-file-pdf-rejected",
+      "passed": true,
+      "durationMs": 760.9448339999999
+    }
+  ],
+  "passed": true,
+  "qualityWarnings": [
+    {
+      "name": "png-ocr-spanish",
+      "warning": "synthetic_spanish_ocr_diacritic_not_preserved"
+    },
+    {
+      "name": "jpeg-ocr-spanish",
+      "warning": "synthetic_spanish_ocr_diacritic_not_preserved"
+    },
+    {
+      "name": "scanned-pdf-ocr-spanish",
+      "warning": "synthetic_spanish_ocr_diacritic_not_preserved"
+    }
+  ],
+  "modelCalls": 0,
+  "realFamilyDocuments": 0,
+  "sourceTextRecorded": false,
+  "fixtureFilesWritten": false,
+  "sourceManifest": [
+    {
+      "path": "scripts/test-parent-document-parser.ts",
+      "sha256": "40505d5aa2af4d33d0e2767ba566facb78674a7ecdb90a66d11b99bf287c9bcb"
+    },
+    {
+      "path": "scripts/parse-parent-document.ts",
+      "sha256": "0a8fbfe6efe0b1bbcfa3761a64ffe2d35a045b5e8baad7240b88459a4c046ee9"
+    },
+    {
+      "path": "src/lib/parent/document-processing.ts",
+      "sha256": "ff61e94abf6e7c6a5c2ae97d1a36351834a416c1d756b0e657c21e6ee338fd3c"
+    },
+    {
+      "path": "src/lib/parent/documents.ts",
+      "sha256": "dca88fefe427b61bc8d1aa1c8e52cd285c4bb7f8e8470b9c21ce0bbd84a2f5b5"
+    },
+    {
+      "path": "src/lib/parent/constants.ts",
+      "sha256": "a913c2b7783301302359f224947cd47e2d65aa257c1d93e7777e0c3971efa2ce"
+    },
+    {
+      "path": "docker/parent-document-worker.Dockerfile",
+      "sha256": "6ac8f2138cf10621c664d125a0b9c4c3b70542d5c5f5562854336dc02ba1f091"
+    },
+    {
+      "path": "docker/parent-document-worker.Dockerfile.dockerignore",
+      "sha256": "394a04885de4c876e8b0ce94dc2f7ff8e1d1ffdf7155ec4f9f1ef98679155f05"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "1696c8d60c5fe9a03a90182ce8e73d24fe24d3c0732ad25770f5335e13de2d17"
+    }
+  ]
+}

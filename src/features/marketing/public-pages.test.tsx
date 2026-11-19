@@ -11,7 +11,7 @@ import { ProductPageContent } from "@/features/marketing/product-page-content";
 describe("public site content contract", () => {
   it("keeps the approved homepage language and OpenAI recognition without the rejected warning", () => {
     const { container } = render(
-      <PublicSiteShell authenticated={false}>
+      <PublicSiteShell authenticated={false} showRecognition>
         <HomePageContent />
       </PublicSiteShell>,
     );
@@ -65,6 +65,7 @@ describe("public site content contract", () => {
       </PublicSiteShell>,
     );
 
+    expect(screen.queryByRole("link", { name: /Selected for OpenAI's inaugural/ })).toBeNull();
     const primaryNavigation = screen.getByRole("navigation", { name: "Primary" });
     expect(within(primaryNavigation).getByRole("link", { name: "Workspace" }).getAttribute("href")).toBe("/families");
     expect(within(primaryNavigation).queryByRole("link", { name: "Sign in" })).toBeNull();

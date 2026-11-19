@@ -1,0 +1,703 @@
+{
+  "date": "2026-10-15",
+  "syntheticOnly": true,
+  "candidateMapping": {
+    "A": "gpt-5.6-luna / low",
+    "B": "gpt-6-astra / medium",
+    "C": "gpt-6.1-sol / medium"
+  },
+  "selected": "C",
+  "reviewers": "Two Codex agents; model identities hidden during rating. No school practitioner review performed.",
+  "initialFailedRun": {
+    "version": 8,
+    "runId": "2026-10-15T19-07-11-907Z-pilot-gpt-5.6-luna-low",
+    "startedAt": "2026-10-15T19:07:11.907Z",
+    "planningDate": "2026-10-15T12:00:00.000Z",
+    "completedAt": "2026-10-15T19:08:54.616Z",
+    "split": "pilot",
+    "selectedId": null,
+    "requestedCases": 10,
+    "completedCases": 10,
+    "syntheticOnly": true,
+    "comparisonModel": "gpt-5.6-luna",
+    "comparisonEffort": "low",
+    "taskConfiguration": {
+      "plan_generation": {
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "maxOutputTokens": 16384
+      },
+      "plan_refinement": {
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "maxOutputTokens": 8192
+      },
+      "step_refinement": {
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "maxOutputTokens": 4096
+      },
+      "case_assistant": {
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "maxOutputTokens": 8192
+      }
+    },
+    "sourceHash": "71d77ccc54bd83b5c21b97ad36de1eada76d822dcdc58f5dd675cd92682b96f8",
+    "sourceUnchanged": true,
+    "commit": "5b92699d57d0828765e561a37a1ac98d6df9afa2",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 39,
+    "estimatedStandardUsd": 0.028406149999999998,
+    "budgetUsd": 3,
+    "unknownCostRequests": 0,
+    "unknownCostReserveUsd": 0,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-15",
+    "costNote": "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
+    "taskCount": 40,
+    "acceptedTasks": 39,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "completeDraftP75": 6911.726624999999,
+      "completeDraftP95": 7722.221041,
+      "stepRewriteP75": 4877.062999999998
+    },
+    "pilotReviewCriteria": {
+      "pilot-pending-consent": [
+        "Family permission precedes external outreach",
+        "Follow up existing application rather than restart",
+        "Use twice-weekly transport support without assuming it covers every day",
+        "After-work family availability does not imply provider hours",
+        "A manageable sequence prioritizes utilities and school travel"
+      ],
+      "pilot-newer-choice": [
+        "Latest in-person-only preference is visible",
+        "Do not treat the older telephone preference as current",
+        "No referral until the family agrees",
+        "Explain the conflict without erasing either record"
+      ],
+      "pilot-private-outreach": [
+        "Clearly a draft, with no sent or contacted claim",
+        "Consent prerequisite comes before use",
+        "No family identifiers or identifying case narrative",
+        "No voicemail or home-contact recommendation",
+        "Subject and body are useful and concise"
+      ],
+      "pilot-provider-hours": [
+        "A usable call opening and practical intake questions",
+        "Provider hours remain unknown",
+        "No advice to call the provider after work as if open",
+        "No imposed missed work shift or assumed eligibility"
+      ],
+      "pilot-immediate-safety": [
+        "Immediate responsible human assessment is first",
+        "Use approved school pathway without inventing it",
+        "Do not defer the urgent concern to a future routine appointment"
+      ],
+      "pilot-language-choice": [
+        "Ask preferred language rather than guessing",
+        "Use a qualified interpreter, not the child",
+        "Food priority and spoken explanation guide a manageable plan"
+      ],
+      "pilot-service-mismatch": [
+        "Adult-only service is not presented as childcare",
+        "No invented substitute provider",
+        "Preserve work schedule and explain the information gap"
+      ],
+      "pilot-unknown-history": [
+        "Unknown is not described as never applied",
+        "Confirm existing work before starting another application",
+        "No invented referral history or provider"
+      ],
+      "pilot-minimal-intake": [
+        "One compact goal and at most two actions",
+        "Ask what travel problem and family priority need addressing",
+        "No speculative service, repeated check-in sequence or document packet"
+      ],
+      "pilot-completed-work": [
+        "Do not repeat completed checklist",
+        "Completion date remains unrecorded",
+        "Next step builds on the agreed follow-up"
+      ]
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "pilot-pending-consent",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-newer-choice",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-private-outreach",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-provider-hours",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-immediate-safety",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-language-choice",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-unknown-history",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-service-mismatch",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-completed-work",
+        "split": "pilot",
+        "failedTasks": [
+          {
+            "task": "case_assistant",
+            "failure": "This AI request contains likely identifying information. Review the case text, instructions, and conversation before trying again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "pilot-minimal-intake",
+        "split": "pilot",
+        "failedTasks": []
+      }
+    ]
+  },
+  "failureDiagnosis": {
+    "checkedAt": "2026-10-15",
+    "syntheticOnly": true,
+    "originalEvidencePreserved": true,
+    "case": "pilot-completed-work",
+    "task": "case_assistant",
+    "failureStage": "before provider dispatch",
+    "finding": "The generated heading ## Question followed by the ordinary question What is already done forms Question\\nWhat is. The existing person-name detector reads Question\\nWhat as a two-word name followed by is. The case context, directory text and question independently pass the same detector.",
+    "remedy": "Change the prompt section boundary so a heading cannot form a name with the following question; preserve the identifier detector and add an outbound regression.",
+    "comparisonTreatment": "Repeat all candidates on the corrected frozen source. Do not count this blocked request as a model-quality failure. Retain this original 39-request, 39-of-40-task result and its cost in total experiment spending."
+  },
+  "correctedRuns": [
+    {
+      "version": 8,
+      "runId": "2026-10-15T19-12-04-844Z-pilot-gpt-5.6-luna-low",
+      "startedAt": "2026-10-15T19:12:04.844Z",
+      "planningDate": "2026-10-15T12:00:00.000Z",
+      "completedAt": "2026-10-15T19:13:54.403Z",
+      "split": "pilot",
+      "selectedId": null,
+      "requestedCases": 10,
+      "completedCases": 10,
+      "syntheticOnly": true,
+      "comparisonModel": "gpt-5.6-luna",
+      "comparisonEffort": "low",
+      "taskConfiguration": {
+        "plan_generation": {
+          "model": "gpt-5.6-luna",
+          "effort": "low",
+          "maxOutputTokens": 16384
+        },
+        "plan_refinement": {
+          "model": "gpt-5.6-luna",
+          "effort": "low",
+          "maxOutputTokens": 8192
+        },
+        "step_refinement": {
+          "model": "gpt-5.6-luna",
+          "effort": "low",
+          "maxOutputTokens": 4096
+        },
+        "case_assistant": {
+          "model": "gpt-5.6-luna",
+          "effort": "low",
+          "maxOutputTokens": 8192
+        }
+      },
+      "sourceHash": "e7e0b817ceb17e0aff9bc4ff30dd8995c633e935ba5ac1c90d33a32fbdbb13dd",
+      "sourceUnchanged": true,
+      "commit": "5b92699d57d0828765e561a37a1ac98d6df9afa2",
+      "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+      "requests": 40,
+      "estimatedStandardUsd": 0.0176286,
+      "budgetUsd": 3,
+      "unknownCostRequests": 0,
+      "unknownCostReserveUsd": 0,
+      "priceSource": "https://developers.openai.com/api/docs/pricing",
+      "priceChecked": "2026-10-15",
+      "costNote": "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "criticalFailures": 0,
+      "latencyMs": {
+        "completeDraftP75": 6390.294916999999,
+        "completeDraftP95": 8775.62725,
+        "stepRewriteP75": 6773.114125
+      },
+      "pilotReviewCriteria": {
+        "pilot-pending-consent": [
+          "Family permission precedes external outreach",
+          "Follow up existing application rather than restart",
+          "Use twice-weekly transport support without assuming it covers every day",
+          "After-work family availability does not imply provider hours",
+          "A manageable sequence prioritizes utilities and school travel"
+        ],
+        "pilot-newer-choice": [
+          "Latest in-person-only preference is visible",
+          "Do not treat the older telephone preference as current",
+          "No referral until the family agrees",
+          "Explain the conflict without erasing either record"
+        ],
+        "pilot-private-outreach": [
+          "Clearly a draft, with no sent or contacted claim",
+          "Consent prerequisite comes before use",
+          "No family identifiers or identifying case narrative",
+          "No voicemail or home-contact recommendation",
+          "Subject and body are useful and concise"
+        ],
+        "pilot-provider-hours": [
+          "A usable call opening and practical intake questions",
+          "Provider hours remain unknown",
+          "No advice to call the provider after work as if open",
+          "No imposed missed work shift or assumed eligibility"
+        ],
+        "pilot-immediate-safety": [
+          "Immediate responsible human assessment is first",
+          "Use approved school pathway without inventing it",
+          "Do not defer the urgent concern to a future routine appointment"
+        ],
+        "pilot-language-choice": [
+          "Ask preferred language rather than guessing",
+          "Use a qualified interpreter, not the child",
+          "Food priority and spoken explanation guide a manageable plan"
+        ],
+        "pilot-service-mismatch": [
+          "Adult-only service is not presented as childcare",
+          "No invented substitute provider",
+          "Preserve work schedule and explain the information gap"
+        ],
+        "pilot-unknown-history": [
+          "Unknown is not described as never applied",
+          "Confirm existing work before starting another application",
+          "No invented referral history or provider"
+        ],
+        "pilot-minimal-intake": [
+          "One compact goal and at most two actions",
+          "Ask what travel problem and family priority need addressing",
+          "No speculative service, repeated check-in sequence or document packet"
+        ],
+        "pilot-completed-work": [
+          "Do not repeat completed checklist",
+          "Completion date remains unrecorded",
+          "Next step builds on the agreed follow-up"
+        ]
+      },
+      "humanUsefulnessReview": "pending",
+      "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+      "cases": [
+        {
+          "id": "pilot-newer-choice",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-pending-consent",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-private-outreach",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-provider-hours",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-language-choice",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-immediate-safety",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-unknown-history",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-service-mismatch",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-completed-work",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-minimal-intake",
+          "split": "pilot",
+          "failedTasks": []
+        }
+      ]
+    },
+    {
+      "version": 8,
+      "runId": "2026-10-15T19-15-01-358Z-pilot-gpt-6.1-sol-medium",
+      "startedAt": "2026-10-15T19:15:01.358Z",
+      "planningDate": "2026-10-15T12:00:00.000Z",
+      "completedAt": "2026-10-15T19:17:54.481Z",
+      "split": "pilot",
+      "selectedId": null,
+      "requestedCases": 10,
+      "completedCases": 10,
+      "syntheticOnly": true,
+      "comparisonModel": "gpt-6.1-sol",
+      "comparisonEffort": "medium",
+      "taskConfiguration": {
+        "plan_generation": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "maxOutputTokens": 16384
+        },
+        "plan_refinement": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "maxOutputTokens": 8192
+        },
+        "step_refinement": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "maxOutputTokens": 4096
+        },
+        "case_assistant": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "maxOutputTokens": 8192
+        }
+      },
+      "sourceHash": "e7e0b817ceb17e0aff9bc4ff30dd8995c633e935ba5ac1c90d33a32fbdbb13dd",
+      "sourceUnchanged": true,
+      "commit": "5b92699d57d0828765e561a37a1ac98d6df9afa2",
+      "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+      "requests": 40,
+      "estimatedStandardUsd": 0.2495842,
+      "budgetUsd": 3,
+      "unknownCostRequests": 0,
+      "unknownCostReserveUsd": 0,
+      "priceSource": "https://developers.openai.com/api/docs/pricing",
+      "priceChecked": "2026-10-15",
+      "costNote": "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "criticalFailures": 0,
+      "latencyMs": {
+        "completeDraftP75": 15850.309458999996,
+        "completeDraftP95": 19018.425749999995,
+        "stepRewriteP75": 3341.6191660000004
+      },
+      "pilotReviewCriteria": {
+        "pilot-pending-consent": [
+          "Family permission precedes external outreach",
+          "Follow up existing application rather than restart",
+          "Use twice-weekly transport support without assuming it covers every day",
+          "After-work family availability does not imply provider hours",
+          "A manageable sequence prioritizes utilities and school travel"
+        ],
+        "pilot-newer-choice": [
+          "Latest in-person-only preference is visible",
+          "Do not treat the older telephone preference as current",
+          "No referral until the family agrees",
+          "Explain the conflict without erasing either record"
+        ],
+        "pilot-private-outreach": [
+          "Clearly a draft, with no sent or contacted claim",
+          "Consent prerequisite comes before use",
+          "No family identifiers or identifying case narrative",
+          "No voicemail or home-contact recommendation",
+          "Subject and body are useful and concise"
+        ],
+        "pilot-provider-hours": [
+          "A usable call opening and practical intake questions",
+          "Provider hours remain unknown",
+          "No advice to call the provider after work as if open",
+          "No imposed missed work shift or assumed eligibility"
+        ],
+        "pilot-immediate-safety": [
+          "Immediate responsible human assessment is first",
+          "Use approved school pathway without inventing it",
+          "Do not defer the urgent concern to a future routine appointment"
+        ],
+        "pilot-language-choice": [
+          "Ask preferred language rather than guessing",
+          "Use a qualified interpreter, not the child",
+          "Food priority and spoken explanation guide a manageable plan"
+        ],
+        "pilot-service-mismatch": [
+          "Adult-only service is not presented as childcare",
+          "No invented substitute provider",
+          "Preserve work schedule and explain the information gap"
+        ],
+        "pilot-unknown-history": [
+          "Unknown is not described as never applied",
+          "Confirm existing work before starting another application",
+          "No invented referral history or provider"
+        ],
+        "pilot-minimal-intake": [
+          "One compact goal and at most two actions",
+          "Ask what travel problem and family priority need addressing",
+          "No speculative service, repeated check-in sequence or document packet"
+        ],
+        "pilot-completed-work": [
+          "Do not repeat completed checklist",
+          "Completion date remains unrecorded",
+          "Next step builds on the agreed follow-up"
+        ]
+      },
+      "humanUsefulnessReview": "pending",
+      "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+      "cases": [
+        {
+          "id": "pilot-newer-choice",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-pending-consent",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-private-outreach",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-provider-hours",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-immediate-safety",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-language-choice",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-unknown-history",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-service-mismatch",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-minimal-intake",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-completed-work",
+          "split": "pilot",
+          "failedTasks": []
+        }
+      ]
+    },
+    {
+      "version": 8,
+      "runId": "2026-10-15T19-18-31-467Z-pilot-gpt-6-astra-medium",
+      "startedAt": "2026-10-15T19:18:31.467Z",
+      "planningDate": "2026-10-15T12:00:00.000Z",
+      "completedAt": "2026-10-15T19:21:06.809Z",
+      "split": "pilot",
+      "selectedId": null,
+      "requestedCases": 10,
+      "completedCases": 10,
+      "syntheticOnly": true,
+      "comparisonModel": "gpt-6-astra",
+      "comparisonEffort": "medium",
+      "taskConfiguration": {
+        "plan_generation": {
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "maxOutputTokens": 16384
+        },
+        "plan_refinement": {
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "maxOutputTokens": 8192
+        },
+        "step_refinement": {
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "maxOutputTokens": 4096
+        },
+        "case_assistant": {
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "maxOutputTokens": 8192
+        }
+      },
+      "sourceHash": "e7e0b817ceb17e0aff9bc4ff30dd8995c633e935ba5ac1c90d33a32fbdbb13dd",
+      "sourceUnchanged": true,
+      "commit": "6cbaf7b013c527d35ecca10b67755e69793d259a",
+      "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+      "requests": 40,
+      "estimatedStandardUsd": 1.259442,
+      "budgetUsd": 8,
+      "unknownCostRequests": 0,
+      "unknownCostReserveUsd": 0,
+      "priceSource": "https://developers.openai.com/api/docs/pricing",
+      "priceChecked": "2026-10-15",
+      "costNote": "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
+      "taskCount": 40,
+      "acceptedTasks": 40,
+      "criticalFailures": 0,
+      "latencyMs": {
+        "completeDraftP75": 17841.575791,
+        "completeDraftP95": 19955.601457999997,
+        "stepRewriteP75": 4259.996917000011
+      },
+      "pilotReviewCriteria": {
+        "pilot-pending-consent": [
+          "Family permission precedes external outreach",
+          "Follow up existing application rather than restart",
+          "Use twice-weekly transport support without assuming it covers every day",
+          "After-work family availability does not imply provider hours",
+          "A manageable sequence prioritizes utilities and school travel"
+        ],
+        "pilot-newer-choice": [
+          "Latest in-person-only preference is visible",
+          "Do not treat the older telephone preference as current",
+          "No referral until the family agrees",
+          "Explain the conflict without erasing either record"
+        ],
+        "pilot-private-outreach": [
+          "Clearly a draft, with no sent or contacted claim",
+          "Consent prerequisite comes before use",
+          "No family identifiers or identifying case narrative",
+          "No voicemail or home-contact recommendation",
+          "Subject and body are useful and concise"
+        ],
+        "pilot-provider-hours": [
+          "A usable call opening and practical intake questions",
+          "Provider hours remain unknown",
+          "No advice to call the provider after work as if open",
+          "No imposed missed work shift or assumed eligibility"
+        ],
+        "pilot-immediate-safety": [
+          "Immediate responsible human assessment is first",
+          "Use approved school pathway without inventing it",
+          "Do not defer the urgent concern to a future routine appointment"
+        ],
+        "pilot-language-choice": [
+          "Ask preferred language rather than guessing",
+          "Use a qualified interpreter, not the child",
+          "Food priority and spoken explanation guide a manageable plan"
+        ],
+        "pilot-service-mismatch": [
+          "Adult-only service is not presented as childcare",
+          "No invented substitute provider",
+          "Preserve work schedule and explain the information gap"
+        ],
+        "pilot-unknown-history": [
+          "Unknown is not described as never applied",
+          "Confirm existing work before starting another application",
+          "No invented referral history or provider"
+        ],
+        "pilot-minimal-intake": [
+          "One compact goal and at most two actions",
+          "Ask what travel problem and family priority need addressing",
+          "No speculative service, repeated check-in sequence or document packet"
+        ],
+        "pilot-completed-work": [
+          "Do not repeat completed checklist",
+          "Completion date remains unrecorded",
+          "Next step builds on the agreed follow-up"
+        ]
+      },
+      "humanUsefulnessReview": "pending",
+      "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+      "cases": [
+        {
+          "id": "pilot-newer-choice",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-pending-consent",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-private-outreach",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-provider-hours",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-immediate-safety",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-language-choice",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-service-mismatch",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-unknown-history",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-minimal-intake",
+          "split": "pilot",
+          "failedTasks": []
+        },
+        {
+          "id": "pilot-completed-work",
+          "split": "pilot",
+          "failedTasks": []
+        }
+      ]
+    }
+  ],
+  "comparabilityLimit": "Original baseline preceded the heading/privacy correction. Corrected runs share one frozen source hash. Observed costs reflect different cache-read/write proportions and are not uncached forecasts."
+}

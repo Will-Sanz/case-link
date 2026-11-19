@@ -1,0 +1,92 @@
+{
+  "caseId": "description-new_snap-2-en",
+  "responseSha256": "67b605647bfab1e000e1c3c8f72c1324a5d2a094dc62c8f147bcaa78bf52c0fb",
+  "requestSha256": "beab3f56a958b53c25207dae4faf7b617040ac2782d9a871f8e85353b00476b7",
+  "priorFingerprint": "5b162f7cfb45dad4d41c4e2b603b50fa1382b7d8079bc535b3518d1a4b3db7d0",
+  "corpusSha256": "6ea3e44b253e66bc26720507c355d6b3da030bfd2d85e59b282feb9607570a19",
+  "projection": {
+    "description": "I have never applied for SNAP and want help paying for groceries.",
+    "screenLocale": "en",
+    "revision": 1,
+    "catalogVersion": "5b162f7cfb45dad4d41c4e2b603b50fa1382b7d8079bc535b3518d1a4b3db7d0",
+    "capabilityVersion": "synthetic-description-evaluation.v6",
+    "routingFacts": {
+      "benefitHistory": {
+        "value": "applied",
+        "source": "parent_typed",
+        "confirmedAt": "2026-11-18T11:01:00Z",
+        "expiresAt": "2026-11-19T11:01:00.000Z"
+      }
+    },
+    "ownedFoodHistory": [],
+    "candidates": [
+      {
+        "need": "food_now",
+        "programId": "philly-food",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "food_now",
+        "programId": "share-community-fridge-19129",
+        "sourceCheckedAt": "2026-11-17",
+        "actions": []
+      },
+      {
+        "need": "snap_new",
+        "programId": "snap-pa",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_new",
+        "programId": "uesf-benefits",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_pending",
+        "programId": "snap-pa",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_pending",
+        "programId": "uesf-benefits",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_renewal",
+        "programId": "snap-pa",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_renewal",
+        "programId": "uesf-benefits",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_problem",
+        "programId": "snap-pa",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      },
+      {
+        "need": "snap_problem",
+        "programId": "uesf-benefits",
+        "sourceCheckedAt": "2026-10-25",
+        "actions": []
+      }
+    ],
+    "questionReasons": {
+      "foodForTwoDays": "Determine whether immediate food help should be offered before benefit paperwork.",
+      "benefitHistory": "Avoid creating a new application for an existing or pending benefit.",
+      "existingIssue": "Distinguish renewal, a benefit problem and an unresolved existing case."
+    },
+    "excludedNeedIds": []
+  },
+  "messageOutputText": "{\"needIds\":[\"snap_pending\"],\"selections\":[{\"need\":\"snap_pending\",\"programId\":\"snap-pa\",\"reason\":\"pending\"},{\"need\":\"snap_pending\",\"programId\":\"uesf-benefits\",\"reason\":\"pending\"}],\"assertions\":[],\"exclusions\":[],\"questionIds\":[\"foodForTwoDays\",\"benefitHistory\"],\"outOfScope\":null}"
+}

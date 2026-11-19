@@ -39,3 +39,7 @@ export function actionUiStatus(
   return action.status;
 }
 
+/** Waiting dates mean the next follow-up; legacy rows may only have a target date. */
+export function actionTargetDate(action: Pick<PlanStepActionItemRow, "status" | "target_date" | "follow_up_date">): string | null {
+  return action.status === "blocked" ? action.follow_up_date ?? action.target_date : action.target_date;
+}

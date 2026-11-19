@@ -1,0 +1,435 @@
+import { foodDescriptionArchiveSchema } from "./food-description-draft";
+import "server-only";
+import { documentUploadKeySchema, documentUploadRecordSchema, documentUploadRegistrationSchema, type DocumentUploadRecord } from "./document-upload";
+import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { requireParentSession } from "./auth";
+import {
+  intakeSchema,
+  mandateSchema,
+  reusedZipSourceSchema,
+  reusableZipSchema,
+  type ReusedZipSource,
+  type ParentPreferences,
+  type ServiceMandate,
+  type SupportIntake,
+  type SupportRequest,
+} from "./domain";
+
+const uuid = z.uuid();
+import { utilityProtectedInputReferenceSchema } from "./utility-protected-input-contract";
+import { familyProfileReadSchema } from "./family-profile";
+import { DOCUMENT_CONSENT_VERSION } from "./constants";
+export { DOCUMENT_CONSENT_VERSION } from "./constants";
+export const PARENT_DOCUMENT_BUCKET = "parent-documents";
+export const parentPreferencesSchema = z
+  .object({
+    contactPreference: z.enum(["in_app", "email"]),
+    language: z.enum(["en", "es"]),
+    quietHoursStart: z.number().int().min(0).max(23),
+    quietHoursEnd: z.number().int().min(0).max(23),
+  })
+  .strict();
+
+function check(error: unknown): void {
+  if (!error) return;
+  const code =
+    typeof error === "object" && "code" in error ? error.code : undefined;
+  if (code === "P0001" && typeof error === "object" && error !== null &&
+    "message" in error && error.message === "parent_reuse_source_changed")
+    throw new Error("parent_reuse_source_changed");
+  if (
+    code === "P0001" &&
+    typeof error === "object" &&
+    "message" in error &&
+    error.message === "parent_document_limit"
+  )
+    throw new Error(
+      "This request has reached its document limit. Remove an unused document or enter the information manually.",
+    );
+  if (code === "40001" || code === "PT409")
+    throw new Error(
+      "This request changed. Reload it before saving your update.",
+    );
+  if (code === "42501")
+    throw new Error(
+      "This request is unavailable, or its permission has changed.",
+    );
+  throw new Error(
+    "CaseLink could not save or load this information. Please try again.",
+  );
+}
+
+export async function getHousehold(): Promise<{
+  id: string;
+  owner_id: string;
+  preferences: ParentPreferences;
+}> {
+  const { supabase, user } = await requireParentSession();
+  const [household, account] = await Promise.all([
+    supabase
+      .from("parent_households")
+      .select("id,owner_id")
+      .eq("owner_id", user.id)
+      .single(),
+    supabase
+      .from("parent_accounts")
+      .select("preferences")
+      .eq("id", user.id)
+      .single(),
+  ]);
+  check(household.error);
+  check(account.error);
+  return {
+    ...household.data!,
+    preferences: parentPreferencesSchema.parse(account.data!.preferences),
+  };
+}
+const requestColumns =
+  "id,household_id,status,closed_reason,intake,mandate,plan,required_actions,version,created_at,updated_at,next_actor,next_trigger,next_run_at,facts,account_changed_at,intake_confirmed_at,intake_need_scoped_fields,intake_reuse,description_source";
+const eventColumns = "id,request_id,kind,actor,summary,created_at,evidence";
+const documentColumns =
+  "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at";
+const pageSize = 100;
+
+async function allParentRows(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    let query = supabase
+      .from(table)
+      .select(columns)
+      .order("id", { ascending: true })
+      .limit(pageSize);
+    if (cursor) query = query.gt("id", cursor);
+    const { data, error } = await query;
+    check(error);
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+    cursor = uuid.parse(page[page.length - 1].id);
+  }
+}
+export async function listSupportRequests(): Promise<SupportRequest[]> {
+  const { supabase } = await requireParentSession();
+  const requests = await allParentRows(
+    supabase,
+    "parent_requests",
+    requestColumns,
+  );
+  return (requests as unknown as SupportRequest[]).sort(
+    (a, b) =>
+      b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id),
+  );
+}
+
+/** Read the complete retained parent-purpose history in sequential, ownership-filtered pages. */
+export async function exportParentInformation() {
+  const { supabase } = await requireParentSession();
+  const exportedAt = new Date().toISOString();
+  const household = await getHousehold();
+  const requests = await allParentRows(
+    supabase,
+    "parent_requests",
+    requestColumns,
+  );
+  const tables = [
+    [
+      "assistant",
+      "parent_assistant_messages",
+      "id,request_id,question,status,answer,error,created_at,updated_at",
+    ],
+    ["events", "parent_events", eventColumns],
+    [
+      "documents",
+      "parent_documents",
+      `${documentColumns},page_count,consent_version,upload_confirmed_at,facts,source_observed_at,facts_valid_until`,
+    ],
+    [
+      "operations",
+      "parent_operations",
+      "id,request_id,request_version,need,program_id,action,packet,packet_hash,data_categories,document_ids,idempotency_key,permission_version,artifact_id,mandate_hash,authorization_snapshot,state,evidence,created_at,updated_at,executed_at",
+    ],
+    [
+      "receipts",
+      "parent_receipts",
+      "id,request_id,operation_id,state,attribution,evidence,evidence_hash,created_at",
+    ],
+    ["supportUpdates", "parent_support_update_receipts",
+      "id,request_id,idempotency_key,action,base_version,result_version,payload_hash,created_at"],
+    [
+      "mandates",
+      "parent_mandates",
+      "id,request_id,request_version,mandate,mandate_hash,accepted_at",
+    ],
+    [
+      "forms",
+      "parent_form_artifacts",
+      "id,request_id,request_version,need,program_id,template_id,template_version,template_hash,form_input_digest,content_sha256,status,expires_at,created_at,snap_snapshot_id,snap_snapshot_hash",
+    ],
+    [
+      "snapApplicationDetails",
+      "parent_snap_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,notice_version,created_at,idempotency_key,confirmed_paths",
+    ],
+    [
+      "wicApplicationDetails",
+      "parent_wic_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key,confirmed_paths",
+    ],
+    [
+      "pecoApplicationDetails",
+      "parent_peco_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key",
+    ],
+    ["pgwApplicationDetails", "parent_pgw_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key"],
+    ["waterApplicationDetails", "parent_water_application_details",
+      "id,request_id,revision,base_version,request_version,details,provenance,source,consent_evidence,notice_version,created_at,idempotency_key"],
+  ] as const;
+  for (const [key, table, columns] of tables) {
+    const rows = await allParentRows(supabase, table, columns);
+    const byRequest = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+      const requestId = String(row.request_id);
+      const group = byRequest.get(requestId) ?? [];
+      group.push(row);
+      byRequest.set(requestId, group);
+    }
+    for (const request of requests)
+      request[key] = byRequest.get(String(request.id)) ?? [];
+  }
+  const protectedExport = await supabase.rpc("parent_export_utility_protected_inputs");
+  check(protectedExport.error);
+  const protectedInputs = z.array(utilityProtectedInputReferenceSchema).safeParse(protectedExport.data);
+  if (!protectedInputs.success || protectedInputs.data.some(input => input.ownerId !== household.owner_id || !requests.some(request => request.id === input.requestId)))
+    throw new Error("CaseLink could not export protected document references. Please try again.");
+  for (const request of requests) request.utilityProtectedInputs = protectedInputs.data.filter(input => input.requestId === request.id);
+  const profileReply = await supabase.rpc("parent_get_family_profile");
+  check(profileReply.error);
+  const profile = familyProfileReadSchema.safeParse(profileReply.data);
+  if (!profile.success || profile.data.ownerId !== household.owner_id)
+    throw new Error("CaseLink could not export your family profile. Please try again.");
+  const descriptionReply = await supabase.rpc("parent_get_food_descriptions");
+  check(descriptionReply.error);
+  const descriptions = foodDescriptionArchiveSchema.safeParse(descriptionReply.data);
+  if (!descriptions.success || descriptions.data.ownerId !== household.owner_id) throw new Error("CaseLink could not export your food-description drafts. Please try again.");
+  return { exportedAt, household, familyProfile: profile.data.profile, foodDescriptions: descriptions.data.drafts, requests };
+}
+export async function getSupportRequest(
+  id: string,
+): Promise<SupportRequest | null> {
+  uuid.parse(id);
+  const { supabase } = await requireParentSession();
+  const request = await supabase
+    .from("parent_requests")
+    .select(requestColumns)
+    .eq("id", id)
+    .maybeSingle();
+  check(request.error);
+  if (!request.data) return null;
+  const [events, documents, peco, pgw, water] = await Promise.all([
+    supabase
+      .from("parent_events")
+      .select(eventColumns)
+      .eq("request_id", id)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(201),
+    supabase
+      .from("parent_documents")
+      .select(
+        "id,request_id,filename,media_type,size_bytes,status,expires_at,created_at,upload_confirmed_at,upload_key",
+      )
+      .eq("request_id", id)
+      .neq("status", "deletion_pending")
+      .order("created_at", { ascending: false }),
+    supabase.from("parent_peco_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
+    supabase.from("parent_pgw_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
+    supabase.from("parent_water_application_details").select("id").eq("request_id", id).limit(1).maybeSingle(),
+  ]);
+  check(events.error);
+  check(documents.error);
+  check(peco.error);
+  check(pgw.error);
+  check(water.error);
+  return {
+    ...request.data,
+    events: (events.data ?? []).slice(0, 200).reverse(),
+    events_truncated: (events.data?.length ?? 0) > 200,
+    documents: documents.data ?? [],
+    has_peco_application_details: !!peco.data,
+    has_pgw_application_details: !!pgw.data,
+    has_water_application_details: !!water.data,
+  } as SupportRequest;
+}
+export async function startSupportRequest(
+  intake: SupportIntake,
+  mandate: ServiceMandate,
+  idempotencyKey?: string,
+  reusedZip?: ReusedZipSource,
+): Promise<string> {
+  const { supabase } = await requireParentSession();
+  const source = reusedZip ? reusedZipSourceSchema.parse(reusedZip) : null;
+  const { data, error } = await supabase.rpc(source ? "parent_start_request_with_reused_zip" : "parent_start_request", {
+    p_intake: intakeSchema.parse(intake),
+    p_mandate: mandateSchema.parse(mandate),
+    p_idempotency_key: idempotencyKey ? uuid.parse(idempotencyKey) : null,
+    ...(source ? { p_source_request_id: source.sourceRequestId, p_source_version: source.sourceVersion } : {}),
+  });
+  check(error);
+  return uuid.parse(data);
+}
+export async function getReusableZip() {
+  const { supabase, user } = await requireParentSession();
+  const { data, error } = await supabase.rpc("parent_reusable_zip");
+  check(error);
+  if (data === null) return { ownerId: user.id, zip: null };
+  const parsed = reusableZipSchema.safeParse(data);
+  if (!parsed.success) throw new Error("CaseLink could not load saved routing information. Please try again.");
+  return { ownerId: user.id, zip: parsed.data };
+}
+export async function controlSupportRequest(
+  id: string,
+  action: "pause" | "resume" | "cancel",
+): Promise<void> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_control_request", {
+    p_request_id: uuid.parse(id),
+    p_action: z.enum(["pause", "resume", "cancel"]).parse(action),
+  });
+  check(error);
+}
+export async function correctSupportRequest(
+  id: string,
+  intake: SupportIntake,
+  expectedVersion: number,
+): Promise<void> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_correct_request", {
+    p_request_id: uuid.parse(id),
+    p_intake: intakeSchema.parse(intake),
+    p_expected_version: z.number().int().positive().parse(expectedVersion),
+  });
+  check(error);
+}
+export async function updateParentPreferences(
+  preferences: ParentPreferences,
+): Promise<void> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_update_preferences", {
+    p_preferences: parentPreferencesSchema.parse(preferences),
+  });
+  check(error);
+}
+export { requestAccountDeletion } from "./account-deletion";
+
+const documentSchema = z
+  .object({
+    requestId: uuid,
+    filename: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[^\p{Cc}/\\]+$/u),
+    mediaType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+    sizeBytes: z.number().int().min(1).max(10485760),
+    pageCount: z.null(),
+    consentVersion: z.literal(DOCUMENT_CONSENT_VERSION),
+    uploadKey: documentUploadKeySchema,
+    uploadSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+export async function registerParentDocument(
+  input: z.infer<typeof documentSchema>,
+): Promise<{ document: DocumentUploadRecord; existing: boolean }> {
+  const value = documentSchema.parse(input);
+  const { supabase } = await requireParentSession();
+  const { data, error } = await supabase.rpc("parent_register_document", {
+    p_request_id: value.requestId, p_filename: value.filename, p_media_type: value.mediaType,
+    p_size_bytes: value.sizeBytes, p_page_count: value.pageCount, p_consent_version: value.consentVersion,
+    p_upload_key: value.uploadKey, p_upload_sha256: value.uploadSha256,
+  });
+  if (error?.code === "PT409" || error?.code === "40001") throw new Error("parent_document_upload_changed");
+  check(error);
+  const parsed = documentUploadRegistrationSchema.safeParse(data);
+  if (!parsed.success || parsed.data.document.request_id.toLowerCase() !== value.requestId.toLowerCase() ||
+    parsed.data.document.upload_key !== value.uploadKey || parsed.data.document.upload_sha256 !== value.uploadSha256)
+    throw new Error("CaseLink could not confirm this upload. Please check its status before trying again.");
+  return parsed.data;
+}
+async function readOwnedDocumentUpload(requestId: string, field: "id" | "upload_key", value: string): Promise<DocumentUploadRecord | null> {
+  const request = uuid.parse(requestId), identifier = uuid.parse(value).toLowerCase();
+  const { supabase } = await requireParentSession();
+  const { data, error } = await supabase.from("parent_documents")
+    .select("id,request_id,filename,media_type,size_bytes,status,expires_at,created_at,upload_confirmed_at,upload_key,object_path,upload_sha256,consent_version,consented_at")
+    .eq("request_id", request).eq(field, identifier).maybeSingle();
+  check(error);
+  if (!data) return null;
+  const parsed = documentUploadRecordSchema.safeParse(data);
+  if (!parsed.success || parsed.data.request_id.toLowerCase() !== request.toLowerCase() || parsed.data[field]?.toLowerCase() !== identifier)
+    throw new Error("CaseLink could not confirm this upload. Please check its status before trying again.");
+  return parsed.data;
+}
+export async function getParentDocumentUpload(requestId: string, key: string): Promise<DocumentUploadRecord | null> {
+  const uploadKey = documentUploadKeySchema.parse(key);
+  const keyed = await readOwnedDocumentUpload(requestId, "upload_key", uploadKey);
+  if (keyed) return keyed;
+  const legacy = await readOwnedDocumentUpload(requestId, "id", uploadKey);
+  return legacy?.upload_key === null ? legacy : null;
+}
+export async function getParentDocumentUploadById(requestId: string, documentId: string): Promise<DocumentUploadRecord | null> {
+  return readOwnedDocumentUpload(requestId, "id", documentId);
+}
+/** A non-confirmed response still requires current request/record checks before any immutable transfer. */
+export async function tryConfirmParentDocumentUpload(requestId: string, documentId: string): Promise<boolean> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_confirm_document_upload", {
+    p_request_id: uuid.parse(requestId), p_document_id: uuid.parse(documentId),
+  });
+  if (error?.code === "42501" && error.message === "private upload has not been confirmed") return false;
+  check(error);
+  return true;
+}
+export async function confirmParentDocumentUpload(
+  requestId: string,
+  documentId: string,
+): Promise<void> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_confirm_document_upload", {
+    p_request_id: uuid.parse(requestId),
+    p_document_id: uuid.parse(documentId),
+  });
+  check(error);
+}
+export async function deleteParentDocument(
+  requestId: string,
+  documentId: string,
+): Promise<void> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_delete_document", {
+    p_request_id: uuid.parse(requestId),
+    p_document_id: uuid.parse(documentId),
+  });
+  check(error);
+  // The isolated retention worker erases bytes after this RPC invalidates their queued uses.
+}
+
+export async function resolveParentAction(
+  requestId: string,
+  actionId: string,
+  value: string,
+): Promise<void> {
+  const { supabase } = await requireParentSession();
+  const { error } = await supabase.rpc("parent_resolve_action", {
+    p_request_id: uuid.parse(requestId),
+    p_action_id: z.string().min(1).max(120).parse(actionId),
+    p_value: z.string().trim().min(1).max(2000).parse(value),
+  });
+  check(error);
+}

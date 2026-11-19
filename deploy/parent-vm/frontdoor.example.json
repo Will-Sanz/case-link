@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "approvalReference": "REQUIRES_RECORDED_AUTHORITY",
+  "approvedUntil": "2000-01-01T00:00:00Z",
+  "publicOrigin": "https://pilot.thecaselink.com",
+  "projectOrigin": "https://zpfypkizsapvsxeykmdq.supabase.co",
+  "service": "frontdoor"
+}

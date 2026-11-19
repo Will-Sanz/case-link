@@ -6,7 +6,6 @@ describe("productionPostureIssues", () => {
     expect(
       productionPostureIssues({
         CASELINK_TENANCY_MODE: "single-tenant",
-        CASELINK_PDF_MODE: "fillable-only",
         CASELINK_INVITE_ONLY: "1",
         CASELINK_HSTS: "1",
         NEXT_PUBLIC_SITE_URL: "https://app.example.edu",
@@ -21,7 +20,6 @@ describe("productionPostureIssues", () => {
     expect(
       productionPostureIssues({
         CASELINK_TENANCY_MODE: "shared",
-        CASELINK_PDF_MODE: "scanned",
         CASELINK_INVITE_ONLY: "0",
         CASELINK_HSTS: "0",
         NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
@@ -30,7 +28,7 @@ describe("productionPostureIssues", () => {
         PLAN_REGENERATE_DEBUG: "1",
         PLAN_REFINE_DEBUG: "1",
       }),
-    ).toHaveLength(12);
+    ).toHaveLength(11);
   });
 
   it.each([
@@ -42,7 +40,6 @@ describe("productionPostureIssues", () => {
   ])("rejects a site URL that is not an exact origin: %s", (siteUrl) => {
     const issues = productionPostureIssues({
       CASELINK_TENANCY_MODE: "single-tenant",
-      CASELINK_PDF_MODE: "fillable-only",
       CASELINK_INVITE_ONLY: "1",
       CASELINK_HSTS: "1",
       NEXT_PUBLIC_SITE_URL: siteUrl,

@@ -1,354 +1,222 @@
 ---
 name: CaseLink
-description: A calm, credible family-support workspace that carries reviewed work into review-ready paperwork.
+description: The original CaseLink identity, carried into clear parent food and utility support.
 colors:
-  primary: "#4932c6"
-  primary-hover: "#3823a7"
-  focus-violet: "#5c47da"
-  navy-ink: "#102052"
-  body-ink: "#3f496d"
-  muted-ink: "#4b557a"
-  soft-ink: "#626b8b"
-  paper: "#fbfaff"
-  surface: "#fffefe"
-  violet-wash: "#eeeaff"
-  lavender-mist: "#f4f0ff"
-  border: "#ded8f4"
-  control-border: "#c8bee9"
-  accent-rule: "#a99ce9"
-  review-bg: "#fff5da"
-  review-ink: "#765a16"
-  error-bg: "#fef2f2"
-  error-ink: "#a32929"
-  print-ink: "#000000"
-  print-muted: "#333333"
-publicSite:
-  genre: "editorial-friendly ed-tech"
-  macrostructure:
-    marketing: "narrative workflow with custom illustration centerpiece and text-led process timeline"
-    content: "long document"
-    auth: "focused editorial entry"
-  colors:
-    paper: "#fbfaff"
-    paper-2: "#f4f0ff"
-    paper-3: "#ebe6fb"
-    surface: "#fffefe"
-    ink: "#102052"
-    body-ink: "#3f496d"
-    muted-ink: "#626b8b"
-    rule: "#ded8f4"
-    rule-strong: "#c8bee9"
-    accent: "#4932c6"
-    accent-hover: "#3823a7"
-    accent-ink: "#fffefe"
-    accent-soft: "#eeeaff"
-    focus: "#5c47da"
-  typography:
-    display: "Newsreader Variable, Georgia, serif"
-    displayWeight: 560
-    body: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-  motion:
-    easeOut: "cubic-bezier(0.16, 1, 0.3, 1)"
-    hero: "copy rise plus visual rise; no repeated section reveals"
-    reducedMotion: "no reveal animation"
+  primary: "oklch(44.93% 0.2146 280.43)"
+  primary-hover: "oklch(38.54% 0.1952 279.25)"
+  primary-soft: "oklch(94.64% 0.0284 294.59)"
+  primary-rule: "oklch(73.31% 0.1105 291.16)"
+  focus: "oklch(51.18% 0.2133 282.31)"
+  paper: "oklch(98.73% 0.0067 295.45)"
+  paper-secondary: "oklch(96.26% 0.0204 298.2)"
+  paper-selected: "oklch(93.51% 0.0286 296.74)"
+  paper-hero: "oklch(97.72% 0.0121 296.36)"
+  surface: "oklch(99.78% 0.0011 17.18)"
+  ink: "oklch(26.48% 0.0939 266.47)"
+  ink-hover: "oklch(31.3% 0.1083 266.72)"
+  ink-strong: "oklch(36.58% 0.0789 271.66)"
+  ink-muted: "oklch(45.68% 0.0619 272.15)"
+  ink-faint: "oklch(53.26% 0.0516 272.35)"
+  rule: "oklch(89.55% 0.0385 295.43)"
+  rule-strong: "oklch(82.37% 0.0606 295.7)"
+  positive: "oklch(48.05% 0.0686 163.64)"
+  positive-bg: "oklch(95.2% 0.0132 159.91)"
+  attention: "oklch(47.66% 0.085 81.02)"
+  attention-bg: "oklch(97.07% 0.0381 90.65)"
+  error: "oklch(47.59% 0.1586 25.61)"
+  error-bg: "oklch(97.05% 0.0129 17.38)"
 typography:
   display:
-    fontFamily: "Newsreader Variable, Georgia, serif"
-    fontSize: "clamp(2.8rem, 6vw, 5.65rem)"
+    fontFamily: '"Newsreader Variable", Georgia, serif'
+    fontSize: "clamp(2rem, 4.5vw, 3.5rem)"
     fontWeight: 560
-    lineHeight: 0.98
-    letterSpacing: "-0.04em"
+    lineHeight: 1.15
+    letterSpacing: "-0.03em"
   headline:
-    fontFamily: "Newsreader Variable, Georgia, serif"
-    fontSize: "3rem"
+    fontFamily: '"Newsreader Variable", Georgia, serif'
+    fontSize: "clamp(1.5rem, 3vw, 2.2rem)"
     fontWeight: 560
-    lineHeight: 1.25
+    lineHeight: 1.15
     letterSpacing: "-0.03em"
   title:
-    fontFamily: "Newsreader Variable, Georgia, serif"
-    fontSize: "1.5rem"
-    fontWeight: 560
-    lineHeight: 1.25
-    letterSpacing: "-0.025em"
+    fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif'
+    fontSize: "1.125rem"
+    fontWeight: 650
+    lineHeight: 1.15
+    letterSpacing: "-0.015em"
   body:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.875rem"
+    fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif'
+    fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.6
-    letterSpacing: "normal"
   label:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.75rem"
-    fontWeight: 600
-    lineHeight: 1.5
-    letterSpacing: "0.12em"
-  micro:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "10px"
-  caption:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "11px"
-  compact:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "13px"
-  reading:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "15px"
-  brand:
-    fontFamily: "Newsreader Variable, Georgia, serif"
-    fontSize: "1.45rem"
-  brand-public:
-    fontFamily: "Newsreader Variable, Georgia, serif"
-    fontSize: "1.75rem"
-  legal:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif'
     fontSize: "0.9375rem"
-  legal-compact:
-    fontFamily: "Geist Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.8125rem"
-  print:
-    fontFamily: "Helvetica, Arial, sans-serif"
-    fontSize: "10px"
+    fontWeight: 600
 rounded:
-  sm: "0.375rem"
   control: "0.625rem"
   card: "0.875rem"
   feature: "1rem"
   pill: "9999px"
 spacing:
-  1: "0.25rem"
-  2: "0.5rem"
-  3: "0.75rem"
-  4: "1rem"
-  5: "1.25rem"
-  6: "1.5rem"
-  8: "2rem"
-  10: "2.5rem"
+  xs: "0.5rem"
+  sm: "0.75rem"
+  md: "1rem"
+  lg: "1.5rem"
+  xl: "2.5rem"
+  2xl: "4rem"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
-    textColor: "{colors.surface}"
-    typography: "{typography.body}"
+    textColor: "#ffffff"
     rounded: "{rounded.control}"
-    padding: "0.5rem 1rem"
+    padding: "0.75rem 1.2rem"
   button-primary-hover:
     backgroundColor: "{colors.primary-hover}"
-    textColor: "{colors.surface}"
-    typography: "{typography.body}"
-    rounded: "{rounded.control}"
-    padding: "0.5rem 1rem"
   button-secondary:
-    backgroundColor: "{colors.violet-wash}"
-    textColor: "{colors.primary}"
-    typography: "{typography.body}"
-    rounded: "{rounded.control}"
-    padding: "0.5rem 1rem"
-  button-outline:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.body-ink}"
-    typography: "{typography.body}"
+    textColor: "{colors.ink}"
     rounded: "{rounded.control}"
-    padding: "0.5rem 1rem"
-  button-ghost:
+    padding: "0.75rem 1.2rem"
+  button-quiet:
     backgroundColor: "transparent"
-    textColor: "{colors.muted-ink}"
-    typography: "{typography.body}"
+    textColor: "{colors.primary}"
+  button-danger:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.error}"
     rounded: "{rounded.control}"
-    padding: "0.5rem 0.75rem"
   input:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.body-ink}"
-    typography: "{typography.body}"
+    textColor: "{colors.ink}"
     rounded: "{rounded.control}"
-    padding: "0.625rem 0.75rem"
-    width: "100%"
-  card:
+    padding: "0.7rem 0.8rem"
+  task-surface:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.navy-ink}"
-    rounded: "{rounded.card}"
-    padding: "1.25rem"
-  chip-review:
-    backgroundColor: "{colors.review-bg}"
-    textColor: "{colors.review-ink}"
-    typography: "{typography.label}"
-    rounded: "{rounded.pill}"
-    padding: "0.25rem 0.75rem"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.feature}"
+    padding: "2rem"
+  outcome-badge:
+    backgroundColor: "{colors.primary-soft}"
+    textColor: "{colors.primary}"
 ---
 
 # Design System: CaseLink
 
-## Public Site Variant: The Guided Table
-
-The public site uses the approved friendly ed-tech direction: deep navy editorial typography, pale lavender paper fields, one restrained violet action color, and an original illustration of a case manager working with a family. It should feel like a trusted school publication made operational—humane, civic, composed, and never juvenile.
-
-- **Genre:** Editorial-friendly ed-tech
-- **Marketing macrostructure:** Narrative workflow, with a custom illustration centerpiece on the homepage, a text-led process timeline, and the product review experience used as the product-page opening
-- **Content macrostructure:** Long document with a bookish heading voice and restrained measure
-- **Auth macrostructure:** Focused editorial entry surface
-- **Display:** Self-hosted Newsreader Variable at weight 560, normal style
-- **Body:** Geist Sans
-- **CTA voice:** Compact violet rectangles with a quiet lift; secondary actions remain typographic
-- **Icon language:** No decorative storytelling icons. Use text and connective rules for process narratives; reserve Lucide line icons for functional controls, product-state demonstrations, and the link-shaped public brand mark.
-- **Imagery:** Original, softly painted editorial scenes with natural proportions, muted ochre/coral/sage support colors, and no text embedded in the art; real team photography stays documentary and minimally framed
-- **Motion:** One hero reveal using the system ease-out curve; reduced-motion users receive the fully visible state without animation
-
-Marketing, legal, auth, and authenticated workspace pages all inherit the same product tokens from `tokens.css`. Public selectors remain as compatibility aliases, but the wordmark, type pairing, navy/lavender palette, violet action color, focus treatment, and heading rhythm are one shared system.
-
 ## Overview
 
-**Creative North Star: "The Calm Handoff"**
+**Creative North Star: "One familiar CaseLink service"**
 
-CaseLink should feel like a well-prepared folder passed between trusted colleagues: ordered, legible, and ready for the next responsible action. Every surface uses lavender paper fields, crisp near-white working sheets, navy editorial hierarchy, restrained violet actions, and concise language so a school case manager can move from family intake to reviewed plan to paperwork without needing software expertise.
+The original CaseLink identity carries through the parent product: lavender paper, deep navy text, restrained violet actions, Newsreader headings and Geist controls. This refresh follows the owner's request to recover the established brand and the explicit selection of imagegen Option 2, Family Panorama. The palette and shared identity are durable; that public-entry composition is a surface choice.
 
-Polish comes from proportion, steady alignment, and visible review boundaries—not visual spectacle. Public surfaces are spacious and editorial; the authenticated workspace is denser and more operational. Both use Newsreader for brand and page-level display, Geist Sans for working copy, gently curved geometry, and explicit human-control cues.
+The public experience is welcoming and editorial, using original family illustration and generous space to introduce food and utility support. Operational screens use the same identity with calmer, readable task surfaces, direct controls and necessary information. The product should feel composed, welcoming and capable, as recorded in [PRODUCT.md](PRODUCT.md).
+
+This is an as-built record of [the shared tokens](tokens.css), [parent styles](src/features/parent/parent.module.css), shared CaseLink wordmark/favicon, linked ChatGPT Futures banner and parent entry. It replaces the superseded teal/lemon parent record. The [historical school design](docs/legacy/school-design.md) remains unchanged; its original visual identity is deliberately reused here.
 
 **Key Characteristics:**
 
-- Calm, credible, and institutionally polished
-- Lavender paper surroundings with near-white working surfaces
-- Violet reserved for action, current location, links, and purposeful emphasis
-- Compact controls inside generous page-level spacing
-- Clear provenance, review state, and manual handoff language
-- Motion that confirms interaction without turning AI into spectacle
+- One CaseLink mark, wordmark, palette and type pairing across public, operational and policy pages.
+- Original family imagery on public entry, with readable forms and clear actions inside the service.
+- Restrained violet emphasis, explicit state labels and visible keyboard focus.
+- Parent-owned actions are prominent; detailed service history and waiting remain secondary.
 
-## Unified Product Colors
+## Colors
 
-The palette moves from CaseLink Violet through Violet Rule, supported by paper whites and violet-gray inks; amber and red appear only for states that require attention.
+The normative values above preserve the source's OKLCH format. New UI uses semantic properties from the root token file; existing compatibility aliases resolve to that same palette.
 
 ### Primary
 
-- **CaseLink Violet** (`#4932c6`): Primary actions, active navigation, key icons, and deliberate high-emphasis public bands.
-- **Deep Violet Hover** (`#3823a7`): Hover state for primary actions and linked emphasis.
-- **Focus Violet** (`#5c47da`): Keyboard focus borders and translucent focus rings.
+Violet supplies primary actions, active navigation, selected choices, links and the chain mark. Its darker hover and pale lavender support tint remain part of the same family. Focus has its own established violet tone.
+
+### Secondary
+
+Sage supports positive feedback, amber supports attention and red supports errors or destructive actions. Each status includes words or an icon and words; hue does not establish an outcome by itself.
 
 ### Neutral
 
-- **Navy Ink** (`#102052`): Headings, wordmark text, and the highest-emphasis instructional copy.
-- **Service Navy** (`#3f496d`): Form labels, navigation, and compact operational text.
-- **Muted Navy** (`#4b557a`): Supporting copy, descriptions, and noncritical metadata.
-- **Soft Navy** (`#626b8b`): Placeholders, timestamps, and tertiary labels.
-- **Lavender Paper** (`#fbfaff`): Default page field and workspace background.
-- **Clean Sheet** (`#fffefe`): Forms, cards, navigation rails, and document-review surfaces.
-- **Violet Wash** (`#eeeaff`): Secondary controls, guidance callouts, empty states, and selected context.
-- **Lavender Mist** (`#f4f0ff`): Large public hero and explanatory bands.
-- **Quiet Rule** (`#ded8f4`): Section borders, card outlines, and shell dividers.
-- **Control Rule** (`#c8bee9`): Inputs and outlined controls that need a clearer boundary.
-- **Violet Rule** (`#a99ce9`): Selection color, secondary action boundaries, and gentle connective detail.
-
-### Tertiary
-
-- **Review Amber** (`#fff5da` / `#765a16`): Fields and chips that need explicit human attention.
-- **Plain Error** (`#fef2f2` / `#a32929`): Recoverable validation and processing failures.
-
-### Named Rules
-
-**The Violet Restraint Rule.** CaseLink Violet marks the next action, current location, or purposeful emphasis; it does not flood routine working surfaces. Green is semantic and reserved for positive or completed states.
-
-**The Written State Rule.** Review, success, and error colors always travel with plain-language labels or icons; color is never the only signal.
+Lavender paper separates the page from the near-white surface. Navy ink supplies headings and body structure; muted ink supplies supporting text. Violet-tinted boundaries separate fields, tasks and rows without adding a competing neutral palette. The darker navy recognition strip sits above the near-white header.
 
 ## Typography
 
-**Display Font:** Newsreader Variable (self-hosted, with `Georgia`, `serif` fallbacks)
-**Body Font:** Geist Sans (with `ui-sans-serif`, `system-ui`, `sans-serif` fallbacks)
+**Display Font:** Newsreader Variable, with Georgia and serif fallbacks.
 
-**Character:** Newsreader gives the public site the civic, bookish authority of a considered school publication. Geist Sans keeps body copy and the product contemporary without feeling technical; compact body and label styles keep daily casework readable and efficient.
+**Body Font:** self-hosted Geist Sans through the existing font variable, with native sans-serif fallbacks.
+
+The serif/sans pairing is shared with the old site. Newsreader supplies warmth and editorial hierarchy; Geist keeps forms, choices, account details and progress easy to scan.
 
 ### Hierarchy
 
-- **Display** (560, responsive): Public heroes, product page titles, family names, and high-emphasis empty states; keep copy short enough to preserve the broad editorial silhouette.
-- **Headline** (600, `3rem`, 1.25): Major public section statements at wide breakpoints; step down to `1.875rem` on small screens.
-- **Title** (600, `1.5rem`, 1.25): Workspace page titles, family names, and form completion states.
-- **Body** (400, `0.875rem`, 1.6): Default workspace copy; public explanatory copy may step up to `1rem`, `1.125rem`, or `1.25rem` with relaxed leading.
-- **Label** (600, `0.75rem`, 0.12em tracking): Sparse uppercase wayfinding labels such as Workspace and Open family. Ordinary form labels stay sentence case.
-- **Compact UI** (`10px`, `11px`, `13px`, `15px`): Deliberate dense-workspace steps for micro indicators, provenance, metadata, and editable plan text; never use the smallest steps for primary instructions.
-- **Brand** (`1.05rem`): Wordmark text only.
-- **Legal** (`0.8125rem`, `0.9375rem`): Long-form legal metadata and reading copy.
-- **Print** (Helvetica, `10px` base): PDF-only fallback chosen for reliable embedded rendering; print ink may use `#000000` and `#333333` for monochrome legibility.
-
-### Named Rules
-
-**The Plainspoken Hierarchy Rule.** Type communicates order without jargon: one decisive heading, direct supporting copy, and labels written for school staff rather than software specialists.
+- **Display:** the shared parent page heading follows the frontmatter role. The public panorama heading grows separately to its implemented entry-page scale, with tighter leading and balanced wrapping; this is not the size for every form.
+- **Headline:** shared section headings use the serif role. Task surfaces intentionally reduce headings to a compact local size.
+- **Title:** functional subsection headings use Geist with semibold emphasis.
+- **Body:** the parent shell explicitly uses the body role above. The legacy global body remains smaller; do not inherit that legacy size into parent forms.
+- **Label:** field labels and controls use clear sentence case. Smaller hints, metadata and badges support the main reading order rather than becoming the primary explanation.
+- **Wordmark:** Newsreader accompanies the shared chain mark; use the shared component rather than rebuilding its text treatment.
 
 ## Layout
 
-The system uses a 4px spacing grid with compact component padding and generous page intervals. Public pages sit in centered containers up to `80rem`, using `1.25rem`, `2rem`, and `2.5rem` horizontal gutters as the viewport grows; large sections typically use `5rem` to `7rem` vertical padding. Marketing layouts collapse from asymmetric two-column compositions into a single readable column.
+Ordinary parent content has a centered maximum width (1160px), with narrower intake/account surfaces (800px) and legal reading surfaces (780px). Desktop content gutters are generous (2.5rem); phone gutters tighten (1.25rem). Related fields sit in rows where space permits and reflow to one column.
 
-The authenticated product uses a fixed `244px` desktop rail and a full-height scrollable work area. At widths below `64rem`, the rail becomes a `64px` mobile header with a contained navigation menu. Families and paperwork content center within `72rem`; form-review rows become multi-column only when labels, editable values, and provenance can remain comfortably legible.
+Public entry places the editorial heading and action above the wide family panorama, followed by one overlapping food/utility entry sheet. The illustration is a real optimized image with descriptive alternative text. Its crop adapts to the viewport; it is not a testimonial or a decorative background behind important text. This composition belongs to the entry surface, while the illustration treatment and brand continuity can carry into other suitable public pages.
 
-**The Room Around the Work Rule.** Give the page generous breathing room, then make controls and review rows compact enough for daily operations; do not solve density by stacking decorative cards.
+The detail workspace has a main task column and a secondary column, reflowing at the implemented tablet boundary (900px). At the phone boundary (760px), the header uses a native expandable menu, the entry sheet stacks, forms become single-column and footers wrap. A separate phone hero scale preserves its hierarchy without forcing desktop dimensions onto a small screen.
+
+A 4px spacing vocabulary underlies the shared tokens; the built form uses purposeful local gaps. Preserve grouping, label association and wrapping rather than forcing every gap onto one scale step.
 
 ## Elevation & Depth
 
-CaseLink uses a hybrid of tonal layering, thin borders, and restrained ambient shadows. Most workspace surfaces are flat and bordered. Shadows appear on primary actions, menus, prominent public product previews, and completed interaction states where a small amount of lift clarifies hierarchy.
+The system combines pale tonal layers and thin boundaries with restrained soft shadows. The primary action uses the shared action shadow. Task surfaces are flat at rest; the mobile navigation uses a soft menu shadow. Global shadow tokens remain available to the existing public surfaces, but ordinary parent rows do not need a raised-card treatment.
 
-### Shadow Vocabulary
+Depth does not stand in for service progress. A changed state stays legible through its label, content and evidence. Motion is limited to short control transitions and the small directional arrow response.
 
-- **Action Lift** (`--shadow-action`): Default violet primary-button and mark elevation.
-- **Working Surface** (`--shadow-surface`): Low navy-violet ambient depth for main workflow panels.
-- **Menu Surface** (`--shadow-menu`): Contained mobile navigation and transient overlays.
-
-### Named Rules
-
-**The Lift With Purpose Rule.** A shadow must explain hierarchy or response; routine cards rely on paper contrast and a one-pixel border.
+The parent shell respects reduced-motion preferences by removing animated transitions and smooth scrolling while retaining visible focus and state changes.
 
 ## Shapes
 
-Controls use gently curved `0.5rem` corners, content cards use `0.75rem`, and featured marketing or empty-state panels use `1rem`. Pills are reserved for short statuses. Borders stay thin and low contrast; dashed outlines signal an available upload or empty-state action. The repeated rounded square behind icons acts as a quiet CaseLink signature without becoming ornamental.
+Controls have gently curved corners using the control radius. Request cards use the card radius; larger task surfaces and the public entry sheet use the feature radius. Status badges are fully rounded. Thin solid boundaries and soft fills organize most work; the document drop area uses an established dashed border.
 
-**The Quiet Curve Rule.** Corners soften institutional workflows without making them playful; preserve the control, card, feature, and pill hierarchy instead of rounding every element to the maximum.
+The CaseLink chain symbol is a single shared vector asset, reused in header, footer and browser icon. Its paired open links remain distinct from OpenAI's marks.
 
 ## Components
 
 ### Buttons
 
-- **Shape:** Gently curved (`0.5rem`) with compact `0.5rem 1rem` workspace padding; public conversion buttons use a `3rem` minimum height.
-- **Primary:** CaseLink Violet with white semibold text and a low violet shadow.
-- **Hover / Focus:** Darken to Deep Violet Hover, lift by one or two pixels, and show a visible Focus Violet ring. Active state returns to the baseline. Disabled state keeps its label visible at reduced opacity.
-- **Secondary / Outline / Ghost:** Secondary buttons use Violet Wash; outlines use Clean Sheet plus Control Rule; ghost actions preserve the paper background until hover.
+The primary violet action has light text, a soft action shadow and the darker violet hover. Secondary actions retain a surface fill and visible boundary. Quiet actions are violet and underlined; destructive actions use the error color with a visible boundary and pale error hover. Controls have a minimum height (48px), explicit pending/disabled treatment and a shared focus outline (3px, offset 4px).
 
-### Chips
+### Cards and task surfaces
 
-- **Style:** Compact semibold text in a pill. Violet communicates in-progress workflow, green communicates positive completion, and Review Amber communicates attention.
-- **State:** Every chip includes a concrete label such as “Ready to download” or “2 to review.”
+Task surfaces use a near-white fill, thin rule, generous padding and the feature radius. Clickable request cards use the smaller card radius and a violet-tinted hover boundary. The parent's necessary step remains above service-owned waiting. The current summary, immutable packets and attributed outcomes remain visually distinct pieces of content.
 
-### Cards / Containers
+### Inputs and choices
 
-- **Corner Style:** Working cards use `0.75rem`; feature panels use `1rem`.
-- **Background:** Clean Sheet on Lavender Paper, with Violet Wash used for nested guidance or selected context.
-- **Shadow Strategy:** Flat by default; use Working Surface depth only for the primary task container.
-- **Border:** One-pixel Quiet Rule; dashed violet-gray borders for upload and empty states.
-- **Internal Padding:** `1.25rem` for compact cards, growing to `1.5rem` or `1.75rem` for primary workflow panels.
+Inputs, selects and textareas use the body size, near-white background, strong boundary and control radius. Labels precede controls; hints and errors sit with the field. Selected radio/checkbox choices use a violet boundary and pale lavender fill, retaining the native selection control. Invalid fields also change their boundary and provide a written error.
 
-### Inputs / Fields
+### Status and progress
 
-- **Style:** Clean Sheet, Control Rule border, `0.5rem` corners, and compact body text. Placeholders use Soft Navy.
-- **Focus:** Shift the border to Focus Violet and add a broad, translucent four-pixel ring.
-- **Error / Disabled:** Errors sit in Plain Error with a readable message. Disabled inputs use a quiet violet-gray fill and preserve legible text.
+Badges pair a soft semantic fill with explicit text. Waiting uses the quieter paper and muted ink. Attention and error states use their corresponding semantics. Timelines and the intake step indicator combine shape, text and current-step semantics, rather than suggesting completion through decoration.
 
-### Navigation
+### Navigation and brand
 
-The desktop rail is white on Lavender Paper with one-pixel dividers. Navigation items use compact sentence-case labels, restrained line icons, and a violet-tinted active row. Mobile navigation keeps the same order and labels in a bordered floating menu; it does not introduce a second information architecture.
+The header and footer share `CaseLinkWordmark` and the same favicon source. Signed-in navigation leads to support and account tasks; signed-out navigation explains the service and sign-in. Current pages have a semantic active state. The mobile menu closes when a destination is selected.
 
-### Paperwork Review
+`ChatGptFuturesBanner` preserves the original linked, text-based recognition above the header, visually separate from the CaseLink identity. It links to the official announcement and does not merge an OpenAI mark into the product logo. Footer policy and contact links stay part of the same branded shell.
 
-Paperwork review is the signature expression of The Calm Handoff. Each field row keeps the PDF field name, editable proposed value, provenance, and review state in one scan path. The final action says “Download completed PDF,” and nearby copy makes the manual handoff to the school's required system explicit.
+### Public illustration and service entry
 
-**The Visible Handoff Rule.** AI-prepared values remain editable and traceable, attention states remain visible, and no completion treatment implies automatic submission.
+The family panorama uses an original gouache-style illustration in the established palette. The food/utility sheet is one coherent entry surface: two columns with a divider on larger screens, then stacked rows on phones. Outlined functional icons, simple arrows, a pale accent field and readable descriptions make both routes recognizable.
 
 ## Do's and Don'ts
 
-### Do:
+### Do
 
-- **Do** reserve CaseLink Violet for primary actions, active location, and meaningful completion.
-- **Do** place near-white working surfaces on Lavender Paper or violet-tinted page fields.
-- **Do** keep provenance, review status, and the next human action visible in paperwork flows.
-- **Do** use plain labels, readable focus rings, and words or icons alongside semantic color.
-- **Do** pair generous page spacing with compact operational controls.
+- Do use the original shared lavender, navy and violet tokens across parent pages.
+- Do reuse the shared CaseLink mark and Newsreader/Geist pairing.
+- Do keep parent body copy and inputs at the readable body role, with visible focus and explicit labels.
+- Do use original illustrative imagery where it supports the public story and preserve its alternative text and responsive crop.
+- Do keep necessary parent actions ahead of secondary waiting and preserve honest outcome labels.
 
-### Don't:
+### Don't
 
-- **Don't** reintroduce legacy forest green, generic blue, or slate as a competing brand system. Green remains available only for explicit positive status.
-- **Don't** use gradients, decorative AI glow, or excessive floating cards to imply sophistication.
-- **Don't** turn the Families workspace into an analytics dashboard or add charts without a decision-making need.
-- **Don't** imply direct integration with required school software, automatic submission, or AI authority over case-manager judgment.
-- **Don't** use identifiable family details in public previews or demonstration fixtures.
+- Don't reintroduce the superseded standalone teal/lemon parent identity.
+- Don't redraw the CaseLink logo differently for individual screens or combine it with OpenAI's marks.
+- Don't present generated people as testimonials or proof that a family received assistance.
+- Don't use color or a decorative change as the only indication of service status.

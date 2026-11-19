@@ -1,0 +1,145 @@
+{
+  "status": "complete_no_retry",
+  "recordedAt": "2026-10-26T04:39:31.880Z",
+  "scope": "actual_local_isolated_parser_and_live_structured_extraction_synthetic_english_only",
+  "originalReport": "docs/verification/parent-live-smoke-2026-10-26T04-24-54-604Z.json",
+  "originalRoutingCalls": 28,
+  "maximumAdditionalCalls": 2,
+  "additionalCalls": 2,
+  "aggregateResponsesCalls": 30,
+  "originalAggregateLimit": 30,
+  "inputTokens": 676,
+  "outputTokens": 310,
+  "aggregateInputTokens": 15550,
+  "aggregateOutputTokens": 930,
+  "tokenUsageComplete": true,
+  "image": {
+    "name": "caselink-document-parser:local",
+    "id": "sha256:8d40b107157d4ba9bd60d6633c34b963ae1167187bd6afbf8f04bab5a146f90f",
+    "user": "65534:65534"
+  },
+  "passed": true,
+  "results": [
+    {
+      "id": "peco-distinct-financial-fields",
+      "passed": true,
+      "elapsedMs": 3230.297541,
+      "facts": {
+        "provider": "peco",
+        "amountDue": 80,
+        "totalBalance": 300,
+        "dueDate": "2026-11-05",
+        "shutoffDate": "2026-11-12"
+      },
+      "pageCount": 1,
+      "sourceObservedAt": "2026-10-26",
+      "sourceQuoteValidationPassed": true,
+      "sourceReferenceCount": 5,
+      "adversarialCanariesPresentInActualParsedSource": false,
+      "adversarialCanariesExcludedFromModel": true
+    },
+    {
+      "id": "pgw-adversarial-source-minimization",
+      "passed": true,
+      "elapsedMs": 2699.958666,
+      "facts": {
+        "provider": "pgw",
+        "amountDue": 25.5,
+        "totalBalance": 400.75,
+        "dueDate": "2026-11-07",
+        "shutoffDate": "2026-11-15"
+      },
+      "pageCount": 1,
+      "sourceObservedAt": "2026-10-26",
+      "sourceQuoteValidationPassed": true,
+      "sourceReferenceCount": 5,
+      "adversarialCanariesPresentInActualParsedSource": true,
+      "adversarialCanariesExcludedFromModel": true
+    }
+  ],
+  "observations": [
+    {
+      "id": "peco-distinct-financial-fields",
+      "httpStatus": 200,
+      "responseStatus": "completed",
+      "model": "gpt-6.1-sol",
+      "usage": {
+        "input_tokens": 338,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 153,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 491
+      },
+      "outgoingInputSha256": "ea7d5f42321015f21773a6a74a2a58f137c77869fa6304573b5a43928fc896e5",
+      "privacyCanariesExcluded": true,
+      "store": false,
+      "strictSchema": true,
+      "providerProjectFingerprint": "06b699b1daa6891744a3cf3a4f9c6b73d779d17cb46f60b476bd869436203599",
+      "errorCode": null
+    },
+    {
+      "id": "pgw-adversarial-source-minimization",
+      "httpStatus": 200,
+      "responseStatus": "completed",
+      "model": "gpt-6.1-sol",
+      "usage": {
+        "input_tokens": 338,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 157,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 495
+      },
+      "outgoingInputSha256": "56ff3b82e726be9564f97963795765225e606a7d8e1a26844bebab75ad2fc2c5",
+      "privacyCanariesExcluded": true,
+      "store": false,
+      "strictSchema": true,
+      "providerProjectFingerprint": "06b699b1daa6891744a3cf3a4f9c6b73d779d17cb46f60b476bd869436203599",
+      "errorCode": null
+    }
+  ],
+  "sourceManifest": [
+    {
+      "path": "scripts/test-parent-live-document.ts",
+      "sha256": "fd4aeeb657395307b5caeb1f1d5e7bd4e3b95aa568cd7f1e620c5d4285ad6d1f"
+    },
+    {
+      "path": "src/lib/parent/document-processing.ts",
+      "sha256": "ff61e94abf6e7c6a5c2ae97d1a36351834a416c1d756b0e657c21e6ee338fd3c"
+    },
+    {
+      "path": "src/lib/parent/documents.ts",
+      "sha256": "dca88fefe427b61bc8d1aa1c8e52cd285c4bb7f8e8470b9c21ce0bbd84a2f5b5"
+    },
+    {
+      "path": "src/lib/parent/constants.ts",
+      "sha256": "a913c2b7783301302359f224947cd47e2d65aa257c1d93e7777e0c3971efa2ce"
+    },
+    {
+      "path": "scripts/parse-parent-document.ts",
+      "sha256": "0a8fbfe6efe0b1bbcfa3761a64ffe2d35a045b5e8baad7240b88459a4c046ee9"
+    },
+    {
+      "path": "docker/parent-document-worker.Dockerfile",
+      "sha256": "6ac8f2138cf10621c664d125a0b9c4c3b70542d5c5f5562854336dc02ba1f091"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "1696c8d60c5fe9a03a90182ce8e73d24fe24d3c0732ad25770f5335e13de2d17"
+    }
+  ],
+  "realFamilyDocuments": 0,
+  "partnerSubmissions": 0,
+  "sourceTextRecorded": false,
+  "dedicatedTestProjectVerified": false,
+  "humanServiceOwnerApproval": false
+}

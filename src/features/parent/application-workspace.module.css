@@ -1,0 +1,381 @@
+/* The application is the task; the checklist stays beside the real work. */
+.caseView {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.caseHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  min-height: 60px;
+  padding: 0.5rem 2rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-surface);
+}
+.caseBackLabel {
+  display: inline;
+}
+.caseHeader > a {
+  font-size: 0.8125rem;
+}
+.caseView .caseHeader h1 {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  text-align: left;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.checklist {
+  min-width: 0;
+  overflow: auto;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid var(--color-rule);
+}
+.workspace .checklist h2 {
+  font: 650 1rem/1.4 var(--font-body);
+  letter-spacing: 0;
+  margin-bottom: 1rem;
+}
+.checklist ol {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.checklist a {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: var(--color-ink);
+  text-decoration: none;
+  padding: 0.75rem 0.5rem;
+  min-height: 48px;
+  border-radius: var(--radius-control);
+}
+.checklist a:hover,
+.checklist a[aria-current="location"] {
+  background: var(--color-accent-soft);
+}
+.checklist a:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.marker {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 50%;
+  color: var(--color-ink-muted);
+}
+.markerDone {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.checklist strong {
+  display: block;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+.checklist small {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: 0.9375rem;
+  margin-top: 0.125rem;
+}
+.content {
+  min-width: 0;
+  overflow: auto;
+  padding: 2rem clamp(1.25rem, 4vw, 4rem) 6rem;
+  scroll-behavior: smooth;
+}
+.workspace .content h2 {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+}
+.workspace .content section {
+  margin-top: 0;
+}
+.content > * {
+  width: 100%;
+  max-width: 68rem;
+  margin-inline: auto;
+  margin-bottom: 1.5rem;
+}
+.panel {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.content > [hidden] {
+  display: none;
+}
+.panel:empty,
+.panel:has(> :empty:only-child) {
+  display: none;
+}
+.helpLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-rule);
+}
+.helpLinks a {
+  padding: 0.25rem;
+  color: var(--color-ink-muted);
+  font-size: 0.8125rem;
+}
+.section {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  scroll-margin-top: 1.5rem;
+}
+.section:focus,
+.overview:focus,
+.panel:focus {
+  outline: none;
+}
+.workspace .sectionHeading {
+  font: 600 1.5rem/1.2 var(--font-display);
+  margin-bottom: 0.25rem;
+}
+.overview {
+  padding: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: 16px;
+}
+.workspace .overview h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.overview > p {
+  color: var(--color-ink-muted);
+  max-width: 65ch;
+}
+.statusLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+.statusLine svg {
+  color: var(--color-accent);
+  margin-top: 0.125rem;
+}
+.statusLine strong {
+  display: block;
+  font-size: 1rem;
+}
+.statusLine p {
+  color: var(--color-ink-muted);
+  font-size: 0.9375rem;
+  margin-top: 0.25rem;
+}
+.nextAction {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-rule);
+}
+.nextAction > p {
+  margin: 0.5rem 0 1rem;
+  max-width: 65ch;
+  color: var(--color-ink-muted);
+}
+.browser {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: 16px;
+  overflow: hidden;
+  min-width: 0;
+}
+.browserBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-accent-soft);
+  font-size: 0.9375rem;
+}
+.browserAddress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.browserBody {
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+.browserBody h3 {
+  font-size: 1.125rem;
+}
+.browserBody > p {
+  color: var(--color-ink-muted);
+  max-width: 65ch;
+  font-size: 0.9375rem;
+}
+.browserActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.frame {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--color-paper);
+}
+.frameNotice {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-rule);
+  font-size: 0.9375rem;
+  color: var(--color-ink-muted);
+}
+.frameViewport {
+  overflow: auto;
+  max-block-size: 70vh;
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.frameButton {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: var(--color-paper);
+  cursor: pointer;
+}
+.frameButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+.frameEnlarged {
+  width: 1100px;
+  max-width: none;
+}
+.verificationTools {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--color-rule);
+}
+.verificationTools details > p {
+  margin-block: 0.75rem;
+  color: var(--color-ink-muted);
+  font-size: 0.9375rem;
+  max-width: 65ch;
+}
+@media (max-width: 850px) {
+  .caseHeader {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+  }
+  .caseView .caseHeader > a {
+    width: 44px;
+    padding: 0.5rem;
+    justify-self: center;
+  }
+  .caseBackLabel {
+    display: none;
+  }
+  .caseHeader > span {
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
+  }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+  }
+  .checklist {
+    flex: none;
+    padding: 0.75rem 1rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-rule);
+    overflow: visible;
+  }
+  .workspace .checklist h2,
+  .checklist small,
+  .marker,
+  .helpLinks {
+    display: none;
+  }
+  .checklist ol {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.25rem;
+  }
+  .checklist li {
+    flex: none;
+  }
+  .checklist a {
+    padding: 0.6rem 0.75rem;
+    min-height: 44px;
+    align-items: center;
+  }
+  .checklist strong {
+    font-size: 0.875rem;
+  }
+  .content {
+    flex: 1;
+    overflow: visible;
+    padding: 1.25rem 1.25rem 6rem;
+  }
+}
+@media (max-width: 480px) {
+  [data-food-workspace] .content,
+  [data-food-workspace] .overview {
+    padding-inline: 12px;
+  }
+  [data-food-workspace] .statusLine {
+    display: block;
+  }
+  .overview,
+  .browserBody {
+    padding: 1.25rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    scroll-behavior: auto;
+  }
+}
+@media print {
+  .caseView {
+    display: block;
+    height: auto;
+  }
+  .workspace {
+    display: block;
+  }
+  .content {
+    overflow: visible;
+    padding: 0;
+  }
+  .content > [hidden] {
+    display: block;
+  }
+  .checklist,
+  .browser {
+    display: none;
+  }
+}

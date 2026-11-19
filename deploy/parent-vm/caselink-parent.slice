@@ -1,0 +1,7 @@
+[Unit]
+Description=Bounded CaseLink parent pilot services
+
+[Slice]
+MemoryMax=2500M
+CPUQuota=100%
+TasksMax=384

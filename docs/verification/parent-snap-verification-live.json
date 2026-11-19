@@ -1,0 +1,115 @@
+{
+  "scope": "Real public COMPASS guest navigation with isolated local Auth; no applicant information, challenge solving, model calls or filing",
+  "firstResultLimit": "other_result remains unknown; initial numeric-only classification was later corrected from source, without retaining/reinterpreting the original body",
+  "interveningUnrecordedFailure": {
+    "outcome": "checks_failed",
+    "stage": "one actual public COMPASS navigation without applicant input",
+    "artifactAvailable": false,
+    "cleanupFailureReported": false,
+    "providerOutcome": "unknown"
+  },
+  "runs": [
+    {
+      "events": 215,
+      "truncated": false,
+      "lastPublicRoute": "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/familysafety",
+      "terminal": {
+        "status": "blocked",
+        "summary": "COMPASS blocked this browser connection. No household information was entered or submitted. CaseLink must resolve the connection before this application can continue here."
+      },
+      "verification": [
+        {
+          "phase": "after_continue",
+          "result": "other_result"
+        }
+      ],
+      "verificationTransport": [
+        {
+          "origin": "https://www.compass.dhs.pa.gov",
+          "path": "/api/intake/v1/recaptcha/verifyrecaptcha",
+          "phase": "after_continue",
+          "policy": "allow",
+          "requests": 1,
+          "failures": 0,
+          "finished": 1,
+          "statuses": {
+            "200": 1
+          }
+        }
+      ],
+      "deniedRequests": 9,
+      "allowedFailures": 2,
+      "recordedRun": "Initial numeric-only diagnostic",
+      "checksPassed": 128,
+      "outcome": "checks_passed",
+      "cleanupPassed": true
+    },
+    {
+      "events": 213,
+      "truncated": false,
+      "lastPublicRoute": "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/captcha",
+      "terminal": null,
+      "verification": [],
+      "outcome": "checks_failed",
+      "checksPassed": 124,
+      "failureStage": "validating the ordinary public COMPASS continuation response",
+      "cleanupPassed": true,
+      "verificationTransport": [
+        {
+          "origin": "https://www.compass.dhs.pa.gov",
+          "path": "/api/intake/v1/recaptcha/verifyrecaptcha",
+          "phase": "after_continue",
+          "policy": "allow",
+          "requests": 1,
+          "failures": 0,
+          "finished": 0,
+          "statuses": {}
+        }
+      ],
+      "deniedRequests": 9,
+      "allowedFailures": 2,
+      "recordedRun": "Failed-report and stale-image recovery diagnostic"
+    },
+    {
+      "events": 215,
+      "truncated": false,
+      "lastPublicRoute": "https://www.compass.dhs.pa.gov/intake/#/applynow/gettingstarted/familysafety",
+      "terminal": {
+        "status": "blocked",
+        "summary": "COMPASS blocked this browser connection. No household information was entered or submitted. CaseLink must resolve the connection before this application can continue here."
+      },
+      "verification": [
+        {
+          "phase": "after_continue",
+          "result": "rejected"
+        }
+      ],
+      "continuationStatuses": [
+        200
+      ],
+      "outcome": "checks_passed",
+      "checksPassed": 134,
+      "failureStage": null,
+      "cleanupPassed": true,
+      "verificationTransport": [
+        {
+          "origin": "https://www.compass.dhs.pa.gov",
+          "path": "/api/intake/v1/recaptcha/verifyrecaptcha",
+          "phase": "after_continue",
+          "policy": "allow",
+          "requests": 1,
+          "failures": 0,
+          "finished": 1,
+          "statuses": {
+            "200": 1
+          }
+        }
+      ],
+      "deniedRequests": 9,
+      "allowedFailures": 2,
+      "recordedRun": "After independently reviewed pending-timeout correction and delayed browser/Auth proofs"
+    }
+  ],
+  "liveVerificationAccepted": false,
+  "finalObservedResult": "COMPASS rejected its normal verification; no accepted live connection, applicant entry or filing"
+}

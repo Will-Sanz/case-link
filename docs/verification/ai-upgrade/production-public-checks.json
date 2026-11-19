@@ -1,0 +1,46 @@
+{
+  "checkedAt": "2026-10-15T20:23:06.716Z",
+  "origin": "https://www.thecaselink.com",
+  "checks": [
+    {
+      "path": "/api/health",
+      "status": 200,
+      "location": null,
+      "productionConnectionBoundary": true,
+      "hsts": true,
+      "nosniff": true,
+      "frameBoundary": true
+    },
+    {
+      "path": "/login",
+      "status": 200,
+      "location": null,
+      "productionConnectionBoundary": true,
+      "hsts": true,
+      "nosniff": true,
+      "frameBoundary": true
+    },
+    {
+      "path": "/families",
+      "status": 307,
+      "location": "/login",
+      "productionConnectionBoundary": true,
+      "hsts": true,
+      "nosniff": true,
+      "frameBoundary": true
+    },
+    {
+      "path": "/signup",
+      "status": 307,
+      "location": "/request-demo",
+      "productionConnectionBoundary": true,
+      "hsts": true,
+      "nosniff": true,
+      "frameBoundary": true
+    }
+  ],
+  "apexRedirectsToCanonical": true,
+  "passed": true,
+  "applicationMutation": false,
+  "credentialsUsed": false
+}

@@ -1,0 +1,2532 @@
+[
+  {
+    "version": 1,
+    "runId": "2026-10-14T15-28-10-154Z-development",
+    "startedAt": "2026-10-14T15:28:10.154Z",
+    "completedAt": "2026-10-14T15:29:01.160Z",
+    "split": "development",
+    "requestedCases": 2,
+    "completedCases": 2,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "0e005c9df5c7314e005294e5655e7bbf3a066b763f1f03f13aa091ea6bd9ba31",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 12,
+    "estimatedStandardUsd": 0.012119200000000002,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 12,
+    "acceptedTasks": 12,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 13502.594749999998,
+      "firstPhaseP95": 13502.594749999998,
+      "completeDraftP75": 35355.63725,
+      "completeDraftP95": 35355.63725,
+      "stepRewriteP75": 3877.8502910000025
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "runId": "2026-10-14T15-31-38-500Z-development",
+    "startedAt": "2026-10-14T15:31:38.500Z",
+    "completedAt": "2026-10-14T15:37:43.006Z",
+    "split": "development",
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "783512b4a8261dac8a15f6dc47d5a0311d370e64db9f0b90aa2d786dcc995775",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.1066084,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 148,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4887.606667,
+      "firstPhaseP95": 6270.850375000009,
+      "completeDraftP75": 17606.616332999954,
+      "completeDraftP95": 23656.732625000004,
+      "stepRewriteP75": 3100.7225000000035
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "transport-school",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "food-budget",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "language-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "caregiver-schedule",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "accessibility-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-phone",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "family-declines",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-home-contact",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-inactive",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-empty",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-demo",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-dismissed",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_90",
+            "checks": [
+              {
+                "code": "dates_in_plan_window",
+                "passed": false,
+                "severity": "quality"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eligibility-unknown",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-follow-up",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "conflicting-meeting",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "completed-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "long-history",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_90",
+            "checks": [
+              {
+                "code": "dates_in_plan_window",
+                "passed": false,
+                "severity": "quality"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "copied-instruction",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "unsafe-guarantee",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-rights",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "safety-concern",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "health-unknown",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 3,
+    "runId": "2026-10-14T15-39-55-410Z-development",
+    "startedAt": "2026-10-14T15:39:55.410Z",
+    "completedAt": "2026-10-14T15:39:55.628Z",
+    "split": "development",
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "cc446bdd9f81d0e7459c3d2b9bcc979337edb8814df61e040b8de343798db438",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 0,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": null,
+      "firstPhaseP95": null,
+      "completeDraftP75": null,
+      "completeDraftP95": null,
+      "stepRewriteP75": null
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "transport-school",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "food-budget",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "caregiver-schedule",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "language-preference",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "accessibility-preference",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "no-phone",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "no-home-contact",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "family-declines",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "directory-empty",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "directory-inactive",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "directory-dismissed",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "directory-demo",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "eligibility-unknown",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "waiting-follow-up",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "completed-history",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "conflicting-meeting",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "long-history",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "copied-instruction",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "unsafe-guarantee",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "safety-concern",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "housing-rights",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "health-unknown",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_30",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_60",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "step_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "plan_refinement",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          },
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "version": 3,
+    "runId": "2026-10-14T15-42-11-567Z-development",
+    "startedAt": "2026-10-14T15:42:11.567Z",
+    "completedAt": "2026-10-14T15:48:11.616Z",
+    "split": "development",
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "cc446bdd9f81d0e7459c3d2b9bcc979337edb8814df61e040b8de343798db438",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.10660560000000002,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 149,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4682.35375,
+      "firstPhaseP95": 6004.754791000014,
+      "completeDraftP75": 16748.349874999985,
+      "completeDraftP95": 21949.329290999973,
+      "stepRewriteP75": 3154.129707999993
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "transport-school",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "food-budget",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "language-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "caregiver-schedule",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "accessibility-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-phone",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "family-declines",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-home-contact",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-empty",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-inactive",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-demo",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-dismissed",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-follow-up",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "eligibility-unknown",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "conflicting-meeting",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "completed-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": [
+          {
+            "task": "generation_90",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "long-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "copied-instruction",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "unsafe-guarantee",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-rights",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "safety-concern",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "health-unknown",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 3,
+    "runId": "2026-10-14T15-50-12-203Z-development",
+    "startedAt": "2026-10-14T15:50:12.203Z",
+    "completedAt": "2026-10-14T15:50:44.460Z",
+    "split": "development",
+    "selectedId": "multiple-barriers",
+    "requestedCases": 1,
+    "completedCases": 1,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "19e74c321ee5fc901717f237dfb93f241279a0754bb094b8dabfd6bb9503ff72",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 6,
+    "estimatedStandardUsd": 0.0040348,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 6,
+    "acceptedTasks": 6,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4848.32675,
+      "firstPhaseP95": 4848.32675,
+      "completeDraftP75": 22311.541709,
+      "completeDraftP95": 22311.541709,
+      "stepRewriteP75": 2182.928165999998
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 3,
+    "runId": "2026-10-14T15-51-17-823Z-held-out",
+    "startedAt": "2026-10-14T15:51:17.823Z",
+    "completedAt": "2026-10-14T15:57:22.796Z",
+    "split": "held-out",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "19e74c321ee5fc901717f237dfb93f241279a0754bb094b8dabfd6bb9503ff72",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.10689740000000005,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 149,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4882.508457999997,
+      "firstPhaseP95": 5374.169500000004,
+      "completeDraftP75": 16794.843500000017,
+      "completeDraftP95": 18663.624832999994,
+      "stepRewriteP75": 3066.6598749999976
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "shared-care",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "minimal-food",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "temporary-stay",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "school-continuity",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "digital-access",
+        "split": "held-out",
+        "failedTasks": [
+          {
+            "task": "case_assistant",
+            "failure": "The AI service could not complete this request. Your saved work is unchanged. Try again.",
+            "checks": []
+          }
+        ]
+      },
+      {
+        "id": "evening-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "reading-preference",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "interpretation-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "declined-documents",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "private-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "empty-employment-directory",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "closed-directory-entry",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "example-program",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "rejected-match",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-review-time",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "hours-unknown",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "finished-discussion",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "older-pending-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "sequencing-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "history-boundary",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "irrelevant-request",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "forged-staff-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "urgent-safeguarding",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "benefits-uncertain",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "long-preferences",
+        "split": "held-out",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 4,
+    "runId": "2026-10-14T15-58-30-372Z-development",
+    "startedAt": "2026-10-14T15:58:30.372Z",
+    "completedAt": "2026-10-14T16:04:25.163Z",
+    "split": "development",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "61244d7560921e7d0b57272e234f5c87286db3fde49c3d1ba479de1d8550d512",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.10601381999999997,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 150,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4946.26225,
+      "firstPhaseP95": 5357.30325,
+      "completeDraftP75": 17571.636583999905,
+      "completeDraftP95": 19163.804999000015,
+      "stepRewriteP75": 2583.1703329999873
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "transport-school",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "food-budget",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "caregiver-schedule",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "language-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "accessibility-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-phone",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "family-declines",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-home-contact",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-inactive",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-empty",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-dismissed",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-demo",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "eligibility-unknown",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-follow-up",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "conflicting-meeting",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "completed-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "long-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "unsafe-guarantee",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "copied-instruction",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "safety-concern",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-rights",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "health-unknown",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 4,
+    "runId": "2026-10-14T16-04-26-202Z-held-out",
+    "startedAt": "2026-10-14T16:04:26.202Z",
+    "completedAt": "2026-10-14T16:11:03.103Z",
+    "split": "held-out",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "61244d7560921e7d0b57272e234f5c87286db3fde49c3d1ba479de1d8550d512",
+    "commit": "eda55cb12372493dd76badcc721be86d276a3e2c",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.10640184000000003,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 150,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 5281.457542000004,
+      "firstPhaseP95": 11587.881915999984,
+      "completeDraftP75": 18789.91287500001,
+      "completeDraftP95": 24099.161709000007,
+      "stepRewriteP75": 3008.507500000007
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "minimal-food",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "shared-care",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "school-continuity",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "temporary-stay",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "evening-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "digital-access",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "interpretation-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "reading-preference",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "private-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "declined-documents",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "empty-employment-directory",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "closed-directory-entry",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "rejected-match",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "example-program",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-review-time",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "hours-unknown",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "finished-discussion",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "older-pending-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "sequencing-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "history-boundary",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "forged-staff-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "irrelevant-request",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "urgent-safeguarding",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "benefits-uncertain",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "long-preferences",
+        "split": "held-out",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 5,
+    "runId": "2026-10-14T16-13-48-498Z-development",
+    "startedAt": "2026-10-14T16:13:48.498Z",
+    "completedAt": "2026-10-14T16:19:37.250Z",
+    "split": "development",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "f3d2a74e2e65744c38dcc4ccb95a944e93c8bc200f7138036802cd9496763a9a",
+    "commit": "aa8a6cde3026ba29894e9d72afb12ae982daf704",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.08814945999999992,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 150,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 5323.285083,
+      "firstPhaseP95": 8019.438750000001,
+      "completeDraftP75": 16265.871125000005,
+      "completeDraftP95": 18222.669291,
+      "stepRewriteP75": 3126.8786669999827
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "transport-school",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "food-budget",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "language-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "caregiver-schedule",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "accessibility-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-phone",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "family-declines",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-home-contact",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-empty",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-inactive",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-demo",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-dismissed",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "eligibility-unknown",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-follow-up",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "conflicting-meeting",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "completed-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "long-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "unsafe-guarantee",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "copied-instruction",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "safety-concern",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-rights",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "health-unknown",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 5,
+    "runId": "2026-10-14T16-19-37-902Z-held-out",
+    "startedAt": "2026-10-14T16:19:37.902Z",
+    "completedAt": "2026-10-14T16:25:48.038Z",
+    "split": "held-out",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "f3d2a74e2e65744c38dcc4ccb95a944e93c8bc200f7138036802cd9496763a9a",
+    "commit": "4913aaf535542243b49a941c9a9397699aabea31",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.08884373999999999,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 150,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4837.914707999997,
+      "firstPhaseP95": 6544.156583000004,
+      "completeDraftP75": 16473.154374000005,
+      "completeDraftP95": 21528.172749999998,
+      "stepRewriteP75": 3403.8316670000204
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "shared-care",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "minimal-food",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "temporary-stay",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "school-continuity",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "evening-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "digital-access",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "reading-preference",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "interpretation-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "declined-documents",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "private-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "closed-directory-entry",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "empty-employment-directory",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "rejected-match",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "example-program",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-review-time",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "hours-unknown",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "finished-discussion",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "older-pending-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "sequencing-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "history-boundary",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "irrelevant-request",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "forged-staff-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "urgent-safeguarding",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "benefits-uncertain",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "long-preferences",
+        "split": "held-out",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 6,
+    "runId": "2026-10-14T16-29-35-191Z-development",
+    "startedAt": "2026-10-14T16:29:35.191Z",
+    "completedAt": "2026-10-14T16:35:16.551Z",
+    "split": "development",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "2eca7d96b84fb0bb3c39ffccfbd107de057a6823dc460c334f8b32e2e47f7bb7",
+    "commit": "4913aaf535542243b49a941c9a9397699aabea31",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.0880465,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 150,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4195.534749999992,
+      "firstPhaseP95": 4799.291458000007,
+      "completeDraftP75": 14187.993583000003,
+      "completeDraftP95": 15859.472165999992,
+      "stepRewriteP75": 3054.2936250000203
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "housing-choice",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "sparse-housing",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "transport-school",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "food-budget",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "language-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "caregiver-schedule",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "accessibility-preference",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-phone",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "family-declines",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "no-home-contact",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-inactive",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-empty",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-dismissed",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "directory-demo",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-follow-up",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "eligibility-unknown",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "completed-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "conflicting-meeting",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "multiple-barriers",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "long-history",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "unsafe-guarantee",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "copied-instruction",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "housing-rights",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "safety-concern",
+        "split": "development",
+        "failedTasks": []
+      },
+      {
+        "id": "health-unknown",
+        "split": "development",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 6,
+    "runId": "2026-10-14T16-35-17-345Z-held-out",
+    "startedAt": "2026-10-14T16:35:17.345Z",
+    "completedAt": "2026-10-14T16:40:34.476Z",
+    "split": "held-out",
+    "selectedId": null,
+    "requestedCases": 25,
+    "completedCases": 25,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "2eca7d96b84fb0bb3c39ffccfbd107de057a6823dc460c334f8b32e2e47f7bb7",
+    "commit": "4913aaf535542243b49a941c9a9397699aabea31",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 150,
+    "estimatedStandardUsd": 0.0887303,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 150,
+    "acceptedTasks": 150,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 4322.577375000008,
+      "firstPhaseP95": 4760.564750000001,
+      "completeDraftP75": 14352.684000000008,
+      "completeDraftP95": 16943.42408299999,
+      "stepRewriteP75": 2345.4008749999994
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "shared-care",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "minimal-food",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "temporary-stay",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "school-continuity",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "evening-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "digital-access",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "reading-preference",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "interpretation-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "declined-documents",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "private-contact",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "empty-employment-directory",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "closed-directory-entry",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "example-program",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "rejected-match",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "hours-unknown",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "waiting-review-time",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "finished-discussion",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "older-pending-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "sequencing-choice",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "history-boundary",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "forged-staff-note",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "irrelevant-request",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "benefits-uncertain",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "urgent-safeguarding",
+        "split": "held-out",
+        "failedTasks": []
+      },
+      {
+        "id": "long-preferences",
+        "split": "held-out",
+        "failedTasks": []
+      }
+    ]
+  },
+  {
+    "version": 7,
+    "runId": "2026-10-14T16-57-57-746Z-held-out",
+    "startedAt": "2026-10-14T16:57:57.746Z",
+    "completedAt": "2026-10-14T16:58:22.255Z",
+    "split": "held-out",
+    "selectedId": "urgent-safeguarding",
+    "requestedCases": 1,
+    "completedCases": 1,
+    "syntheticOnly": true,
+    "model": "gpt-5.6-luna",
+    "mode": "fast",
+    "sourceHash": "480bfe765a147dd2b20e637e85e9fd59fbfc05f0e1460b5c6a45cb6bf42a18e2",
+    "commit": "a3f3a6d3c9d2863a30d01d2e26fe5d092cf6253f",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 6,
+    "estimatedStandardUsd": 0.0034075999999999998,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-14",
+    "costNote": "Estimate from returned token usage at standard short-context rates; not an invoice or provider-enforced spend cap.",
+    "taskCount": 6,
+    "acceptedTasks": 6,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "firstPhaseP75": 3605.513166,
+      "firstPhaseP95": 3605.513166,
+      "completeDraftP75": 14450.847917,
+      "completeDraftP95": 14450.847917,
+      "stepRewriteP75": 4174.328334
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "urgent-safeguarding",
+        "split": "held-out",
+        "failedTasks": []
+      }
+    ]
+  }
+]

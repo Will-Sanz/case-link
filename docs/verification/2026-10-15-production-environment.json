@@ -1,0 +1,97 @@
+{
+  "project": "prj_1zxzzKu8eljHJvPd6gFY3LhyxwWc",
+  "updatedAt": "2026-10-15T00:56:46.766Z",
+  "configured": [
+    "CASELINK_PRODUCTION_SUPABASE_URL",
+    "CASELINK_ENVIRONMENT",
+    "CASELINK_HSTS",
+    "CASELINK_INVITE_ONLY",
+    "CASELINK_TENANCY_MODE",
+    "NEXT_PUBLIC_SITE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL"
+  ],
+  "removed": [
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "CASELINK_PDF_MODE"
+  ],
+  "openAiSecretReplaced": false,
+  "liveSecretsRotated": false,
+  "productionDeploymentChanged": false,
+  "entries": [
+    {
+      "key": "CASELINK_PRODUCTION_SUPABASE_URL",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_ENVIRONMENT",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_HSTS",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_INVITE_ONLY",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "CASELINK_TENANCY_MODE",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NEXT_PUBLIC_SITE_URL",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ]
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ]
+    }
+  ],
+  "valuesPrinted": false,
+  "readback": {
+    "settingsMatched": true,
+    "publicKeyAccepted": true,
+    "signupDisabled": true,
+    "webAdminKeyAbsent": true,
+    "pdfFlagAbsent": true,
+    "secretValuesRetrieved": false
+  },
+  "openAiProductionUseVerified": false,
+  "note": "Config entries are API type encrypted; the OpenAI credential is write-only Secret (API type sensitive). Secret omission from env run is expected. Production candidate is built but protected browser test/promotion remain pending."
+}

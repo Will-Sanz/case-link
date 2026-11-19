@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-10-26T16:18:19.686Z",
+  "origin": "http://127.0.0.1:3200",
+  "apiInterception": false,
+  "actualConnectedAssertions": [
+    "The actual connected smoke is deliberately authorized.",
+    "The connected build names the exact existing provider in its browser policy.",
+    "Unsupported email-code signup is absent from the existing-account UI.",
+    "The disposable preexisting identity signs in through the actual connected UI.",
+    "The actual connected account belongs to the exact disposable Auth identity.",
+    "Connected parent cookies remain HttpOnly and SameSite=Lax.",
+    "The actual connected session belongs to the exact disposable Auth identifier.",
+    "Actual connected household information is private and uncached.",
+    "The smoke cannot authorize a partner submission or external action.",
+    "The real connected three-step intake saves preparation-only support.",
+    "The actual recorded mandate excludes external execution.",
+    "The real file input remains unavailable before document consent.",
+    "The actual connected private PDF upload and confirmation succeed.",
+    "The actual connected pause future work control succeeds.",
+    "The actual connected request saves its paused status.",
+    "The actual connected resume support control succeeds.",
+    "The actual connected request saves its active status.",
+    "The actual connected cancellation withdraws future permission.",
+    "The actual connected request records its cancelled status; the operator verifies database revocation separately.",
+    "A retained old parent cookie cannot restore actual connected access after sign-out.",
+    "The actual connected sign-out removes interactive parent access."
+  ],
+  "originalAccountPreservation": {
+    "authIdentities": 16,
+    "staffRecords": 14,
+    "schoolFamilies": 2,
+    "credentialsAndStatusUnchanged": true,
+    "staffRecordsUnchanged": true,
+    "schoolRecordsUnchanged": true,
+    "authSettingsUnchanged": true
+  },
+  "syntheticCleanupVerified": {
+    "auth_fixture": 0,
+    "household_fixture": 0,
+    "parent_fixture": 0,
+    "staff_fixture": 0,
+    "storage_fixture": 0
+  },
+  "publicBoundaryChecks": {
+    "emailCodeRejectedBeforeProvider": true,
+    "recoveryRedirectExactOriginalSite": true,
+    "anonymousAccountDenied": true
+  },
+  "approvedUntil": "2026-10-26T18:08:45.988Z",
+  "identityCutoff": "2026-10-26T16:08:46.084Z",
+  "publicReleaseApproved": false,
+  "backgroundWorkersActivated": false,
+  "externalCapabilitiesEnabled": 0,
+  "paidModelCallsThisRun": 0
+}

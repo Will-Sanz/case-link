@@ -1,0 +1,238 @@
+{
+  "reviewer": "family_needs",
+  "reviewType": "independent semantic output review; model identities known",
+  "sourceDirectory": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-42-21-414Z-pilot-substantive-refinement-task-routing-task-effort",
+  "reviewedCaseCount": 5,
+  "reviewedTaskOutputCount": 10,
+  "method": "Read each exact request, source facts, directory evidence, original fields, criteria and proposed content. Inspected the complete safety outputs and recursively compared all proposed fields to original fields in the other four cases. Ratings are 1–5, where5 means ready for case-manager review with no material issue found.",
+  "conclusion": "No critical defect found in these ten proposals. Explicitly requested urgent-safety edits still work after the title-only preservation clarification. Both routes make the exact document removal and date edit. Sol is clearer on private in-person arrangements and provider-inquiry sequencing. Luna remains useful for narrow edits, with minor semantic omissions requiring human review.",
+  "scopeLimits": [
+    "Five synthetic requests, one response per task: this is evidence for the tested wording/date/document edits, not a guarantee of model reliability or practitioner usefulness.",
+    "Full-plan refinement was given three goals but each request changed fields in the first goal only. These results do not prove multi-goal substantive revisions, adding/removing actions, ownership changes or structural replanning.",
+    "Narrow refinement received only the first goal; untouched Waiting/completed goals outside its scope are preserved by the workflow, not tested as model-visible content in that narrow call.",
+    "The safety request explicitly labels existing future dated tasks as separate follow-up and forbids rescheduling them. Preserved future dates are correct for this request, not a recommendation to delay an urgent assessment.",
+    "No database/browser checks, production writes or new provider calls were performed for this review."
+  ],
+  "reviews": [
+    {
+      "caseId": "pilot-newer-choice",
+      "task": "step_refinement",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "low",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 4,
+        "clarity": 4,
+        "familyVoice": 4
+      },
+      "verdict": "Useful with a small edit",
+      "criticalDefects": [],
+      "observations": [
+        "Replaces both outdated telephone instructions with in-person school conversation and postpones referral decisions.",
+        "Both rewritten fields omit the explicit privacy requirement. In-person at school does not itself ensure a private setting; retain 'private' in the proposed wording."
+      ],
+      "evidence": [
+        "Meet in person at school ... Postpone referral decisions ... do not call the family.",
+        "Arrange an in-person conversation at school."
+      ]
+    },
+    {
+      "caseId": "pilot-newer-choice",
+      "task": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "medium",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for case-manager review",
+      "criticalDefects": [],
+      "observations": [
+        "Carries private, in-person-only school contact and no telephone into both relevant fields.",
+        "The scheduling action says agree the time in person, avoiding a telephone call to arrange the in-person meeting.",
+        "Other goals and human records remain unchanged in the proposal."
+      ],
+      "evidence": [
+        "Agree a time with the family in person at school for a private conversation; do not telephone."
+      ]
+    },
+    {
+      "caseId": "pilot-provider-hours",
+      "task": "step_refinement",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "low",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 3,
+        "clarity": 4,
+        "familyVoice": 4
+      },
+      "verdict": "Useful with clearer sequence",
+      "criticalDefects": [],
+      "observations": [
+        "Removes the missed-shift demand and unsupported after-work provider call.",
+        "Summary accurately includes weekday-morning information access and keeps appointment availability and document requirements unconfirmed.",
+        "Action discusses intake with the family before clearly establishing how the case manager will gather the information. Permission-before-inquiry and use of the weekday-morning information window are less explicit than in the full-plan proposal.",
+        "This is a clarity/actionability issue, not evidence that provider contact happened or that consent was asserted."
+      ],
+      "evidence": [
+        "After work, discuss with the family how intake works and whether they agree to a referral. Verify provider hours ..."
+      ]
+    },
+    {
+      "caseId": "pilot-provider-hours",
+      "task": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "medium",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 4,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for review with optional shortening",
+      "criticalDefects": [],
+      "observations": [
+        "Clear order: prepare questions, discuss permission after work, if agreed verify the weekday-morning information window, make general inquiry, then review answers before a referral.",
+        "Protects the work schedule and does not assume appointments, documents or provider hours beyond the supplied source.",
+        "Summary and action repeat several conditions; concise wording could preserve the same safeguards."
+      ],
+      "evidence": [
+        "If agreed, verify the listed weekday-morning information window and request general information without sharing identifying details."
+      ]
+    },
+    {
+      "caseId": "pilot-immediate-safety",
+      "task": "step_refinement",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "low",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 4,
+        "clarity": 4,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for review with small wording improvement",
+      "criticalDefects": [],
+      "observations": [
+        "The explicitly requested safety edit is not suppressed: responsible staff must speak privately now and use the school's approved pathway.",
+        "No protocol, diagnosis, completed assessment or rescheduled date is invented.",
+        "Expected-result past tense is appropriate to that field and explicitly says no assessment is implied complete; it is not a saved outcome claim.",
+        "Prefer an observable expected result that explicitly names initiation of immediate assessment rather than the awkward meta-clause 'no assessment is implied as complete'."
+      ],
+      "evidence": [
+        "A responsible staff member must speak privately with the family now and use the school's approved safeguarding pathway.",
+        "The family has spoken privately ... no assessment is implied as complete."
+      ]
+    },
+    {
+      "caseId": "pilot-immediate-safety",
+      "task": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "medium",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 4,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for review with optional shortening",
+      "criticalDefects": [],
+      "observations": [
+        "States private staff contact now and initiation of immediate assessment through the approved pathway.",
+        "Explains policy is not supplied, does not imply assessment occurred, and preserves separately dated follow-up as instructed.",
+        "The summary and expected result repeat proposal/not-completed disclaimers; shorter wording would be easier to use."
+      ],
+      "evidence": [
+        "who initiates an immediate assessment through the school's approved safeguarding pathway. This is an intended result, not a record of completed assessment."
+      ]
+    },
+    {
+      "caseId": "pilot-unknown-history",
+      "task": "step_refinement",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "low",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for case-manager review",
+      "criticalDefects": [],
+      "observations": [
+        "Removes only Photo identification and retains Agreed preparation checklist exactly.",
+        "No substitute demand, eligibility assumption or additional rewrite."
+      ],
+      "evidence": [
+        "required_documents: ['Agreed preparation checklist']"
+      ]
+    },
+    {
+      "caseId": "pilot-unknown-history",
+      "task": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "medium",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for case-manager review",
+      "criticalDefects": [],
+      "observations": [
+        "Removes only the unverified first-goal document requirement.",
+        "Other goals, document lists, human records and existing wording are preserved."
+      ],
+      "evidence": [
+        "required_documents: ['Agreed preparation checklist']"
+      ]
+    },
+    {
+      "caseId": "pilot-completed-work",
+      "task": "step_refinement",
+      "model": "gpt-6-luna",
+      "reasoningEffort": "low",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for case-manager review",
+      "criticalDefects": [],
+      "observations": [
+        "Changes only the supplied open action's target date from October22 to October25.",
+        "Does not invent a completion date or alter its notes/outcome/status.",
+        "Separate Waiting/completed steps are outside the narrow proposal; this run cannot by itself test model preservation of records it was not supplied."
+      ],
+      "evidence": [
+        "target_date: 2026-10-22 -> 2026-10-25"
+      ]
+    },
+    {
+      "caseId": "pilot-completed-work",
+      "task": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "medium",
+      "ratings": {
+        "factualSupport": 5,
+        "actionability": 5,
+        "clarity": 5,
+        "familyVoice": 5
+      },
+      "verdict": "Ready for case-manager review",
+      "criticalDefects": [],
+      "observations": [
+        "Changes only the first open action target date to October25.",
+        "Waiting follow-up remains November19; completed work, historical outcome, notes, ownership and unrelated fields remain unchanged."
+      ],
+      "evidence": [
+        "target_date: 2026-10-22 -> 2026-10-25"
+      ]
+    }
+  ]
+}

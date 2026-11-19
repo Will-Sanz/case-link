@@ -1,0 +1,10 @@
+**
+!package.json
+!package-lock.json
+!src/
+!src/lib/
+!src/lib/parent/
+!src/lib/parent/documents.ts
+!src/lib/parent/constants.ts
+!scripts/
+!scripts/parse-parent-document.ts

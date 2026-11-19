@@ -1,0 +1,37 @@
+{
+  "id": "pa-snap-pa600fs-sg-2019-es",
+  "version": "2019-09-offline-2026-11-18.v1",
+  "programId": "snap-pa",
+  "need": "snap_new",
+  "printedRevision": "PA 600 FS-S (SG) 9/19",
+  "sourceUrl": "https://www.pa.gov/content/dam/copapwp-pagov/en/dhs/documents/services/assistance/documents/benefits-applications/pa-600-fs-s.pdf",
+  "sourceCheckedAt": "2026-11-18",
+  "verifiedUntil": "2026-12-03T05:00:00.000Z",
+  "sha256": "7c75e5509799c30841de6c553ba2c3ad0f11896dbfb6d198d33952c5151a400b",
+  "byteLength": 451296,
+  "pageCount": 12,
+  "pageWidth": 612,
+  "pageHeight": 792,
+  "scope": "Offline preparation/rendering verification only. No registry activation, protected collection, accepted signature, delivery or agency status authority. The existing December 3 ceiling is not renewed.",
+  "limits": {
+    "householdRows": 8,
+    "incomeRows": 5
+  },
+  "personalFieldsLeftBlank": [
+    "Applicant signature and date on printed page 1",
+    "Applicant, witness/provider and authorized-representative signatures/dates on printed page 5",
+    "Social Security number for each person requesting SNAP"
+  ],
+  "excludedAreas": [
+    "CAO-only registration and expedited eligibility decisions",
+    "Optional racial/ethnic information and voter registration",
+    "Authorized-representative designation not established by this formatter"
+  ],
+  "semanticLimits": [
+    "A household size is not a household roster.",
+    "Aggregate household income is not an identified person's income source, amount and received date.",
+    "A pay-period amount is not this month's total income; this formatter does not annualize or infer it.",
+    "The synthetic income rows support actual received dates in the current month; future expected income needs its own verified field representation.",
+    "Printed 2019 thresholds and policy amounts are not used as current eligibility rules."
+  ]
+}

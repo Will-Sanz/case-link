@@ -1,0 +1,139 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "startedAt": "2026-10-15T03:52:21.863Z",
+  "syntheticOnly": true,
+  "providerCalls": 0,
+  "resourceMutations": 0,
+  "checks": [
+    "Fixed production operator authenticated",
+    "Production keys available only in memory",
+    "Disposable standard account created",
+    "Audited case-manager provisioning",
+    "Real password login",
+    "Synthetic family created",
+    "Existing current directory source available",
+    "Current resource matched without changing directory",
+    "Saved snapshot excludes the source phone",
+    "Production staged plan starts with the current directory",
+    "Generation lease acquired",
+    "Production saves a generated phase",
+    "Generated phase is readable by its owner",
+    "Database restores exact source contacts from verified references",
+    "Production plan snapshot returns its saved phase",
+    "Production plan snapshot returns its saved phase",
+    "Production plan snapshot returns its saved phase",
+    "Production plan snapshot returns its saved phase",
+    "Production plan snapshot returns its saved phase"
+  ],
+  "cleanup": {
+    "family": true,
+    "account": true
+  },
+  "passed": true,
+  "readTimings": [
+    331,
+    273,
+    288,
+    286,
+    411
+  ],
+  "requests": [
+    {
+      "path": "/auth/v1/admin/users",
+      "status": 200,
+      "milliseconds": 727
+    },
+    {
+      "path": "/rest/v1/rpc/operator_set_user_role",
+      "status": 204,
+      "milliseconds": 482
+    },
+    {
+      "path": "/auth/v1/token",
+      "status": 200,
+      "milliseconds": 374
+    },
+    {
+      "path": "/rest/v1/rpc/create_family_intake",
+      "status": 200,
+      "milliseconds": 340
+    },
+    {
+      "path": "/rest/v1/resources",
+      "status": 200,
+      "milliseconds": 197
+    },
+    {
+      "path": "/rest/v1/rpc/add_manual_resource_match",
+      "status": 200,
+      "milliseconds": 184
+    },
+    {
+      "path": "/rest/v1/rpc/start_staged_plan_generation",
+      "status": 200,
+      "milliseconds": 161
+    },
+    {
+      "path": "/rest/v1/rpc/claim_ai_job",
+      "status": 200,
+      "milliseconds": 131
+    },
+    {
+      "path": "/rest/v1/rpc/append_staged_plan_phase",
+      "status": 200,
+      "milliseconds": 189
+    },
+    {
+      "path": "/rest/v1/plan_steps",
+      "status": 200,
+      "milliseconds": 122
+    },
+    {
+      "path": "/rest/v1/rpc/get_family_plan_snapshot",
+      "status": 200,
+      "milliseconds": 331
+    },
+    {
+      "path": "/rest/v1/rpc/get_family_plan_snapshot",
+      "status": 200,
+      "milliseconds": 271
+    },
+    {
+      "path": "/rest/v1/rpc/get_family_plan_snapshot",
+      "status": 200,
+      "milliseconds": 288
+    },
+    {
+      "path": "/rest/v1/rpc/get_family_plan_snapshot",
+      "status": 200,
+      "milliseconds": 286
+    },
+    {
+      "path": "/rest/v1/rpc/get_family_plan_snapshot",
+      "status": 200,
+      "milliseconds": 410
+    },
+    {
+      "path": "/auth/v1/logout",
+      "status": 204,
+      "milliseconds": 260
+    },
+    {
+      "path": "/rest/v1/families",
+      "status": 204,
+      "milliseconds": 1052
+    },
+    {
+      "path": "/auth/v1/admin/users/0c0fc177-8c01-4e88-9a96-9f8b54d979dc",
+      "status": 200,
+      "milliseconds": 95
+    },
+    {
+      "path": "/auth/v1/admin/users/0c0fc177-8c01-4e88-9a96-9f8b54d979dc",
+      "status": 200,
+      "milliseconds": 143
+    }
+  ],
+  "finishedAt": "2026-10-15T03:52:30.915Z",
+  "credentialsPersistedOrPrinted": false
+}

@@ -1,0 +1,304 @@
+{
+  "before": [
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "kl4XnzmbiKBFVlh9",
+      "key": "CASELINK_HSTS",
+      "updatedAt": 1785880792516
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "ir85fzulNtVdU9PR",
+      "key": "CASELINK_INVITE_ONLY",
+      "updatedAt": 1785880788453
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "WicpoYRylwDG8ijn",
+      "key": "CASELINK_PDF_MODE",
+      "updatedAt": 1785880783989
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "e3T8lDvJnj5lOAUl",
+      "key": "CASELINK_TENANCY_MODE",
+      "updatedAt": 1785880779673
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "development",
+        "preview",
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "DNuZRK0yN5Q6sdXt",
+      "key": "NEXT_PUBLIC_SITE_URL",
+      "updatedAt": 1774525779838
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "development",
+        "preview",
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "fYsBL2FohqsMbwg5",
+      "key": "SUPABASE_SERVICE_ROLE_KEY",
+      "updatedAt": 1774056149375
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "development",
+        "preview",
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "VgQObaC3TUI7CXDG",
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "updatedAt": 1774056149375
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "development",
+        "preview",
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "mU0wUnwLOo9Hl8zV",
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "updatedAt": 1774056149375
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "development",
+        "preview",
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "YFm2e4MDuiZaK023",
+      "key": "OPENAI_API_KEY",
+      "updatedAt": 1774056104825
+    }
+  ],
+  "after": [
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "5ooaxsmRsMuzqXL1",
+      "key": "CASELINK_PRODUCTION_SUPABASE_URL",
+      "updatedAt": 1792008181402
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "rqLEqZhmrLGoeQAn",
+      "key": "CASELINK_ENVIRONMENT",
+      "updatedAt": 1792008179245
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "4MpAwVpaTziDOzQB",
+      "key": "CASELINK_HSTS",
+      "updatedAt": 1792008177042
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "X3jEPjByHU6uldk2",
+      "key": "CASELINK_INVITE_ONLY",
+      "updatedAt": 1792008174765
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "Zqk4F9PwerrU24jV",
+      "key": "CASELINK_TENANCY_MODE",
+      "updatedAt": 1792008172521
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "LzsQaa1lYEC1sxUg",
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "updatedAt": 1792008170241
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "7Zkm3jhz0deVu5J6",
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "updatedAt": 1792008168008
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "preview"
+      ],
+      "gitBranch": "codex/school-pilot-readiness",
+      "id": "n9pf6uJik1u1bK8n",
+      "key": "NEXT_PUBLIC_SITE_URL",
+      "updatedAt": 1792008165694
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "kl4XnzmbiKBFVlh9",
+      "key": "CASELINK_HSTS",
+      "updatedAt": 1785880792516
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "ir85fzulNtVdU9PR",
+      "key": "CASELINK_INVITE_ONLY",
+      "updatedAt": 1785880788453
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "WicpoYRylwDG8ijn",
+      "key": "CASELINK_PDF_MODE",
+      "updatedAt": 1785880783989
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "id": "e3T8lDvJnj5lOAUl",
+      "key": "CASELINK_TENANCY_MODE",
+      "updatedAt": 1785880779673
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "DNuZRK0yN5Q6sdXt",
+      "key": "NEXT_PUBLIC_SITE_URL",
+      "updatedAt": 1792008157158
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "fYsBL2FohqsMbwg5",
+      "key": "SUPABASE_SERVICE_ROLE_KEY",
+      "updatedAt": 1792008154785
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "VgQObaC3TUI7CXDG",
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "updatedAt": 1792008159597
+    },
+    {
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "mU0wUnwLOo9Hl8zV",
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "updatedAt": 1792008162068
+    },
+    {
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "customEnvironmentIds": [],
+      "id": "YFm2e4MDuiZaK023",
+      "key": "OPENAI_API_KEY",
+      "updatedAt": 1792008152419
+    }
+  ],
+  "checkedAt": "2026-10-14T20:04:48.487366+00:00",
+  "projectId": "prj_1zxzzKu8eljHJvPd6gFY3LhyxwWc",
+  "teamId": "team_wwXXIa3JR9qMrIBopTUBsG5J",
+  "previewBranch": "codex/school-pilot-readiness",
+  "previewSupabaseProject": "umnbyupudhunyccqhyrp",
+  "productionSupabaseProject": "zpfypkizsapvsxeykmdq",
+  "previewOrigin": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+  "method": "Signed-in Vercel CLI 63.1.0; metadata-only API reads with decrypt=false; exact original entry IDs scoped to Production; public Preview config added through CLI stdin.",
+  "checks": {
+    "legacyValuesPreserved": true,
+    "legacyKeysNotReadOrPrinted": true,
+    "legacySecretsWriteOnly": true,
+    "legacyEntriesProductionOnly": true,
+    "stagingPublicConfigBranchScoped": true,
+    "noPreviewAdministrativeCredential": true
+  },
+  "limits": [
+    "New staging OpenAI key awaits private operator entry. No new preview built yet.",
+    "Existing deployments retain their old environment snapshots. No production promotion or key rotation.",
+    "Legacy service-role credential remains Production-only pending operator-vault removal, exposure review and release.",
+    "Production origin, environment markers, hosted workflow and credential provenance still require release evidence."
+  ],
+  "stagingOpenAIKey": {
+    "savedBy": "user in Vercel dashboard",
+    "verifiedUsing": "Authenticated API with decrypt=false; metadata only",
+    "id": "dwh3QZ0enpXC1SvT",
+    "key": "OPENAI_API_KEY",
+    "type": "sensitive",
+    "target": [
+      "preview"
+    ],
+    "gitBranch": "codex/school-pilot-readiness",
+    "createdAt": 1792009653275,
+    "secretRetrieved": false,
+    "providerProjectAndBudgetVerified": false
+  }
+}

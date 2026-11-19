@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-15",
+  "environment": "staging",
+  "method": "Visible native Chrome walkthrough in the user's existing authenticated session, explicitly authorized by the user",
+  "tested_source": "8d300f91f76079841a7a8d8a651621a20d897d86",
+  "tested_deployment": "dpl_H7n91KE3wTrZnaBwwAp1rJ6aqtDg",
+  "shared_testing_url": "https://case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app/families",
+  "alias_repair": "The shared testing alias was still serving source 123b74e98218df5a28c8af057d5cae41026b6b14. Reassigned it to the tested deployment and verified the new Continue plan link after refreshing Chrome.",
+  "synthetic_family": "Test Family 903",
+  "checks_passed": [
+    "Create a family with only a non-identifying label and selected barriers",
+    "PDF export blocked before plan review",
+    "Optional priorities, strengths, contact constraints, and previous attempts saved and included in the generation snapshot",
+    "Generated actions use the relative's twice-weekly transport support and follow up on the existing utility application",
+    "Families Continue plan link returns to the current action's anchor",
+    "Prepare the referral disclosure expands with the keyboard and preserves selected contacts",
+    "Waiting status and a synthetic private progress note save correctly; the date becomes the next follow-up date",
+    "Explicit date confirmation required when marking the plan reviewed",
+    "Record PDF downloads successfully and contains the staff-only note",
+    "Family takeaway starts with no selected actions or contacts and requires confirmation",
+    "Downloaded family takeaway contains only the selected action, owner, follow-up date, goal, and selected contact",
+    "Private notes, unselected actions, unselected contacts, and full family context are absent from the family takeaway",
+    "Removing the selected action clears its associated contact, confirmation, and PDF preview",
+    "Reselecting the action does not restore the prior contact selection",
+    "Switching between record and family PDFs clears family selections and confirmation"
+  ],
+  "pdf_inspection": {
+    "record_pages": 3,
+    "family_takeaway_pages": 1,
+    "method": "Extracted downloaded PDF text with Poppler, asserted selected-content/privacy boundaries, and visually inspected every rendered page",
+    "result": "Readable text and intact content; the record table header can fall at a page boundary, an existing layout refinement opportunity"
+  },
+  "findings": [
+    {
+      "issue": "Some generated week-range timing labels contradict their exact action dates",
+      "example": "Weeks 7-8 guidance included December 17 and January 7 from an October 15 plan start",
+      "response": "Follow-up code change makes exact dates the scheduling truth for newly generated plans and includes saved dates in prior-phase summaries. Existing plans and human-authored timing remain unchanged."
+    },
+    {
+      "issue": "A generated provider-status call applied the family's after-work availability to provider hours and preceded the separate family referral review",
+      "response": "During the synthetic review, manually clarified the first action to agree with the family who will follow up before contacting a provider and confirm provider office hours. AI proposals still require case-manager review."
+    }
+  ],
+  "end_state": "Test Family 903 retained for inspection; Chrome remains signed in with the example family takeaway prepared. Existing family records and production were not changed."
+}

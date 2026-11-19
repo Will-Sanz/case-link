@@ -11,9 +11,11 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
+    // Keep durable budget histories from competing with SQL fixtures for disk time.
+    maxWorkers: 1,
     environment: "node",
     globals: true,
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
     clearMocks: true,
     restoreMocks: true,
   },

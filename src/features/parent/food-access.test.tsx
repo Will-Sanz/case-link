@@ -1,0 +1,243 @@
+// @vitest-environment jsdom
+import { createHash } from "node:crypto";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildFoodAccessAlternatives } from "@/lib/parent/food-access-alternatives";
+import { bindFoodAccessReport, buildFoodAccessPlanBody, foodAccessReportSchema, SHARE_FOOD_ACCESS_PROGRAM, type FoodAccessPlan, type FoodAccessReport } from "@/lib/parent/food-access";
+import { fixtureIntake, fixtureMandate, fixtureRequest } from "@/lib/parent/test-fixtures";
+import { FoodAccess, FoodAccessReportSummary } from "./food-access";
+import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
+
+const now = new Date("2026-11-18T12:00:00Z"), reportAt = "2026-11-18T12:05:00Z";
+const request = () => fixtureRequest({ version: 2, created_at: now.toISOString(), updated_at: now.toISOString(),
+  intake: fixtureIntake({ needs: ["food_now", "snap_new"], zip: "19129", householdSize: null, incomeAmount: null }),
+  mandate: fixtureMandate({ mode: "prepare_only", allowedActions: ["research", "prepare"], allowedData: ["household"],
+    recipientIds: [SHARE_FOOD_ACCESS_PROGRAM, "snap-pa"], expiresAt: "2026-11-25T12:00:00Z" }) });
+function plan(current = request(), override: Partial<Parameters<typeof buildFoodAccessPlanBody>[0]> = {}): FoodAccessPlan {
+  const body = buildFoodAccessPlanBody({ requestId: current.id, requestVersion: current.version, generatedAt: now.toISOString(), sourceReviewCurrent: true, ...override });
+  return { ...body, planHash: createHash("sha256").update(JSON.stringify(body)).digest("hex") };
+}
+function recorded(source: FoodAccessPlan, body: string): FoodAccessReport {
+  const { action: _, ...input } = JSON.parse(body); void _;
+  return bindFoodAccessReport(source, input, { eventId: "22222222-2222-4222-8222-222222222222", reportedAt: reportAt });
+}
+function response(value: unknown, status = 200) { return { ok: status >= 200 && status < 300, status, json: async () => value }; }
+function select(result = "no_food") { fireEvent.change(screen.getByLabelText("Did this food option work for you?"), { target: { value: result } }); }
+const submit = () => fireEvent.click(screen.getByRole("button", { name: "Save food report" }));
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+describe("saved public food access plan and report", () => {
+  it.each(["en", "es"] as const)("renders the saved owned directory check without fetching or presenting confirmed food (%s)", locale => {
+    const current = request(), source = plan(current), report = recorded(source, JSON.stringify({ expectedVersion: current.version, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "22222222-2222-4222-8222-222222222222", result: "no_food" }));
+    const alternatives = buildFoodAccessAlternatives({ request: current, report, zip: "19129", now,
+      result: { sites: [{ id: 148, name: "Nombre original ñ <script>", address: "Source address", zip: "19129", category: "Food Site", phoneNumber: null, website: null, hours: [], serviceAreaNotes: "Original source note" }],
+        sourceUrl: "https://www.phila.gov/food/", checkedAt: reportAt, availability: "city_listed_unconfirmed", moreSitesAvailable: false } });
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    render(<ParentLocaleProvider initialLocale={locale}><FoodAccess request={current} plan={source} report={report} alternatives={alternatives} onChange={vi.fn()} /></ParentLocaleProvider>);
+    expect(screen.getByRole("heading", { name: locale === "es" ? "Otros lugares consultados para esta solicitud" : "Other City listings checked for this request" })).toBeTruthy();
+    expect(screen.getByText("Nombre original ñ <script>").lang).toBe(""); expect(document.querySelector("script")).toBeNull();
+    expect(screen.getByText(locale === "es" ? "Estos son lugares del directorio, no alimentos confirmados ni una reserva. El servicio aún necesita verificar una opción que le sirva." : "These are directory entries, not confirmed food or a reservation. CaseLink still needs to verify a usable option.")).toBeTruthy();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(["positive", "closed", "version", "report", "expired_zip", "read_error"])("hides a saved directory observation after %s changes", kind => {
+    const current = request(), source = plan(current), report = recorded(source, JSON.stringify({ expectedVersion: current.version, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "22222222-2222-4222-8222-222222222222", result: "no_food" }));
+    const alternatives = buildFoodAccessAlternatives({ request: current, report, zip: "19129", now, result: null });
+    if (kind === "positive") Object.assign(report, { result: "received_enough_food", outcome: "support_received" });
+    if (kind === "closed") { current.status = "closed"; current.closed_reason = "completed"; current.version++; }
+    if (kind === "version") current.version++;
+    if (kind === "report") report.eventId = "33333333-3333-4333-8333-333333333333";
+    if (kind === "expired_zip") current.intake_confirmed_at = { zip: "2026-08-01T12:00:00Z" };
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    render(<FoodAccess request={current} plan={source} report={report} alternatives={alternatives} onChange={vi.fn()} readError={kind === "read_error" ? new Error("Owned read unavailable") : null} />);
+    expect(screen.queryByText("The City directory check was unavailable. This remains a CaseLink service issue.")).toBeNull();
+    if (kind === "closed") expect(screen.queryByRole("heading", { name: "Other City listings checked for this request" })).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(["empty", "unavailable"] as const)("explains a saved %s check and an unresolved practical constraint without asking new facts", state => {
+    const current = request(), source = plan(current), report = recorded(source, JSON.stringify({ expectedVersion: current.version, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "22222222-2222-4222-8222-222222222222", result: "need_another_way" }));
+    const alternatives = buildFoodAccessAlternatives({ request: current, report, zip: "19129", now, result: state === "unavailable" ? null : {
+      sites: [], sourceUrl: "https://www.phila.gov/food/", checkedAt: reportAt, availability: "city_listed_unconfirmed", moreSitesAvailable: false } });
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    render(<FoodAccess request={current} plan={source} report={report} alternatives={alternatives} onChange={vi.fn()} />);
+    expect(screen.getByText(state === "empty" ? "The City check returned no other matching entries. This does not mean no food help exists." : "The City directory check was unavailable. This remains a CaseLink service issue.")).toBeTruthy();
+    expect(screen.getByText("You still need another way to obtain food. These listings do not verify delivery, a helper or physical access.")).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull(); expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("shows Spanish guidance and attributed reports while preserving the named site, source and exact report body", async () => {
+    const source = plan(), changed = vi.fn();
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<ParentLocaleProvider initialLocale="es"><FoodAccess request={request()} plan={source} onChange={changed} /></ParentLocaleProvider>);
+    expect(screen.getByRole("heading", { name: "Su opción para obtener alimentos" }).closest("section")?.lang).toBe("es");
+    expect(screen.getByText(/No se sabe si hay alimentos y no hay nada reservado/)).toBeTruthy();
+    expect(screen.getByText(/Guía de Share revisada el 17 nov 2026/)).toBeTruthy();
+    expect(screen.getByText("2901 W Hunting Park Ave, Philadelphia, PA 19129").lang).toBe("en");
+    expect(screen.getByRole("link", { name: "Leer las instrucciones de acceso de Share" }).getAttribute("href")).toBe(source.source.operatorUrl);
+    fireEvent.change(screen.getByLabelText("¿Esta opción de alimentos le sirvió?"), { target: { value: "some_food_still_needed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar lo ocurrido" }));
+    await screen.findByRole("heading", { name: "Su necesidad de alimentos sigue abierta" });
+    expect(screen.getByRole("status").textContent).toBe("Se guardó su informe: Recogí algunos alimentos y aún necesito ayuda.");
+    expect(screen.getByText(/Este es su informe; Share no lo ha confirmado/)).toBeTruthy();
+    expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toMatchObject({ action: "food_visit", result: "some_food_still_needed", siteId: source.site.id, planHash: source.planHash });
+    expect(changed).toHaveBeenCalledOnce();
+  });
+  it("keeps an unknown report and its exact retry when the family changes screen language", async () => {
+    const source = plan(), fetcher = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockImplementation(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<ParentLocaleProvider initialLocale="en"><ParentLanguageSelector /><FoodAccess request={request()} plan={source} onChange={vi.fn()} /></ParentLocaleProvider>);
+    select(); submit(); await screen.findByRole("button", { name: "Retry same report" });
+    fireEvent.change(screen.getByLabelText("Screen language / Idioma de pantalla"), { target: { value: "es" } });
+    expect((screen.getByLabelText("¿Esta opción de alimentos le sirvió?") as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.getByText("Informe pendiente de confirmar: No había alimentos")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar el mismo informe" }));
+    await screen.findByRole("heading", { name: "Su necesidad de alimentos sigue abierta" });
+    expect(fetcher.mock.calls[1][1].body).toBe(fetcher.mock.calls[0][1].body);
+    fireEvent.change(screen.getByLabelText("Idioma de pantalla / Screen language"), { target: { value: "en" } });
+    expect(screen.getByRole("status").textContent).toBe("Your food report is saved: There was no food available.");
+  });
+  it("does not carry a saved announcement into a different request", async () => {
+    const source = plan(), fetcher = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetcher); const view = render(<FoodAccess request={request()} plan={source} onChange={vi.fn()} />);
+    select(); submit(); await screen.findByRole("heading", { name: "Your food need remains open" });
+    const other = { ...request(), id: "44444444-4444-4444-8444-444444444444" };
+    view.rerender(<FoodAccess request={other} plan={plan(other)} onChange={vi.fn()} />);
+    expect(screen.getByRole("status").textContent).toBe("");
+    expect(screen.queryByText(/Food access report:/)).toBeNull();
+  });
+  it.each(["active", "closed"] as const)("allows an intentional correction while %s without a routine confirmation or silent restart", async status => {
+    const original=request(), source=plan(original), current={ ...original,status,...(status === "closed" ? { version:original.version+1,closed_reason:"completed" } : {}) };
+    const positive=recorded(source,JSON.stringify({ expectedVersion:original.version,siteId:source.site.id,planHash:source.planHash,reportKey:"22222222-2222-4222-8222-222222222222",result:"received_enough_food" }));
+    const fetch=vi.fn(async (_url:string, init:RequestInit)=>{ const { action:_,...input }=JSON.parse(String(init.body)); void _;
+      return response({ ok:true,report:foodAccessReportSchema.parse({ ...positive,...input,eventId:"33333333-3333-4333-8333-333333333333",reportedAt:"2026-11-18T12:06:00Z",outcome:"unresolved" }) }); });
+    vi.stubGlobal("fetch",fetch);render(<FoodAccess request={current} plan={source} report={positive} onChange={vi.fn()}/>);
+    expect(screen.queryByLabelText("Did this food option work for you?")).toBeNull();
+    fireEvent.click(screen.getByRole("button",{ name:"Correct this food report" }));
+    expect(document.activeElement).toBe(screen.getByLabelText("Did this food option work for you?"));
+    select("no_food");submit();await screen.findByRole("heading",{ name:"Your food need remains open" });
+    expect(screen.getByRole("status").textContent).toContain("Your food report is saved");
+    expect(fetch).toHaveBeenCalledOnce();expect(JSON.parse(String(fetch.mock.calls[0][1].body))).toMatchObject({ expectedVersion:current.version,result:"no_food" });
+    if(status === "closed") expect(screen.getByText(/This request stays closed and no work has restarted/)).toBeTruthy();
+  });
+  it("shows dated source guidance and unknown stock without a routine confirmation or any mount-time write", () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    render(<FoodAccess request={request()} plan={plan()} onChange={vi.fn()} />);
+    expect(screen.getByText("2901 W Hunting Park Ave, Philadelphia, PA 19129")).toBeTruthy();
+    expect(screen.getByText(/Stock is unknown and nothing is reserved/)).toBeTruthy();
+    expect(screen.getByText(/Share guidance reviewed Nov 17, 2026/)).toBeTruthy();
+    expect((screen.getByLabelText("Did this food option work for you?") as HTMLSelectElement).value).toBe("");
+    expect(screen.queryByRole("textbox")).toBeNull(); expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("saves one site-bound report, announces the retained unmet need and reloads existing work", async () => {
+    const source = plan(), changed = vi.fn();
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetch); render(<FoodAccess request={request()} plan={source} onChange={changed} />);
+    select(); const button = screen.getByRole("button", { name: "Save food report" }); fireEvent.click(button); fireEvent.click(button);
+    await screen.findByRole("heading", { name: "Your food need remains open" });
+    expect(screen.getByText(/Food access report: There was no food available/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "See direct support options" }).getAttribute("href")).toBe("/support/help");
+    expect(fetch).toHaveBeenCalledTimes(1); expect(changed).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(fetch.mock.calls[0][1].body));
+    expect(Object.keys(body).sort()).toEqual(["action", "expectedVersion", "planHash", "reportKey", "result", "siteId"]);
+    expect(body).toMatchObject({ action: "food_visit", expectedVersion: 2, planHash: source.planHash, siteId: source.site.id, result: "no_food" });
+    expect(fetch.mock.calls[0][0]).toBe(`/api/parent/requests/${request().id}/outcome`);
+  });
+  it("retains the exact unknown attempt across polling and a new plan, then retries the same body", async () => {
+    const current = request(), source = plan(), changed = vi.fn();
+    const fetch = vi.fn().mockRejectedValueOnce(new Error("offline")).mockImplementation(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetch);
+    const view = render(<FoodAccess request={current} plan={source} onChange={changed} />);
+    select(); submit(); await screen.findByRole("button", { name: "Retry same report" });
+    const original = fetch.mock.calls[0][1].body;
+    view.rerender(<FoodAccess request={{ ...current, updated_at: reportAt }} plan={plan(current, { generatedAt: "2026-11-18T12:01:00Z" })} onChange={changed} />);
+    expect((screen.getByLabelText("Did this food option work for you?") as HTMLSelectElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Retry same report" }));
+    await screen.findByRole("heading", { name: "Your food need remains open" });
+    expect(fetch).toHaveBeenCalledTimes(2); expect(fetch.mock.calls[1][1].body).toBe(original);
+  });
+  it("reconciles a lost acknowledgement from the saved event without another POST", async () => {
+    const current = request(), source = plan(), changed = vi.fn();
+    const fetch = vi.fn().mockResolvedValue(response({ ok: true, report: {} })); vi.stubGlobal("fetch", fetch);
+    const view = render(<FoodAccess request={current} plan={source} onChange={changed} />);
+    select("received_enough_food"); submit(); await screen.findByRole("button", { name: "Retry same report" });
+    const saved = recorded(source, String(fetch.mock.calls[0][1].body));
+    view.rerender(<FoodAccess request={{ ...current, events: [{ id: saved.eventId, request_id: current.id, kind: "parent.outcome_reported", actor: "parent",
+      summary: "You reported a food visit.", created_at: reportAt, evidence: { foodAccessReport: saved } }] }} plan={source} onChange={changed} />);
+    await screen.findByRole("heading", { name: "Your food report is recorded" });
+    expect(screen.queryByRole("button", { name: "Retry same report" })).toBeNull(); expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Other support requests keep their own progress/)).toBeTruthy();
+  });
+  it.each(["expectedVersion", "planHash", "result"] as const)("does not reconcile an event that shares a key but changes %s", async field => {
+    const current = request(), source = plan(), fetch = vi.fn().mockRejectedValue(new Error("offline")); vi.stubGlobal("fetch", fetch);
+    const view = render(<FoodAccess request={current} plan={source} onChange={vi.fn()} />);
+    select(); submit(); await screen.findByRole("button", { name: "Retry same report" });
+    const saved = recorded(source, String(fetch.mock.calls[0][1].body));
+    const changed = { ...saved, [field]: field === "expectedVersion" ? 1 : field === "planHash" ? "f".repeat(64) : "could_not_access" };
+    view.rerender(<FoodAccess request={current} plan={source} report={changed} onChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Retry same report" })).toBeTruthy();
+    expect((screen.getByLabelText("Did this food option work for you?") as HTMLSelectElement).disabled).toBe(true);
+  });
+  it("permits only an exact retry after a pause, without enabling a new report", async () => {
+    const current = request(), source = plan(), fetch = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockImplementation(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) }));
+    vi.stubGlobal("fetch", fetch); const view = render(<FoodAccess request={current} plan={source} onChange={vi.fn()} />);
+    select(); submit(); await screen.findByRole("button", { name: "Retry same report" });
+    view.rerender(<FoodAccess request={{ ...current, status: "paused" }} plan={source} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry same report" }));
+    await screen.findByRole("heading", { name: "Your food need remains open" });
+    expect((screen.getByRole("button", { name: "Save food report" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
+  });
+  it.each(["paused", "cancelled", "expired", "program", "prepare", "household", "stale_plan", "read_error"])("keeps new reporting closed for %s", kind => {
+    const current = request(), source = plan(); let readError: Error | undefined;
+    if (kind === "paused" || kind === "cancelled") current.status = kind;
+    if (kind === "expired") current.mandate.expiresAt = "2026-11-18T11:00:00Z";
+    if (kind === "program") current.mandate.recipientIds = ["philly-food"];
+    if (kind === "prepare") current.mandate.allowedActions = ["research"];
+    if (kind === "household") current.mandate.allowedData = ["income"];
+    if (kind === "stale_plan") current.version++;
+    if (kind === "read_error") readError = new Error("Latest check unavailable");
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    render(<FoodAccess request={current} plan={source} onChange={vi.fn()} readError={readError} />);
+    expect((screen.getByLabelText("Did this food option work for you?") as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Save food report" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("suppresses conflicting walk-up instructions while allowing a current request to ask for another way", async () => {
+    const source = plan(request(), { cityObservation: { recordId: 122, checkedAt: now.toISOString(), state: "closed" } });
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => response({ ok: true, report: recorded(source, String(init.body)) })); vi.stubGlobal("fetch", fetch);
+    render(<FoodAccess request={request()} plan={source} onChange={vi.fn()} />);
+    expect(screen.queryByText(/24-hour access/)).toBeNull(); select("need_another_way"); submit();
+    await screen.findByRole("heading", { name: "Your food need remains open" });
+    expect(screen.getByText(/Food access report: I need another way/)).toBeTruthy();
+  });
+  it.each([400, 409, 412])("reloads after a definitive %s transaction rejection and allows a fresh corrected report", async status => {
+    const changed = vi.fn(), fetch = vi.fn().mockResolvedValue(response({ ok: false, error: "Check the current plan." }, status)); vi.stubGlobal("fetch", fetch);
+    render(<FoodAccess request={request()} plan={plan()} onChange={changed} />);
+    select(); submit(); await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: "Retry same report" })).toBeNull();
+    expect((screen.getByLabelText("Did this food option work for you?") as HTMLSelectElement).disabled).toBe(false);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+  it("displays an earlier validated site report after a regenerated plan, without claiming a program receipt", () => {
+    const source = plan(), saved = recorded(source, JSON.stringify({ action: "food_visit", expectedVersion: 2, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "33333333-3333-4333-8333-333333333333", result: "some_food_still_needed" }));
+    render(<FoodAccess request={request()} plan={plan(request(), { generatedAt: "2026-11-18T12:06:00Z" })} report={saved} onChange={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Your food need remains open" })).toBeTruthy();
+    expect(screen.getByText(/Share has not confirmed it/)).toBeTruthy();
+    expect(screen.queryByText(/24-hour access/)).toBeNull();
+  });
+  it("does not display another household's report or malformed provider attribution", () => {
+    const source = plan(), saved = recorded(source, JSON.stringify({ action: "food_visit", expectedVersion: 2, siteId: source.site.id, planHash: source.planHash,
+      reportKey: "33333333-3333-4333-8333-333333333333", result: "no_food" }));
+    render(<><FoodAccessReportSummary requestId={request().id} report={{ ...saved, requestId: "44444444-4444-4444-8444-444444444444" }} />
+      <FoodAccessReportSummary requestId={request().id} report={{ ...saved, attribution: "provider_api" }} /></>);
+    expect(screen.queryByText(/Food access report/)).toBeNull();
+  });
+});

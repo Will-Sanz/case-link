@@ -1,0 +1,33 @@
+{
+  "syntheticOnly": true,
+  "results": [
+    {
+      "fixture": "dated-states",
+      "pages": 2,
+      "checkedSourceFields": 45,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "fixture": "many-goals",
+      "pages": 8,
+      "checkedSourceFields": 289,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "fixture": "maximum-fields",
+      "pages": 4,
+      "checkedSourceFields": 18,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "fixture": "latin-characters",
+      "pages": 1,
+      "checkedSourceFields": 16,
+      "errors": [],
+      "passed": true
+    }
+  ]
+}

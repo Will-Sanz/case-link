@@ -1,0 +1,35 @@
+{
+  "verifiedAt": "2026-10-15T20:02:45.418570+00:00",
+  "source": "f0ed2be84b77ea08706d00c5e8991a596b25cd68",
+  "qaDeployment": "dpl_G8D56sndRGkYosU6eWTLU4U9CAq3",
+  "qaState": "READY",
+  "aliases": [
+    {
+      "alias": "case-link-git-codex-school-pilot-readiness-will-sanzs-projects.vercel.app",
+      "deploymentId": "dpl_G8D56sndRGkYosU6eWTLU4U9CAq3",
+      "url": "case-link-in0y0uyr9-will-sanzs-projects.vercel.app",
+      "createdAt": 1791922348113
+    },
+    {
+      "alias": "www.thecaselink.com",
+      "deploymentId": "dpl_FesLWbGr9B5jYCs1gwQYpdEtb7uL",
+      "url": "case-link-4sug5d6c5-will-sanzs-projects.vercel.app",
+      "createdAt": 1774484635751
+    }
+  ],
+  "ci": {
+    "run": 38797793219,
+    "conclusion": "success",
+    "tests": 798,
+    "testFiles": 91,
+    "browserScenarios": 12,
+    "databaseSecurity": "success",
+    "pdfFixtures": 9,
+    "typecheckLintAuditBuild": "success"
+  },
+  "codeql": {
+    "run": 38797793395,
+    "conclusion": "success"
+  },
+  "productionPromotion": false
+}

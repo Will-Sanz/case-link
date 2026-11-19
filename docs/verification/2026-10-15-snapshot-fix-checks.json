@@ -1,0 +1,42 @@
+{
+  "commit": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+  "migrationCommit": "8ef767edad2f035f2637874bd1b8225907f0d507",
+  "ciRun": 38753128811,
+  "ciConclusion": "success",
+  "ciUrl": "https://github.com/Will-Sanz/case-link/actions/runs/38753128811",
+  "codeqlRun": 38753128797,
+  "codeqlConclusion": "success",
+  "codeqlUrl": "https://github.com/Will-Sanz/case-link/actions/runs/38753128797",
+  "unitComponentTests": 686,
+  "browserScenarios": 7,
+  "databaseExecutedReadRegression": "passed; one action row read for the single-action fixture",
+  "databaseAuthRestoreLegacyUpgradePdfChecks": "passed",
+  "releasePreflight": "passed before production candidate creation",
+  "localFullStackRestarted": false,
+  "stagingWorkflow": "2026-10-15-hosted-snapshot-fix.json",
+  "stagingMigration": "2026-10-15-staging-snapshot-migration.json",
+  "productionMigration": "2026-10-15-production-snapshot-migration.json",
+  "productionReadVerification": "2026-10-15-production-snapshot-reads.json",
+  "reviews": {
+    "correctnessSecurityPrivacyPerformance": "Complete; only the already-authorized snapshot is materialized. Full output and revision hashes, ownership, grants, SECURITY INVOKER and search path are unchanged.",
+    "separatePonytailDeletionPass": "Complete; one evaluation keyword, the required migration definition and an executed-read regression. No new dependency, cache, abstraction or timeout increase."
+  },
+  "productionCandidate": {
+    "id": "dpl_8BAZJwJQEqFG7RkjykwuwyrXGEU8",
+    "url": "case-link-5r6jnsdzo-will-sanzs-projects.vercel.app",
+    "target": "production",
+    "readyState": "READY",
+    "gitSource": {
+      "type": "github",
+      "repoId": 1187614129,
+      "ref": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b",
+      "sha": "9e7d0e29aa556eb780b96e04e6d4c5ef8511e19b"
+    },
+    "requestedAutoAssignCustomDomains": false,
+    "alias": [
+      "case-link-will-sanzs-projects.vercel.app",
+      "case-link-git-9e7d0e29aa556eb780b96e-3903f0-will-sanzs-projects.vercel.app"
+    ],
+    "createdAt": "2026-10-15T14:51:16.718Z"
+  }
+}

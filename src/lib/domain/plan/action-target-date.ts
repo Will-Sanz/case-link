@@ -1,22 +1,6 @@
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-const MAX_PLAN_DAYS = 90;
+import { parseDateOnly, schoolDate } from "@/lib/dates";
 
-function parseDateOnly(value: string | null | undefined): Date | null {
-  const match = value?.match(DATE_ONLY);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  return parsed;
-}
+const MAX_PLAN_DAYS = 90;
 
 function toDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -49,7 +33,7 @@ export function resolveActionTargetDate({
   weekIndex: number;
   proposedTargetDate?: string | null;
 }): string {
-  const start = parseDateOnly(planStartDate.slice(0, 10));
+  const start = parseDateOnly(planStartDate.length === 10 ? planStartDate : schoolDate(new Date(planStartDate)));
   if (!start) {
     throw new Error("Plan start date must be a valid ISO date");
   }

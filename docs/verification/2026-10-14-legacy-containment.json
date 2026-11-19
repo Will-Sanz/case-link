@@ -1,0 +1,16 @@
+{
+  "startedAt": "2026-10-14T16:54:21.272Z",
+  "completedAt": "2026-10-14T16:54:21.453Z",
+  "syntheticOnly": true,
+  "localOnly": true,
+  "legacySelfPromotionReproduced": true,
+  "legacyAdminSelfProvisioningReproduced": true,
+  "roleAndIdentityChangesDeniedAfterPatch": true,
+  "selfProvisioningDeniedAfterPatch": true,
+  "accountsUnchanged": true,
+  "profileEditingAndOwnedCaseAccessPreserved": true,
+  "existingAdminPreserved": true,
+  "anonymousRpcDenied": true,
+  "cleanupPassed": true,
+  "limits": "Minimal local Auth uid fixture and original account/family schema. No hosted account exploit, no full legacy upgrade, no email or real family data."
+}

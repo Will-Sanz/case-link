@@ -1,0 +1,19 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "checkedAt": "2026-10-14T22:38:43.832Z",
+  "scope": "Disposable confirmed Auth account; no application role grant, emails, biometric prompts or provider setting changes",
+  "publicFeatureSettings": {
+    "passkeys_enabled": false
+  },
+  "webAuthnSecondFactor": {
+    "enrollmentAccepted": false,
+    "errorCode": "mfa_webauthn_enroll_not_enabled",
+    "httpStatus": 422
+  },
+  "cleanup": {
+    "sessionsRevoked": true,
+    "accountRemoved": true
+  },
+  "credentialsPrintedOrPersisted": false,
+  "interpretation": "The current hosted configuration does not accept WebAuthn enrollment. This does not prove whether Supabase can enable the experimental feature or which plan/support terms apply."
+}

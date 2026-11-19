@@ -1,3 +1,4 @@
+import { actionTargetDate } from "@/lib/domain/plan/action-state";
 import type {
   CaseProgressPlanChange,
   PlanStepActionItemRow,
@@ -21,10 +22,7 @@ export function listProgressActionOptions(plan: PlanWithSteps): ProgressActionOp
           action,
           goal: step.details?.stage_goal?.trim() || step.title.trim(),
           stepTitle: step.title.trim(),
-          effectiveDate:
-            action.status === "blocked"
-              ? action.follow_up_date ?? action.target_date
-              : action.target_date,
+          effectiveDate: actionTargetDate(action),
           stepOrder: step.sort_order,
         })),
     )

@@ -1,0 +1,75 @@
+/* Separate recovery and official-help targets when private collection is unavailable. */
+.availability {
+  display: grid;
+  gap: 0.75rem;
+}
+.availability > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+@media (max-width: 480px) {
+  .intake,
+  .intakeSurface {
+    padding-inline: 20px;
+  }
+  .notice,
+  .mandateNotice,
+  .personalStep {
+    padding-inline: 16px;
+  }
+  .activity {
+    padding-inline: 0;
+  }
+  [data-case-workspace] .overview,
+  .receipts {
+    padding-inline: 12px;
+  }
+  [data-case-workspace] .receipts > a {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-inline: 12px;
+  }
+  [data-case-workspace] .activity [role="status"] {
+    padding-inline: 8px;
+  }
+  .progress {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .progress li {
+    flex: 1 1 8em;
+    gap: 8px;
+  }
+  .intake button,
+  [data-case-workspace] .overview a,
+  [data-case-workspace] .personalStep a,
+  [data-case-workspace] .activity button {
+    padding-inline: 12px;
+  }
+  .mandateNotice,
+  [data-case-workspace] .state,
+  .feedback > div,
+  .answers [role="alert"] {
+    display: block;
+  }
+  .feedback > div,
+  .answers [role="alert"],
+  .answers [role="status"],
+  .activity [role="status"],
+  .activity [role="alert"],
+  .profileNotice > div {
+    padding-inline: 12px;
+  }
+  .intake input:not([type="checkbox"]):not([type="radio"]),
+  .intake select,
+  .answers input:not([type="checkbox"]):not([type="radio"]),
+  .answers select,
+  .activity input,
+  .activity select,
+  .activity textarea {
+    min-width: 0;
+    padding-inline: 12px;
+  }
+}

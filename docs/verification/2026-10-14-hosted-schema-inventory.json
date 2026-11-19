@@ -1,0 +1,366 @@
+{
+  "checkedOn": "2026-10-14",
+  "project": "zpfypkizsapvsxeykmdq",
+  "inspection": "Read-only information_schema and pg_catalog; no row data",
+  "tables": [
+    {
+      "name": "activity_log",
+      "columns": [
+        "id",
+        "family_id",
+        "actor_user_id",
+        "action",
+        "entity_type",
+        "entity_id",
+        "details",
+        "created_at"
+      ]
+    },
+    {
+      "name": "app_users",
+      "columns": [
+        "id",
+        "email",
+        "role",
+        "created_at",
+        "updated_at",
+        "display_name",
+        "job_title",
+        "organization",
+        "phone",
+        "pronouns",
+        "service_area",
+        "bio",
+        "preferred_contact_method",
+        "notes_signature"
+      ]
+    },
+    {
+      "name": "barrier_plan_records",
+      "columns": [
+        "id",
+        "owner_user_id",
+        "reference_id",
+        "family_id",
+        "selected_barriers",
+        "additional_details",
+        "generated_plan_json",
+        "matched_resources_json",
+        "status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "case_notes",
+      "columns": [
+        "id",
+        "family_id",
+        "author_id",
+        "body",
+        "created_at"
+      ]
+    },
+    {
+      "name": "case_progress_updates",
+      "columns": [
+        "id",
+        "family_id",
+        "plan_id",
+        "author_id",
+        "occurred_on",
+        "summary",
+        "plan_changes",
+        "created_at"
+      ]
+    },
+    {
+      "name": "families",
+      "columns": [
+        "id",
+        "name",
+        "summary",
+        "urgency",
+        "household_notes",
+        "status",
+        "created_by_id",
+        "created_at",
+        "updated_at",
+        "archived_at"
+      ]
+    },
+    {
+      "name": "family_barriers",
+      "columns": [
+        "id",
+        "family_id",
+        "preset_key",
+        "label",
+        "sort_order",
+        "created_at"
+      ]
+    },
+    {
+      "name": "family_case_managers",
+      "columns": [
+        "family_id",
+        "user_id",
+        "assigned_at"
+      ]
+    },
+    {
+      "name": "family_goals",
+      "columns": [
+        "id",
+        "family_id",
+        "preset_key",
+        "label",
+        "sort_order",
+        "created_at"
+      ]
+    },
+    {
+      "name": "family_members",
+      "columns": [
+        "id",
+        "family_id",
+        "display_name",
+        "relationship",
+        "notes",
+        "age_approx",
+        "created_at"
+      ]
+    },
+    {
+      "name": "plan_step_action_items",
+      "columns": [
+        "id",
+        "plan_step_id",
+        "title",
+        "description",
+        "week_index",
+        "target_date",
+        "status",
+        "sort_order",
+        "outcome",
+        "notes",
+        "follow_up_date",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "plan_step_activity",
+      "columns": [
+        "id",
+        "plan_step_id",
+        "family_id",
+        "actor_user_id",
+        "action",
+        "activity_type",
+        "notes",
+        "details",
+        "created_at"
+      ]
+    },
+    {
+      "name": "plan_step_resources",
+      "columns": [
+        "plan_step_id",
+        "resource_id"
+      ]
+    },
+    {
+      "name": "plan_steps",
+      "columns": [
+        "id",
+        "plan_id",
+        "phase",
+        "title",
+        "description",
+        "status",
+        "due_date",
+        "assigned_to_id",
+        "sort_order",
+        "created_at",
+        "updated_at",
+        "details",
+        "workflow_data",
+        "priority",
+        "ai_helper_data"
+      ]
+    },
+    {
+      "name": "plans",
+      "columns": [
+        "id",
+        "family_id",
+        "version",
+        "summary",
+        "generation_source",
+        "ai_model",
+        "created_at",
+        "client_display",
+        "generation_state"
+      ]
+    },
+    {
+      "name": "referrals",
+      "columns": [
+        "id",
+        "family_id",
+        "resource_id",
+        "organization_label",
+        "contact_person",
+        "contact_attempted_at",
+        "method",
+        "status",
+        "outcome",
+        "next_follow_up_at",
+        "notes",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "resource_import_runs",
+      "columns": [
+        "id",
+        "started_at",
+        "finished_at",
+        "source_path",
+        "row_count",
+        "success_count",
+        "error_count",
+        "error_log"
+      ]
+    },
+    {
+      "name": "resource_matches",
+      "columns": [
+        "id",
+        "family_id",
+        "resource_id",
+        "match_reason",
+        "score",
+        "status",
+        "created_at",
+        "updated_at",
+        "plan_step_id"
+      ]
+    },
+    {
+      "name": "resources",
+      "columns": [
+        "id",
+        "slug",
+        "active",
+        "import_key",
+        "office_or_department",
+        "program_name",
+        "description",
+        "category",
+        "invite_march_partner_fair",
+        "partner_fair_attended",
+        "recruit_for_grocery_giveaways",
+        "primary_contact_name",
+        "primary_contact_title",
+        "primary_contact_email",
+        "primary_contact_phone",
+        "primary_contact_phone_norm",
+        "secondary_contact_name",
+        "secondary_contact_title",
+        "secondary_contact_email",
+        "secondary_contact_phone",
+        "secondary_contact_phone_norm",
+        "services_select_all",
+        "additional_info",
+        "tabling_at_events",
+        "promotional_materials",
+        "educational_workshops",
+        "volunteer_recruitment_support",
+        "tags",
+        "search_text",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "tasks",
+      "columns": [
+        "id",
+        "family_id",
+        "title",
+        "description",
+        "completed",
+        "completed_at",
+        "source",
+        "plan_step_id",
+        "created_by_id",
+        "due_date",
+        "created_at",
+        "updated_at"
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "schema": "public",
+      "name": "can_access_family",
+      "arguments": "p_family_id uuid",
+      "security_definer": true,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "a72e2dbbf4bfceeedb0129ca934661d5",
+      "anon_execute": true,
+      "authenticated_execute": true
+    },
+    {
+      "schema": "public",
+      "name": "capture_case_progress_update",
+      "arguments": "p_family_id uuid, p_plan_id uuid, p_occurred_on date, p_summary text, p_changes jsonb",
+      "security_definer": false,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "9799c39cfbdd61ec913e4afee11bfd68",
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    {
+      "schema": "public",
+      "name": "create_family_intake_row",
+      "arguments": "p_name text, p_summary text, p_urgency family_urgency, p_household_notes text, p_status family_status",
+      "security_definer": true,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "753ef88e790f3cde01f3f813d74990aa",
+      "anon_execute": true,
+      "authenticated_execute": true
+    },
+    {
+      "schema": "public",
+      "name": "is_app_admin",
+      "arguments": "",
+      "security_definer": true,
+      "configuration": [
+        "search_path=public"
+      ],
+      "definition_md5": "68dbc9017997032f1bc9c6d2379a0624",
+      "anon_execute": true,
+      "authenticated_execute": true
+    },
+    {
+      "schema": "public",
+      "name": "set_updated_at",
+      "arguments": "",
+      "security_definer": false,
+      "configuration": null,
+      "definition_md5": "4d6804d5850641a33867814c9e76a714",
+      "anon_execute": true,
+      "authenticated_execute": true
+    }
+  ]
+}

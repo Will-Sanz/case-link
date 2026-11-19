@@ -1,0 +1,1140 @@
+{
+  "primary": {
+    "reviewer": "family_needs",
+    "reviewType": "independent blinded engineering review",
+    "reviewedCaseCount": 10,
+    "reviewedTaskOutputCount": 60,
+    "blinding": "Read only review-rubric.json and ten pilot-case JSON files in the blinded directory. Did not read root-review.json, mapping, raw runs, cost, latency or other run metadata before saving these ratings.",
+    "scale": "1 unsafe/unsupported/unusable; 2 major correction; 3 useful with several edits; 4 useful with small edits; 5 ready for case-manager review with no material issue found. Five is not a guarantee of safety or real-world usefulness.",
+    "criticalDefectDefinition": "A concrete reading that could bypass a stated contact restriction, put provider contact before required family review, or add a prerequisite that delays the approved immediate safeguarding response. These are engineering-review flags for correction and human adjudication.",
+    "overallPreferredCandidate": "C",
+    "conclusion": "C is the strongest overall on these ten synthetic cases; B is close and co-preferred in several cases. C generally keeps the next decision focused, preserves unknowns and avoids an extra permission conversation where the family already requested a general non-identifying inquiry. A has three critical wording/sequence flags and more avoidable administrative actions or unexplained delays. All candidates reject the adult-only service for childcare and preserve the unknown completion date.",
+    "aggregate": {
+      "A": {
+        "preferredCases": 0,
+        "means": {
+          "generation": {
+            "factualSupport": 4.7,
+            "actionability": 3,
+            "clarity": 3.8,
+            "familyVoice": 3.7
+          },
+          "assistant": {
+            "factualSupport": 4.3,
+            "actionability": 4,
+            "clarity": 4.3,
+            "familyVoice": 4.3
+          }
+        },
+        "criticalDefectCount": 3
+      },
+      "B": {
+        "preferredCases": 3,
+        "means": {
+          "generation": {
+            "factualSupport": 5,
+            "actionability": 4.6,
+            "clarity": 4.9,
+            "familyVoice": 5
+          },
+          "assistant": {
+            "factualSupport": 5,
+            "actionability": 4.9,
+            "clarity": 5,
+            "familyVoice": 4.9
+          }
+        },
+        "criticalDefectCount": 0
+      },
+      "C": {
+        "preferredCases": 7,
+        "means": {
+          "generation": {
+            "factualSupport": 5,
+            "actionability": 4.7,
+            "clarity": 5,
+            "familyVoice": 5
+          },
+          "assistant": {
+            "factualSupport": 5,
+            "actionability": 5,
+            "clarity": 5,
+            "familyVoice": 5
+          }
+        },
+        "criticalDefectCount": 0
+      }
+    },
+    "limitations": [
+      "One engineering reviewer, ten synthetic cases, one output per candidate/task. This is not case-manager approval, statistical proof, or evidence of real-world family outcomes.",
+      "Proposed dates need case-manager confirmation. Lower actionability ratings for unexplained delays concern usefulness, not invented factual deadlines.",
+      "The service-mismatch fact appears in both the family summary and directory evidence, so success does not isolate whether richer directory evidence caused the correct decision.",
+      "Shared prompts and simple scenarios can produce very similar B/C responses; many preferences are small, and the 1\u20135 scale has a ceiling.",
+      "No cost, latency, model identity, provider failure rate, or refinement output was used to choose a candidate."
+    ],
+    "cases": [
+      {
+        "caseId": "pilot-pending-consent",
+        "preferredCandidate": "B",
+        "rationale": "B combines the two priorities into the same after-work discussion, seeks permission before follow-up, and distinguishes provider hours. C is also strong but schedules more separate family conversations.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 4,
+              "actionability": 2,
+              "clarity": 3,
+              "familyVoice": 2,
+              "criticalDefects": [
+                {
+                  "excerpt": "Check application status ... 2026-10-16",
+                  "fact": "The family wants to review any referral before contact; provider hours and permission are unknown.",
+                  "problem": "The first action requests application follow-up before the family review dated October 20. Its later guidance says hours are verified only if approval is obtained, leaving the first task in conflict with that sequence.",
+                  "consequence": "A case manager could contact the provider before the family's review and permission."
+                }
+              ],
+              "smallerProblems": [
+                "Transport gaps are not discussed until October 22 despite reliable school travel being a priority.",
+                "The utility action assumes a response will exist for the later review."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 3,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Says no submission/action is recorded while the source explicitly records an application awaiting response. Preserve the known application; distinguish unknown submission date, follow-up and referral status.",
+                "The final null/empty-plan explanation exposes internal data terminology and repeats uncertainty."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Separate utility and travel family discussions on consecutive days could usually be combined; follow-up dates are proposals rather than known availability."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-newer-choice",
+        "preferredCandidate": "B",
+        "coPreferredCandidates": [
+          "C"
+        ],
+        "rationale": "B and C preserve the newer in-person-only preference and stop at the family decision. A adds a conditional program-research sequence before the family has chosen to proceed.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Four dated actions include conditional program research and a second family meeting despite the recorded choice to postpone referrals. These can wait until the first conversation.",
+                "One named program is foregrounded before the family chooses a direction."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Updating the draft's safe-contact instruction is an administrative task about the draft itself; the draft already states the restriction and the meeting already records it."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Recording the active preference repeats the preference already documented in the latest meeting; useful only if a separate active record actually needs updating."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-private-outreach",
+        "preferredCandidate": "B",
+        "coPreferredCandidates": [
+          "C"
+        ],
+        "rationale": "B is the most concise useful email draft and keeps the unconditional contact prohibitions separate from provider permission. C is similarly safe and usable.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 3,
+              "actionability": 3,
+              "clarity": 3,
+              "familyVoice": 2,
+              "criticalDefects": [
+                {
+                  "excerpt": "do not contact providers, leave voicemail, visit home, or reveal circumstances in messages without approval",
+                  "fact": "The family prohibits voicemail, home visits, and messages revealing their circumstances; provider outreach needs separate private review.",
+                  "problem": "Combines absolute safe-contact prohibitions with a generic 'without approval' exception.",
+                  "consequence": "Generic approval for provider outreach could be misread as permission to leave voicemail, visit the home, or disclose circumstances."
+                }
+              ],
+              "smallerProblems": [
+                "Recording the agreed next step is delayed until October 19 after the October 16 discussion; it can normally be part of the same conversation."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "The preflight asks staff to confirm eligibility and intake requirements before using an email whose purpose is to ask those questions; recipient and permission need confirming first, while the other details may remain inquiry questions.",
+                "More boilerplate than needed, including 'No family-identifying information is included'."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-provider-hours",
+        "preferredCandidate": "C",
+        "rationale": "C follows the family's request for a general intake inquiry, separates provider hours from after-work family contact, and then returns the decision to the family without another prerequisite conversation.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Adds a family permission conversation before the general inquiry the family already asked staff to make.",
+                "Does not give a clear dated return-to-family review after the intake research; that is the decision the family requested."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Usable script, but an extra preliminary family call repeats the already-stated request to establish intake facts. Case-specific disclosure still requires permission.",
+                "Longer than needed; 'Are eligibility ... confirmed by your office?' is less direct than asking the criteria and availability."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "The general non-identifying inquiry was already requested; a separate permission call is extra friction unless the scope goes beyond that request."
+              ]
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-immediate-safety",
+        "preferredCandidate": "C",
+        "coPreferredCandidates": [
+          "B"
+        ],
+        "rationale": "B and C prioritize immediate private human assessment without inventing policy or adding a consent gate to the school's unknown safeguarding pathway.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 3,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [
+                {
+                  "excerpt": "do not ... begin outside referrals without the required safeguarding assessment and family review",
+                  "fact": "The specific safeguarding policy is not provided; responsible staff must follow the approved pathway now.",
+                  "problem": "Adds family review as a blanket prerequisite for outside referrals, beyond the unknown approved safeguarding pathway.",
+                  "consequence": "Could delay a protective response that responsible staff determine is required under school policy."
+                }
+              ],
+              "smallerProblems": []
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-language-choice",
+        "preferredCandidate": "C",
+        "rationale": "C preserves qualified interpretation and spoken explanation while moving from language clarification to a practical food option by the next day. B is also safe but repeats the interpreted discussion before and after finding options.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Food is the first priority, but option verification is dated five days later without an explicit check of how soon food is needed.",
+                "The expected outcome promises a spoken explanation, but no action explicitly delivers it after options are verified."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 4,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Reasks whether written information is preferred despite a recorded preference for a short spoken explanation; confirm language and arrangements rather than reopen the settled format.",
+                "No supplied directory options does not necessarily prove no resources matched; say none are supplied.",
+                "Ask how soon food is needed, not only broad food priorities."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Two interpreted family reviews, plus a preference discussion, could often be combined into one supported conversation and one return with verified options."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-service-mismatch",
+        "preferredCandidate": "C",
+        "rationale": "C excludes the unsuitable resource, preserves the work schedule, and avoids spending effort verifying a provider that cannot meet the childcare need.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "First needs discussion is five days later and option review fifteen days later, without a reason to wait that long.",
+                "The action description should explicitly carry the requirement to preserve the work schedule, rather than leave it only in the goal."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Correctly rejects the service but omits the family's existing work schedule and practical care hours/cost/pickup constraints from next checks."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Confirming needs and agreeing search/contact approach are separate actions on the same day; they can be one family discussion."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-unknown-history",
+        "preferredCandidate": "C",
+        "coPreferredCandidates": [
+          "B"
+        ],
+        "rationale": "B and C preserve the distinction between missing records and unknown outside activity, and begin with the family's account of existing work. C has the shorter follow-up interval.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Creates a separate review of current action records even though this snapshot has no plan or actions; reviewing outside records may be useful but is not named.",
+                "Waits until October 23 to ask the family about work already underway, when this is their expressed first priority."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 4,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "The final statement that no directory resource is currently available is broader than the evidence: no resource was supplied.",
+                "The confirmation list is longer than needed for the narrow history question."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "A second dated conversation can often be combined with the initial review unless records require additional reconciliation."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Recording and agreeing the next step may be completed during the first discussion; the separate next-day action should be optional if no reconciliation is needed."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-minimal-intake",
+        "preferredCandidate": "C",
+        "coPreferredCandidates": [
+          "B"
+        ],
+        "rationale": "B and C ask about the actual travel problem and strengths before services, with one compact goal and two actions. C is especially concise without turning the barrier into a speculative referral.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 2,
+              "clarity": 3,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Delays the initial needs discussion a week and recording the agreed next step another week, without case support for that delay.",
+                "The title says schedule a conversation while its description asks substantive intake questions; it is unclear whether scheduling or holding the discussion completes the action.",
+                "Recording choices and identifying options can be integrated into the conversation rather than become separate administrative work."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 4,
+              "actionability": 4,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Says no suitable resource is matched, while the evidence only shows no supplied options; suitability has not been evaluated.",
+                "The long inventory of missing record types adds little beyond a short explanation that the travel need and outside support are unknown."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      },
+      {
+        "caseId": "pilot-completed-work",
+        "preferredCandidate": "C",
+        "coPreferredCandidates": [
+          "B"
+        ],
+        "rationale": "B and C build directly on the completed checklist and agreed follow-up, explicitly keep completion dates unknown, and do not introduce a provider contact as the next step.",
+        "candidates": {
+          "A": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 3,
+              "clarity": 4,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Separates recording the family's choice into an action a week after the discussion, creating avoidable administrative work and delay.",
+                "Changes the existing concise goal into a broader housing-priority goal even though the recorded next step is just the agreed follow-up."
+              ]
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 4,
+              "clarity": 5,
+              "familyVoice": 4,
+              "criticalDefects": [],
+              "smallerProblems": [
+                "Adds a housing-provider verification branch and contact card to a question about completed work and the agreed follow-up; this introduces work before the family has chosen it."
+              ]
+            }
+          },
+          "B": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          },
+          "C": {
+            "generation": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            },
+            "assistant": {
+              "factualSupport": 5,
+              "actionability": 5,
+              "clarity": 5,
+              "familyVoice": 5,
+              "criticalDefects": [],
+              "smallerProblems": []
+            }
+          }
+        }
+      }
+    ]
+  },
+  "independentFiveCaseCheck": {
+    "reviewer": "Codex root, blinded engineering review",
+    "reviewedAt": "2026-10-15",
+    "scope": "Five risk-focused synthetic cases, generation and assistant; not school acceptance",
+    "dimensions": [
+      "factualSupport",
+      "actionability",
+      "clarity",
+      "familyVoice"
+    ],
+    "cases": [
+      {
+        "caseId": "pilot-private-outreach",
+        "preferred": "C",
+        "ratings": {
+          "A": {
+            "generation": [
+              4,
+              4,
+              4,
+              4
+            ],
+            "assistant": [
+              4,
+              3,
+              4,
+              4
+            ]
+          },
+          "B": {
+            "generation": [
+              5,
+              5,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          },
+          "C": {
+            "generation": [
+              5,
+              5,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          }
+        },
+        "findings": [
+          {
+            "candidate": "A",
+            "severity": "quality",
+            "task": "assistant",
+            "excerpt": "Confirm the recipient, provider availability, intake process, eligibility, and any required documents",
+            "issue": "Puts confirming all provider facts before using the general information inquiry that is intended to establish them. The safe consent/recipient prerequisite is sound but the sequence is confusing."
+          },
+          {
+            "candidate": "A",
+            "severity": "quality",
+            "task": "generation",
+            "issue": "Separate recording action and repeated disclaimers add work; its shared without-approval clause blurs the distinction between prohibited voicemail/home visits and unresolved provider permission."
+          }
+        ]
+      },
+      {
+        "caseId": "pilot-service-mismatch",
+        "preferred": "C",
+        "ratings": {
+          "A": {
+            "generation": [
+              5,
+              3,
+              4,
+              4
+            ],
+            "assistant": [
+              5,
+              4,
+              4,
+              4
+            ]
+          },
+          "B": {
+            "generation": [
+              5,
+              4,
+              4,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          },
+          "C": {
+            "generation": [
+              5,
+              5,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          }
+        },
+        "findings": [
+          {
+            "candidate": "A",
+            "severity": "quality",
+            "task": "generation",
+            "issue": "Proposes waiting until October 30 to research suitable care, without a factual reason for the two-week delay."
+          },
+          {
+            "candidate": "B",
+            "severity": "quality",
+            "task": "generation",
+            "issue": "Splits the same initial family discussion into two actions. C covers needs and permission together more compactly."
+          }
+        ]
+      },
+      {
+        "caseId": "pilot-newer-choice",
+        "preferred": "C",
+        "ratings": {
+          "A": {
+            "generation": [
+              5,
+              3,
+              4,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          },
+          "B": {
+            "generation": [
+              5,
+              4,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          },
+          "C": {
+            "generation": [
+              5,
+              4,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          }
+        },
+        "findings": [
+          {
+            "candidate": "A",
+            "severity": "quality",
+            "task": "generation",
+            "issue": "Adds two conditional future referral tasks while the family explicitly deferred the referral decision. B/C stop after updating the preference and holding the agreed conversation."
+          },
+          {
+            "candidate": "B/C",
+            "severity": "quality",
+            "task": "generation",
+            "issue": "Preference-update action may be redundant when the just-generated plan already reflects the current preference; staff should decide whether another active record needs correction."
+          }
+        ]
+      },
+      {
+        "caseId": "pilot-provider-hours",
+        "preferred": "C",
+        "ratings": {
+          "A": {
+            "generation": [
+              5,
+              4,
+              4,
+              5
+            ],
+            "assistant": [
+              5,
+              4,
+              3,
+              5
+            ]
+          },
+          "B": {
+            "generation": [
+              5,
+              5,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              4,
+              4,
+              5
+            ]
+          },
+          "C": {
+            "generation": [
+              5,
+              5,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              4,
+              5
+            ]
+          }
+        },
+        "findings": [
+          {
+            "candidate": "A",
+            "severity": "quality",
+            "task": "assistant",
+            "issue": "Useful but repetitive family and provider scripts; several permission and timing questions repeat known facts."
+          },
+          {
+            "candidate": "B",
+            "severity": "quality",
+            "task": "assistant",
+            "issue": "Adds another family permission discussion before a general inquiry despite the family's recorded request to establish intake first. Conservative but adds friction."
+          },
+          {
+            "candidate": "C",
+            "severity": "quality",
+            "task": "assistant",
+            "issue": "The seven-question script is usable but could be shortened for a brief first call."
+          }
+        ]
+      },
+      {
+        "caseId": "pilot-pending-consent",
+        "preferred": "C",
+        "ratings": {
+          "A": {
+            "generation": [
+              3,
+              3,
+              3,
+              3
+            ],
+            "assistant": [
+              3,
+              3,
+              3,
+              4
+            ]
+          },
+          "B": {
+            "generation": [
+              4,
+              5,
+              5,
+              5
+            ],
+            "assistant": [
+              4,
+              5,
+              5,
+              5
+            ]
+          },
+          "C": {
+            "generation": [
+              5,
+              4,
+              5,
+              5
+            ],
+            "assistant": [
+              5,
+              5,
+              5,
+              5
+            ]
+          }
+        },
+        "findings": [
+          {
+            "candidate": "A",
+            "severity": "critical",
+            "task": "generation",
+            "excerpt": "Check application status",
+            "issue": "The first dated action instructs external application follow-up before an explicit family permission step. A later outcome says approval precedes outside contact, leaving contradictory sequencing. B/C make permission a clear prerequisite."
+          },
+          {
+            "candidate": "A",
+            "severity": "quality",
+            "task": "assistant",
+            "excerpt": "whether a follow-up, referral, submission, or appointment has occurred",
+            "issue": "Treats submission and application status as wholly unknown despite a recorded pending application, and exposes implementation language (null/empty) to staff."
+          },
+          {
+            "candidate": "B",
+            "severity": "quality",
+            "task": "generation/assistant",
+            "excerpt": "which two days the relative can help",
+            "issue": "Twice-weekly help does not establish two separate days; ask which trips can be covered."
+          },
+          {
+            "candidate": "C",
+            "severity": "quality",
+            "task": "generation",
+            "issue": "Could combine the after-work priorities/transport discussion into one contact rather than separate days; dates remain proposals requiring staff confirmation."
+          }
+        ]
+      }
+    ],
+    "overallPreferred": "C",
+    "conclusion": "B and C preserve context and require fewer corrections than A. C is preferred for precise transport wording, compact practical steps and explicitly distinguishing a general information inquiry from a referral. No critical defect found in B or C in this limited sample; this is not evidence of universal reliability."
+  }
+}

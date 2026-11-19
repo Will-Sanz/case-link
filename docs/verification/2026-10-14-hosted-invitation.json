@@ -1,0 +1,45 @@
+{
+  "project": "umnbyupudhunyccqhyrp",
+  "sentAt": "2026-10-14T21:45:20.293Z",
+  "operation": "scripts/invite-user-operation.ts",
+  "delivery": "invitation",
+  "role": "case_manager",
+  "active": true,
+  "confirmationPending": false,
+  "recipient": "Only the operator-controlled inbox explicitly authorized in this chat",
+  "mailboxReceiptVerified": true,
+  "deliveryEvidence": {
+    "inInbox": true,
+    "sender": "CaseLink Staging <staging@thecaselink.com>",
+    "subject": "You're invited to CaseLink",
+    "reportedAuthentication": [
+      "dkim=pass",
+      "dkim=pass",
+      "spf=pass"
+    ],
+    "dmarc": "No result present in the inspected Authentication-Results header",
+    "links": 2,
+    "canonicalStagingCallback": true,
+    "credentialsOnlyInFragment": true,
+    "invitationTypeAndSetupDestination": true,
+    "fifteenMinuteInstructions": true,
+    "credentialValuesPrinted": false
+  },
+  "administratorTest": "An earlier administrator-creation request was rejected before execution. The user subsequently explicitly approved temporarily granting this existing staging account administrator access. The password-only administrator gate passed and case-manager access was restored through the audited operator operation; enrollment/challenge remains incomplete. See 2026-10-14-hosted-mfa-gate.json.",
+  "previewGate": {
+    "browserShowsContinue": true,
+    "addressBarCredentialRemoved": true,
+    "authConfirmationStillPending": true,
+    "lastSignInStillAbsent": true
+  },
+  "explicitConfirmation": {
+    "passwordSetupShown": true,
+    "skippedPasswordFamilyRoute": "/families",
+    "deniedDestination": "/reset-password?mode=setup",
+    "passwordEntry": "Completed privately by the user; confirmed email and password presence checked without reading the password",
+    "passwordSignInReachedFamilies": true,
+    "passwordSignInAt": "2026-10-14T22:06:58.795879Z"
+  },
+  "passwordChangeNotification": "Received in the authorized operator Inbox with SPF/DKIM passing and no credential link; see 2026-10-14-hosted-mfa-gate.json",
+  "remaining": "Hosted recovery, expired/resend/reused links, MFA challenge and school mailbox/scanner acceptance"
+}

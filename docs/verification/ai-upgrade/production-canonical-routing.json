@@ -1,0 +1,96 @@
+{
+  "deploymentId": "dpl_BtUijxvxRbopdJ5Ebr214t36grWU",
+  "commit": "59ef91349f0076c1f3d70a515277915a645facd5",
+  "records": [
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:28:37.929Z",
+      "estimatedUsd": 0.0106572,
+      "elapsedMs": 4188,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:28:31.173Z",
+      "estimatedUsd": 0.011344700000000001,
+      "elapsedMs": 8004,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:28:17.342Z",
+      "estimatedUsd": 0.0117047,
+      "elapsedMs": 8171,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:28:01.286Z",
+      "estimatedUsd": 0.012077200000000001,
+      "elapsedMs": 9812,
+      "ok": true
+    },
+    {
+      "route": "caseAssistant",
+      "taskType": "case_assistant",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:27:50.234Z",
+      "estimatedUsd": 0.0110297,
+      "elapsedMs": 6975,
+      "ok": true
+    },
+    {
+      "route": "previewRefinePlan",
+      "taskType": "plan_refinement",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:27:02.617Z",
+      "estimatedUsd": 0.0122085,
+      "elapsedMs": 6221,
+      "ok": true
+    },
+    {
+      "route": "previewRefinePlanStep",
+      "taskType": "step_refinement",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:26:54.452Z",
+      "estimatedUsd": 0.0098435,
+      "elapsedMs": 4754,
+      "ok": true
+    },
+    {
+      "route": "generateCompletePlan",
+      "taskType": "plan_generation",
+      "model": "gpt-6.1-sol",
+      "returnedModel": "gpt-6.1-sol",
+      "serviceTier": "default",
+      "ts": "2026-10-15T20:26:38.801Z",
+      "estimatedUsd": 0.012201100000000001,
+      "elapsedMs": 17059,
+      "ok": true
+    }
+  ],
+  "calls": 8,
+  "estimatedUsd": 0.09106660000000001
+}

@@ -1,0 +1,113 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "startedAt": "2026-10-15T14:32:04.877Z",
+  "syntheticOnly": true,
+  "providerCalls": 0,
+  "resourceMutations": 0,
+  "checks": [
+    "Fixed production operator authenticated",
+    "Production keys available only in memory",
+    "Disposable standard account created",
+    "Audited case-manager provisioning",
+    "Real password login",
+    "Synthetic family created",
+    "Six current directory sources available",
+    "Current resource matched without changing directory",
+    "Saved snapshot excludes source contact values",
+    "Production staged plan starts with the current directory",
+    "Generation lease acquired",
+    "Production saves a generated phase",
+    "Production snapshot returns four saved steps",
+    "Snapshot retains all twelve actions",
+    "Direct read-only connection prepared through official CLI",
+    "Direct connection target is fixed",
+    "Query measurements use live standard-staff permissions",
+    "Comparison changes only snapshot evaluation strategy",
+    "Materialized comparison preserves the complete snapshot and revision hashes"
+  ],
+  "cleanup": {
+    "family": true,
+    "account": true
+  },
+  "passed": true,
+  "shape": {
+    "resources": 6,
+    "steps": 4,
+    "actions": 12,
+    "generationStateBytes": 3980
+  },
+  "sequentialReadMilliseconds": [
+    392,
+    321,
+    393,
+    326,
+    361
+  ],
+  "concurrentReadMilliseconds": [
+    [
+      759,
+      759,
+      451
+    ],
+    [
+      928,
+      556,
+      712
+    ],
+    [
+      550,
+      423,
+      359
+    ]
+  ],
+  "explain": [
+    {
+      "variant": "current",
+      "planningMilliseconds": 5.543,
+      "executionMilliseconds": 214.614,
+      "sharedHitBlocks": 2036,
+      "sharedReadBlocks": 0,
+      "nodes": 250,
+      "actionRowsRead": 96,
+      "planTableScanNodes": 32,
+      "actionTableScanNodes": 8
+    },
+    {
+      "variant": "materialized",
+      "planningMilliseconds": 0.938,
+      "executionMilliseconds": 28.499,
+      "sharedHitBlocks": 277,
+      "sharedReadBlocks": 0,
+      "nodes": 40,
+      "actionRowsRead": 12,
+      "planTableScanNodes": 4,
+      "actionTableScanNodes": 1
+    },
+    {
+      "variant": "current",
+      "planningMilliseconds": 5.403,
+      "executionMilliseconds": 210.515,
+      "sharedHitBlocks": 2036,
+      "sharedReadBlocks": 0,
+      "nodes": 250,
+      "actionRowsRead": 96,
+      "planTableScanNodes": 32,
+      "actionTableScanNodes": 8
+    },
+    {
+      "variant": "materialized",
+      "planningMilliseconds": 0.916,
+      "executionMilliseconds": 28.036,
+      "sharedHitBlocks": 277,
+      "sharedReadBlocks": 0,
+      "nodes": 40,
+      "actionRowsRead": 12,
+      "planTableScanNodes": 4,
+      "actionTableScanNodes": 1
+    }
+  ],
+  "finishedAt": "2026-10-15T14:32:20.883Z",
+  "credentialsPersistedOrPrinted": false,
+  "conclusion": "The existing query repeats action reads eight times. Materializing only the filtered snapshot returns identical data and revision hashes with substantially less work. It is a measured contributor to load, not proof of the sole cause of the earlier timeout.",
+  "schemaMutated": false
+}

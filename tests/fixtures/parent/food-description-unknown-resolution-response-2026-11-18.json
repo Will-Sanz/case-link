@@ -1,0 +1,20 @@
+{
+  "caseId": "description-ambiguity-3-en",
+  "fingerprint": "b6a4ebbe8b608fff85ba23cbc9240edd249115c2805bb7ef1a144ab071a37c7d",
+  "attempts": [
+    {
+      "attempt": 5,
+      "turn": 1,
+      "requestSha256": "2751635bda75f643f4ea64ec602e7c55ac7068499852949e186b6f40035805f4",
+      "responseSha256": "0775b7d132799f99bbe76d3e1f9591c4b55b61b274159058f0bf537a356fb355",
+      "message": "{\"needIds\":[\"food_now\"],\"selections\":[{\"need\":\"food_now\",\"programId\":\"philly-food\",\"reason\":\"immediate\"},{\"need\":\"food_now\",\"programId\":\"share-community-fridge-19129\",\"reason\":\"immediate\"}],\"assertions\":[{\"questionId\":\"benefitHistory\",\"value\":\"not_sure\",\"span\":{\"start\":23,\"end\":54,\"text\":\"I do not know our SNAP history.\"}}],\"exclusions\":[],\"questionIds\":[],\"outOfScope\":null}"
+    },
+    {
+      "attempt": 6,
+      "turn": 3,
+      "requestSha256": "2496e628548b333e4286a727f2b780251db78391bb4558fd1063cef89e9f4e59",
+      "responseSha256": "884c75cdd68db9ca88887fd43716bd8eadd1f9c3c5e119c593b556335cb622f8",
+      "message": "{\"needIds\":[\"food_now\"],\"selections\":[{\"need\":\"food_now\",\"programId\":\"philly-food\",\"reason\":\"immediate\"},{\"need\":\"food_now\",\"programId\":\"share-community-fridge-19129\",\"reason\":\"immediate\"}],\"assertions\":[{\"questionId\":\"foodForTwoDays\",\"value\":\"no\",\"span\":{\"start\":0,\"end\":18,\"text\":\"We need food today\"}},{\"questionId\":\"benefitHistory\",\"value\":\"never\",\"span\":{\"start\":39,\"end\":69,\"text\":\"we have never applied for SNAP\"}}],\"exclusions\":[],\"questionIds\":[],\"outOfScope\":null}"
+    }
+  ]
+}

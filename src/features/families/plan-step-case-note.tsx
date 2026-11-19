@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates";
+
 import {
   useCallback,
   useEffect,
@@ -10,10 +12,15 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { RefinementChangeReview } from "./refinement-change-review";
+import type { RefinementChange } from "@/lib/domain/plan/refinement-review";
+import { PlanContactPicker } from "./plan-contact-picker";
+import type { PlanContact } from "@/lib/matching/plan-resources";
 import { Textarea } from "@/components/ui/textarea";
 import { textareaClass } from "@/lib/ui/form-classes";
 import { cn } from "@/lib/utils/cn";
 import {
+  actionTargetDate,
   actionUiStatus,
   actionUserNotes,
   encodeActionNotes,
@@ -23,8 +30,6 @@ import {
 import type { PlanStepActionItemRow, PlanStepDetails, PlanStepRow } from "@/types/family";
 import {
   buildMainParagraph,
-  contactsFromEditable,
-  contactsToEditable,
   documentsFromEditable,
   documentsToEditable,
   formatContactDisplay,
@@ -34,81 +39,13 @@ import {
   parseMainParagraphOnSave,
 } from "@/features/families/plan-case-note-derive";
 
-type FocusField = "title" | "body" | "documents" | "contact" | "outcome" | null;
+type FocusField = "title" | "body" | "documents" | "outcome" | null;
 
 const sectionLabelClass =
   "text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]";
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return <p className={sectionLabelClass}>{children}</p>;
-}
-
-function RefineComparisonCard({
-  label,
-  title,
-  summary,
-  outcome,
-  documents,
-  contact,
-  proposed = false,
-}: {
-  label: string;
-  title: string;
-  summary: string;
-  outcome: string | null;
-  documents: string | null;
-  contact: string | null;
-  proposed?: boolean;
-}) {
-  const fields = [
-    ["Title", title],
-    ["Summary", summary],
-    ["Expected result", outcome],
-    ["Documents", documents],
-    ["Contact", contact],
-  ] as const;
-
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-3",
-        proposed
-          ? "border-[var(--color-positive-rule)] bg-[var(--color-positive-bg)]"
-          : "border-[var(--color-rule)] bg-[var(--color-paper)]",
-      )}
-    >
-      <p className={cn(sectionLabelClass, proposed && "text-[var(--color-positive)]")}>{label}</p>
-      <dl className="mt-3 space-y-3">
-        {fields.map(([fieldLabel, value]) => (
-          <div key={fieldLabel}>
-            <dt className="text-[11px] font-medium text-[var(--color-ink-faint)]">{fieldLabel}</dt>
-            <dd
-              className={cn(
-                "mt-0.5 whitespace-pre-wrap text-sm leading-relaxed",
-                value?.trim() ? "text-[var(--color-ink-strong)]" : "italic text-[var(--color-ink-faint)]",
-                fieldLabel === "Title" && value?.trim() && "font-semibold text-[var(--color-ink)]",
-              )}
-            >
-              {value?.trim() || "Not set"}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
-function formatDateOnly(value: string | null): string | null {
-  if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: parsed.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
-  }).format(parsed);
 }
 
 function ownerLabel(owner: PlanStepDetails["owner"]): string {
@@ -161,6 +98,7 @@ function DocumentField({
         <p className="text-xs text-[var(--color-ink-faint)]">One item per line</p>
         <textarea
           ref={ref}
+          aria-label="Documents"
           rows={rows}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -189,6 +127,7 @@ function DocumentField({
 
 export function PlanStepCaseNote({
   step,
+  directoryContacts = [],
   editing,
   onPatchStep,
   onPatchDetails,
@@ -204,7 +143,9 @@ export function PlanStepCaseNote({
   stepDirty,
   refineOpen,
   refineInstruction,
-  refinePreview,
+  refineChanges,
+  refineSelected,
+  onRefineSelect,
   refinePending,
   onRefineInstruction,
   onRefineRun,
@@ -214,6 +155,7 @@ export function PlanStepCaseNote({
   onOpenRefine,
 }: {
   step: PlanStepRow;
+  directoryContacts?: PlanContact[];
   editing: boolean;
   onPatchStep: (patch: Partial<PlanStepRow>) => void;
   onPatchDetails: (patch: Partial<PlanStepDetails>) => void;
@@ -229,12 +171,9 @@ export function PlanStepCaseNote({
   stepDirty?: boolean;
   refineOpen: boolean;
   refineInstruction: string;
-  refinePreview: {
-    title: string;
-    description: string;
-    details: PlanStepDetails;
-    stepPriority?: PlanStepRow["priority"];
-  } | null;
+  refineChanges: RefinementChange[] | null;
+  refineSelected: string[];
+  onRefineSelect: (id: string, checked: boolean) => void;
   refinePending: boolean;
   onRefineInstruction: (v: string) => void;
   onRefineRun: () => void;
@@ -251,33 +190,20 @@ export function PlanStepCaseNote({
   const mainParagraphRead = useMemo(() => buildMainParagraph(step), [step]);
   const [bodyDraft, setBodyDraft] = useState("");
   const documentsEditable = useMemo(() => documentsToEditable(d), [d]);
-  const contactEditable = useMemo(() => contactsToEditable(d.contacts), [d.contacts]);
   const outcomeEditable = d.expected_outcome?.trim() ?? "";
   const documentsDisplay = useMemo(() => formatDocumentsDisplay(d), [d]);
   const contactDisplay = useMemo(() => formatContactDisplay(d), [d]);
   const outcomeDisplay = useMemo(() => formatOutcomeDisplay(d), [d]);
-  const refineDocumentsDisplay = useMemo(
-    () => (refinePreview ? formatDocumentsDisplay(refinePreview.details) : null),
-    [refinePreview],
-  );
-  const refineContactDisplay = useMemo(
-    () => (refinePreview ? formatContactDisplay(refinePreview.details) : null),
-    [refinePreview],
-  );
   const recordNotes = useMemo(() => formatRecordNotes(step.workflow_data), [step.workflow_data]);
   const actions = useMemo(
     () =>
       [...(step.action_items ?? [])].sort((a, b) => {
-        if (a.target_date && b.target_date && a.target_date !== b.target_date) {
-          return a.target_date.localeCompare(b.target_date);
-        }
-        if (a.target_date && !b.target_date) return -1;
-        if (!a.target_date && b.target_date) return 1;
-        return a.sort_order - b.sort_order;
+        const aDate = actionTargetDate(a), bDate = actionTargetDate(b);
+        return (aDate ?? "9999-12-31").localeCompare(bDate ?? "9999-12-31") || a.sort_order - b.sort_order || a.id.localeCompare(b.id);
       }),
     [step.action_items],
   );
-  const completedActionCount = actions.filter((action) => action.status === "completed").length;
+  const completedActionCount = actions.filter((action) => actionUiStatus(action) === "completed").length;
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const { ref: bodyRef, rows: bodyRows } = useAutosizeTextarea(
@@ -337,6 +263,7 @@ export function PlanStepCaseNote({
             <textarea
               ref={titleRef}
               id={titleId}
+              aria-label="Title"
               value={step.title}
               onChange={(e) => onPatchStep({ title: e.target.value })}
               onBlur={() => setFocus(null)}
@@ -357,7 +284,7 @@ export function PlanStepCaseNote({
               onClick={() => editing && setFocus("title")}
               aria-labelledby={titleId}
             >
-              <h4 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">{step.title}</h4>
+              <h4 id={titleId} className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">{step.title}</h4>
             </button>
           )}
 
@@ -421,6 +348,7 @@ export function PlanStepCaseNote({
             <textarea
               ref={bodyRef}
               id={bodyId}
+              aria-label="Summary"
               rows={bodyRows}
               value={bodyDraft}
               onChange={(e) => setBodyDraft(e.target.value)}
@@ -492,13 +420,14 @@ export function PlanStepCaseNote({
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
-                      <span>Target date</span>
+                      <span>{action.status === "blocked" ? "Next follow-up date" : "Target date"}</span>
                       <input
                         type="date"
-                        value={action.target_date ?? ""}
+                        value={actionTargetDate(action) ?? ""}
                         onChange={(event) =>
                           onPatchActionItem(action.id, {
                             target_date: event.target.value || null,
+                            ...(action.status === "blocked" ? { follow_up_date: event.target.value || null } : {}),
                           })
                         }
                         className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
@@ -522,7 +451,8 @@ export function PlanStepCaseNote({
                           onPatchActionItem(action.id, {
                             status: next === "waiting" ? "blocked" : next,
                             notes: encodeActionNotes(action.notes, false),
-                            follow_up_date: next === "waiting" ? action.follow_up_date : null,
+                            follow_up_date: next === "waiting" ? action.follow_up_date ?? action.target_date : null,
+                            ...(next === "waiting" ? { target_date: action.follow_up_date ?? action.target_date } : {}),
                           });
                         }}
                         className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
@@ -568,10 +498,8 @@ export function PlanStepCaseNote({
                         required={action.status === "blocked"}
                       />
                     </label>
-                    <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
-                      <span>
-                        {action.status === "blocked" ? "Next follow-up date" : "Follow-up date (optional)"}
-                      </span>
+                    {action.status !== "blocked" ? <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
+                      <span>Follow-up date (optional)</span>
                       <input
                         type="date"
                         value={action.follow_up_date ?? ""}
@@ -581,9 +509,8 @@ export function PlanStepCaseNote({
                           })
                         }
                         className="w-full rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)]"
-                        required={action.status === "blocked"}
                       />
-                    </label>
+                    </label> : null}
                   </div>
                   <label className="block space-y-1 text-xs text-[var(--color-ink-muted)]">
                     <span>Outcome (optional)</span>
@@ -607,7 +534,7 @@ export function PlanStepCaseNote({
               {actions.map((action) => {
                 const done = action.status === "completed";
                 const noLongerNeeded = isActionNoLongerNeeded(action);
-                const targetLabel = formatDateOnly(action.target_date);
+                const targetLabel = formatDateOnly(actionTargetDate(action));
                 const followUpLabel = formatDateOnly(action.follow_up_date);
                 const userNotes = actionUserNotes(action.notes);
                 return (
@@ -658,12 +585,12 @@ export function PlanStepCaseNote({
                         <span className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           {targetLabel ? (
                             <time
-                              dateTime={action.target_date ?? undefined}
+                              dateTime={actionTargetDate(action) ?? undefined}
                               className="font-medium text-[var(--color-accent)]"
                             >
-                              Target {targetLabel}
+                              {action.status === "blocked" ? "Follow up" : "Target"} {targetLabel}
                             </time>
-                          ) : (
+                          ) : done ? <span>No target date required</span> : (
                             <span className="font-medium text-amber-800">Target date needed</span>
                           )}
                           {action.status === "blocked" ? (
@@ -679,7 +606,7 @@ export function PlanStepCaseNote({
                               In progress
                             </span>
                           ) : null}
-                          {followUpLabel ? (
+                          {followUpLabel && action.status !== "blocked" ? (
                             <time dateTime={action.follow_up_date ?? undefined} className="text-[var(--color-ink-muted)]">
                               Follow up {followUpLabel}
                             </time>
@@ -718,39 +645,15 @@ export function PlanStepCaseNote({
         {(contactDisplay || editing) && (
           <section className="space-y-1.5">
             <SectionLabel>Contact</SectionLabel>
-            {editing && focus === "contact" ? (
-              <div className="space-y-1.5">
-                <p className="text-xs text-[var(--color-ink-faint)]">
-                  One contact per line; separate name, phone, email, and notes with ·
-                </p>
-                <Textarea
-                  rows={Math.max(2, contactEditable.split(/\r?\n/).length + 1)}
-                  value={contactEditable}
-                  onChange={(e) => onPatchDetails({ contacts: contactsFromEditable(e.target.value) })}
-                  onBlur={() => setFocus(null)}
-                  className="min-h-[3rem] w-full resize-y border-0 border-b border-[var(--color-rule)] bg-transparent px-0 py-1 text-[15px] leading-relaxed text-[var(--color-ink-strong)] shadow-none focus-visible:ring-0"
-                  autoFocus
-                />
-              </div>
-            ) : !editing && contactDisplay ? (
-              <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{contactDisplay}</p>
-            ) : editing && !contactDisplay && focus !== "contact" ? (
-              <button
-                type="button"
-                onClick={() => setFocus("contact")}
-                className="w-full text-left text-[var(--color-ink-faint)] italic hover:bg-[var(--color-paper)]"
-              >
-                Add primary contact…
-              </button>
-            ) : editing && contactDisplay && focus !== "contact" ? (
-              <button
-                type="button"
-                onClick={() => setFocus("contact")}
-                className="w-full text-left text-[15px] leading-relaxed text-[var(--color-ink-2)] hover:bg-[var(--color-paper)]"
-              >
-                {contactDisplay}
-              </button>
-            ) : null}
+            {editing ? (
+              <PlanContactPicker value={d.contacts ?? []} choices={directoryContacts} onChange={contacts => onPatchDetails({ contacts })} />
+            ) : (
+              <>
+                <p className="text-[15px] leading-relaxed text-[var(--color-ink-2)]">{contactDisplay}</p>
+                {(d.contacts ?? []).some(contact => !directoryContacts.some(choice => choice.source_resource_id === contact.source_resource_id && choice.source_updated_at === contact.source_updated_at)) &&
+                  <p className="text-xs text-[var(--color-ink-muted)]">A contact needs a current directory source. Edit this action to remove or reselect it before review.</p>}
+              </>
+            )}
           </section>
         )}
 
@@ -759,6 +662,7 @@ export function PlanStepCaseNote({
             <SectionLabel>Expected outcome</SectionLabel>
             {editing && focus === "outcome" ? (
               <Textarea
+                aria-label="Expected outcome"
                 rows={Math.max(2, outcomeEditable.split(/\r?\n/).length + 1)}
                 value={outcomeEditable}
                 onChange={(e) => onPatchDetails({ expected_outcome: e.target.value || undefined })}
@@ -799,6 +703,7 @@ export function PlanStepCaseNote({
           <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Case record</SectionLabel>
             <Textarea
+              aria-label="Case record notes"
               rows={3}
               value={(step.workflow_data?.outcome_notes as string | undefined) ?? ""}
               onChange={(e) =>
@@ -811,6 +716,7 @@ export function PlanStepCaseNote({
               className="w-full resize-y border-[var(--color-rule)] text-sm"
             />
             <Textarea
+              aria-label="Blocker explanation"
               rows={2}
               value={(step.workflow_data?.blocker_reason as string | undefined) ?? ""}
               onChange={(e) =>
@@ -829,7 +735,7 @@ export function PlanStepCaseNote({
           <section className="space-y-3 border-t border-[var(--color-rule)] pt-5">
             <SectionLabel>Assist</SectionLabel>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary" className="h-8 text-xs" onClick={onOpenRefine}>
+              <Button type="button" variant="secondary" className="h-8 text-xs" id={`${titleId}-refine`} onClick={onOpenRefine}>
                 Refine action
               </Button>
             </div>
@@ -840,11 +746,12 @@ export function PlanStepCaseNote({
                 aria-label="Refine action with AI"
               >
                 <p className="text-xs text-[var(--color-ink-muted)]">
-                  Describe how this action should read. Preview updates this action&apos;s draft only until
-                  you apply; use <strong>Save edits</strong> to persist.
+                  Describe the wording, preparation, or date changes you want. Choose changes from the preview,
+                  then use <strong>Save edits</strong> to save.
                 </p>
                 <Textarea
                   rows={3}
+                  aria-label="AI revision instructions"
                   value={refineInstruction}
                   onChange={(e) => onRefineInstruction(e.target.value)}
                   placeholder="e.g. Shorten for a city intake form; keep contacts and documents."
@@ -864,7 +771,7 @@ export function PlanStepCaseNote({
                     Close
                   </Button>
                 </div>
-                {refinePreview ? (
+                {refineChanges ? (
                   <div className="space-y-3 border-t border-[var(--color-rule)] pt-3" aria-live="polite">
                     <div>
                       <p className="text-sm font-semibold text-[var(--color-ink)]">Review changes</p>
@@ -873,27 +780,9 @@ export function PlanStepCaseNote({
                         it, and <strong>Save edits</strong> is still required.
                       </p>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <RefineComparisonCard
-                        label="Current draft"
-                        title={step.title}
-                        summary={mainParagraphRead}
-                        outcome={outcomeDisplay}
-                        documents={documentsDisplay}
-                        contact={contactDisplay}
-                      />
-                      <RefineComparisonCard
-                        label="Proposed draft"
-                        title={refinePreview.title}
-                        summary={refinePreview.description}
-                        outcome={refinePreview.details.expected_outcome?.trim() || null}
-                        documents={refineDocumentsDisplay}
-                        contact={refineContactDisplay}
-                        proposed
-                      />
-                    </div>
+                    <RefinementChangeReview changes={refineChanges} selected={refineSelected} onSelect={onRefineSelect} />
                     <div className="flex flex-wrap gap-2 pt-1">
-                      <Button type="button" className="h-8 text-xs" onClick={onRefineApply}>
+                      <Button type="button" className="h-8 text-xs" onClick={() => { onRefineApply(); document.getElementById(`${titleId}-refine`)?.focus(); }} disabled={!refineSelected.length}>
                         Apply to draft
                       </Button>
                       <Button

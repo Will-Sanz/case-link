@@ -1,0 +1,172 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "checkedAt": "2026-10-15T01:25:00Z",
+  "commandResult": "warning-level check exited nonzero as configured; full results subsequently captured with fail-on none",
+  "warningCount": 31,
+  "warnings": [
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "add_case_note"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "add_manual_resource_match"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "append_staged_plan_phase"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "archive_family"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "can_access_family"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "capture_case_progress_update"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "claim_ai_job"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "consume_ai_budget"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "create_family_intake"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "create_manual_plan_step"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "create_plan_with_steps"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "delete_plan_step"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "ensure_app_user"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "is_active_app_user"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "is_app_admin"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "mark_plan_reviewed"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "record_activity_event"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "record_paperwork_download"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "release_ai_job"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "replace_family_barriers"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "replace_family_goals"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "replace_family_members"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "replace_suggested_resource_matches"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "save_family_planning_context"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "save_plan_edits"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "start_staged_plan_generation"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "update_family_meta"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "update_resource_match"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "routine": "update_staged_plan_state"
+    },
+    {
+      "name": "auth_leaked_password_protection",
+      "level": "WARN",
+      "routine": null
+    },
+    {
+      "name": "auth_insufficient_mfa_options",
+      "level": "WARN",
+      "routine": null
+    }
+  ],
+  "disposition": {
+    "authenticated_security_definer_function_executable": "29 intentionally authenticated RPCs/helpers. Current definitions use auth.uid plus can_access_family or active password-session guards, or the bounded caller-owned job-release predicate. save_plan_edits has the same family guard. Anonymous execution is revoked. Covered by the full database/Auth security suite and hosted ownership/offboarding/logout denials. No grants broadened to silence this advisor.",
+    "auth_leaked_password_protection": "Not available on the current Free plan. Fourteen-character mixed password policy remains. Paid upgrade requires user decision.",
+    "auth_insufficient_mfa_options": "Expected consequence of the explicit user decision to remove all CaseLink 2FA; vendor operator MFA is unchanged."
+  },
+  "limitations": [
+    "This is not a zero-warning advisor result.",
+    "No school or provider contractual sign-off is implied."
+  ]
+}

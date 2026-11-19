@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-10-26T17:40:45.962Z",
+  "buildId": "SYkRQ6SVqpKLLp-8enSpT",
+  "origin": "http://127.0.0.1:3200",
+  "mode": "Headless UI review using explicitly synthetic intercepted parent API fixtures; no real family data or live model/partner actions.",
+  "visual": {
+    "screens": 45,
+    "viewports": [
+      "laptop",
+      "phone",
+      "reflow",
+      "tablet",
+      "wide"
+    ],
+    "overflow": 0,
+    "accessibilityFindings": 0
+  },
+  "interactions": {
+    "states": 36,
+    "overflow": 0,
+    "accessibilityFindings": 0,
+    "longConversationFollowLatest": true,
+    "earlierHistoryReadingPreserved": true
+  },
+  "review": {
+    "normal": "Passed scoped UI flow, privacy, accessibility, performance and regression review.",
+    "ponytail": "Passed separate reuse/deletion review; existing resource/API/date helpers and native controls, no added dependencies.",
+    "rendered": "Inspected desktop/mobile/tablet authorization, status and request layout; assistant answer/queue/cancel/offline; intake, account, recovery and Help. Fixed chat history position and nested Help heading inset; confirmed final render."
+  },
+  "evidence": {
+    "visual": "tmp/parent-verification/visual-results.json",
+    "interactions": "tmp/parent-verification/production-ux/results.json",
+    "visualLog": "tmp/parent-verification/progress-visual-final.log",
+    "interactionLog": "tmp/parent-verification/progress-ux-final.log"
+  },
+  "limitations": [
+    "Synthetic UI checks do not certify live Auth, model answers, program delivery, legal compliance or breach-free operation.",
+    "No additional UI edits are pending."
+  ]
+}

@@ -1,0 +1,116 @@
+import { beforeEach, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), assistant: vi.fn(), description: vi.fn(), delay: vi.fn() }));
+vi.mock("node:timers/promises", () => ({ setTimeout: mocks.delay }));
+vi.mock("./assistant", () => ({ runOneParentAssistantTurn: mocks.assistant }));
+vi.mock("./worker-runtime", () => ({ runOneParentJob: mocks.plan }));
+vi.mock("./food-description-runtime", async importOriginal => ({ ...await importOriginal<typeof import("./food-description-runtime")>(), runOneFoodDescriptionTurn: mocks.description }));
+import { runParentWorkerService } from "./worker-service";
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.plan.mockResolvedValue({ state: "idle" });
+  mocks.assistant.mockResolvedValue({ state: "idle" });
+  mocks.description.mockResolvedValue(false);
+  mocks.delay.mockResolvedValue(undefined);
+});
+const options = () => ({
+  database: { query: vi.fn().mockResolvedValue({ rows: [] }) },
+  apiKey: "synthetic-key",
+  brokerOrigin: "http://127.0.0.1:3310",
+  brokerSecret: "synthetic-private-broker-secret",
+  supabaseOrigin: "https://approved.supabase.co",
+  fetcher: vi.fn().mockResolvedValue(Response.json({ ready: true })),
+});
+it("reports only actual configured services and clears readiness when it stops", async () => {
+  const input = options();
+  await runParentWorkerService(input);
+  expect(input.fetcher).toHaveBeenCalledWith(
+    new URL("http://127.0.0.1:3310/health"),
+    expect.objectContaining({
+      headers: { authorization: `Bearer ${input.brokerSecret}` },
+    }),
+  );
+  expect(input.database.query).toHaveBeenNthCalledWith(
+    1,
+    "select parent_private.parent_record_worker_health($1,$2,$3)",
+    [true, true, true],
+  );
+  expect(mocks.plan).toHaveBeenCalledTimes(1);
+  expect(mocks.assistant).toHaveBeenCalledTimes(1);
+  expect(mocks.plan.mock.invocationCallOrder[0]).toBeLessThan(mocks.assistant.mock.invocationCallOrder[0]);
+  expect(input.database.query).toHaveBeenLastCalledWith(
+    "select parent_private.parent_record_worker_health(false,false,false)",
+  );
+});
+it("claims only bounded continuations with an unavailable broker and performs no model work without a key", async () => {
+  const input = options();
+  input.fetcher.mockRejectedValue(new Error("offline"));
+  await runParentWorkerService(input);
+  expect(input.database.query).toHaveBeenNthCalledWith(
+    1,
+    "select parent_private.parent_record_worker_health($1,$2,$3)",
+    [false, true, true],
+  );
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true }));
+  expect(mocks.assistant).toHaveBeenCalledTimes(1);
+  vi.clearAllMocks();
+  await runParentWorkerService({ ...input, apiKey: undefined });
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, apiKey: undefined }));
+  expect(mocks.assistant).not.toHaveBeenCalled();
+  expect(input.fetcher).not.toHaveBeenCalled();
+});
+it("continues authorized work independently of page polling until stopped", async () => {
+  const input = options(),
+    stop = new AbortController();
+  mocks.plan.mockImplementation(async () => {
+    if (mocks.plan.mock.calls.length === 2) stop.abort();
+    return { state: "idle" };
+  });
+  try {
+    const running = runParentWorkerService({
+      ...input,
+      watch: true,
+      signal: stop.signal,
+    });
+    await running;
+    expect(mocks.plan.mock.calls.length).toBeGreaterThan(1);
+    expect(mocks.delay).toHaveBeenCalledExactlyOnceWith(5000, undefined, { signal: stop.signal });
+    expect(input.database.query).toHaveBeenCalledWith(
+      "select parent_private.parent_record_worker_health($1,$2,$3)",
+      [true, true, true],
+    );
+    expect(input.database.query).toHaveBeenLastCalledWith(
+      "select parent_private.parent_record_worker_health(false,false,false)",
+    );
+  } finally {
+    stop.abort();
+  }
+}, 10000);
+it.each(["missing model key", "unavailable broker"])("checks only exact continuations with a private port and %s", async missing => {
+  const input = options(), protectedSnapSubmission = { execute: vi.fn(), reconcile: vi.fn() };
+  if (missing === "unavailable broker") input.fetcher.mockRejectedValue(new Error("offline"));
+  await runParentWorkerService({ ...input, apiKey: missing === "missing model key" ? undefined : input.apiKey, protectedSnapSubmission });
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, protectedSnapSubmission }));
+  if (missing === "missing model key") { expect(mocks.assistant).not.toHaveBeenCalled(); expect(input.fetcher).not.toHaveBeenCalled(); }
+  expect(protectedSnapSubmission.execute).not.toHaveBeenCalled(); expect(protectedSnapSubmission.reconcile).not.toHaveBeenCalled();
+});
+
+it("runs the fixed private utility preparation port without a model key or planning broker", async () => {
+  const input = options(), protectedUtilityPreparation = { prepare: vi.fn() };
+  await runParentWorkerService({ ...input, apiKey: undefined, protectedUtilityPreparation });
+  expect(mocks.plan).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ continuationOnly: true, protectedUtilityPreparation }));
+  expect(mocks.assistant).not.toHaveBeenCalled(); expect(input.fetcher).not.toHaveBeenCalled(); expect(protectedUtilityPreparation.prepare).not.toHaveBeenCalled();
+});
+
+it("refreshes independent description health during one bounded asynchronous interpretation and clears it at shutdown", async () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-18T15:00:00Z"));
+  const input=options(),stop=new AbortController(); input.fetcher.mockImplementation(async()=>Response.json({ready:true}));
+  mocks.description.mockImplementation(async()=>{await new Promise(resolve=>setTimeout(resolve,60000));stop.abort();return true;});
+  try {
+    const running=runParentWorkerService({...input,watch:true,signal:stop.signal,foodDescriptionProjectId:"proj_synthetic"});
+    await vi.advanceTimersByTimeAsync(59000);
+    const heartbeats=input.database.query.mock.calls.filter(call=>call[0]==="select parent_private.parent_record_food_description_health($1,$2,$3)"&&call[1]?.[0]===true);
+    expect(heartbeats.length).toBeGreaterThanOrEqual(3); expect(heartbeats.every(call=>call[1]?.[2]==="proj_synthetic")).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000); await running;
+    expect(input.database.query).toHaveBeenCalledWith("select parent_private.parent_record_food_description_health(false,$1,$2)",[expect.stringMatching(/^[a-f0-9]{64}$/),"proj_synthetic"]);
+  } finally {stop.abort();vi.useRealTimers();}
+});

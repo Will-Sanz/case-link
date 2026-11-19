@@ -1,0 +1,30 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "startedAt": "2026-10-15T03:24:41.463Z",
+  "syntheticOnly": true,
+  "providerCalls": 0,
+  "resourceMutations": 0,
+  "checks": [
+    "Fixed production operator authenticated",
+    "Production keys available only in memory",
+    "Disposable standard account created",
+    "Audited case-manager provisioning",
+    "Real password login",
+    "Synthetic family created",
+    "Existing current directory source available",
+    "Current resource matched without changing directory",
+    "Saved snapshot excludes the source phone",
+    "Production staged plan starts with the current directory",
+    "Generation lease acquired",
+    "Production saves a generated phase",
+    "Generated phase is readable by its owner",
+    "Database restores exact source contacts from verified references"
+  ],
+  "cleanup": {
+    "family": true,
+    "account": true
+  },
+  "passed": true,
+  "finishedAt": "2026-10-15T03:24:47.054Z",
+  "credentialsPersistedOrPrinted": false
+}

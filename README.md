@@ -1,140 +1,76 @@
-# CaseLink: Family Support Planning and Paperwork
+# CaseLink: parent-owned family support
 
-## Product north star
+CaseLink's October 27 direction is one parent-owned service with maximum useful AI independence. The bounded R1 MVP delivers confirmed food access and one adult career-support booking lifecycle; R2 preserves complete food/utility coverage, then R3 expands across the original catalog. After minimum intake and one informed authorization, AI pursues supported work and follows up, involving a person only for a genuine necessary step. Each released workflow must be complete and polished. Preserve the current engineering; a provider failure changes a route dependency, not the product or stack.
 
-**CaseLink helps school case managers turn family needs into a structured intervention plan and reviewed, ready-to-submit paperwork.** A case manager creates a family profile, records barriers, generates and edits the plan, uploads a blank required form, reviews the AI-prepared draft, and downloads the completed PDF for their required school system.
+**Implementation status:** the parent app is implemented locally on `main` with verified-email accounts, scoped household data, consented documents, durable service jobs, source-backed AI tools, permission controls and current/exact-packet PDF exports. Local automated and production-build UI/UX checks passed; no hosted deployment or real-family processing has been enabled. Live partner transports and final release evidence remain explicit gates in [implementation progress](docs/parent-support-progress.md).
 
-The near-term product is deliberately narrow. It is built for **speed, clarity, and professional judgment**, not for replacing case managers or the school's required system of record. Broader school-operations automation remains a future possibility only after this core workflow proves useful.
+The original CaseLink identity, linked ChatGPT Futures recognition and published policy/contact substance carry into the parent workflow. The owner approved [Option 2, Family Panorama](docs/parent-brand-options.md). [Existing-account support](docs/parent-shared-accounts.md) reuses email/password identities while preserving school records and separate parent sessions. The later capped localhost planning/assistant pilot expires **October 27, 2026, 12:54:27 p.m. EDT**; the new plan does not renew it or activate food reservations/adult bookings. Default preview/test profiles remain synthetic. [Background/assistant evidence](docs/verification/parent-background-assistant.md), [connected-account evidence](docs/verification/parent-connected-accounts.md) and [production readiness](docs/parent-production-readiness.md) record exact scope and remaining gates.
 
-The staged path from the current application to that north star is documented in the [Product Redesign Plan](docs/product-redesign-plan.md).
+## Current product documents
 
-The product definition for CaseLink's core AI experience is documented in the [Adaptive Intervention Planning PRD](docs/intervention-planning-prd.md).
+- [Detailed parent-support MVP PRD](docs/parent-support-mvp-prd.md): scope, end-to-end journeys, agent authority, consent, partner contracts, privacy, states, acceptance criteria and launch gates.
+- [Launch and expansion plan](docs/parent-launch-and-expansion-plan.md): researched first routes, L0–L6 delivery backlog, owner dependencies, conditional MVP estimate and full workflow expansion order.
+- [Phased implementation plan](docs/parent-support-implementation-plan.md): current-app change map, dependencies, complete-coverage milestones, autonomy/quality gates and verification. The earlier narrow-product time estimate is superseded; full-product estimates follow feasibility work.
+- [AGENTS.md](AGENTS.md): project instructions and product north star.
+- [Documentation index and precedence](docs/README.md): current requirements versus legacy runtime instructions and historical evidence.
 
----
+The parent PRD and implementation plan supersede the school case-manager product roadmap. Historical records remain available for understanding existing behavior and preserving operational safeguards.
 
-## The problem
+## Intended MVP experience
 
-Case managers juggle fragile timelines, referrals, documentation, and constant context-switching. Information lives in **notes, spreadsheets, email threads, and separate directories**—easy to lose, hard to hand off, expensive to reconstruct for every family.
+1. Choose an enabled service: R1 food access or adult career support, then food/utility C-01 in R2. Verified urgent official help remains accessible independently.
+2. Complete minimum adaptive intake or provide supported documents with processing consent. Reuse reliable current facts; allow Not sure and manual entry.
+3. Review a short understandable mandate naming permitted programs/recipients, actions, data, limits and preferences. Click **Start getting support** once to authorize the bounded service.
+4. GPT-6.1 Sol chooses useful compatible routes, prepares/completes supported forms, executes permitted submissions/referrals/scheduling, checks status and follows up. In-scope routine work proceeds without another approval click.
+5. Participate only for genuinely necessary facts, new permissions, required personal authentication/signature/attestation, consequential choices or qualified assistance. The agent prepares that step and resumes afterward.
+6. Return to **My support** for meaningful progress, control of the mandate, useful notices/receipts and attributed outcomes. Durable authorized work continues without an open browser.
 
-The cost is not only time. It is **cognitive load**: deciding what matters *this week*, what can wait, and which community resources actually fit the case. When that work is fragmented, plans drift, steps duplicate, and families wait longer for coherent support.
+R1 requires both complete food-access and adult career-support booking workflows. R2 retains immediate food, SNAP new/renewal/pending/routine issues, relevant WIC journeys, electricity/gas/water affordability/arrears/shutoff/disconnection and combined needs; R3 maps the remaining catalog. The staged decision supersedes all-C-01-before-first-family-release, not its eventual coverage or any privacy/quality gate. Internal slices remain tests. Every advertised journey needs a real completion contract; existing partnership alone does not prove current capacity, booking authority or status access. The new R1 routes are planned, not enabled.
 
-CaseLink exists to **reduce that fragmentation** and make the path from intake to action **visible, editable, and accountable**.
+Preparation, referral sending, partner acceptance, agency submission, assistance approval and actual support received are different events. A model response or opened link does not prove any external action succeeded. PDFs support preparation and handoff; completion of a document is not the service outcome.
 
----
+## Existing application and architecture
 
-## The solution
+| Layer | Current foundation | Parent-MVP direction |
+| --- | --- | --- |
+| Application | Next.js App Router, React, TypeScript, Tailwind | Reuse components and create the focused parent journey |
+| Identity/data | Supabase Auth/Postgres with staff roles, password-session checks and family RLS | Reuse existing verified identities in reviewed shared mode; add owned parent households and scoped permissions without inheriting school records |
+| AI | Server-side OpenAI Responses API; local defaults already gpt-6.1-sol; validated text outputs, budgets and privacy checks | Add a judgment/tool-capable coordinator with food/utility playbooks, source-backed facts, standing mandates and permitted execution |
+| Work execution | Persisted stages advanced by browser requests | Add verified durable server execution, recovery, waits and duplicate prevention |
+| Directory | Existing partner resources and import pipeline | Add reviewed program/route contracts, provenance, freshness and explicit unknowns |
+| PDF | @react-pdf/renderer and pdf-lib, reviewed-plan and family-takeaway tests | Reuse for supported forms, useful summaries and exact attempted/submitted packets/receipts |
+| Hosting | Managed Vercel and Supabase school deployment; synthetic staging | Separate parent service environment and synthetic staging; retain legacy isolation |
 
-CaseLink brings **family intake**, **barrier assessment**, **intervention planning**, and **paperwork preparation** into one focused workflow. A case manager captures the approved family context and barriers in structured forms. When enabled, **OpenAI** turns that context into a structured plan and helps map reviewed information into an uploaded blank PDF.
+The existing app has invitation-only staff access, de-identified family planning, edited/dated actions, reviewed PDFs and family takeaways. Its school routes remain alongside the separate parent implementation; school deployment approvals do not enable parent processing. Read the [legacy operations runbook](docs/production-operations-runbook.md) before operating that deployment; those school settings must not be relaxed to make the parent prototype work.
 
-Everything downstream is **editable**. Plans and populated form fields remain drafts until a case manager reviews them. CaseLink produces a completed PDF; it does not submit directly to external school systems in the initial scope.
+The current code is preserved on **codex/case-manager-baseline-2026-10-25**, commit **700bb46**. Main was fast-forwarded to this baseline before the parent documentation changes. The original codex/school-pilot-readiness branch remains intact. These are local Git states; remote publication and hosted deployment are separate operations. Existing untracked design assets and temporary outputs remain outside the preservation commit.
 
----
+## Development and verification
 
-## Key features
+Use a supported, patched Node 24.x release (.nvmrc), matching CI and hosting, and install locked dependencies with `npm ci`. Read AGENTS.md and installed Next.js guides before framework changes. Parent environment examples, isolated background services and test commands are in [the parent runtime guide](docs/parent-support-runtime.md). The older `.env.example` and production runbook describe the preserved school environment.
 
-- **Families** — Create a family support case and reopen it from one simple list.
-- **Barrier intake** — Record the needs and context that should shape the intervention.
-- **Editable intervention plans** — Generate a structured plan, trace it to approved barriers, and edit it before approval.
-- **Paperwork preparation** — Upload a blank required PDF, map approved information into a draft, review uncertain or missing fields, and download the completed form.
-- **Human review** — Plans and forms remain drafts until the case manager approves them.
+Run `npm run parent:verify` for the clean synthetic parent verification path. The focused `parent:test`, `parent:test:db`, `parent:test:pdf` and `parent:test:visual` commands distinguish unit/SQL/PDF/browser evidence. Source tests and a successful build do not certify live provider execution or family readiness.
 
-Supporting resource, timeline, task, and case-assistant capabilities remain subordinate to that narrow V1 workflow. They should expand only when pilot evidence justifies it.
+Legacy commands remain available while school routes are retained:
 
----
+- `npm run verify`: lockfile/resource/secret checks, typecheck, lint, unit/component tests and production build; the pre-push hook runs it.
+- `npm run test:auth-security`: real local Auth lifecycle, password-session and role-access tests.
+- `npm run test:db-security`: real local database authorization, concurrency, rollback and audit tests.
+- `npm run test:restore`: isolated synthetic backup/restore and authorization rehearsal.
+- `npm run test:e2e`: production-build browser account/casework, accessibility and download checks against local Supabase; requires Playwright Chromium and Poppler.
+- `npm run test:pdf`: extracted source-content and rendered PDF placement/monochrome checks; requires Python and Poppler.
+- `npm run test:ai-quality`: existing opt-in AI-quality corpus under its configured test environment; inspect the harness before a provider-backed run.
+- `npm run verify:release -- <exact-commit-SHA>`: required trusted repository checks for that commit; does not deploy or replace hosted release approval.
+- `npm run test:ai-contracts -- --live`: optional provider format checks using small synthetic requests and an operator test-project key; excluded from normal CI.
 
-## How it works (high level)
+The parent plan requires these layers to grow with new behavior: parent/partner/legacy isolation, comprehensible mandates, source/fact freshness, document permissions, in-scope automatic decisions, necessary intervention, durable retries, exact operation policy/evidence, accessible polished states, AI failure/injection evaluations, forms/exports and operational recovery. Measure family/operator effort and freeze autonomy denominators; missing connectors or manual routine completion cannot be hidden as exclusions. Preserve existing safeguards while implementing the new parent-specific boundary.
 
-**Input → processing → output**, end to end:
+Local Supabase uses Docker for isolated synthetic development/test data. Never connect a parent preview to the school's production database. Do not include family content, private partner contacts, credentials, prompts or raw documents in Git, logs or public verification artifacts.
 
-```
-Case manager creates a family and enters approved context and barriers
-        ↓
-AI drafts a structured intervention plan
-        ↓
-Case manager reviews and edits the plan
-        ↓
-Case manager uploads a blank PDF; CaseLink drafts form entries
-        ↓
-Case manager reviews, downloads, and manually submits the PDF to the required system
-```
+## Partner data and historical operations
 
-The loop is intentional: **capture → draft → human edit → prepare form → human review → download**. AI accelerates drafting; **the case manager controls what becomes official**.
+The committed resource CSV is synthetic; the real partner network is maintained separately. Preserve it and verify the complete food/utility program/action coverage in delivery phases. See [data/README.md](data/README.md).
 
----
+The [school-pilot tracker](docs/school-pilot-fix-tracker.md), [school operations runbook](docs/production-operations-runbook.md), [release handoff](docs/pilot-readiness-handoff.md) and docs/verification preserve historical findings and the existing deployment's controls. Their school approvals and passing tests do not establish parent-product readiness.
 
-## Technical architecture
-
-| Layer | Choice | Why it’s there |
-|--------|--------|----------------|
-| **Frontend** | Next.js (App Router), React, TypeScript, Tailwind | Server Components where they help; cohesive UI; fast iteration without sacrificing type safety. |
-| **Application server** | Next.js server actions, route handlers, Node **proxy** for session refresh | Keeps auth/session handling aligned with the current Supabase + Next stack; avoids fragile Edge + cookie patterns for this product. |
-| **Database** | Supabase **Postgres** | Relational model fits families, plans, steps, referrals, and audit-style activity. |
-| **Authorization** | **Row Level Security (RLS)** | Every data path uses the **end-user JWT**; policies gate rows (e.g. via `can_access_family`: creator, assignee, or admin). No “trust the client” for tenancy. |
-| **Auth** | Supabase Auth | Hosted identity, email flows, and sessions integrated with the same project as the database. |
-| **AI** | OpenAI API (**server-only** key) | Structured completions for plans and assistance; models restricted by an **allowlist** at startup. |
-| **Hosting** | Vercel (typical) | Fits the Next.js deployment model; environment separation is an operator concern, not assumed in product code paths. |
-
-**Data flow (simplified):** The browser holds a **Supabase anon key** and session; queries and mutations go through PostgREST **as the signed-in user**, so RLS is always in play. Privileged keys (e.g. service role) are **not** part of the web client—they exist only for trusted offline operations like bulk import scripts, not for interactive app traffic.
-
-**Validation:** User input is checked with **Zod** on the server; AI-facing actions use **dedicated schemas** so prompts and payloads stay bounded.
-
----
-
-## AI integration
-
-OpenAI is used **where structured language generation clearly helps**:
-
-- **Plan phases** — Context includes barriers, case notes, and **matched resources** (so suggestions can name real programs). Responses are expected as **JSON** matching strict shapes, then **validated** (with repair/retry paths where implemented).
-- **Step-level refinement** — Adjust one step without throwing away the rest of the plan.
-- **Case assistant & step helpers** — Short-form assistance grounded in family-scoped data.
-
-Design principles:
-
-- **Structured prompts and schemas** — Reduce rambling outputs and make downstream UI predictable.
-- **Human-in-the-loop** — Outputs are **editable**; the product assumes review before reliance, especially for high-stakes decisions.
-- **Support, not substitution** — CaseLink is a **tool for case managers**, not an autonomous agent making decisions for families.
-
-Operational guardrails include **shared atomic per-user and deployment AI budgets**, **one-owner generation claims**, **payload and output token caps**, and **generic user-facing errors in production** with privacy-filtered diagnostics in server logs.
-
----
-
-## Security & privacy approach
-
-- **Secrets stay server-side** — Only public Supabase URL + anon key belong in the browser; OpenAI and service-role credentials never ship to the client.
-- **RLS and narrow RPCs** — Family access, value constraints, immutable ownership, cross-family integrity, and consequential transactions are enforced in Postgres, not only in UI checks.
-- **Validated inputs** — Server actions, AI entry points, and critical database boundaries reject malformed, identifying, or oversized input.
-- **Throttled AI** — Database-backed minute, hour, and deployment-day budgets coordinate across application instances and fail closed in production.
-- **Bounded paperwork** — Only blank, unlocked, fillable PDFs are accepted; the file remains in the active browser tab, while only bounded field metadata may be sent for mapping.
-- **No ads, no third-party analytics baked into the product narrative** — The app is built for case work, not ad profiles.
-- **Sensitive data** — The V1 pilot permits de-identified case context only and requires one dedicated environment per school or district. Operators must complete the hosted controls and exercises in the production runbook.
-
-HTTP security headers (e.g. frame options, content-type options, referrer and permissions policies) are set at the framework layer to reduce common browser-level risks.
-
----
-
-## Design philosophy
-
-The UI targets **usable density**: clear hierarchy, minimal noise, and flows that match how teams actually work—in the spirit of **modern productivity tools** (clean dashboards, structured documents) rather than cluttered “enterprise” forms. The goal is to **get to the next right action** with less hunting and less retyping.
-
----
-
-## Limitations & future work
-
-- **Account lifecycle** — Accounts are invitation-only; access, offboarding, archive retention, and deletion are operator-controlled.
-- **Dependence on third-party AI** — When OpenAI is enabled, content generation relies on vendor availability, policy, and pricing; the stack includes **rules-based** paths where AI is off or fails.
-- **Paperwork profile** — V1 supports blank standard AcroForm PDFs only; scanned, completed, signed, encrypted, XFA, attached, or active-content documents are rejected.
-- **Resource matching** — Deliberately **not** embedding-based; weights and rules live in code for transparency and predictability, at the cost of semantic “nearest neighbor” search. The repo ships a **small synthetic CSV** for demos; full partner exports stay **local** (see `data/README.md`).
-- **Early-stage product** — Scope is described honestly; the codebase is structured for review and iteration, not for claiming completeness.
-
----
-
-## Legal
-
-- **Privacy Policy:** `/privacy`
-- **Terms of Service:** `/terms`
-
-## Production readiness
-
-- [Production hardening audit](docs/production-hardening-audit.md)
-- [Remediation and finding closure](docs/production-hardening-remediation.md)
-- [Production operations runbook](docs/production-operations-runbook.md)
+Before any real parent pilot, verify ownership/acting authority, mandate/consent, data processing, permitted execution, retention/deletion, messages, restore and operating coverage. A broader family-ready release also requires complete journey coverage, visual/accessibility/language quality and measured autonomy/outcomes. Existing /privacy and /terms pages must change alongside actual parent behavior.

@@ -1,0 +1,60 @@
+{
+  "id": "pa-wic-preapplication-2026-11-13",
+  "version": "2026-11-13.v1",
+  "programId": "wic-pa",
+  "sourceUrl": "https://pawic.com/OnlineApplication.aspx",
+  "officialGuidanceUrl": "https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist",
+  "sourceCheckedAt": "2026-11-13T18:57:45.283Z",
+  "verifiedUntil": "2026-11-20T18:57:45.283Z",
+  "sourceSha256": "c6daa011c75c4b21838cea17a579d1097c09b00f0584e668eede2a343dd0b774",
+  "sourceByteLength": 76934,
+  "scope": "Public HTML-field inventory shared by the fictional formatter and separately gated private WIC preparation. This inventory grants no collection approval, provider-validated submission readiness or transport authority.",
+  "fields": {
+    "contactFirstName": { "id": "txtFirstName", "maxLength": 50 },
+    "contactLastName": { "id": "txtLastName", "maxLength": 50 },
+    "street": { "id": "txtStreet", "maxLength": 100 },
+    "city": { "id": "txtCity", "maxLength": 50 },
+    "zip": { "id": "txtZip", "maxLength": 6, "mask": "99999" },
+    "county": { "id": "ddlCounty", "value": "51", "label": "Philadelphia" },
+    "email": { "id": "txtEmail", "maxLength": 100 },
+    "phone": { "id": "txtPhone", "maxLength": 13, "mask": "999-999-9999" },
+    "contactBirthDate": { "id": "txtContactDOB", "maxLength": 13 },
+    "motherFirstName": { "id": "txtMomFirstName", "maxLength": 50 },
+    "motherLastName": { "id": "txtMomLastName", "maxLength": 50 },
+    "motherBirthDate": { "id": "txtMomDOB", "maxLength": 11 },
+    "expectedDeliveryDate": { "id": "txtDeliveryDate", "maxLength": 11 },
+    "childFirstName": { "id": "txtChildFirstName", "maxLength": 50 },
+    "childLastName": { "id": "txtChildLastName", "maxLength": 50 },
+    "childBirthDate": { "id": "txtChildBirthDate", "maxLength": 11 }
+  },
+  "applicationTypes": {
+    "new": { "id": "content_content_rblPreapplicationType_0", "value": "1", "label": "New" },
+    "reapplying": { "id": "content_content_rblPreapplicationType_1", "value": "2", "label": "Re-Applying" },
+    "transfer": { "id": "content_content_rblPreapplicationType_2", "value": "3", "label": "Transfer from Another County/State" }
+  },
+  "beneficiaryControls": { "mother": "chkMom", "children": "chkKid" },
+  "appointmentPreferences": {
+    "morning": { "id": "rbApptAM", "value": "AM" },
+    "afternoon": { "id": "rbApptPM", "value": "PM" }
+  },
+  "motherStatuses": {
+    "pregnant": { "id": "content_content_rblMotherStatus_0", "value": "1", "label": "Pregnant" },
+    "postpartum": { "id": "content_content_rblMotherStatus_1", "value": "2", "label": "Postpartum (delivered a baby in the last 6 months)" },
+    "breastfeeding": { "id": "content_content_rblMotherStatus_2", "value": "3", "label": "Breastfeeding an infant under 12 months of age" }
+  },
+  "acknowledgment": {
+    "id": "chkAcknowledgement",
+    "text": "I understand that WIC eligibility is determined at the time of my appointment, and completing this pre-application does not guarantee enrollment."
+  },
+  "displayedSuccessText": "Your application was successfully submitted.\nSomeone will reach out to you to schedule an appointment and verify your information.",
+  "omittedFields": ["motherRace", "childRace", "motherEthnicity", "childEthnicity", "motherMedicalAssistance", "childMedicalAssistance"],
+  "semanticLimits": [
+    "The seven-day expiry follows the PRD's weekly source-review ceiling for this offline contract; it does not establish provider permission or runtime collection authority.",
+    "Required-field icons and conditional UI establish expected preparation fields; backend requirements and acceptance of omitted fields have not been tested.",
+    "The public success-handler text describes later contact; no actual response, stable receipt, booked appointment or enrollment was observed.",
+    "The parent's personal acknowledgment remains unresolved; preparation does not create consent or clinical eligibility.",
+    "Do not copy the provider script's invented Child/contact-surname defaults or default New selection as factual family answers.",
+    "No income thresholds, clinical assessment, identifiers, credentials, signatures or optional demographic/Medical Assistance fields are supported.",
+    "The thirty-child rehearsal bound is a local resource limit, not a verified provider limit."
+  ]
+}

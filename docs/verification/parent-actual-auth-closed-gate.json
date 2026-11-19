@@ -1,0 +1,8 @@
+{
+  "checkedAt": "2026-10-26T04:20:10.677Z",
+  "mode": "actual-local-auth-closed-gate",
+  "processingEnabled": false,
+  "enrollmentDenied": true,
+  "denialMatchesProcessingPolicy": true,
+  "identityCreated": false
+}

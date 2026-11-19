@@ -1,0 +1,196 @@
+{
+  "reviewer": "family_needs",
+  "sourceDirectory": "/Users/willsanz/homelessness-project/tmp/ai-evaluation/2026-10-15T19-41-58-842Z-pilot-all-task-routing-task-effort",
+  "requestedSourceRevision": "187a93",
+  "reviewType": "Final selected-model content review against the same ten synthetic source cases and rubric used in the blinded pack",
+  "reviewedCases": 10,
+  "reviewedOutputs": 20,
+  "model": "gpt-6.1-sol",
+  "criticalDefectsFound": 0,
+  "conclusion": "No critical defect found in the final ten generation and ten assistant outputs. The earlier baseline consent/contact/safeguarding problems do not recur in this sample. Minor plan usefulness issues remain: combine duplicative family conversations, avoid unnecessary record-update tasks, and confirm food urgency before a later scheduled options review.",
+  "limitations": [
+    "One sample per case/task, not practitioner validation or evidence of real-world outcomes.",
+    "The service-mismatch fact is present in both summary and directory evidence; correct rejection does not isolate the directory enhancement's effect.",
+    "All dates are proposed and need case-manager confirmation; no browser or database behavior was assessed in this content review.",
+    "No source edits or new paid calls were performed."
+  ],
+  "cases": [
+    {
+      "caseId": "pilot-pending-consent",
+      "generation": {
+        "verdict": "Useful with small edits",
+        "criticalDefects": [],
+        "notes": [
+          "Permission and family review precede application follow-up; existing application is not restarted. Family after-work contact and provider hours are separated.",
+          "Five actions are manageable but the two October15 family conversations should normally be combined.",
+          "Twice-weekly help is described as two available days; prefer confirming trips/occasions instead of assuming separate days."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Preserves 'awaiting response' as known status, asks about urgency and remaining gaps, and distinguishes unknown follow-up from absent outside activity.",
+          "Minor wording: asks which two days rather than which trips/occasions."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-newer-choice",
+      "generation": {
+        "verdict": "Useful with small edits",
+        "criticalDefects": [],
+        "notes": [
+          "Explicit private, in-person school conversations; no telephone even to confirm the meeting date; referral decision deferred.",
+          "Updating contact instructions duplicates the recorded latest meeting unless an active preference field actually needs updating."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Explains the older telephone preference is superseded and does not treat draft/referral discussion as consent."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-private-outreach",
+      "generation": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "One private family discussion; preserves the unconditional no-voicemail, no-home-visit and no-disclosing-messages restrictions separately from provider approval."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Usable short generic email with subject/body; explicit private review and provider-contact permission before use; no family narrative or claimed sending."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-provider-hours",
+      "generation": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Performs the requested general non-identifying intake inquiry, then returns findings to the family after work.",
+          "No missed shift or after-work provider opening is assumed; eligibility/requirements remain verification questions."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Practical provider call opening and questions; family timing and provider availability are explicitly separate; consent to referral is sought after family review."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-immediate-safety",
+      "generation": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Immediate private staff assessment and approved safeguarding action both dated today; no invented protocol or delay for ordinary plan review."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Requires private responsible-human assessment now; medium urgency label does not delay it; no blanket family-review gate before necessary safeguarding action."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-language-choice",
+      "generation": {
+        "verdict": "Useful with small edits",
+        "criticalDefects": [],
+        "notes": [
+          "Unknown preferred language is confirmed; qualified interpreter and short spoken explanation are explicit; child interpretation is prohibited.",
+          "Check how soon food is needed in the first discussion. The plan schedules explaining options on October19 without explicitly checking whether access must happen sooner. No immediate food emergency is asserted in the facts."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Does ask food urgency, preserves spoken interpretation and child restriction, and does not invent a language or service."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-service-mismatch",
+      "generation": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Excludes the adult-only program, preserves work schedule, verifies child-serving alternatives without inventing providers, and seeks choice before family-specific contact."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Directly rejects the mismatch and identifies practical childcare unknowns and the work-schedule constraint."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-unknown-history",
+      "generation": {
+        "verdict": "Useful with small edits",
+        "criticalDefects": [],
+        "notes": [
+          "Family-reported existing work comes before new applications and permission precedes provider contact.",
+          "Recording and agreeing next steps may be combined with the first conversation if no reconciliation is needed; 'what the family reports' is more neutral than 'believes'."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Missing records remain unknown outside activity; asks about applications, status and existing follow-up without inventing history."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-minimal-intake",
+      "generation": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "One compact goal/two actions; asks actual trip needs and what already works before proposing support. No speculative provider or document packet."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Family priority, strengths, safe contact and existing support remain central; acknowledges unknown time-sensitive trips and incomplete history."
+        ]
+      }
+    },
+    {
+      "caseId": "pilot-completed-work",
+      "generation": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "One agreed follow-up conversation; does not repeat the completed checklist or invent when it was completed."
+        ]
+      },
+      "assistant": {
+        "verdict": "Ready for case-manager review",
+        "criticalDefects": [],
+        "notes": [
+          "Clearly separates completion from target/effective and update dates; confirms follow-up timing without reopening completed work."
+        ]
+      }
+    }
+  ]
+}

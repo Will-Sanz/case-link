@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
-import { createPortal } from "react-dom";
+import { useLayoutEffect, useId, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
@@ -21,7 +20,7 @@ type ConfirmDialogProps = {
 };
 
 /**
- * Accessible in-app confirmation (replaces `window.confirm`). Renders via portal to `document.body`.
+ * Accessible in-app confirmation (replaces `window.confirm`) using the native modal top layer.
  */
 export function ConfirmDialog({
   open,
@@ -39,7 +38,7 @@ export function ConfirmDialog({
   const descId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -49,9 +48,8 @@ export function ConfirmDialog({
     };
   }, [open]);
 
-  if (!open || typeof document === "undefined") return null;
-
-  return createPortal(
+  // Keep the closed dialog mounted so native close() can restore its opener's focus.
+  return (
     <dialog
       ref={dialogRef}
       role="alertdialog"
@@ -83,7 +81,7 @@ export function ConfirmDialog({
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" disabled={pending} onClick={onClose} autoFocus>
+          <Button type="button" variant="secondary" disabled={pending} onClick={onClose}>
             {cancelLabel}
           </Button>
           <Button
@@ -99,7 +97,6 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </dialog>,
-    document.body,
+    </dialog>
   );
 }

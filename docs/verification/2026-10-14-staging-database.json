@@ -1,0 +1,338 @@
+{
+  "checkedAt": "2026-10-14T21:05:10.985173+00:00",
+  "project": "umnbyupudhunyccqhyrp",
+  "name": "caselink-staging",
+  "organization": "esnufmvikgpxzgoosqnw",
+  "region": "us-east-1",
+  "plan": "Free",
+  "createdByUser": true,
+  "syntheticOnly": true,
+  "counts": {
+    "authUsers": 0,
+    "appUsers": 0,
+    "families": 0,
+    "resources": 0,
+    "publicTables": 22,
+    "privateTables": 3
+  },
+  "migrations": [
+    {
+      "file": "20260321000000_init_schema.sql",
+      "version": "20260321000000",
+      "name": "init_schema",
+      "sha256": "ff09c5785197080a2957114da7c08d21f89f5c4f0d57e40d4ed91c1ae8280ee6",
+      "executionVersion": "20261014165811"
+    },
+    {
+      "file": "20260321120000_family_rls.sql",
+      "version": "20260321120000",
+      "name": "family_rls",
+      "sha256": "073a166d244ab7ffabce5a80525e8a9893f834f794a6e148a78195a175218475",
+      "executionVersion": "20261014165821"
+    },
+    {
+      "file": "20260321140000_resource_matches_rls.sql",
+      "version": "20260321140000",
+      "name": "resource_matches_rls",
+      "sha256": "2d364e03da6e31962f87a5daafe966e3ff702dfbf15c672d9d919265cbeb669f",
+      "executionVersion": "20261014165829"
+    },
+    {
+      "file": "20260321160000_family_intake_rpc.sql",
+      "version": "20260321160000",
+      "name": "family_intake_rpc",
+      "sha256": "f9e999c6320287c4a675f9ceca816c8caa92b5d4c8b158e5040530cacc641a33",
+      "executionVersion": "20261014165837"
+    },
+    {
+      "file": "20260321170000_plans_rls.sql",
+      "version": "20260321170000",
+      "name": "plans_rls",
+      "sha256": "2ba2e812c50fa67552ba170ba269176de2bd2a0d0a967ce8e89af6d5aa412c19",
+      "executionVersion": "20261014165842"
+    },
+    {
+      "file": "20260321180000_plan_steps_details.sql",
+      "version": "20260321180000",
+      "name": "plan_steps_details",
+      "sha256": "371f98810d4296c291f2ef3d6f31249973206fb3482f67a68bc55d2702aa4c98",
+      "executionVersion": "20261014165847"
+    },
+    {
+      "file": "20260321200000_plan_steps_progression_and_workflow.sql",
+      "version": "20260321200000",
+      "name": "plan_steps_progression_and_workflow",
+      "sha256": "9783c1b47b7055e0c3d06b92f8fc35e4f11721966eb5105d40e7b1f1af900a67",
+      "executionVersion": "20261014165853"
+    },
+    {
+      "file": "20260321210000_workflow_execution.sql",
+      "version": "20260321210000",
+      "name": "workflow_execution",
+      "sha256": "420522a7a94ce0480fc95adbb2d076bd3acb41a52d37064808bd6216c4e2bebc",
+      "executionVersion": "20261014165857"
+    },
+    {
+      "file": "20260322100000_checklist_and_refinement.sql",
+      "version": "20260322100000",
+      "name": "checklist_and_refinement",
+      "sha256": "3311e7e0553f8075dfe93baee5cef118978f99617e50ba26685cd8af65c365a5",
+      "executionVersion": "20261014165901"
+    },
+    {
+      "file": "20260323100000_plan_step_action_items.sql",
+      "version": "20260323100000",
+      "name": "plan_step_action_items",
+      "sha256": "e0eb2cd67b6ea1792471bc39316e0cbc31a11673b21f01a458b67c0d82ee9625",
+      "executionVersion": "20261014165907"
+    },
+    {
+      "file": "20260324100000_plan_step_ai_helper.sql",
+      "version": "20260324100000",
+      "name": "plan_step_ai_helper",
+      "sha256": "2111774ec934eea9f09436d428cf79ffea7cd400091815878eac2c67ea4868d8",
+      "executionVersion": "20261014165938"
+    },
+    {
+      "file": "20260325200000_app_users_profile.sql",
+      "version": "20260325200000",
+      "name": "app_users_profile",
+      "sha256": "126496388257e905ccf8af3e4fb88818b4313d578826bcecae5a5b59e5da9038",
+      "executionVersion": "20261014165952"
+    },
+    {
+      "file": "20260326120000_barrier_plan_records.sql",
+      "version": "20260326120000",
+      "name": "barrier_plan_records",
+      "sha256": "e71107fb78f8e031540b405c6678d5e3ccd31756781c784eedb290fc2c8d96aa",
+      "executionVersion": "20261014171037"
+    },
+    {
+      "file": "20260327120000_plans_client_display.sql",
+      "version": "20260327120000",
+      "name": "plans_client_display",
+      "sha256": "27038480384445dbfb922575ee1881b675d820b255e94cd6ce82ed385ed9ecf7",
+      "executionVersion": "20261014171042"
+    },
+    {
+      "file": "20260328120000_plans_generation_state.sql",
+      "version": "20260328120000",
+      "name": "plans_generation_state",
+      "sha256": "0548aa401985d9f5a2beb4f15be907fd30d5d3bbb1c578caa211204ec90c1bac",
+      "executionVersion": "20261014171047"
+    },
+    {
+      "file": "20260329120000_families_archived_at.sql",
+      "version": "20260329120000",
+      "name": "families_archived_at",
+      "sha256": "c78ab10c3bd17fa64a0b23332997fea9adcbccfa751115716272eda56a41bd72",
+      "executionVersion": "20261014171050"
+    },
+    {
+      "file": "20260405120000_referrals_tasks_rls.sql",
+      "version": "20260405120000",
+      "name": "referrals_tasks_rls",
+      "sha256": "22e53f4f422ca16e5a4a35b69157e9e3bcb3b523e8add9125d7cf09fbe3e1b6a",
+      "executionVersion": "20261014171057"
+    },
+    {
+      "file": "20260406120000_rls_policy_hardening.sql",
+      "version": "20260406120000",
+      "name": "rls_policy_hardening",
+      "sha256": "eb81f8e3aaa0802f34dd7e99f45738357fd057a4f12ce8bd18564964c59f25d6",
+      "executionVersion": "20261014171522"
+    },
+    {
+      "file": "20260802120000_demo_requests.sql",
+      "version": "20260802120000",
+      "name": "demo_requests",
+      "sha256": "46c6acc080f5be68907345456d51917b898d1d82dd4381199347e1251a012f69",
+      "executionVersion": "20261014171528"
+    },
+    {
+      "file": "20260802143000_replace_family_barriers_rpc.sql",
+      "version": "20260802143000",
+      "name": "replace_family_barriers_rpc",
+      "sha256": "09eae120d1956f23943b6ea04a8f5b0ab7203e9585da8772f064326922c4d779",
+      "executionVersion": "20261014171708"
+    },
+    {
+      "file": "20260804123000_case_progress_updates.sql",
+      "version": "20260804123000",
+      "name": "case_progress_updates",
+      "sha256": "65018df35a314fb8d20b0dd5106af5bec34b1384b71ce17dfd7d2a935b782683",
+      "executionVersion": "20261014171733"
+    },
+    {
+      "file": "20260804173443_production_hardening.sql",
+      "version": "20260804173443",
+      "name": "production_hardening",
+      "sha256": "e5322274892b437d4f0c54145b8c8f1f14eb61c295061adde17646465193538e",
+      "executionVersion": "20261014171747"
+    },
+    {
+      "file": "20261013203641_save_family_planning_context.sql",
+      "version": "20261013203641",
+      "name": "save_family_planning_context",
+      "sha256": "c94bb72337940205cf3aaf966b41e0695b64cdec3049d51cb5020d597315075d",
+      "executionVersion": "20261014171754"
+    },
+    {
+      "file": "20261013204624_enforce_active_accounts.sql",
+      "version": "20261013204624",
+      "name": "enforce_active_accounts",
+      "sha256": "80eadaca6ff6693520eab858af683cd51983de348d8e57fba6e444e3cc20d50e",
+      "executionVersion": "20261014173147"
+    },
+    {
+      "file": "20261013205809_require_live_sessions.sql",
+      "version": "20261013205809",
+      "name": "require_live_sessions",
+      "sha256": "ff9efb30c841ea1374fd3334e7a47342bf3c7c6ace7da97aebcf163f6bab5fc9",
+      "executionVersion": "20261014173220"
+    },
+    {
+      "file": "20261013211053_require_initial_password.sql",
+      "version": "20261013211053",
+      "name": "require_initial_password",
+      "sha256": "e838c4560b64fbcfa5d2a875e26509a911b73fa821713fb0e0da4c4840a3d95e",
+      "executionVersion": "20261014173224"
+    },
+    {
+      "file": "20261013220007_enforce_mfa_access_and_recovery.sql",
+      "version": "20261013220007",
+      "name": "enforce_mfa_access_and_recovery",
+      "sha256": "69e0b807a9ebd155aafa05ce30d7ab01943351fe6468d4b878fbdd3b718834ce",
+      "executionVersion": "20261014173631"
+    },
+    {
+      "file": "20261013222316_bind_plan_review_to_snapshot.sql",
+      "version": "20261013222316",
+      "name": "bind_plan_review_to_snapshot",
+      "sha256": "99af470f61bdcc41b9ddfd2e9f4b417af7f5141cf93557316a9f322d91ecbb57",
+      "executionVersion": "20261014173647"
+    },
+    {
+      "file": "20261013224711_atomic_plan_edits_and_progress.sql",
+      "version": "20261013224711",
+      "name": "atomic_plan_edits_and_progress",
+      "sha256": "a6368bd8dbdae288aa677ca7f24a0148145a8953c7c835e7603cea5660c0db85",
+      "executionVersion": "20261014173654"
+    },
+    {
+      "file": "20261013235624_generation_resume_leases.sql",
+      "version": "20261013235624",
+      "name": "generation_resume_leases",
+      "sha256": "3ecce61a6a11d6704c1b807aa440271ae0926e190ae7614ffc3df7b44e6d0e7b",
+      "executionVersion": "20261014173732"
+    },
+    {
+      "file": "20261014000822_atomic_ai_journey_budgets.sql",
+      "version": "20261014000822",
+      "name": "atomic_ai_journey_budgets",
+      "sha256": "4f14a9b2455e3a9b7226d4ae84113db574b4bad05efc322ed3cf759fe5f07eff",
+      "executionVersion": "20261014173745"
+    },
+    {
+      "file": "20261014002118_bounded_family_next_work.sql",
+      "version": "20261014002118",
+      "name": "bounded_family_next_work",
+      "sha256": "602f00d7a7439e989ae07c08bf503797f7119cdd92d632c85954c26c07cbf9aa",
+      "executionVersion": "20261014173807"
+    },
+    {
+      "file": "20261014002544_reuse_authorized_parent_reads.sql",
+      "version": "20261014002544",
+      "name": "reuse_authorized_parent_reads",
+      "sha256": "40ffd105b83ced1003c948272ec9d37c1edcb132d3c4c041d08e84c11fd73b13",
+      "executionVersion": "20261014173816"
+    },
+    {
+      "file": "20261014003444_confirm_school_calendar_dates.sql",
+      "version": "20261014003444",
+      "name": "confirm_school_calendar_dates",
+      "sha256": "537c404484b5749ed688f32d00a776d630734303363aaa79621e97bb2eadc3e8",
+      "executionVersion": "20261014173933"
+    },
+    {
+      "file": "20261014005053_resource_directory_availability.sql",
+      "version": "20261014005053",
+      "name": "resource_directory_availability",
+      "sha256": "f526016711364827a873ed1f2035a050ca578303266e2f1bd679ce24ccea8fc2",
+      "executionVersion": "20261014173944"
+    },
+    {
+      "file": "20261014010429_identifier_variants.sql",
+      "version": "20261014010429",
+      "name": "identifier_variants",
+      "sha256": "a70089a0104ef78264c29c0fff32c8874089928588ceb3e32ac74a7e126c0caa",
+      "executionVersion": "20261014174029"
+    },
+    {
+      "file": "20261014012912_contact_provenance.sql",
+      "version": "20261014012912",
+      "name": "contact_provenance",
+      "sha256": "d7f29ced0c2d9d78e3b511ee3c279739198df6cb0eda9ddbffe082257e65d7e8",
+      "executionVersion": "20261014174037"
+    },
+    {
+      "file": "20261014174244_restrict_platform_rls_trigger.sql",
+      "version": "20261014174244",
+      "name": "restrict_platform_rls_trigger",
+      "sha256": "100080081d283918aecd31735b64bc14bc56f3a735db3bf164baa14a96e46bf5",
+      "executionVersion": "20261014174325"
+    },
+    {
+      "file": "20261014203800_explicit_application_privileges.sql",
+      "version": "20261014203800",
+      "name": "explicit_application_privileges",
+      "sha256": "0cfb5d2cfa9e13b7415ec844ff85c427c6dbf3849a5eb5847aa5e1997ac81793",
+      "executionVersion": "20261014204815"
+    }
+  ],
+  "historyRepair": "Successful MCP execution timestamps were reconciled to repository versions only on this new empty staging project. The latest migration was also matched by the exact stored SQL SHA-256 before repair. All 39 versions are recorded; SQL statements were preserved. No legacy-project history was repaired.",
+  "checks": {
+    "publicTablesWithoutRls": 0,
+    "anonymousSecurityDefinerFunctions": 0,
+    "ordinaryRolesWithPrivateTableAccess": [],
+    "selfInsert": false,
+    "roleUpdate": false,
+    "platformRlsTriggerEnabled": true,
+    "platformRlsTriggerPublicExecution": false,
+    "syntheticSqlRoleSmoke": "passed after migration 39",
+    "smokeCovers": [
+      "owned-case access",
+      "unrelated-case denial",
+      "self-promotion denial",
+      "profile editing",
+      "offboarded-session denial",
+      "revoked-session denial",
+      "rollback leaves no accounts or cases"
+    ],
+    "maintenanceGrants": 0,
+    "anonymousCallableFunctions": 0,
+    "serviceArchiveSelect": false,
+    "futurePostgresObjectsRequireExplicitApplicationGrants": true,
+    "smokeTransientFailure": "First connector request returned Invalid or expired requestState; retry passed and reported zero remaining Auth users/families."
+  },
+  "advisorSummary": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 2,
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "count": 30,
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+    }
+  ],
+  "limits": [
+    "SQL role simulation, not real hosted Auth tokens or browser journey",
+    "Private tables rely on revoked role grants and non-exposed schema; RLS is not enabled on those three tables",
+    "Intended authenticated RPCs still produce 30 advisor warnings; authorization regression evidence and hosted full role matrix remain relevant",
+    "No real hosted Auth tokens, invitation delivery, AI workflow, production upgrade or production application deployment; separate environment/Auth evidence is recorded in adjacent files."
+  ]
+}

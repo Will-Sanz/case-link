@@ -1,4 +1,6 @@
+"use client";
 import type { ReactNode } from "react";
+import { ParentLanguageSelector, useParentLocale } from "@/features/parent/parent-locale";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
@@ -18,16 +20,18 @@ export function AuthShell({
   /** Privacy / Terms links below the card (auth flows). */
   showLegalLinks?: boolean;
 }) {
+  const { t, provided } = useParentLocale();
   return (
-    <div className={`${styles.shell} public-auth flex min-h-svh flex-col items-center justify-center px-4 py-16`}>
+    <main className={`${styles.shell} public-auth flex min-h-svh flex-col items-center justify-center px-4 py-16`}>
       <div className={`${styles.content} w-full max-w-[400px]`}>
         <div className="mb-7 text-center">
           <CaseLinkWordmark className="justify-center" />
           <h1 className="sr-only">{title}</h1>
           <p className="mt-3 text-sm leading-relaxed text-[var(--public-ink-muted)]">
-            {subtitle}
+            {t(subtitle)}
           </p>
         </div>
+        {provided && <ParentLanguageSelector />}
         <Card className={`${styles.card} p-6`}>
           {children}
         </Card>
@@ -37,7 +41,7 @@ export function AuthShell({
               href="/privacy"
               className="font-medium underline-offset-2 hover:underline"
             >
-              Privacy Policy
+              {t("Privacy Policy")}
             </Link>
             <span className="mx-1.5 text-[var(--public-rule-divider)]" aria-hidden>
               ·
@@ -46,7 +50,7 @@ export function AuthShell({
               href="/terms"
               className="font-medium underline-offset-2 hover:underline"
             >
-              Terms of Service
+              {t("Terms of Service")}
             </Link>
           </p>
         ) : null}
@@ -54,6 +58,6 @@ export function AuthShell({
           <div className="mt-6 text-center text-sm text-[var(--public-ink-muted)]">{footer}</div>
         ) : null}
       </div>
-    </div>
+    </main>
   );
 }

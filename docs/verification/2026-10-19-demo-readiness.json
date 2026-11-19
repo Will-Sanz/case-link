@@ -1,0 +1,2838 @@
+{
+  "date": "2026-10-19",
+  "applicationSource": "44f10a033a2e2c5b450181586cb3994ec5b94f05",
+  "publicOrigin": "https://www.thecaselink.com",
+  "scope": "User-requested background demo-readiness fix and full retest, plus administrator email or private-link invitations.",
+  "changes": [
+    "Disable viewport/hover prefetch for workspace navigation, family cards, PDF links and matched resource details; protected reads occur on deliberate navigation.",
+    "Share the verified Supabase client and active password-session check within one server render, without sharing identities or authorization across requests.",
+    "Administrator Settings invitations use the signed-in caller and an independently authorized Supabase Edge Function; privileged credentials remain outside Next.js.",
+    "Pending case-manager invitations support native email delivery or a canonical one-use fragment link. Existing confirmed accounts never expose recovery links; inactive accounts and administrator roles are guarded.",
+    "Use the school timezone and fixed locale for saved case timestamps so server and browser hydration agree.",
+    "Remove trailing PDF step padding that could create an empty continuation page; retain every source field and print margin.",
+    "Family profile loads only its editable fields and related counts in one RLS-protected request, rather than seven full-workspace requests.",
+    "Profile saves revalidate the actual affected workspace paths without a redundant client refresh. Session failures are recoverable and lost responses preserve entered fields.",
+    "All detailed workspace reads embed scoped family relations and bounded histories in one request, followed by the unchanged plan snapshot; the redundant intake refresh is removed."
+  ],
+  "localChecks": {
+    "unitTests": 818,
+    "testFiles": 96,
+    "browserScenarios": 15,
+    "browserPassed": true,
+    "typecheck": true,
+    "lint": true,
+    "productionBuild": true,
+    "databaseAuthorizationConcurrencyRollbackAndAudit": true,
+    "authPasswordRecoveryOffboardingRetainedTokens": true,
+    "syntheticRestore": true,
+    "legacyContainmentAndUpgrade": true,
+    "pdfFixtures": 10,
+    "pdfPages": 28,
+    "secretScan": true,
+    "lockfileAndResourceChecks": true,
+    "liveAiFormatChecks": 30,
+    "productionLeanProfileQueryAcceptedWithoutSelectingRealFamily": true,
+    "productionEmbeddedQueryAcceptedWithOperator": false,
+    "operatorEmbeddedQueryDenialExpected": true
+  },
+  "stagingInvitations": {
+    "project": "umnbyupudhunyccqhyrp",
+    "syntheticOnly": true,
+    "checks": [
+      "A real case-manager password session is denied",
+      "A real administrator issues an email-bound invitation",
+      "Invitation sessions cannot open casework",
+      "Recipient sets a password and signs in normally",
+      "The invitation token cannot be reused",
+      "Existing accounts never expose a password-reset token"
+    ],
+    "passed": true,
+    "cleanup": true
+  },
+  "productionInvitationFunction": {
+    "status": "ACTIVE",
+    "version": 1,
+    "verifyJwt": true,
+    "deployedSourceReadBackMatches": true,
+    "handlerSha256": "12da4f9c937f67c1d40da28b272bd732bb298c3341e82caaa4a7debd1986082f",
+    "entrypointSha256": "f929a56ef63e8e74d29d88f5d183300cf5fcbae648d9ae99814ae57f4dcf7f54",
+    "importsSha256": "48f52020f2a29b16acc3124d6476b0ad258052cf394fbe32a6cf08910aee7c90"
+  },
+  "review": {
+    "normal": "Traced live caller authentication, role checks, provisioning order, audit, confirmed/offboarded users, canonical links, client recovery, account switching, and request-scoped caching. Existing casework RLS and password-session controls retained.",
+    "ponytail": "Separate deletion/reuse pass: native Link prefetch control, React request cache, existing Auth mail templates and operator RPC; no new dependency, schema, abstraction or configurable role picker. Removed a redundant prefetch prop on an in-page anchor and obsolete TOTP advice.",
+    "embeddedReadsNormal": "Reviewed every getFamilyDetail caller, preserved field selection and relation ordering, retained both 50-row history limits, existing snapshot semantics, archived/missing behavior, error propagation, per-table RLS and live-password account checks. The native join uses declared foreign keys and no privileged application client.",
+    "embeddedReadsPonytail": "Separate deletion pass replaces six network reads with native embedded relations and deletes the redundant intake refresh. No new abstraction, retry policy, schema, dependency or timeout increase. The existing plan snapshot remains unchanged."
+  },
+  "supersededPartialFixAttempts": [
+    {
+      "startedAt": "2026-10-19T02:49:44.656Z",
+      "finishedAt": "2026-10-19T02:52:50.455Z",
+      "origin": "https://case-link-80eui2ude-will-sanzs-projects.vercel.app",
+      "failedStage": "full plan AI refinement",
+      "timings": {
+        "public browsing": 2257,
+        "new account invitation and password setup": 11705,
+        "account settings": 12284,
+        "minimal family intake and context": 37922,
+        "manual edit recovery and waiting follow-up": 2727,
+        "selective action AI refinement": 8549
+      },
+      "issues": [
+        "expect(locator).toHaveCount(expected) failed\n\nLocator:  getByRole('dialog')\nExpected: 0\nReceived: 1\nTimeout:  45000ms\n\nCall log:\n  - Expect \"toHaveCount\" getByRole('dialog') with timeout 45000ms\n  - waiting for getByRole('dialog')\n    40 × locator resolved to 1 element\n       - unexpected value \"1\"\n"
+      ],
+      "browserErrors": [],
+      "httpErrors": [],
+      "cleanup": {
+        "families": true,
+        "account": true
+      }
+    },
+    {
+      "startedAt": "2026-10-19T03:03:14.177Z",
+      "finishedAt": "2026-10-19T03:04:38.193Z",
+      "origin": "https://case-link-80eui2ude-will-sanzs-projects.vercel.app",
+      "failedStage": "account settings",
+      "timings": {
+        "public browsing": 2116,
+        "new account invitation and password setup": 35272
+      },
+      "issues": [
+        "expect(locator).toBeEnabled() failed\n\nLocator: getByRole('button', { name: 'Save changes', exact: true })\nExpected: enabled\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeEnabled\" getByRole('button', { name: 'Save changes', exact: true }) with timeout 30000ms\n  - waiting for getByRole('button', { name: 'Save changes', exact: true })\n"
+      ],
+      "browserErrors": [],
+      "httpErrors": [],
+      "cleanup": {
+        "families": true,
+        "account": true
+      }
+    }
+  ],
+  "hostedFinal": {
+    "startedAt": "2026-10-19T15:24:13.726Z",
+    "origin": "https://www.thecaselink.com",
+    "headless": true,
+    "syntheticOnly": true,
+    "checks": [
+      "Landing page accessibility",
+      "Public signup correctly routes to Request demo",
+      "Sign in accessibility",
+      "Anonymous workspace access denied",
+      "Hosted Settings administrator issues a private case-manager invitation",
+      "Password setup accessibility",
+      "New invitation accepted, mismatch rejected, password set",
+      "New account empty Families accessibility",
+      "Invalid login rejected; new account signs into empty Families",
+      "Confirmed users receive no new link; case managers cannot invite",
+      "Account settings accessibility",
+      "Profile changes persist after reload",
+      "Family intake accessibility",
+      "Family created with label and barriers, no description",
+      "Generated plan accessibility",
+      "Live AI plan generation and saved context",
+      "Unsaved edit restores after refresh; waiting reason and date persist",
+      "Families resumes saved next action",
+      "Selected AI action title saves and preserves tasks, dates and progress",
+      "Full plan AI preview saves selected title and preserves every action",
+      "Family profile, barriers, plan navigation",
+      "32 repeated workspace tab changes and eight full plan reloads complete without a stall",
+      "Family context edit persists",
+      "Meeting progress saves once and appears in case history after reload",
+      "Manual dated action can be added and removed with confirmation",
+      "Matched directory contact can be selected and saved",
+      "Directory contact selection persists after reload",
+      "Reviewed PDF accessibility",
+      "Human-reviewed record PDF downloads and exactly matches preview",
+      "Every downloaded PDF page has readable content, safe print margins and monochrome output",
+      "Mobile family takeaway accessibility",
+      "Family takeaway confirms selection, excludes private notes, fits mobile and invalidates stale preview",
+      "Case advice produces reviewable output",
+      "Draft an outreach email produces reviewable output",
+      "Prepare a call script produces reviewable output",
+      "Review a meeting update produces reviewable output",
+      "Case assistant accessibility",
+      "Assistant leaves saved actions unchanged",
+      "Recovery link resets password and fresh login works",
+      "Logout removes workspace access"
+    ],
+    "timings": {
+      "public browsing": 1895,
+      "new account invitation and password setup": 13883,
+      "account settings": 3119,
+      "minimal family intake and context": 46381,
+      "manual edit recovery and waiting follow-up": 3350,
+      "selective action AI refinement": 7841,
+      "full plan AI refinement": 9507,
+      "family profile and workspace navigation": 2417,
+      "repeated workspace navigation": 46816,
+      "family context, progress and manual actions": 7317,
+      "directory contact selection": 2543,
+      "human review and both PDF downloads": 24520,
+      "case assistant and preparation tools": 39862,
+      "password recovery and logout": 12358
+    },
+    "issues": [],
+    "browserErrors": [],
+    "httpErrors": [],
+    "cleanup": {
+      "families": true,
+      "account": true
+    },
+    "readinessWaitMs": 346,
+    "privatePrefetches": [],
+    "requestFailures": [
+      {
+        "stage": "public browsing",
+        "path": "/request-demo",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/product",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/reset-password",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/new",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "manual edit recovery and waiting follow-up",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "directory contact selection",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "directory contact selection",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "https://www.thecaselink.com/57dd9504-b970-4d12-a05a-508739a77c9d",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "https://www.thecaselink.com/919611ef-82ac-4c15-b374-6f3eb78ccba1",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/reset-password",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      }
+    ],
+    "accessibility": [
+      {
+        "page": "Landing page",
+        "violations": []
+      },
+      {
+        "page": "Sign in",
+        "violations": []
+      },
+      {
+        "page": "Password setup",
+        "violations": []
+      },
+      {
+        "page": "New account empty Families",
+        "violations": []
+      },
+      {
+        "page": "Account settings",
+        "violations": []
+      },
+      {
+        "page": "Family intake",
+        "violations": []
+      },
+      {
+        "page": "Generated plan",
+        "violations": []
+      },
+      {
+        "page": "Reviewed PDF",
+        "violations": []
+      },
+      {
+        "page": "Mobile family takeaway",
+        "violations": []
+      },
+      {
+        "page": "Case assistant",
+        "violations": []
+      }
+    ],
+    "actionRequests": [
+      {
+        "stage": "account settings",
+        "path": "/profile",
+        "elapsedMs": 634,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "elapsedMs": 38966,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/overview",
+        "elapsedMs": 9020,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "elapsedMs": 722,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "elapsedMs": 432,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "elapsedMs": 5973,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "full plan AI refinement",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/plan",
+        "elapsedMs": 7573,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/profile",
+        "elapsedMs": 703,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "elapsedMs": 617,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "elapsedMs": 552,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "elapsedMs": 530,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "elapsedMs": 564,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/paperwork",
+        "elapsedMs": 548,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/assistant",
+        "elapsedMs": 9228,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/assistant",
+        "elapsedMs": 7165,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/assistant",
+        "elapsedMs": 7516,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/c5e4ff93-4aff-41d4-a7b3-825696149353/assistant",
+        "elapsedMs": 8064,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/profile",
+        "elapsedMs": 463,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/profile",
+        "elapsedMs": 294,
+        "status": 200,
+        "transportError": null
+      }
+    ],
+    "generatedGoals": 2,
+    "generatedActions": 3,
+    "navigation": [
+      {
+        "round": 0,
+        "path": "profile",
+        "elapsedMs": 371
+      },
+      {
+        "round": 0,
+        "path": "overview",
+        "elapsedMs": 860
+      },
+      {
+        "round": 0,
+        "path": "plan",
+        "elapsedMs": 848
+      },
+      {
+        "round": 0,
+        "path": "plan reload",
+        "elapsedMs": 719
+      },
+      {
+        "round": 0,
+        "path": "paperwork",
+        "elapsedMs": 533
+      },
+      {
+        "round": 1,
+        "path": "profile",
+        "elapsedMs": 505
+      },
+      {
+        "round": 1,
+        "path": "overview",
+        "elapsedMs": 508
+      },
+      {
+        "round": 1,
+        "path": "plan",
+        "elapsedMs": 865
+      },
+      {
+        "round": 1,
+        "path": "plan reload",
+        "elapsedMs": 819
+      },
+      {
+        "round": 1,
+        "path": "paperwork",
+        "elapsedMs": 1040
+      },
+      {
+        "round": 2,
+        "path": "profile",
+        "elapsedMs": 508
+      },
+      {
+        "round": 2,
+        "path": "overview",
+        "elapsedMs": 824
+      },
+      {
+        "round": 2,
+        "path": "plan",
+        "elapsedMs": 863
+      },
+      {
+        "round": 2,
+        "path": "plan reload",
+        "elapsedMs": 610
+      },
+      {
+        "round": 2,
+        "path": "paperwork",
+        "elapsedMs": 521
+      },
+      {
+        "round": 3,
+        "path": "profile",
+        "elapsedMs": 492
+      },
+      {
+        "round": 3,
+        "path": "overview",
+        "elapsedMs": 1012
+      },
+      {
+        "round": 3,
+        "path": "plan",
+        "elapsedMs": 850
+      },
+      {
+        "round": 3,
+        "path": "plan reload",
+        "elapsedMs": 1048
+      },
+      {
+        "round": 3,
+        "path": "paperwork",
+        "elapsedMs": 529
+      },
+      {
+        "round": 4,
+        "path": "profile",
+        "elapsedMs": 508
+      },
+      {
+        "round": 4,
+        "path": "overview",
+        "elapsedMs": 514
+      },
+      {
+        "round": 4,
+        "path": "plan",
+        "elapsedMs": 850
+      },
+      {
+        "round": 4,
+        "path": "plan reload",
+        "elapsedMs": 694
+      },
+      {
+        "round": 4,
+        "path": "paperwork",
+        "elapsedMs": 528
+      },
+      {
+        "round": 5,
+        "path": "profile",
+        "elapsedMs": 515
+      },
+      {
+        "round": 5,
+        "path": "overview",
+        "elapsedMs": 1025
+      },
+      {
+        "round": 5,
+        "path": "plan",
+        "elapsedMs": 8435
+      },
+      {
+        "round": 5,
+        "path": "plan reload",
+        "elapsedMs": 3892
+      },
+      {
+        "round": 5,
+        "path": "paperwork",
+        "elapsedMs": 1043
+      },
+      {
+        "round": 6,
+        "path": "profile",
+        "elapsedMs": 522
+      },
+      {
+        "round": 6,
+        "path": "overview",
+        "elapsedMs": 2031
+      },
+      {
+        "round": 6,
+        "path": "plan",
+        "elapsedMs": 3899
+      },
+      {
+        "round": 6,
+        "path": "plan reload",
+        "elapsedMs": 1526
+      },
+      {
+        "round": 6,
+        "path": "paperwork",
+        "elapsedMs": 1550
+      },
+      {
+        "round": 7,
+        "path": "profile",
+        "elapsedMs": 507
+      },
+      {
+        "round": 7,
+        "path": "overview",
+        "elapsedMs": 1509
+      },
+      {
+        "round": 7,
+        "path": "plan",
+        "elapsedMs": 850
+      },
+      {
+        "round": 7,
+        "path": "plan reload",
+        "elapsedMs": 1107
+      },
+      {
+        "round": 7,
+        "path": "paperwork",
+        "elapsedMs": 525
+      }
+    ],
+    "pdfPages": 1,
+    "pdfLayout": {
+      "syntheticOnly": true,
+      "results": [
+        {
+          "fixture": "hosted-record",
+          "pages": 1,
+          "checkedSourceFields": 2,
+          "errors": [],
+          "passed": true
+        },
+        {
+          "fixture": "hosted-family-takeaway",
+          "pages": 1,
+          "checkedSourceFields": 2,
+          "errors": [],
+          "passed": true
+        }
+      ]
+    },
+    "passed": true,
+    "cleanupStarted": true,
+    "finishedAt": "2026-10-19T15:27:57.055Z",
+    "emailDeliveryTested": false,
+    "auditHistoryRetained": true,
+    "status": "passed",
+    "pdfsVisuallyReviewed": true,
+    "hostingBypassUsed": false,
+    "normalRuntimeLogScanClear": true
+  },
+  "promotion": {
+    "status": "promoted",
+    "deploymentId": "dpl_G24yNqApeFwVVU9AZ9in1dsETd9Y",
+    "source": "44f10a033a2e2c5b450181586cb3994ec5b94f05",
+    "publicOrigin": "https://www.thecaselink.com",
+    "verifiedAliasMatches": true,
+    "completedAt": "2026-10-19T15:24:06.526Z",
+    "previousDeploymentId": "dpl_EuqpThU6XMobcWv3QgcBzWJdWxMq",
+    "previousSource": "13ea358ba4c076a0859389cc63fcf091c1a30a35"
+  },
+  "limits": [
+    "Synthetic engineering verification does not establish school approval, resource accuracy, real-case privacy acceptance or uninterrupted provider availability.",
+    "No family outreach, calls or external submissions occurred. No paid plan, key rotation, hosted Auth/SMTP setting or production database schema was changed."
+  ],
+  "regressions": {
+    "pdfBoundaryBefore": {
+      "pages": 2,
+      "blankTrailingPage": true,
+      "unitTestFailedBeforeFix": true
+    },
+    "pdfBoundaryAfter": {
+      "pages": 1,
+      "allSourceFieldsPresent": true
+    },
+    "timezoneBrowser": "Pacific/Auckland",
+    "timezoneServer": "UTC",
+    "timezoneDisplay": "America/New_York"
+  },
+  "additionalHostedFindings": {
+    "source": "a017fbbf418fd652a860f0a6b699811c06346669",
+    "workspaceStress": {
+      "tabChanges": 32,
+      "fullPlanReloads": 8,
+      "timeouts": 0,
+      "unusedProtectedPageRequests": 0,
+      "slowestMilliseconds": 8135
+    },
+    "dateHydrationErrors": 3,
+    "recordPdfDecorationOnlyTrailingPage": true,
+    "fixtureCleanupPassed": true,
+    "fixedBy": "9458476fc7c1d9a65bcc9ef7c2588524df2948df"
+  },
+  "latestProfileFinding": {
+    "source": "9458476fc7c1d9a65bcc9ef7c2588524df2948df",
+    "route": "Family profile after saved context and reload",
+    "failure": "Fifteen-second upstream read timeouts occurred on the POST revalidation and two simultaneous profile GETs. The profile loaded the full plan/directory graph, although it only used editable family fields and counts.",
+    "fix": "One lean RLS-scoped profile read; explicit current-page revalidation; remove redundant router.refresh; preserve form fields on response loss.",
+    "sourcePending": false,
+    "fixedBy": "13ea358ba4c076a0859389cc63fcf091c1a30a35"
+  },
+  "postPromotionEmptyFamilyFailure": {
+    "source": "13ea358ba4c076a0859389cc63fcf091c1a30a35",
+    "startedAt": "2026-10-19T15:01:23.449Z",
+    "finishedAt": "2026-10-19T15:02:42.527Z",
+    "failedStage": "minimal family intake and context",
+    "serverError": "Three overview reads hit the 15-second upstream deadline while loading six separate related-table requests.",
+    "cleanup": {
+      "families": true,
+      "account": true
+    },
+    "fix": "Use native RLS-protected embedded relations plus the existing plan snapshot (two requests total); remove the intake client refresh.",
+    "fixedBy": "44f10a033a2e2c5b450181586cb3994ec5b94f05"
+  },
+  "productionEmail": {
+    "startedAt": "2026-10-19T15:06:46.966Z",
+    "origin": "https://www.thecaselink.com",
+    "syntheticOnly": true,
+    "checks": [
+      "Public Settings sends a native invitation to the delivery simulator",
+      "Configured mail service retains the accepted test email",
+      "Accepted template uses the canonical confirmation page and fragment-only token",
+      "The actual emailed link completes password setup and fresh sign-in"
+    ],
+    "cleanup": {
+      "accountsRemoved": true
+    },
+    "delivery": {
+      "id": "01a154b3-8a90-7d78-a728-a2646bcb37b0",
+      "createdAt": "2026-10-19 15:06:55.150000+00",
+      "lastEvent": "delivered",
+      "simulated": true,
+      "humanInboxPlacementVerified": false,
+      "providerAccepted": true,
+      "simulatedDeliveryConfirmed": true,
+      "lastCheckedAt": "2026-10-19T15:14:33.510Z",
+      "documentation": "https://resend.com/docs/dashboard/emails/send-test-emails",
+      "note": "Provider simulator confirmed delivery; this does not establish human inbox placement."
+    },
+    "passed": true,
+    "auditHistoryRetained": true,
+    "finishedAt": "2026-10-19T15:07:01.455Z"
+  },
+  "productionEmbeddedQueryCompatibility": "Passed full real password-authenticated candidate workflow, including notes/history/resource relations and all 40 navigation samples.",
+  "releaseChecks": {
+    "source": "44f10a033a2e2c5b450181586cb3994ec5b94f05",
+    "ciRun": 39275652169,
+    "codeqlRun": 39275652122,
+    "status": "passed"
+  },
+  "finalCandidate": {
+    "id": "dpl_G24yNqApeFwVVU9AZ9in1dsETd9Y",
+    "url": "https://case-link-ov7q9n46g-will-sanzs-projects.vercel.app",
+    "source": "44f10a033a2e2c5b450181586cb3994ec5b94f05",
+    "productionSettings": true,
+    "publicDomainsAssignedAtCreation": false,
+    "status": "ready-and-40-checks-passed"
+  },
+  "testingBoundary": {
+    "backgroundOnly": true,
+    "noHumanActionsRequired": true,
+    "disposableAccountsAndSyntheticCases": true,
+    "noRealRecipientInvitationSent": true,
+    "fixtureAuditHistoryRetained": true
+  },
+  "intermediatePromotion": {
+    "id": "dpl_EuqpThU6XMobcWv3QgcBzWJdWxMq",
+    "source": "13ea358ba4c076a0859389cc63fcf091c1a30a35",
+    "privateChecksPassed": 40,
+    "publicNewFamilyReadFailed": true,
+    "finalForwardFix": "44f10a033a2e2c5b450181586cb3994ec5b94f05"
+  },
+  "hostedCandidate": {
+    "startedAt": "2026-10-19T15:17:24.102Z",
+    "origin": "https://case-link-ov7q9n46g-will-sanzs-projects.vercel.app",
+    "headless": true,
+    "syntheticOnly": true,
+    "checks": [
+      "Landing page accessibility",
+      "Public signup correctly routes to Request demo",
+      "Sign in accessibility",
+      "Anonymous workspace access denied",
+      "Hosted Settings administrator issues a private case-manager invitation",
+      "Password setup accessibility",
+      "New invitation accepted, mismatch rejected, password set",
+      "New account empty Families accessibility",
+      "Invalid login rejected; new account signs into empty Families",
+      "Confirmed users receive no new link; case managers cannot invite",
+      "Account settings accessibility",
+      "Profile changes persist after reload",
+      "Family intake accessibility",
+      "Family created with label and barriers, no description",
+      "Generated plan accessibility",
+      "Live AI plan generation and saved context",
+      "Unsaved edit restores after refresh; waiting reason and date persist",
+      "Families resumes saved next action",
+      "Selected AI action title saves and preserves tasks, dates and progress",
+      "Full plan AI preview saves selected title and preserves every action",
+      "Family profile, barriers, plan navigation",
+      "32 repeated workspace tab changes and eight full plan reloads complete without a stall",
+      "Family context edit persists",
+      "Meeting progress saves once and appears in case history after reload",
+      "Manual dated action can be added and removed with confirmation",
+      "Matched directory contact can be selected and saved",
+      "Directory contact selection persists after reload",
+      "Reviewed PDF accessibility",
+      "Human-reviewed record PDF downloads and exactly matches preview",
+      "Every downloaded PDF page has readable content, safe print margins and monochrome output",
+      "Mobile family takeaway accessibility",
+      "Family takeaway confirms selection, excludes private notes, fits mobile and invalidates stale preview",
+      "Case advice produces reviewable output",
+      "Draft an outreach email produces reviewable output",
+      "Prepare a call script produces reviewable output",
+      "Review a meeting update produces reviewable output",
+      "Case assistant accessibility",
+      "Assistant leaves saved actions unchanged",
+      "Recovery link resets password and fresh login works",
+      "Logout removes workspace access"
+    ],
+    "timings": {
+      "public browsing": 2392,
+      "new account invitation and password setup": 18822,
+      "account settings": 4065,
+      "minimal family intake and context": 47982,
+      "manual edit recovery and waiting follow-up": 3202,
+      "selective action AI refinement": 8031,
+      "full plan AI refinement": 9616,
+      "family profile and workspace navigation": 2400,
+      "repeated workspace navigation": 41162,
+      "family context, progress and manual actions": 7360,
+      "directory contact selection": 1762,
+      "human review and both PDF downloads": 25802,
+      "case assistant and preparation tools": 55565,
+      "password recovery and logout": 20455
+    },
+    "issues": [],
+    "browserErrors": [],
+    "httpErrors": [],
+    "cleanup": {
+      "families": true,
+      "account": true
+    },
+    "readinessWaitMs": 106344,
+    "privatePrefetches": [],
+    "accessibility": [
+      {
+        "page": "Landing page",
+        "violations": []
+      },
+      {
+        "page": "Sign in",
+        "violations": []
+      },
+      {
+        "page": "Password setup",
+        "violations": []
+      },
+      {
+        "page": "New account empty Families",
+        "violations": []
+      },
+      {
+        "page": "Account settings",
+        "violations": []
+      },
+      {
+        "page": "Family intake",
+        "violations": []
+      },
+      {
+        "page": "Generated plan",
+        "violations": []
+      },
+      {
+        "page": "Reviewed PDF",
+        "violations": []
+      },
+      {
+        "page": "Mobile family takeaway",
+        "violations": []
+      },
+      {
+        "page": "Case assistant",
+        "violations": []
+      }
+    ],
+    "requestFailures": [
+      {
+        "stage": "public browsing",
+        "path": "/request-demo",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/request-demo",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/product",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/login",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/product",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/login",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "public browsing",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/reset-password",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "new account invitation and password setup",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "account settings",
+        "path": "/profile",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/new",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "manual edit recovery and waiting follow-up",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "manual edit recovery and waiting follow-up",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family profile and workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "repeated workspace navigation",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "https://case-link-ov7q9n46g-will-sanzs-projects.vercel.app/b20823dc-54cc-4e1d-8827-1a316de67e0a",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "https://case-link-ov7q9n46g-will-sanzs-projects.vercel.app/1db260cd-9ce7-4175-8842-bf75a3e1f759",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/assistant",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/assistant",
+        "method": "POST",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/login",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/terms",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/forgot-password",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/privacy",
+        "method": "GET",
+        "prefetch": true,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/families",
+        "method": "GET",
+        "prefetch": false,
+        "error": "net::ERR_ABORTED"
+      }
+    ],
+    "actionRequests": [
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "elapsedMs": 2339,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "elapsedMs": 5270,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/overview",
+        "elapsedMs": 38129,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "elapsedMs": 1995,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "minimal family intake and context",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "elapsedMs": 657,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "selective action AI refinement",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "elapsedMs": 5517,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "full plan AI refinement",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "elapsedMs": 7366,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "full plan AI refinement",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/plan",
+        "elapsedMs": 1032,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "family context, progress and manual actions",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/profile",
+        "elapsedMs": 676,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "elapsedMs": 650,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "elapsedMs": 679,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "elapsedMs": 674,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "elapsedMs": 707,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "elapsedMs": 639,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "human review and both PDF downloads",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/paperwork",
+        "elapsedMs": 702,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/assistant",
+        "elapsedMs": 13063,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "case assistant and preparation tools",
+        "path": "/families/d36bf2ce-8c72-4131-adfd-d4983da39ce3/assistant",
+        "elapsedMs": 11598,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/profile",
+        "elapsedMs": 429,
+        "status": 200,
+        "transportError": null
+      },
+      {
+        "stage": "password recovery and logout",
+        "path": "/profile",
+        "elapsedMs": 1820,
+        "status": 200,
+        "transportError": null
+      }
+    ],
+    "generatedGoals": 2,
+    "generatedActions": 4,
+    "navigation": [
+      {
+        "round": 0,
+        "path": "profile",
+        "elapsedMs": 347
+      },
+      {
+        "round": 0,
+        "path": "overview",
+        "elapsedMs": 869
+      },
+      {
+        "round": 0,
+        "path": "plan",
+        "elapsedMs": 853
+      },
+      {
+        "round": 0,
+        "path": "plan reload",
+        "elapsedMs": 842
+      },
+      {
+        "round": 0,
+        "path": "paperwork",
+        "elapsedMs": 528
+      },
+      {
+        "round": 1,
+        "path": "profile",
+        "elapsedMs": 512
+      },
+      {
+        "round": 1,
+        "path": "overview",
+        "elapsedMs": 502
+      },
+      {
+        "round": 1,
+        "path": "plan",
+        "elapsedMs": 876
+      },
+      {
+        "round": 1,
+        "path": "plan reload",
+        "elapsedMs": 579
+      },
+      {
+        "round": 1,
+        "path": "paperwork",
+        "elapsedMs": 536
+      },
+      {
+        "round": 2,
+        "path": "profile",
+        "elapsedMs": 507
+      },
+      {
+        "round": 2,
+        "path": "overview",
+        "elapsedMs": 612
+      },
+      {
+        "round": 2,
+        "path": "plan",
+        "elapsedMs": 857
+      },
+      {
+        "round": 2,
+        "path": "plan reload",
+        "elapsedMs": 776
+      },
+      {
+        "round": 2,
+        "path": "paperwork",
+        "elapsedMs": 533
+      },
+      {
+        "round": 3,
+        "path": "profile",
+        "elapsedMs": 508
+      },
+      {
+        "round": 3,
+        "path": "overview",
+        "elapsedMs": 510
+      },
+      {
+        "round": 3,
+        "path": "plan",
+        "elapsedMs": 857
+      },
+      {
+        "round": 3,
+        "path": "plan reload",
+        "elapsedMs": 560
+      },
+      {
+        "round": 3,
+        "path": "paperwork",
+        "elapsedMs": 530
+      },
+      {
+        "round": 4,
+        "path": "profile",
+        "elapsedMs": 511
+      },
+      {
+        "round": 4,
+        "path": "overview",
+        "elapsedMs": 1016
+      },
+      {
+        "round": 4,
+        "path": "plan",
+        "elapsedMs": 6427
+      },
+      {
+        "round": 4,
+        "path": "plan reload",
+        "elapsedMs": 4183
+      },
+      {
+        "round": 4,
+        "path": "paperwork",
+        "elapsedMs": 1544
+      },
+      {
+        "round": 5,
+        "path": "profile",
+        "elapsedMs": 507
+      },
+      {
+        "round": 5,
+        "path": "overview",
+        "elapsedMs": 2037
+      },
+      {
+        "round": 5,
+        "path": "plan",
+        "elapsedMs": 1372
+      },
+      {
+        "round": 5,
+        "path": "plan reload",
+        "elapsedMs": 1151
+      },
+      {
+        "round": 5,
+        "path": "paperwork",
+        "elapsedMs": 524
+      },
+      {
+        "round": 6,
+        "path": "profile",
+        "elapsedMs": 505
+      },
+      {
+        "round": 6,
+        "path": "overview",
+        "elapsedMs": 1519
+      },
+      {
+        "round": 6,
+        "path": "plan",
+        "elapsedMs": 842
+      },
+      {
+        "round": 6,
+        "path": "plan reload",
+        "elapsedMs": 957
+      },
+      {
+        "round": 6,
+        "path": "paperwork",
+        "elapsedMs": 1045
+      },
+      {
+        "round": 7,
+        "path": "profile",
+        "elapsedMs": 511
+      },
+      {
+        "round": 7,
+        "path": "overview",
+        "elapsedMs": 1003
+      },
+      {
+        "round": 7,
+        "path": "plan",
+        "elapsedMs": 846
+      },
+      {
+        "round": 7,
+        "path": "plan reload",
+        "elapsedMs": 638
+      },
+      {
+        "round": 7,
+        "path": "paperwork",
+        "elapsedMs": 916
+      }
+    ],
+    "pdfPages": 2,
+    "pdfLayout": {
+      "syntheticOnly": true,
+      "results": [
+        {
+          "fixture": "hosted-record",
+          "pages": 2,
+          "checkedSourceFields": 2,
+          "errors": [],
+          "passed": true
+        },
+        {
+          "fixture": "hosted-family-takeaway",
+          "pages": 1,
+          "checkedSourceFields": 2,
+          "errors": [],
+          "passed": true
+        }
+      ]
+    },
+    "passed": true,
+    "cleanupStarted": true,
+    "finishedAt": "2026-10-19T15:23:23.186Z",
+    "emailDeliveryTested": false,
+    "auditHistoryRetained": true,
+    "pdfsVisuallyReviewed": true,
+    "normalRuntimeLogScanClear": true
+  },
+  "existingAdministratorCheck": {
+    "activeAdministratorsExcludingFixtures": 1,
+    "available": true,
+    "permissionsChanged": false
+  },
+  "cleanup": {
+    "allHostedFixturesRemoved": true,
+    "auditHistoryRetained": true,
+    "temporaryHostingCookieFilesRemoved": 12,
+    "localTestServicesStopped": true,
+    "localTestVolumesPreserved": true,
+    "otherUserFilesUntouched": true
+  },
+  "observation": {
+    "startedAt": "2026-10-19T15:02:59.876Z",
+    "durationMinutes": 30,
+    "probes": [
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:02:59.879Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 275
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:03:00.154Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 169
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:03:00.323Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 167
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:03:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 176
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:04:59.882Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 242
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:05:59.882Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 253
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:06:59.882Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 203
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:07:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 189
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:08:00.070Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 80
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:08:00.150Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 110
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:08:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 217
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:09:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 191
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:10:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 187
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:11:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 202
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:12:59.857Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 208
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:13:00.066Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 126
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:13:00.193Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 137
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:13:59.878Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 321
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:14:59.879Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 178
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:15:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 159
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:16:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 198
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:17:59.882Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 159
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:18:00.042Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 104
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:18:00.147Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 121
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:18:59.879Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 185
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:19:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 227
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:20:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 168
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:21:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 155
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:22:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 187
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:23:00.068Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 115
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:23:00.184Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 133
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:23:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 164
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:24:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 218
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:25:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 225
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:26:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 186
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:27:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 274
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:28:00.156Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 97
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:28:00.254Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 111
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:28:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 415
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:29:59.880Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 486
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:30:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 223
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:31:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 855
+      },
+      {
+        "path": "/api/health",
+        "at": "2026-10-19T15:32:59.881Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 274
+      },
+      {
+        "path": "/login",
+        "at": "2026-10-19T15:33:00.157Z",
+        "status": 200,
+        "passed": true,
+        "elapsedMs": 105
+      },
+      {
+        "path": "/families",
+        "at": "2026-10-19T15:33:00.264Z",
+        "status": 307,
+        "passed": true,
+        "elapsedMs": 122
+      }
+    ],
+    "passed": true,
+    "finishedAt": "2026-10-19T15:33:00.388Z",
+    "scope": "Public health/login/anonymous access; no claim of continuous authenticated DB load",
+    "initialSource": "13ea358ba4c076a0859389cc63fcf091c1a30a35",
+    "finalSource": "44f10a033a2e2c5b450181586cb3994ec5b94f05",
+    "promotedAt": "2026-10-19T15:24:06.526Z",
+    "finalSourceProbeCount": 13
+  },
+  "finalRuntimeLogScan": {
+    "deploymentId": "dpl_G24yNqApeFwVVU9AZ9in1dsETd9Y",
+    "since": "2026-10-19T15:19:08.000Z",
+    "until": "2026-10-19T15:33:32.549Z",
+    "levels": [
+      "warning",
+      "error",
+      "fatal"
+    ],
+    "entries": 0
+  },
+  "finalAliasReadBack": {
+    "productionDeployment": "dpl_G24yNqApeFwVVU9AZ9in1dsETd9Y",
+    "source": "44f10a033a2e2c5b450181586cb3994ec5b94f05",
+    "qaDeploymentUnchanged": "dpl_G8D56sndRGkYosU6eWTLU4U9CAq3"
+  }
+}

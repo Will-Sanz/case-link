@@ -1,0 +1,1220 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { errors, type BrowserContext } from "@playwright/test";
+import { createApplicationBrowser } from "./browser-runner";
+import {
+  COMPASS_HOUSEHOLD_ENTRY,
+  COMPASS_HOUSEHOLD_HEADING,
+} from "./compass-household-entry";
+import {
+  browserAuthoritySchema,
+  COMPASS_CAPTCHA,
+  COMPASS_FAMILY_SAFETY,
+  COMPASS_HOUSEHOLD_DIVIDER,
+  COMPASS_INTRODUCTION_END,
+  type BrowserControl,
+} from "./browser-policy";
+import {
+  fixtureRequest,
+  fixtureMandate,
+  fixtureIntake,
+  fixtureNow,
+} from "./test-fixtures";
+
+const id = fixtureRequest().id;
+const token = "verified-token";
+type Outcome =
+  | "verification"
+  | "household"
+  | "household_changed"
+  | "ending"
+  | "ending_changed"
+  | "divider_changed"
+  | "challenge"
+  | "captcha_challenge"
+  | "captcha_challenge_late"
+  | "unconfirmed";
+
+/** A labeled replay of public DOM metadata; not live provider execution or a filing fixture. */
+function harness(outcome: Outcome = "verification") {
+  const prefix = "https://www.compass.dhs.pa.gov/intake/#/";
+  const paths = [
+    "getstarted",
+    "applynow/gettingstarted",
+    "applynow/gettingstarted/tutorial",
+    "applynow/gettingstarted/importantinformation",
+    "applynow/gettingstarted/submitreferral",
+    "applynow/gettingstarted/WICpreapplication",
+    "applynow/gettingstarted/gatepost",
+    "applynow/gettingstarted/existingaccount",
+    "applynow/gettingstarted/familysafety",
+  ];
+  let currentUrl = prefix + paths[0];
+  let errorVisible = false;
+  let challengeVisible = false;
+  let captchaReady = false;
+  let captchaComponentCount = 1;
+  let captchaTarget:
+    "valid" | "missing" | "heading_changed" | "id_changed" | "foreign" =
+    "valid";
+  let nextEnabled = true;
+  let topmost = true;
+  let focused = true;
+  let hydrating = false;
+  let renderedPixels = "initial";
+  const captureRoutes: string[] = [];
+  let challengeBox = { x: 100, y: 100, width: 300, height: 200 };
+  let challengeUrl =
+    "https://www.google.com/recaptcha/api2/bframe?k=public-test-key";
+  let beforeHandle: (() => void) | undefined;
+  let beforeCaptchaCount: (() => void) | undefined;
+  const listeners = new Map<string, (value: unknown) => void>();
+  const mainFrame = {};
+  const clicks = vi.fn<(url: string) => void>();
+  const keyPress = vi.fn(async () => {});
+  const forbiddenInput = vi.fn(() => {
+    throw new Error("No applicant input is allowed");
+  });
+  function navigate(url: string) {
+    currentUrl = url;
+    listeners.get("framenavigated")?.(mainFrame);
+  }
+  const advance = async () => {
+    const from = currentUrl;
+    clicks(from);
+    if (from === COMPASS_FAMILY_SAFETY) {
+      if (outcome === "verification") errorVisible = true;
+      else if (
+        ["ending", "ending_changed", "divider_changed"].includes(outcome)
+      )
+        navigate(COMPASS_CAPTCHA);
+      else if (outcome === "household" || outcome === "household_changed")
+        navigate(COMPASS_HOUSEHOLD_ENTRY);
+      else if (
+        outcome === "challenge" ||
+        outcome === "captcha_challenge" ||
+        outcome === "captcha_challenge_late"
+      ) {
+        challengeVisible = outcome !== "captcha_challenge_late";
+        if (outcome !== "challenge") navigate(COMPASS_CAPTCHA);
+      } else navigate(prefix + "unsupported");
+    } else if (from === COMPASS_CAPTCHA) navigate(COMPASS_INTRODUCTION_END);
+    else if (from === COMPASS_INTRODUCTION_END)
+      navigate(COMPASS_HOUSEHOLD_DIVIDER);
+    else if (from === COMPASS_HOUSEHOLD_DIVIDER)
+      navigate(COMPASS_HOUSEHOLD_ENTRY);
+    else {
+      const index = paths.findIndex((path) => prefix + path === from);
+      navigate(prefix + paths[index + 1]);
+    }
+  };
+  const keyTarget = { press: keyPress };
+  const googleFrame = {
+    url: () => challengeUrl,
+    locator: () => ({ elementHandle: vi.fn(async () => keyTarget) }),
+  };
+  const challengeClick = vi.fn(async () => {});
+  const challengeHandle = {
+    contentFrame: async () => googleFrame,
+    boundingBox: async () => challengeBox,
+    evaluate: vi.fn(async (read: (...args: never[]) => unknown) =>
+      read.length === 2 ? topmost : focused,
+    ),
+    click: challengeClick,
+    focus: vi.fn(async () => {
+      focused = true;
+    }),
+  };
+  const challengeLocator = {
+    getAttribute: async () => challengeUrl,
+    elementHandle: async () => challengeHandle,
+    isVisible: async () => challengeVisible,
+  };
+  const unknownFrame = {};
+  const unknownLocator = {
+    getAttribute: async () => "https://unreviewed.example.test/widget",
+    elementHandle: async () => ({ contentFrame: async () => unknownFrame }),
+  };
+  const fieldMask = { kind: "masked-fields" };
+  const screenshot = vi.fn(
+    async (options: {
+      mask: unknown[];
+      maskColor: string;
+    }): Promise<Buffer> => {
+      if (!options.maskColor) throw new Error("unmasked frame");
+      captureRoutes.push(currentUrl);
+      return Buffer.from(`actual-test-render:${currentUrl}:${renderedPixels}`);
+    },
+  );
+  const page = {
+    on: vi.fn((event: string, callback: (value: unknown) => void) => {
+      listeners.set(event, callback);
+    }),
+    mainFrame: () => mainFrame,
+    setDefaultTimeout: vi.fn(),
+    goto: vi.fn(async () => {}),
+    url: () => currentUrl,
+    viewportSize: vi.fn(() => ({ width: 1100, height: 720 })),
+    getByText: vi.fn((text: string) => ({
+      first: () => ({ waitFor: vi.fn(async () => {}) }),
+      waitFor: vi.fn(async () => {
+        if (
+          (outcome === "ending_changed" &&
+            currentUrl === COMPASS_INTRODUCTION_END) ||
+          (outcome === "divider_changed" &&
+            currentUrl === COMPASS_HOUSEHOLD_DIVIDER)
+        )
+          throw new Error("public metadata missing");
+        hydrating = false;
+      }),
+      isVisible: vi.fn(async () =>
+        text.startsWith("We were unable")
+          ? errorVisible
+          : !hydrating &&
+            !(
+              outcome === "ending_changed" &&
+              currentUrl === COMPASS_INTRODUCTION_END
+            ) &&
+            !(
+              outcome === "divider_changed" &&
+              currentUrl === COMPASS_HOUSEHOLD_DIVIDER
+            ),
+      ),
+    })),
+    getByRole: vi.fn((role: string, options: { name: string }) => {
+      const visible = async (): Promise<boolean> =>
+        (currentUrl !== COMPASS_CAPTCHA ||
+          (role === "button"
+            ? captchaTarget !== "missing"
+            : captchaTarget !== "heading_changed")) &&
+        (role !== "heading" ||
+          (!hydrating &&
+            (options.name === COMPASS_HOUSEHOLD_HEADING
+              ? outcome !== "household_changed"
+              : true)));
+      const enabled = async () =>
+        currentUrl === COMPASS_CAPTCHA ? captchaReady : nextEnabled;
+      const locator = {
+        click: advance,
+        waitFor: vi.fn(async () => {
+          hydrating = false;
+        }),
+        isVisible: visible,
+        isEnabled: enabled,
+        elementHandle: vi.fn(async () => {
+          const boundUrl = currentUrl;
+          const handle = {
+            isVisible: visible,
+            isEnabled: enabled,
+            getAttribute: async () =>
+              currentUrl === COMPASS_CAPTCHA && captchaTarget === "id_changed"
+                ? "unreviewedNextID"
+                : "nextButtonID",
+            click: vi.fn(async () => {
+              if (currentUrl !== boundUrl)
+                throw new Error("detached public button");
+              await advance();
+            }),
+          };
+          beforeHandle?.();
+          beforeHandle = undefined;
+          return handle;
+        }),
+        last: () => locator,
+      };
+      return locator;
+    }),
+    locator: vi.fn((selector: string) => {
+      if (selector === "compass-ui-getting-started-captcha")
+        return {
+          count: async () => {
+            beforeCaptchaCount?.();
+            beforeCaptchaCount = undefined;
+            return captchaComponentCount;
+          },
+          getByRole: (role: string, options: { name: string }) =>
+            captchaTarget === "foreign"
+              ? { isVisible: async (): Promise<boolean> => false }
+              : page.getByRole(role, options),
+        };
+      if (selector.startsWith('main input[id="'))
+        return { waitFor: vi.fn(async () => {}) };
+      if (selector === "iframe")
+        return { all: async () => [challengeLocator, unknownLocator] };
+      if (selector === 'main input:not([type="hidden"])')
+        return {
+          evaluateAll: vi.fn(async () =>
+            outcome === "household_changed"
+              ? []
+              : [
+                  "firstName",
+                  "lastName",
+                  "dob-datepicker-date",
+                  "gender_male",
+                  "gender_female",
+                ].map((field) => ({
+                  id: field,
+                  type: field.startsWith("gender_") ? "radio" : "text",
+                  required: true,
+                })),
+          ),
+        };
+      if (selector.startsWith("label")) return { click: vi.fn(async () => {}) };
+      return fieldMask;
+    }),
+    waitForURL: vi.fn(async (expected: string | ((url: URL) => boolean)) => {
+      if (typeof expected === "string") {
+        if (currentUrl !== expected) throw new Error("unexpected public route");
+      } else {
+        if (!expected(new URL(currentUrl)))
+          throw new Error("bounded navigation timeout");
+      }
+    }),
+    waitForFunction: vi.fn(async () => {
+      if (outcome === "captcha_challenge_late") challengeVisible = true;
+      else navigate(COMPASS_INTRODUCTION_END);
+    }),
+    screenshot,
+    fill: forbiddenInput,
+    inputValue: forbiddenInput,
+  };
+  const context = {
+    route: vi.fn(async () => {}),
+    routeWebSocket: vi.fn(async () => {}),
+    on: vi.fn(),
+    newPage: vi.fn(async () => page),
+    close: vi.fn(async () => {}),
+  };
+  const authority = browserAuthoritySchema.parse({
+    ...fixtureRequest({
+      intake: fixtureIntake({ needs: ["snap_new"] }),
+      mandate: fixtureMandate({ recipientIds: ["snap-pa"] }),
+    }),
+    mandate_revoked_at: null,
+  });
+  const grant = {
+    ownerId: "owner",
+    authority,
+    expiresAt: fixtureNow.getTime() + 600000,
+  };
+  const authorize = vi.fn(async () => grant);
+  const runner = createApplicationBrowser({
+    authorize,
+    context: async () => context as unknown as BrowserContext,
+  });
+  async function state() {
+    return (await runner.read(token, id, "GET")).json();
+  }
+  async function start() {
+    await runner.read(token, id, "POST");
+    await vi.waitFor(async () =>
+      expect((await state()).session?.status).toBe("needs_parent"),
+    );
+    return state();
+  }
+  async function input(
+    action: BrowserControl["action"] = { type: "continue" },
+  ) {
+    const value = await state();
+    const session = value.session;
+    await runner.read(token, id, "GET", true, session.handoff.frameId);
+    return { sessionId: session.id, frameId: session.handoff.frameId, action };
+  }
+  return {
+    runner,
+    authorize,
+    grant,
+    context,
+    screenshot,
+    captureRoutes,
+    clicks,
+    page,
+    challengeLocator,
+    unknownLocator,
+    fieldMask,
+    challengeClick,
+    keyPress,
+    forbiddenInput,
+    state,
+    start,
+    input,
+    navigate,
+    setNextEnabled: (value: boolean) => {
+      nextEnabled = value;
+    },
+    setCaptchaReady: (value: boolean) => {
+      captchaReady = value;
+    },
+    setCaptchaComponentCount: (value: number) => {
+      captchaComponentCount = value;
+    },
+    setChallengeVisible: (value: boolean) => {
+      challengeVisible = value;
+    },
+    setCaptchaTarget: (value: typeof captchaTarget) => {
+      captchaTarget = value;
+    },
+    setTopmost: (value: boolean) => {
+      topmost = value;
+    },
+    setFocused: (value: boolean) => {
+      focused = value;
+    },
+    setHydrating: (value: boolean) => {
+      hydrating = value;
+    },
+    changePixels: () => {
+      renderedPixels = "changed";
+    },
+    moveChallenge: () => {
+      challengeBox = { ...challengeBox, x: challengeBox.x + 20 };
+    },
+    setChallengeUrl: (value: string) => {
+      challengeUrl = value;
+    },
+    beforeHandle: (callback: () => void) => {
+      beforeHandle = callback;
+    },
+    beforeCaptchaCount: (callback: () => void) => {
+      beforeCaptchaCount = callback;
+    },
+  };
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(fixtureNow);
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+it("pauses one actual context before Family Safety Next and provides only a masked, expiring preview handoff", async () => {
+  const h = harness();
+  const value = await h.start();
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(h.context.close).not.toHaveBeenCalled();
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(0);
+  expect(value.session.canControl).toBe(true);
+  expect(value.session.handoff).toMatchObject({
+    width: 1100,
+    height: 720,
+    expiresAt: new Date(h.grant.expiresAt).toISOString(),
+  });
+  expect(value.session.summary).toContain("This preview pauses");
+  expect(value.session.summary).toContain(
+    "does not establish that every applicant",
+  );
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  expect(
+    h.screenshot.mock.calls.every(
+      ([options]) => (options as { maskColor: string }).maskColor === "#dcd8ed",
+    ),
+  ).toBe(true);
+  await h.runner.close();
+});
+
+it("requires the exact served frame before control, rejects stale reads, and consumes each accepted nonce once", async () => {
+  const h = harness("household");
+  const { session } = await h.start();
+  const command = {
+    sessionId: session.id,
+    frameId: session.handoff.frameId,
+    action: { type: "continue" },
+  };
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  await expect(h.runner.read(token, id, "GET", true)).rejects.toThrow(
+    "stale_frame",
+  );
+  await expect(
+    h.runner.read(token, id, "GET", true, fixtureRequest().id),
+  ).rejects.toThrow("stale_frame");
+  const frame = await h.runner.read(token, id, "GET", true, command.frameId);
+  expect(frame.headers.get("cache-control")).toBe("private, no-store");
+  expect(await frame.text()).toContain(COMPASS_FAMILY_SAFETY);
+  await h.runner.control(token, id, command);
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(1);
+  await h.runner.close();
+});
+
+it.each(["household", "ending"] as const)(
+  "recognizes same-session %s resumption and stops before any protected screenshot or applicant input",
+  async (outcome) => {
+    const h = harness(outcome);
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    const value = await h.state();
+    expect(value.session.status).toBe("completed");
+    expect(value.session.summary).toContain("same browser session");
+    expect(value.session.summary).toContain("no application was submitted");
+    expect(value.session.canControl).toBe(false);
+    expect(value.session.handoff).toBeNull();
+    expect(value.session.frameUrl).toBeNull();
+    expect(new Set(h.captureRoutes).size).toBe(9);
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    if (outcome === "ending") {
+      expect(
+        h.clicks.mock.calls.filter(
+          ([url]) =>
+            url === COMPASS_INTRODUCTION_END ||
+            url === COMPASS_HOUSEHOLD_DIVIDER,
+        ),
+      ).toHaveLength(2);
+    }
+    expect((await h.runner.read(token, id, "GET", true)).status).toBe(404);
+    await h.runner.close();
+  },
+);
+
+it.each([
+  "household_changed",
+  "ending_changed",
+  "divider_changed",
+  "unconfirmed",
+] as const)(
+  "fails closed on changed or unknown %s metadata without applicant input",
+  async (outcome) => {
+    const h = harness(outcome);
+    await h.start();
+    await h.runner.control(token, id, await h.input()).catch(() => {});
+    const value = await h.state();
+    expect(value.session.status).toBe("blocked");
+    expect(value.session.canControl).toBe(false);
+    expect(value.session.frameUrl).toBeNull();
+    expect(new Set(h.captureRoutes).size).toBe(9);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    await h.runner.close();
+  },
+);
+
+it("keeps a provider verification error a service block and never automatically retries it", async () => {
+  const h = harness();
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const value = await h.state();
+  expect(value.session.status).toBe("blocked");
+  expect(value.session.summary).toContain(
+    "CaseLink must resolve the connection",
+  );
+  expect(value.session.canControl).toBe(false);
+  await h.runner.sweep();
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(1);
+  await h.runner.close();
+});
+
+it("automatically resumes a verified same-page transition during sweep without an 'I finished' click", async () => {
+  const h = harness("ending");
+  await h.start();
+  h.navigate(COMPASS_INTRODUCTION_END);
+  await h.runner.sweep();
+  expect((await h.state()).session.status).toBe("completed");
+  expect(
+    h.clicks.mock.calls.filter(
+      ([url]) =>
+        url === COMPASS_INTRODUCTION_END || url === COMPASS_HOUSEHOLD_DIVIDER,
+    ),
+  ).toHaveLength(2);
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  await h.runner.close();
+});
+
+it("retains an exact authorized CAPTCHA session after a native pending timeout and later resumes", async () => {
+  const h = harness("ending");
+  await h.start();
+  const command = await h.input();
+  const expiresAt = h.grant.expiresAt;
+  h.page.waitForFunction.mockRejectedValue(
+    new errors.TimeoutError("pending public result"),
+  );
+  const response = await h.runner.control(token, id, command);
+  expect(response.status).toBe(200);
+  expect((await response.json()).session).toMatchObject({
+    status: "running",
+    currentUrl: COMPASS_CAPTCHA,
+    frameUrl: null,
+    handoff: null,
+    canControl: false,
+  });
+  expect((await h.state()).session.status).toBe("running");
+  expect(h.grant.expiresAt).toBe(expiresAt);
+  expect(h.context.close).not.toHaveBeenCalled();
+  expect((await h.runner.read(token, id, "GET", true)).status).toBe(404);
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  h.navigate(COMPASS_INTRODUCTION_END);
+  await h.runner.sweep();
+  expect((await h.state()).session.status).toBe("completed");
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(1);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
+  expect(h.captureRoutes).not.toContain(COMPASS_CAPTCHA);
+  await h.runner.close();
+});
+
+it("offers a later real challenge in the same pending context without repeating the ordinary continuation", async () => {
+  const h = harness("ending");
+  await h.start();
+  h.page.waitForFunction.mockRejectedValue(new errors.TimeoutError("pending"));
+  await h.runner.control(token, id, await h.input());
+  h.setChallengeVisible(true);
+  await h.runner.sweep();
+  expect((await h.state()).session).toMatchObject({
+    status: "needs_parent",
+    currentUrl: COMPASS_CAPTCHA,
+    canControl: true,
+    handoff: { kind: "challenge" },
+  });
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_FAMILY_SAFETY),
+  ).toHaveLength(1);
+  await h.runner.close();
+});
+
+it.each([0, 2])(
+  "blocks a timed-out CAPTCHA with %s reviewed components",
+  async (count) => {
+    const h = harness("ending");
+    await h.start();
+    h.setCaptchaComponentCount(count);
+    h.page.waitForFunction.mockRejectedValue(
+      new errors.TimeoutError("pending"),
+    );
+    await expect(h.runner.control(token, id, await h.input())).rejects.toThrow(
+      "public_step_changed",
+    );
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect((await h.state()).session).toMatchObject({
+      status: "blocked",
+      frameUrl: null,
+      handoff: null,
+      canControl: false,
+    });
+    await h.runner.close();
+  },
+);
+
+it.each(["ordinary", "fake_timeout"])(
+  "does not hide a %s error as pending verification",
+  async (kind) => {
+    const h = harness("ending");
+    await h.start();
+    const error = new Error("public page failure");
+    if (kind === "fake_timeout") error.name = "TimeoutError";
+    h.page.waitForFunction.mockRejectedValue(error);
+    await expect(h.runner.control(token, id, await h.input())).rejects.toThrow(
+      "public page failure",
+    );
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect((await h.state()).session.status).toBe("blocked");
+    await h.runner.close();
+  },
+);
+
+it.each([
+  "cancelled",
+  "paused",
+  "revoked",
+  "expired",
+  "foreign",
+  "stop",
+] as const)(
+  "ends pending verification when %s happens during its bounded wait",
+  async (reason) => {
+    const h = harness("ending");
+    await h.start();
+    const command = await h.input();
+    h.page.waitForFunction.mockImplementation(async () => {
+      if (reason === "expired")
+        vi.setSystemTime(new Date(h.grant.expiresAt + 1));
+      else if (reason === "revoked")
+        h.authorize.mockRejectedValue(new Error("revoked"));
+      else if (reason === "foreign")
+        h.authorize.mockResolvedValue({ ...h.grant, ownerId: "foreign" });
+      else if (reason === "stop") await h.runner.read(token, id, "DELETE");
+      else h.grant.authority.status = reason;
+      throw new errors.TimeoutError("pending");
+    });
+    await expect(h.runner.control(token, id, command)).rejects.toThrow();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    expect(h.captureRoutes).not.toContain(COMPASS_CAPTCHA);
+    await h.runner.close();
+  },
+);
+
+it.each(["unknown", "household"] as const)(
+  "reclassifies a %s navigation during a pending timeout without capturing it",
+  async (target) => {
+    const h = harness("ending");
+    await h.start();
+    h.page.waitForFunction.mockImplementation(async () => {
+      h.navigate(
+        target === "household"
+          ? COMPASS_HOUSEHOLD_ENTRY
+          : "https://unreviewed.example.test/",
+      );
+      throw new errors.TimeoutError("pending");
+    });
+    const response = await h.runner.control(token, id, await h.input());
+    expect((await response.json()).session).toMatchObject({
+      status: target === "household" ? "completed" : "blocked",
+      canControl: false,
+      handoff: null,
+      frameUrl: null,
+    });
+    expect(
+      h.captureRoutes.every(
+        (url) => !url.includes("household") && !url.includes("unreviewed"),
+      ),
+    ).toBe(true);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await h.runner.close();
+  },
+);
+
+it.each(["ending", "household", "unknown"] as const)(
+  "rechecks a %s navigation during pending component inspection before treating it as missing",
+  async (target) => {
+    const h = harness("ending");
+    await h.start();
+    h.page.waitForFunction.mockRejectedValue(
+      new errors.TimeoutError("pending"),
+    );
+    h.setCaptchaComponentCount(0);
+    h.beforeCaptchaCount(() =>
+      h.navigate(
+        target === "ending"
+          ? COMPASS_INTRODUCTION_END
+          : target === "household"
+            ? COMPASS_HOUSEHOLD_ENTRY
+            : "https://unreviewed.example.test/",
+      ),
+    );
+    const response = await h.runner.control(token, id, await h.input());
+    expect((await response.json()).session.status).toBe(
+      target === "unknown" ? "blocked" : "completed",
+    );
+    expect(
+      h.captureRoutes.every(
+        (url) =>
+          !url.includes("household") &&
+          !url.includes("unreviewed") &&
+          url !== COMPASS_INTRODUCTION_END,
+      ),
+    ).toBe(true);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await h.runner.close();
+  },
+);
+
+it("automatically continues the provider's enabled normal Next after a same-page CAPTCHA result", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const waiting = (await h.state()).session;
+  await h.runner.sweep();
+  expect((await h.state()).session.handoff.frameId).toBe(
+    waiting.handoff.frameId,
+  );
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(0);
+  h.setCaptchaReady(true);
+  await h.runner.sweep();
+  expect((await h.state()).session.status).toBe("completed");
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(1);
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
+  expect(
+    h.captureRoutes.some(
+      (url) => url.includes("/household") || url === COMPASS_INTRODUCTION_END,
+    ),
+  ).toBe(false);
+  await h.runner.sweep();
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(1);
+  await h.runner.close();
+});
+
+it.each(["missing", "foreign"] as const)(
+  "does not advance a %s CAPTCHA Next outside the reviewed component contract",
+  async (target) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaTarget(target);
+    h.setCaptchaReady(true);
+    await h.runner.sweep();
+    expect((await h.state()).session.status).toBe("needs_parent");
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    await h.runner.close();
+  },
+);
+
+it.each(["heading_changed", "id_changed"] as const)(
+  "stops before a CAPTCHA Next with %s public metadata",
+  async (target) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaTarget(target);
+    h.setCaptchaReady(true);
+    await h.runner.sweep();
+    const state = (await h.state()).session;
+    expect(state.status).toBe("blocked");
+    expect(state.handoff).toBeNull();
+    expect(state.frameUrl).toBeNull();
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await h.runner.close();
+  },
+);
+
+it.each(["cancelled", "paused", "revoked", "expired", "foreign"] as const)(
+  "cannot automatically continue an enabled CAPTCHA Next after %s authority",
+  async (reason) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaReady(true);
+    if (reason === "expired") vi.setSystemTime(new Date(h.grant.expiresAt + 1));
+    else if (reason === "revoked")
+      h.authorize.mockRejectedValue(new Error("revoked"));
+    else if (reason === "foreign")
+      h.authorize.mockResolvedValueOnce({ ...h.grant, ownerId: "foreign" });
+    else h.grant.authority.status = reason;
+    await h.runner.sweep();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    expect(h.forbiddenInput).not.toHaveBeenCalled();
+    await h.runner.close();
+  },
+);
+
+it.each(["navigation", "cancellation"] as const)(
+  "rejects a %s race during enabled CAPTCHA Next inspection",
+  async (reason) => {
+    const h = harness("captcha_challenge");
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    h.setCaptchaReady(true);
+    h.beforeHandle(() => {
+      if (reason === "navigation") h.navigate(COMPASS_HOUSEHOLD_ENTRY);
+      else h.grant.authority.status = "cancelled";
+    });
+    await h.runner.sweep();
+    expect(
+      h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+    ).toHaveLength(0);
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    expect(
+      h.captureRoutes.some(
+        (url) => url.includes("/household") || url === COMPASS_INTRODUCTION_END,
+      ),
+    ).toBe(false);
+    await h.runner.close();
+  },
+);
+
+it("serializes an enabled CAPTCHA continuation against sweep and retained parent input", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const previous = await h.input({ type: "key", key: "Tab" });
+  h.setCaptchaReady(true);
+  await Promise.allSettled([
+    h.runner.sweep(),
+    h.runner.sweep(),
+    h.runner.control(token, id, previous),
+  ]);
+  expect((await h.state()).session.status).toBe("completed");
+  expect(
+    h.clicks.mock.calls.filter(([url]) => url === COMPASS_CAPTCHA),
+  ).toHaveLength(1);
+  expect(h.keyPress).not.toHaveBeenCalled();
+  expect(h.context.newPage).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
+it.each(["challenge", "captcha_challenge", "captcha_challenge_late"] as const)(
+  "allows genuine bounded parent iframe control on the exact %s public route",
+  async (outcome) => {
+    const h = harness(outcome);
+    await h.start();
+    await h.runner.control(token, id, await h.input());
+    const challenge = await h.state();
+    expect(challenge.session.status).toBe("needs_parent");
+    expect(challenge.session.currentUrl).toBe(
+      outcome === "challenge" ? COMPASS_FAMILY_SAFETY : COMPASS_CAPTCHA,
+    );
+    const masks = (h.screenshot.mock.calls.at(-1)?.[0] as { mask: unknown[] })
+      .mask;
+    expect(masks).toContain(h.fieldMask);
+    expect(masks).toContain(h.unknownLocator);
+    expect(masks).not.toContain(h.challengeLocator);
+    await h.runner.control(
+      token,
+      id,
+      await h.input({ type: "click", x: 0.2, y: 0.2 }),
+    );
+    expect(h.challengeClick).toHaveBeenCalledWith({
+      position: { x: 120, y: 44 },
+      timeout: 2000,
+    });
+    await h.runner.control(
+      token,
+      id,
+      await h.input({ type: "key", key: "Tab" }),
+    );
+    expect(h.keyPress).toHaveBeenCalledWith("Tab", { timeout: 2000 });
+    h.navigate(COMPASS_HOUSEHOLD_ENTRY);
+    await h.runner.sweep();
+    expect((await h.state()).session.status).toBe("completed");
+    await h.runner.close();
+  },
+);
+
+it("rejects non-frame clicks, overlays and keys focused outside the approved frame without consuming the valid nonce", async () => {
+  const h = harness("challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const original = await h.input({ type: "click", x: 0.9, y: 0.9 });
+  await expect(h.runner.control(token, id, original)).rejects.toThrow(
+    "control_target",
+  );
+  h.setTopmost(false);
+  await expect(
+    h.runner.control(token, id, {
+      ...original,
+      action: { type: "click", x: 0.2, y: 0.2 },
+    }),
+  ).rejects.toThrow("control_target");
+  h.setFocused(false);
+  await expect(
+    h.runner.control(token, id, {
+      ...original,
+      action: { type: "key", key: "Enter" },
+    }),
+  ).rejects.toThrow("control_target");
+  const unchanged = (await h.state()).session;
+  expect(unchanged.handoff.frameId).toBe(original.frameId);
+  expect(unchanged.handoff.expiresAt).toBe(
+    new Date(h.grant.expiresAt).toISOString(),
+  );
+  expect(h.challengeClick).not.toHaveBeenCalled();
+  expect(h.keyPress).not.toHaveBeenCalled();
+  await h.runner.close();
+});
+
+it("lets a keyboard-only parent enter the actual verified challenge frame with Tab", async () => {
+  const h = harness("challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  h.setFocused(false);
+  await h.runner.control(token, id, await h.input({ type: "key", key: "Tab" }));
+  expect(h.keyPress).toHaveBeenCalledWith("Tab", { timeout: 2000 });
+  expect(h.challengeClick).not.toHaveBeenCalled();
+  await h.runner.close();
+});
+
+it("automatically updates changed challenge pixels and invalidates only the superseded frame", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const original = await h.input({ type: "key", key: "Tab" });
+  h.changePixels();
+  await h.runner.sweep();
+  const changed = (await h.state()).session;
+  expect(changed.handoff.frameId).not.toBe(original.frameId);
+  await expect(
+    h.runner.read(token, id, "GET", true, original.frameId),
+  ).rejects.toThrow("stale_frame");
+  await expect(h.runner.control(token, id, original)).rejects.toThrow(
+    "stale_frame",
+  );
+  const current = await h.input({ type: "key", key: "Tab" });
+  await h.runner.sweep();
+  expect((await h.state()).session.handoff.frameId).toBe(current.frameId);
+  await h.runner.control(token, id, current);
+  expect(h.keyPress).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
+it("keeps an identical displayed snapshot usable and never recaptures during its exact frame read", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const command = await h.input({ type: "key", key: "Tab" });
+  await h.runner.sweep();
+  expect((await h.state()).session.handoff.frameId).toBe(command.frameId);
+  const captures = h.screenshot.mock.calls.length;
+  h.changePixels();
+  const image = await h.runner.read(token, id, "GET", true, command.frameId);
+  expect(h.screenshot).toHaveBeenCalledTimes(captures);
+  expect(await image.text()).toContain(":initial");
+  const refreshed = (await h.state()).session;
+  expect(refreshed.handoff.frameId).not.toBe(command.frameId);
+  expect(refreshed.handoff.expiresAt).toBe(
+    new Date(h.grant.expiresAt).toISOString(),
+  );
+  await h.runner.close();
+});
+
+it("refuses changed challenge pixels immediately before input and preserves the fresh recoverable handoff", async () => {
+  const h = harness("captcha_challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const command = await h.input({ type: "click", x: 0.2, y: 0.2 });
+  h.changePixels();
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  expect(h.challengeClick).not.toHaveBeenCalled();
+  expect(h.context.close).not.toHaveBeenCalled();
+  const fresh = (await h.state()).session;
+  expect(fresh.status).toBe("needs_parent");
+  expect(fresh.handoff.frameId).not.toBe(command.frameId);
+  await h.runner.control(
+    token,
+    id,
+    await h.input({ type: "click", x: 0.2, y: 0.2 }),
+  );
+  expect(h.challengeClick).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
+it("waits for public SPA metadata before following the reviewed ending and divider controls", async () => {
+  const h = harness("ending");
+  await h.start();
+  h.setHydrating(true);
+  await h.runner.control(token, id, await h.input());
+  expect((await h.state()).session.status).toBe("completed");
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  await h.runner.close();
+});
+
+it("waits for the exact blank household form to hydrate before classifying the connection", async () => {
+  const h = harness("household");
+  await h.start();
+  h.setHydrating(true);
+  await h.runner.control(token, id, await h.input());
+  expect((await h.state()).session.status).toBe("completed");
+  expect(h.page.locator).toHaveBeenCalledWith(
+    'main input[id="firstName"][required]',
+  );
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
+  await h.runner.close();
+});
+
+it("rejects a challenge that reflows while current authorization is being checked", async () => {
+  const h = harness("challenge");
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  const command = await h.input({ type: "click", x: 0.2, y: 0.2 });
+  const ordinary = h.authorize.getMockImplementation()!;
+  let checks = 0;
+  h.authorize.mockImplementation(async () => {
+    checks++;
+    if (checks === 5) h.moveChallenge();
+    return ordinary();
+  });
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "control_target",
+  );
+  expect(h.challengeClick).not.toHaveBeenCalled();
+  expect((await h.state()).session.handoff.frameId).not.toBe(command.frameId);
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "stale_frame",
+  );
+  await h.runner.close();
+});
+
+it("Stop clears the context before a newly reached public ending can resume", async () => {
+  const h = harness("ending");
+  await h.start();
+  h.navigate(COMPASS_INTRODUCTION_END);
+  const stopped = await (await h.runner.read(token, id, "DELETE")).json();
+  expect(stopped.session.status).toBe("closed");
+  expect(
+    h.clicks.mock.calls.filter(
+      ([url]) =>
+        url === COMPASS_INTRODUCTION_END || url === COMPASS_HOUSEHOLD_DIVIDER,
+    ),
+  ).toHaveLength(0);
+  expect(h.context.close).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
+it("masks and refuses an invisible or foreign verification iframe", async () => {
+  const h = harness("challenge");
+  h.setChallengeUrl(
+    "https://www.google.com/recaptcha/api2/anchor?size=invisible",
+  );
+  await h.start();
+  await h.runner.control(token, id, await h.input());
+  expect((await h.state()).session.status).toBe("blocked");
+  expect((h.screenshot.mock.calls[8][0] as { mask: unknown[] }).mask).toContain(
+    h.challengeLocator,
+  );
+  expect(h.challengeClick).not.toHaveBeenCalled();
+  await h.runner.close();
+});
+
+it("rejects foreign owners, wrong sessions, arbitrary input and concurrent replay without browser effects", async () => {
+  const h = harness();
+  await h.start();
+  const command = await h.input({ type: "refresh" });
+  h.authorize.mockResolvedValueOnce({ ...h.grant, ownerId: "another-owner" });
+  await expect(h.runner.control("foreign-token", id, command)).rejects.toThrow(
+    "not_owned",
+  );
+  await expect(
+    h.runner.control(token, id, { ...command, sessionId: fixtureRequest().id }),
+  ).rejects.toThrow("stale_frame");
+  await expect(
+    h.runner.control(token, id, {
+      ...command,
+      action: { type: "type", text: "sensitive" },
+    }),
+  ).rejects.toThrow();
+  const captures = h.screenshot.mock.calls.length;
+  const results = await Promise.allSettled([
+    h.runner.control(token, id, command),
+    h.runner.control(token, id, command),
+  ]);
+  expect(
+    results.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
+  expect(results.filter((result) => result.status === "rejected")).toHaveLength(
+    1,
+  );
+  expect(h.screenshot).toHaveBeenCalledTimes(captures + 2);
+  expect((await h.state()).session.handoff.frameId).not.toBe(command.frameId);
+  expect(h.forbiddenInput).not.toHaveBeenCalled();
+  await h.runner.close();
+});
+
+it("rejects navigation during target inspection before it can click a different page's Next", async () => {
+  const h = harness("household");
+  await h.start();
+  const command = await h.input();
+  h.beforeHandle(() => h.navigate(COMPASS_HOUSEHOLD_ENTRY));
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "page_changed",
+  );
+  expect(
+    h.clicks.mock.calls.filter(
+      ([url]) =>
+        url === COMPASS_FAMILY_SAFETY || url === COMPASS_HOUSEHOLD_ENTRY,
+    ),
+  ).toHaveLength(0);
+  expect(new Set(h.captureRoutes).size).toBe(9);
+  expect((await h.state()).session.canControl).toBe(false);
+  await h.runner.close();
+});
+
+it.each(["paused", "cancelled", "revoked", "expired"] as const)(
+  "erases the same-session handoff when authority becomes %s",
+  async (reason) => {
+    const h = harness();
+    await h.start();
+    const command = await h.input();
+    if (reason === "expired") vi.setSystemTime(new Date(h.grant.expiresAt + 1));
+    else if (reason === "revoked")
+      h.authorize.mockRejectedValue(new Error("revoked"));
+    else h.grant.authority.status = reason;
+    await h.runner.sweep();
+    expect(h.context.close).toHaveBeenCalledTimes(1);
+    await expect(h.runner.control(token, id, command)).rejects.toThrow();
+    if (reason !== "revoked") {
+      const value = await h.state();
+      expect(value.session.frameUrl).toBeNull();
+      expect(value.session.handoff).toBeNull();
+      expect(value.session.canControl).toBe(false);
+    }
+    await h.runner.close();
+  },
+);
+
+it("bounds accepted commands without changing the session deadline, and invalid requests do not refresh it", async () => {
+  const h = harness();
+  await h.start();
+  for (let index = 0; index < 12; index++)
+    await h.runner.control(token, id, await h.input({ type: "refresh" }));
+  const command = await h.input({ type: "refresh" });
+  await expect(h.runner.control(token, id, command)).rejects.toThrow(
+    "control_rate",
+  );
+  expect((await h.state()).session.handoff.frameId).toBe(command.frameId);
+  expect((await h.state()).session.handoff.expiresAt).toBe(
+    new Date(h.grant.expiresAt).toISOString(),
+  );
+  await h.runner.close();
+});
+
+it("ends an exhausted total command allowance instead of advertising permanently unusable controls", async () => {
+  const h = harness();
+  await h.start();
+  let result;
+  for (let index = 0; index < 120; index++) {
+    if (index % 12 === 0) vi.setSystemTime(new Date(Date.now() + 11000));
+    result = await (
+      await h.runner.control(token, id, await h.input({ type: "refresh" }))
+    ).json();
+  }
+  expect(result.session.status).toBe("blocked");
+  expect(result.session.summary).toContain("interaction limit");
+  expect(result.session.canControl).toBe(false);
+  expect(result.session.handoff).toBeNull();
+  expect(h.context.close).toHaveBeenCalledTimes(1);
+  await h.runner.close();
+});
+
+it("cannot restore a frame after Stop races with screenshot capture", async () => {
+  const h = harness();
+  let finish: (value: Buffer) => void = () => {};
+  h.screenshot.mockImplementationOnce(
+    () =>
+      new Promise<Buffer>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await h.runner.read(token, id, "POST");
+  await vi.waitFor(() => expect(h.screenshot).toHaveBeenCalled());
+  await h.runner.read(token, id, "DELETE");
+  finish(Buffer.from("late frame"));
+  await vi.waitFor(() => expect(h.context.close).toHaveBeenCalled());
+  const value = await h.state();
+  expect(value.session.status).toBe("closed");
+  expect(value.session.frameUrl).toBeNull();
+  expect(value.session.handoff).toBeNull();
+  expect((await h.runner.read(token, id, "GET", true)).status).toBe(404);
+  await h.runner.close();
+});

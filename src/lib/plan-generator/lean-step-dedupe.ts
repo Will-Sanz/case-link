@@ -1,5 +1,12 @@
 import type { LeanPlanPhaseStep } from "@/lib/plan-generator/lean-plan-schema";
 
+/** Similar wording can describe different work. Only identical compact steps are rejected. */
+export function hasExactDuplicateLeanSteps(steps: LeanPlanPhaseStep[]): boolean {
+  const keys = steps.map(step => JSON.stringify(step, (_key, value: unknown) =>
+    typeof value === "string" ? value.trim().toLowerCase().replace(/\s+/g, " ") : value));
+  return new Set(keys).size !== keys.length;
+}
+
 function normalizeBlob(s: string): string {
   return s
     .toLowerCase()
@@ -54,7 +61,6 @@ export function dedupeLeanPhaseStepsInBatch(steps: LeanPlanPhaseStep[]): LeanPla
     if (out.some((o) => stepsAreNearDuplicate(o, s))) continue;
     out.push(s);
   }
-  if (out.length === 0 && steps.length > 0) return [steps[0]!];
   return out;
 }
 
@@ -84,7 +90,7 @@ export function filterStepsAgainstPriorSummary(
 }
 
 /**
- * In-batch dedupe, then drop steps that largely repeat prior-phase summary (keeps at least one if all filtered).
+ * In-batch dedupe, then drop steps that largely repeat prior-phase summary.
  */
 export function dedupeLeanPhaseSteps(
   steps: LeanPlanPhaseStep[],
@@ -93,7 +99,7 @@ export function dedupeLeanPhaseSteps(
   let next = dedupeLeanPhaseStepsInBatch(steps);
   if (priorSummary?.trim()) {
     const filtered = filterStepsAgainstPriorSummary(next, priorSummary);
-    if (filtered.length > 0) next = dedupeLeanPhaseStepsInBatch(filtered);
+    next = filtered;
   }
   return next;
 }

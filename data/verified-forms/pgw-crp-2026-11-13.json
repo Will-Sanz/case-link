@@ -1,0 +1,27 @@
+{
+  "id": "pgw-crp-public-form-2026-11-13",
+  "version": "2026-11-13.v1",
+  "programId": "pgw-crp",
+  "sourceUrl": "https://www.pgworks.com/uploads/media/CRPApplicationEng.pdf",
+  "officialGuidanceUrl": "https://www.pgworks.com/about-your-bill/financial-support-programs/crp",
+  "sourceCheckedAt": "2026-11-13T21:39:43.000Z",
+  "verifiedUntil": "2026-11-20T21:39:43.000Z",
+  "sourceSha256": "f67e89ab9a0102d5cc95c73c6d1c14b7fe14daa697aa850b269826e0240a149c",
+  "sourceByteLength": 2332657,
+  "pageCount": 4,
+  "blankPageNumbers": [2],
+  "fillableFieldCount": 0,
+  "identifierTypes": ["ssn", "drivers_license", "student_id", "passport", "visa", "itin", "other"],
+  "customerOfRecordOmissions": ["governmentIdentifier", "dateOfBirth"],
+  "personalActs": ["customer_signature_and_responsibilities", "outside_supporter_signature_when_applicable"],
+  "semanticLimits": [
+    "The observed source has no printed version identifier; this is an observation contract, not an invented provider version.",
+    "All non-customer household members, adults and children, require an accepted identifier. Opaque requirements are not completed identification and no raw identifier belongs in this formatter or application JSON.",
+    "The customer of record's ID and birth date are not required. Do not collect either just to prepare this application.",
+    "New enrollment, recertification, re-enrollment and pending work remain distinct. No draft establishes the correct existing-account journey or an amount due.",
+    "Gross income evidence, no-income statements, outside financial support and SNAP/housing amounts have separate requirements. Source types do not validate proof or establish a zero-income claim.",
+    "The customer and applicable outside supporter complete their actual personal acts. The formatter supplies no signature, date, responsibility assent, payment or financial commitment.",
+    "Static unsigned preparation is separate from protected member-ID insertion, final evidence assembly, accepted submission, receipt, reconnection or assistance.",
+    "The weekly source ceiling and local field/page limits are engineering bounds, not provider eligibility rules or processing approval."
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "project": "zpfypkizsapvsxeykmdq",
+  "observedAt": "2026-10-15T01:23:00Z",
+  "signupDisabled": true,
+  "canonicalSiteUrl": "https://www.thecaselink.com",
+  "redirectAllowlist": [
+    "https://www.thecaselink.com/auth/callback"
+  ],
+  "minimumPasswordLength": 14,
+  "passwordRequiresLowerUpperDigitsSymbols": true,
+  "secureEmailChange": true,
+  "securePasswordChange": true,
+  "emailCodeExpirySeconds": 900,
+  "emailCodeLength": 8,
+  "passkeySignInEnabled": false,
+  "totpEnrollmentEnabled": false,
+  "phoneMfaEnabled": false,
+  "aal1DeadlineEnabled": false,
+  "verifiedFactors": 0,
+  "refreshTokenRotationEnabled": true,
+  "refreshReuseIntervalSeconds": 10,
+  "accessTokenSeconds": 3600,
+  "sessionTimeboxHours": 0,
+  "inactivityTimeoutHours": 0,
+  "sessionPolicyLimitation": "Timebox/inactivity controls and leaked-password screening require an unapproved paid plan; no upgrade performed. Explicit logout/offboarding revoke live database access and have hosted evidence.",
+  "smtp": {
+    "enabled": true,
+    "host": "smtp.resend.com",
+    "port": 587,
+    "minimumIntervalSeconds": 15,
+    "existingCredentialPreserved": true,
+    "actualOwnerInboxDeliveryVerified": true
+  },
+  "credentialsIncluded": false
+}

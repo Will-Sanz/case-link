@@ -1,0 +1,7 @@
+{
+  "caseId": "description-new_snap-2-en",
+  "attempt": 3,
+  "requestHash": "f208f081d629f01c385fb33107ff39d286ed47fce67adb4358993cb3e03f7cdf",
+  "responseHash": "f263cb0541adc2cab00589841b4e6f2f610669c80e486c0ea353cbe9e1268552",
+  "message": "{\"needIds\":[\"snap_pending\"],\"selections\":[{\"need\":\"snap_pending\",\"programId\":\"snap-pa\",\"reason\":\"pending\"},{\"need\":\"snap_pending\",\"programId\":\"uesf-benefits\",\"reason\":\"pending\"}],\"assertions\":[{\"questionId\":\"benefitHistory\",\"value\":\"never\",\"span\":{\"start\":0,\"end\":29,\"text\":\"I have never applied for SNAP\"}}],\"exclusions\":[],\"questionIds\":[\"foodForTwoDays\"],\"outOfScope\":null}"
+}

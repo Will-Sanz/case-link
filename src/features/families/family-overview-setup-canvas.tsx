@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { formatSchoolTimestamp } from "@/lib/dates";
+
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { Check, Xmark } from "iconoir-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +15,20 @@ import type { BarrierPresetLabel } from "@/types/barrier-workflow";
 type BarrierOption = { key: string; label: string };
 
 type CustomBarrierRow = { id: string; text: string };
+
+function GenerationElapsed() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const minutes = Math.floor(seconds / 60);
+  const elapsed = minutes === 0 ? `${seconds}s` : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  return <span>Preparing actions and target dates… {elapsed}</span>;
+}
 
 export function FamilyOverviewSetupCanvas({
   familyName,
@@ -27,11 +43,8 @@ export function FamilyOverviewSetupCanvas({
   lastSavedAt,
   error,
   generateBusy,
-  generateStartedAt,
-  elapsedSeconds,
   onGenerate,
   hasGeneratedThisSession,
-  formatElapsed,
 }: {
   familyName: string;
   barrierOptions: readonly BarrierOption[];
@@ -46,11 +59,8 @@ export function FamilyOverviewSetupCanvas({
   error: string | null;
   /** True while plan generation (including staged 60/90 phases) is in progress. */
   generateBusy: boolean;
-  generateStartedAt: number | null;
-  elapsedSeconds: number;
   onGenerate: () => void;
   hasGeneratedThisSession: boolean;
-  formatElapsed: (seconds: number) => string;
 }) {
   const [customDraft, setCustomDraft] = useState("");
 
@@ -87,7 +97,7 @@ export function FamilyOverviewSetupCanvas({
           <h1 className="workspace-display mt-1 text-2xl text-[var(--color-ink)]">{familyName}</h1>
         </div>
         {lastSavedAt ? (
-          <p className="text-xs text-[var(--color-ink-faint)]">Updated {new Date(lastSavedAt).toLocaleString()}</p>
+          <p className="text-xs text-[var(--color-ink-faint)]">Updated {formatSchoolTimestamp(lastSavedAt)}</p>
         ) : null}
       </header>
 
@@ -193,18 +203,27 @@ export function FamilyOverviewSetupCanvas({
           </div>
         </section>
 
-        {/* 3. Additional context */}
+        {/* 3. Family context */}
         <section className="space-y-3">
           <Label htmlFor="family-additional-context" className="text-sm font-semibold text-[var(--color-ink)]">
-            Additional context
+            Family priorities and context <span className="font-normal text-[var(--color-ink-muted)]">(optional)</span>
           </Label>
+          <div id="family-context-prompts" className="space-y-2 text-sm leading-6 text-[var(--color-ink-muted)]">
+            <p>Use what the family has shared. Leave anything you have not discussed out.</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>What matters most to the family right now?</li>
+              <li>What strengths, support, or routines are already helping?</li>
+              <li>What practical limits or preferences should the plan respect, and what have they already tried?</li>
+            </ul>
+          </div>
           <Textarea
             id="family-additional-context"
             className="min-h-[120px] resize-y border-[var(--color-rule-strong)] bg-[var(--color-surface)] text-sm leading-relaxed text-[var(--color-ink-strong)] placeholder:text-[var(--color-ink-faint)] focus-visible:border-[var(--color-focus)] focus-visible:ring-[var(--color-focus)]/15"
             value={additionalContext}
             onChange={(e) => onAdditionalContextChange(e.target.value)}
-            placeholder="Describe anything important about the situation..."
-            aria-describedby="family-additional-context-help"
+            placeholder="For example: The family wants to keep the school routine steady. A relative can help with transport twice a week. Calls need to be after work; an earlier application is still waiting for a response."
+            maxLength={4000}
+            aria-describedby="family-context-prompts family-additional-context-help"
           />
           <p id="family-additional-context-help" className="text-xs leading-5 text-[var(--color-ink-faint)]">
             Keep this de-identified. Do not include names, addresses, birth dates, student IDs,
@@ -215,7 +234,7 @@ export function FamilyOverviewSetupCanvas({
         {/* 5. Live setup preview */}
         {showLivePreview ? (
           <section className="space-y-3" aria-live="polite">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">Context</p>
+            <p className="text-sm font-semibold text-[var(--color-ink)]">Context for this draft</p>
             {selectedSet.size > 0 || customBarriers.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {barrierOptions
@@ -271,13 +290,13 @@ export function FamilyOverviewSetupCanvas({
                   : "Draft action plan"}
             </Button>
           </div>
-          {generateBusy && generateStartedAt ? (
+          {generateBusy ? (
             <div className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
               <span
                 className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-rule-strong)] border-t-[var(--color-accent)]"
                 aria-hidden
               />
-              <span>Preparing actions and target dates… {formatElapsed(elapsedSeconds)}</span>
+              <GenerationElapsed />
             </div>
           ) : null}
         </div>

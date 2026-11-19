@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "approvalReference": "REQUIRES_RECORDED_AUTHORITY",
+  "approvedUntil": "2000-01-01T00:00:00Z",
+  "publicOrigin": "https://pilot.thecaselink.com",
+  "projectOrigin": "https://zpfypkizsapvsxeykmdq.supabase.co",
+  "service": "worker",
+  "databaseUrl": "REQUIRES_DEDICATED_LOGIN_DIRECT_VERIFY_FULL_URL",
+  "brokerSecret": "REQUIRES_SHARED_BROKER_SECRET",
+  "modelKey": "REQUIRES_WORKER_MODEL_KEY",
+  "parserImage": "REQUIRES_REVIEWED_PARSER_IMAGE_DIGEST",
+  "dockerHost": "unix:///run/user/REQUIRES_PARSER_UID/docker.sock",
+  "parserDaemonId": "REQUIRES_VERIFIED_ROOTLESS_DAEMON_ID"
+}

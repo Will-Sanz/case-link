@@ -1,18 +1,9 @@
 import { z } from "zod";
+import { parseDateOnly } from "@/lib/dates";
 
-const dateOnlySchema = (message: string) =>
-  z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, message)
-    .refine((value) => {
-      const [year, month, day] = value.split("-").map(Number);
-      const date = new Date(Date.UTC(year, month - 1, day));
-      return (
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() === month - 1 &&
-        date.getUTCDate() === day
-      );
-    }, message);
+export const dateOnlySchema = (message: string) =>
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, message)
+    .refine((value) => parseDateOnly(value) !== null, message);
 
 export const aiModeSchema = z.enum(["fast", "thinking"]).optional();
 
@@ -29,6 +20,8 @@ const planStepDetailsSchema = z.object({
   contacts: z
     .array(
       z.object({
+        source_resource_id: z.string().uuid().optional(),
+        source_updated_at: z.string().datetime({ offset: true }).optional(),
         name: z.string().optional(),
         phone: z.string().optional(),
         email: z.string().optional(),
@@ -60,27 +53,22 @@ const planStepWorkflowSchema = z.object({
   checklist_completed: z.array(z.boolean()).optional(),
 });
 
-export const generatePlanSchema = z.object({
+export const stagedPlanStartSchema = z.object({
   familyId: z.string().uuid(),
-  /** Optional notes when regenerating an existing plan; passed to the AI. */
   regenerationFeedback: z.string().max(4000).optional(),
-  /**
-   * Set by the Regenerate UI only. When true, the server requires a successful
-   * OpenAI plan (no rules fallback) so titles and full step content are freshly generated.
-   */
-  regenerateExistingPlan: z.boolean().optional(),
   aiMode: aiModeSchema,
-});
-
-export const stagedPlanStartSchema = generatePlanSchema.pick({
-  familyId: true,
-  regenerationFeedback: true,
-  aiMode: true,
 });
 
 export const stagedPlanAdvanceSchema = z.object({
   familyId: z.string().uuid(),
+  planId: z.string().uuid(),
   aiMode: aiModeSchema,
+});
+
+export const continuePlanManuallySchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
 export const planClientDisplaySchema = z.object({
@@ -104,13 +92,14 @@ export const updatePlanSchema = z.object({
 export const markPlanReviewedSchema = z.object({
   familyId: z.string().uuid(),
   planId: z.string().uuid(),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
 export const updatePlanStepSchema = z.object({
   stepId: z.string().uuid(),
   familyId: z.string().uuid(),
-  expectedUpdatedAt: z.string().datetime().optional(),
-  title: z.string().min(1).max(500).optional(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
+  title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(4000).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
   details: planStepDetailsSchema.optional(),
@@ -151,19 +140,12 @@ export const linkResourceToStepSchema = z.object({
   stepId: z.string().uuid(),
 });
 
-export const toggleChecklistItemSchema = z.object({
-  stepId: z.string().uuid(),
-  familyId: z.string().uuid(),
-  checklistIndex: z.number().int().min(0),
-  completed: z.boolean(),
-});
-
 export const updatePlanStepActionItemSchema = z.object({
   actionItemId: z.string().uuid(),
   familyId: z.string().uuid(),
-  expectedUpdatedAt: z.string().datetime().optional(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]).optional(),
-  title: z.string().min(1).max(500).optional(),
+  title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(4000).nullable().optional(),
   week_index: z.number().int().min(1).max(52).optional(),
   target_date: z
@@ -183,33 +165,58 @@ export const refineStepSchema = z.object({
   aiMode: aiModeSchema,
 });
 
+export const savePlanEditsSchema = z.object({
+  familyId: z.string().uuid(),
+  planId: z.string().uuid(),
+  steps: z.array(z.object({
+    stepId: z.string().uuid(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+    patch: updatePlanStepSchema.omit({ familyId: true, stepId: true, expectedUpdatedAt: true }).strict(),
+    actionItems: z.array(z.object({
+      actionItemId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      patch: updatePlanStepActionItemSchema.omit({ familyId: true, actionItemId: true, expectedUpdatedAt: true }).strict(),
+    })).max(50),
+  })).min(1).max(15),
+});
+export type SavePlanEditsInput = z.infer<typeof savePlanEditsSchema>;
+
 const previewDraftActionItemSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.union([z.string().max(4000), z.null()]).optional(),
-  week_index: z.number().int().min(1).max(12),
-  target_date: z.union([z.string(), z.null()]).optional(),
+  id: z.string().uuid(),
+  updated_at: z.string().datetime({ offset: true }),
+  status: z.enum(["pending", "in_progress", "completed", "blocked"]),
+  notes: z.string().max(2000).nullable(),
+  outcome: z.string().max(2000).nullable(),
+  follow_up_date: dateOnlySchema("Use a valid follow-up date").nullable(),
+  title: z.string().trim().min(1).max(500),
+  description: z.string().max(4000).nullable(),
+  week_index: z.number().int().min(1).max(52),
+  target_date: dateOnlySchema("Use a valid target date").nullable(),
+});
+
+export const previewStepDraftSchema = z.object({
+  id: z.string().uuid(),
+  updated_at: z.string().datetime({ offset: true }),
+  status: z.enum(["pending", "in_progress", "completed", "blocked"]),
+  workflow_data: planStepWorkflowSchema.optional(),
+  phase: z.enum(["30", "60", "90"]),
+  title: z.string().trim().min(1).max(500),
+  description: z.string().max(4000),
+  details: planStepDetailsSchema.optional(),
+  action_items: z.array(previewDraftActionItemSchema).max(50),
 });
 
 export const previewRefinePlanSchema = z.object({
   familyId: z.string().uuid(),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
   feedback: z.string().min(1, "Feedback is required").max(2000),
   aiMode: aiModeSchema,
   draft: z.object({
-    steps: z
-      .array(
-        z.object({
-          phase: z.enum(["30", "60", "90"]),
-          title: z.string().min(1).max(500),
-          description: z.string().max(4000),
-          details: planStepDetailsSchema.optional(),
-          action_items: z.array(previewDraftActionItemSchema).min(1).max(10),
-        }),
-      )
-      .min(1)
-      .max(15),
+    steps: z.array(previewStepDraftSchema).min(1).max(15),
   }),
 });
 
 
-/** Same shape as refine; used for preview-only AI step revision. */
-export const previewRefineStepSchema = refineStepSchema;
+export const previewRefineStepSchema = refineStepSchema.extend({
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/), draft: previewStepDraftSchema,
+});

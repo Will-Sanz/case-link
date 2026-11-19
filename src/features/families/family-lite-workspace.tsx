@@ -1,6 +1,9 @@
 "use client";
 
+import { formatSchoolTimestamp } from "@/lib/dates";
+
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +26,7 @@ import { ArchiveFamilyFromListControl } from "@/features/families/archive-family
 import { FamilyOverviewSetupCanvas } from "@/features/families/family-overview-setup-canvas";
 import { DEFAULT_AI_MODE } from "@/lib/ai/ai-mode";
 import { cn } from "@/lib/utils/cn";
+import { pollPlanGeneration } from "@/lib/domain/plan/poll-generation";
 import { completedGenerationStageCount } from "@/lib/domain/plan/generation-progress";
 import { validateNoPii } from "@/lib/privacy/no-pii";
 import type {
@@ -40,7 +44,7 @@ function savedAdditionalDetails(
 function parseBarrierLinesOrdered(input: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const part of input.split(/\r?\n|,|;/)) {
+  for (const part of input.split(/\r?\n/)) {
     const t = part.trim();
     if (!t) continue;
     const key = t.toLowerCase();
@@ -59,13 +63,6 @@ function initialCustomBarriers(
     id: crypto.randomUUID(),
     text,
   }));
-}
-
-function formatElapsed(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (mins === 0) return `${secs}s`;
-  return `${mins}m ${String(secs).padStart(2, "0")}s`;
 }
 
 function ResourceMatchCard({
@@ -184,25 +181,30 @@ function ResourceMatchCard({
 
 export function FamilyLiteWorkspace({
   familyId,
+  familyUpdatedAt,
   familyName,
   barrierOptions,
   initialResult,
   plan,
+  hasPreviousReviewedPlan = false,
   progressUpdates = [],
   caseNotes = [],
   tab = "plan",
 }: {
   familyId: string;
+  familyUpdatedAt: string;
   familyName: string;
   barrierOptions: readonly { key: string; label: string }[];
   initialResult: BarrierWorkflowResult | null;
   /** Latest `plans` + `plan_steps` from the server, canonical for edit + PDF. */
   plan: PlanWithSteps | null;
+  hasPreviousReviewedPlan?: boolean;
   progressUpdates?: CaseProgressUpdateRow[];
   caseNotes?: CaseNoteRow[];
   tab?: "overview" | "plan" | "resources" | "assistant";
 }) {
   const router = useRouter();
+  const [contextUpdatedAt, setContextUpdatedAt] = useState(familyUpdatedAt);
   const [result, setResult] = useState<BarrierWorkflowResult | null>(initialResult);
   const [selected, setSelected] = useState<BarrierPresetLabel[]>(
     (initialResult?.selectedBarriers ?? []).filter((s): s is BarrierPresetLabel =>
@@ -219,17 +221,19 @@ export function FamilyLiteWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [localPlanGenerating, setLocalPlanGenerating] = useState(false);
-  const [generateStartedAt, setGenerateStartedAt] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hasGeneratedThisSession, setHasGeneratedThisSession] = useState(false);
   const [resourceRetrying, setResourceRetrying] = useState(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
+  const [pollPaused, setPollPaused] = useState(false);
   const serverPlanStillGenerating = plan?.generation_state?.status === "running";
-  const planGenerateBusy = localPlanGenerating || serverPlanStillGenerating;
+  const planGenerateBusy = localPlanGenerating || (serverPlanStillGenerating && !pollPaused);
   const savedGenerationStages = completedGenerationStageCount(plan?.generation_state);
+  const singlePlanGeneration = !plan?.generation_state || plan.generation_state.generation_strategy === "single";
   const generationStageLabel =
-    savedGenerationStages === 0
+    singlePlanGeneration
+      ? "Drafting your plan"
+      : savedGenerationStages === 0
       ? "Drafting the first actions"
       : savedGenerationStages === 1
         ? "Adding follow-up actions"
@@ -238,39 +242,58 @@ export function FamilyLiteWorkspace({
           : "Plan ready";
 
   const stagedPollRef = useRef<Promise<void> | null>(null);
-  const resumePollStartedRef = useRef(false);
+  const resumePollStartedRef = useRef<string | null>(null);
+  const pollController = useRef<AbortController | null>(null);
+  const pollPlanIdRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      pollController.current?.abort();
+      resumePollStartedRef.current = null;
+    };
+  }, [familyId]);
 
   const planGenerationStatus = plan?.generation_state?.status;
 
-  const runStagedPlanPolling = useCallback(async () => {
-    if (stagedPollRef.current) {
-      await stagedPollRef.current;
+  const runStagedPlanPolling = useCallback(async (planId?: string) => {
+    if (!planId) {
+      setPollPaused(true);
+      setError("Reload the saved draft before continuing preparation.");
       return;
     }
+    if (stagedPollRef.current) {
+      if (pollPlanIdRef.current !== planId) pollController.current?.abort();
+      await stagedPollRef.current;
+      if (!pollController.current?.signal.aborted || !mountedRef.current) return;
+    }
+    const controller = new AbortController();
+    pollPlanIdRef.current = planId;
+    pollController.current = controller;
+    setPollPaused(false);
     const promise = (async () => {
       try {
-        for (let i = 0; i < 6; i++) {
-          const adv = await advanceStagedLeanPlanGeneration({
-            familyId,
-            aiMode: DEFAULT_AI_MODE,
-          });
-          if (!adv.ok) {
-            setError(
-              `Plan preparation paused. Your completed work is saved. ${adv.error}`,
-            );
+        const outcome = await pollPlanGeneration(
+          () => advanceStagedLeanPlanGeneration({ familyId, planId, aiMode: DEFAULT_AI_MODE }),
+          async () => {
             const reload = await loadBarrierWorkflowForFamilyAction(familyId);
+            if (controller.signal.aborted) return;
             if (reload.ok) setResult(reload.result);
             router.refresh();
-            break;
-          }
-          const reload = await loadBarrierWorkflowForFamilyAction(familyId);
-          if (reload.ok) setResult(reload.result);
-          router.refresh();
-          if (adv.done) {
-            if (tab === "overview") router.push(`/families/${familyId}/plan`);
-            break;
-          }
-          await new Promise((res) => setTimeout(res, 250));
+          },
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        if (typeof outcome === "object") {
+          setPollPaused(true);
+          setError(`Plan preparation paused. Your completed work is saved. ${outcome.error}`);
+          if (tab === "overview") router.push(`/families/${familyId}/plan`);
+        } else if (outcome === "complete" && tab === "overview") {
+          router.push(`/families/${familyId}/plan`);
+        } else if (outcome === "superseded") {
+          setPollPaused(true);
+          setError("A newer draft is available. Reload to continue it.");
         }
       } finally {
         stagedPollRef.current = null;
@@ -280,9 +303,11 @@ export function FamilyLiteWorkspace({
     await promise;
   }, [familyId, router, tab]);
 
-  useEffect(() => {
+  const [previousInitialResult, setPreviousInitialResult] = useState(initialResult);
+  if (previousInitialResult !== initialResult) {
+    setPreviousInitialResult(initialResult);
     setResult(initialResult);
-  }, [initialResult]);
+  }
 
   /**
    * If the user landed or refreshed while a staged plan is still running, resume polling once.
@@ -290,36 +315,20 @@ export function FamilyLiteWorkspace({
    */
   useEffect(() => {
     if (planGenerationStatus !== "running") {
-      resumePollStartedRef.current = false;
+      resumePollStartedRef.current = null;
       return;
     }
-    if (resumePollStartedRef.current) return;
-    resumePollStartedRef.current = true;
+    if (!plan?.id || resumePollStartedRef.current === plan.id) return;
+    resumePollStartedRef.current = plan.id;
     setLocalPlanGenerating(true);
     void (async () => {
       try {
-        await runStagedPlanPolling();
+        await runStagedPlanPolling(plan.id);
       } finally {
         setLocalPlanGenerating(false);
-        resumePollStartedRef.current = false;
       }
     })();
-  }, [planGenerationStatus, runStagedPlanPolling]);
-
-  useEffect(() => {
-    if (!planGenerateBusy) {
-      setGenerateStartedAt(null);
-      setElapsedSeconds(0);
-      return;
-    }
-    const startedAt = Date.now();
-    setGenerateStartedAt(startedAt);
-    setElapsedSeconds(0);
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [planGenerateBusy]);
+  }, [planGenerationStatus, plan?.id, runStagedPlanPolling]);
 
   function toggleLabel(label: BarrierPresetLabel) {
     setSelected((prev) =>
@@ -375,8 +384,10 @@ export function FamilyLiteWorkspace({
           selectedBarriers: selected,
           additionalBarriers: customBarriers.map((b) => b.text).join("\n"),
           additionalDetails: additionalContext.trim(),
+          expectedUpdatedAt: contextUpdatedAt,
           aiMode: DEFAULT_AI_MODE,
         });
+        if (r.savedContextAt) setContextUpdatedAt(r.savedContextAt);
         if (!r.ok) {
           setError(r.error);
           router.refresh();
@@ -386,7 +397,7 @@ export function FamilyLiteWorkspace({
         setHasGeneratedThisSession(true);
 
         if (r.stagedPolling) {
-          await runStagedPlanPolling();
+          await runStagedPlanPolling(r.planId);
         } else {
           router.push(`/families/${familyId}/plan`);
         }
@@ -437,7 +448,7 @@ export function FamilyLiteWorkspace({
     setError(null);
     setLocalPlanGenerating(true);
     try {
-      await runStagedPlanPolling();
+      await runStagedPlanPolling(plan?.id);
     } finally {
       setLocalPlanGenerating(false);
     }
@@ -470,6 +481,11 @@ export function FamilyLiteWorkspace({
           {error}
         </p>
       ) : null}
+      {pollPaused && serverPlanStillGenerating ? (
+        <Button type="button" variant="secondary" onClick={continueDraft} disabled={localPlanGenerating}>
+          Continue draft
+        </Button>
+      ) : null}
       {tab === "overview" ? (
         <div className="space-y-3">
           <FamilyOverviewSetupCanvas
@@ -485,11 +501,8 @@ export function FamilyLiteWorkspace({
             lastSavedAt={result?.lastSavedAt}
             error={error}
             generateBusy={planGenerateBusy}
-            generateStartedAt={generateStartedAt}
-            elapsedSeconds={elapsedSeconds}
             onGenerate={generate}
             hasGeneratedThisSession={hasGeneratedThisSession}
-            formatElapsed={formatElapsed}
           />
           <div className="flex justify-end pt-1">
             <ArchiveFamilyFromListControl familyId={familyId} />
@@ -506,11 +519,28 @@ export function FamilyLiteWorkspace({
             </div>
             {result?.lastSavedAt ? (
               <p className="text-xs text-[var(--color-ink-faint)]">
-                Updated {new Date(result.lastSavedAt).toLocaleString()}
+                Updated {formatSchoolTimestamp(result.lastSavedAt)}
               </p>
             ) : null}
           </div>
+          {result?.additionalDetails.trim() ? (
+            <details open className="mt-5 border-t border-[var(--color-rule)] pt-4">
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30">
+                Family priorities and context
+              </summary>
+              <p className="mt-3 max-w-prose whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-muted)]">{result.additionalDetails}</p>
+              <p className="mt-3 text-xs leading-5 text-[var(--color-ink-faint)]">
+                Current saved context. Check the actions against it before approving; later context changes do not automatically update a draft.
+              </p>
+            </details>
+          ) : null}
         </Card>
+      ) : null}
+
+      {tab === "plan" && hasPreviousReviewedPlan ? (
+        <Link prefetch={false} href={`/families/${familyId}/plan/previous`} className="inline-block rounded-lg border border-[var(--color-rule)] px-4 py-3 text-sm underline">
+          View previous reviewed plan
+        </Link>
       ) : null}
 
       {tab === "plan" && plan ? (
@@ -531,16 +561,16 @@ export function FamilyLiteWorkspace({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-medium">{generationStageLabel}…</p>
-            <p className="text-xs text-[var(--color-ink-muted)]">{savedGenerationStages} of 3 stages safely saved</p>
+            {!singlePlanGeneration ? <p className="text-xs text-[var(--color-ink-muted)]">{savedGenerationStages} of 3 stages safely saved</p> : null}
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-rule)]" aria-hidden>
+          {!singlePlanGeneration ? <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-rule)]" aria-hidden>
             <div
               className="h-full origin-left rounded-full bg-[var(--color-positive)] transition-transform duration-500"
               style={{ transform: `scaleX(${savedGenerationStages / 3})` }}
             />
-          </div>
+          </div> : null}
           <p className="mt-2 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-            You can leave this page and return. Each completed pass is saved automatically.
+            You can leave this page and return. Your planning context is saved, and the draft is saved when it is ready.
           </p>
         </div>
       ) : null}
@@ -548,6 +578,7 @@ export function FamilyLiteWorkspace({
       {(result || plan) && tab === "plan" ? (
         <Card className="border-[var(--color-rule)] bg-[var(--color-surface)] p-5 [box-shadow:var(--shadow-surface)] sm:p-6">
           <FamilyPlanPanel
+            key={familyId}
             familyId={familyId}
             plan={plan}
             workflow={result}
@@ -625,7 +656,7 @@ export function FamilyLiteWorkspace({
       ) : null}
 
       {tab === "assistant" ? (
-        <CaseAssistantChat familyId={familyId} familyName={familyName} />
+        <CaseAssistantChat key={familyId} familyId={familyId} familyName={familyName} />
       ) : null}
     </div>
   );

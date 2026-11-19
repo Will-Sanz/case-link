@@ -1,0 +1,16 @@
+@media (max-width: 600px) {
+  .page.page {
+    padding-inline: min(1.25rem, 4vw);
+  }
+
+  .page.page h1 {
+    font-size: 1.75rem;
+  }
+
+  .directFood.directFood {
+    max-width: 100%;
+    padding-inline: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

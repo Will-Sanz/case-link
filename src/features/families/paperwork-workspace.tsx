@@ -26,7 +26,7 @@ export function PaperworkWorkspace({
           Check each goal, action, and target date, then mark the plan reviewed before
           opening its PDF.
         </p>
-        <Link
+        <Link prefetch={false}
           href={`/families/${familyId}/plan`}
           className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-ink)] hover:bg-[var(--color-accent-hover)]"
         >

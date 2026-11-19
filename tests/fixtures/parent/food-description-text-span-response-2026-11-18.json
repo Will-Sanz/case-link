@@ -1,0 +1,7 @@
+{
+  "caseId": "description-ambiguity-3-es",
+  "turn": 1,
+  "requestSha256": "d8b72220703b3a72300422606064bc62685255870af924d95820972cc967b66e",
+  "responseSha256": "37a0d96d6b4f3b36d0a4dca5f61a00415ebf532674817e6f23d58ac28d88ad37",
+  "message": "{\"needIds\":[\"food_now\"],\"selections\":[{\"need\":\"food_now\",\"programId\":\"philly-food\",\"reason\":\"immediate\"},{\"need\":\"food_now\",\"programId\":\"share-community-fridge-19129\",\"reason\":\"immediate\"}],\"assertions\":[{\"questionId\":\"benefitHistory\",\"value\":\"not_sure\",\"span\":{\"start\":28,\"end\":57,\"text\":\"no sé si hemos solicitado SNAP\"}}],\"exclusions\":[],\"questionIds\":[],\"outOfScope\":null}"
+}

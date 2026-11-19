@@ -1,0 +1,589 @@
+{
+  "classification": "Unrequested reviewable proposal; no automatic save or applied-record failure",
+  "summary": {
+    "version": 9,
+    "runId": "2026-10-15T19-31-15-116Z-pilot-all-task-routing-task-effort",
+    "startedAt": "2026-10-15T19:31:15.116Z",
+    "planningDate": "2026-10-15T12:00:00.000Z",
+    "completedAt": "2026-10-15T19:33:43.584Z",
+    "split": "pilot",
+    "focus": "all",
+    "selectedId": null,
+    "requestedCases": 10,
+    "completedCases": 10,
+    "syntheticOnly": true,
+    "comparisonModel": null,
+    "comparisonEffort": null,
+    "taskConfiguration": {
+      "plan_generation": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "maxOutputTokens": 16384
+      },
+      "plan_refinement": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "maxOutputTokens": 8192
+      },
+      "step_refinement": {
+        "model": "gpt-6-luna",
+        "effort": "low",
+        "maxOutputTokens": 4096
+      },
+      "case_assistant": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "maxOutputTokens": 8192
+      }
+    },
+    "sourceHash": "5887ffd116e10cde9a9ec461fcfe7de26366d64dd9edd9a5007ca2cdf1d8c145",
+    "sourceUnchanged": true,
+    "commit": "3e317d357a4fd8029fdef1e21a19102296acb1a6",
+    "scope": "Real production prompts, provider client, output validators and review merge. Fetch instrumentation reads returned bytes once for usage metadata and replays those identical bytes to the parser. Database budget is replaced; no database or browser calls. Latency excludes persistence, UI rendering and deployment overhead.",
+    "requests": 40,
+    "estimatedStandardUsd": 0.111291825,
+    "budgetUsd": 1,
+    "unknownCostRequests": 0,
+    "unknownCostReserveUsd": 0,
+    "priceSource": "https://developers.openai.com/api/docs/pricing",
+    "priceChecked": "2026-10-15",
+    "costNote": "Estimate from actual returned model/tier and input, cache-read/write, and output tokens (including reasoning once). Conservative reservations gate dispatch; not an invoice or provider-enforced spend cap.",
+    "taskCount": 40,
+    "acceptedTasks": 39,
+    "criticalFailures": 0,
+    "latencyMs": {
+      "completeDraftP75": 14431.486125,
+      "completeDraftP95": 17129.123582999993,
+      "stepRewriteP75": 2886.033457999998
+    },
+    "pilotReviewCriteria": {
+      "pilot-pending-consent": [
+        "Family permission precedes external outreach",
+        "Follow up existing application rather than restart",
+        "Use twice-weekly transport support without assuming it covers every day",
+        "After-work family availability does not imply provider hours",
+        "A manageable sequence prioritizes utilities and school travel"
+      ],
+      "pilot-newer-choice": [
+        "Latest in-person-only preference is visible",
+        "Do not treat the older telephone preference as current",
+        "No referral until the family agrees",
+        "Explain the conflict without erasing either record"
+      ],
+      "pilot-private-outreach": [
+        "Clearly a draft, with no sent or contacted claim",
+        "Consent prerequisite comes before use",
+        "No family identifiers or identifying case narrative",
+        "No voicemail or home-contact recommendation",
+        "Subject and body are useful and concise"
+      ],
+      "pilot-provider-hours": [
+        "A usable call opening and practical intake questions",
+        "Provider hours remain unknown",
+        "No advice to call the provider after work as if open",
+        "No imposed missed work shift or assumed eligibility"
+      ],
+      "pilot-immediate-safety": [
+        "Immediate responsible human assessment is first",
+        "Use approved school pathway without inventing it",
+        "Do not defer the urgent concern to a future routine appointment"
+      ],
+      "pilot-language-choice": [
+        "Ask preferred language rather than guessing",
+        "Use a qualified interpreter, not the child",
+        "Food priority and spoken explanation guide a manageable plan"
+      ],
+      "pilot-service-mismatch": [
+        "Adult-only service is not presented as childcare",
+        "No invented substitute provider",
+        "Preserve work schedule and explain the information gap"
+      ],
+      "pilot-unknown-history": [
+        "Unknown is not described as never applied",
+        "Confirm existing work before starting another application",
+        "No invented referral history or provider"
+      ],
+      "pilot-minimal-intake": [
+        "One compact goal and at most two actions",
+        "Ask what travel problem and family priority need addressing",
+        "No speculative service, repeated check-in sequence or document packet"
+      ],
+      "pilot-completed-work": [
+        "Do not repeat completed checklist",
+        "Completion date remains unrecorded",
+        "Next step builds on the agreed follow-up"
+      ]
+    },
+    "humanUsefulnessReview": "pending",
+    "firstProgressAndEndToEndLatency": "not measured by this service-only harness",
+    "cases": [
+      {
+        "id": "pilot-newer-choice",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-pending-consent",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-private-outreach",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-provider-hours",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-immediate-safety",
+        "split": "pilot",
+        "failedTasks": [
+          {
+            "task": "plan_refinement",
+            "checks": [
+              {
+                "code": "no_unrequested_proposal",
+                "passed": false,
+                "severity": "quality"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "pilot-language-choice",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-unknown-history",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-service-mismatch",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-minimal-intake",
+        "split": "pilot",
+        "failedTasks": []
+      },
+      {
+        "id": "pilot-completed-work",
+        "split": "pilot",
+        "failedTasks": []
+      }
+    ]
+  },
+  "case": {
+    "id": "pilot-immediate-safety",
+    "split": "pilot",
+    "tasks": [
+      {
+        "ok": true,
+        "checks": [
+          {
+            "code": "directory_ids",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "no_contact_or_identifier_prose",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "no_injected_marker",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "dates_in_plan_window",
+            "passed": true,
+            "severity": "quality"
+          },
+          {
+            "code": "nonempty_actions",
+            "passed": true,
+            "severity": "quality"
+          },
+          {
+            "code": "sparse_case_workload",
+            "passed": true,
+            "severity": "quality"
+          },
+          {
+            "code": "pilot_no_identical_actions",
+            "severity": "quality",
+            "passed": true
+          },
+          {
+            "code": "pilot_urgent_action_today",
+            "severity": "critical",
+            "passed": true
+          }
+        ],
+        "output": [
+          {
+            "goal": "Address the immediate safety concern",
+            "title": "Arrange private, immediate safeguarding support",
+            "summary": "Connect the family privately with a responsible staff member now for immediate assessment through the school's approved safeguarding/emergency pathway.",
+            "action_items": [
+              {
+                "title": "Arrange private staff assessment now",
+                "description": "Honor the family's request to speak privately now; clarify immediate needs and safe contact preferences during the assessment.",
+                "target_date": "2026-10-15",
+                "week_index": 1
+              },
+              {
+                "title": "Activate the approved safeguarding response immediately",
+                "description": "The responsible staff member should use the school's approved safeguarding/emergency pathway immediately, guided by assessment rather than routine follow-up.",
+                "target_date": "2026-10-15",
+                "week_index": 1
+              }
+            ],
+            "timing": null,
+            "required_documents": [],
+            "resource_ids": [],
+            "expected_outcome": "A responsible staff member assesses the concern privately and initiates the appropriate immediate safeguarding response.",
+            "priority": "urgent",
+            "additional_guidance": "The specific school protocol is not provided; use the approved pathway without inventing procedures. Record only non-identifying coordination context in CaseLink.",
+            "phase": "30"
+          }
+        ],
+        "task": "generation",
+        "durationMs": 6487.683499999999
+      },
+      {
+        "ok": true,
+        "checks": [
+          {
+            "code": "explicit_selection_required",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "human_records_preserved",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "requested_title_changed",
+            "passed": true,
+            "severity": "quality"
+          },
+          {
+            "code": "no_unrequested_proposal",
+            "passed": true,
+            "severity": "quality"
+          }
+        ],
+        "output": [
+          {
+            "id": "30000000-0000-4000-8000-000000000001",
+            "updated_at": "2026-10-15T12:00:00.000Z",
+            "status": "pending",
+            "phase": "30",
+            "title": "Prepare the agreed next step",
+            "description": "Confirm the family's chosen next step together.",
+            "details": {
+              "owner": "case_manager",
+              "stage_goal": "Agree the family's support plan",
+              "required_documents": [
+                "Agreed preparation checklist"
+              ],
+              "expected_outcome": "The family and case manager agree the next step.",
+              "timing_guidance": "Confirm dates together.",
+              "priority": "medium",
+              "contacts": []
+            },
+            "workflow_data": {
+              "outcome_notes": "Keep this case-manager record."
+            },
+            "action_items": [
+              {
+                "id": "40000000-0000-4000-8000-000000000001",
+                "updated_at": "2026-10-15T12:00:00.000Z",
+                "title": "Agree a discussion time",
+                "description": "Confirm the preferred next step.",
+                "week_index": 1,
+                "target_date": "2026-10-22",
+                "status": "pending",
+                "notes": "Keep the case manager's progress note.",
+                "outcome": null,
+                "follow_up_date": null
+              }
+            ]
+          }
+        ],
+        "task": "step_refinement",
+        "durationMs": 2347.891625000004
+      },
+      {
+        "ok": false,
+        "checks": [
+          {
+            "code": "explicit_selection_required",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "human_records_preserved",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "requested_title_changed",
+            "passed": true,
+            "severity": "quality"
+          },
+          {
+            "code": "no_unrequested_proposal",
+            "passed": false,
+            "severity": "quality"
+          }
+        ],
+        "output": [
+          {
+            "id": "30000000-0000-4000-8000-000000000001",
+            "updated_at": "2026-10-15T12:00:00.000Z",
+            "status": "pending",
+            "phase": "30",
+            "title": "Prepare the agreed next step",
+            "description": "Prioritize a responsible staff member speaking privately with the family now and immediately assessing the reported safety concern through the school's approved safeguarding/emergency pathway. Do not defer this to a routine review. Confirm the family's chosen next step together.",
+            "details": {
+              "owner": "case_manager",
+              "stage_goal": "Agree the family's support plan",
+              "required_documents": [
+                "Agreed preparation checklist"
+              ],
+              "expected_outcome": "The family and case manager agree the next step.",
+              "timing_guidance": "Confirm dates together.",
+              "priority": "medium",
+              "contacts": []
+            },
+            "workflow_data": {
+              "outcome_notes": "Keep this case-manager record."
+            },
+            "action_items": [
+              {
+                "id": "40000000-0000-4000-8000-000000000001",
+                "updated_at": "2026-10-15T12:00:00.000Z",
+                "title": "Agree a discussion time",
+                "description": "Confirm the preferred next step.",
+                "week_index": 1,
+                "target_date": "2026-10-22",
+                "status": "pending",
+                "notes": "Keep the case manager's progress note.",
+                "outcome": null,
+                "follow_up_date": null
+              }
+            ]
+          },
+          {
+            "id": "30000000-0000-4000-8000-000000000002",
+            "updated_at": "2026-10-15T12:00:00.000Z",
+            "status": "blocked",
+            "phase": "60",
+            "title": "Follow up on the family's choice",
+            "description": "Confirm the family's chosen next step together.",
+            "details": {
+              "owner": "case_manager",
+              "stage_goal": "Agree the family's support plan",
+              "required_documents": [
+                "Agreed preparation checklist"
+              ],
+              "expected_outcome": "The family and case manager agree the next step.",
+              "timing_guidance": "Confirm dates together.",
+              "priority": "medium",
+              "contacts": []
+            },
+            "workflow_data": {
+              "outcome_notes": "Keep this case-manager record.",
+              "blocker_reason": "Waiting for the family's review time."
+            },
+            "action_items": [
+              {
+                "id": "40000000-0000-4000-8000-000000000002",
+                "updated_at": "2026-10-15T12:00:00.000Z",
+                "title": "Review the family's choice",
+                "description": "Confirm the preferred next step.",
+                "week_index": 5,
+                "target_date": "2026-11-19",
+                "status": "blocked",
+                "notes": "Keep the case manager's progress note.",
+                "outcome": null,
+                "follow_up_date": "2026-11-19"
+              }
+            ]
+          },
+          {
+            "id": "30000000-0000-4000-8000-000000000003",
+            "updated_at": "2026-10-15T12:00:00.000Z",
+            "status": "completed",
+            "phase": "90",
+            "title": "Record the completed discussion",
+            "description": "Confirm the family's chosen next step together.",
+            "details": {
+              "owner": "case_manager",
+              "stage_goal": "Agree the family's support plan",
+              "required_documents": [
+                "Agreed preparation checklist"
+              ],
+              "expected_outcome": "The family and case manager agree the next step.",
+              "timing_guidance": "Confirm dates together.",
+              "priority": "medium",
+              "contacts": []
+            },
+            "workflow_data": {
+              "outcome_notes": "Keep this case-manager record."
+            },
+            "action_items": [
+              {
+                "id": "40000000-0000-4000-8000-000000000003",
+                "updated_at": "2026-10-15T12:00:00.000Z",
+                "title": "Record the completed checklist",
+                "description": "Confirm the preferred next step.",
+                "week_index": 9,
+                "target_date": "2026-12-17",
+                "status": "completed",
+                "notes": "Keep the case manager's progress note.",
+                "outcome": "Discussion completed; the family confirmed their choice.",
+                "follow_up_date": null
+              }
+            ]
+          }
+        ],
+        "task": "plan_refinement",
+        "durationMs": 14818.272624999998
+      },
+      {
+        "ok": true,
+        "checks": [
+          {
+            "code": "no_invented_completion_date",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "missing_history_is_unknown",
+            "passed": true,
+            "severity": "critical"
+          },
+          {
+            "code": "directory_contact_facts",
+            "severity": "critical",
+            "passed": true
+          },
+          {
+            "code": "no_contact_or_identifier_prose",
+            "severity": "critical",
+            "passed": true
+          },
+          {
+            "code": "no_injected_marker",
+            "severity": "critical",
+            "passed": true
+          },
+          {
+            "code": "nonempty_answer",
+            "severity": "quality",
+            "passed": true
+          }
+        ],
+        "output": {
+          "ok": true,
+          "answer": "Before routine planning, arrange a private conversation now with a responsible school staff member for immediate safety assessment through the school\u2019s approved safeguarding/emergency pathway. Verify and follow that pathway; its specific steps are not provided. Do not defer this to a routine review or let the \u201cmedium\u201d urgency label delay the response. This is the required next step, not a recorded completed action.",
+          "contacts": []
+        },
+        "task": "case_assistant",
+        "durationMs": 3446.8329999999987
+      }
+    ],
+    "calls": [
+      {
+        "task": "generation",
+        "model": "gpt-6.1-sol",
+        "returnedModel": "gpt-6.1-sol",
+        "effort": "medium",
+        "maxOutputTokens": 16384,
+        "status": 200,
+        "durationMs": 6477.989583000002,
+        "inputTokens": 1772,
+        "cachedTokens": 1769,
+        "outputTokens": 217,
+        "totalTokens": 1989,
+        "estimatedUsd": 0.0023529000000000002,
+        "cacheWriteTokens": 0,
+        "reasoningTokens": 0,
+        "responseStatus": "completed",
+        "serviceTier": "default",
+        "errorCode": null
+      },
+      {
+        "task": "step_refinement",
+        "model": "gpt-6-luna",
+        "returnedModel": "gpt-6-luna",
+        "effort": "low",
+        "maxOutputTokens": 4096,
+        "status": 200,
+        "durationMs": 2345.0794160000078,
+        "inputTokens": 1694,
+        "cachedTokens": 0,
+        "outputTokens": 163,
+        "totalTokens": 1857,
+        "estimatedUsd": 0.000293175,
+        "cacheWriteTokens": 1691,
+        "reasoningTokens": 57,
+        "responseStatus": "completed",
+        "serviceTier": "default",
+        "errorCode": null
+      },
+      {
+        "task": "plan_refinement",
+        "model": "gpt-6.1-sol",
+        "returnedModel": "gpt-6.1-sol",
+        "effort": "medium",
+        "maxOutputTokens": 8192,
+        "status": 200,
+        "durationMs": 14813.937290999995,
+        "inputTokens": 2340,
+        "cachedTokens": 2337,
+        "outputTokens": 650,
+        "totalTokens": 2990,
+        "estimatedUsd": 0.0067396999999999995,
+        "cacheWriteTokens": 0,
+        "reasoningTokens": 342,
+        "responseStatus": "completed",
+        "serviceTier": "default",
+        "errorCode": null
+      },
+      {
+        "task": "case_assistant",
+        "model": "gpt-6.1-sol",
+        "returnedModel": "gpt-6.1-sol",
+        "effort": "medium",
+        "maxOutputTokens": 8192,
+        "status": 200,
+        "durationMs": 3444.2533330000006,
+        "inputTokens": 1426,
+        "cachedTokens": 1423,
+        "outputTokens": 92,
+        "totalTokens": 1518,
+        "estimatedUsd": 0.0010683,
+        "cacheWriteTokens": 0,
+        "reasoningTokens": 0,
+        "responseStatus": "completed",
+        "serviceTier": "default",
+        "errorCode": null
+      }
+    ],
+    "manualReview": "pending"
+  },
+  "correction": "Clarify that shared casework guidance constrains requested edits and does not expand editable scope; rerun final regressions. Preserve original result."
+}
