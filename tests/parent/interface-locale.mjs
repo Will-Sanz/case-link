@@ -117,7 +117,7 @@ try {
         await refreshed;
         assert.equal(supportReads, readsBefore + 1);
         await page.getByRole('link', { name: /Ver apoyo/ }).click();
-        await page.getByText('Work status & updates', { exact: true }).click();
+        await page.getByText(parentText('es', 'Work status & updates'), { exact: true }).click();
         await page.getByRole('heading', { name: 'En espera del próximo paso', exact: true }).waitFor();
         const panel = page.getByRole('region', { name: 'En espera del próximo paso' });
         assert.equal(await panel.getAttribute('lang'), 'es');

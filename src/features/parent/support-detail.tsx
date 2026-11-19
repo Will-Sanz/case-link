@@ -151,6 +151,11 @@ function CorrectDetails({
   const localized = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_") || need.startsWith("wic_"));
   const t = (copy: string) => localized ? parentText(copy) : copy;
   const [intake, setIntake] = useState(request.intake);
+  const frequencies = [
+    ["unknown", "Not sure / not provided"], ["weekly", "Weekly"], ["biweekly", "Every two weeks"],
+    ["twice_monthly", "Twice a month"], ["monthly", "Monthly"], ["yearly", "Yearly"],
+  ];
+  const frequencyLabel = frequencies.find(([value]) => value === intake.incomeFrequency)?.[1];
   const [baseVersion, setBaseVersion] = useState(request.version);
   const [editing, setEditing] = useState(false);
   const [pendingWork, setPendingWork] = useState<{ scope: string; controller: AbortController } | null>(null);
@@ -292,6 +297,7 @@ function CorrectDetails({
               <label htmlFor="correct-frequency">{t("How often")}</label>
               <select
                 id="correct-frequency"
+                aria-describedby={localized && frequencyLabel ? "correct-frequency-choice" : undefined}
                 className={styles.select}
                 value={intake.incomeFrequency}
                 onChange={(e) =>
@@ -301,13 +307,9 @@ function CorrectDetails({
                   )
                 }
               >
-                <option value="unknown">{t("Not sure / not provided")}</option>
-                <option value="weekly">{t("Weekly")}</option>
-                <option value="biweekly">{t("Every two weeks")}</option>
-                <option value="twice_monthly">{t("Twice a month")}</option>
-                <option value="monthly">{t("Monthly")}</option>
-                <option value="yearly">{t("Yearly")}</option>
+                {frequencies.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
               </select>
+              {localized && frequencyLabel && <p className={styles.hint} id="correct-frequency-choice">{t(frequencyLabel)}</p>}
             </div>
           </div>}
           {privateUtility && <p className={styles.hint}>Names, birth dates, account details, addresses and income source lists are corrected in <a className={styles.textLink} href="#application-review">Your utility application answers</a>. Household routing ZIP and any shutoff date stay separate.</p>}

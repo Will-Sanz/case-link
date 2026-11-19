@@ -21,15 +21,15 @@ it("does not accept legacy spending flags or a source-unbound new approval",asyn
   await expect(foodDescriptionEvaluationCommand(["--approved-live","/unavailable-approval.json","0"],{OPENAI_API_KEY:"legacy",CASELINK_PARENT_RUN_LIVE_EVALS:"1"},fetcher)).rejects.toThrow();
   expect(fetcher).not.toHaveBeenCalled();
 });
-async function approvedFixture(priorCount: 2 | 3 | 4 | 5 | 6 = 6){
-  vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(priorCount>=5?"2026-11-19T00:30:00Z":"2026-11-18T16:00:00Z"));
+async function approvedFixture(priorCount: 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8){
+  vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(priorCount===8?"2026-11-19T16:00:00Z":priorCount>=5?"2026-11-19T00:30:00Z":"2026-11-18T16:00:00Z"));
   const root=mkdtempSync(join(tmpdir(),"description-command-"));roots.push(root);
   const dry=await foodDescriptionEvaluationCommand(["--dry"],{});if(!("adapterSha256" in dry))throw new Error("Expected a dry plan");
-  const approval={purpose:"optional_food_description_synthetic_evaluation_v1",syntheticOnly:true,approvalReference:"SYNTHETIC UNIT TEST ONLY",approvedUntil:priorCount>=5?"2026-11-19T04:59:59Z":"2026-11-18T23:00:00Z",processorReference:"synthetic",noticeRetentionReference:"synthetic",billingReference:"synthetic",projectId:"proj_synthetic",projectMetadataReference:"synthetic Standard global",approvedResponseModelId:"gpt-6.1-sol",region:"global",serviceTier:"default",fingerprint:FOOD_DESCRIPTION_FINGERPRINT,corpusSha256:FOOD_DESCRIPTION_CORPUS_SHA,adapterSha256:dry.adapterSha256,rateCardDate:priorCount>=5?"2026-11-19":"2026-11-18",maximumCalls:80,maximumCountRequests:80,maximumInputTokens:8000,maximumOutputTokens:1500,maximumNanoDollars:5_000_000_000,runDirectory:join(root,"run")};
+  const approval={purpose:"optional_food_description_synthetic_evaluation_v1",syntheticOnly:true,approvalReference:"SYNTHETIC UNIT TEST ONLY",approvedUntil:priorCount===8?"2026-11-20T04:59:59Z":priorCount>=5?"2026-11-19T04:59:59Z":"2026-11-18T23:00:00Z",processorReference:"synthetic",noticeRetentionReference:"synthetic",billingReference:"synthetic",projectId:"proj_synthetic",projectMetadataReference:"synthetic Standard global",approvedResponseModelId:"gpt-6.1-sol",region:"global",serviceTier:"default",fingerprint:FOOD_DESCRIPTION_FINGERPRINT,corpusSha256:FOOD_DESCRIPTION_CORPUS_SHA,adapterSha256:dry.adapterSha256,rateCardDate:priorCount>=5?"2026-11-19":"2026-11-18",maximumCalls:80,maximumCountRequests:80,maximumInputTokens:8000,maximumOutputTokens:1500,maximumNanoDollars:5_000_000_000,runDirectory:join(root,"run")};
   const projection=descriptionEvaluationPlan().cases[0].turns[0].projection;
   const init={method:"POST",redirect:"error" as const,headers:{Authorization:"Bearer synthetic","Content-Type":"application/json","OpenAI-Project":"proj_synthetic"},body:JSON.stringify({...FOOD_DESCRIPTION_EVALUATION_BINDING.request,input:[{role:"user",content:JSON.stringify(projection)}]})};
-  const maximum=priorCount===2?87 as const:priorCount===3?93 as const:priorCount===4?100 as const:priorCount===5?120 as const:133 as const;
-  const aggregate={maximumCalls:maximum,maximumCountRequests:maximum,maximumNanoDollars:5_000_000_000 as const,priorRuns:await sealedDescriptionEvaluationPriors(approval,init,priorCount===6?6:priorCount===5?5:priorCount===4?4:priorCount===3)};
+  const maximum=priorCount===2?87 as const:priorCount===3?93 as const:priorCount===4?100 as const:priorCount===5?120 as const:priorCount===6?133 as const:priorCount===7?172 as const:182 as const;
+  const aggregate={maximumCalls:maximum,maximumCountRequests:maximum,maximumNanoDollars:5_000_000_000 as const,priorRuns:await sealedDescriptionEvaluationPriors(approval,init,priorCount===8?8:priorCount===7?7:priorCount===6?6:priorCount===5?5:priorCount===4?4:priorCount===3)};
   const currentApproval={...approval,aggregate};
   const config=join(root,"approval.json"),bytes=JSON.stringify({sourceSha256:dry.sourceSha256,approval:currentApproval});writeFileSync(config,bytes,{mode:0o600});
   const hash=createHash("sha256").update(bytes).digest("hex");
@@ -48,8 +48,8 @@ it("uses the actual driver only after a hash-bound new approval, halts unknown b
   });
   const result=await foodDescriptionEvaluationCommand(["--approved-live",config,"0"],env,fetcher);
   expect(result).toMatchObject({mode:"live_synthetic",corpusCases:60,corpusTurns:240,maximumGenerationCalls:80,maximumCountRequests:80,reservedAttemptsAcrossRun:2,modelQualityApproved:false,humanReviewedCases:0,
-    maximumAggregateGenerationCalls:133,maximumAggregateCountRequests:133,aggregateReservedAttempts:55,aggregateReservedNanoDollars:3_025_000_000,
-    sealedPriorAccounting:{pairs:53,reservedNanoDollars:2_915_000_000,knownMeasuredNanoDollars:31_800_000,budgetedNanoDollars:31_800_000},aggregateBudgetBoundNanoDollars:141_800_000});
+    maximumAggregateGenerationCalls:182,maximumAggregateCountRequests:182,aggregateReservedAttempts:104,aggregateReservedNanoDollars:5_720_000_000,
+    sealedPriorAccounting:{pairs:102,reservedNanoDollars:5_610_000_000,knownMeasuredNanoDollars:61_200_000,budgetedNanoDollars:61_200_000},aggregateBudgetBoundNanoDollars:171_200_000});
   expect(fetcher).toHaveBeenCalledTimes(4);expect(generation).toBe(2);expect(readdirSync(approval.runDirectory)).toContain("halted.json");
   expect(result.accounting).toMatchObject({countHttpAttemptMarkers:2,generationHttpAttemptMarkers:2,completeUsageReceipts:1,costComplete:false,reservedNanoDollars:110000000});
   vi.setSystemTime(new Date("2026-11-19T16:00:00Z"));
@@ -87,7 +87,7 @@ it("requires the explicit aggregate approval before a new revised live run", asy
   await expect(foodDescriptionEvaluationCommand(['--approved-live', s.config, '0'], { ...s.env, CASELINK_FOOD_DESCRIPTION_EVAL_APPROVAL_SHA256: createHash('sha256').update(bytes).digest('hex') }, fetcher)).rejects.toThrow();
   expect(fetcher).not.toHaveBeenCalled();
 });
-it.each([2,3,4,5]as const)("keeps the old%s-prior configuration readable without admitting another old live run",async priorCount=>{
+it.each([2,3,4,5,6,7]as const)("keeps the old%s-prior configuration readable without admitting another old live run",async priorCount=>{
   const s=await approvedFixture(priorCount),fetcher=vi.fn<typeof fetch>();
   await withFoodDescriptionEvaluationBudget({approval:s.approval,apiKey:'synthetic'},async()=>{});
   vi.setSystemTime(new Date('2026-11-19T00:30:00Z'));

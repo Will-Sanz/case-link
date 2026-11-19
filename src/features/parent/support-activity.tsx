@@ -166,6 +166,13 @@ export function SupportActivity({
     [message, setMessage] = useState(""),
     [reportError, setReportError] = useState("");
   const reportNeed = reportableNeeds.includes(need) ? need : undefined;
+  const outcomes = [
+    ["support_received", "I received support"],
+    ["assistance_approved", "The program told me assistance was approved"],
+    ["declined", "The program declined assistance"],
+    ["unresolved", "I still need help"],
+  ];
+  const outcomeLabel = outcomes.find(([value]) => value === outcome)?.[1];
   async function report(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!reportNeed) return;
@@ -257,6 +264,7 @@ export function SupportActivity({
               <label htmlFor="report-need">{t("Which support?")}</label>
               <select
                 id="report-need"
+                aria-describedby={localized && reportNeed ? "report-need-choice" : undefined}
                 className={styles.select}
                 value={reportNeed ?? ""}
                 onChange={(e) => setNeed(e.target.value as typeof need)}
@@ -268,20 +276,20 @@ export function SupportActivity({
                   </option>
                 ))}
               </select>
+              {localized && reportNeed && <p className={styles.hint} id="report-need-choice">{t(NEED_LABELS[reportNeed])}</p>}
             </div>
             <div className={styles.field}>
               <label htmlFor="report-outcome">{t("What happened?")}</label>
               <select
                 id="report-outcome"
+                aria-describedby={localized && outcomeLabel ? "report-outcome-choice" : undefined}
                 className={styles.select}
                 value={outcome}
                 onChange={(e) => setOutcome(e.target.value)}
               >
-                <option value="support_received">{t("I received support")}</option>
-                <option value="assistance_approved">{t("The program told me assistance was approved")}</option>
-                <option value="declined">{t("The program declined assistance")}</option>
-                <option value="unresolved">{t("I still need help")}</option>
+                {outcomes.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
               </select>
+              {localized && outcomeLabel && <p className={styles.hint} id="report-outcome-choice">{t(outcomeLabel)}</p>}
             </div>
             <div className={styles.field}>
               <label htmlFor="report-reference">{t("What did you receive or hear, and when?")}</label>

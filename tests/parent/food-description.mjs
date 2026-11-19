@@ -90,7 +90,7 @@ try {
       if (path.endsWith('/food-sites')) return json({ sites: [], sourceUrl: 'https://www.phila.gov/food/', checkedAt: createdAt, availability: 'city_listed_unconfirmed', moreSitesAvailable: false });
       assert.equal(method, 'GET', 'This fixture permits only its explicit bounded mutations.'); return json({ capabilities: [] });
     });
-    async function check(name, large = width === 320 && ['consent-before-text', 'owned-empty-draft', 'necessary-question', 'change-understood-answers', 'vetted-options', 'start-unknown'].includes(name)) {
+    async function check(name, large = width === 320 && ['consent-before-text', 'owned-empty-draft', 'ready-food-optional-question', 'change-understood-answers', 'vetted-options', 'start-unknown'].includes(name)) {
       if (routingOnly && name !== 'current-routing-choice') return;
       await page.waitForLoadState('networkidle'); await page.evaluate(() => document.fonts.ready.then(() => undefined));
       await page.waitForFunction(title => document.title.includes(title), parentText(locale, 'Get support'));
@@ -169,7 +169,7 @@ try {
     await page.getByText(foodDescriptionCopy[other].waiting, { exact: true }).waitFor(); assert.equal(queues.length, 2); await changeLocale(locale); await check('saved-waiting');
     draft = { ...draft, state: 'result', selection: { needIds: ['food_now'], selections: [], assertions: [], exclusions: [], questionIds: ['benefitHistory'], outOfScope: null } };
     await page.evaluate(() => window.dispatchEvent(new Event('focus'))); const history = page.getByLabel(q.history, { exact: true }); await history.waitFor();
-    assert.equal(await page.getByLabel(q.enough, { exact: true }).count(), 0); assert.equal(await history.evaluate(node => document.activeElement === node), true); await check('necessary-question');
+    assert.equal(await page.getByLabel(q.enough, { exact: true }).count(), 0); await page.waitForFunction(() => document.activeElement?.id === 'food-guide-results'); await check('ready-food-optional-question');
     await history.selectOption('applied');
     if (routingOnly) { await page.locator('[aria-labelledby="food-description-title"] p').filter({hasText:q.applied}).waitFor(); await check('current-routing-choice',true); assert.equal(resolves.length,0); await context.close(); continue; }
     await page.getByRole('button', { name: c.resolve, exact: true }).click(); await page.getByRole('button', { name: c.resolveRetry, exact: true }).waitFor(); await check('clarification-unknown');

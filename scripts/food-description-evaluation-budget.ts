@@ -11,7 +11,7 @@ export const DESCRIPTION_EVAL_LIMITS = { calls: 80, counts: 80, batchCalls: 16, 
 export const DESCRIPTION_EVAL_RATE_CARD = { checkedAt: "2026-11-19", model: "gpt-6.1-sol", tier: "default", region: "global", ordinary: 2000, cached: 100, write30m: 2500, write12h: 5000, output: 10000 } as const;
 const ref = z.string().trim().min(1).max(300), sha = z.string().regex(/^[a-f0-9]{64}$/);
 const sealedPriorRunSchema = z.object({ runDirectory: z.string().refine(isAbsolute), configurationPath: z.string().refine(isAbsolute), configurationSha256: sha,
-  evidenceSha256: sha, reservedPairs: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(7), z.literal(20), z.literal(13)]) }).strict();
+  evidenceSha256: sha, reservedPairs: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(7), z.literal(20), z.literal(13), z.literal(39), z.literal(10)]) }).strict();
 const legacyAggregateSchema = z.object({ maximumCalls: z.literal(87), maximumCountRequests: z.literal(87), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(2) }).strict();
 export const descriptionEvaluationApprovalSchema = z.object({
   purpose: z.literal("optional_food_description_synthetic_evaluation_v1"), syntheticOnly: z.literal(true), approvalReference: ref,
@@ -25,7 +25,9 @@ export const descriptionEvaluationApprovalSchema = z.object({
   aggregate: z.union([legacyAggregateSchema, z.object({ maximumCalls: z.literal(93), maximumCountRequests: z.literal(93), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(3) }).strict(),
     z.object({ maximumCalls: z.literal(100), maximumCountRequests: z.literal(100), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(4) }).strict(),
     z.object({ maximumCalls: z.literal(120), maximumCountRequests: z.literal(120), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(5) }).strict(),
-    z.object({ maximumCalls: z.literal(133), maximumCountRequests: z.literal(133), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(6) }).strict()]).optional(),
+    z.object({ maximumCalls: z.literal(133), maximumCountRequests: z.literal(133), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(6) }).strict(),
+    z.object({ maximumCalls: z.literal(172), maximumCountRequests: z.literal(172), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(7) }).strict(),
+    z.object({ maximumCalls: z.literal(182), maximumCountRequests: z.literal(182), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(8) }).strict()]).optional(),
 }).strict();
 export type DescriptionEvaluationApproval = z.infer<typeof descriptionEvaluationApprovalSchema>;
 export type DescriptionEvaluationBudget = { fetch: (caseId: string, turn: number) => typeof fetch; attempts: () => number; halt: () => void };
@@ -89,8 +91,8 @@ export function sealedDescriptionEvaluationEvidenceHash(directory: string) {
 export function sealedDescriptionEvaluationPriorAccounting(approval: DescriptionEvaluationApproval) {
   if (!approval.aggregate) return { pairs: 0, reservedNanoDollars: 0, knownMeasuredNanoDollars: 0, budgetedNanoDollars: 0 };
   const refs = approval.aggregate.priorRuns;
-  const nextDay=approval.aggregate.maximumCalls===120||approval.aggregate.maximumCalls===133;
-  const measured = approval.aggregate.maximumCalls !== 87, counts = approval.aggregate.maximumCalls===133 ? [3,4,6,7,20,13] : nextDay ? [3,4,6,7,20] : approval.aggregate.maximumCalls === 100 ? [3,4,6,7] : measured ? [3,4,6] : [3,4];
+  const nextDay=approval.aggregate.maximumCalls===120||approval.aggregate.maximumCalls===133||approval.aggregate.maximumCalls===172||approval.aggregate.maximumCalls===182;
+  const measured = approval.aggregate.maximumCalls !== 87, counts = approval.aggregate.maximumCalls===182 ? [3,4,6,7,20,13,39,10] : approval.aggregate.maximumCalls===172 ? [3,4,6,7,20,13,39] : approval.aggregate.maximumCalls===133 ? [3,4,6,7,20,13] : nextDay ? [3,4,6,7,20] : approval.aggregate.maximumCalls === 100 ? [3,4,6,7] : measured ? [3,4,6] : [3,4];
   if (new Set(refs.map(ref => ref.runDirectory)).size !== counts.length
     || descriptionEvaluationHash(refs.map(ref=>ref.reservedPairs)) !== descriptionEvaluationHash(counts)) throw safeError();
   const historical = descriptionEvaluationApprovalSchema.extend({ fingerprint: sha, adapterSha256: sha });
@@ -98,7 +100,7 @@ export function sealedDescriptionEvaluationPriorAccounting(approval: Description
   for (const [index, ref] of refs.entries()) {
     const prior = historical.parse(readDescriptionEvaluationEvidence(join(ref.runDirectory, "approval.json"))), prefix = ledgerPrefix(prior);
     const config = z.object({ approval: historical }).passthrough().parse(readDescriptionEvaluationEvidence(ref.configurationPath));
-    if ((index < 2 ? !!prior.aggregate : !prior.aggregate || prior.aggregate.maximumCalls !== [87,93,100,120][index-2] || descriptionEvaluationHash(prior.aggregate.priorRuns) !== descriptionEvaluationHash(refs.slice(0,index)))
+    if ((index < 2 ? !!prior.aggregate : !prior.aggregate || prior.aggregate.maximumCalls !== [87,93,100,120,133,172][index-2] || descriptionEvaluationHash(prior.aggregate.priorRuns) !== descriptionEvaluationHash(refs.slice(0,index)))
       || prior.runDirectory !== ref.runDirectory || prior.runDirectory === approval.runDirectory || prior.approvalReference === approval.approvalReference
       || prior.projectId !== approval.projectId || descriptionEvaluationHash(config.approval) !== descriptionEvaluationHash(prior)
       || descriptionEvaluationFileHash(ref.configurationPath) !== ref.configurationSha256
@@ -106,7 +108,8 @@ export function sealedDescriptionEvaluationPriorAccounting(approval: Description
       || descriptionEvaluationFileHash(join(ref.runDirectory, "halted.json")) !== descriptionEvaluationFileHash(`${prefix}-halted.json`)
       || sealedDescriptionEvaluationEvidenceHash(ref.runDirectory) !== ref.evidenceSha256) throw safeError();
     const oldWindow=nextDay&&index<5;
-    if (measured && (prior.approvedUntil !== (oldWindow?"2026-11-18T23:59:59Z":approval.approvedUntil) || prior.processorReference !== approval.processorReference
+    const priorExpiry=oldWindow?"2026-11-18T23:59:59Z":approval.aggregate.maximumCalls===182?"2026-11-19T04:59:59Z":approval.approvedUntil;
+    if (measured && (prior.approvedUntil !== priorExpiry || prior.processorReference !== approval.processorReference
       || prior.noticeRetentionReference !== approval.noticeRetentionReference || prior.projectMetadataReference !== approval.projectMetadataReference
       || prior.approvedResponseModelId !== approval.approvedResponseModelId || prior.rateCardDate !== (oldWindow?"2026-11-18":approval.rateCardDate))) throw safeError();
     const inner = join(ref.runDirectory, "reconciliation-halted.json"), outer = `${prefix}-reconciliation-halted.json`;
@@ -148,7 +151,9 @@ export async function withFoodDescriptionEvaluationBudget<T>(input: {
   let permitted = true;
   const current = () => {
     const time = now().getTime();
-    if(approval.aggregate?.maximumCalls===120||approval.aggregate?.maximumCalls===133
+    if(approval.aggregate?.maximumCalls===182
+      ? approval.rateCardDate!=="2026-11-19"||approval.approvedUntil!=="2026-11-20T04:59:59Z"
+      : approval.aggregate?.maximumCalls===120||approval.aggregate?.maximumCalls===133||approval.aggregate?.maximumCalls===172
       ? approval.rateCardDate!=="2026-11-19"||approval.approvedUntil!=="2026-11-19T04:59:59Z"
       : approval.rateCardDate!=="2026-11-18")throw safeError();
     if (!permitted || !Number.isFinite(time) || time >= Date.parse(approval.approvedUntil) || now().toISOString().slice(0, 10) !== approval.rateCardDate || !input.apiKey) throw safeError();

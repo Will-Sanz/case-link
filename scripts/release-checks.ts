@@ -6,6 +6,7 @@ import { z } from "zod";
 export const REQUIRED_CHECKS = [
   { name: "verify", appId: 15368 },
   { name: "database-security", appId: 15368 },
+  { name: "parent-native-security", appId: 15368 },
   { name: "analyze", appId: 15368 },
   { name: "CodeQL", appId: 57789 },
 ] as const;

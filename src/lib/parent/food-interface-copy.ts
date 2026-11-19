@@ -1,5 +1,7 @@
 /** Fixed CaseLink interface copy; original provider and family wording keep their own language. */
 export const SPANISH_FOOD_INTERFACE_COPY = {
+  "Earlier application and delivery records need checking before a new filing. Program progress and Activity & receipts show the available records.": "Antes de presentar una solicitud nueva, se deben revisar los registros anteriores de solicitudes y entregas. Avance del programa y Actividad y recibos muestran los registros disponibles.",
+  "No application is currently confirmed as submitted. Check Program progress for recorded next steps; you can also use the official program directly.": "No hay ninguna solicitud confirmada como presentada. Consulte Avance del programa para ver los próximos pasos registrados; también puede usar el programa oficial directamente.",
   " · Application prepared": " · Solicitud preparada",
   " · Application submitted": " · Solicitud presentada",
   " · Delivery result not confirmed": " · Resultado de entrega sin confirmar",

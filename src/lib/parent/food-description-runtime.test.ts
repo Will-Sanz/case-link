@@ -32,6 +32,8 @@ describe("one reserved private food interpretation turn", () => {
     expect(fixedRequest.instructions).toContain("An application described only as started is not evidence it was submitted.");
     expect(fixedRequest.instructions).toContain("the server handles owned-request coverage");
     expect(fixedRequest.instructions).toContain("An explicit current need for food or groceries today supports foodForTwoDays:no.");
+    expect(fixedRequest.instructions).toContain("An existingIssue assertion requires benefitHistory:receiving from a governing fact or another source-backed assertion.");
+    expect(fixedRequest.instructions).toContain("receiving includes current or past benefits.");
     expect(FOOD_DESCRIPTION_FINGERPRINT).toBe(createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex"));
     for (const drift of [{ service_tier: "priority" }, { store: true }, { reasoning: { effort: "low" } }, { max_output_tokens: 2000 }]) {
       const changed = { ...FOOD_DESCRIPTION_EVALUATION_BINDING, request: { ...fixedRequest, ...drift } };

@@ -342,6 +342,13 @@
   }
 }
 @media (max-width: 480px) {
+  [data-food-workspace] .content,
+  [data-food-workspace] .overview {
+    padding-inline: 12px;
+  }
+  [data-food-workspace] .statusLine {
+    display: block;
+  }
   .overview,
   .browserBody {
     padding: 1.25rem;

@@ -221,7 +221,7 @@ export function ApplicationWorkspace({
   const { t: parentText, locale } = useParentLocale();
   const snap = request.intake.needs.includes("snap_new");
   const wicInterface = request.intake.needs.some(need => need.startsWith("wic_"));
-  const foodOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_"));
+  const foodOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need === "food_now" || need.startsWith("snap_") || need.startsWith("wic_"));
   const localizedInterface = snap || wicInterface || foodOnly;
   const t = (text: string) => localizedInterface ? parentText(text) : text;
   const wic = request.intake.needs.includes("wic_new");
@@ -326,10 +326,14 @@ export function ApplicationWorkspace({
                   : utility
                     ? `Open ${utilityAnswers} to read or correct private preparation. A saved draft does not apply for assistance, change payments or protect against shutoff. Official program help remains available there.`
                   : historyLimited
-                    ? "Earlier application and delivery records need checking before a new filing. The Official website section remains available."
+                    ? foodOnly && !snap
+                      ? "Earlier application and delivery records need checking before a new filing. Program progress and Activity & receipts show the available records."
+                      : "Earlier application and delivery records need checking before a new filing. The Official website section remains available."
                     : needsService
                       ? "CaseLink has a service connection to resolve. You do not need to repeat your household details. Official program access remains available."
-                      : "No application is currently confirmed as submitted. Open the Official website section; you can also use the official program directly.";
+                      : foodOnly && !snap
+                        ? "No application is currently confirmed as submitted. Check Program progress for recorded next steps; you can also use the official program directly."
+                        : "No application is currently confirmed as submitted. Open the Official website section; you can also use the official program directly.";
   const steps = [
     {
       id: "application-overview",
@@ -392,7 +396,7 @@ export function ApplicationWorkspace({
     },
   ];
   return (
-    <div className={layout.workspace} ref={workspace} onClick={event => {
+    <div className={layout.workspace} data-food-workspace={foodOnly ? "" : undefined} ref={workspace} onClick={event => {
       const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]');
       if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (selectTarget(link.hash.slice(1))) {

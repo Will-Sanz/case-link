@@ -1840,6 +1840,19 @@
   padding: 0.6rem 0.95rem;
   font-size: 0.875rem;
 }
+@media (max-width: 480px) {
+  [data-food-workspace] :is(.surface, .notice, .error, .success) {
+    padding-inline: 12px;
+  }
+  [data-food-workspace] :is(.notice, .error, .success) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  [data-food-workspace] :is(.button, .secondary, .quiet, .danger) {
+    padding-inline: 12px;
+    overflow-wrap: normal;
+  }
+}
 
 .infoPage {
   display: grid;

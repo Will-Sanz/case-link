@@ -188,3 +188,58 @@ it.each(languages)("keeps the real official-website running explanation for new 
  const detail=screen.getByText((_,node)=>node?.tagName==="P"&&!!node.textContent?.startsWith(text(locale,summary)));
  expect(detail.textContent).toContain(text(locale,"The Official website section shows the official site connection and any recorded blocker."));
 });
+
+describe("saved food return-use readability",()=>{
+ it.each(languages)("exposes complete selected report values and keeps the exact report in %s",async locale=>{
+  const request=fixtureRequest();request.intake.needs=["snap_pending","snap_renewal"];
+  const fetcher=vi.fn<(url:string,init?:RequestInit)=>Promise<ReturnType<typeof response>>>(async()=>response({ok:true}));vi.stubGlobal("fetch",fetcher);
+  render(<ParentLocaleProvider initialLocale={locale}><SupportActivity request={request} onChange={vi.fn()} history={{data:{operations:[],historyLimited:false},loading:false,error:null,reload:vi.fn()}}/></ParentLocaleProvider>);
+  const need=screen.getByLabelText(text(locale,"Which support?"));
+  const outcome=screen.getByLabelText(text(locale,"What happened?"));
+  const caption=(element:HTMLElement)=>document.getElementById(element.getAttribute("aria-describedby")??"")?.textContent;
+  expect(caption(need)).toBe(text(locale,"Check a SNAP application"));
+  expect(caption(outcome)).toBe(text(locale,"I received support"));
+  fireEvent.change(need,{target:{value:"snap_renewal"}});
+  fireEvent.change(outcome,{target:{value:"unresolved"}});
+  expect(caption(need)).toBe(text(locale,"Renew SNAP"));
+  expect(caption(outcome)).toBe(text(locale,"I still need help"));
+  fireEvent.change(screen.getByLabelText(text(locale,"What did you receive or hear, and when?")),{target:{value:"Original report unchanged"}});
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:text(locale,"Save my report")})));
+  expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({need:"snap_renewal",outcome:"unresolved",reference:"Original report unchanged"});
+ });
+ it.each(languages)("exposes the complete correction frequency without changing the default in %s",async locale=>{
+  const request=fixtureRequest();request.intake.needs=["snap_pending"];request.events=[];request.documents=[];request.intake.incomeFrequency="unknown";
+  vi.stubGlobal("fetch",vi.fn(async()=>response({request,operations:[],historyLimited:false})));
+  render(<ParentLocaleProvider initialLocale={locale}><SupportDetail requestId={request.id}/></ParentLocaleProvider>);
+  const nav=await screen.findByRole("navigation",{name:text(locale,"Your application checklist")});fireEvent.click(nav.querySelector('a[href="#application-controls"]')!);
+  fireEvent.click(screen.getByText(text(locale,"Correct household or bill information")));
+  const select=screen.getByLabelText(text(locale,"How often")) as HTMLSelectElement;
+  const caption=()=>document.getElementById(select.getAttribute("aria-describedby")??"")?.textContent;
+  expect(select.value).toBe("unknown");expect(caption()).toBe(text(locale,"Not sure / not provided"));
+  fireEvent.change(select,{target:{value:"monthly"}});expect(select.value).toBe("monthly");expect(caption()).toBe(text(locale,"Monthly"));
+ });
+ it.each(languages.flatMap(locale=>[false,true].map(historyLimited=>({locale,historyLimited}))))("points ordinary food $locale fallback to actual sections (limited $historyLimited)",({locale,historyLimited})=>{
+  const request=fixtureRequest();request.intake.needs=["snap_pending"];
+  render(<ParentLocaleProvider initialLocale={locale}><ApplicationWorkspace request={request} history={{data:{operations:[],historyLimited},loading:false,error:null,reload:vi.fn()}}>{null}</ApplicationWorkspace></ParentLocaleProvider>);
+  const copy=historyLimited?"Earlier application and delivery records need checking before a new filing. Program progress and Activity & receipts show the available records.":"No application is currently confirmed as submitted. Check Program progress for recorded next steps; you can also use the official program directly.";
+  const detail=screen.getByText(text(locale,copy));expect(detail.closest("[lang]")?.getAttribute("lang")).toBe(locale);
+  expect(document.querySelector('a[href="#application-programs"]')).toBeTruthy();expect(document.querySelector('a[href="#application-browser"]')).toBeNull();
+ });
+ it.each(([ ["food_now"], ["snap_pending"], ["snap_new"], ["wic_new"], ["snap_pending","wic_continuing"], ["electricity"], ["food_now","electricity"] ] as const).map(selected=>({selected})))("scopes compact return layout to food-only needs $selected",({selected})=>{
+  const request=fixtureRequest();request.intake.needs=[...selected];
+  const view=render(<ParentLocaleProvider initialLocale="es"><ApplicationWorkspace request={request} history={{data:{operations:[],historyLimited:false},loading:false,error:null,reload:vi.fn()}}>{null}</ApplicationWorkspace></ParentLocaleProvider>);
+  expect(view.container.firstElementChild?.hasAttribute("data-food-workspace")).toBe(!selected.some(need=>need==="electricity"));
+ });
+ it("keeps mixed utility report controls on their existing display boundary",()=>{
+  const request=fixtureRequest();request.intake.needs=["snap_pending","electricity"];
+  render(<ParentLocaleProvider initialLocale="es"><SupportActivity request={request} onChange={vi.fn()} history={{data:{operations:[],historyLimited:false},loading:false,error:null,reload:vi.fn()}}/></ParentLocaleProvider>);
+  expect(screen.getByLabelText("Which support?").getAttribute("aria-describedby")).toBeNull();
+  expect(screen.getByLabelText("What happened?").getAttribute("aria-describedby")).toBeNull();
+ });
+ it("keeps the actual new SNAP website fallback unchanged",()=>{
+  const request=fixtureRequest();request.intake.needs=["snap_new"];
+  render(<ApplicationWorkspace request={request} history={{data:{operations:[],historyLimited:false},loading:false,error:null,reload:vi.fn()}}>{null}</ApplicationWorkspace>);
+  expect(screen.getByText("No application is currently confirmed as submitted. Open the Official website section; you can also use the official program directly.")).toBeTruthy();
+  expect(document.querySelector('a[href="#application-browser"]')).toBeTruthy();
+ });
+});
