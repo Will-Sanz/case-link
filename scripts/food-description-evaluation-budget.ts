@@ -8,10 +8,10 @@ import { readBoundedBody } from "../src/lib/parent/http";
 
 export const FOOD_DESCRIPTION_CORPUS_SHA = "6ea3e44b253e66bc26720507c355d6b3da030bfd2d85e59b282feb9607570a19";
 export const DESCRIPTION_EVAL_LIMITS = { calls: 80, counts: 80, batchCalls: 16, input: 8000, output: 1500, capNanoDollars: 5_000_000_000, reservationNanoDollars: 55_000_000 } as const;
-export const DESCRIPTION_EVAL_RATE_CARD = { checkedAt: "2026-11-18", model: "gpt-6.1-sol", tier: "default", region: "global", ordinary: 2000, cached: 100, write30m: 2500, write12h: 5000, output: 10000 } as const;
+export const DESCRIPTION_EVAL_RATE_CARD = { checkedAt: "2026-11-19", model: "gpt-6.1-sol", tier: "default", region: "global", ordinary: 2000, cached: 100, write30m: 2500, write12h: 5000, output: 10000 } as const;
 const ref = z.string().trim().min(1).max(300), sha = z.string().regex(/^[a-f0-9]{64}$/);
 const sealedPriorRunSchema = z.object({ runDirectory: z.string().refine(isAbsolute), configurationPath: z.string().refine(isAbsolute), configurationSha256: sha,
-  evidenceSha256: sha, reservedPairs: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(7)]) }).strict();
+  evidenceSha256: sha, reservedPairs: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(7), z.literal(20)]) }).strict();
 const legacyAggregateSchema = z.object({ maximumCalls: z.literal(87), maximumCountRequests: z.literal(87), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(2) }).strict();
 export const descriptionEvaluationApprovalSchema = z.object({
   purpose: z.literal("optional_food_description_synthetic_evaluation_v1"), syntheticOnly: z.literal(true), approvalReference: ref,
@@ -19,11 +19,12 @@ export const descriptionEvaluationApprovalSchema = z.object({
   projectId: z.string().regex(/^proj_[A-Za-z0-9_-]{1,100}$/), projectMetadataReference: ref,
   approvedResponseModelId: z.string().regex(/^gpt-6\.1-sol(?:-\d{4}-\d{2}-\d{2})?$/), region: z.literal("global"), serviceTier: z.literal("default"),
   fingerprint: z.literal(FOOD_DESCRIPTION_FINGERPRINT), corpusSha256: z.literal(FOOD_DESCRIPTION_CORPUS_SHA), adapterSha256: sha,
-  rateCardDate: z.literal("2026-11-18"), maximumCalls: z.literal(80), maximumCountRequests: z.literal(80), maximumInputTokens: z.literal(8000),
+  rateCardDate: z.union([z.literal("2026-11-18"),z.literal("2026-11-19")]), maximumCalls: z.literal(80), maximumCountRequests: z.literal(80), maximumInputTokens: z.literal(8000),
   maximumOutputTokens: z.literal(1500), maximumNanoDollars: z.literal(5_000_000_000),
   runDirectory: z.string().refine(isAbsolute),
   aggregate: z.union([legacyAggregateSchema, z.object({ maximumCalls: z.literal(93), maximumCountRequests: z.literal(93), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(3) }).strict(),
-    z.object({ maximumCalls: z.literal(100), maximumCountRequests: z.literal(100), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(4) }).strict()]).optional(),
+    z.object({ maximumCalls: z.literal(100), maximumCountRequests: z.literal(100), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(4) }).strict(),
+    z.object({ maximumCalls: z.literal(120), maximumCountRequests: z.literal(120), maximumNanoDollars: z.literal(5_000_000_000), priorRuns: z.array(sealedPriorRunSchema).length(5) }).strict()]).optional(),
 }).strict();
 export type DescriptionEvaluationApproval = z.infer<typeof descriptionEvaluationApprovalSchema>;
 export type DescriptionEvaluationBudget = { fetch: (caseId: string, turn: number) => typeof fetch; attempts: () => number; halt: () => void };
@@ -83,11 +84,12 @@ export function sealedDescriptionEvaluationEvidenceHash(directory: string) {
   const outer = readdirSync(dirname(directory)).filter(name => name === `${prefix}.json` || name.startsWith(`${prefix}-`) && name.endsWith(".json")).sort().map(name => ({ name: `outer:${name}`, sha256: descriptionEvaluationFileHash(join(dirname(directory), name)) }));
   return descriptionEvaluationHash([...inner, ...outer]);
 }
-/** Original reservations stay sealed. Exact93/100 lineages may budget fully observed charges; no response supplies new quality evidence. */
+/** Original reservations stay sealed. Exact successor lineages budget verified charges, never prior quality. */
 export function sealedDescriptionEvaluationPriorAccounting(approval: DescriptionEvaluationApproval) {
   if (!approval.aggregate) return { pairs: 0, reservedNanoDollars: 0, knownMeasuredNanoDollars: 0, budgetedNanoDollars: 0 };
   const refs = approval.aggregate.priorRuns;
-  const measured = approval.aggregate.maximumCalls !== 87, counts = approval.aggregate.maximumCalls === 100 ? [3,4,6,7] : measured ? [3,4,6] : [3,4];
+  const nextDay=approval.aggregate.maximumCalls===120;
+  const measured = approval.aggregate.maximumCalls !== 87, counts = nextDay ? [3,4,6,7,20] : approval.aggregate.maximumCalls === 100 ? [3,4,6,7] : measured ? [3,4,6] : [3,4];
   if (new Set(refs.map(ref => ref.runDirectory)).size !== counts.length
     || descriptionEvaluationHash(refs.map(ref=>ref.reservedPairs)) !== descriptionEvaluationHash(counts)) throw safeError();
   const historical = descriptionEvaluationApprovalSchema.extend({ fingerprint: sha, adapterSha256: sha });
@@ -95,16 +97,16 @@ export function sealedDescriptionEvaluationPriorAccounting(approval: Description
   for (const [index, ref] of refs.entries()) {
     const prior = historical.parse(readDescriptionEvaluationEvidence(join(ref.runDirectory, "approval.json"))), prefix = ledgerPrefix(prior);
     const config = z.object({ approval: historical }).passthrough().parse(readDescriptionEvaluationEvidence(ref.configurationPath));
-    if ((index < 2 ? !!prior.aggregate : !prior.aggregate || prior.aggregate.maximumCalls !== (index === 2 ? 87 : 93) || descriptionEvaluationHash(prior.aggregate.priorRuns) !== descriptionEvaluationHash(refs.slice(0,index)))
+    if ((index < 2 ? !!prior.aggregate : !prior.aggregate || prior.aggregate.maximumCalls !== [87,93,100][index-2] || descriptionEvaluationHash(prior.aggregate.priorRuns) !== descriptionEvaluationHash(refs.slice(0,index)))
       || prior.runDirectory !== ref.runDirectory || prior.runDirectory === approval.runDirectory || prior.approvalReference === approval.approvalReference
       || prior.projectId !== approval.projectId || descriptionEvaluationHash(config.approval) !== descriptionEvaluationHash(prior)
       || descriptionEvaluationFileHash(ref.configurationPath) !== ref.configurationSha256
       || descriptionEvaluationFileHash(join(ref.runDirectory, "approval.json")) !== descriptionEvaluationFileHash(`${prefix}.json`)
       || descriptionEvaluationFileHash(join(ref.runDirectory, "halted.json")) !== descriptionEvaluationFileHash(`${prefix}-halted.json`)
       || sealedDescriptionEvaluationEvidenceHash(ref.runDirectory) !== ref.evidenceSha256) throw safeError();
-    if (measured && (prior.approvedUntil !== approval.approvedUntil || prior.processorReference !== approval.processorReference
+    if (measured && (prior.approvedUntil !== (nextDay?"2026-11-18T23:59:59Z":approval.approvedUntil) || prior.processorReference !== approval.processorReference
       || prior.noticeRetentionReference !== approval.noticeRetentionReference || prior.projectMetadataReference !== approval.projectMetadataReference
-      || prior.approvedResponseModelId !== approval.approvedResponseModelId || prior.rateCardDate !== approval.rateCardDate)) throw safeError();
+      || prior.approvedResponseModelId !== approval.approvedResponseModelId || prior.rateCardDate !== (nextDay?"2026-11-18":approval.rateCardDate))) throw safeError();
     const inner = join(ref.runDirectory, "reconciliation-halted.json"), outer = `${prefix}-reconciliation-halted.json`;
     if ((existsSync(inner) || existsSync(outer)) && descriptionEvaluationFileHash(inner) !== descriptionEvaluationFileHash(outer)) throw safeError();
     const accounting = descriptionEvaluationAccounting(ref.runDirectory);
@@ -144,6 +146,9 @@ export async function withFoodDescriptionEvaluationBudget<T>(input: {
   let permitted = true;
   const current = () => {
     const time = now().getTime();
+    if(approval.aggregate?.maximumCalls===120
+      ? approval.rateCardDate!=="2026-11-19"||approval.approvedUntil!=="2026-11-19T04:59:59Z"
+      : approval.rateCardDate!=="2026-11-18")throw safeError();
     if (!permitted || !Number.isFinite(time) || time >= Date.parse(approval.approvedUntil) || now().toISOString().slice(0, 10) !== approval.rateCardDate || !input.apiKey) throw safeError();
   };
   current();
