@@ -152,6 +152,7 @@ export async function createParentSqlFixture(
     "20261118194631_parent_food_directory_bounded_retry.sql",
     "20261118230000_parent_food_description_unknown_resolution.sql",
     "20261118235507_parent_food_description_source_fact_carry.sql",
+    "20261119002547_parent_food_description_routing_gaps.sql",
   ];
   try {
     const last = throughMigration ? migrations.indexOf(throughMigration) : migrations.length - 1;

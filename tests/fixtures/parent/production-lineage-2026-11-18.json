@@ -854,6 +854,14 @@
     {
       "name": "20261118230000_parent_food_description_unknown_resolution.sql",
       "sha256": "c27858dd4a0878541fc62c9c0323faed168726572fa3d876829fb23841437828"
+    },
+    {
+      "name": "20261118235507_parent_food_description_source_fact_carry.sql",
+      "sha256": "efb7a3e50be2c506578c1f6463717f88c749b83c6d5d8b3a9ba787ee0663145c"
+    },
+    {
+      "name": "20261119002547_parent_food_description_routing_gaps.sql",
+      "sha256": "b454cbb9b925784355cc31a2a0c252d610fe67f296a0df8a8cc534bd802dd1f4"
     }
   ],
   "fixtureSql": {

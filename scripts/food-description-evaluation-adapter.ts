@@ -74,19 +74,32 @@ export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, ind
       current.state = "proposal"; current.questionIds = [];
       differences.push("The description explicitly supplies unknown SNAP history alongside current food need; preserve Not sure without repeating that answered benefit question.");
     }
+    if (item.id.startsWith("description-choice_and_scope-3-")) {
+      current.state = "needs_clarification"; current.questionIds = ["foodForTwoDays"]; current.urgency = null;
+      differences.push("Wanting a food site today does not establish the household's two-day food supply; retain the necessary food question without inventing a shortage.");
+    }
+    if (z.array(z.unknown()).parse(current.questionIds).includes("foodForTwoDays") && !z.array(z.string()).parse(current.needIds).includes("food_now")) {
+      current.needIds = ["food_now", ...z.array(z.string()).parse(current.needIds)];
+      current.allowedProgramIdsByNeed = { ...record(current.allowedProgramIdsByNeed ?? {}), food_now: [] };
+      differences.push("An unanswered food question retains compatible provisional food help; unknown supply is not No, urgency, a program action or a raw-model nomination success.");
+    }
     if (z.array(z.unknown()).parse(record(item.turns[0].input).excludedNeeds).length) differences.push("Archived excludedNeeds is not a public queue input; source-anchored exclusions and the explicit terminal choice remain authoritative.");
     if (archived.state === "outside_supported_geography") {
-      current.state = "manual"; current.outOfScope = "other";
-      differences.push("Current strict selection uses manual/other for explicit unsupported geography, not an invented state or eligibility finding.");
+      current.state = "manual"; current.outOfScope = "outside_pa";
+      differences.push("Current strict selection uses manual/outside_pa for explicit unsupported geography, not an invented state or eligibility finding.");
     }
   }
   if (archived.state === "open_existing" && index < 2) {
     current.needIds = []; current.existingRequests = descriptionEvaluationCurrentRequests(descriptionEvaluationContext(item)).map(({ requestId, needIds }) => ({ requestId, needIds }));
     differences.push("Covered SNAP moves from proposed needIds into owned existingRequests; no new/resumed mandate.");
   }
+  if (index === 1 && /^description-owned_history-(1|3)-/.test(item.id)) {
+    current.answers = { ...record(current.answers), benefitHistory: "not_sure" };
+    differences.push("The owned submitted request supplies routing coverage, not a parent-provided history assertion; no supplied answer or clear initial source establishes applied.");
+  }
   if ((index === 0 || item.turns[index].modelCalls === 1) && archived.allowedProgramIdsByNeed) {
     const input = descriptionEvaluationInput(item, index), projected = buildFoodDescriptionProjection(input, descriptionEvaluationContext(item), new Date(DESCRIPTION_EVALUATION_NOW));
-    const allowed = record(archived.allowedProgramIdsByNeed);
+    const allowed = record(current.allowedProgramIdsByNeed);
     current.allowedProgramIdsByNeed = Object.fromEntries(Object.keys(allowed).map(need => [need, projected.candidates.filter(candidate => candidate.need === need).map(candidate => candidate.programId)]));
     if (descriptionEvaluationHash(current.allowedProgramIdsByNeed) !== descriptionEvaluationHash(allowed)) differences.push("The actual reviewed catalog includes the public Share access route; this is a grounded proposal only, with no stock/reservation/eligibility claim.");
   }
@@ -95,6 +108,12 @@ export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, ind
     current.handoff = foodAssessmentHandoffSchema.parse({ needs: [handoff.need], answers: handoff.answers });
     current.complementaryStartSupported=true;
     differences.push("Explicit singular archived choice maps to needs:[choice]; complementary starts are now supported, while this chosen single terminal leaves the other need unstarted under its own mandate.");
+  }
+  if (["description-untrusted_and_sources-3-en", "description-untrusted_and_sources-3-es"].includes(item.id) && index >= 2) {
+    const truthful = { foodForTwoDays: "yes", benefitHistory: "denied", existingIssue: null };
+    if (index === 2) current.answers = truthful;
+    else current.handoff = foodAssessmentHandoffSchema.parse({ needs: ["snap_problem"], answers: truthful });
+    differences.push("A parent-reported denial notice routes to the existing SNAP problem journey without inventing received benefits or an agency-verified decision.");
   }
   if(item.turns[index].kind==="manual_exit"&&current.target==="https://www.feedingamerica.org/find-your-local-foodbank"){
     current.target="https://www.feedingamerica.org/need-help-find-food";differences.push("Use the actual existing FoodSites public fallback URL; discovery is not an allocation, reservation or program action.");
@@ -107,6 +126,28 @@ export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, ind
     const typed=applyDescriptionEvaluationAnswers(descriptionEvaluationContext(item),item.turns[1].suppliedAnswers??{});
     current.resultRevision=typed.revision+1;
     if(current.resultRevision!==archived.resultRevision)differences.push("Actual zero-call clarification already advanced the owned revision; the explicit edit advances that current revision again without renewing its original deadline.");
+  }
+  if (index === 2 && item.id.startsWith("description-pending-3-")) {
+    current.state = "manual";
+    differences.push("Enough food, benefits in use and no current issue leave no proposed new action; My support remains the declared exit.");
+  }
+  if (index === 2 && item.id.startsWith("description-owned_history-3-")) {
+    current.state = "open_existing"; current.needIds = [];
+    current.existingRequests = descriptionEvaluationCurrentRequests(descriptionEvaluationContext(item)).map(({ requestId, needIds }) => ({ requestId, needIds }));
+    differences.push("The corrected pending intent is already covered by the same owned active application; open that request without a duplicate proposal or resumed mandate.");
+  }
+  if (item.id.startsWith("description-choice_and_scope-3-") && index > 0) {
+    if (current.answers) current.answers = { ...record(current.answers), foodForTwoDays: "not_sure" };
+    if ("urgency" in current) current.urgency = null;
+    if (index === 1) { current.remainingQuestionIds = ["foodForTwoDays"]; current.requiresTypedTiming = true; }
+    if (index === 2) { current.state = "needs_clarification"; current.questionIds = ["foodForTwoDays"]; }
+    if (index === 3) {
+      const handoff = record(current.handoff);
+      current.handoff = foodAssessmentHandoffSchema.parse({ ...handoff, answers: { ...record(handoff.answers), foodForTwoDays: "not_sure" } });
+      current.partialHandoff = true; current.remainingQuestionIds = ["foodForTwoDays"];
+      current.nativeActionEvidence = "The selected SNAP-only path does not require food inventory. UI/API and embedded SQL readiness are checked separately; this schema check creates no request, mandate or provider action.";
+    }
+    differences.push("No supplied answer or later source establishes two-day food supply; retain its question for food work while the independently ready chosen SNAP-only path uses unknown inventory, without a fabricated typed Not sure.");
   }
   return { archived, current, differences };
 }
@@ -151,7 +192,7 @@ export function descriptionEvaluationPlan(corpus = loadDescriptionEvaluationCorp
     languageCounts: { en: 30, es: 30 }, modelFingerprint: FOOD_DESCRIPTION_FINGERPRINT, logicalNow: DESCRIPTION_EVALUATION_NOW };
 }
 export function descriptionEvaluationAdapterHash() {
-  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json","utf8"));
+  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v13-adapter.json","utf8"));
   if(descriptionEvaluationHash(saved)!==descriptionEvaluationHash(plan))throw new Error("description_evaluation_adapter_changed");
   return descriptionEvaluationHash(plan);
 }

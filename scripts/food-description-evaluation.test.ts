@@ -11,7 +11,7 @@ function fixtureBudget(){
     const pending=description.includes("already pending"),unclear=description.includes("only one more day");
     const food=pending?"need food today":unclear?"food for only one more day":description.includes("groceries today")?"groceries today":"no food for tomorrow";
     const benefit=pending?"already pending":"never applied for SNAP";
-    const selection=description.includes("already started")?{needIds:["snap_pending"],selections:[],assertions:[{questionId:"benefitHistory",value:"applied",span:span("already started")}],exclusions:[],questionIds:[],outOfScope:null}
+    const selection=description.includes("already started")||description.includes("ya inicié")?{needIds:[],selections:[],assertions:[],exclusions:[],questionIds:[],outOfScope:null}
       :{needIds:unclear?["food_now"]:["food_now",pending?"snap_pending":"snap_new"],selections:[],assertions:[{questionId:"foodForTwoDays",value:"no",span:span(food)},...unclear?[{questionId:"benefitHistory",value:"not_sure",span:span("I do not know whether anyone applied for benefits")}]:[{questionId:"benefitHistory",value:pending?"applied":"never",span:span(benefit)}]],exclusions:[],questionIds:[],outOfScope:null};
     return Response.json({id:"resp_synthetic",status:"completed",model:"gpt-6.1-sol",service_tier:"default",usage:{input_tokens:100,output_tokens:40,total_tokens:140,input_tokens_details:{cached_tokens:0,cache_write_tokens:0,cache_write_tokens_details:{ttl_30m_tokens:0,ttl_12h_tokens:0}},output_tokens_details:{reasoning_tokens:10}},output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(selection,(key,item)=>key==="span"?{text:item.text}:item)}]}]});
   });
@@ -43,11 +43,11 @@ describe("actual interpreter with explicit synthetic transport, never model-qual
     const result=await runDescriptionEvaluationCase(item,{budget:f.budget,projectId:"proj_synthetic",apiKey:"synthetic"});
     expect(f.requests).toHaveLength(1);expect(f.halt).toHaveBeenCalled();expect(result.criticalFailure).toBe(true);expect(result.turns).toHaveLength(4);expect(result.turns.filter(turn=>turn.status==="unrun_after_failure")).toHaveLength(3);
   });
-  it("keeps a covered owned journey in existingRequests through the zero-call continuation",async()=>{
-    const f=fixtureBudget(),item=corpus.cases.find(item=>item.id==="description-owned_history-1-en")!;
+  it.each(["en", "es"])("keeps a covered owned journey without inventing a submitted answer through zero-call continuation (%s)",async language=>{
+    const f=fixtureBudget(),item=corpus.cases.find(item=>item.id===`description-owned_history-1-${language}`)!;
     const result=await runDescriptionEvaluationCase(item,{budget:f.budget,projectId:"proj_synthetic",apiKey:"synthetic"});
     expect(f.requests).toHaveLength(1);expect(result.criticalFailure).toBe(false);expect(result.qualityFailures).toBe(0);
-    expect(result.turns[1]).toMatchObject({status:"deterministic_typed_answers",result:{needIds:[],state:"open_existing",existingRequests:[{requestId:"00000000-0000-4000-8000-000000000101",needIds:["snap_pending"]}]}});
+    expect(result.turns[1]).toMatchObject({status:"deterministic_typed_answers",result:{needIds:[],state:"open_existing",proposedAnswers:{benefitHistory:"not_sure"},existingRequests:[{requestId:"00000000-0000-4000-8000-000000000101",needIds:["snap_pending"]}]}});
     expect(result.turns[3]).toMatchObject({target:"/support/00000000-0000-4000-8000-000000000101",checks:[{passed:true}]});
   });
   it("stops when an operational stale-result guard fails instead of merely recording its status",async()=>{

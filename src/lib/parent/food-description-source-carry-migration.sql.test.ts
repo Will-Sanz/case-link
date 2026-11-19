@@ -6,7 +6,7 @@ describe.skipIf(!modulePath)("description source carry forward migration boundar
   const definitions = async (fixture: typeof before) => (await fixture.admin.query(`select p.oid::regprocedure::text signature,pg_get_functiondef(p.oid) definition,
     pg_get_userbyid(p.proowner) owner,p.proacl::text acl,p.prosecdef,p.proconfig,p.provolatile,p.proparallel,p.proleakproof
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','parent_private') and p.prokind='f' order by 1`)).rows;
-  beforeAll(async () => { before = await createParentSqlFixture(modulePath!, "20261118230000_parent_food_description_unknown_resolution.sql"); after = await createParentSqlFixture(modulePath!); });
+  beforeAll(async () => { before = await createParentSqlFixture(modulePath!, "20261118230000_parent_food_description_unknown_resolution.sql"); after = await createParentSqlFixture(modulePath!, "20261118235507_parent_food_description_source_fact_carry.sql"); });
   afterAll(async () => { await before?.admin.end(); await after?.admin.end(); });
   it("changes only the five reviewed definitions, retains every installed owner/ACL/security attribute and adds one private helper", async () => {
     const old = await definitions(before), next = await definitions(after);

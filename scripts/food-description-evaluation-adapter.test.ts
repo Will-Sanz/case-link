@@ -5,9 +5,9 @@ import { FOOD_DESCRIPTION_EVALUATION_BINDING } from "../src/lib/parent/food-desc
 import { descriptionEvaluationHash } from "./food-description-evaluation-budget";
 const corpus = loadDescriptionEvaluationCorpus();
 describe("hash-pinned actual description DTO adapter, without model or network", () => {
-  it("changes only the four explicit unknown-history question oracles and two consequent states, retaining their archived expectations", () => {
+  it("preserves the four explicit unknown-history corrections alongside separately reviewed food questions", () => {
     const rows = descriptionEvaluationPlan(corpus).cases;
-    const changed = rows.filter(item => JSON.stringify(item.turns[0].archived.questionIds) !== JSON.stringify(item.turns[0].current.questionIds));
+    const changed = rows.filter(item => !item.id.startsWith("description-choice_and_scope-3-") && JSON.stringify(item.turns[0].archived.questionIds) !== JSON.stringify(item.turns[0].current.questionIds));
     expect(changed.map(item => item.id)).toEqual(["description-urgent-2-en", "description-urgent-2-es", "description-ambiguity-3-en", "description-ambiguity-3-es"]);
     for (const item of changed) {
       if (item.id.includes("ambiguity")) {
@@ -21,7 +21,7 @@ describe("hash-pinned actual description DTO adapter, without model or network",
         expect(item.turns[0].differences).toContain("The description explicitly supplies unknown SNAP history alongside current food need; preserve Not sure without repeating that answered benefit question.");
       }
     }
-    expect(rows.filter(item => item.turns[0].archived.state !== item.turns[0].current.state && item.turns[0].archived.state !== "outside_supported_geography").map(item => item.id)).toEqual(["description-urgent-2-en", "description-urgent-2-es"]);
+    expect(rows.filter(item => !item.id.startsWith("description-choice_and_scope-3-") && item.turns[0].archived.state !== item.turns[0].current.state && item.turns[0].archived.state !== "outside_supported_geography").map(item => item.id)).toEqual(["description-urgent-2-en", "description-urgent-2-es"]);
   });
   it("preserves all60/240/80/24 rows and both language denominators", () => {
     const plan=descriptionEvaluationPlan(corpus); expect(plan.caseCount).toBe(60);expect(plan.turnCount).toBe(240);expect(plan.maximumModelCalls).toBe(80);expect(plan.zeroCallGuardCases).toBe(24);
@@ -38,12 +38,19 @@ describe("hash-pinned actual description DTO adapter, without model or network",
   it.each(corpus.blockedCases)("blocks $id before count or generation", item => {
     expect(foodDescriptionInputSchema.safeParse({description:item.description,screenLocale:item.language}).success).toBe(false);
   });
-  it("marks all incompatible archived targets explicitly and adapts26 terminal choices without compound creation", () => {
+  it("marks incompatible targets and retains26 terminal intents, including2 independently ready SNAP-only choices", () => {
     const rows=descriptionEvaluationPlan(corpus).cases.flatMap(item=>item.turns);
     expect(rows.filter(row=>row.turn===1&&row.differences.length)).toHaveLength(60);
     const terminals=rows.filter(row=>row.kind==="typed_handoff");expect(terminals).toHaveLength(26);
-    for(const row of terminals)expect((row.current.handoff as {needs:string[]}).needs).toHaveLength(1);
-    expect(rows.filter(row=>row.turn===1&&row.archived.state==="outside_supported_geography").every(row=>row.current.state==="manual"&&row.current.outOfScope==="other")).toBe(true);
+    expect(terminals.filter(row => row.current.partialHandoff === true)).toHaveLength(2);
+    for (const row of terminals) {
+      expect((row.current.handoff as { needs: string[] }).needs).toHaveLength(1);
+      if (row.current.partialHandoff === true) {
+        expect(row.current.remainingQuestionIds).toEqual(["foodForTwoDays"]);
+        expect(row.current.handoff).toMatchObject({ needs: ["snap_new"], answers: { foodForTwoDays: "not_sure" } });
+      }
+    }
+    expect(rows.filter(row=>row.turn===1&&row.archived.state==="outside_supported_geography").every(row=>row.current.state==="manual"&&row.current.outOfScope==="outside_pa")).toBe(true);
     expect(rows.filter(row=>row.turn===1&&row.archived.state==="open_existing").every(row=>Array.isArray(row.current.existingRequests))).toBe(true);
     expect(rows.filter(row=>row.kind==="change_state_and_revalidate")).toHaveLength(40);
   });

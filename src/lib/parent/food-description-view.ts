@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { foodAssessmentQuestionReasons, foodAssessmentSchema } from "./food-assessment";
-import { foodDescriptionNeedSchema } from "./food-description";
+import { assessFoodSupport, foodAssessmentQuestionReasons, foodAssessmentSchema } from "./food-assessment";
+import { foodDescriptionNeedSchema, foodDescriptionOutOfScopeSchema } from "./food-description";
 import { foodDescriptionMutationSchema, foodDescriptionSourceSchema } from "./food-description-draft";
 /** Family screens accept only vetted identifiers and typed values, never model-authored copy or links. */
 export const foodDescriptionViewSchema = z.object({
@@ -10,9 +10,21 @@ export const foodDescriptionViewSchema = z.object({
   questionIds: z.array(z.enum(Object.keys(foodAssessmentQuestionReasons) as (keyof typeof foodAssessmentQuestionReasons)[])).max(3),
   conflicts: z.array(z.enum(Object.keys(foodAssessmentQuestionReasons) as (keyof typeof foodAssessmentQuestionReasons)[])).max(3).default([]),
   existingRequests: z.array(z.object({ requestId: z.uuid(), needIds: z.array(foodDescriptionNeedSchema).min(1).max(5) }).strict()).max(14), excludedNeedIds: z.array(foodDescriptionNeedSchema).max(5),
-  outOfScope: z.enum(["wic", "utilities", "other"]).nullable(), executionGranted: z.literal(false),
+  outOfScope: foodDescriptionOutOfScopeSchema.nullable(), executionGranted: z.literal(false),
 });
 export type FoodDescriptionView = z.infer<typeof foodDescriptionViewSchema>;
+
+/** Readiness for a selected path is not permission to start work or a new answer. */
+export function readyFoodDescriptionNeeds(result: Pick<FoodDescriptionView, "state" | "needIds" | "questionIds" | "conflicts" | "proposedAnswers" | "outOfScope">) {
+  if (result.outOfScope === "outside_pa") return [];
+  if (result.state === "proposal") return result.needIds;
+  if (result.state !== "needs_clarification" || result.conflicts.length) return [];
+  const assessed = assessFoodSupport(result.proposedAnswers).map(path => path.need);
+  return result.needIds.filter(need => assessed.includes(need) && (need === "food_now"
+    ? !result.questionIds.includes("foodForTwoDays")
+    : !result.questionIds.some(question => question === "benefitHistory" || question === "existingIssue")));
+}
+
 export const foodDescriptionProposalSchema = foodDescriptionViewSchema.extend({ source: foodDescriptionSourceSchema }).strict();
 export type FoodDescriptionProposal = z.infer<typeof foodDescriptionProposalSchema>;
 

@@ -10,7 +10,7 @@ export const foodAssessmentQuestionReasons = {
 
 export const foodAssessmentSchema = z.object({
   foodForTwoDays: z.enum(["yes", "no", "not_sure"]),
-  benefitHistory: z.enum(["never", "applied", "receiving", "not_sure"]),
+  benefitHistory: z.enum(["never", "applied", "denied", "receiving", "not_sure"]),
   existingIssue: z.enum(["renewal", "stopped", "card", "none", "not_sure"]).nullable(),
 }).strict().superRefine((answers, context) => {
   if (answers.benefitHistory === "receiving" ? answers.existingIssue === null : answers.existingIssue !== null)
@@ -51,6 +51,7 @@ export function assessFoodSupport(input: unknown): FoodRecommendation[] {
   if (answers.foodForTwoDays !== "yes") paths.push({ need: "food_now", reason: "immediate" });
   if (answers.benefitHistory === "never") paths.push({ need: "snap_new", reason: "new" });
   else if (answers.benefitHistory === "applied") paths.push({ need: "snap_pending", reason: "pending" });
+  else if (answers.benefitHistory === "denied") paths.push({ need: "snap_problem", reason: "problem" });
   else if (answers.benefitHistory === "receiving") {
     if (answers.existingIssue === "renewal") paths.push({ need: "snap_renewal", reason: "renewal" });
     else if (["stopped", "card", "not_sure"].includes(answers.existingIssue!)) paths.push({ need: "snap_problem", reason: "problem" });

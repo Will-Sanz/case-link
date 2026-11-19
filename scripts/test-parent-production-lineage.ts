@@ -97,7 +97,7 @@ export async function runNativeParentProductionLineage(args:string[]){
     assert.deepEqual((await client.query("select to_jsonb(u) app_user,(select to_jsonb(f) from public.families f where f.id=$2) family from public.app_users u where u.id=$1",[staff,family])).rows[0],rowsBefore);
     const afterRoles=await roles();for(const role of oldRoles)assert.deepEqual(afterRoles.find(after=>after.rolname===role.rolname),role);assert.deepEqual(await memberships(),oldMemberships);
     assert.deepEqual((await client.query("select version,name from lineage_fixture.migration_history order by version")).rows,lineage.recordedMigrationHistory);
-    evidence={syntheticOnly:true,localOnly:true,sourceBase:lineage.sourceBase,sourceHistoryRecords:100,productionOnlyRecords:5,baselineFiles:76,pendingFiles:36,observedFunctionDefinitions:25,observedCriticalColumns:82,
+    evidence={syntheticOnly:true,localOnly:true,sourceBase:lineage.sourceBase,sourceHistoryRecords:100,productionOnlyRecords:5,baselineFiles:76,pendingFiles:38,observedFunctionDefinitions:25,observedCriticalColumns:82,
       oldSchoolRowsDefinitionsAndGrantsPreserved:true,oldRoleAttributesMembershipsPreserved:true,sourceHistoryPreserved:true,cases,
       limits:"Reconstructed schema lineage and synthetic records only; no production data/settings/passwords, actual migration-tool history mutation, hosted Auth, provider/model calls, family outcome or release approval."};
   }catch(error){failure=error;}

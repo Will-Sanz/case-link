@@ -25,7 +25,7 @@ it.each(['history name','history omission','unknown remote version','source omis
 it.each(['postgresql://postgres:postgres@db.example.invalid:5432/postgres','postgresql://postgres:postgres@127.0.0.1:54322/postgres','postgresql://postgres:postgres@localhost:58422/postgres','postgresql://postgres:postgres@127.0.0.1:58422/other_database','postgresql://postgres:postgres@127.0.0.1:58422/postgres?sslmode=require'])("rejects a non-owned native target %s",url=>{expect(()=>assertNativeLineageTarget(url)).toThrow();});
 it("has a key-free native dry plan and does not accept a caller's database override",async()=>{
   expect(assertNativeLineageTarget('postgresql://postgres:postgres@127.0.0.1:58422/postgres')).toContain('127.0.0.1:58422');
-  expect(await runNativeParentProductionLineage(['--dry'])).toMatchObject({mode:'dry',pendingFiles:36,observedFunctions:25,observedColumns:82,modelCalls:0,providerCalls:0});
+  expect(await runNativeParentProductionLineage(['--dry'])).toMatchObject({mode:'dry',pendingFiles:38,observedFunctions:25,observedColumns:82,modelCalls:0,providerCalls:0});
   await expect(runNativeParentProductionLineage(['--synthetic-approval','--db-url','postgresql://remote.invalid/private-credential'])).rejects.toThrow('Only --dry or --synthetic-approval is supported; a database URL cannot be supplied.');
 });
 it("keeps school policies while excluding new parent policies from the school-only fingerprint",()=>{
@@ -46,8 +46,8 @@ it.skipIf(!modulePath)("refuses an observed schema missing the one-enabled-contr
   try{await fixture.admin.query('drop index parent_private.parent_one_snap_controlled_test');await expect(assertObservedProductionSchema(fixture.admin)).rejects.toThrow();}
   finally{await fixture.admin.query('rollback');}
 });
-it.skipIf(!modulePath)("upgrades all36 pending files from the observed parent lineage",async()=>{
-  expect(await rehearseParentProductionUpgrade(fixture.admin,{embedded:true})).toMatchObject({observedFunctions:25,ongoingInfinityPreserved:true,preSubmitReviewWithoutDispatch:true,publicDirectoryAndMixedIsolation:true,unknownDescriptionsResolved:true,modelCalls:0,providerCalls:0});
+it.skipIf(!modulePath)("upgrades all38 pending files from the observed parent lineage",async()=>{
+  expect(await rehearseParentProductionUpgrade(fixture.admin,{embedded:true})).toMatchObject({observedFunctions:25,ongoingInfinityPreserved:true,preSubmitReviewWithoutDispatch:true,publicDirectoryAndMixedIsolation:true,unknownDescriptionsResolved:true,descriptionRoutingReadOnly:true,modelCalls:0,providerCalls:0});
 });
 
 it("uses the existing byte order for historical schema fingerprints, independent of host locale",()=>{

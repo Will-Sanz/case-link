@@ -1,17 +1,21 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FoodDescription } from "./food-description";
+import { FoodAssessment } from "./food-assessment";
 import { FoodAssessmentQuestions } from "./food-assessment-questions";
 import { foodAssessmentCopy } from "@/lib/parent/food-assessment-copy";
 import { ParentLanguageSelector, ParentLocaleProvider } from "./parent-locale";
+import type { FoodDescriptionProposal } from "@/lib/parent/food-description-view";
+import { foodDescriptionCopy } from "@/lib/parent/food-description-copy";
+import { getProgram } from "@/lib/parent/programs";
 import type { FoodDescriptionArchive } from "@/lib/parent/food-description-draft";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }) }));
 vi.mock("./sign-in", () => ({ ParentSignIn: (props: { onSignedIn?: () => Promise<void> }) => <button onClick={() => void props.onSignedIn?.()}>Synthetic sign-in only</button> }));
 const owner = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002", id = "00000000-0000-4000-8000-000000000003";
 let available: boolean, signedIn: boolean, archive: FoodDescriptionArchive, fetcher: ReturnType<typeof vi.fn<typeof fetch>>;
 let loseQueueAck: boolean, dropQueueWrite: boolean, queuedBodies: string[], resolveBodies: string[], loseResolveAck: boolean, nextDraftId: string;
-let resultView: {state:string;proposedAnswers:{foodForTwoDays:string;benefitHistory:string;existingIssue:null};needIds:string[];questionIds:string[];existingRequests:{requestId:string;needIds:string[]}[];excludedNeedIds:string[];outOfScope:null;executionGranted:false};
+let resultView: {state:string;proposedAnswers:{foodForTwoDays:string;benefitHistory:string;existingIssue:FoodDescriptionProposal["proposedAnswers"]["existingIssue"]};needIds:string[];questionIds:string[];existingRequests:{requestId:string;needIds:string[]}[];excludedNeedIds:string[];outOfScope:FoodDescriptionProposal["outOfScope"];conflicts?:FoodDescriptionProposal["conflicts"];executionGranted:false};
 const onProposed = vi.fn(), onManual = vi.fn(), onReset = vi.fn();
 const draft = (): FoodDescriptionArchive["drafts"][number] => ({ id, revision: 0, state: "empty", noticeVersion: "food-description-2026-11-18.v1", consentedAt: new Date().toISOString(), createdAt: new Date().toISOString(), contentExpiresAt: new Date(Date.now()+86400000).toISOString(), metadataExpiresAt: new Date(Date.now()+172800000).toISOString(), input: null, projection: null, selection: null, queueKey: null, sameChargedContext: false, usage: [] });
 const renderTool = () => render(<ParentLocaleProvider initialLocale="en"><ParentLanguageSelector/><FoodDescription onProposed={onProposed} onManual={onManual} onReset={onReset}/></ParentLocaleProvider>);
@@ -109,7 +113,8 @@ it("asks only unresolved routing questions, focuses them and reconciles the same
   resultView={...resultView,state:"needs_clarification",proposedAnswers:{foodForTwoDays:"no",benefitHistory:"not_sure",existingIssue:null},needIds:["food_now"],questionIds:["benefitHistory"]};
   renderTool();fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
   const history=await screen.findByLabelText(/Do you get help paying/);await waitFor(()=>expect(document.activeElement).toBe(history));
-  expect(screen.queryByLabelText(/Do you have enough food/)).toBeNull();expect(onProposed).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText(/Do you have enough food/)).toBeNull();
+  expect(onProposed).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ needIds: ["food_now"], questionIds: ["benefitHistory"], source: { draftId: id, revision: 1 } }));
   fireEvent.change(history,{target:{value:"never"}});loseResolveAck=true;fireEvent.click(screen.getByRole("button",{name:"Use these routing answers"}));
   await screen.findByRole("button",{name:"Check the same saved routing answers"});expect(resolveBodies).toHaveLength(1);
   fireEvent.change(screen.getByLabelText(/Screen language/),{target:{value:"es"}});
@@ -227,4 +232,150 @@ it.each(["en", "es"] as const)("shows the complete current routing choice beside
   view.rerender(<ParentLocaleProvider initialLocale={locale}><FoodAssessmentQuestions answers={{foodForTwoDays:"yes",benefitHistory:"applied",existingIssue:null}} onChange={onChange}/></ParentLocaleProvider>);
   for(const text of [c.yes,c.applied])expect(screen.getByText(text,{selector:"p"})).toBeTruthy();
   expect(screen.queryByText(c.card,{selector:"p"})).toBeNull();expect(onChange).not.toHaveBeenCalled();expect(queuedBodies).toHaveLength(0);expect(resolveBodies).toHaveLength(0);
+});
+
+it.each(["en", "es"] as const)("keeps food unanswered while exposing the independently ready SNAP-only proposal (%s)", async language => {
+  const description = language === "en" ? "I now want help with my first SNAP application as well as food today." : "Ahora también quiero ayuda con mi primera solicitud de SNAP, además de comida para hoy.";
+  archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description, screenLocale: language } }];
+  resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: ["foodForTwoDays"] };
+  renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
+  await screen.findByLabelText(foodAssessmentCopy.en.enough);
+  if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language/), { target: { value: "es" } });
+  const answer = await screen.findByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement;
+  expect(answer.value).toBe(""); expect(answer.required).toBe(true); expect(answer.checkValidity()).toBe(false);
+  expect(onProposed).toHaveBeenCalledWith(expect.objectContaining({ state: "needs_clarification", needIds: ["snap_new"], questionIds: ["foodForTwoDays"], source: { draftId: id, revision: 2 } }));
+  expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
+});
+
+it.each((["en", "es"] as const).flatMap(language => (["manual", "needs_clarification", "proposal"] as const).map(state => ({ language, state }))))("shows direct WIC choices with honest limits while preserving independent food work ($language/$state)", async ({ language, state }) => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 1, input: { description: language === "en" ? "I need WIC support." : "Necesito apoyo de WIC.", screenLocale: language } }];
+  resultView = { ...resultView, state, outOfScope: "wic", proposedAnswers: { foodForTwoDays: state === "proposal" ? "no" : "not_sure", benefitHistory: "not_sure", existingIssue: null },
+    needIds: state === "manual" ? [] : ["food_now"], questionIds: state === "needs_clarification" ? ["foodForTwoDays"] : [] };
+  renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
+  if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language/), { target: { value: "es" } });
+  const region = await screen.findByRole("region", { name: language === "en" ? "WIC support" : "Apoyo de WIC" });
+  const links = [...region.querySelectorAll("a")];
+  expect(links.map(link => link.getAttribute("href"))).toEqual(["/get-support?need=wic_new", "/get-support?need=wic_continuing", getProgram("wic-pa")!.officialUrl]);
+  expect(links.map(link => link.textContent)).toEqual(language === "en" ? ["Apply for WIC", "Continue WIC support", "Official WIC appointment guidance"] : ["Solicitar WIC", "Continuar el apoyo de WIC", "Orientación oficial sobre citas de WIC"]);
+  expect(region.closest("[lang]")?.getAttribute("lang")).toBe(language);
+  expect(region.textContent).toContain(language === "en" ? "separate WIC notice" : "aviso de WIC por separado");
+  expect(region.textContent).toContain(language === "en" ? "does not send a pre-application, book an appointment or confirm enrollment" : "no envía una presolicitud, reserva una cita ni confirma la inscripción");
+  if (state === "needs_clarification") expect((screen.getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
+  if (state === "manual") {
+    expect(screen.queryByText(foodAssessmentCopy[language].history)).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(region.querySelector("h3")));
+  }
+  expect(queuedBodies).toEqual([]); expect(resolveBodies).toEqual([]);
+  expect(onProposed).toHaveBeenCalledTimes(state === "proposal" ? 1 : 0);
+  expect(archive.drafts[0].input?.screenLocale).toBe(language);
+});
+
+it.each(["en", "es"] as const)("shows the existing public outside-area food fallback directly (%s)", async language => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 1, input: { description: language === "en" ? "I need food support outside Pennsylvania." : "Necesito apoyo alimentario fuera de Pensilvania.", screenLocale: language } }];
+  resultView = { ...resultView, state: "manual", outOfScope: "outside_pa", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "not_sure", existingIssue: null }, needIds: [], questionIds: [] };
+  renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
+  if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language/), { target: { value: "es" } });
+  const link = await screen.findByRole("link", { name: language === "en" ? "Find a food bank outside this area" : "Buscar un banco de alimentos fuera de esta zona" });
+  expect(link.getAttribute("href")).toBe("https://www.feedingamerica.org/need-help-find-food");
+  expect(link.closest("[lang]")?.getAttribute("lang")).toBe(language);
+  await waitFor(() => expect(document.activeElement).toBe(link.closest("section")?.querySelector("h3")));
+  expect(screen.getByText(language === "en" ? /These connected options do not cover the area you described/ : /Estas opciones conectadas no cubren la zona que describió/)).toBeTruthy();
+  expect(screen.queryByLabelText(foodAssessmentCopy[language].enough)).toBeNull(); expect(screen.queryByLabelText(foodAssessmentCopy[language].history)).toBeNull();
+  expect(onProposed).not.toHaveBeenCalled(); expect(queuedBodies).toEqual([]); expect(resolveBodies).toEqual([]);
+  expect(screen.getByRole("button", { name: foodDescriptionCopy[language].manual })).toBeTruthy();
+});
+
+it.each(["en", "es"] as const)("exposes the ready SNAP path through the actual guide without inventing a food answer or an extra click (%s)", async language => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description: language === "en" ? "My first SNAP application and food today." : "Mi primera solicitud de SNAP y comida para hoy.", screenLocale: language } }];
+  resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: ["foodForTwoDays"] };
+  const onChoose = vi.fn();
+  render(<ParentLocaleProvider initialLocale={language}><FoodAssessment onChoose={onChoose} descriptionOptions={{}}/></ParentLocaleProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: name => name.startsWith(foodDescriptionCopy[language].resume) }));
+  const choice = await screen.findByRole("button", { name: foodAssessmentCopy[language].titles.snap_new });
+  expect(screen.getByText(foodDescriptionCopy[language].readyOptions)).toBeTruthy();
+  const resultHeading = screen.getByRole("heading", { name: foodAssessmentCopy[language].results });
+  await waitFor(() => expect(document.activeElement).toBe(resultHeading));
+  const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
+  expect((within(tool).getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
+  expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].both })).toBeNull();
+  expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles.food_now })).toBeNull();
+  fireEvent.click(choice);
+  expect(onChoose).toHaveBeenCalledExactlyOnceWith({ needs: ["snap_new"], answers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, descriptionSource: { draftId: id, revision: 2 } });
+  expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
+  fireEvent.click(within(tool).getByRole("button", { name: foodDescriptionCopy[language].edit }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles.snap_new })).toBeNull());
+});
+
+it.each([
+  { name: "food only", needs: ["food_now"], questions: ["foodForTwoDays"] },
+  { name: "unknown history", needs: ["food_now", "snap_new"], questions: ["foodForTwoDays", "benefitHistory"] },
+  { name: "unresolved issue", needs: ["food_now", "snap_problem"], questions: ["foodForTwoDays", "existingIssue"] },
+  { name: "incompatible benefit", needs: ["food_now", "snap_new"], questions: ["foodForTwoDays"], history: "applied" },
+  { name: "multiple benefit paths", needs: ["food_now", "snap_new", "snap_pending"], questions: ["foodForTwoDays"], expectedNeeds: ["snap_new"] },
+  { name: "typed conflict", needs: ["food_now", "snap_new"], questions: ["foodForTwoDays"], conflicts: ["benefitHistory"] as const },
+])("respects readiness limits for $name", async ({ needs, questions, conflicts, history, expectedNeeds }) => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 1, input: { description: "Food help", screenLocale: "en" } }];
+  resultView = { ...resultView, state: "needs_clarification", needIds: needs, questionIds: questions, conflicts: conflicts ? [...conflicts] : [],
+    proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: history ?? (needs.includes("snap_problem") ? "receiving" : "never"), existingIssue: needs.includes("snap_problem") ? "not_sure" : null } };
+  renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
+  await screen.findByLabelText(foodAssessmentCopy.en.enough);
+  if (expectedNeeds) expect(onProposed).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ needIds: expectedNeeds, questionIds: questions }));
+  else expect(onProposed).not.toHaveBeenCalled();
+  expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
+});
+
+it.each(["proposal", "needs_clarification"])("keeps outside-area help separate from local SNAP choices despite an upstream %s state", async state => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 1, input: { description: "We live outside Pennsylvania and want help with a first SNAP application.", screenLocale: "en" } }];
+  resultView = { ...resultView, state, outOfScope: "outside_pa", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: state === "proposal" ? [] : ["foodForTwoDays"] };
+  const choose = vi.fn();
+  render(<ParentLocaleProvider initialLocale="en"><FoodAssessment onChoose={choose} descriptionOptions={{}}/></ParentLocaleProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: name => name.startsWith(foodDescriptionCopy.en.resume) }));
+  await screen.findByRole("link", { name: "Find a food bank outside this area" });
+  await waitFor(() => expect(screen.queryByRole("button", { name: foodAssessmentCopy.en.titles.snap_new })).toBeNull());
+  expect(screen.queryByRole("button", { name: foodAssessmentCopy.en.submit })).toBeNull();
+  expect(choose).not.toHaveBeenCalled(); expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
+});
+
+it.each(["en", "es"] as const)("corrects a ready SNAP interpretation without a model call or a fabricated food confirmation (%s)", async language => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description: "My first SNAP application.", screenLocale: language } }];
+  resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: ["foodForTwoDays"] };
+  const ordinary = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (url, init) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : null;
+    if (body?.action !== "resolve") return ordinary(url, init);
+    resolveBodies.push(String(init!.body)); archive.drafts[0].revision = 3;
+    resultView = { ...resultView, proposedAnswers: body.answers, needIds: ["food_now", "snap_pending"], questionIds: ["foodForTwoDays"] };
+    return Response.json({ ok: true, draftId: id, revision: 3 });
+  });
+  const choose = vi.fn();
+  render(<ParentLocaleProvider initialLocale={language}><FoodAssessment onChoose={choose} descriptionOptions={{}}/></ParentLocaleProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: name => name.startsWith(foodDescriptionCopy[language].resume) }));
+  await screen.findByRole("button", { name: foodAssessmentCopy[language].titles.snap_new });
+  const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
+  fireEvent.click(within(tool).getByRole("button", { name: foodDescriptionCopy[language].changeAnswers }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles.snap_new })).toBeNull());
+  fireEvent.change(within(tool).getByLabelText(foodAssessmentCopy[language].history), { target: { value: "applied" } });
+  fireEvent.click(within(tool).getByRole("button", { name: foodDescriptionCopy[language].resolve }));
+  const pending = await screen.findByRole("button", { name: foodAssessmentCopy[language].titles.snap_pending });
+  expect(resolveBodies).toHaveLength(1); expect(queuedBodies).toEqual([]);
+  expect(JSON.parse(resolveBodies[0])).toMatchObject({ expectedOwnerId: owner, draftId: id, expectedRevision: 2, changedQuestionIds: ["benefitHistory"], answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null } });
+  expect((within(tool).getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
+  fireEvent.click(pending);
+  expect(choose).toHaveBeenCalledExactlyOnceWith({ needs: ["snap_pending"], answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null }, descriptionSource: { draftId: id, revision: 3 } });
+});
+
+it.each(["en", "es"] as const)("exposes only ready food through the actual guide while SNAP history remains unanswered (%s)", async language => {
+  archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description: language === "en" ? "We have no food today." : "No tenemos comida hoy.", screenLocale: language } }];
+  resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "no", benefitHistory: "not_sure", existingIssue: null }, needIds: ["food_now"], questionIds: ["benefitHistory"] };
+  const choose = vi.fn();
+  render(<ParentLocaleProvider initialLocale={language}><FoodAssessment onChoose={choose} descriptionOptions={{}}/></ParentLocaleProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: name => name.startsWith(foodDescriptionCopy[language].resume) }));
+  const option = await screen.findByRole("button", { name: foodAssessmentCopy[language].titles.food_now });
+  const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
+  expect((within(tool).getByLabelText(foodAssessmentCopy[language].history) as HTMLSelectElement).value).toBe("");
+  expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].both })).toBeNull();
+  for (const need of ["snap_new", "snap_pending", "snap_renewal", "snap_problem"] as const) expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles[need] })).toBeNull();
+  fireEvent.click(option);
+  expect(choose).toHaveBeenCalledExactlyOnceWith({ needs: ["food_now"], answers: { foodForTwoDays: "no", benefitHistory: "not_sure", existingIssue: null }, descriptionSource: { draftId: id, revision: 2 } });
+  expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
 });

@@ -80,7 +80,12 @@ it("still rejects invented spans, honors exclusions and blocks duplicate applica
   expect(result({ ...editedContext(), excludedNeedIds: ["snap_new"] }).needIds).toEqual(["food_now"]);
   const context = editedContext(); context.history = [{ ownerId: context.ownerId, requestId: "00000000-0000-4000-8000-000000000201", requestVersion: 2,
     requestStatus: "active", need: "snap_pending", state: "agency_submitted", current: true }];
-  const value = result(context);
+  const projection = buildFoodDescriptionProjection(editedInput, context, now);
+  const validated = validateFoodDescriptionSelection({ projection, selection: selection(), currentContext: context, now });
+  expect(() => reconcileFoodDescriptionRequests(validated, [], context.ownerId)).toThrow("parent_food_description_changed");
+  const value = reconcileFoodDescriptionRequests(validated, [{ ownerId: context.ownerId, requestId: context.history[0].requestId,
+    requestVersion: 2, requestStatus: "active", needIds: ["snap_pending"], pendingSnapFollowUp: false }], context.ownerId);
+  expect(value.existingRequests).toEqual([{ requestId: context.history[0].requestId, needIds: ["snap_pending"] }]);
   expect(value.duplicateApplicationBlocked).toBe(true); expect(value.needIds).not.toContain("snap_new"); expect(value.executionGranted).toBe(false);
 });
 

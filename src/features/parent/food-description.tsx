@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { z } from "zod";
+import { getProgram } from "@/lib/parent/programs";
 import { foodDescriptionInputSchema } from "@/lib/parent/food-description";
 import { FOOD_DESCRIPTION_NOTICE_VERSION, foodDescriptionArchiveSchema, type FoodDescriptionArchive, type FoodDescriptionRoutingAnswers } from "@/lib/parent/food-description-draft";
 import { foodAssessmentCopy } from "@/lib/parent/food-assessment-copy";
 import { foodDescriptionCopy } from "@/lib/parent/food-description-copy";
-import { foodDescriptionAttemptConfirmed, foodDescriptionViewSchema, type FoodDescriptionProposal } from "@/lib/parent/food-description-view";
+import { foodDescriptionAttemptConfirmed, foodDescriptionViewSchema, readyFoodDescriptionNeeds, type FoodDescriptionProposal } from "@/lib/parent/food-description-view";
 import { boundedParentApi, displayDate, ParentApiError } from "./api";
 import { foodAssessmentSchema } from "@/lib/parent/food-assessment";
 import { FoodAssessmentQuestions, FoodAssessmentSummary, type FoodQuestion, type FoodQuestionValues } from "./food-assessment-questions";
@@ -35,7 +36,7 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
   onActive?: (active: boolean) => void;
   signInOptions?: Pick<ComponentProps<typeof ParentSignIn>, "existingAccountRecovery" | "recoveryHref" | "emailCodeAvailable">;
 }) {
-  const { locale } = useParentLocale(), c = foodDescriptionCopy[locale];
+  const { locale, t } = useParentLocale(), c = foodDescriptionCopy[locale];
   const resource = useParentResource<{ archive: unknown }>("/food-description");
   const reloadIfIdle = resource.reloadIfIdle, clearResource = resource.clear, reload = resource.reload;
   const archive = useMemo(() => { const parsed = foodDescriptionArchiveSchema.safeParse(resource.data?.archive); return parsed.success ? parsed.data : null; }, [resource.data]);
@@ -46,7 +47,7 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
   const [issue, setIssue] = useState<Issue | null>(null), [uncertain, setUncertain] = useState(false), [proposal, setProposal] = useState<FoodDescriptionProposal | null>(null);
   const [clarification, setClarification] = useState<FoodQuestionValues | null>(null), [changedQuestions, setChangedQuestions] = useState<FoodQuestion[]>([]);
   const [resolveAttempt, setResolveAttempt] = useState<string | null>(null), [cancelRequestedId, setCancelRequestedId] = useState<string | null>(null);
-  const firstQuestion = useRef<HTMLSelectElement>(null);
+  const firstQuestion = useRef<HTMLSelectElement>(null), manualGuidance = useRef<HTMLHeadingElement>(null);
   const automaticResultKey = useRef<string | null>(null);
   const owner = useRef<string | null>(null), createAttempt = useRef<string | null>(null);
   const [queueAttempt, setQueueAttempt] = useState<{ body: string; draftId: string } | null>(null);
@@ -55,13 +56,19 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
   const visible = available || Boolean(archive?.drafts.length);
   const selected = archive?.drafts.find(draft => draft.id === selectedId) ?? null;
   const contentCurrent = usePermissionWindow(Date.parse(selected?.contentExpiresAt ?? ""));
+  const hasReadyNeeds = proposal !== null && readyFoodDescriptionNeeds(proposal).length > 0;
+  const readyOptions = proposal?.state === "needs_clarification" && hasReadyNeeds;
+  const manualOnly = proposal?.state === "manual" && !proposal.needIds.length && !proposal.questionIds.length && !proposal.existingRequests.length
+    && (proposal.outOfScope === "wic" || proposal.outOfScope === "outside_pa");
+  const wic = getProgram("wic-pa");
   const contentDeadlines = archive?.drafts.filter(draft => draft.input || draft.projection || draft.selection || draft.usage.some(call => call.modelProjection || call.selection)
     || draft.id === selectedId && !["expired", "cancelled"].includes(draft.state)).map(draft => Date.parse(draft.contentExpiresAt)) ?? [];
   const writable = Boolean((selected?.state === "empty" || editing) && archive?.available && available && selected?.id !== cancelRequestedId && contentCurrent);
   useEffect(() => { if (opened && writable) editor.current?.focus(); }, [opened, writable, selected?.id]);
   const onActiveRef = useRef(onActive); useLayoutEffect(() => { onActiveRef.current = onActive; }, [onActive]);
-  useEffect(() => { onActiveRef.current?.(visible && opened && proposal?.state !== "proposal"); }, [visible, opened, proposal?.state]);
+  useEffect(() => { onActiveRef.current?.(visible && opened && !hasReadyNeeds); }, [visible, opened, hasReadyNeeds]);
   useEffect(() => { if (proposal?.state === "needs_clarification") firstQuestion.current?.focus(); }, [proposal]);
+  useEffect(() => { if (manualOnly) manualGuidance.current?.focus(); }, [manualOnly, proposal?.source.draftId, proposal?.source.revision]);
   const onResetRef = useRef(onReset); useLayoutEffect(() => { onResetRef.current = onReset; }, [onReset]);
   useEffect(() => {
     const controller = new AbortController(); work.current = controller;
@@ -206,7 +213,8 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
     if (!permissionWindowCurrent(Date.parse(deadline ?? ""))) throw new ParentApiError("changed", 409);
     setProposal(next); setChangedQuestions([]); setResolveAttempt(null);
     setClarification({ ...next.proposedAnswers, ...Object.fromEntries(next.questionIds.map(id => [id, id === "existingIssue" ? null : ""])) });
-    if (next.state === "proposal") onProposed(next);
+    const needs = readyFoodDescriptionNeeds(next);
+    if (needs.length) onProposed({ ...next, needIds: needs });
   }
   async function resolve() {
     if (pending || !proposal || !clarification || !archive) return;
@@ -255,12 +263,25 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
         {!editing && contentCurrent && cancelRequestedId !== selected.id && archive?.available && ["result", "failed", "unknown"].includes(selected.state) && <button type="button" className={styles.secondary} disabled={pending} onClick={() => { setText(selected.input?.description ?? ""); setEditing(true); setProposal(null); setQueueAttempt(null); setUncertain(false); onResetRef.current(); }}>{c.edit}</button>}
         <p role="status">{uncertain ? c.unknown : selected.state === "empty" ? c.empty : ["queued", "running"].includes(selected.state) ? c.waiting : selected.state === "expired" ? c.expired : selected.state === "cancelled" ? c.cancelled : selected.state === "result" ? "" : c.failed}</p>
         {["expired", "cancelled"].includes(selected.state) && available && archive?.available && <button type="button" className={styles.button} onClick={openCurrentOrNew} disabled={pending}>{c.newDraft}</button>}
-        {contentCurrent && proposal?.state === "proposal" && <button type="button" className={styles.secondary} disabled={pending} onClick={() => {
+        {contentCurrent && (proposal?.state === "proposal" || readyOptions) && <button type="button" className={styles.secondary} disabled={pending} onClick={() => {
           setClarification(proposal.proposedAnswers); setChangedQuestions([]); setResolveAttempt(null); setProposal({ ...proposal, state: "needs_clarification", questionIds: ["foodForTwoDays", "benefitHistory", ...(proposal.proposedAnswers.benefitHistory === "receiving" ? ["existingIssue" as const] : [])] }); onResetRef.current();
         }}>{c.changeAnswers}</button>}
         {contentCurrent && !!proposal?.conflicts.length && <p role="status">{c.conflict}</p>}
-        {contentCurrent && proposal?.state === "manual" && <p>{c.manualResult}</p>}
-        {contentCurrent && proposal && <FoodAssessmentSummary answers={proposal.proposedAnswers}/>}
+        {contentCurrent && proposal?.state === "manual" && !manualOnly && <p>{c.manualResult}</p>}
+        {contentCurrent && proposal?.outOfScope === "wic" && <section className={styles.space} aria-labelledby="food-description-wic-title">
+          <h3 id="food-description-wic-title" ref={manualGuidance} tabIndex={-1}>{c.wicTitle}</h3><p>{c.wicIntro}</p><p className={styles.hint}>{c.wicLimit}</p>
+          <div className={styles.serviceLinks}>
+            <Link className={styles.textLink} href="/get-support?need=wic_new">{t("Apply for WIC")}</Link>
+            <Link className={styles.textLink} href="/get-support?need=wic_continuing">{t("Continue WIC support")}</Link>
+            {wic && <a className={styles.textLink} href={wic.officialUrl}>{c.wicOfficial}</a>}
+          </div>
+        </section>}
+        {contentCurrent && proposal?.outOfScope === "outside_pa" && <section className={styles.space} aria-labelledby="food-description-outside-title">
+          <h3 id="food-description-outside-title" ref={manualGuidance} tabIndex={-1}>{c.outsideTitle}</h3><p>{c.outsideIntro}</p>
+          <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food">{t("Find a food bank outside this area")}</a>
+        </section>}
+        {contentCurrent && readyOptions && <p className={styles.hint}>{c.readyOptions}</p>}
+        {contentCurrent && proposal && !manualOnly && <FoodAssessmentSummary answers={proposal.proposedAnswers}/>}
         {contentCurrent && proposal?.state === "needs_clarification" && clarification && <form className={styles.form} onSubmit={event => { event.preventDefault(); void resolve(); }}>
           <p>{c.clarify}</p><fieldset disabled={pending || !!resolveAttempt} className={styles.fieldset}>
             <FoodAssessmentQuestions answers={clarification} questionIds={proposal.questionIds} firstAnswer={firstQuestion} onChange={(field, value) => {

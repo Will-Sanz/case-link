@@ -29,6 +29,8 @@ describe("one reserved private food interpretation turn", () => {
     expect(body).toMatchObject({ model: "gpt-6.1-sol", service_tier: "default", store: false, max_output_tokens: 1500, reasoning: { effort: "medium" } });
     const { input: variableInput, ...fixedRequest } = body; expect(variableInput).toHaveLength(1);
     expect(fixedRequest).toEqual(FOOD_DESCRIPTION_EVALUATION_BINDING.request);
+    expect(fixedRequest.instructions).toContain("An application described only as started is not evidence it was submitted.");
+    expect(fixedRequest.instructions).toContain("the server handles owned-request coverage");
     expect(FOOD_DESCRIPTION_FINGERPRINT).toBe(createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex"));
     for (const drift of [{ service_tier: "priority" }, { store: true }, { reasoning: { effort: "low" } }, { max_output_tokens: 2000 }]) {
       const changed = { ...FOOD_DESCRIPTION_EVALUATION_BINDING, request: { ...fixedRequest, ...drift } };

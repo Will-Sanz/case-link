@@ -7,6 +7,7 @@ import { getProgramsForNeeds, programRoutingIssue, supportsInitialServiceDeliver
 
 import { getFoodDescriptionResult } from "@/lib/parent/food-description-data";
 import { FoodDescriptionError } from "@/lib/parent/food-description-draft";
+import { readyFoodDescriptionNeeds } from "@/lib/parent/food-description-view";
 
 const capabilitiesSchema = z.array(z.object({ programId: z.string().max(60), enabled: z.boolean(), actions: z.array(actionSchema).max(6) })).max(100);
 
@@ -18,9 +19,9 @@ export async function POST(request: Request) {
     const { supabase, user } = await requireParentSession();
     if (input.descriptionSource) {
       const result = await getFoodDescriptionResult(input.descriptionSource.draftId, { ownerId: user.id, revision: input.descriptionSource.revision });
-      if (result.state !== "proposal" || result.proposedAnswers.foodForTwoDays !== input.answers.foodForTwoDays
+      if (result.proposedAnswers.foodForTwoDays !== input.answers.foodForTwoDays
         || result.proposedAnswers.benefitHistory !== input.answers.benefitHistory || result.proposedAnswers.existingIssue !== input.answers.existingIssue
-        || input.needs.some(need => !result.needIds.includes(need))) throw new FoodDescriptionError(409, "changed");
+        || input.needs.some(need => !readyFoodDescriptionNeeds(result).includes(need))) throw new FoodDescriptionError(409, "changed");
 
     }
     const connections = await supabase.rpc("parent_capability_summary");

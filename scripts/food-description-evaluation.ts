@@ -4,6 +4,7 @@ import {isDeepStrictEqual}from"node:util";
 import { z } from "zod";
 import { buildFoodDescriptionProjection, foodDescriptionSelectionSchema, validateFoodDescriptionSelection, type FoodDescriptionContext } from "../src/lib/parent/food-description";
 import { assessFoodSupport, foodAssessmentHandoffSchema, foodAssessmentSchema } from "../src/lib/parent/food-assessment";
+import { readyFoodDescriptionNeeds } from "../src/lib/parent/food-description-view";
 import { runOneFoodDescriptionTurn } from "../src/lib/parent/food-description-runtime";
 import { DESCRIPTION_EVALUATION_NOW, applyDescriptionEvaluationAnswers, carryDescriptionEvaluationFacts, descriptionEvaluationContext, descriptionEvaluationCurrentRequests, descriptionEvaluationInput, descriptionEvaluationOracle, descriptionEvaluationPlannedProjection, descriptionEvaluationResult,
   revalidateDescriptionEvaluationChange, type DescriptionEvaluationCase, type DescriptionEvaluationResult } from "./food-description-evaluation-adapter";
@@ -11,7 +12,7 @@ import { descriptionEvaluationHash,type DescriptionEvaluationBudget } from "./fo
 
 const object = z.record(z.string(), z.unknown());
 export const DESCRIPTION_EVALUATION_SOURCE_PATHS = ["scripts/food-description-evaluation-budget.ts", "scripts/food-description-evaluation-adapter.ts", "scripts/food-description-evaluation.ts", "scripts/run-food-description-evaluation.ts",
-  "src/lib/parent/food-description-runtime.ts", "src/lib/parent/food-description.ts", "src/lib/parent/food-assessment.ts", "src/lib/parent/programs.ts", "src/lib/parent/domain.ts", "src/lib/parent/http.ts", "src/lib/parent/assistant-contract.ts", "src/lib/privacy/no-pii.ts", "src/lib/parent/food-access.ts", "src/features/parent/food-sites.tsx", "tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json", "tests/fixtures/parent/food-description-source-facts-2026-11-18.v1.json", "package-lock.json"];
+  "src/lib/parent/food-description-runtime.ts", "src/lib/parent/food-description.ts", "src/lib/parent/food-description-view.ts", "src/lib/parent/food-assessment.ts", "src/lib/parent/programs.ts", "src/lib/parent/domain.ts", "src/lib/parent/http.ts", "src/lib/parent/assistant-contract.ts", "src/lib/privacy/no-pii.ts", "src/lib/parent/food-access.ts", "src/features/parent/food-sites.tsx", "tests/fixtures/parent/food-description-2026-11-18.v13-adapter.json", "tests/fixtures/parent/food-description-source-facts-2026-11-18.v1.json", "package-lock.json"];
 export function descriptionEvaluationSourceManifest() { return DESCRIPTION_EVALUATION_SOURCE_PATHS.map(path => ({ path, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") })); }
 export function descriptionEvaluationBatches(cases: DescriptionEvaluationCase[]) {
   const smoke = ["urgent-1", "new_snap-2", "ambiguity-3", "owned_history-1"].flatMap(id => ["en", "es"].map(language => `description-${id}-${language}`));
@@ -78,7 +79,7 @@ export async function runDescriptionEvaluationCase(item: DescriptionEvaluationCa
         if(latePriorRejected!==null)checks.push({code:"late_prior_revision_rejected",passed:latePriorRejected,severity:"critical"});
         if("resultRevision" in oracle.current)checks.push({code:"resultRevision",passed:context.revision===oracle.current.resultRevision,severity:"critical"});
         turns.push({ turn: index + 1, kind: turn.kind, status: "measured_interpretation", rawModelNominationAccuracy:"unmeasured", revision:context.revision, latePriorRejected, projection: model.projection, selection: model.selection, result: model.result, usage: model.usage, elapsedMs:model.elapsedMs,
-          familyEffort:{necessaryQuestionCount:model.result.questionIds.length,expectedQuestionCount:Array.isArray(oracle.current.questionIds)?oracle.current.questionIds.length:null,reusedTypedFactCount:Object.keys(model.projection.routingFacts).length,questionReasons:model.result.questionIds.map(id=>({id,reason:model!.projection.questionReasons[id]})),operatorWork:"Human quality/comprehension review still pending; native authority evidence is separate."},checks, ...oracle });
+          familyEffort:{basis:"Routing observation only; ready selected paths do not require questions for other work.",observedFamilyEffort:false,unresolvedRoutingQuestionCount:model.result.questionIds.length,expectedUnresolvedRoutingQuestionCount:Array.isArray(oracle.current.questionIds)?oracle.current.questionIds.length:null,readyNeedIds:readyFoodDescriptionNeeds(model.result),reusedRoutingFactCount:Object.keys(model.projection.routingFacts).length,questionReasons:model.result.questionIds.map(id=>({id,reason:model!.projection.questionReasons[id]})),operatorWork:"Human quality/comprehension review still pending; native authority evidence is separate."},checks, ...oracle });
       } else if (["answer_vetted_questions", "continue_without_repeating_known_answers", "continue_existing_request_without_new_questions"].includes(turn.kind)) {
         if (!model) throw new Error("description_evaluation_missing_model_result");
         const suppliedAnswers = object.parse(turn.suppliedAnswers ?? {});
@@ -114,7 +115,14 @@ export async function runDescriptionEvaluationCase(item: DescriptionEvaluationCa
       } else if (turn.kind === "typed_handoff") {
         if (!model) throw new Error("description_evaluation_missing_model_result");
         const handoff = object.parse(turn.handoff), actual = foodAssessmentHandoffSchema.parse({ needs: [handoff.need], answers: model.result.proposedAnswers });
-        turns.push({ turn: index + 1, kind: turn.kind, status: "typed_handoff_schema_checked", actual, checks: [{ code: "terminal_answers", passed: isDeepStrictEqual(actual,oracle.current.handoff), severity: "quality" },{code:"only_proposed_uncovered_need",passed:model.result.needIds.includes(actual.needs[0]),severity:"critical"}], ...oracle });
+        const checks: { code: string; passed: boolean; severity: "critical" | "quality" }[] = [
+          { code: "terminal_answers", passed: isDeepStrictEqual(actual, oracle.current.handoff), severity: "quality" },
+          { code: "only_ready_uncovered_need", passed: readyFoodDescriptionNeeds(model.result).includes(actual.needs[0]), severity: "critical" },
+        ];
+        if (oracle.current.partialHandoff === true) checks.push({ code: "partial_handoff_preserves_pending_food", passed: model.result.state === "needs_clarification"
+          && isDeepStrictEqual(model.result.questionIds, oracle.current.remainingQuestionIds) && actual.needs.every(need => need !== "food_now"), severity: "critical" });
+        turns.push({ turn: index + 1, kind: turn.kind, status: "typed_handoff_schema_checked", actual, pendingQuestionIds: model.result.questionIds,
+          noRequestOrMandateCreated: true, checks, ...oracle });
       } else if (["manual_exit", "open_existing_request"].includes(turn.kind)) {
         const target = z.string().parse(oracle.current.target);
         const allowed = target === "/get-support" || target === "https://www.phila.gov/food/" || target === "/my-support" || target === "https://www.feedingamerica.org/need-help-find-food" || /^\/support\/[0-9a-f-]{36}$/.test(target) && availableOwnedRequests.some(request=>target===`/support/${request.requestId}`);
@@ -127,7 +135,7 @@ export async function runDescriptionEvaluationCase(item: DescriptionEvaluationCa
   }
   const transcripts:(Record<string,unknown>&{oracleCoverage:{automaticallyCheckedFields:string[];retainedUnmeasuredFields:string[];remainingEvidence:string}})[]=turns.map(turn=>{
     const current=object.parse(turn.current),codes=new Set(Array.isArray(turn.checks)?turn.checks.map(check=>check.code):[]);
-    const mapped:Record<string,string>={no_execution_granted:"executionGranted",selected_programs_grounded:"allowedProgramIdsByNeed",existing_owned_requests:"existingRequests",out_of_scope:"outOfScope",old_result_rejected:"oldResultUsable",terminal_answers:"handoff",fixed_owned_or_public_target:"target"};
+    const mapped:Record<string,string>={no_execution_granted:"executionGranted",selected_programs_grounded:"allowedProgramIdsByNeed",existing_owned_requests:"existingRequests",out_of_scope:"outOfScope",old_result_rejected:"oldResultUsable",partial_handoff_preserves_pending_food:"remainingQuestionIds",terminal_answers:"handoff",fixed_owned_or_public_target:"target"};
     const checked=new Set([...codes].map(code=>mapped[code]??(code==="questionIds"&&"remainingQuestionIds" in current?"remainingQuestionIds":code)));
     return{...turn,oracleCoverage:{automaticallyCheckedFields:Object.keys(current).filter(field=>checked.has(field)),retainedUnmeasuredFields:Object.keys(current).filter(field=>!checked.has(field)),remainingEvidence:"Native authority/start/provider proof and human semantic/bilingual review remain separate; retained unmeasured fields are not passes."}};
   });

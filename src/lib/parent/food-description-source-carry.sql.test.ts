@@ -6,7 +6,7 @@ import { validateFoodDescriptionSelection } from "./food-description";
 import { fixtureIntake, fixtureMandate } from "./test-fixtures";
 
 const modulePath = process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
-describe.skipIf(!modulePath)("same-draft source fact carry through actual worker and owned SQL handoff", () => {
+describe.skipIf(!modulePath)("migration37 source carry through actual worker and owned SQL handoff, before selected-route migration38", () => {
   let fixture: Awaited<ReturnType<typeof createParentSqlFixture>>, owner: string, session: string;
   async function query(sql: string, values: unknown[] = [], role = "authenticated") {
     await fixture.admin.query(`set role ${role}`);
@@ -167,4 +167,20 @@ describe.skipIf(!modulePath)("same-draft source fact carry through actual worker
     await expect(queue(id, 1, "I already applied and am waiting.")).rejects.toThrow();
     expect((await fixture.admin.query("select count(*)::int n from parent_private.food_description_calls where draft_id=$1", [id])).rows[0].n).toBe(1);
   });
+  it.each(["en", "es"] as const)("retains the historical migration37 SNAP-only denial before migration38 allows independent readiness (%s)", async language => {
+    const description = language === "en" ? "I now want help with my first SNAP application as well as food today." : "Ahora también quiero ayuda con mi primera solicitud de SNAP, además de comida para hoy.";
+    const quote = language === "en" ? "first SNAP application" : "primera solicitud de SNAP";
+    const id = (await query("select public.parent_create_food_description($1,$2,'food-description-2026-11-18.v1',true) id", [owner, randomUUID()])).rows[0].id;
+    await query("select public.parent_queue_food_description($1,$2,0,$3,$4)", [id, owner, randomUUID(), JSON.stringify({ description, screenLocale: language })]);
+    await work([{ questionId: "benefitHistory", value: "never", span: { text: quote } }], ["food_now", "snap_new"]);
+    const vetted = validateFoodDescriptionSelection({ ...await result(id), now: new Date() });
+    expect(vetted).toMatchObject({ state: "needs_clarification", questionIds: ["foodForTwoDays"], proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never" } });
+    expect((await facts(id)).routing_facts).not.toHaveProperty("foodForTwoDays");
+    const before = (await fixture.admin.query("select count(*)::int n from public.parent_requests")).rows[0].n;
+    const intake = fixtureIntake({ needs: ["snap_new"], utilityProviders: [] });
+    const mandate = fixtureMandate({ recipientIds: ["snap-pa"], mode: "prepare_only", allowedActions: ["research", "prepare"], expiresAt: new Date(Date.now() + 86400000).toISOString() });
+    await expect(query("select public.parent_start_food_description_request($1,$2,$3,$4) id", [JSON.stringify({ draftId: id, revision: 1 }), JSON.stringify(intake), JSON.stringify(mandate), randomUUID()])).rejects.toThrow("description routing changed");
+    expect((await fixture.admin.query("select count(*)::int n from public.parent_requests")).rows[0].n).toBe(before);
+  });
+
 });
