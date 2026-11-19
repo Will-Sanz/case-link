@@ -26,7 +26,7 @@ describe("one reserved private food interpretation turn", () => {
     const [url, init] = options.fetcher.mock.calls[0], body = JSON.parse(String(init!.body));
     expect(url).toBe(FOOD_DESCRIPTION_EVALUATION_BINDING.transport.endpoint);
     expect(init?.method).toBe(FOOD_DESCRIPTION_EVALUATION_BINDING.transport.method); expect(init?.redirect).toBe(FOOD_DESCRIPTION_EVALUATION_BINDING.transport.redirect); expect(init).toMatchObject({ redirect: "error", headers: expect.objectContaining({ "OpenAI-Project": "proj_synthetic" }) });
-    expect(body).toMatchObject({ model: "gpt-6.1-sol", service_tier: "default", store: false, max_output_tokens: 1500, reasoning: { effort: "medium" } });
+    expect(body).toMatchObject({ model: "gpt-6.1-sol", service_tier: "default", store: false, max_output_tokens: 1500, reasoning: { effort: "high" } });
     const { input: variableInput, ...fixedRequest } = body; expect(variableInput).toHaveLength(1);
     expect(fixedRequest).toEqual(FOOD_DESCRIPTION_EVALUATION_BINDING.request);
     expect(fixedRequest.instructions).toContain("An application described only as started is not evidence it was submitted.");
@@ -35,7 +35,7 @@ describe("one reserved private food interpretation turn", () => {
     expect(fixedRequest.instructions).toContain("An existingIssue assertion requires benefitHistory:receiving from a governing fact or another source-backed assertion.");
     expect(fixedRequest.instructions).toContain("receiving includes current or past benefits.");
     expect(FOOD_DESCRIPTION_FINGERPRINT).toBe(createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex"));
-    for (const drift of [{ service_tier: "priority" }, { store: true }, { reasoning: { effort: "low" } }, { max_output_tokens: 2000 }]) {
+    for (const drift of [{ service_tier: "priority" }, { store: true }, { reasoning: { effort: "low" } }, { max_output_tokens: 2000 }, { instructions: fixedRequest.instructions + " changed" }]) {
       const changed = { ...FOOD_DESCRIPTION_EVALUATION_BINDING, request: { ...fixedRequest, ...drift } };
       expect(createHash("sha256").update(JSON.stringify(changed)).digest("hex")).not.toBe(FOOD_DESCRIPTION_FINGERPRINT);
     }

@@ -724,7 +724,7 @@ async function main() {
         const headers = new Headers(init.headers), body = JSON.parse(String(init.body)), projection = JSON.parse(body.input[0].content);
         check(headers.get("OpenAI-Project") === "proj_synthetic" && headers.get("Authorization") === "Bearer isolated-native-no-provider-key"
           && body.model === "gpt-6.1-sol" && body.service_tier === "default" && body.store === false && body.max_output_tokens === 1500
-          && body.text?.format?.strict === true && body.reasoning?.effort === "medium" && !["tools", "metadata", "conversation", "previous_response_id"].some(key => key in body),
+          && body.text?.format?.strict === true && body.reasoning?.effort === "high" && !["tools", "metadata", "conversation", "previous_response_id"].some(key => key in body),
         "The synthetic exchange verifies the exact pinned project/model/tier/schema, no storage and no tools before supplying fixture bytes.");
         check(!/DescriptionProfileCanary|DescriptionProfileCorrected|145 Synthetic Lane|primaryPerson|homeAddress|ownerId|requestId|household_id/.test(body.input[0].content)
           && typeof projection.description === "string", "Only minimized food routing information reaches the explicit synthetic exchange; private profile/application fields and IDs stay outside it.");

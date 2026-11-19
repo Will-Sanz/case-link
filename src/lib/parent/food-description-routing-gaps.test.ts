@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
-import { FOOD_DESCRIPTION_EVALUATION_BINDING, FOOD_DESCRIPTION_FINGERPRINT } from "./food-description-runtime";
 import { assessFoodSupport, foodAssessmentHandoffSchema } from "./food-assessment";
 import { buildFoodDescriptionProjection, reconcileFoodDescriptionRequests, validateFoodDescriptionSelection, type FoodDescriptionContext } from "./food-description";
 const now = new Date("2026-11-18T12:00:00Z"), owner = "00000000-0000-4000-8000-000000000001", request = "00000000-0000-4000-8000-000000000101";
@@ -107,11 +105,6 @@ describe("truthful current food routing", () => {
     expect(() => reconcileFoodDescriptionRequests(vetted, [{ ownerId: "00000000-0000-4000-8000-000000000002", requestId: request, requestVersion: 4, requestStatus: "active", needIds: ["food_now"], pendingSnapFollowUp: false }], owner)).toThrow("parent_food_description_changed");
   });
 
-  it("binds the source-supply meaning to the exact dispatched instructions rather than treating pickup logistics as a shortage", () => {
-    expect(FOOD_DESCRIPTION_EVALUATION_BINDING.request.instructions).toContain("An explicit current need for food or groceries today supports foodForTwoDays:no.");
-    expect(FOOD_DESCRIPTION_EVALUATION_BINDING.request.instructions).toContain("Requesting only a food site or pickup time, or unclear timing such as soon, does not establish two-day food supply; do not assert No from that alone.");
-    expect(createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex")).toBe(FOOD_DESCRIPTION_FINGERPRINT);
-  });
 
   it.each(["wic", "utilities", "other"].flatMap(outOfScope => ["yes", "not_sure"].map(food => ({ outOfScope, food }))))("does not treat a current nonshortage $food assertion as SNAP intent alongside $outOfScope", ({ outOfScope, food }) => {
     const description = food === "yes" ? "We have enough food. I need other support." : "I am not sure about food. I need other support.";
