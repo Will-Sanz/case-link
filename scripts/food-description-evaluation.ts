@@ -5,13 +5,13 @@ import { z } from "zod";
 import { buildFoodDescriptionProjection, foodDescriptionSelectionSchema, validateFoodDescriptionSelection, type FoodDescriptionContext } from "../src/lib/parent/food-description";
 import { assessFoodSupport, foodAssessmentHandoffSchema, foodAssessmentSchema } from "../src/lib/parent/food-assessment";
 import { runOneFoodDescriptionTurn } from "../src/lib/parent/food-description-runtime";
-import { DESCRIPTION_EVALUATION_NOW, applyDescriptionEvaluationAnswers, descriptionEvaluationContext, descriptionEvaluationCurrentRequests, descriptionEvaluationInput, descriptionEvaluationOracle, descriptionEvaluationPlannedProjection, descriptionEvaluationResult,
+import { DESCRIPTION_EVALUATION_NOW, applyDescriptionEvaluationAnswers, carryDescriptionEvaluationFacts, descriptionEvaluationContext, descriptionEvaluationCurrentRequests, descriptionEvaluationInput, descriptionEvaluationOracle, descriptionEvaluationPlannedProjection, descriptionEvaluationResult,
   revalidateDescriptionEvaluationChange, type DescriptionEvaluationCase, type DescriptionEvaluationResult } from "./food-description-evaluation-adapter";
 import { descriptionEvaluationHash,type DescriptionEvaluationBudget } from "./food-description-evaluation-budget";
 
 const object = z.record(z.string(), z.unknown());
 export const DESCRIPTION_EVALUATION_SOURCE_PATHS = ["scripts/food-description-evaluation-budget.ts", "scripts/food-description-evaluation-adapter.ts", "scripts/food-description-evaluation.ts", "scripts/run-food-description-evaluation.ts",
-  "src/lib/parent/food-description-runtime.ts", "src/lib/parent/food-description.ts", "src/lib/parent/food-assessment.ts", "src/lib/parent/programs.ts", "src/lib/parent/domain.ts", "src/lib/parent/http.ts", "src/lib/parent/assistant-contract.ts", "src/lib/privacy/no-pii.ts", "src/lib/parent/food-access.ts", "src/features/parent/food-sites.tsx", "tests/fixtures/parent/food-description-2026-11-18.v9-adapter.json", "package-lock.json"];
+  "src/lib/parent/food-description-runtime.ts", "src/lib/parent/food-description.ts", "src/lib/parent/food-assessment.ts", "src/lib/parent/programs.ts", "src/lib/parent/domain.ts", "src/lib/parent/http.ts", "src/lib/parent/assistant-contract.ts", "src/lib/privacy/no-pii.ts", "src/lib/parent/food-access.ts", "src/features/parent/food-sites.tsx", "tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json", "tests/fixtures/parent/food-description-source-facts-2026-11-18.v1.json", "package-lock.json"];
 export function descriptionEvaluationSourceManifest() { return DESCRIPTION_EVALUATION_SOURCE_PATHS.map(path => ({ path, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") })); }
 export function descriptionEvaluationBatches(cases: DescriptionEvaluationCase[]) {
   const smoke = ["urgent-1", "new_snap-2", "ambiguity-3", "owned_history-1"].flatMap(id => ["en", "es"].map(language => `description-${id}-${language}`));
@@ -19,7 +19,7 @@ export function descriptionEvaluationBatches(cases: DescriptionEvaluationCase[])
   const rest = cases.filter(item => !smoke.includes(item.id)).map(item => item.id);
   return [smoke, ...Array.from({ length: Math.ceil(rest.length / 8) }, (_, index) => rest.slice(index * 8, index * 8 + 8))];
 }
-type Interpretation = {projection: ReturnType<typeof buildFoodDescriptionProjection>;selection:z.infer<typeof foodDescriptionSelectionSchema>;result:DescriptionEvaluationResult;usage:unknown;elapsedMs:number};
+type Interpretation = {projection: ReturnType<typeof buildFoodDescriptionProjection>;selection:z.infer<typeof foodDescriptionSelectionSchema>;result:DescriptionEvaluationResult;usage:unknown;elapsedMs:number;sourceProjection: ReturnType<typeof buildFoodDescriptionProjection>};
 export async function interpretDescriptionEvaluationTurn(item: DescriptionEvaluationCase, index: number, context: FoodDescriptionContext, budget: DescriptionEvaluationBudget, projectId: string, apiKey: string):Promise<Interpretation> {
   const started=performance.now();
   const input = descriptionEvaluationInput(item, index), projection = buildFoodDescriptionProjection(input, context, new Date(DESCRIPTION_EVALUATION_NOW));
@@ -41,7 +41,7 @@ export async function interpretDescriptionEvaluationTurn(item: DescriptionEvalua
   await runOneFoodDescriptionTurn({ database, apiKey, projectId, fetcher, now: () => new Date(DESCRIPTION_EVALUATION_NOW) });
   if (selected === undefined) { budget.halt(); throw new Error("description_evaluation_model_stage_failed"); }
   const selection = foodDescriptionSelectionSchema.parse(selected), result = descriptionEvaluationResult(projection, selection, context);
-  return { projection, selection, result, usage, elapsedMs:performance.now()-started };
+  return { projection, selection, result, usage, elapsedMs:performance.now()-started, sourceProjection: projection };
 }
 function checksFor(result: DescriptionEvaluationResult, expected: Record<string, unknown>) {
   const checks: { code: string; passed: boolean; severity: "critical" | "quality"; basis?: "vetted_result" }[] = [];
@@ -68,6 +68,7 @@ export async function runDescriptionEvaluationCase(item: DescriptionEvaluationCa
       if (turn.modelCalls === 1) {
         let latePriorRejected: boolean | null = null;
         if (index > 0) {
+          if (model) context = carryDescriptionEvaluationFacts(context, model.sourceProjection, model.selection);
           context = { ...context, revision: context.revision + 1, expectedRevision: context.revision + 1 };
           if (model) { try { validateFoodDescriptionSelection({projection:model.projection,selection:model.selection,currentContext:context,now:new Date(DESCRIPTION_EVALUATION_NOW)});latePriorRejected=false; } catch {latePriorRejected=true;} }
         }
@@ -80,7 +81,10 @@ export async function runDescriptionEvaluationCase(item: DescriptionEvaluationCa
           familyEffort:{necessaryQuestionCount:model.result.questionIds.length,expectedQuestionCount:Array.isArray(oracle.current.questionIds)?oracle.current.questionIds.length:null,reusedTypedFactCount:Object.keys(model.projection.routingFacts).length,questionReasons:model.result.questionIds.map(id=>({id,reason:model!.projection.questionReasons[id]})),operatorWork:"Human quality/comprehension review still pending; native authority evidence is separate."},checks, ...oracle });
       } else if (["answer_vetted_questions", "continue_without_repeating_known_answers", "continue_existing_request_without_new_questions"].includes(turn.kind)) {
         if (!model) throw new Error("description_evaluation_missing_model_result");
-        const next = applyDescriptionEvaluationAnswers(context, turn.suppliedAnswers ?? {});
+        const suppliedAnswers = object.parse(turn.suppliedAnswers ?? {});
+        const sourceFacts = Object.keys(suppliedAnswers).length ? carryDescriptionEvaluationFacts(context, model.sourceProjection, model.selection) : context;
+        let next = applyDescriptionEvaluationAnswers(sourceFacts, suppliedAnswers);
+        if (next.revision === context.revision) next = context;
         // Clear only the obsolete issue assertion when a supplied actual typed benefit answer changes its meaning.
         const actualAnswers = foodAssessmentSchema.parse({ ...model.result.proposedAnswers, ...object.parse(turn.suppliedAnswers ?? {}) });
         if (actualAnswers.benefitHistory !== "receiving") actualAnswers.existingIssue = null;

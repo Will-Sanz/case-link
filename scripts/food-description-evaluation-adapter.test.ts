@@ -1,19 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { buildFoodDescriptionProjection, foodDescriptionInputSchema } from "../src/lib/parent/food-description";
-import { applyDescriptionEvaluationAnswers, descriptionEvaluationAdapterHash, descriptionEvaluationContext, descriptionEvaluationInput, descriptionEvaluationPlan, loadDescriptionEvaluationCorpus } from "./food-description-evaluation-adapter";
+import { applyDescriptionEvaluationAnswers, descriptionEvaluationAdapterHash, descriptionEvaluationContext, descriptionEvaluationInput, descriptionEvaluationPlannedProjection, descriptionEvaluationPlan, loadDescriptionEvaluationCorpus } from "./food-description-evaluation-adapter";
 import { FOOD_DESCRIPTION_EVALUATION_BINDING } from "../src/lib/parent/food-description-runtime";
 import { descriptionEvaluationHash } from "./food-description-evaluation-budget";
 const corpus = loadDescriptionEvaluationCorpus();
 describe("hash-pinned actual description DTO adapter, without model or network", () => {
-  it("changes only the two explicit unknown-history question oracles, retaining their archived expectations", () => {
+  it("changes only the four explicit unknown-history question oracles and two consequent states, retaining their archived expectations", () => {
     const rows = descriptionEvaluationPlan(corpus).cases;
     const changed = rows.filter(item => JSON.stringify(item.turns[0].archived.questionIds) !== JSON.stringify(item.turns[0].current.questionIds));
-    expect(changed.map(item => item.id)).toEqual(["description-ambiguity-3-en", "description-ambiguity-3-es"]);
+    expect(changed.map(item => item.id)).toEqual(["description-urgent-2-en", "description-urgent-2-es", "description-ambiguity-3-en", "description-ambiguity-3-es"]);
     for (const item of changed) {
-      expect(item.turns[0].archived.questionIds).toEqual(["foodForTwoDays", "benefitHistory"]);
-      expect(item.turns[0].current.questionIds).toEqual(["foodForTwoDays"]);
-      expect(item.turns[0].differences).toContain("The description explicitly supplies unknown SNAP history; honor that Not sure answer without asking the same benefit question again.");
+      if (item.id.includes("ambiguity")) {
+        expect(item.turns[0].archived.questionIds).toEqual(["foodForTwoDays", "benefitHistory"]);
+        expect(item.turns[0].current.questionIds).toEqual(["foodForTwoDays"]);
+        expect(item.turns[0].differences).toContain("The description explicitly supplies unknown SNAP history; honor that Not sure answer without asking the same benefit question again.");
+      } else {
+        expect(item.turns[0].archived.questionIds).toEqual(["benefitHistory"]);
+        expect(item.turns[0].archived.state).toBe("needs_clarification");
+        expect(item.turns[0].current).toMatchObject({ state: "proposal", questionIds: [] });
+        expect(item.turns[0].differences).toContain("The description explicitly supplies unknown SNAP history alongside current food need; preserve Not sure without repeating that answered benefit question.");
+      }
     }
+    expect(rows.filter(item => item.turns[0].archived.state !== item.turns[0].current.state && item.turns[0].archived.state !== "outside_supported_geography").map(item => item.id)).toEqual(["description-urgent-2-en", "description-urgent-2-es"]);
   });
   it("preserves all60/240/80/24 rows and both language denominators", () => {
     const plan=descriptionEvaluationPlan(corpus); expect(plan.caseCount).toBe(60);expect(plan.turnCount).toBe(240);expect(plan.maximumModelCalls).toBe(80);expect(plan.zeroCallGuardCases).toBe(24);
@@ -53,4 +61,22 @@ describe("hash-pinned actual description DTO adapter, without model or network",
     expect(before.facts).toEqual({});expect(after.facts.benefitHistory?.value).toBe("applied");expect(after.revision).toBe(2);
     expect(applyDescriptionEvaluationAnswers(after,{benefitHistory:"applied"})).toEqual(after);
   });
+  it("uses INPUT-only annotations for planned carry, independently of every expected/oracle value", () => {
+    const item = structuredClone(corpus.cases.find(item => item.id === "description-new_snap-3-en")!);
+    const before = descriptionEvaluationPlannedProjection(item, 2);
+    for (const turn of item.turns) turn.expected = { answers: { foodForTwoDays: "no", benefitHistory: "receiving" }, needIds: ["food_now"] };
+    expect(descriptionEvaluationPlannedProjection(item, 2)).toEqual(before);
+    expect(before.routingFacts.foodForTwoDays).toMatchObject({ source: "parent_description", value: "yes", sourceRevision: 1 });
+    expect(before.routingFacts).not.toHaveProperty("zip");
+    expect(JSON.stringify(before.routingFacts)).not.toMatch(/confirmedAt|ownerId|draftId|enough food/);
+  });
+
+  it("never revives an earlier source assertion after a genuine typed Not sure correction", () => {
+    const item = structuredClone(corpus.cases.find(item => item.id === "description-new_snap-3-en")!);
+    item.turns[1].suppliedAnswers = { benefitHistory: "not_sure" };
+    const projection = descriptionEvaluationPlannedProjection(item, 2);
+    expect(projection.routingFacts.benefitHistory).toMatchObject({ source: "parent_typed", value: "not_sure", confirmedAt: "2026-11-18T12:00:00Z" });
+    expect(projection.routingFacts.foodForTwoDays).toMatchObject({ source: "parent_description", value: "yes", sourceRevision: 1 });
+  });
+
 });

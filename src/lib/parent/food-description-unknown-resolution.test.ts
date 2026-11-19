@@ -70,7 +70,7 @@ it.each(["owner", "revision", "source_date"])("still rejects changed %s before r
   const changed = structuredClone(context);
   if (kind === "owner") changed.ownerId = "00000000-0000-4000-8000-000000000002";
   if (kind === "revision") changed.revision++;
-  if (kind === "source_date") changed.facts.foodForTwoDays!.confirmedAt = "2026-11-18T11:59:00Z";
+  if (kind === "source_date" && changed.facts.foodForTwoDays?.source !== "parent_description") changed.facts.foodForTwoDays!.confirmedAt = "2026-11-18T11:59:00Z";
   expect(() => validateFoodDescriptionSelection({ projection, selection: selection(), currentContext: changed, now })).toThrow();
 });
 

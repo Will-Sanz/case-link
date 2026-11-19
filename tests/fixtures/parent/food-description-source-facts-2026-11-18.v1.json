@@ -1,0 +1,303 @@
+{
+  "version": "food-description-input-source-facts.v1",
+  "cases": [
+    {
+      "id": "description-urgent-3-en",
+      "descriptionSha256": "25f8988226de1ee53a6317ec87dd26d5d957901ba740c4635375b5ae1b76ac5a",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "no",
+          "text": "We need groceries today"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "never",
+          "text": "I have never applied for SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-urgent-3-es",
+      "descriptionSha256": "05e4f4a0b5b65aac1d3ffdabbfc765836db083a3c3d4d5a75423bd0c4f7973f6",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "no",
+          "text": "Necesitamos alimentos hoy"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "never",
+          "text": "nunca he solicitado SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-new_snap-3-en",
+      "descriptionSha256": "00ae64c2c0dbf4b6d7b31cc78f9592ba259cf6f636d4eb9767af793858c22992",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "There is enough food for two days"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "never",
+          "text": "This would be my first SNAP application"
+        }
+      ]
+    },
+    {
+      "id": "description-new_snap-3-es",
+      "descriptionSha256": "5f813de45ba9a220a3c5ac8e92cccfd3dde017f240a51ea49c2f14dd75106147",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "Hay suficiente comida para dos días"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "never",
+          "text": "Esta sería mi primera solicitud de SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-renewal-3-en",
+      "descriptionSha256": "176d08bf5b3d0604b780ab7c1a3fed10505a60b9c725d65ff7c55364b932a17c",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "We have food for this week"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "receiving",
+          "text": "My current SNAP needs renewal"
+        },
+        {
+          "questionId": "existingIssue",
+          "value": "renewal",
+          "text": "My current SNAP needs renewal"
+        }
+      ]
+    },
+    {
+      "id": "description-renewal-3-es",
+      "descriptionSha256": "59b87b1627fb6efe3773b57a3ad23c097eaf784a83ebf6059f5863e6a293ed77",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "Tenemos comida para esta semana"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "receiving",
+          "text": "Necesito renovar mis beneficios actuales de SNAP"
+        },
+        {
+          "questionId": "existingIssue",
+          "value": "renewal",
+          "text": "Necesito renovar mis beneficios actuales de SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-pending-3-en",
+      "descriptionSha256": "384eaaa64f32b58409d8461cfc7f9f4a064e03778deabb02c5ce8c67fbbb56ea",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "We have enough food for the week"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "applied",
+          "text": "are waiting on our SNAP application"
+        }
+      ]
+    },
+    {
+      "id": "description-pending-3-es",
+      "descriptionSha256": "5376ba69658da486c17d8a4c3df7e5a93bb8929fc0fdd415a8a64e09906b6b77",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "Tenemos suficiente comida para la semana"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "applied",
+          "text": "estamos esperando una respuesta sobre nuestra solicitud de SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-benefit_problem-3-en",
+      "descriptionSha256": "9bea54bbb4cc74140a997ddb34eb229fca705c258366ac0eb9d885b8100abc1d",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "We have food for the week"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "receiving",
+          "text": "my current SNAP"
+        },
+        {
+          "questionId": "existingIssue",
+          "value": "not_sure",
+          "text": "A notice about my current SNAP is confusing"
+        }
+      ]
+    },
+    {
+      "id": "description-benefit_problem-3-es",
+      "descriptionSha256": "6d1eefbd63f56bef00b4c55be34d1deee9d8e321ec3b9c33b1b83f5f1864b88b",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "Tenemos comida para la semana"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "receiving",
+          "text": "mis beneficios actuales de SNAP"
+        },
+        {
+          "questionId": "existingIssue",
+          "value": "not_sure",
+          "text": "No entiendo un aviso sobre mis beneficios actuales de SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-ambiguity-3-en",
+      "descriptionSha256": "18daff47366181fa0ed9061281b5e62e81d623b36935c46e7f52914c48dd9dc0",
+      "assertions": [
+        {
+          "questionId": "benefitHistory",
+          "value": "not_sure",
+          "text": "I do not know our SNAP history"
+        }
+      ]
+    },
+    {
+      "id": "description-ambiguity-3-es",
+      "descriptionSha256": "0bc328b162936ba9db9a6fbd1b92b1dad4bfb6c5bd1dcbc18999ff94ffeed9ce",
+      "assertions": [
+        {
+          "questionId": "benefitHistory",
+          "value": "not_sure",
+          "text": "no sé si hemos solicitado SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-combined-3-en",
+      "descriptionSha256": "9b8305640e355193523016d64e6ac4025427394b0eae773379d85860d2d9ba96",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "no",
+          "text": "We need food today"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "receiving",
+          "text": "our SNAP stopped"
+        },
+        {
+          "questionId": "existingIssue",
+          "value": "stopped",
+          "text": "our SNAP stopped"
+        }
+      ]
+    },
+    {
+      "id": "description-combined-3-es",
+      "descriptionSha256": "49ff33dc23dcf02bf89d6261d548fd205376ab79493d33455265ef9a9307257d",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "no",
+          "text": "Necesitamos comida hoy"
+        },
+        {
+          "questionId": "benefitHistory",
+          "value": "receiving",
+          "text": "se suspendió nuestro SNAP"
+        },
+        {
+          "questionId": "existingIssue",
+          "value": "stopped",
+          "text": "se suspendió nuestro SNAP"
+        }
+      ]
+    },
+    {
+      "id": "description-choice_and_scope-3-en",
+      "descriptionSha256": "a0c61a4c6da463e826177af82402a18a76e25b8c014d7fd7057461371b622f6e",
+      "assertions": []
+    },
+    {
+      "id": "description-choice_and_scope-3-es",
+      "descriptionSha256": "803d219b0aa96564d75383f2e018cdbe1805513089e194f573622167525579a6",
+      "assertions": []
+    },
+    {
+      "id": "description-owned_history-3-en",
+      "descriptionSha256": "caf7fbba7974cda21f0ee6d6c6a65aaaed71ce4868afa3169252e899842e7402",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "We have food for this week"
+        }
+      ]
+    },
+    {
+      "id": "description-owned_history-3-es",
+      "descriptionSha256": "1b4d5997c56800d733e886b35f001fb6b44ed18067f5cb9f09dfef2509610ad7",
+      "assertions": [
+        {
+          "questionId": "foodForTwoDays",
+          "value": "yes",
+          "text": "Tenemos comida para esta semana"
+        }
+      ]
+    },
+    {
+      "id": "description-untrusted_and_sources-3-en",
+      "descriptionSha256": "7d33eadb6bb2b38c2dd5530dcfef5fc816651599b35cfc3749f30a57f5203ed7",
+      "assertions": [
+        {
+          "questionId": "benefitHistory",
+          "value": "applied",
+          "text": "my SNAP application is pending"
+        }
+      ]
+    },
+    {
+      "id": "description-untrusted_and_sources-3-es",
+      "descriptionSha256": "fc722696bd0ac7a35800f12ded6a60a93e9e88252082918be16314badfba18dc",
+      "assertions": [
+        {
+          "questionId": "benefitHistory",
+          "value": "applied",
+          "text": "mi solicitud está pendiente"
+        }
+      ]
+    }
+  ]
+}

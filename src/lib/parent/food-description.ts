@@ -35,10 +35,12 @@ const provenance = {
   source: z.enum(["parent_typed", "family_profile"]), confirmedAt: timestamp, expiresAt: timestamp,
   descriptionUsePermitted: z.boolean().optional(),
 };
+const descriptionProvenance = { source: z.literal("parent_description"), sourceRevision: revision, sourceAttemptCreatedAt: timestamp, expiresAt: timestamp };
+const ordinaryFact = <T extends z.ZodType>(value: T) => z.union([z.object({ value, ...provenance }).strict(), z.object({ value, ...descriptionProvenance }).strict()]);
 const factsSchema = z.object({
-  foodForTwoDays: z.object({ value: foodAssessmentSchema.shape.foodForTwoDays, ...provenance }).strict().optional(),
-  benefitHistory: z.object({ value: foodAssessmentSchema.shape.benefitHistory, ...provenance }).strict().optional(),
-  existingIssue: z.object({ value: foodAssessmentSchema.shape.existingIssue.unwrap(), ...provenance }).strict().optional(),
+  foodForTwoDays: ordinaryFact(foodAssessmentSchema.shape.foodForTwoDays).optional(),
+  benefitHistory: ordinaryFact(foodAssessmentSchema.shape.benefitHistory).optional(),
+  existingIssue: ordinaryFact(foodAssessmentSchema.shape.existingIssue.unwrap()).optional(),
   zip: z.object({ value: z.string().regex(/^\d{5}$/), ...provenance }).strict().optional(),
 }).strict();
 const historySchema = z.object({
@@ -74,9 +76,11 @@ export const foodDescriptionSelectionSchema = z.object({
 }).strict();
 
 function currentFacts(facts: FoodDescriptionContext["facts"], now: Date) {
-  return Object.fromEntries(Object.entries(facts).filter(([, fact]) => Date.parse(fact.confirmedAt) <= now.getTime()
-    && Date.parse(fact.expiresAt) > now.getTime()
-    && (fact.source !== "family_profile" || fact.descriptionUsePermitted === true))) as FoodDescriptionContext["facts"];
+  return Object.fromEntries(Object.entries(facts).filter(([, fact]) => {
+    const suppliedAt = Date.parse(fact.source === "parent_description" ? fact.sourceAttemptCreatedAt : fact.confirmedAt);
+    return suppliedAt <= now.getTime() && Date.parse(fact.expiresAt) > now.getTime() && (fact.source !== "parent_description" || Date.parse(fact.expiresAt) <= suppliedAt + 86400000)
+      && (fact.source !== "family_profile" || fact.descriptionUsePermitted === true);
+  })) as FoodDescriptionContext["facts"];
 }
 function checkedContext(value: unknown, now: Date) {
   const context = foodDescriptionContextSchema.parse(value);
@@ -112,6 +116,26 @@ export const foodDescriptionProjectionSchema = foodDescriptionInputSchema.extend
   excludedNeedIds: z.array(foodDescriptionNeedSchema).max(5).refine(unique),
 }).strict();
 
+/** Only validated assertions from this same immutable source attempt may join a later draft revision. */
+export function carryFoodDescriptionFacts(input: { projection: FoodDescriptionProjection; selection: unknown; facts: FoodDescriptionContext["facts"];
+  sourceAttemptCreatedAt: string; contentExpiresAt: string; now: Date }): FoodDescriptionContext["facts"] {
+  const projection = foodDescriptionProjectionSchema.parse(input.projection), selection = foodDescriptionSelectionSchema.parse(input.selection);
+  const facts = currentFacts(factsSchema.parse(input.facts), input.now), suppliedAt = Date.parse(timestamp.parse(input.sourceAttemptCreatedAt));
+  const expiresAt = Math.min(Date.parse(timestamp.parse(input.contentExpiresAt)), suppliedAt + 86400000);
+  if (suppliedAt > input.now.getTime() || expiresAt <= input.now.getTime()) return facts;
+  for (const assertion of selection.assertions) {
+    const { questionId: field, span } = assertion, original = projection.routingFacts[field], current = facts[field];
+    if (span.end <= span.start || span.end > projection.description.length || projection.description.slice(span.start, span.end) !== span.text) throw new Error("parent_food_description_unverified_selection");
+    if (projection.description.indexOf(span.text) !== projection.description.lastIndexOf(span.text)) continue;
+    if (original && original.source !== "parent_description" && original.value !== "not_sure") continue;
+    if (current && current.source !== "parent_description" && current.value !== "not_sure" || current?.value === assertion.value) continue;
+    Object.assign(facts, { [field]: { value: assertion.value, source: "parent_description", sourceRevision: projection.revision,
+      sourceAttemptCreatedAt: input.sourceAttemptCreatedAt, expiresAt: new Date(expiresAt).toISOString() } });
+  }
+  if (facts.benefitHistory?.value !== "receiving") delete facts.existingIssue;
+  return facts;
+}
+
 
 /** Span checks anchor an interpretation, not its semantic quality. That requires the still-unapproved measured evaluation. */
 export function validateFoodDescriptionSelection(input: {
@@ -128,7 +152,7 @@ export function validateFoodDescriptionSelection(input: {
   const values: Partial<FoodAssessmentAnswers> = Object.fromEntries(Object.entries(facts).filter(([field]) => field !== "zip").map(([field, fact]) => [field, fact.value]));
   for (const assertion of selection.assertions) {
     const field = assertion.questionId;
-    if (values[field] !== undefined && values[field] !== "not_sure") {
+    if (values[field] !== undefined && values[field] !== "not_sure" && facts[field]?.source !== "parent_description") {
       if (values[field] !== assertion.value) conflicts.push(field);
     } else Object.assign(values, { [field]: assertion.value });
   }

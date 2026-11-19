@@ -12,7 +12,7 @@ function fixtureBudget(){
     const food=pending?"need food today":unclear?"food for only one more day":description.includes("groceries today")?"groceries today":"no food for tomorrow";
     const benefit=pending?"already pending":"never applied for SNAP";
     const selection=description.includes("already started")?{needIds:["snap_pending"],selections:[],assertions:[{questionId:"benefitHistory",value:"applied",span:span("already started")}],exclusions:[],questionIds:[],outOfScope:null}
-      :{needIds:unclear?["food_now"]:["food_now",pending?"snap_pending":"snap_new"],selections:[],assertions:[{questionId:"foodForTwoDays",value:"no",span:span(food)},...unclear?[]:[{questionId:"benefitHistory",value:pending?"applied":"never",span:span(benefit)}]],exclusions:[],questionIds:[],outOfScope:null};
+      :{needIds:unclear?["food_now"]:["food_now",pending?"snap_pending":"snap_new"],selections:[],assertions:[{questionId:"foodForTwoDays",value:"no",span:span(food)},...unclear?[{questionId:"benefitHistory",value:"not_sure",span:span("I do not know whether anyone applied for benefits")}]:[{questionId:"benefitHistory",value:pending?"applied":"never",span:span(benefit)}]],exclusions:[],questionIds:[],outOfScope:null};
     return Response.json({id:"resp_synthetic",status:"completed",model:"gpt-6.1-sol",service_tier:"default",usage:{input_tokens:100,output_tokens:40,total_tokens:140,input_tokens_details:{cached_tokens:0,cache_write_tokens:0,cache_write_tokens_details:{ttl_30m_tokens:0,ttl_12h_tokens:0}},output_tokens_details:{reasoning_tokens:10}},output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(selection,(key,item)=>key==="span"?{text:item.text}:item)}]}]});
   });
   return{requests,halt,fetcher,budget:{fetch:()=>fetcher,halt,attempts:()=>requests.length}};
@@ -74,5 +74,35 @@ describe("actual interpreter with explicit synthetic transport, never model-qual
     const batches=descriptionEvaluationBatches(corpus.cases);expect(batches).toHaveLength(8);expect(new Set(batches.flat()).size).toBe(60);expect(batches[0]).toHaveLength(8);
     for(const batch of batches){expect(batch.length).toBeLessThanOrEqual(10);expect(batch.reduce((n,id)=>n+corpus.cases.find(item=>item.id===id)!.turns.reduce((n,t)=>n+(t.modelCalls??0),0),0)).toBeLessThanOrEqual(16);}
     expect(batches[0].filter(id=>id.endsWith("-en"))).toHaveLength(4);expect(batches[0].filter(id=>id.endsWith("-es"))).toHaveLength(4);
+  });
+});
+
+describe("actual validated source carry, never oracle-seeded context", () => {
+  it("retains the first actual food assertion through the paid-case benefit edit without another food question", async () => {
+    const item = corpus.cases.find(item => item.id === "description-new_snap-3-en")!, requests: unknown[] = [];
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body)), projection = JSON.parse(body.input[0].content); requests.push(projection);
+      const first = requests.length === 1;
+      const assertions = first ? [{ questionId: "foodForTwoDays", value: "yes", span: { text: "enough food for two days" } }, { questionId: "benefitHistory", value: "never", span: { text: "my first SNAP application" } }]
+        : [{ questionId: "benefitHistory", value: "applied", span: { text: "already submitted a SNAP application" } }];
+      return Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2,
+        input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } },
+        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ needIds: [first ? "snap_new" : "snap_pending"], selections: [], assertions, exclusions: [], questionIds: [], outOfScope: null }) }] }] });
+    });
+    const result = await runDescriptionEvaluationCase(item, { budget: { fetch: () => fetcher, halt: vi.fn(), attempts: () => requests.length }, projectId: "proj_synthetic", apiKey: "synthetic" });
+    expect(fetcher).toHaveBeenCalledTimes(2); expect(result.criticalFailure).toBe(false);
+    expect(result.turns[2]).toMatchObject({ result: { proposedAnswers: { foodForTwoDays: "yes", benefitHistory: "applied" }, needIds: ["snap_pending"], questionIds: [], executionGranted: false },
+      projection: { routingFacts: { foodForTwoDays: { source: "parent_description", sourceRevision: 1, value: "yes", sourceAttemptCreatedAt: "2026-11-18T12:00:00Z", expiresAt: "2026-11-19T12:00:00.000Z" } } } });
+    expect(result.modelQualityApproved).toBe(false);
+  });
+  it("never injects a planned food fact when the actual initial validated model response omitted it", async () => {
+    const item = corpus.cases.find(item => item.id === "description-new_snap-3-en")!, halt = vi.fn();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } },
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ needIds: ["snap_new"], selections: [], assertions: [{ questionId: "benefitHistory", value: "never", span: { text: "my first SNAP application" } }], exclusions: [], questionIds: [], outOfScope: null }) }] }] }));
+    const result = await runDescriptionEvaluationCase(item, { budget: { fetch: () => fetcher, halt, attempts: () => fetcher.mock.calls.length }, projectId: "proj_synthetic", apiKey: "synthetic" });
+    expect(fetcher).toHaveBeenCalledOnce(); expect(halt).toHaveBeenCalled(); expect(result.criticalFailure).toBe(true);
+    expect(result.turns[0]).toMatchObject({ result: { originalFacts: {}, questionIds: ["foodForTwoDays"] } });
+    expect(result.turns[2].status).toBe("unrun_after_failure");
   });
 });

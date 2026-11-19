@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { buildFoodDescriptionProjection, foodDescriptionContextSchema, foodDescriptionInputSchema, reconcileFoodDescriptionRequests, validateFoodDescriptionSelection, type FoodDescriptionContext } from "../src/lib/parent/food-description";
+import { buildFoodDescriptionProjection, carryFoodDescriptionFacts, foodDescriptionContextSchema, foodDescriptionSelectionSchema, foodDescriptionInputSchema, reconcileFoodDescriptionRequests, validateFoodDescriptionSelection, type FoodDescriptionContext } from "../src/lib/parent/food-description";
 import { foodAssessmentHandoffSchema, foodAssessmentSchema } from "../src/lib/parent/food-assessment";
 import { FOOD_DESCRIPTION_EVALUATION_BINDING, FOOD_DESCRIPTION_FINGERPRINT } from "../src/lib/parent/food-description-runtime";
 import { FOOD_DESCRIPTION_CORPUS_SHA, descriptionEvaluationHash } from "./food-description-evaluation-budget";
@@ -70,6 +70,10 @@ export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, ind
       current.questionIds = ["foodForTwoDays"];
       differences.push("The description explicitly supplies unknown SNAP history; honor that Not sure answer without asking the same benefit question again.");
     }
+    if (["description-urgent-2-en", "description-urgent-2-es"].includes(item.id)) {
+      current.state = "proposal"; current.questionIds = [];
+      differences.push("The description explicitly supplies unknown SNAP history alongside current food need; preserve Not sure without repeating that answered benefit question.");
+    }
     if (z.array(z.unknown()).parse(record(item.turns[0].input).excludedNeeds).length) differences.push("Archived excludedNeeds is not a public queue input; source-anchored exclusions and the explicit terminal choice remain authoritative.");
     if (archived.state === "outside_supported_geography") {
       current.state = "manual"; current.outOfScope = "other";
@@ -106,9 +110,36 @@ export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, ind
   }
   return { archived, current, differences };
 }
+/** Fixed synthetic attempt time, not a fabricated real-parent confirmation. Actual SQL uses immutable call.created_at. */
+export function carryDescriptionEvaluationFacts(context: FoodDescriptionContext, projection: ReturnType<typeof buildFoodDescriptionProjection>, selection: unknown): FoodDescriptionContext {
+  return foodDescriptionContextSchema.parse({ ...context, facts: carryFoodDescriptionFacts({ facts: context.facts, projection, selection,
+    sourceAttemptCreatedAt: DESCRIPTION_EVALUATION_NOW, contentExpiresAt: "2026-11-19T12:00:00.000Z", now: new Date(DESCRIPTION_EVALUATION_NOW) }) });
+}
+// Immutable input annotations are source files, rehashed by the dispatch manifest; parse them once rather than rebuilding the corpus for every budget check.
+const sourceAnnotations = z.object({ version: z.literal("food-description-input-source-facts.v1"), cases: z.array(z.object({ id: z.string(), descriptionSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    assertions: z.array(z.object({ questionId: z.enum(["foodForTwoDays", "benefitHistory", "existingIssue"]), value: z.string(), text: z.string().min(1).max(500) }).strict()).max(3) }).strict()).length(20) }).strict()
+    .parse(JSON.parse(readFileSync("tests/fixtures/parent/food-description-source-facts-2026-11-18.v1.json", "utf8")));
+const annotatedCaseIds = loadDescriptionEvaluationCorpus().cases.filter(value => value.turns.slice(1).some(turn => turn.modelCalls === 1)).map(value => value.id);
+if (new Set(sourceAnnotations.cases.map(value => value.id)).size !== 20 || sourceAnnotations.cases.some(value => !annotatedCaseIds.includes(value.id))) throw new Error("description_evaluation_source_annotations_changed");
+function plannedSourceAssertions(item: DescriptionEvaluationCase) {
+  const source = sourceAnnotations.cases.find(value => value.id === item.id), description = descriptionEvaluationInput(item, 0).description;
+  if (!source || source.descriptionSha256 !== createHash("sha256").update(description).digest("hex")) throw new Error("description_evaluation_source_annotations_changed");
+  return foodDescriptionSelectionSchema.parse({ needIds: [], selections: [], exclusions: [], questionIds: [], outOfScope: null,
+    assertions: source.assertions.map(({ text, ...assertion }) => {
+      const start = description.indexOf(text);
+      if (start < 0 || start !== description.lastIndexOf(text)) throw new Error("description_evaluation_source_annotations_changed");
+      return { ...assertion, span: { start, end: start + text.length, text } };
+    }) });
+}
 export function descriptionEvaluationPlannedProjection(item:DescriptionEvaluationCase,index:number){
   let context=descriptionEvaluationContext(item);
-  if(index>0){context=applyDescriptionEvaluationAnswers(context,item.turns[1].suppliedAnswers??{});context={...context,revision:context.revision+1,expectedRevision:context.revision+1};}
+  if(index>0){
+    const original=buildFoodDescriptionProjection(descriptionEvaluationInput(item,0),context,new Date(DESCRIPTION_EVALUATION_NOW)), supplied=record(item.turns[1].suppliedAnswers??{});
+    let selection=plannedSourceAssertions(item);
+    const sourceFacts=Object.keys(supplied).length?carryDescriptionEvaluationFacts(context,original,selection):context, next=applyDescriptionEvaluationAnswers(sourceFacts,supplied);
+    if(next.revision!==context.revision){context=next;selection={...selection,assertions:selection.assertions.filter(assertion=>!context.facts[assertion.questionId])};}
+    context=carryDescriptionEvaluationFacts(context,original,selection);context={...context,revision:context.revision+1,expectedRevision:context.revision+1};
+  }
   return buildFoodDescriptionProjection(descriptionEvaluationInput(item,index),context,new Date(DESCRIPTION_EVALUATION_NOW));
 }
 export function descriptionEvaluationPlan(corpus = loadDescriptionEvaluationCorpus()) {
@@ -116,11 +147,11 @@ export function descriptionEvaluationPlan(corpus = loadDescriptionEvaluationCorp
     maximumModelCalls: turn.modelCalls ?? 0, ...descriptionEvaluationOracle(item, index),
     ...(turn.modelCalls===1?{projection:descriptionEvaluationPlannedProjection(item,index),requestSha256:descriptionEvaluationHash({...FOOD_DESCRIPTION_EVALUATION_BINDING.request,input:[{role:"user",content:JSON.stringify(descriptionEvaluationPlannedProjection(item,index))}]})}:{}),
     authorityBoundary: turn.kind === "change_state_and_revalidate" && ["processing", "draft", "identity", "routing"].some(key => key in record(turn.changes)) ? "actual SQL/Auth/start proof required separately; never a model quality pass" : null })) }));
-  return { version:"food-description-evaluation-wrapper-2026-11-18.v6", corpusSha256: FOOD_DESCRIPTION_CORPUS_SHA, cases, caseCount: 60, turnCount: 240, maximumModelCalls: 80, zeroCallGuardCases: 24,
+  return { version:"food-description-evaluation-wrapper-2026-11-18.v7", corpusSha256: FOOD_DESCRIPTION_CORPUS_SHA, cases, caseCount: 60, turnCount: 240, maximumModelCalls: 80, zeroCallGuardCases: 24,
     languageCounts: { en: 30, es: 30 }, modelFingerprint: FOOD_DESCRIPTION_FINGERPRINT, logicalNow: DESCRIPTION_EVALUATION_NOW };
 }
 export function descriptionEvaluationAdapterHash() {
-  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v9-adapter.json","utf8"));
+  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json","utf8"));
   if(descriptionEvaluationHash(saved)!==descriptionEvaluationHash(plan))throw new Error("description_evaluation_adapter_changed");
   return descriptionEvaluationHash(plan);
 }
@@ -129,7 +160,7 @@ export function applyDescriptionEvaluationAnswers(context: FoodDescriptionContex
   if(!Number.isFinite(Date.parse(confirmedAt))||Date.parse(confirmedAt)>Date.parse(DESCRIPTION_EVALUATION_NOW))throw new Error("description_evaluation_invalid_fact_time");
   const values = answers.parse(supplied), next = structuredClone(context);
   for (const [field, value] of Object.entries(values)) {
-    if (value === null || next.facts[field as keyof typeof next.facts]?.value === value) continue;
+    if (value === null || next.facts[field as keyof typeof next.facts]?.value === value && next.facts[field as keyof typeof next.facts]?.source !== "parent_description") continue;
     Object.assign(next.facts, { [field]: { value, source: "parent_typed", confirmedAt, expiresAt: new Date(Math.min(Date.parse(confirmedAt)+86400000,Date.parse(DESCRIPTION_EVALUATION_NOW)+86400000)).toISOString() } });
   }
   if (values.benefitHistory && values.benefitHistory !== "receiving") delete next.facts.existingIssue;

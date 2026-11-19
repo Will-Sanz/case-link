@@ -150,6 +150,8 @@ export async function createParentSqlFixture(
     "20261118192417_parent_snap_ordinary_routing_reuse.sql",
     "20261118192507_parent_support_update_receipts.sql",
     "20261118194631_parent_food_directory_bounded_retry.sql",
+    "20261118230000_parent_food_description_unknown_resolution.sql",
+    "20261118235507_parent_food_description_source_fact_carry.sql",
   ];
   try {
     const last = throughMigration ? migrations.indexOf(throughMigration) : migrations.length - 1;
