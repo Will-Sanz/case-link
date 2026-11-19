@@ -1,0 +1,72 @@
+{
+  "version": "parent-food-release-evidence-2026-11-19.v1",
+  "recordedAt": "2026-11-19T21:06:23.000040+00:00",
+  "applicationCommit": "3c030ad9dcbfebe33b22973d44aab652a21c1123",
+  "reviewedCandidate": "4ba6a2228be3c02ca7801843ccd5595cc94ba50b",
+  "applicationTree": "fde491f5dedf37f90cf3e71c2e2771f606815203",
+  "pullRequest": "https://github.com/Will-Sanz/case-link/pull/31",
+  "merge": "normal merge; identical tested tree",
+  "CI": {
+    "requiredChecks": 5,
+    "allPassed": true,
+    "actions": "https://github.com/Will-Sanz/case-link/actions/runs/44611386786",
+    "codeQL": "https://github.com/Will-Sanz/case-link/actions/runs/44611386986",
+    "unit": {
+      "passed": 7617,
+      "skipped": 1817,
+      "declared": 9434
+    },
+    "separateSQL": {
+      "passed": 1806,
+      "skipped": 1
+    },
+    "nativeDatabaseAssertions": 333,
+    "nativeAuthAssertions": 635,
+    "groupsOverlap": true,
+    "standardNextBuildPassed": true
+  },
+  "modelEvaluation": {
+    "sourceSha256": "bab3870bbee7e72610a103db7eab1f826481c9f276af5122a2e944a04de2e05b",
+    "fingerprint": "36a38d76e787e5c745b451510ae844457e66710ec5f43e1d07a1905712084e8b",
+    "adapterSha256": "859e316840b8b32059413312a081b35b4cd869ed4b89a9327ff79a67683f1142",
+    "cases": 60,
+    "turns": 240,
+    "languages": {
+      "en": 30,
+      "es": 30
+    },
+    "actualModelCalls": 80,
+    "actualTokenCounts": 80,
+    "uniqueZeroCallGuards": 24,
+    "criticalFailures": 0,
+    "qualityFailures": 0,
+    "independentNormalSemanticBilingualReview": "clear",
+    "distinctPonytailReview": "clear",
+    "reviewSha256": "8014dfd9c408b3c0ea456bd3d34b1b3691003c56866e2be044d3d58dca40ce73",
+    "freshMeasuredNanoDollars": 367288500,
+    "allEarlierMeasuredNanoDollars": 1230042700,
+    "originalCumulativeMeasuredNanoDollars": 1597331200,
+    "originalCapNanoDollars": 5000000000,
+    "earlierHaltedRunsRetainedWithoutQualityCredit": true,
+    "nativeAuthorityTurnsUnmeasuredInModelRunner": 20,
+    "terminalSchemasNotActions": 26,
+    "fixedLinksNotActions": 34,
+    "rawAutomaticNominationAccuracy": "unmeasured",
+    "actualInnerReviewFlags": "pending/false retained unchanged; independent review is a separate immutable artifact"
+  },
+  "sourcePackage": {
+    "selectedFiles": 521,
+    "sourceSha256": "e93a8280e7272389ddced4b16f59aebf284f4a9fb8d7fdecf476a5030a894c76",
+    "manifestSha256": "4445bfe3f9c10de89217c2147c8f4c2502fd89a7f506fad271da286c5ea48f06",
+    "packagingToolSha256": "a938110f0f2f9638bfbabadf861d1e740324df6a99a581d79ef1bd858c06354e"
+  },
+  "deployment": "pending exact existing-host build, additive38-body upgrade and real-path verification; this file is source/evaluation evidence only",
+  "unchangedBoundaries": [
+    "no provider sending or government filing",
+    "no new enrollment or cohort",
+    "no new processing purpose or model allowance",
+    "existing owner account and credentials preserved",
+    "backup waiver is not fresh restore coverage",
+    "provider acceptance/stock/outcomes, no-email access and actual family observation remain separate gates"
+  ]
+}
