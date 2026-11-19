@@ -183,7 +183,7 @@ export function validateFoodDescriptionSelection(input: {
   const questions: z.infer<typeof questionId>[] = [];
   if (!existingRequestIds.length && selection.outOfScope !== "outside_pa") {
     if (foodScopeAllowed && values.foodForTwoDays === undefined && !excludedNeedIds.includes("food_now")) questions.push("foodForTwoDays");
-    if (benefitScopeAllowed && values.benefitHistory === undefined && foodDescriptionNeedSchema.options.some(need => need !== "food_now" && !excludedNeedIds.includes(need))) questions.push("benefitHistory");
+    if (benefitScopeAllowed && (benefitWanted || !excludedNeedIds.includes("snap_new")) && values.benefitHistory === undefined && foodDescriptionNeedSchema.options.some(need => need !== "food_now" && !excludedNeedIds.includes(need))) questions.push("benefitHistory");
     if (benefitScopeAllowed && values.benefitHistory === "receiving" && values.existingIssue === undefined) questions.push("existingIssue");
     if (benefitScopeAllowed && selection.needIds.includes("snap_new") && duplicateBlocked && !questions.includes("benefitHistory")) questions.push("benefitHistory");
   }
