@@ -7,6 +7,7 @@ const corpus = loadDescriptionEvaluationCorpus();
 const item = (id: string) => corpus.cases.find(value => value.id === id)!;
 const provisional = ["renewal-1", "renewal-2", "pending-1", "pending-2", "benefit_problem-1", "benefit_problem-2", "ambiguity-1", "ambiguity-2", "owned_history-2", "untrusted_and_sources-1", "untrusted_and_sources-3"];
 const languages = ["en", "es"];
+const inventory = ["new_snap-1", "new_snap-3", "renewal-3", "pending-3", "benefit_problem-3", "owned_history-3"];
 
 describe("independently reviewed current food-description expectations", () => {
   it.each(provisional.flatMap(scenario => languages.map(language => `description-${scenario}-${language}`)))("retains provisional food while its necessary question is unanswered: %s", id => {
@@ -57,14 +58,20 @@ describe("independently reviewed current food-description expectations", () => {
     expect(plan).toMatchObject({ caseCount: 60, turnCount: 240, maximumModelCalls: 80, zeroCallGuardCases: 24, languageCounts: { en: 30, es: 30 } });
     expect(plan.cases.flatMap(value => value.turns)).toHaveLength(240);
   });
-  it("preserves every predeclared current expectation from the stopped v13 and v14 runs", () => {
+  it("preserves every predeclared current expectation while adding the inventory/choice check", () => {
     const current = descriptionEvaluationPlan(corpus);
-    for (const version of [13, 14]) {
+    for (const version of [13, 14, 15]) {
       const previous = JSON.parse(readFileSync(`tests/fixtures/parent/food-description-2026-11-18.v${version}-adapter.json`, "utf8"));
-      expect(current.cases.map(value => value.turns.map(turn => turn.current))).toEqual(previous.cases.map((value: { turns: { current: unknown }[] }) => value.turns.map(turn => turn.current)));
+      expect(current.cases.map(value => value.turns.map(turn => {
+        const { excludedNeedIds, ...unchanged } = turn.current;
+        if (excludedNeedIds !== undefined) expect(excludedNeedIds).toEqual([]);
+        return unchanged;
+      }))).toEqual(previous.cases.map((value: { turns: { current: unknown }[] }) => value.turns.map(turn => turn.current)));
     }
+    expect(current.cases.flatMap(value => value.turns.filter(turn => "excludedNeedIds" in turn.current).map(turn => `${value.id}:${turn.turn}`)).sort())
+      .toEqual(inventory.flatMap(scenario => languages.flatMap(language => [1, 2, 3].map(turn => `description-${scenario}-${language}:${turn}`))).sort());
   });
-  it("changes only the 44 reviewed current turns and preserves every archived turn", () => {
+  it("changes only the 74 reviewed current turns and preserves every archived turn", () => {
     const archivedPlan = JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json", "utf8"));
     const plan = descriptionEvaluationPlan(corpus), changed: string[] = [];
     for (const [caseIndex, value] of plan.cases.entries()) for (const [turnIndex, turn] of value.turns.entries()) {
@@ -78,8 +85,9 @@ describe("independently reviewed current food-description expectations", () => {
       ...languages.flatMap(language => [`description-pending-3-${language}:3`, `description-owned_history-3-${language}:3`]),
       ...languages.flatMap(language => [`description-choice_and_scope-2-${language}:1`, `description-untrusted_and_sources-3-${language}:3`, `description-untrusted_and_sources-3-${language}:4`]),
       ...[1, 3].flatMap(kind => languages.map(language => `description-owned_history-${kind}-${language}:2`)),
+      ...inventory.flatMap(scenario => languages.flatMap(language => [1, 2, 3].map(turn => `description-${scenario}-${language}:${turn}`))),
     ];
-    expect(changed.sort()).toEqual(expected.sort());
+    expect(changed.sort()).toEqual([...new Set(expected)].sort());
   });
 
 });

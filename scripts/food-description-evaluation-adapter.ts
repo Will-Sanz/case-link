@@ -64,6 +64,10 @@ export type DescriptionEvaluationResult = ReturnType<typeof descriptionEvaluatio
 /** Expected output is never used to construct a projection or a model assertion. */
 export function descriptionEvaluationOracle(item: DescriptionEvaluationCase, index: number) {
   const archived = record(item.turns[index].expected ?? item.turns[index]), current = { ...archived }, differences: string[] = [];
+  if (/^description-(new_snap-(1|3)|renewal-3|pending-3|benefit_problem-3|owned_history-3)-(en|es)$/.test(item.id) && index < 3) {
+    current.excludedNeedIds = [];
+    differences.push("These descriptions report food inventory and benefit intent without declining food help; enough food is not an opt-out, including after a later correction.");
+  }
   if (index === 0) {
     differences.push("Archived ZIP stays at the typed handoff boundary; it is absent from the actual model DTO.");
     if (["description-ambiguity-3-en", "description-ambiguity-3-es"].includes(item.id)) {
@@ -192,7 +196,7 @@ export function descriptionEvaluationPlan(corpus = loadDescriptionEvaluationCorp
     languageCounts: { en: 30, es: 30 }, modelFingerprint: FOOD_DESCRIPTION_FINGERPRINT, logicalNow: DESCRIPTION_EVALUATION_NOW };
 }
 export function descriptionEvaluationAdapterHash() {
-  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v15-adapter.json","utf8"));
+  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v16-adapter.json","utf8"));
   if(descriptionEvaluationHash(saved)!==descriptionEvaluationHash(plan))throw new Error("description_evaluation_adapter_changed");
   return descriptionEvaluationHash(plan);
 }

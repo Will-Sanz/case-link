@@ -12,7 +12,7 @@ import { descriptionEvaluationHash,type DescriptionEvaluationBudget } from "./fo
 
 const object = z.record(z.string(), z.unknown());
 export const DESCRIPTION_EVALUATION_SOURCE_PATHS = ["scripts/food-description-evaluation-budget.ts", "scripts/food-description-evaluation-adapter.ts", "scripts/food-description-evaluation.ts", "scripts/run-food-description-evaluation.ts",
-  "src/lib/parent/food-description-runtime.ts", "src/lib/parent/food-description.ts", "src/lib/parent/food-description-view.ts", "src/lib/parent/food-assessment.ts", "src/lib/parent/programs.ts", "src/lib/parent/domain.ts", "src/lib/parent/http.ts", "src/lib/parent/assistant-contract.ts", "src/lib/privacy/no-pii.ts", "src/lib/parent/food-access.ts", "src/features/parent/food-sites.tsx", "tests/fixtures/parent/food-description-2026-11-18.v15-adapter.json", "tests/fixtures/parent/food-description-source-facts-2026-11-18.v1.json", "package-lock.json"];
+  "src/lib/parent/food-description-runtime.ts", "src/lib/parent/food-description.ts", "src/lib/parent/food-description-view.ts", "src/lib/parent/food-assessment.ts", "src/lib/parent/programs.ts", "src/lib/parent/domain.ts", "src/lib/parent/http.ts", "src/lib/parent/assistant-contract.ts", "src/lib/privacy/no-pii.ts", "src/lib/parent/food-access.ts", "src/features/parent/food-sites.tsx", "tests/fixtures/parent/food-description-2026-11-18.v16-adapter.json", "tests/fixtures/parent/food-description-source-facts-2026-11-18.v1.json", "package-lock.json"];
 export function descriptionEvaluationSourceManifest() { return DESCRIPTION_EVALUATION_SOURCE_PATHS.map(path => ({ path, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") })); }
 export function descriptionEvaluationBatches(cases: DescriptionEvaluationCase[]) {
   const smoke = ["urgent-1", "new_snap-2", "ambiguity-3", "owned_history-1"].flatMap(id => ["en", "es"].map(language => `description-${id}-${language}`));
@@ -46,8 +46,8 @@ export async function interpretDescriptionEvaluationTurn(item: DescriptionEvalua
 }
 function checksFor(result: DescriptionEvaluationResult, expected: Record<string, unknown>) {
   const checks: { code: string; passed: boolean; severity: "critical" | "quality"; basis?: "vetted_result" }[] = [];
-  for (const [field, actual] of [["state", result.state], ["needIds", result.needIds], ["questionIds", result.questionIds], ["answers", result.proposedAnswers], ["urgency", result.proposedUrgency]] as const)
-    if (field in expected) checks.push({ code: field, passed: isDeepStrictEqual(actual,expected[field]), severity: ["needIds", "urgency", "answers"].includes(field) || field === "questionIds" && Array.isArray(actual) && actual.some(id=>!Array.isArray(expected[field]) || !(expected[field] as unknown[]).includes(id)) ? "critical" : "quality", basis:"vetted_result" });
+  for (const [field, actual] of [["state", result.state], ["needIds", result.needIds], ["excludedNeedIds", result.excludedNeedIds], ["questionIds", result.questionIds], ["answers", result.proposedAnswers], ["urgency", result.proposedUrgency]] as const)
+    if (field in expected) checks.push({ code: field, passed: isDeepStrictEqual(actual,expected[field]), severity: ["needIds", "excludedNeedIds", "urgency", "answers"].includes(field) || field === "questionIds" && Array.isArray(actual) && actual.some(id=>!Array.isArray(expected[field]) || !(expected[field] as unknown[]).includes(id)) ? "critical" : "quality", basis:"vetted_result" });
   checks.push({ code: "no_execution_granted", passed: result.executionGranted === false, severity: "critical", basis:"vetted_result" });
   if (expected.allowedProgramIdsByNeed) {
     const allowed = object.parse(expected.allowedProgramIdsByNeed);
