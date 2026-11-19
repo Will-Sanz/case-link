@@ -191,12 +191,12 @@ export function descriptionEvaluationPlan(corpus = loadDescriptionEvaluationCorp
   const cases = corpus.cases.map(item => ({ id: item.id, language: item.language, turns: item.turns.map((turn, index) => ({ turn: index + 1, kind: turn.kind,
     maximumModelCalls: turn.modelCalls ?? 0, ...descriptionEvaluationOracle(item, index),
     ...(turn.modelCalls===1?{projection:descriptionEvaluationPlannedProjection(item,index),requestSha256:descriptionEvaluationHash({...FOOD_DESCRIPTION_EVALUATION_BINDING.request,input:[{role:"user",content:JSON.stringify(descriptionEvaluationPlannedProjection(item,index))}]})}:{}),
-    authorityBoundary: turn.kind === "change_state_and_revalidate" && ["processing", "draft", "identity", "routing"].some(key => key in record(turn.changes)) ? "actual SQL/Auth/start proof required separately; never a model quality pass" : null })) }));
+    authorityBoundary: turn.kind === "change_state_and_revalidate" && ["processing", "draft", "identity", "routing", "history"].some(key => key in record(turn.changes)) ? "actual SQL/Auth/start proof required separately; never a model quality pass" : null })) }));
   return { version:"food-description-evaluation-wrapper-2026-11-18.v7", corpusSha256: FOOD_DESCRIPTION_CORPUS_SHA, cases, caseCount: 60, turnCount: 240, maximumModelCalls: 80, zeroCallGuardCases: 24,
     languageCounts: { en: 30, es: 30 }, modelFingerprint: FOOD_DESCRIPTION_FINGERPRINT, logicalNow: DESCRIPTION_EVALUATION_NOW };
 }
 export function descriptionEvaluationAdapterHash() {
-  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v18-adapter.json","utf8"));
+  const plan=descriptionEvaluationPlan(),saved=JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v19-adapter.json","utf8"));
   if(descriptionEvaluationHash(saved)!==descriptionEvaluationHash(plan))throw new Error("description_evaluation_adapter_changed");
   return descriptionEvaluationHash(plan);
 }
@@ -223,7 +223,12 @@ export function revalidateDescriptionEvaluationChange(item: DescriptionEvaluatio
   }
   if (changes.catalog) next.catalogVersion = String(record(changes.catalog).version);
   if (changes.capabilities) next.capabilityVersion = String(record(changes.capabilities).version);
-  if (changes.history) next.history = history(changes.history);
+  if (changes.history) {
+    next.history = history(changes.history);
+    const current = buildFoodDescriptionProjection({ description: projection.description, screenLocale: projection.screenLocale }, next, new Date(DESCRIPTION_EVALUATION_NOW));
+    // Reusing an unchanged interpretation never reuses a cancelled request's execution scope.
+    if (descriptionEvaluationHash(current) === descriptionEvaluationHash(projection)) return { status: "requires_native_evidence" as const, boundary: "request_scope", availableOwnedRequests: descriptionEvaluationCurrentRequests(next), archived: item.turns[2].expected };
+  }
   if (changes.routingFacts) {
     const facts = record(changes.routingFacts), supplied=answers.parse(Object.fromEntries(["foodForTwoDays","benefitHistory","existingIssue"].filter(key=>key in facts).map(key=>[key,facts[key]])));
     return { status: "typed_reassessment_required" as const, supplied, confirmedAt:facts.confirmedAt, archived: item.turns[2].expected };

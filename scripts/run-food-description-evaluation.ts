@@ -36,7 +36,7 @@ export async function foodDescriptionEvaluationCommand(args: string[], env: Reco
   const envelope = privateApproval(args[1], env.CASELINK_FOOD_DESCRIPTION_EVAL_APPROVAL_SHA256) as { sourceSha256?: unknown; approval?: unknown };
   if (envelope.sourceSha256 !== sourceSha256) throw new Error(generic);
   const approval = descriptionEvaluationApprovalSchema.parse(envelope.approval);
-  if (approval.adapterSha256 !== adapterSha256 || approval.aggregate?.maximumCalls !== 269) throw new Error(generic);
+  if (approval.adapterSha256 !== adapterSha256 || approval.aggregate?.maximumCalls !== 274) throw new Error(generic);
   const apiKey = env.CASELINK_FOOD_DESCRIPTION_EVAL_API_KEY;
   if (!apiKey) throw new Error(generic); // No ordinary OPENAI_API_KEY or legacy allowance fallback.
   const batch = Number(args[2]), selected = batches[batch], results: Awaited<ReturnType<typeof runDescriptionEvaluationCase>>[] = [];

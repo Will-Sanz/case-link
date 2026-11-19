@@ -50,6 +50,15 @@ describe("actual interpreter with explicit synthetic transport, never model-qual
     expect(result.turns[1]).toMatchObject({status:"deterministic_typed_answers",result:{needIds:[],state:"open_existing",proposedAnswers:{benefitHistory:"not_sure"},existingRequests:[{requestId:"00000000-0000-4000-8000-000000000101",needIds:["snap_pending"]}]}});
     expect(result.turns[3]).toMatchObject({target:"/support/00000000-0000-4000-8000-000000000101",checks:[{passed:true}]});
   });
+  it.each(["en", "es"])("keeps unchanged cancelled-request scope a native boundary without reusing permission (%s)",async language=>{
+    const f=fixtureBudget(),item=corpus.cases.find(item=>item.id===`description-owned_history-2-${language}`)!;
+    f.fetcher.mockResolvedValue(Response.json({id:"resp_synthetic",status:"completed",model:"gpt-6.1-sol",service_tier:"default",usage:{input_tokens:100,output_tokens:40,total_tokens:140,input_tokens_details:{cached_tokens:0,cache_write_tokens:0,cache_write_tokens_details:{ttl_30m_tokens:0,ttl_12h_tokens:0}},output_tokens_details:{reasoning_tokens:0}},output:[{type:"message",content:[{type:"output_text",text:JSON.stringify({needIds:["snap_pending"],selections:[],assertions:[{questionId:"benefitHistory",value:"applied",span:{text:language==="en"?"my SNAP application had already been submitted.":"mi solicitud de SNAP ya se había presentado."}}],exclusions:[],questionIds:[],outOfScope:null})}]}]}));
+    const result=await runDescriptionEvaluationCase(item,{budget:f.budget,projectId:"proj_synthetic",apiKey:"synthetic"});
+    expect(f.fetcher).toHaveBeenCalledOnce();expect(f.halt).not.toHaveBeenCalled();expect(result.criticalFailure).toBe(false);expect(result.qualityFailures).toBe(0);
+    expect(result.turns[2]).toMatchObject({status:"requires_native_evidence",actual:{boundary:"request_scope",availableOwnedRequests:[]},checks:[],current:{oldResultUsable:false,cancelledRequestMustNotResume:true},oracleCoverage:{retainedUnmeasuredFields:expect.arrayContaining(["oldResultUsable","cancelledRequestMustNotResume"])}});
+    expect(result.turns[2].oracleCoverage.automaticallyCheckedFields).not.toContain("oldResultUsable");
+    expect(result.turns[3]).toMatchObject({status:"typed_handoff_schema_checked",noRequestOrMandateCreated:true,current:{reusePriorMandate:false,requiresNewMandate:true},actual:{needs:["snap_pending"]}});
+  });
   it("stops when an operational stale-result guard fails instead of merely recording its status",async()=>{
     const f=fixtureBudget(),item=structuredClone(corpus.cases.find(item=>item.id==="description-urgent-1-en")!);
     item.turns[2].changes={catalog:{version:FOOD_DESCRIPTION_FINGERPRINT}};
