@@ -4,7 +4,7 @@ import { runDescriptionEvaluationCase } from "./food-description-evaluation";
 
 const corpus = loadDescriptionEvaluationCorpus();
 describe("independently ready terminal paths, with synthetic transport only", () => {
-  it.each(["en", "es"])("checks the chosen SNAP path without inventing a food answer or starting work (%s)", async language => {
+  it.each(["en", "es"].flatMap(language => [false, true].map(inventSupply => ({ language, inventSupply }))))("checks the chosen SNAP path without inventing a food answer ($language, invented $inventSupply)", async ({ language, inventSupply }) => {
     const item = corpus.cases.find(value => value.id === `description-choice_and_scope-3-${language}`)!;
     const requests: { routingFacts: unknown }[] = [], halt = vi.fn();
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
@@ -14,15 +14,24 @@ describe("independently ready terminal paths, with synthetic transport only", ()
       const exclusionText = language === "en" ? "without applying for benefits" : "sin solicitar beneficios";
       const benefitText = language === "en" ? "first SNAP application" : "primera solicitud de SNAP";
       const selection = { needIds: first ? ["food_now"] : ["food_now", "snap_new"], selections: [],
-        assertions: first ? [] : [{ questionId: "benefitHistory", value: "never", span: { text: benefitText } }],
-        exclusions: first ? ["snap_new", "snap_pending", "snap_renewal", "snap_problem"].map(need => ({ need, span: { text: exclusionText } })) : [],
+        assertions: first ? [] : [{ questionId: "benefitHistory", value: "never", span: { text: benefitText } },
+          ...(inventSupply ? [{ questionId: "foodForTwoDays", value: "no", span: { text: language === "en" ? "food today" : "comida para hoy" } }] : [])],
+        exclusions: first ? ["snap_new"].map(need => ({ need, span: { text: exclusionText } })) : [],
         questionIds: [], outOfScope: null };
       return Response.json({ id: "resp_synthetic", status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2,
         input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } },
         output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selection) }] }] });
     });
     const result = await runDescriptionEvaluationCase(item, { budget: { fetch: () => fetcher, halt, attempts: () => requests.length }, projectId: "proj_synthetic", apiKey: "synthetic" });
-    expect(fetcher).toHaveBeenCalledTimes(2); expect(halt).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    if (inventSupply) {
+      expect(halt).toHaveBeenCalled();
+      expect(result).toMatchObject({ criticalFailure: true, qualityFailures: 2, humanReview: "pending", modelQualityApproved: false });
+      expect(result.turns[2]).toMatchObject({ checks: expect.arrayContaining([{ code: "answers", passed: false, severity: "critical", basis: "vetted_result" }, { code: "urgency", passed: false, severity: "critical", basis: "vetted_result" }]) });
+      expect(result.turns[3].status).toBe("unrun_after_failure");
+      return;
+    }
+    expect(halt).not.toHaveBeenCalled();
     expect(result).toMatchObject({ criticalFailure: false, qualityFailures: 0, humanReview: "pending", modelQualityApproved: false });
     expect(requests.every(value => !JSON.stringify(value.routingFacts).includes("foodForTwoDays"))).toBe(true);
     expect(result.turns[2]).toMatchObject({ result: { state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never" }, questionIds: ["foodForTwoDays"] } });
