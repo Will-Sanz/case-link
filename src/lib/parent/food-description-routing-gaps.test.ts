@@ -108,7 +108,8 @@ describe("truthful current food routing", () => {
   });
 
   it("binds the source-supply meaning to the exact dispatched instructions rather than treating pickup logistics as a shortage", () => {
-    expect(FOOD_DESCRIPTION_EVALUATION_BINDING.request.instructions).toContain("Requesting a food site or giving a pickup time does not by itself establish two-day food supply; do not assert No from that alone.");
+    expect(FOOD_DESCRIPTION_EVALUATION_BINDING.request.instructions).toContain("An explicit current need for food or groceries today supports foodForTwoDays:no.");
+    expect(FOOD_DESCRIPTION_EVALUATION_BINDING.request.instructions).toContain("Requesting only a food site or pickup time, or unclear timing such as soon, does not establish two-day food supply; do not assert No from that alone.");
     expect(createHash("sha256").update(JSON.stringify(FOOD_DESCRIPTION_EVALUATION_BINDING)).digest("hex")).toBe(FOOD_DESCRIPTION_FINGERPRINT);
   });
 

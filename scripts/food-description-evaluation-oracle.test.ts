@@ -51,9 +51,15 @@ describe("independently reviewed current food-description expectations", () => {
     const hash = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
     expect(hash("tests/fixtures/parent/food-description-2026-11-18.v3.json")).toBe("6ea3e44b253e66bc26720507c355d6b3da030bfd2d85e59b282feb9607570a19");
     expect(hash("tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json")).toBe("1e889f0bb66b19ad6adec3d2093506ead93d739f0312d85412a917c01fe1ea55");
+    expect(hash("tests/fixtures/parent/food-description-2026-11-18.v13-adapter.json")).toBe("747f54fcc97277b83eb34b68a20488883007a5342c62be849631a2aea727a0b9");
     const plan = descriptionEvaluationPlan(corpus);
     expect(plan).toMatchObject({ caseCount: 60, turnCount: 240, maximumModelCalls: 80, zeroCallGuardCases: 24, languageCounts: { en: 30, es: 30 } });
     expect(plan.cases.flatMap(value => value.turns)).toHaveLength(240);
+  });
+  it("preserves every predeclared current expectation from the stopped v13 run", () => {
+    const previous = JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v13-adapter.json", "utf8"));
+    const current = descriptionEvaluationPlan(corpus);
+    expect(current.cases.map(value => value.turns.map(turn => turn.current))).toEqual(previous.cases.map((value: { turns: { current: unknown }[] }) => value.turns.map(turn => turn.current)));
   });
   it("changes only the 44 reviewed current turns and preserves every archived turn", () => {
     const archivedPlan = JSON.parse(readFileSync("tests/fixtures/parent/food-description-2026-11-18.v10-adapter.json", "utf8"));

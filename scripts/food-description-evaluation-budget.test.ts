@@ -280,12 +280,12 @@ it.each([3,4]as const)("still enforces the original5 dollars when%s complete pri
   expect(s.fetcher).toHaveBeenCalledTimes(2);
 });
 
-it.each([93,100,120]as const)("refuses pre-existing quality results in a fresh%s run without changing the sealed histories",async maximum=>{
-  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,maximum===120?5:maximum===100?4:true);
+it.each([93,100,120,133]as const)("refuses pre-existing quality results in a fresh%s run without changing the sealed histories",async maximum=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,maximum===133?6:maximum===120?5:maximum===100?4:true);
   const before=priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory));
-  const approval={...s.approval,...(maximum===120?{rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z'}:{}),aggregate:{maximumCalls:maximum,maximumCountRequests:maximum,maximumNanoDollars:5_000_000_000,priorRuns}};
+  const approval={...s.approval,...(maximum>=120?{rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z'}:{}),aggregate:{maximumCalls:maximum,maximumCountRequests:maximum,maximumNanoDollars:5_000_000_000,priorRuns}};
   mkdirSync(s.dir,{mode:0o700});writeFileSync(join(s.dir,'description-urgent-1-en-result.json'),'{"synthetic":"retained quality from another source"}',{mode:0o600});
-  await expect(withFoodDescriptionEvaluationBudget({...s.options,approval,...(maximum===120?{now:()=>new Date('2026-11-19T00:30:00Z')}:{})},async()=>{})).rejects.toThrow();
+  await expect(withFoodDescriptionEvaluationBudget({...s.options,approval,...(maximum>=120?{now:()=>new Date('2026-11-19T00:30:00Z')}:{})},async()=>{})).rejects.toThrow();
   expect(s.fetcher).not.toHaveBeenCalled();expect(priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory))).toEqual(before);
 });
 
@@ -392,4 +392,82 @@ it("keeps the original5 ceiling when all40 prior charges consume their full rese
   }
   await expect(withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-no-extra-dollar-en',1)(endpoint,s.init))).rejects.toThrow();
   expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:50,reservedNanoDollars:2_750_000_000,costComplete:true});expect(s.fetcher).toHaveBeenCalledTimes(2);
+});
+
+
+it("accepts only the exact133 continuation shape without resetting the original cap",()=>{
+  const s=setup(),counts=[3,4,6,7,20,13];
+  const priorRuns=counts.map((reservedPairs,index)=>({runDirectory:join(dirname(s.dir),`shape-prior-${index}`),configurationPath:join(dirname(s.dir),`shape-${index}.json`),configurationSha256:'a'.repeat(64),evidenceSha256:'b'.repeat(64),reservedPairs}));
+  const approval={...s.approval,rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z',aggregate:{maximumCalls:133,maximumCountRequests:133,maximumNanoDollars:5_000_000_000,priorRuns}};
+  expect(descriptionEvaluationApprovalSchema.parse(approval)).toMatchObject({maximumCalls:80,maximumCountRequests:80,maximumNanoDollars:5_000_000_000,aggregate:{maximumCalls:133,maximumCountRequests:133}});
+  for(const maximum of [132,134])expect(descriptionEvaluationApprovalSchema.safeParse({...approval,aggregate:{...approval.aggregate,maximumCalls:maximum,maximumCountRequests:maximum}}).success).toBe(false);
+  expect(descriptionEvaluationApprovalSchema.safeParse({...approval,maximumNanoDollars:5_000_000_001}).success).toBe(false);
+});
+
+
+it("retains all53 sealed charges and admits only the final133rd aggregate pair",async()=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,6);
+  const before=priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory));
+  const approval={...s.approval,rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z',aggregate:{maximumCalls:133,maximumCountRequests:133,maximumNanoDollars:5_000_000_000,priorRuns}},options={...s.options,approval,now:()=>new Date('2026-11-19T00:30:00Z')};
+  await withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-first-en',1)(endpoint,s.init));
+  const prefix=join(dirname(s.dir),`.food-description-evaluation-${descriptionEvaluationHash(approval.approvalReference)}`);
+  for(let attempt=2;attempt<80;attempt++)for(const suffix of ['intent','count-dispatch','count','dispatch','observation','response']){
+    const original=readFileSync(join(s.dir,`attempt-001-${suffix}.json`)),bytes=suffix==='intent'?JSON.stringify({...JSON.parse(original.toString()),attempt,caseId:`description-seeded-${attempt}-en`}):original;
+    const stem=`attempt-${String(attempt).padStart(3,'0')}`;writeFileSync(join(s.dir,`${stem}-${suffix}.json`),bytes,{mode:0o600,flag:'wx'});if(suffix!=='response')writeFileSync(`${prefix}-${stem}-${suffix}.json`,bytes,{mode:0o600,flag:'wx'});
+  }
+  await withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-final-en',1)(endpoint,s.init));
+  expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:80,reservedNanoDollars:4_400_000_000,costComplete:true});
+  expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(approval))).toEqual({pairs:53,reservedNanoDollars:2_915_000_000,knownMeasuredNanoDollars:31_800_000,budgetedNanoDollars:31_800_000});
+  await expect(withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-forbidden-134-en',1)(endpoint,s.init))).rejects.toThrow();
+  expect(s.fetcher).toHaveBeenCalledTimes(4);expect(priorRuns.map(ref=>sealedDescriptionEvaluationEvidenceHash(ref.runDirectory))).toEqual(before);
+  for(const [index,ref]of priorRuns.entries())expect(JSON.parse(readFileSync(join(ref.runDirectory,'approval.json'),'utf8'))).toMatchObject(index<5?{rateCardDate:'2026-11-18',approvedUntil:'2026-11-18T23:59:59Z'}:{rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z',aggregate:{maximumCalls:120}});
+});
+
+it("pins133 to the same current window and original5 before any new durable action",async()=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,6),before=readdirSync(dirname(s.dir)).sort();
+  const approval={...s.approval,rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z',aggregate:{maximumCalls:133,maximumCountRequests:133,maximumNanoDollars:5_000_000_000,priorRuns}};
+  for(const changed of [{rateCardDate:'2026-11-18'},{rateCardDate:'2026-11-20'},{approvedUntil:'2026-11-19T05:00:00Z'},{approvedUntil:'2026-11-20T04:59:59Z'},{maximumNanoDollars:5_000_000_001}])
+    await expect(withFoodDescriptionEvaluationBudget({...s.options,approval:{...approval,...changed},now:()=>new Date('2026-11-19T00:30:00Z')},async()=>{})).rejects.toThrow();
+  for(const date of ['2026-11-18T23:59:58Z','2026-11-19T04:59:59Z','2026-11-20T00:30:00Z'])
+    await expect(withFoodDescriptionEvaluationBudget({...s.options,approval,now:()=>new Date(date)},async()=>{})).rejects.toThrow();
+  expect(readdirSync(dirname(s.dir)).sort()).toEqual(before);expect(s.fetcher).not.toHaveBeenCalled();
+});
+
+it.each(['missing sixth','wrong nested reference','wrong sixth aggregate','unsealed sixth','missing response','false charge','unknown usage','changed sixth expiry','changed sixth card','duplicate sixth','wrong sixth count'])("blocks133 %s before any new endpoint or refund",async kind=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,6),ref=priorRuns[5];
+  const approval={...s.approval,rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z',aggregate:{maximumCalls:133,maximumCountRequests:133,maximumNanoDollars:5_000_000_000,priorRuns}};
+  const config=JSON.parse(readFileSync(ref.configurationPath,'utf8')),prior=config.approval,prefix=join(dirname(ref.runDirectory),`.food-description-evaluation-${descriptionEvaluationHash(prior.approvalReference)}`);
+  if(kind==='wrong nested reference')prior.aggregate.priorRuns[4].evidenceSha256='f'.repeat(64);
+  if(kind==='wrong sixth aggregate')prior.aggregate={...prior.aggregate,maximumCalls:100,maximumCountRequests:100,priorRuns:prior.aggregate.priorRuns.slice(0,4)};
+  if(kind==='unsealed sixth'){rmSync(join(ref.runDirectory,'halted.json'));rmSync(`${prefix}-halted.json`);}
+  if(kind==='missing response')rmSync(join(ref.runDirectory,'attempt-001-response.json'));
+  if(kind==='false charge'||kind==='unknown usage')for(const path of [join(ref.runDirectory,'attempt-001-observation.json'),`${prefix}-attempt-001-observation.json`]){
+    const observation=JSON.parse(readFileSync(path,'utf8'));if(kind==='false charge')observation.measuredNanoDollars=0;else observation.usage={complete:false};writeFileSync(path,JSON.stringify(observation));
+  }
+  if(kind==='changed sixth expiry')prior.approvedUntil='2026-11-19T05:00:00Z';
+  if(kind==='changed sixth card')prior.rateCardDate='2026-11-18';
+  if(['wrong nested reference','wrong sixth aggregate','changed sixth expiry','changed sixth card'].includes(kind)){
+    for(const path of [join(ref.runDirectory,'approval.json'),`${prefix}.json`])writeFileSync(path,JSON.stringify(prior));
+    writeFileSync(ref.configurationPath,JSON.stringify(config));ref.configurationSha256=descriptionEvaluationFileHash(ref.configurationPath);
+  }
+  ref.evidenceSha256=sealedDescriptionEvaluationEvidenceHash(ref.runDirectory);
+  if(kind==='missing sixth')priorRuns.pop();
+  if(kind==='duplicate sixth')priorRuns[5]={...priorRuns[4],reservedPairs:13};
+  if(kind==='wrong sixth count')priorRuns[5]={...ref,reservedPairs:20};
+  await expect(withFoodDescriptionEvaluationBudget({...s.options,approval,now:()=>new Date('2026-11-19T00:30:00Z')},budget=>budget.fetch('description-new-en',1)(endpoint,s.init))).rejects.toThrow();
+  expect(s.fetcher).not.toHaveBeenCalled();expect(descriptionEvaluationAccounting(ref.runDirectory).reservedPairs).toBe(13);
+});
+
+it("retains the original5 ceiling when all53 prior charges used their reservations",async()=>{
+  const s=setup(),priorRuns=await sealedDescriptionEvaluationPriors(s.approval,s.init,6,true);
+  const approval={...s.approval,rateCardDate:'2026-11-19',approvedUntil:'2026-11-19T04:59:59Z',aggregate:{maximumCalls:133,maximumCountRequests:133,maximumNanoDollars:5_000_000_000,priorRuns}},options={...s.options,approval,now:()=>new Date('2026-11-19T00:30:00Z')};
+  expect(sealedDescriptionEvaluationPriorAccounting(descriptionEvaluationApprovalSchema.parse(approval))).toMatchObject({pairs:53,knownMeasuredNanoDollars:2_915_000_000,reservedNanoDollars:2_915_000_000});
+  await withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-first-en',1)(endpoint,s.init));
+  const prefix=join(dirname(s.dir),`.food-description-evaluation-${descriptionEvaluationHash(approval.approvalReference)}`);
+  for(let attempt=2;attempt<=37;attempt++)for(const suffix of ['intent','count-dispatch','count','dispatch','observation','response']){
+    const original=readFileSync(join(s.dir,`attempt-001-${suffix}.json`)),bytes=suffix==='intent'?JSON.stringify({...JSON.parse(original.toString()),attempt,caseId:`description-seeded-${attempt}-en`}):original;
+    const stem=`attempt-${String(attempt).padStart(3,'0')}`;writeFileSync(join(s.dir,`${stem}-${suffix}.json`),bytes,{mode:0o600,flag:'wx'});if(suffix!=='response')writeFileSync(`${prefix}-${stem}-${suffix}.json`,bytes,{mode:0o600,flag:'wx'});
+  }
+  await expect(withFoodDescriptionEvaluationBudget(options,budget=>budget.fetch('description-no-extra-dollar-en',1)(endpoint,s.init))).rejects.toThrow();
+  expect(descriptionEvaluationAccounting(s.dir)).toMatchObject({reservedPairs:37,reservedNanoDollars:2_035_000_000,costComplete:true});expect(s.fetcher).toHaveBeenCalledTimes(2);
 });
