@@ -74,7 +74,8 @@ describe("parent account controls", () => {
     vi.stubGlobal("fetch", fetchMock); render(<ParentAccount />);
     fireEvent.change(await screen.findByLabelText("Start"), { target: { value: "20" } });
     fireEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-    const alert = await screen.findByRole("alert"); expect(document.activeElement).toBe(alert);
+    const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(document.activeElement).toBe(alert));
     expect((screen.getByLabelText("Start") as HTMLSelectElement).value).toBe("20");
   });
   it("offers the optional family profile separately from contact and sign-in preferences", async () => {

@@ -197,5 +197,21 @@
       "path": "parent-food-release-2026-11-19/public-get-support-es-phone.jpg",
       "sha256": "3b82d2cf82f73280d117603c9c0913d5764981ca72e6777794db16ff9959383e"
     }
-  ]
+  ],
+  "documentationFollowup": {
+    "firstEvidenceCommit": "ff4df14f13d0712e8160bf8df01f75b2b66b87b4",
+    "firstCI": "https://github.com/Will-Sanz/case-link/actions/runs/44645561952",
+    "firstCIUnitResult": {
+      "passed": 7616,
+      "failed": 1,
+      "skipped": 1817,
+      "seconds": 651.74
+    },
+    "failure": "account.test.tsx preference-save focus assertion observed alert before the existing React useEffect focused it; other database/native/Auth/CodeQL jobs passed",
+    "repair": "test awaits the same activeElement===alert assertion with existing waitFor/default timeout; retained chosen-value assertion unchanged",
+    "runtimeBytesChanged": false,
+    "independentNormalAccessibilityAndPonytailReview": "clear",
+    "correctedCI": "https://github.com/Will-Sanz/case-link/pull/32/checks; tracked separately from the retained failed first run",
+    "focusedAccountTestsPassed": 6
+  }
 }
