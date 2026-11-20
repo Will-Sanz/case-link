@@ -1,0 +1,217 @@
+{
+  "version": "parent-food-release-evidence-2026-11-19.v2",
+  "recordedAt": "2026-11-20T00:00:58.150095+00:00",
+  "applicationCommit": "3c030ad9dcbfebe33b22973d44aab652a21c1123",
+  "reviewedCandidate": "4ba6a2228be3c02ca7801843ccd5595cc94ba50b",
+  "applicationTree": "fde491f5dedf37f90cf3e71c2e2771f606815203",
+  "pullRequest": "https://github.com/Will-Sanz/case-link/pull/31",
+  "merge": "normal merge; identical tested tree",
+  "CI": {
+    "requiredChecks": 5,
+    "allPassed": true,
+    "actions": "https://github.com/Will-Sanz/case-link/actions/runs/44611386786",
+    "codeQL": "https://github.com/Will-Sanz/case-link/actions/runs/44611386986",
+    "unit": {
+      "passed": 7617,
+      "skipped": 1817,
+      "declared": 9434
+    },
+    "separateSQL": {
+      "passed": 1806,
+      "skipped": 1
+    },
+    "nativeDatabaseAssertions": 333,
+    "nativeAuthAssertions": 635,
+    "groupsOverlap": true,
+    "standardNextBuildPassed": true
+  },
+  "modelEvaluation": {
+    "sourceSha256": "bab3870bbee7e72610a103db7eab1f826481c9f276af5122a2e944a04de2e05b",
+    "fingerprint": "36a38d76e787e5c745b451510ae844457e66710ec5f43e1d07a1905712084e8b",
+    "adapterSha256": "859e316840b8b32059413312a081b35b4cd869ed4b89a9327ff79a67683f1142",
+    "cases": 60,
+    "turns": 240,
+    "languages": {
+      "en": 30,
+      "es": 30
+    },
+    "actualModelCalls": 80,
+    "actualTokenCounts": 80,
+    "uniqueZeroCallGuards": 24,
+    "criticalFailures": 0,
+    "qualityFailures": 0,
+    "independentNormalSemanticBilingualReview": "clear",
+    "distinctPonytailReview": "clear",
+    "reviewSha256": "8014dfd9c408b3c0ea456bd3d34b1b3691003c56866e2be044d3d58dca40ce73",
+    "freshMeasuredNanoDollars": 367288500,
+    "allEarlierMeasuredNanoDollars": 1230042700,
+    "originalCumulativeMeasuredNanoDollars": 1597331200,
+    "originalCapNanoDollars": 5000000000,
+    "earlierHaltedRunsRetainedWithoutQualityCredit": true,
+    "nativeAuthorityTurnsUnmeasuredInModelRunner": 20,
+    "terminalSchemasNotActions": 26,
+    "fixedLinksNotActions": 34,
+    "rawAutomaticNominationAccuracy": "unmeasured",
+    "actualInnerReviewFlags": "pending/false retained unchanged; independent review is a separate immutable artifact"
+  },
+  "sourcePackage": {
+    "selectedFiles": 521,
+    "sourceSha256": "e93a8280e7272389ddced4b16f59aebf284f4a9fb8d7fdecf476a5030a894c76",
+    "manifestSha256": "4445bfe3f9c10de89217c2147c8f4c2502fd89a7f506fad271da286c5ea48f06",
+    "packagingToolSha256": "a938110f0f2f9638bfbabadf861d1e740324df6a99a581d79ef1bd858c06354e"
+  },
+  "deployment": {
+    "url": "https://www.thecaselink.com",
+    "host": "existing caselink-dev-01",
+    "applicationCommit": "3c030ad9dcbfebe33b22973d44aab652a21c1123",
+    "promotedAt": "2026-11-19T22:07:10.889191+00:00",
+    "buildId": "H1_WZINec6V3gT5_Quhde",
+    "buildRecord": {
+      "commit": "3c030ad9dcbfebe33b22973d44aab652a21c1123",
+      "tree": "fde491f5dedf37f90cf3e71c2e2771f606815203",
+      "sourceSha256": "e93a8280e7272389ddced4b16f59aebf284f4a9fb8d7fdecf476a5030a894c76",
+      "manifestSha256": "4445bfe3f9c10de89217c2147c8f4c2502fd89a7f506fad271da286c5ea48f06",
+      "lockSha256": "4c0e7f990c23f62e8a1243dac0f91f0c348322c31792e394449a6e45463f75d0",
+      "toolSha256": "a938110f0f2f9638bfbabadf861d1e740324df6a99a581d79ef1bd858c06354e",
+      "toolchain": {
+        "node": "v24.22.2",
+        "npm": "11.19.1",
+        "platform": "linux",
+        "arch": "x64"
+      },
+      "buildId": "H1_WZINec6V3gT5_Quhde",
+      "markerSha256": "b6234300397cf1947ada4d7d8ae3882a5ba019bfe0602bc66c111376d60b78a6",
+      "publicFingerprint": "b68ec7b461daf5cf0f00b02ced812714aec500163adc72e329d74b9ec99c2f59",
+      "generatedInventorySha256": "02f21b1d3d9e5045741c4afbd9137819625d6fb96fb92d39f2de24cbdf579924",
+      "generatedLinksSha256": "26f65451db24815229476c3747000868015fe235b75f8719600d36dfc3eeffa4",
+      "buildMethod": "Turbopack; same-source host cold typegen/typecheck cache1536MiB then full build1024MiB; original2GiB cgroup",
+      "phase": "staged and built only; runtime/cache/cutover not configured"
+    },
+    "sevenMatchingServiceDirectories": true,
+    "sender": "unchanged original source; inactive",
+    "sourceFilesRootOwnedReadOnly": true,
+    "newWebCache": "separate cache within existing web StateDirectory; old cache preserved",
+    "profiles": "all eight original hash/owner/mode/ongoing values unchanged",
+    "maintenanceWindow": {
+      "startedAt": "2026-11-19T21:47:15.948098+00:00",
+      "newServicesReadyAt": "2026-11-19T22:07:10.889191+00:00"
+    },
+    "buildFailureHistory": "Default Turbo and fixed1024 Turbo exceeded2GiB during TypeScript; webpack attempt exceeded2GiB during compilation. All failed artifacts preserved. Sequential same-source cold typegen/check then full Turbo passed without skipped checks or increased resources.",
+    "postBuildRepairs": "One standard contained generated React-PDF link explicitly pinned and target files hashed;139 already-executable dependency files gained read/execute for service users after root sealing, without changing bytes or adding write permissions."
+  },
+  "unchangedBoundaries": [
+    "no provider sending or government filing",
+    "no new enrollment or cohort",
+    "no new processing purpose or model allowance",
+    "existing owner account and credentials preserved",
+    "backup waiver is not fresh restore coverage",
+    "provider acceptance/stock/outcomes, no-email access and actual family observation remain separate gates"
+  ],
+  "schema": {
+    "exactSourceBodiesApplied": 38,
+    "historyRowsAfter": 138,
+    "allOriginal100RowsPreserved": true,
+    "allFiveProductionOnlyRowsPreserved": true,
+    "sourceToActualVersionMap": "parent-food-release-migrations-2026-11-19.json",
+    "sourceMapSha256": "f0475405e1c3cb16e6f7a29acdf579dd83e771a2f7d792b13426d9592407f77e",
+    "all25OriginalFunctionOwnerSecurityAclSearchPathsPreserved": true,
+    "closedDefaultAndSourceGuardChecks": 8,
+    "allPassed": true,
+    "newGroup": "parent_utility_protected: NOLOGIN/NOINHERIT, closed policies; only native creator ADMIN membership, without INHERIT or SET",
+    "finalSchemaCacheReload": "NOTIFY pgrst, reload schema; owned operations HTTP response then ok:true with empty operations",
+    "noHistoryRepairResetActivationOrCredentialMutation": true
+  },
+  "liveVerification": {
+    "existingOwnerIdentityAccessAndOriginalTwoMandates": "unchanged stable metadata fingerprints; no credential material read or changed",
+    "publicHTTPSRecoveryHSTSNoStoreAssetsApexAndAnonymous401": true,
+    "phone": {
+      "width": 390,
+      "languages": [
+        "en",
+        "es"
+      ],
+      "noHorizontalOverflow": true,
+      "actualScreenshotsInspected": true
+    },
+    "desktop": {
+      "width": 1280,
+      "languages": [
+        "en",
+        "es"
+      ],
+      "noHorizontalOverflow": true,
+      "actualScreenshotsInspected": true,
+      "method": "installed headless test browser, actual public HTTPS, no interception"
+    },
+    "viewportCorrection": "Initial IAB1280 request remained390; those captures receive no desktop credit. Separate actual1280 captures provide desktop evidence.",
+    "guidedFoodHistory": "Unknown history retained; ready immediate food offered without inventing a new SNAP application",
+    "realAuthApiDatabaseWorkerPublicFood": "fridge-only prepare_only request saved, planned and reopened;0AI reservations and0transport operations",
+    "pageCloseContinuation": {
+      "leftViewerAt": "2026-11-19T22:17:29.740Z",
+      "workerSavedAt": "2026-11-19T22:17:30.304385Z",
+      "actualWorkerCompletedAfterViewerLeft": true
+    },
+    "fictionalNegativeReport": "no_food persisted with parent_reported attribution; worker attempts advanced1to2 and saved listed alternatives; no actual food availability or receipt claimed",
+    "ownSmokeLifecycle": "both newly created fictional requests cancelled through actual UI/API; authority revoked, jobs cancelled and leases cleared; original requests retained",
+    "observedCleanup": {
+      "firstSnapshotAt": "2026-11-19T22:09:16.778139+00:00",
+      "secondSnapshotAt": "2026-11-19T22:40:10.847517+00:00",
+      "bothIndependentJobsExit0AtBothObservations": true,
+      "differentActualTimerCycles": true,
+      "coversFiveMinuteBackoffInterval": true,
+      "fiveLongRunningServices": "active, same new source,0restarts in both snapshots"
+    },
+    "notClaimed": [
+      "fresh protected-document upload on the hosted release",
+      "actual recovery email or new password sign-in",
+      "SMS/no-email account access",
+      "real-family observation",
+      "agency/partner receipt, food stock, reservation or food received",
+      "indefinite stability or scale capacity"
+    ]
+  },
+  "liveBlockers": {
+    "generalAIPlanning": "existing original runtime budget is exhausted at28/28; cap and ledger preserved. City-finder-only fictional smoke reserved the last allowed call then failed ai_budget_exhausted on the next required call, with0operations; subsequently cancelled. Fridge public path succeeded independently without a model.",
+    "runtimeModelAccounting": "one additional existing-runtime planning reservation retained; exact token usage/dollar charge is not recorded by that older runtime ledger. It is separate from the fully measured language evaluation; no refund/reset or further AI call was made.",
+    "otherGates": [
+      "provider sending/government filings remain disabled and actual accepted channels unverified",
+      "description/profile/WIC/new utility collection purposes remain closed",
+      "no-email account access and actual family observation unresolved"
+    ]
+  },
+  "releaseDisposition": "Merged and deployed existing-owner code release with verified public-food preparation/report/follow-up/control scope. General AI planning is budget-blocked; full food workflow, R1 and family launch remain incomplete.",
+  "publicVisuals": [
+    {
+      "path": "parent-food-release-2026-11-19/public-get-support-en-desktop-verified.png",
+      "sha256": "243146fedf29dfd273c40e3003c1f448b18e50745b0242bf240c60e0b41290e4"
+    },
+    {
+      "path": "parent-food-release-2026-11-19/public-get-support-en-phone.jpg",
+      "sha256": "cbda309fec2fb9a8d67dc144a582f5c4ba705e489351060cd0f5028a83a58225"
+    },
+    {
+      "path": "parent-food-release-2026-11-19/public-get-support-es-desktop-verified.png",
+      "sha256": "67abf400ba2fee66c274eaf4c559be35290d6b00fb69c36f50b4cd7b97f0c9ca"
+    },
+    {
+      "path": "parent-food-release-2026-11-19/public-get-support-es-phone.jpg",
+      "sha256": "3b82d2cf82f73280d117603c9c0913d5764981ca72e6777794db16ff9959383e"
+    }
+  ],
+  "documentationFollowup": {
+    "firstEvidenceCommit": "ff4df14f13d0712e8160bf8df01f75b2b66b87b4",
+    "firstCI": "https://github.com/Will-Sanz/case-link/actions/runs/44645561952",
+    "firstCIUnitResult": {
+      "passed": 7616,
+      "failed": 1,
+      "skipped": 1817,
+      "seconds": 651.74
+    },
+    "failure": "account.test.tsx preference-save focus assertion observed alert before the existing React useEffect focused it; other database/native/Auth/CodeQL jobs passed",
+    "repair": "test awaits the same activeElement===alert assertion with existing waitFor/default timeout; retained chosen-value assertion unchanged",
+    "runtimeBytesChanged": false,
+    "independentNormalAccessibilityAndPonytailReview": "clear",
+    "correctedCI": "https://github.com/Will-Sanz/case-link/pull/32/checks; tracked separately from the retained failed first run",
+    "focusedAccountTestsPassed": 6
+  }
+}
