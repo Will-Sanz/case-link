@@ -12,9 +12,13 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     if (url.searchParams.has("draft")) return parentJson({ ok: true, result: await getFoodDescriptionResult(z.uuid().parse(url.searchParams.get("draft")), url.searchParams.has("revision") ? { revision: z.coerce.number().int().positive().parse(url.searchParams.get("revision")) } : undefined) });
     const archive = await getFoodDescriptionArchive();
-    if (url.searchParams.get("download") === "1") return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), foodDescriptions: archive }, null, 2), {
-      headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": 'attachment; filename="caselink-food-description.json"' },
-    });
+    if (url.searchParams.get("download") === "1") {
+      const expectedOwner = url.searchParams.get("expectedOwner");
+      if (expectedOwner !== null && z.uuid().parse(expectedOwner).toLowerCase() !== archive.ownerId.toLowerCase()) throw new FoodDescriptionError(409, "changed");
+      return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), foodDescriptions: archive }, null, 2), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": 'attachment; filename="caselink-food-description.json"' },
+      });
+    }
     return parentJson({ ok: true, archive });
   } catch (error) { return failure(error); }
 }

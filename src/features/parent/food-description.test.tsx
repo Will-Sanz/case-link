@@ -145,7 +145,7 @@ it("keeps retained description rights separate and rejects a different owner", a
   expect(screen.queryByRole("button", { name: "Review description" })).toBeNull();
   expect(screen.queryByRole("link", { name: "Download retained descriptions" })).toBeNull();
   view.rerender(<FoodDescription archiveOwner={owner} />);
-  expect((await screen.findByRole("link", { name: "Download retained descriptions" })).getAttribute("href")).toBe("/api/parent/food-description?download=1");
+  expect((await screen.findByRole("link", { name: "Download retained descriptions" })).getAttribute("href")).toBe(`/api/parent/food-description?download=1&expectedOwner=${owner}`);
   fireEvent.click(await screen.findByRole("button", { name: "Review description" }));
   expect(screen.getByText("Food help tomorrow")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Clear description" }));
@@ -189,7 +189,7 @@ it("rechecks current ownership before any prose upload and clears a changed acco
 it("retains rights/cancel controls after collection closure and never requeues a charged unknown", async () => {
   available = false; archive.available = false; archive.drafts = [{ ...draft(), state: "unknown", revision: 1, input: { description: "Food help tomorrow", screenLocale: "en" } }];
   renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
-  expect(screen.queryByRole("textbox")).toBeNull(); expect(screen.getByRole("link", { name: "Download retained descriptions" }).getAttribute("href")).toBe("/api/parent/food-description?download=1");
+  expect(screen.queryByRole("textbox")).toBeNull(); expect(screen.getByRole("link", { name: "Download retained descriptions" }).getAttribute("href")).toBe(`/api/parent/food-description?download=1&expectedOwner=${owner}`);
   fireEvent.click(screen.getByRole("button", { name: "Cancel and clear this description" }));
   await waitFor(() => expect(archive.drafts[0].state).toBe("cancelled")); expect(queuedBodies).toEqual([]); expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true);
 });

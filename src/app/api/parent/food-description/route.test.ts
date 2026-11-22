@@ -23,6 +23,15 @@ it("keeps retained export and cancellation available while collection is closed"
   expect((await DELETE(request("DELETE", { action: "cancel", expectedOwnerId: id, draftId: id }))).status).toBe(200); expect(mocks.available).not.toHaveBeenCalled();
   expect((await DELETE(request("DELETE", { action: "cancel", expectedOwnerId: id, draftId: id, description: "PRIVATE_CANARY" }))).status).toBe(400);
 });
+it("does not download a different household’s archive after switching accounts", async () => {
+  const another = "00000000-0000-4000-8000-000000000002";
+  const download = (owner: string) => GET(new Request(`http://localhost/api/parent/food-description?download=1&expectedOwner=${owner}`));
+  expect((await download(id)).status).toBe(200);
+  const stale = await download(another);
+  expect(stale.status).toBe(409);
+  expect(stale.headers.has("content-disposition")).toBe(false);
+  expect(await stale.json()).toEqual({ ok: false, code: "changed" });
+});
 it.each([[409, "changed"], [403, "unavailable"], [429, "resource_limit"], [503, "service"]] as const)("returns bounded %i errors without provider text", async (status, code) => {
   mocks.mutate.mockRejectedValue(new FoodDescriptionError(status, code)); const reply = await POST(request("POST", { action: "create" })); expect(reply.status).toBe(status); expect(await reply.json()).toEqual({ ok: false, code });
 });

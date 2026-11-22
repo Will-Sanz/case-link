@@ -341,7 +341,7 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
       <button type="button" className={styles.secondary} onClick={reload}>{t("Try again")}</button></div>;
     if (!archive.drafts.length) return <p>{t("No saved descriptions.")}</p>;
     return <div lang={locale} className={styles.stack}>
-        <a className={styles.textLink} href="/api/parent/food-description?download=1">{c.download}</a>
+        <a className={styles.textLink} href={`/api/parent/food-description?download=1&expectedOwner=${archive.ownerId}`}>{c.download}</a>
         {archive.drafts.map(draft => <p key={draft.id}>
           {displayDate(draft.createdAt, true, locale)}{" "}
           {draft.id !== selectedId && !["cancelled", "expired"].includes(draft.state) && <button className={styles.quiet} type="button" onClick={() => openDraft(draft)} disabled={pending}>{t("Review description")}</button>}
@@ -504,6 +504,6 @@ export function FoodDescription({ onProposed, onManual, onReset, signInOptions, 
     {opened && <button type="button" className={styles.secondary} disabled={!!onStart && pending} onClick={() => { discardResultRead();
       if (!pending && selected?.state === "empty" && contentCurrent && !cancelRequestedId) setEntryText(text);
       setOpened(false); setProposal(null); setClarification(null); setResolveAttempt(null); onResetRef.current?.(); onManual?.(); }}>{onStart ? t("See other support options") : c.manual}</button>}
-    {!onStart && !!archive?.drafts.length && <details className={styles.space}><summary>{c.history}</summary><a className={styles.textLink} href="/api/parent/food-description?download=1">{c.download}</a>{archive.drafts.map(draft => <p key={draft.id}><button type="button" className={styles.secondary} onClick={() => openDraft(draft)} disabled={pending}>{c.resume} · {displayDate(draft.createdAt, true, locale)}</button></p>)}</details>}
+    {!onStart && !!archive?.drafts.length && <details className={styles.space}><summary>{c.history}</summary><a className={styles.textLink} href={`/api/parent/food-description?download=1&expectedOwner=${archive.ownerId}`}>{c.download}</a>{archive.drafts.map(draft => <p key={draft.id}><button type="button" className={styles.secondary} onClick={() => openDraft(draft)} disabled={pending}>{c.resume} · {displayDate(draft.createdAt, true, locale)}</button></p>)}</details>}
   </section>;
 }

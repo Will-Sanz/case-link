@@ -777,7 +777,7 @@ async function main() {
       const anon = await browser.newContext({ baseURL: origin }); contexts.push(anon); const anonPage = await anon.newPage();
       await anonPage.goto(`${origin}/get-support`, { waitUntil: "networkidle" });
       check(await anonPage.getByRole("link", { name: "Find urgent food or utility help", exact: true }).isVisible()
-        && await anonPage.getByRole("group", { name: "Need help today?", exact: true }).isVisible()
+        && await anonPage.getByRole("group", { name: "Do you need help today?", exact: true }).isVisible()
         && await anonPage.locator("#food-description-entry").count() === 0, "The actual anonymous guide retains urgent food help and manual routing with optional interpretation closed.");
       check((await anonPage.request.get(`${descriptionUrl}/availability`)).status() === 200 && !(await (await anonPage.request.get(`${descriptionUrl}/availability`)).json()).available,
         "New optional interpretation is actually unavailable before any fixture-specific purpose approval.");
