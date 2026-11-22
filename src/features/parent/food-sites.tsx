@@ -175,7 +175,7 @@ export function FoodSites({ zip, initialZip }: { zip?: string; initialZip?: stri
         <div className={styles.serviceLinks}>
           <a className={styles.textLink} href="https://www.sharefoodprogram.org/community-fridges/">{t("Read Share’s fridge access instructions")}</a>
           <a className={styles.textLink} href="https://www.sharefoodprogram.org/find-food/">{t("Open Share’s food finder")}</a>
-          <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food">{t("Find a food bank outside this area")}</a>
+          <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food">{t("Feeding America’s food bank finder")}</a>
           <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food/wic">{t("Feeding America’s WIC guide")}</a>
           {pennsylvaniaWic && <a className={styles.textLink} href={pennsylvaniaWic.officialUrl}>{t("Request a Pennsylvania WIC appointment")}</a>}
         </div>

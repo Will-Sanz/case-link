@@ -84,7 +84,10 @@ try {
       'https://www.feedingamerica.org/need-help-find-food',
       'https://www.feedingamerica.org/need-help-find-food/wic',
       'https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist',
-    ]) assert.equal(await listings.locator(`a[href="${href}"]`).isVisible(), true);
+    ]) {
+      const link = await listings.locator(`a[href="${href}"]`).boundingBox();
+      assert.ok(link && link.height >= 44, `${href} has a visible, usable link target`);
+    }
     // Re-open the screen to keep the synthetic contract exact to19104.
     async function reopen(state) { mode = state; await page.reload({ waitUntil: 'networkidle' }); if (largeText) { await page.addStyleTag({ content: 'html{font-size:200%}' }); await main.evaluate(el => { el.parentElement.style.fontSize = '32px'; }); } await chooseSupport(); await openFinder(); await listings.getByRole('button', { name: c.search }).click(); }
     await reopen('empty'); await listings.getByText(c.empty).waitFor(); await check('empty');
