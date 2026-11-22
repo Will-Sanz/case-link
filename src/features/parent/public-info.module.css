@@ -1,3 +1,13 @@
+.page.page {
+  max-width: 69rem;
+}
+.page > section > :is(p, ul) {
+  max-width: 65ch;
+}
+.page > section {
+  scroll-margin-top: 1.5rem;
+}
+
 @media (max-width: 600px) {
   .page.page {
     padding-inline: min(1.25rem, 4vw);
@@ -10,7 +20,6 @@
   .directFood.directFood {
     max-width: 100%;
     padding-inline: 12px;
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }

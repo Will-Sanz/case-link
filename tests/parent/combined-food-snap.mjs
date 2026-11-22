@@ -1,3 +1,4 @@
+import { chooseScreenLanguage } from "./screen-language.mjs";
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
@@ -74,10 +75,15 @@ try {
       const selector = page.getByLabel(/Screen language|Idioma de pantalla/);
       if (await selector.inputValue() !== locale) {
         const refreshed = page.waitForResponse(response => response.request().headers().rsc === '1' && new URL(response.url()).pathname === '/get-support');
-        await selector.selectOption(locale); await refreshed; await page.waitForLoadState('networkidle');
+        await chooseScreenLanguage(page, locale); await refreshed; await page.waitForLoadState('networkidle');
       }
-      await page.getByLabel(/enough food|suficiente comida/).selectOption('no');
-      await page.getByLabel(/help paying|ayuda para comprar/).selectOption(history);
+      await page.locator('#start-zip').fill('19104');
+      await page.getByRole('radio', { name: locale === 'en' ? 'Yes' : 'Sí', exact: true }).check();
+      await page.getByRole('button', { name: parentText(locale, 'Find support'), exact: true }).click();
+      await page.getByRole('button', { name: parentText(locale, 'Food or SNAP'), exact: true }).click();
+      await page.locator('#food-guide-enough input[value=no]').check();
+      await page.getByText(/Explore help paying for groceries|Buscar ayuda para pagar los alimentos/).click();
+      await page.locator(`#food-guide-history input[value="${history}"]`).check();
       await page.getByRole('button', { name: locale === 'en' ? 'See my options' : 'Ver mis opciones' }).click();
       await check('compatible-options-' + history);
       await page.getByRole('button', { name: locale === 'en' ? 'Continue with both options' : 'Continuar con ambas opciones' }).click();

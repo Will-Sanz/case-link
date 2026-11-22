@@ -2,7 +2,7 @@
 import { useParentLocale } from "./parent-locale";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Lock, ShoppingBag } from "iconoir-react";
+import { ArrowRight, Lock } from "iconoir-react";
 import styles from "./parent.module.css";
 
 export function UrgentHelp() {
@@ -47,10 +47,10 @@ export function ParentLanding() {
               <ArrowRight width={19} height={19} aria-hidden="true" />
             </Link>
 
-            <Link className={styles.heroDirectHelp} href="/support/help#urgent">
-              {t("Need help today? Find direct resources")}{" "}
-              <ArrowRight width={16} height={16} aria-hidden="true" />
-            </Link>
+            <div className={styles.heroLinks}>
+              <Link href="/support/help#urgent">{t("Need help today? Find direct resources")}</Link>
+              <Link href="/my-support">{t("Go to My support")}</Link>
+            </div>
           </div>
         </div>
         <div className={styles.heroVisual}>
@@ -65,24 +65,6 @@ export function ParentLanding() {
           />
         </div>
       </section>
-      <section className={styles.services} aria-label={t("Choose your support")}>
-        <Link className={styles.serviceChoice} href="/get-support?need=food">
-          <span className={styles.serviceIcon}>
-            <ShoppingBag width={31} height={31} aria-hidden="true" />
-          </span>
-          <div>
-            <strong>{t("Food & benefits")}</strong>
-            <span>{t("Food today, SNAP and WIC. Find a place to start.")}</span>
-          </div>
-          <ArrowRight width={21} height={21} aria-hidden="true" />
-        </Link>
-      </section>
-      <div className={styles.landingUrgent}>
-        <Link href="/support/help#urgent">
-          {t("Need immediate help? See urgent resources")}{" "}
-          <ArrowRight width={18} height={18} aria-hidden="true" />
-        </Link>
-      </div>
       <section className={styles.explainSection}>
         <div className={styles.explainInner}>
           <div>

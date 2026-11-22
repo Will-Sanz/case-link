@@ -304,7 +304,12 @@ function Documents({
           </div>
         </details>
       )}
-      {uncertain && attempt && <button className={styles.quiet} disabled={pending} onClick={() => readAttempt(attempt.key, attempt.readOnlyRecovery)}>{t("Check upload status")}</button>}
+      {uncertain && attempt && <div className={styles.notice}>
+        <div>
+          <p>{t("Check whether the original file was saved before sending another copy.")}</p>
+          <button className={styles.quiet} disabled={pending} onClick={() => readAttempt(attempt.key, attempt.readOnlyRecovery)}>{t("Check upload status")}</button>
+        </div>
+      </div>}
       {message && (
         <p className={`${styles.success} ${styles.space}`} role="status">
           {t(message)}

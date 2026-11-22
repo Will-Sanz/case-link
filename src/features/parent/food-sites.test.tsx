@@ -35,12 +35,30 @@ afterEach(() => {
 describe("connected City food listings", () => {
   it("keeps the reviewed fridge distinct from a reservation, stock or delivery-only listing", () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch); render(<FoodSites />);
-    fireEvent.click(screen.getByText("More food options and a no-paperwork fridge"));
+    fireEvent.click(screen.getByText("More food and WIC resources"));
     expect(screen.getByText(/2901 W. Hunting Park Avenue/)).toBeTruthy();
     expect(screen.getByText(/stock is unknown and nothing is reserved/)).toBeTruthy();
     expect(screen.getByText(/Other fridges can have different hours/)).toBeTruthy();
     expect(screen.getByText(/Some finder locations offer delivery only/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Read Share’s fridge access instructions" }).getAttribute("href")).toBe("https://www.sharefoodprogram.org/community-fridges/");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["en", "More food and WIC resources", "Feeding America’s WIC guide", "Request a Pennsylvania WIC appointment"],
+    ["es", "Más recursos de alimentos y WIC", "Guía de WIC de Feeding America", "Solicitar una cita de WIC en Pensilvania"],
+  ] as const)("offers the four forwarded resources and the official state WIC action without lookup in %s", (locale, summary, guide, appointment) => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    render(<ParentLocaleProvider initialLocale={locale}><FoodSites /></ParentLocaleProvider>);
+    fireEvent.click(screen.getByText(summary));
+    const destinations = screen.getAllByRole("link").map(link => link.getAttribute("href"));
+    expect(destinations).toEqual(expect.arrayContaining([
+      "https://www.phila.gov/food/",
+      "https://www.sharefoodprogram.org/community-fridges/",
+      "https://www.feedingamerica.org/need-help-find-food",
+      "https://www.feedingamerica.org/need-help-find-food/wic",
+    ]));
+    expect(screen.getByRole("link", { name: guide }).getAttribute("href")).toBe("https://www.feedingamerica.org/need-help-find-food/wic");
+    expect(screen.getByRole("link", { name: appointment }).getAttribute("href")).toBe("https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist");
     expect(fetch).not.toHaveBeenCalled();
   });
   it("keeps a long directory compact while making every returned location available", async () => {

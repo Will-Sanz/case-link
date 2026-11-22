@@ -7,6 +7,13 @@ import { SupportUpdateRecovery } from "./support-update-recovery";
 import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
+export const PERMISSION_DATA_LABELS = {
+  household: "Household and routing details",
+  income: "Income details",
+  utility: "Utility account facts",
+  documents: "Consented documents and extracted facts",
+} satisfies Record<ServiceMandate["allowedData"][number], string>;
+
 export type PermissionEditorHandle = { open: () => void };
 function focusFirstField(form: HTMLFormElement | null) {
   form?.querySelector<HTMLInputElement>("input")?.focus();
@@ -114,12 +121,7 @@ function PermissionEditorContent({
             <legend className={styles.legend}>
               {t("Information CaseLink may use")}</legend>
             <div className={styles.choices}>
-              {[
-                ["household", "Household and routing details"],
-                ["income", "Income details"],
-                ["utility", "Utility account facts"],
-                ["documents", "Consented documents and extracted facts"],
-              ].map(([id, label]) => (
+              {Object.entries(PERMISSION_DATA_LABELS).map(([id, label]) => (
                 <label className={styles.choice} key={id}>
                   <input
                     type="checkbox"

@@ -49,17 +49,125 @@ async function openEmpty() {
   fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(screen.getByRole("button", { name: "Open my private description draft" }));
   return await screen.findByLabelText("Describe only the food help you need");
 }
+async function fillCompact() {
+  const onStart = vi.fn();
+  render(<ParentLocaleProvider initialLocale="en"><FoodDescription onStart={onStart} onProposed={onProposed} onManual={onManual} onReset={onReset}/></ParentLocaleProvider>);
+  fireEvent.click(screen.getByRole("radio", { name: "Yes" }));
+  fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19129" } });
+  fireEvent.change(await screen.findByLabelText("Tell us what you need (optional)"), { target: { value: "Food help tomorrow" } });
+  fireEvent.click(screen.getByRole("checkbox"));
+  return onStart;
+}
+
+it("uses a single compact submit to consent and queue, without putting ZIP or urgency into the description", async () => {
+  const onStart = await fillCompact();
+  expect(fetcher.mock.calls.some(([, init]) => init?.method)).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  await waitFor(() => expect(queuedBodies).toHaveLength(1));
+  const writes = fetcher.mock.calls.filter(([, init]) => init?.method === "POST").map(([, init]) => JSON.parse(String(init!.body)));
+  expect(writes.map(body => body.action)).toEqual(["create", "queue"]);
+  expect(writes[0]).toMatchObject({ expectedOwnerId: owner, consentAccepted: true });
+  expect(writes[1].input).toEqual({ description: "Food help tomorrow", screenLocale: "en" });
+  expect(writes[1]).not.toHaveProperty("routingAnswers");
+  expect(onStart).toHaveBeenCalledExactlyOnceWith({ zip: "19129", urgent: true });
+  expect(screen.queryByText(/private description draft/)).toBeNull();
+});
+
+it("keeps a compact submission in the tab through sign-in and waits for an explicit submit", async () => {
+  signedIn = false;
+  await fillCompact();
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  signedIn = true;
+  fireEvent.click(await screen.findByRole("button", { name: "Synthetic sign-in only" }));
+  const entry = await screen.findByLabelText("Tell us what you need (optional)");
+  expect(entry).toHaveProperty("value", "Food help tomorrow");
+  expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  await waitFor(() => expect(queuedBodies).toHaveLength(1));
+});
+
+it("reuses the current owned description record and recognizes its lost acknowledgement", async () => {
+  archive.drafts = [draft()]; loseQueueAck = true;
+  await fillCompact();
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  await screen.findByText("We’re checking your options.");
+  expect(queuedBodies).toHaveLength(1);
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+});
+
+it("does not replay an uncertain compact submission after another tab clears it", async () => {
+  dropQueueWrite = true; loseQueueAck = true;
+  await fillCompact();
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  const retry = await screen.findByRole("button", { name: "Check my submission" });
+  archive.drafts[0] = { ...archive.drafts[0], state: "cancelled" };
+  fireEvent.click(retry);
+  await screen.findByRole("button", { name: "Find support" });
+  expect(queuedBodies).toHaveLength(1);
+  expect(screen.getByLabelText("ZIP code")).not.toHaveProperty("disabled", true);
+});
+
+it("offers a saved result after the short form when the account has used its new-description allowance", async () => {
+  archive.available = false;
+  archive.drafts = [{ ...draft(), state: "result", revision: 1, input: { description: "Prior food question", screenLocale: "en" } }];
+  const receive = vi.fn();
+  render(<FoodAssessment onChoose={receive} onStart={vi.fn()} descriptionOptions={{}} />);
+  fireEvent.click(screen.getByRole("radio", { name: "No" }));
+  fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19104" } });
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Check my earlier description" }));
+  await screen.findByRole("heading", { name: "Your proposed next steps" });
+  expect(fetcher.mock.calls.some(([, init]) => init?.method)).toBe(false);
+});
+
+it("keeps the manual choice available when the server no longer permits reading a prior result", async () => {
+  available = false; archive.available = false;
+  archive.drafts = [{ ...draft(), state: "result", revision: 1, input: { description: "Prior food question", screenLocale: "en" } }];
+  const ordinary = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation((url, init) => String(url).includes("?draft=")
+    ? Promise.resolve(Response.json({ ok: false, code: "unavailable" }, { status: 403 })) : ordinary(url, init));
+  render(<FoodAssessment onChoose={vi.fn()} onStart={vi.fn()} descriptionOptions={{}} />);
+  fireEvent.click(screen.getByRole("radio", { name: "No" }));
+  fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19104" } });
+  fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Check my earlier description" }));
+  await screen.findByRole("alert");
+  expect(screen.getByRole("button", { name: "Food or SNAP" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Check my earlier description" })).toBeNull();
+  expect(fetcher.mock.calls.some(([, init]) => init?.method)).toBe(false);
+});
+
+it("keeps retained description rights separate and rejects a different owner", async () => {
+  available = false; archive.available = false;
+  archive.drafts = [{ ...draft(), state: "unknown", revision: 1, input: { description: "Food help tomorrow", screenLocale: "en" } }];
+  const view = render(<FoodDescription archiveOwner={other} />);
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("button", { name: "Review description" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Download retained descriptions" })).toBeNull();
+  view.rerender(<FoodDescription archiveOwner={owner} />);
+  expect((await screen.findByRole("link", { name: "Download retained descriptions" })).getAttribute("href")).toBe("/api/parent/food-description?download=1");
+  fireEvent.click(await screen.findByRole("button", { name: "Review description" }));
+  expect(screen.getByText("Food help tomorrow")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Clear description" }));
+  await waitFor(() => expect(archive.drafts[0].state).toBe("cancelled"));
+  expect(screen.queryByText("Food help tomorrow")).toBeNull();
+});
+
 it("default closure leaves the manual entry unblocked and never offers or sends prose", async () => {
   available = false; archive.available = false; const view = renderTool();
   await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2)); expect(view.container.querySelector("textarea")).toBeNull(); expect(screen.queryByRole("heading", { name: /Optional:/ })).toBeNull(); expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
-it("creates the owned consent draft before exposing the editor; sending remains a separate explicit action", async () => {
-  renderTool(); fireEvent.click(await screen.findByRole("button", { name: "Open my private description draft" }));
+it("keeps the inline description in memory until a separate explicit send", async () => {
+  renderTool();
+  const entry = await screen.findByRole("textbox", { name: "What kind of food help do you need?" });
+  fireEvent.change(entry, { target: { value: "Food help tomorrow" } });
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Open my private description draft" }));
   expect(screen.queryByRole("textbox")).toBeNull(); expect((screen.getByRole("button", { name: "Open my private description draft" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(screen.getByRole("button", { name: "Open my private description draft" }));
   const editor = await screen.findByLabelText("Describe only the food help you need"); await waitFor(() => expect(document.activeElement).toBe(editor));
   const creates = fetcher.mock.calls.filter(([, init]) => init?.method === "POST"); expect(creates).toHaveLength(1); expect(JSON.parse(String(creates[0][1]!.body))).toMatchObject({ action: "create", expectedOwnerId: owner, consentAccepted: true }); expect(queuedBodies).toEqual([]);
-  fireEvent.change(editor, { target: { value: "Food help tomorrow" } }); expect(queuedBodies).toEqual([]);
+  expect(editor).toHaveProperty("value", "Food help tomorrow"); expect(queuedBodies).toEqual([]);
 });
 it("blocks known private input locally without sending a description", async () => {
   renderTool(); const editor = await openEmpty(); fireEvent.change(editor, { target: { value: "My password is private" } }); fireEvent.click(screen.getByRole("button", { name: "Send this description" }));
@@ -109,14 +217,14 @@ it("automatically confirms a lost committed acknowledgement with an owned read, 
 });
 
 it("keeps optional unresolved questions available without taking focus from ready food and reconciles the same zero-call clarification across locale changes",async()=>{
-  const selectFocus=vi.spyOn(HTMLSelectElement.prototype,"focus");
+  const questionFocus=vi.spyOn(HTMLInputElement.prototype,"focus");
   archive.drafts=[{...draft(),state:"result",revision:1,input:{description:"Food help",screenLocale:"en"}}];
   resultView={...resultView,state:"needs_clarification",proposedAnswers:{foodForTwoDays:"no",benefitHistory:"not_sure",existingIssue:null},needIds:["food_now"],questionIds:["benefitHistory"]};
   renderTool();fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
-  const history=await screen.findByLabelText(/Do you get help paying/);expect(selectFocus).not.toHaveBeenCalled();
-  expect(screen.queryByLabelText(/Do you have enough food/)).toBeNull();
+  await screen.findByRole("group", { name: /Do you get help paying/ });expect(questionFocus).not.toHaveBeenCalled();
+  expect(screen.queryByRole("group", { name: /Do you have enough food/ })).toBeNull();
   expect(onProposed).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ needIds: ["food_now"], questionIds: ["benefitHistory"], source: { draftId: id, revision: 1 } }));
-  fireEvent.change(history,{target:{value:"never"}});loseResolveAck=true;fireEvent.click(screen.getByRole("button",{name:"Use these routing answers"}));
+  fireEvent.click(screen.getByRole("radio", { name: "No, and I have not applied" }));loseResolveAck=true;fireEvent.click(screen.getByRole("button",{name:"Use these routing answers"}));
   await screen.findByRole("button",{name:"Check the same saved routing answers"});expect(resolveBodies).toHaveLength(1);
   fireEvent.change(screen.getByLabelText(/Screen language/),{target:{value:"es"}});
   fireEvent.click(screen.getByRole("button",{name:"Consultar las mismas respuestas guardadas"}));
@@ -129,7 +237,7 @@ it("still focuses the first indispensable question when no selected work is read
   archive.drafts=[{...draft(),state:"result",revision:1,input:{description:"Food help",screenLocale:"en"}}];
   resultView={...resultView,state:"needs_clarification",proposedAnswers:{foodForTwoDays:"not_sure",benefitHistory:"not_sure",existingIssue:null},needIds:["food_now"],questionIds:["foodForTwoDays","benefitHistory"]};
   renderTool();fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
-  const food=await screen.findByLabelText(/Do you have enough food/);await waitFor(()=>expect(document.activeElement).toBe(food));
+  const food=await screen.findByRole("radio", { name: /^Yes$/ });await waitFor(()=>expect(document.activeElement).toBe(food));
   expect(onProposed).not.toHaveBeenCalled();expect(resolveBodies).toEqual([]);expect(queuedBodies).toEqual([]);
 });
 
@@ -154,7 +262,7 @@ it("keeps a manual exit available during optional sign-in without collecting or 
   signedIn=false;renderTool();fireEvent.click(await screen.findByRole("button",{name:"Sign in to use this optional tool"}));
   expect(screen.getByRole("button",{name:"Synthetic sign-in only"})).toBeTruthy();
   fireEvent.click(screen.getByRole("button",{name:"Use guided questions"}));expect(onManual).toHaveBeenCalled();
-  expect(screen.queryByRole("textbox")).toBeNull();expect(queuedBodies).toHaveLength(0);
+  expect(screen.queryByLabelText("Describe only the food help you need")).toBeNull();expect(queuedBodies).toHaveLength(0);
 });
 
 it("blocks a late pre-expiry result from restoring a proposal, then permits an explicitly consented new draft without extending the old deadline",async()=>{
@@ -180,7 +288,7 @@ it("drops an already-expired initial content cache before it can be opened, even
   let reads=0;const original=fetcher.getMockImplementation()!;
   fetcher.mockImplementation((input,init)=>!init?.method&&String(input).endsWith("/food-description")&&++reads>1?Promise.reject(new Error("offline")):original(input,init));
   renderTool();await waitFor(()=>expect(onReset).toHaveBeenCalled());
-  expect(screen.queryByText("Already expired canary")).toBeNull();expect(screen.queryByRole("textbox")).toBeNull();expect(onProposed).not.toHaveBeenCalled();expect(queuedBodies).toHaveLength(0);
+  expect(screen.queryByText("Already expired canary")).toBeNull();expect(screen.queryByLabelText("Describe only the food help you need")).toBeNull();expect(onProposed).not.toHaveBeenCalled();expect(queuedBodies).toHaveLength(0);
 });
 
 it("does not restore a late optional result after the family has chosen guided questions",async()=>{
@@ -226,7 +334,7 @@ it("automatically reconciles a clarification committed before manual exit when i
   const original=fetcher.getMockImplementation()!;let finishPatch!:(value:Response)=>void;
   fetcher.mockImplementation(async(input,init)=>{const response=await original(input,init);if(init?.method==="PATCH")return new Promise<Response>(resolve=>{finishPatch=resolve;});return response;});
   renderTool();fireEvent.click(await screen.findByRole("button",{name:/Open this saved draft/}));
-  const history=await screen.findByLabelText(/Do you get help paying/);fireEvent.change(history,{target:{value:"applied"}});fireEvent.click(screen.getByRole("button",{name:"Use these routing answers"}));
+  fireEvent.click(await screen.findByRole("radio", { name: "I applied and am waiting" }));fireEvent.click(screen.getByRole("button",{name:"Use these routing answers"}));
   await waitFor(()=>expect(finishPatch).toBeTypeOf("function"));expect(archive.drafts[0].revision).toBe(2);
   fireEvent.click(screen.getByRole("button",{name:"Use guided questions"}));await act(async()=>{finishPatch(Response.json({ok:true,draftId:id,revision:2}));});
   fireEvent.click(screen.getByRole("button",{name:/Open this saved draft/}));
@@ -234,13 +342,15 @@ it("automatically reconciles a clarification committed before manual exit when i
   expect(resolveBodies).toHaveLength(1);expect(queuedBodies).toHaveLength(0);
 });
 
-it.each(["en", "es"] as const)("shows the complete current routing choice beside native selects in %s without implying it was saved", locale => {
+it.each(["en", "es"] as const)("shows the complete current routing choices in %s without implying they were saved", locale => {
   const c=foodAssessmentCopy[locale],onChange=vi.fn();
   const view=render(<ParentLocaleProvider initialLocale={locale}><FoodAssessmentQuestions answers={{foodForTwoDays:"no",benefitHistory:"receiving",existingIssue:"card"}} onChange={onChange}/></ParentLocaleProvider>);
-  for(const text of [c.no,c.receiving,c.card])expect(screen.getByText(text,{selector:"p"})).toBeTruthy();
+  expect(screen.getByRole("radio", { name: c.no, checked: true })).toBeTruthy();
+  for(const text of [c.receiving,c.card])expect(screen.getByRole("radio", { name: text, checked: true })).toBeTruthy();
   view.rerender(<ParentLocaleProvider initialLocale={locale}><FoodAssessmentQuestions answers={{foodForTwoDays:"yes",benefitHistory:"applied",existingIssue:null}} onChange={onChange}/></ParentLocaleProvider>);
-  for(const text of [c.yes,c.applied])expect(screen.getByText(text,{selector:"p"})).toBeTruthy();
-  expect(screen.queryByText(c.card,{selector:"p"})).toBeNull();expect(onChange).not.toHaveBeenCalled();expect(queuedBodies).toHaveLength(0);expect(resolveBodies).toHaveLength(0);
+  expect(screen.getByRole("radio", { name: c.yes, checked: true })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: c.applied, checked: true })).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: c.card })).toBeNull();expect(onChange).not.toHaveBeenCalled();expect(queuedBodies).toHaveLength(0);expect(resolveBodies).toHaveLength(0);
 });
 
 it.each(["en", "es"] as const)("keeps food unanswered while exposing the independently ready SNAP-only proposal (%s)", async language => {
@@ -248,10 +358,11 @@ it.each(["en", "es"] as const)("keeps food unanswered while exposing the indepen
   archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description, screenLocale: language } }];
   resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: ["foodForTwoDays"] };
   renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
-  await screen.findByLabelText(foodAssessmentCopy.en.enough);
+  await screen.findByRole("group", { name: foodAssessmentCopy.en.enough });
   if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language/), { target: { value: "es" } });
-  const answer = await screen.findByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement;
-  expect(answer.value).toBe(""); expect(answer.required).toBe(true); expect(answer.checkValidity()).toBe(false);
+  const group = await screen.findByRole("group", { name: foodAssessmentCopy[language].enough });
+  const answer = within(group).getAllByRole("radio")[0] as HTMLInputElement;
+  expect(group.querySelector(":checked")).toBeNull(); expect(answer.required).toBe(true); expect(answer.checkValidity()).toBe(false);
   expect(onProposed).toHaveBeenCalledWith(expect.objectContaining({ state: "needs_clarification", needIds: ["snap_new"], questionIds: ["foodForTwoDays"], source: { draftId: id, revision: 2 } }));
   expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
 });
@@ -269,7 +380,7 @@ it.each((["en", "es"] as const).flatMap(language => (["manual", "needs_clarifica
   expect(region.closest("[lang]")?.getAttribute("lang")).toBe(language);
   expect(region.textContent).toContain(language === "en" ? "separate WIC notice" : "aviso de WIC por separado");
   expect(region.textContent).toContain(language === "en" ? "does not send a pre-application, book an appointment or confirm enrollment" : "no envía una presolicitud, reserva una cita ni confirma la inscripción");
-  if (state === "needs_clarification") expect((screen.getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
+  if (state === "needs_clarification") expect(screen.getByRole("group", { name: foodAssessmentCopy[language].enough }).querySelector(":checked")).toBeNull();
   if (state === "manual") {
     expect(screen.queryByText(foodAssessmentCopy[language].history)).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(region.querySelector("h3")));
@@ -289,13 +400,13 @@ it.each(["en", "es"] as const)("shows the existing public outside-area food fall
   expect(link.closest("[lang]")?.getAttribute("lang")).toBe(language);
   await waitFor(() => expect(document.activeElement).toBe(link.closest("section")?.querySelector("h3")));
   expect(screen.getByText(language === "en" ? /These connected options do not cover the area you described/ : /Estas opciones conectadas no cubren la zona que describió/)).toBeTruthy();
-  expect(screen.queryByLabelText(foodAssessmentCopy[language].enough)).toBeNull(); expect(screen.queryByLabelText(foodAssessmentCopy[language].history)).toBeNull();
+  expect(screen.queryByRole("group", { name: foodAssessmentCopy[language].enough })).toBeNull(); expect(screen.queryByLabelText(foodAssessmentCopy[language].history)).toBeNull();
   expect(onProposed).not.toHaveBeenCalled(); expect(queuedBodies).toEqual([]); expect(resolveBodies).toEqual([]);
   expect(screen.getByRole("button", { name: foodDescriptionCopy[language].manual })).toBeTruthy();
 });
 
 it.each(["en", "es"] as const)("exposes the ready SNAP path through the actual guide without inventing a food answer or an extra click (%s)", async language => {
-  const selectFocus = vi.spyOn(HTMLSelectElement.prototype, "focus");
+  const inputFocus = vi.spyOn(HTMLInputElement.prototype, "focus");
   archive.drafts = [{ ...draft(), state: "result", revision: 2, input: { description: language === "en" ? "My first SNAP application and food today." : "Mi primera solicitud de SNAP y comida para hoy.", screenLocale: language } }];
   resultView = { ...resultView, state: "needs_clarification", proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: "never", existingIssue: null }, needIds: ["food_now", "snap_new"], questionIds: ["foodForTwoDays"] };
   const onChoose = vi.fn();
@@ -305,9 +416,9 @@ it.each(["en", "es"] as const)("exposes the ready SNAP path through the actual g
   expect(screen.getByText(foodDescriptionCopy[language].readyOptions)).toBeTruthy();
   const resultHeading = screen.getByRole("heading", { name: foodAssessmentCopy[language].results });
   await waitFor(() => expect(document.activeElement).toBe(resultHeading));
-  expect(selectFocus).not.toHaveBeenCalled();
+  expect(inputFocus).not.toHaveBeenCalled();
   const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
-  expect((within(tool).getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
+  expect(within(tool).getByRole("group", { name: foodAssessmentCopy[language].enough }).querySelector(":checked")).toBeNull();
   expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].both })).toBeNull();
   expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles.food_now })).toBeNull();
   fireEvent.click(choice);
@@ -329,7 +440,7 @@ it.each([
   resultView = { ...resultView, state: "needs_clarification", needIds: needs, questionIds: questions, conflicts: conflicts ? [...conflicts] : [],
     proposedAnswers: { foodForTwoDays: "not_sure", benefitHistory: history ?? (needs.includes("snap_problem") ? "receiving" : "never"), existingIssue: needs.includes("snap_problem") ? "not_sure" : null } };
   renderTool(); fireEvent.click(await screen.findByRole("button", { name: /Open this saved draft/ }));
-  await screen.findByLabelText(foodAssessmentCopy.en.enough);
+  await screen.findByRole("group", { name: foodAssessmentCopy.en.enough });
   if (expectedNeeds) expect(onProposed).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ needIds: expectedNeeds, questionIds: questions }));
   else expect(onProposed).not.toHaveBeenCalled();
   expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
@@ -365,12 +476,12 @@ it.each(["en", "es"] as const)("corrects a ready SNAP interpretation without a m
   const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
   fireEvent.click(within(tool).getByRole("button", { name: foodDescriptionCopy[language].changeAnswers }));
   await waitFor(() => expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles.snap_new })).toBeNull());
-  fireEvent.change(within(tool).getByLabelText(foodAssessmentCopy[language].history), { target: { value: "applied" } });
+  fireEvent.click(within(tool).getByRole("radio", { name: foodAssessmentCopy[language].applied }));
   fireEvent.click(within(tool).getByRole("button", { name: foodDescriptionCopy[language].resolve }));
   const pending = await screen.findByRole("button", { name: foodAssessmentCopy[language].titles.snap_pending });
   expect(resolveBodies).toHaveLength(1); expect(queuedBodies).toEqual([]);
   expect(JSON.parse(resolveBodies[0])).toMatchObject({ expectedOwnerId: owner, draftId: id, expectedRevision: 2, changedQuestionIds: ["benefitHistory"], answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null } });
-  expect((within(tool).getByLabelText(foodAssessmentCopy[language].enough) as HTMLSelectElement).value).toBe("");
+  expect(within(tool).getByRole("group", { name: foodAssessmentCopy[language].enough }).querySelector(":checked")).toBeNull();
   fireEvent.click(pending);
   expect(choose).toHaveBeenCalledExactlyOnceWith({ needs: ["snap_pending"], answers: { foodForTwoDays: "not_sure", benefitHistory: "applied", existingIssue: null }, descriptionSource: { draftId: id, revision: 3 } });
 });
@@ -383,10 +494,19 @@ it.each(["en", "es"] as const)("exposes only ready food through the actual guide
   fireEvent.click(await screen.findByRole("button", { name: name => name.startsWith(foodDescriptionCopy[language].resume) }));
   const option = await screen.findByRole("button", { name: foodAssessmentCopy[language].titles.food_now });
   const tool = screen.getByRole("region", { name: foodDescriptionCopy[language].title });
-  expect((within(tool).getByLabelText(foodAssessmentCopy[language].history) as HTMLSelectElement).value).toBe("");
+  expect(within(tool).getByRole("group", { name: foodAssessmentCopy[language].history }).querySelector(":checked")).toBeNull();
   expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].both })).toBeNull();
   for (const need of ["snap_new", "snap_pending", "snap_renewal", "snap_problem"] as const) expect(screen.queryByRole("button", { name: foodAssessmentCopy[language].titles[need] })).toBeNull();
   fireEvent.click(option);
   expect(choose).toHaveBeenCalledExactlyOnceWith({ needs: ["food_now"], answers: { foodForTwoDays: "no", benefitHistory: "not_sure", existingIssue: null }, descriptionSource: { draftId: id, revision: 2 } });
   expect(resolveBodies).toEqual([]); expect(queuedBodies).toEqual([]);
+});
+
+it("keeps newly typed words when resuming an owned description with previous results", async () => {
+  archive.drafts = [{ ...draft(), revision: 1, state: "result", input: { description: "Previous food question", screenLocale: "en" } }];
+  renderTool();
+  fireEvent.change(await screen.findByRole("textbox", { name: "What kind of food help do you need?" }), { target: { value: "We need food for tomorrow" } });
+  fireEvent.click(screen.getByRole("button", { name: "Open my private description draft" }));
+  expect(await screen.findByLabelText("Describe only the food help you need")).toHaveProperty("value", "We need food for tomorrow");
+  expect(queuedBodies).toHaveLength(0);
 });

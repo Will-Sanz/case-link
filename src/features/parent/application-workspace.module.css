@@ -27,7 +27,9 @@
 }
 .workspace {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
+  grid-template-areas: "next checklist" "content checklist";
+  grid-template-rows: auto 1fr;
   flex: 1;
   min-height: 0;
 }
@@ -35,7 +37,8 @@
   min-width: 0;
   overflow: auto;
   padding: 1.5rem 1rem;
-  border-right: 1px solid var(--color-rule);
+  grid-area: checklist;
+  border-left: 1px solid var(--color-rule);
 }
 .workspace .checklist h2 {
   font: 650 1rem/1.4 var(--font-body);
@@ -93,9 +96,10 @@
   margin-top: 0.125rem;
 }
 .content {
+  grid-area: content;
   min-width: 0;
   overflow: auto;
-  padding: 2rem clamp(1.25rem, 4vw, 4rem) 6rem;
+  padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2rem;
   scroll-behavior: smooth;
 }
 .workspace .content h2 {
@@ -129,6 +133,19 @@
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-rule);
+}
+.settings {
+  margin-top: 0.65rem;
+  font-size: 0.875rem;
+}
+.settings summary {
+  cursor: pointer;
+  width: fit-content;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.25rem;
+}
+.settings select {
+  max-width: 18rem;
 }
 .helpLinks a {
   padding: 0.25rem;
@@ -184,6 +201,8 @@
   margin-top: 0.25rem;
 }
 .nextAction {
+  grid-area: next;
+  margin: 1.25rem clamp(1rem, 3vw, 2.5rem) 0;
   padding-top: 1.25rem;
   border-top: 1px solid var(--color-rule);
 }
@@ -309,23 +328,21 @@
   .checklist {
     flex: none;
     padding: 0.75rem 1rem;
-    border-right: 0;
+    border-left: 0;
     border-bottom: 1px solid var(--color-rule);
     overflow: visible;
   }
-  .workspace .checklist h2,
   .checklist small,
   .marker,
   .helpLinks {
     display: none;
   }
   .checklist ol {
-    display: flex;
-    overflow-x: auto;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
     gap: 0.25rem;
   }
-  .checklist li {
-    flex: none;
+  .workspace .checklist h2 {
+    margin-bottom: 0.35rem;
   }
   .checklist a {
     padding: 0.6rem 0.75rem;
@@ -338,7 +355,7 @@
   .content {
     flex: 1;
     overflow: visible;
-    padding: 1.25rem 1.25rem 6rem;
+    padding: 1.25rem 1rem 2rem;
   }
 }
 @media (max-width: 480px) {
@@ -378,4 +395,33 @@
   .browser {
     display: none;
   }
+}
+
+.foodOverview {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 62ch;
+}
+.foodOverview p + p {
+  color: var(--color-ink-muted);
+}
+
+.permissionFacts {
+  margin-block: 1rem;
+}
+.permissionFacts ul {
+  display: grid;
+  justify-items: start;
+  margin: 0;
+}
+
+.receipts {
+  gap: 0.9rem;
+}
+.receipts > section {
+  border: 0;
+  border-block: 1px solid var(--color-rule);
+  border-radius: 0;
+  padding: 1rem 0;
+  background: transparent;
 }

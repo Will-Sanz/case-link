@@ -84,6 +84,40 @@ async function refreshSupport() {
 }
 
 describe("support detail", () => {
+  it("offers My support when a request cannot be found", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false, status: 404, json: async () => ({ error: "Request unavailable" }),
+    }));
+    render(<SupportDetail requestId={requestId} />);
+    await screen.findByRole("heading", { name: "This request is unavailable" });
+    expect(screen.getByRole("link", { name: "Go to My support" }).getAttribute("href")).toBe("/my-support");
+    expect(screen.queryByRole("navigation", { name: "Your application checklist" })).toBeNull();
+  });
+
+  it("leads a food request to its recorded plan without an application status", async () => {
+    const request = fixture();
+    const at = "2026-11-18T12:00:00Z";
+    vi.setSystemTime(new Date(at));
+    request.intake.needs = ["food_now"];
+    request.intake.zip = "19129";
+    request.mandate.recipientIds = [SHARE_FOOD_ACCESS_PROGRAM];
+    const foodAccess = { ...buildFoodAccessPlanBody({ requestId, requestVersion: request.version, generatedAt: at, sourceReviewCurrent: true }), planHash: "a".repeat(64) };
+    request.plan = { version: 1, summary: "Food plan", generatedAt: at, model: null, routes: [{
+      need: "food_now", programId: SHARE_FOOD_ACCESS_PROGRAM, title: foodAccess.site.name, summary: "Food plan saved",
+      state: "prepared", nextActor: "parent", steps: [], foodAccess,
+      officialUrl: foodAccess.source.operatorUrl, sourceUrl: foodAccess.source.operatorUrl, limitation: null,
+    }] };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url === `/api/parent/requests/${requestId}`
+      ? { ok: true, status: 200, json: async () => ({ request, progress: { state: "needs_parent", summary: "The food plan is ready", updatedAt: at, nextRunAt: null, canContinueAfterClosing: false } }) }
+      : response(request)));
+    render(<SupportDetail requestId={requestId} />);
+    const plan = await screen.findByRole("link", { name: "View food access plan" });
+    expect(screen.queryByText("No application submission recorded")).toBeNull();
+    fireEvent.click(plan);
+    expect(await screen.findByRole("heading", { name: "Your food access plan" })).toBeTruthy();
+    expect(document.activeElement?.id).toBe("application-programs");
+  });
+
   it.each(["waiting", "needs_parent"] as const)("automatically shows the finished SNAP draft and slows checks after queued/running becomes %s", async ending => {
     vi.useFakeTimers();
     const request=fixture();request.intake.needs=["snap_new"];

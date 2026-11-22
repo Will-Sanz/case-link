@@ -23,7 +23,8 @@ export function ServiceError({
         </div>
         <h2>{t("Let’s bring you back to your support")}</h2>
         <p>
-          {t("Sign in to your CaseLink account to keep your household’s information private.")}</p>
+          {t("Sign in to your CaseLink account to keep your household’s information private.")}{" "}
+          {t("You can return here after signing in.")}</p>
         <Link
           className={styles.button}
           href={`/sign-in?next=${encodeURIComponent(returnTo)}`}
@@ -31,6 +32,7 @@ export function ServiceError({
           {t("Sign in to continue")}{" "}
           <ArrowRight width={18} height={18} aria-hidden="true" />
         </Link>
+        <p className={styles.space}><Link className={styles.textLink} href="/support/help#urgent">{t("See direct support options")}</Link></p>
       </div>
     );
   return (

@@ -1,3 +1,4 @@
+import { chooseScreenLanguage } from "./screen-language.mjs";
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
@@ -58,7 +59,7 @@ try {
         async function recoveryLocale(locale) {
             const path = new URL(page.url()).pathname;
             const response = page.waitForResponse(r => r.request().headers().rsc === '1' && new URL(r.url()).pathname === path && new URL(r.url()).searchParams.get('ui') === locale);
-            await page.getByLabel(/Screen language|Idioma de pantalla/).selectOption(locale);
+            await chooseScreenLanguage(page, locale);
             await response;
             await page.waitForURL(url => url.searchParams.get('ui') === locale);
             await settle();
@@ -68,9 +69,10 @@ try {
             return false; const range = document.createRange(); range.selectNodeContents(button); const text = range.getBoundingClientRect(), box = button.getBoundingClientRect(); return text.width > 0 && (text.left < box.left - 1 || text.right > box.right + 1); }).map(button => button.textContent)); assert.deepEqual(clipped, [], name + ' clipped button labels'); await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: `${evidence}/${name}-${width}.png`, fullPage: true }); results.push({ name, width, title: await page.title(), lang: await page.locator('html').getAttribute('lang'), axeViolations: 0 }); }
         await page.goto(origin + '/sign-in');
         await page.getByLabel('Your email address').waitFor();
+        assert.equal(await page.locator('header').getByRole('combobox').count(), 0);
         await check('sign-in-en');
         const response = page.waitForResponse(r => r.request().headers().rsc === '1' && new URL(r.url()).pathname === '/sign-in');
-        await page.getByLabel('Screen language / Idioma de pantalla').selectOption('es');
+        await chooseScreenLanguage(page, 'es');
         await response;
         await page.waitForFunction(() => document.title === 'Iniciar sesión | CaseLink');
         await check('sign-in-es');
@@ -83,8 +85,9 @@ try {
         await page.getByRole('heading', { name: 'Busquemos apoyo alimentario para su familia.' }).waitFor();
         await page.waitForFunction(() => document.title === 'Pedir apoyo | CaseLink');
         await check('food-guide-es');
-        await page.getByLabel(/suficiente comida/).selectOption('no');
-        await page.getByLabel(/ayuda para comprar/).selectOption('applied');
+        await page.getByRole('radio', { name: 'No', exact: true }).check();
+        await page.getByText('Buscar ayuda para pagar los alimentos', { exact: true }).click();
+        await page.locator('#food-guide-history input[value=applied]').check();
         await page.getByRole('button', { name: 'Ver mis opciones' }).click();
         await page.getByRole('button', { name: 'Consultar una solicitud pendiente' }).click();
         await page.getByLabel('Contraseña', { exact: true }).waitFor();
@@ -97,12 +100,12 @@ try {
         const handoffLocale = await page.locator('#support-zip').evaluate(input => input.closest('[lang]')?.getAttribute('lang')); assert.equal(handoffLocale, 'es');
         assert.equal(await page.getByLabel(parentText(handoffLocale, 'Preferred service language')).inputValue(), 'en');
         await page.getByLabel(parentText(handoffLocale, 'Household ZIP code')).fill('19129');
-        await page.getByLabel('Idioma de pantalla / Screen language').selectOption('en');
+        await chooseScreenLanguage(page, 'en');
         await page.waitForFunction(() => document.documentElement.lang === 'en');
         await settle();
         assert.equal(await page.getByLabel('Household ZIP code').inputValue(), '19129');
         assert.equal(await page.getByLabel('Preferred service language').inputValue(), 'en');
-        await page.getByLabel('Screen language / Idioma de pantalla').selectOption('es');
+        await chooseScreenLanguage(page, 'es');
         await page.waitForFunction(() => document.documentElement.lang === 'es');
         await page.goto(origin + '/my-support');
         await page.getByRole('heading', { name: 'Mi apoyo', exact: true }).waitFor();

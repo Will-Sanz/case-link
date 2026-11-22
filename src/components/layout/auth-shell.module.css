@@ -87,3 +87,12 @@
   outline: 3px solid var(--public-focus);
   outline-offset: 2px;
 }
+
+.recoveryTitle {
+  margin-top: 1rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 8vw, 2.375rem);
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--public-ink);
+}

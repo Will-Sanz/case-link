@@ -50,15 +50,14 @@ it("provides working food and urgent entry paths alongside the approved illustra
       .getByRole("link", { name: /Find support for my family/ })
       .getAttribute("href"),
   ).toBe("/get-support");
-  expect(
-    screen.getByRole("link", { name: /Food & benefits/ }).getAttribute("href"),
-  ).toBe("/get-support?need=food");
+  expect(screen.queryByRole("link", { name: /Food & benefits/ })).toBeNull();
+  expect(screen.getByRole("link", { name: "Go to My support" }).getAttribute("href")).toBe("/my-support");
   expect(screen.queryByRole("link", { name: /Help with utility bills/ })).toBeNull();
   expect(screen.queryByRole("heading", { name: "A few things you might be wondering" })).toBeNull();
   expect(screen.queryByText(/Live assistance is preparing to launch/)).toBeNull();
   expect(
     screen
-      .getByRole("link", { name: /Need immediate help/ })
+      .getByRole("link", { name: /Need help today\? Find direct resources/ })
       .getAttribute("href"),
   ).toBe("/support/help#urgent");
   expect(

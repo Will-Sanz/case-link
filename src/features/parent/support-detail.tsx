@@ -12,12 +12,12 @@ import {
   Lock,
   Pause,
   Play,
-  ShieldCheck,
 } from "iconoir-react";
 import { NEED_LABELS, OUTCOME_LABELS, intakeSchema, storedIntakeSchema } from "@/lib/parent/domain";
 import type {
   NecessaryAction,
   SupportIntake,
+  SupportAction,
   SupportRequest,
 } from "@/lib/parent/domain";
 import { getProgram, PROGRAMS } from "@/lib/parent/programs";
@@ -37,6 +37,7 @@ import { SavedAccountAnswers } from "./saved-account-answers";
 import { ANSWER_FIELDS } from "@/lib/parent/answers";
 import { supportRouteLabel, supportRouteReceipt } from "@/lib/parent/application-readiness";
 import {
+  PERMISSION_DATA_LABELS,
   PermissionEditor,
   type PermissionEditorHandle,
 } from "./permission-editor";
@@ -48,6 +49,15 @@ import workspace from "./application-workspace.module.css";
 import { UrgentHelp } from "./landing";
 import styles from "./parent.module.css";
 import wicStyles from "./wic.module.css";
+
+const PERMISSION_ACTION_LABELS: Record<SupportAction, string> = {
+  research: "Look up options",
+  prepare: "Prepare your information",
+  share: "Share permitted information",
+  submit: "Submit supported applications",
+  schedule: "Coordinate appointments",
+  follow_up: "Follow up with programs",
+};
 
 function officialLink(value?: string): string | null {
   return value && PROGRAMS.some((program) => program.officialUrl === value)
@@ -82,6 +92,9 @@ function RequiredStep({
     action.reason === "missing_fact" && action.field === "snap_application_details";
   const snapSubmit = action.need === "snap_new" && request.intake.needs.includes("snap_new") && action.reason === "submission_review" && action.field === "snap_final_submit";
   const url = officialLink(action.url);
+  const stepOwner = action.reason === "personal_step"
+    ? "Complete with the program"
+    : action.reason === "expanded_permission" ? "Decide what CaseLink may do" : null;
   const canAnswer =
     (action.reason === "missing_fact" &&
       ANSWER_FIELDS.includes(action.field as (typeof ANSWER_FIELDS)[number])) ||
@@ -97,6 +110,7 @@ function RequiredStep({
       <h2 lang="" id={`step-${action.id}`} tabIndex={-1}>
         {action.title}
       </h2>
+      {stepOwner && <p lang={localized ? locale : "en"} className={styles.small}><strong>{t(stepOwner)}</strong></p>}
       <p lang="">{action.explanation}</p>
       {snapSubmit ? <a lang={locale} className={styles.button} href="#snap-final-review">{t("Review application and Submit")}</a> : snapDetails ? <a lang={locale} className={styles.button} href="#application-answers" onClick={onSnapDetails}>{t("Answer SNAP application questions")}</a> : canAnswer ? (
         <NecessaryAnswer
@@ -460,7 +474,13 @@ export function SupportDetail({ requestId }: { requestId: string }) {
   if (!request)
     return (
       <div className={styles.container}>
-        <ServiceError
+        {error instanceof ParentApiError && error.status === 404 ? (
+          <div lang={locale} className={styles.empty}>
+            <h1>{t("This request is unavailable")}</h1>
+            <p>{t("Check My support for the requests available to your account.")}</p>
+            <Link className={styles.button} href="/my-support">{t("Go to My support")}</Link>
+          </div>
+        ) : <ServiceError
           error={
             error ??
             new Error(
@@ -469,7 +489,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           }
           retry={reload}
           returnTo={`/support/${requestId}`}
-        />
+        />}
       </div>
     );
   const wicOnly = request.intake.needs.length > 0 && request.intake.needs.every(need => need.startsWith("wic_"));
@@ -478,6 +498,7 @@ export function SupportDetail({ requestId }: { requestId: string }) {
   const wt = (text: string) => localized ? t(text) : text;
   const inactive = ["cancelled", "closed"].includes(request.status);
   const acceptingActions = request.status === "active";
+  const foodAccessOnly = request.intake.needs.length === 1 && request.intake.needs[0] === "food_now";
   const foodRoute = request.plan?.routes.find(route => route.need === "food_now" && route.foodAccess);
   const currentOperations = history.error
     ? []
@@ -571,13 +592,6 @@ export function SupportDetail({ requestId }: { requestId: string }) {
             <UrgentHelp />
           </div>
         )}
-        {request.status === "paused" && (
-          <div lang={localized ? locale : "en"} className={styles.notice}>
-            <Pause width={22} height={22} aria-hidden="true" />
-            <p>
-              <strong>{wt("Paused by you.")}</strong>{" "}{wt("No future actions will run while paused. Resume when you’re ready; expired permission may need renewal.")}</p>
-          </div>
-        )}
         <section
           id="your-next-steps"
           lang={localized ? locale : "en"}
@@ -603,7 +617,10 @@ export function SupportDetail({ requestId }: { requestId: string }) {
                     : "Your Submit decision is saved. CaseLink owns the delivery check; you do not need to repeat the review."
                 : submittedNeeds.length === request.intake.needs.length
                   ? "Use the recorded submission and any official notices above for your next step. No household update is currently requested."
-                : "No household updates are requested in this section. Check the official website and overview sections for any website verification or other next step.")}
+                  : foodAccessOnly
+                    ? "CaseLink has no household questions for you right now."
+                    : "No household updates are requested in this section. Check the official website and overview sections for any website verification or other next step.")}
+              {acceptingActions && foodAccessOnly && <>{" "}<a className={styles.textLink} href="#application-programs">{wt("See your food options and any visit instructions.")}</a></>}
             </p>
           )}
           {acceptingActions && (
@@ -762,13 +779,18 @@ export function SupportDetail({ requestId }: { requestId: string }) {
         <section
           id="application-receipts"
           lang={localized ? locale : "en"}
-          className={`${styles.surface} ${workspace.section} ${wicOnly ? wicStyles.receipts : ""}`}
+          className={`${styles.surface} ${workspace.section} ${workspace.receipts} ${wicOnly ? wicStyles.receipts : ""}`}
           tabIndex={-1}
         >
           <h2>{wt("Activity & receipts")}</h2>
           <p className={`${styles.subtle} ${styles.small}`}>
             {wt("Prepared, sent, received, approved and support actually received are different steps. We show only recorded evidence.")}
           </p>
+          <SupportActivity
+            request={request}
+            onChange={reload}
+            history={history}
+          />
           {request.events?.length ? (
             <ol className={`${styles.timeline} ${styles.space}`}>
               {request.events.map((event) => (
@@ -835,11 +857,6 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           <p className={`${styles.hint} ${styles.space}`}>
             {wt("Your download reflects the recorded state. Submitted packet versions and receipts are preserved when a permitted channel produces them.")}
           </p>
-          <SupportActivity
-            request={request}
-            onChange={reload}
-            history={history}
-          />
         </section>
         <div
           id="application-documents"
@@ -914,22 +931,25 @@ export function SupportDetail({ requestId }: { requestId: string }) {
           </section>
           <section className={styles.surface}>
             <h2>{wt("Your permission")}</h2>
-            <div className={`${styles.inline} ${styles.small}`}>
-              <ShieldCheck width={22} height={22} aria-hidden="true" />
-              <strong>
-                {wt(request.mandate.mode === "prepare_only"
-                  ? "Research & preparation only"
-                  : "Permitted actions within your limits")}
-              </strong>
-            </div>
-            <p className={`${styles.hint} ${styles.space}`}>{wt(request.mandate.recipientIds.length === 1 ? "Expires {date} · Up to {attempts} attempts · {count} named program" : "Expires {date} · Up to {attempts} attempts · {count} named programs").replace("{date}", displayDate(request.mandate.expiresAt, false, localized ? locale : "en")).replace("{attempts}", String(request.mandate.maxAttempts)).replace("{count}", String(request.mandate.recipientIds.length))}</p>
-            <ul className={styles.recipientList}>
-              {request.mandate.recipientIds.map((id) => (
-                <li key={id} lang={getProgram(id) ? "en" : localized ? locale : "en"}>
-                  {getProgram(id)?.name ?? wt("Named program unavailable")}
-                </li>
-              ))}
-            </ul>
+            <p className={styles.subtle}>{wt(inactive ? "Your saved permission for this request." : "These limits apply to future work on this request.")}</p>
+            <dl className={`${styles.factList} ${workspace.permissionFacts}`}>
+              <dt>{wt(request.mandate.recipientIds.length === 1 ? "1 named program" : "{n} named programs").replace("{n}", String(request.mandate.recipientIds.length))}</dt>
+              <dd><ul className={styles.recipientList}>
+                {request.mandate.recipientIds.map(id => (
+                  <li key={id} lang={getProgram(id) ? "en" : localized ? locale : "en"}>
+                    {getProgram(id)?.name ?? wt("Named program unavailable")}
+                  </li>
+                ))}
+              </ul></dd>
+              <dt>{wt("What you allowed CaseLink to do")}</dt>
+              <dd>{request.mandate.allowedActions.map(action => wt(PERMISSION_ACTION_LABELS[action])).join(" · ")}</dd>
+              <dt>{wt("Information CaseLink may use")}</dt>
+              <dd>{request.mandate.allowedData.map(field => wt(PERMISSION_DATA_LABELS[field])).join(" · ")}</dd>
+              <dt>{wt("Expires")}</dt>
+              <dd><time dateTime={request.mandate.expiresAt}>{displayDate(request.mandate.expiresAt, false, localized ? locale : "en")}</time></dd>
+              <dt>{wt("Attempt limit")}</dt>
+              <dd>{wt("Up to {n} attempts").replace("{n}", String(request.mandate.maxAttempts))}</dd>
+            </dl>
             <p className={`${styles.hint} ${styles.space}`}>{wt("No signatures, passwords, EBT PINs or binding financial commitments. Documents need their own processing consent.")}</p>
             {!inactive && (
               <PermissionEditor

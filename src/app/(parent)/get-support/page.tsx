@@ -13,7 +13,7 @@ export default async function GetSupportPage({
   const { need } = await searchParams;
   const existing = process.env.CASELINK_PARENT_ACCOUNT_MODE === "existing";
   const recovery = canonicalProjectOrigin(process.env.CASELINK_PARENT_RECOVERY_SITE_URL);
-  return <ParentIntake initialNeed={need ?? "food"} signInOptions={{ existingAccountRecovery: existing,
+  return <ParentIntake simpleStart initialNeed={need ?? "food"} signInOptions={{ existingAccountRecovery: existing,
     recoveryHref: existing && recovery?.startsWith("https://") ? `${recovery}/forgot-password` : undefined,
     emailCodeAvailable: parentEmailCodeEnabled(process.env) }}/>;
 }

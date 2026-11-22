@@ -1,15 +1,8 @@
 "use client";
 import { useParentLocale } from "./parent-locale";
-import type { recordedReceipt } from "./support-activity";
+import { RECORDED_RECEIPT_SOURCES, type recordedReceipt } from "./support-activity";
 import { displayDate } from "./api";
 import styles from "./parent.module.css";
-
-const attribution = {
-  agency_receipt: "Agency receipt",
-  provider_api: "Program system record",
-  authenticated_partner: "Partner confirmed",
-  operator_confirmed: "Operator confirmed",
-};
 
 export function SnapSubmissionConfirmation({ requestId, operationId, receipt, outcome }: {
   requestId: string;
@@ -28,14 +21,14 @@ export function SnapSubmissionConfirmation({ requestId, operationId, receipt, ou
       <h3>{t("Your submission record") }</h3>
       <p><strong>{t("Recorded reference:") }</strong> {receipt.reference}</p>
       <p className={styles.hint}>
-        {t(attribution[receipt.source])} · {" "}
+        {t(RECORDED_RECEIPT_SOURCES[receipt.source])} · {" "}
         <time dateTime={receipt.recordedAt}>{displayDate(receipt.recordedAt, true, locale)}</time> {t("(Eastern time)") }{" "}</p>
       <a className={styles.textLink}
         href={`/api/parent/requests/${requestId}/operations/${encodeURIComponent(operationId)}/export`}>
         {t("Download this exact submission record") }{" "}</a>
       <h3 className={styles.space}>{t("What to do next") }</h3>
       {status && <p className={styles.hint}>
-        {t(attribution[receipt.source])} {t("· Status reference:") }{" "}{status.reference} · {" "}
+        {t(RECORDED_RECEIPT_SOURCES[receipt.source])} {t("· Status reference:") }{" "}{status.reference} · {" "}
         <time dateTime={status.observedAt}>{displayDate(status.observedAt, true, locale)}</time> {t("(Eastern time). Follow the official notice for complete instructions.") }{" "}</p>}
       <ul className={`${styles.list} ${styles.space}`}>
         {status?.documents?.map((document, index) => <li key={index}>

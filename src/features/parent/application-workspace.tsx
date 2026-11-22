@@ -1,10 +1,11 @@
 "use client";
-import { useParentLocale } from "./parent-locale";
+import { ParentDisplaySettings, useParentLocale } from "./parent-locale";
 import { parentText as translateParentText } from "@/lib/parent/locale";
 import Link from "next/link";
 import { Children, isValidElement, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Clock } from "iconoir-react";
 import type { SupportNeed, SupportRequest } from "@/lib/parent/domain";
+import { foodAccessPlanSchema, foodAccessReportSchema } from "@/lib/parent/food-access";
 import type { SupportProgress } from "@/lib/parent/progress";
 import { currentProtectedSnapAttempt, currentSnapReview, currentSnapDraft, SnapDraftReview, isSnapFinalReviewAction, protectedRecordedSnapPacket, protectedRecordedUtilityPacket, recordedReceipt, type OperationHistory, type RecordedOperation } from "./support-activity";
 import { sameSnapProtectedOperationBinding, snapProtectedDeliveryAttempt, type SnapProtectedOperation } from "@/lib/parent/snap-protected-operation";
@@ -17,6 +18,7 @@ import { PgwSavedApplication } from "./pgw-saved-application";
 import { WaterSavedApplication } from "./water-saved-application";
 import { isUtilityPreparationMandate } from "@/lib/parent/utility-preparation-scope";
 import { SnapFinalReview } from "./snap-final-review";
+import { usePermissionWindow } from "./use-permission-window";
 import styles from "./parent.module.css";
 import layout from "./application-workspace.module.css";
 import wicStyles from "./wic.module.css";
@@ -238,7 +240,7 @@ export function ApplicationWorkspace({
   const reviewRequested = snap && request.required_actions.some(action => !action.resolved && (!action.resolver || action.resolver === "parent") && isSnapFinalReviewAction(action));
   const protectedPrepared = snap && !error && !loading && operations.some(operation => operation.request_id === request.id && operation.request_version === request.version && operation.state === "prepared" && protectedRecordedSnapPacket(operation));
   const application = recordedApplicationState(
-    operations,
+    loading || error ? [] : operations,
     snap ? "snap-pa" : undefined,
     request.version,
     snap
@@ -278,62 +280,108 @@ export function ApplicationWorkspace({
     (action) =>
       !action.resolved && action.resolver && action.resolver !== "parent",
   );
-  const nextActor = inactive
-    ? "Work is paused or finished"
-    : needsVerification
-      ? "Next: You — COMPASS verification"
-    : actions.length
-      ? "Next: You"
-      : application.outcome === "support_received"
-        ? "Outcome recorded: Support received"
-        : application.outcome === "assistance_approved"
-          ? "Next: Program follow-up"
-          : application.outcome === "declined"
-            ? "Next: Decision & follow-up"
-            : reviewFinished && !application.submitted
-              ? "Next: CaseLink"
-            : progress?.state === "running" || progress?.state === "queued"
-              ? "Next: CaseLink"
-              : application.submitted
-                ? "Next: The program"
-                : "Next: CaseLink’s application connection";
+  const foodAccessOnly = request.intake.needs.length === 1 && request.intake.needs[0] === "food_now";
+  const foodRoute = request.plan?.routes.find(route => route.need === "food_now" && route.foodAccess);
+  const foodPlan = foodAccessPlanSchema.safeParse(foodRoute?.foodAccess).data;
+  const foodReport = foodAccessReportSchema.safeParse(foodRoute?.foodAccessReport).data;
+  const reportedFood = foodAccessOnly && progress && foodReport?.requestId === request.id ? foodReport : undefined;
+  const preparedFood = progress?.state === "needs_parent" && foodPlan?.requestId === request.id &&
+    foodPlan.state === "prepared" && foodPlan.requestVersion === request.version && !foodRoute?.foodAccessReport;
+  const permissionCurrent = usePermissionWindow(Date.parse(request.mandate.expiresAt));
+  const permissionExpired = progress?.state === "needs_parent" && !permissionCurrent;
+  const deliveryUnconfirmed = !foodAccessOnly && !loading && !error && !application.submitted && !application.outcome &&
+    operations.some(operation => operation.request_id === request.id && operation.request_version === request.version &&
+      operation.state === "delivery_unknown" && operation.action === "submit" &&
+      operation.need && (snap ? operation.need === "snap_new" && operation.program_id === "snap-pa" : request.intake.needs.includes(operation.need)));
   const localizedPersonalStepDetail = !inactive && !needsVerification && actions.length > 0 && locale === "es" && localizedInterface;
   const progressSummary = progress && <span lang={translateParentText("es", progress.summary) === progress.summary ? "" : localizedInterface ? locale : "en"}>{t(progress.summary)}</span>;
-  const nextDetail = inactive
-    ? "Your recorded information and history stay available below. Your permission controls show whether this request can resume."
-    : needsVerification
-      ? "COMPASS needs a verification step in the Official website section. CaseLink will check the result and continue the supported connection steps automatically."
-    : actions.length
-      ? (localizedPersonalStepDetail ? t("{count} personal step(s) need your attention. Open Your next steps to continue.").replace("{count}", String(actions.length)) : `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Open Your next steps to continue.`)
-      : application.outcome === "support_received"
-        ? "Support received is recorded. Your receipt and any remaining support steps are below. This outcome does not start another application."
-        : application.outcome === "assistance_approved"
-          ? "Approval is recorded. Actual receipt of support is a separate step. Check Activity & receipts for the decision, delivery and follow-up evidence."
-          : application.outcome === "declined"
-            ? "A decline is recorded. Check Activity & receipts for the decision and Program progress for any recorded appeal or alternative. The decision does not start a new application."
-            : reviewFinished && !application.submitted
-              ? attemptRecorded
-                ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry. No repeat Submit decision is requested."
-                : "Your Submit decision is saved. CaseLink must check delivery and record any agency confirmation. You do not need to choose Submit again."
-            : progress?.state === "running"
-              ? <>{progressSummary}{" "}{t(localizedInterface && !snap ? "Program progress shows recorded next steps. Opening a public website does not mean CaseLink is filling in or submitting an application." : "The Official website section shows the official site connection and any recorded blocker.")}</>
-              : progress?.state === "queued"
-                ? progressSummary
-                : application.submitted
-                  ? "Check Activity & receipts for the actual agency record and any interview, document or follow-up requirement."
-                  : wic && !snap
-                    ? "Open Your WIC answers to read or correct private preparation. CaseLink still needs an accepted pre-application and appointment connection; nothing here confirms a booking or enrollment. Official WIC help remains available there."
-                  : utility
-                    ? `Open ${utilityAnswers} to read or correct private preparation. A saved draft does not apply for assistance, change payments or protect against shutoff. Official program help remains available there.`
-                  : historyLimited
-                    ? foodOnly && !snap
-                      ? "Earlier application and delivery records need checking before a new filing. Program progress and Activity & receipts show the available records."
-                      : "Earlier application and delivery records need checking before a new filing. The Official website section remains available."
-                    : needsService
-                      ? "CaseLink has a service connection to resolve. You do not need to repeat your household details. Official program access remains available."
-                      : foodOnly && !snap
-                        ? "No application is currently confirmed as submitted. Check Program progress for recorded next steps; you can also use the official program directly."
-                        : "No application is currently confirmed as submitted. Open the Official website section; you can also use the official program directly.";
+  const evidenceLink = application.hasAttempt || application.submitted
+    ? { label: snapSubmissionComplete ? "View application receipt" : "View recorded evidence", target: "application-receipts", secondary: !snapSubmissionComplete }
+    : undefined;
+
+  function nextStep(): { title: string; detail: ReactNode; action?: { label: string; target: string; secondary?: boolean } } {
+    if (request.status === "paused") return {
+      title: "Paused by you",
+      detail: "No future actions will run while paused. Resume when you’re ready; expired permission may need renewal.",
+      action: { label: "Review your permission", target: "application-controls", secondary: true },
+    };
+    if (reportedFood?.outcome === "support_received" && request.status !== "cancelled") return {
+      title: "Your food visit report is saved",
+      detail: "Your report records that you collected food. Activity & receipts shows what you reported and when.",
+      action: { label: "View food report", target: "application-programs", secondary: true },
+    };
+    if (inactive) return {
+      title: "Work is paused or finished",
+      detail: "Your recorded information and history stay available below. Your permission controls show whether this request can resume.",
+    };
+    if (permissionExpired) return {
+      title: "Your permission has expired", detail: progressSummary,
+      action: { label: "Review your permission", target: "application-controls" },
+    };
+    if (needsVerification) return {
+      title: "Next: You — COMPASS verification",
+      detail: "COMPASS needs a verification step in the Official website section. CaseLink will check the result and continue the supported connection steps automatically.",
+      action: { label: "Complete COMPASS verification", target: "application-browser" },
+    };
+    if (actions.length) return {
+      title: "Next: You",
+      detail: localizedPersonalStepDetail
+        ? t("{count} personal step(s) need your attention. Open Your next steps to continue.").replace("{count}", String(actions.length))
+        : `${actions.length === 1 ? "One personal step needs" : `${actions.length} personal steps need`} your attention. Open Your next steps to continue.`,
+      action: reviewRequested && !reviewFinished
+        ? { label: "Review application and Submit", target: "snap-final-review" }
+        : { label: actions.length === 1 ? "Complete your step" : "See your steps", target: "your-next-steps" },
+    };
+    if (preparedFood) return {
+      title: "Your food access plan is ready", detail: progressSummary,
+      action: { label: "View food access plan", target: "application-programs" },
+    };
+    if (application.outcome === "support_received") return {
+      title: "Outcome recorded: Support received", action: evidenceLink,
+      detail: "Support received is recorded. Your receipt and any remaining support steps are below. This outcome does not start another application.",
+    };
+    if (application.outcome === "assistance_approved") return {
+      title: "Next: Program follow-up", action: evidenceLink,
+      detail: "Approval is recorded. Actual receipt of support is a separate step. Check Activity & receipts for the decision, delivery and follow-up evidence.",
+    };
+    if (application.outcome === "declined") return {
+      title: "Next: Decision & follow-up", action: evidenceLink,
+      detail: "A decline is recorded. Check Activity & receipts for the decision and Program progress for any recorded appeal or alternative. The decision does not start a new application.",
+    };
+    if (reviewFinished && !application.submitted) return {
+      title: "Next: CaseLink", action: evidenceLink,
+      detail: attemptRecorded
+        ? "A delivery attempt is recorded. CaseLink must confirm its result before any retry. No repeat Submit decision is requested."
+        : "Your Submit decision is saved. CaseLink must check delivery and record any agency confirmation. You do not need to choose Submit again.",
+    };
+    if (deliveryUnconfirmed) return { title: "Next: CaseLink", detail: application.detail, action: evidenceLink };
+    if (application.submitted) return {
+      title: "Next: The program", action: evidenceLink,
+      detail: "Check Activity & receipts for the actual agency record and any interview, document or follow-up requirement.",
+    };
+    if (progress?.state === "running") return {
+      title: "Next: CaseLink",
+      detail: foodAccessOnly ? progressSummary : <>{progressSummary}{" "}{t(localizedInterface && !snap
+        ? "Program progress shows recorded next steps. Opening a public website does not mean CaseLink is filling in or submitting an application."
+        : "The Official website section shows the official site connection and any recorded blocker.")}</>,
+    };
+    if (progress?.state === "queued" || progress?.state === "waiting" || progress?.state === "failed" || progress?.state === "service_offline") return {
+      title: progress.state === "queued" ? "Next: CaseLink" : progress.state === "waiting" ? "Waiting for the next step" : "Check program progress",
+      detail: progressSummary,
+    };
+    let detail = foodOnly && !snap
+      ? "No application is currently confirmed as submitted. Check Program progress for recorded next steps; you can also use the official program directly."
+      : "No application is currently confirmed as submitted. Open the Official website section; you can also use the official program directly.";
+    if (wic && !snap) detail = "Open Your WIC answers to read or correct private preparation. CaseLink still needs an accepted pre-application and appointment connection; nothing here confirms a booking or enrollment. Official WIC help remains available there.";
+    else if (utility) detail = `Open ${utilityAnswers} to read or correct private preparation. A saved draft does not apply for assistance, change payments or protect against shutoff. Official program help remains available there.`;
+    else if (foodAccessOnly) detail = "Your food request is saved. Check Program progress for available food options and any updates.";
+    else if (historyLimited) detail = foodOnly && !snap
+      ? "Earlier application and delivery records need checking before a new filing. Program progress and Activity & receipts show the available records."
+      : "Earlier application and delivery records need checking before a new filing. The Official website section remains available.";
+    else if (needsService) detail = "CaseLink has a service connection to resolve. You do not need to repeat your household details. Official program access remains available.";
+    return { title: needsService ? "Next: CaseLink" : "Check program progress", detail, action: evidenceLink };
+  }
+  const { title: nextActor, detail: nextDetail, action: nextAction } = nextStep();
   const steps = [
     {
       id: "application-overview",
@@ -357,7 +405,9 @@ export function ApplicationWorkspace({
           ? t("{n} need you").replace("{n}", String(actions.length))
           : needsVerification
             ? "COMPASS step above"
-          : "Nothing requested",
+            : preparedFood
+              ? "Food plan ready"
+              : "Nothing requested",
       done:
         !needsVerification &&
         request.required_actions.length > 0 &&
@@ -370,9 +420,9 @@ export function ApplicationWorkspace({
       detail:
         loading || error
           ? "Checking records"
-          : application.submitted
-            ? "Submission recorded"
-            : "Not confirmed",
+          : foodAccessOnly
+            ? reportedFood ? "Food report saved" : preparedFood ? "Food plan ready" : "Food options & updates"
+            : application.submitted ? "Submission recorded" : "Not confirmed",
       done: !loading && !error && application.submitted,
     },
     {
@@ -404,8 +454,17 @@ export function ApplicationWorkspace({
         if (window.location.hash !== link.hash) window.history.pushState(null, "", link.hash);
       }
     }}>
+      <section className={layout.nextAction} aria-labelledby="application-next-action" lang={localizedInterface ? locale : "en"}>
+        <h2 id="application-next-action">{t(nextActor)}</h2>
+            <p lang={typeof nextDetail === "string" ? localizedPersonalStepDetail ? locale : t(nextDetail) === nextDetail ? "en" : locale : localizedInterface ? locale : "en"}>{typeof nextDetail === "string" ? t(nextDetail) : nextDetail}</p>
+        {nextAction && (
+          <a className={nextAction.secondary ? styles.secondary : styles.button} href={`#${nextAction.target}`}>
+            {t(nextAction.label)} <ArrowRight width={17} height={17} aria-hidden="true" />
+          </a>
+        )}
+      </section>
       <nav lang={localizedInterface ? locale : "en"} className={layout.checklist} aria-label={t("Your application checklist")}>
-        <h2>{t(snap ? "Your SNAP request" : "Your support request")}</h2>
+        <h2>{t("Request sections")}</h2>
         <ol>
           {steps.map((step) => (
             <li key={step.id}>
@@ -436,6 +495,7 @@ export function ApplicationWorkspace({
           <Link href="/support/terms">{t("Terms")}</Link>
           <a href="mailto:willsanz23@gmail.com">{t("Contact CaseLink")}</a>
         </div>
+        <ParentDisplaySettings className={layout.settings} />
       </nav>
       <div className={layout.content} tabIndex={0}>
         <section
@@ -452,6 +512,13 @@ export function ApplicationWorkspace({
               ? "Where your application stands"
               : "Where your support stands")}
           </h2>
+          {foodAccessOnly ? (
+            <div className={layout.foodOverview}>
+              <p>{t("Your food request is saved.")}</p>
+              <p>{t("Find the food access plan, local options and any visit report in Program progress.")}</p>
+              {!preparedFood && !reportedFood && <a className={styles.textLink} href="#application-programs">{t("Open Program progress")}</a>}
+            </div>
+          ) : <>
           <div className={`${layout.statusLine} ${wicInterface ? wicStyles.state : ""}`}>
             {application.submitted && !error ? (
               <Check width={22} height={22} aria-hidden="true" />
@@ -487,15 +554,6 @@ export function ApplicationWorkspace({
               </p>
             </div>
           </div>
-          {!loading && !error && snapSubmissionComplete && (
-            <a
-              className={styles.button}
-              href="#application-receipts"
-
-            >
-              {t("View application receipt")} <ArrowRight width={17} height={17} aria-hidden="true" />
-            </a>
-          )}
           {!loading && !error && snapSubmission && snapReceipt && (
             <SnapSubmissionConfirmation
               requestId={request.id}
@@ -518,16 +576,8 @@ export function ApplicationWorkspace({
               {t("before starting a new application. You can still check the public website view below; it does not start or duplicate an application.")}
             </p>
           )}
-          <div className={layout.nextAction}>
-            <strong>{t(nextActor)}</strong>
-            <p lang={typeof nextDetail === "string" ? localizedPersonalStepDetail ? locale : t(nextDetail) === nextDetail ? "en" : locale : localizedInterface ? locale : "en"}>{typeof nextDetail === "string" ? t(nextDetail) : nextDetail}</p>
-            {!inactive && (actions.length > 0 || needsVerification) && (
-              <a lang={localizedInterface ? locale : "en"} className={styles.button} href={needsVerification ? "#application-browser" : reviewRequested && !reviewFinished ? "#snap-final-review" : "#your-next-steps"}>
-                {t(needsVerification ? "Complete COMPASS verification" : reviewRequested && !reviewFinished ? "Review application and Submit" : actions.length === 1 ? "Complete your step" : "See your steps")}{" "}
-                <ArrowRight width={17} height={17} aria-hidden="true" />
-              </a>
-            )}
-          </div>
+
+          </>}
         </section>
         <div id="application-review" tabIndex={-1} className={layout.panel} data-workspace-panel="application-review" hidden={activeSection !== "application-review"}>
         {draft && <SnapDraftReview key={`${request.id}:${request.version}:${draft.artifact_id}`} request={request} operation={draft}/>}

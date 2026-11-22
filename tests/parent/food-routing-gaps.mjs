@@ -85,7 +85,7 @@ try {
         checks.push({ mode: mode.id, locale, width, large, state: name, axeViolations: 0, synthetic: true }); console.log('passed', mode.id, locale, width, large, name);
       }
       await page.goto(origin + '/get-support'); await page.waitForLoadState('networkidle');
-      if (mode.fallback) await page.getByText(d.history, { exact: true }).waitFor(); else await page.getByLabel(c.enough, { exact: true }).waitFor();
+      if (mode.fallback) await page.getByText(d.history, { exact: true }).waitFor(); else await page.getByRole("group", { name: c.enough, exact: true }).waitFor();
       await page.evaluate(() => { const note = document.createElement('aside'); note.lang = 'en'; note.textContent = 'Synthetic interface proof only: no real account, model, provider or support outcome.'; document.body.prepend(note); });
       if (large) {
         await page.addStyleTag({ content: 'html { font-size: 200%; }' });
@@ -97,21 +97,22 @@ try {
         const resume = page.getByRole('button', { name: new RegExp(d.resume) }); await resume.focus(); await resume.press('Enter');
         const heading = page.getByRole('heading', { name: mode.fallback === 'wic' ? d.wicTitle : d.outsideTitle, exact: true }); await heading.waitFor();
         await page.waitForFunction(id => document.activeElement?.id === id, mode.fallback === 'wic' ? 'food-description-wic-title' : 'food-description-outside-title');
-        assert.equal(await page.getByLabel(c.enough, { exact: true }).count(), 0); assert.equal(await page.getByLabel(c.history, { exact: true }).count(), 0);
+        assert.equal(await page.getByRole("group", { name: c.enough, exact: true }).count(), 0); assert.equal(await page.getByRole("group", { name: c.history, exact: true }).count(), 0);
         const region = page.getByRole('region', { name: mode.fallback === 'wic' ? d.wicTitle : d.outsideTitle });
         assert.deepEqual(await region.locator('a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), mode.fallback === 'wic' ? ['/get-support?need=wic_new', '/get-support?need=wic_continuing', getProgram('wic-pa').officialUrl] : ['https://www.feedingamerica.org/need-help-find-food']);
         await check('direct-options', '[aria-labelledby="food-description-title"]');
         await heading.press('Tab'); assert.equal(await region.locator('a').first().evaluate(node => node.matches(':focus')), true, 'Direct alternative is keyboard reachable.');
         assert.equal(selected.length, 0); assert.ok(reads.some(path => path.endsWith('/food-description'))); continue;
       }
-      if (mode.food) await page.getByLabel(c.enough, { exact: true }).selectOption(mode.food);
+      if (mode.food) await page.locator(`#food-guide-enough input[value="${mode.food}"]`).check();
+      if (mode.benefit) await page.getByText(c.benefits, { exact: true }).click();
       if (mode.benefit === 'denied') {
-        const history = page.getByLabel(c.history, { exact: true }); await history.focus();
+        const history = page.locator('#food-guide-history input[value=denied]'); await history.focus();
         assert.equal(await history.evaluate(node => node.matches(':focus')), true);
-        await history.selectOption('denied');
-        assert.equal(await history.inputValue(), 'denied');
-      } else if (mode.benefit) await page.getByLabel(c.history, { exact: true }).selectOption(mode.benefit);
-      if (mode.issue) await page.getByLabel(c.issue, { exact: true }).selectOption(mode.issue);
+        await history.check();
+        assert.equal(await history.isChecked(), true);
+      } else if (mode.benefit) await page.locator(`#food-guide-history input[value="${mode.benefit}"]`).check();
+      if (mode.issue) await page.locator(`#food-guide-issue input[value="${mode.issue}"]`).check();
       if (mode.id !== 'denial') { assert.equal(await page.getByText(c.partial, { exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: c.submit, exact: true }).isEnabled(), true); }
       await page.getByRole('button', { name: c.submit, exact: true }).scrollIntoViewIfNeeded(); await check('choice', '[aria-labelledby="food-assessment-title"]');
       await page.getByRole('button', { name: c.submit, exact: true }).focus(); await page.getByRole('button', { name: c.submit, exact: true }).press('Enter');
@@ -120,8 +121,8 @@ try {
       for (const need of ['food_now', 'snap_new', 'snap_pending', 'snap_renewal', 'snap_problem']) assert.equal(await page.getByRole('button', { name: c.titles[need], exact: true }).count(), need === mode.need ? 1 : 0);
       assert.equal(await page.getByRole('button', { name: c.both, exact: true }).count(), 0); await check('ready-options', '[aria-labelledby="food-assessment-title"]');
       await page.getByRole('button', { name: c.change, exact: true }).click();
-      assert.equal(await page.getByLabel(c.enough, { exact: true }).inputValue(), mode.food); assert.equal(await page.getByLabel(c.history, { exact: true }).inputValue(), mode.benefit);
-      if (mode.benefit === 'receiving') assert.equal(await page.getByLabel(c.issue, { exact: true }).inputValue(), mode.issue);
+      assert.equal(await page.locator('#food-guide-enough input:checked').evaluateAll(options => options[0]?.value ?? ''), mode.food); assert.equal(await page.locator('#food-guide-history input:checked').evaluateAll(options => options[0]?.value ?? ''), mode.benefit);
+      if (mode.benefit === 'receiving') assert.equal(await page.locator('#food-guide-issue input:checked').evaluateAll(options => options[0]?.value ?? ''), mode.issue);
       assert.equal(selected.length, 0, 'Editing/previewing never starts a preflight or request.');
       await page.getByRole('button', { name: c.submit, exact: true }).click(); await page.getByRole('button', { name: c.titles[mode.need], exact: true }).click();
       await page.locator('#support-zip').waitFor(); assert.equal(selected.length, 0, 'Choosing a route alone is not an account preflight.');

@@ -1,3 +1,4 @@
+import { chooseScreenLanguage } from "./screen-language.mjs";
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -144,10 +145,10 @@ try {
       if(width===320&&largeText){
         const other=locale==='en'?'es':'en',before=writes.length;
         const refreshed=page.waitForResponse(response=>response.request().headers().rsc==='1'&&new URL(response.url()).pathname===`/support/${requestId}`);
-        await page.getByLabel(/Screen language|Idioma de pantalla/).selectOption(other);await refreshed;await page.waitForLoadState('networkidle');await page.waitForFunction(()=>document.title==='Your support | CaseLink');await scale();await page.waitForFunction(value=>document.documentElement.lang===value,other);
+        await chooseScreenLanguage(page, other);await refreshed;await page.waitForLoadState('networkidle');await page.waitForFunction(()=>document.title==='Your support | CaseLink');await scale();await page.waitForFunction(value=>document.documentElement.lang===value,other);
         const switched=page.getByRole('form',{name:copy[other].group});await switched.getByRole('alert').waitFor();assert.equal(await switched.locator('#answer-fixture-zip').inputValue(),'19129');assert.equal(writes.length,before);
         const restored=page.waitForResponse(response=>response.request().headers().rsc==='1'&&new URL(response.url()).pathname===`/support/${requestId}`);
-        await page.getByLabel(/Screen language|Idioma de pantalla/).selectOption(locale);await restored;await page.waitForLoadState('networkidle');await page.waitForFunction(()=>document.title==='Your support | CaseLink');await scale();await page.waitForFunction(value=>document.documentElement.lang===value,locale);
+        await chooseScreenLanguage(page, locale);await restored;await page.waitForLoadState('networkidle');await page.waitForFunction(()=>document.title==='Your support | CaseLink');await scale();await page.waitForFunction(value=>document.documentElement.lang===value,locale);
         group=page.getByRole('form',{name:c.group});assert.equal(await group.locator('#answer-fixture-zip').inputValue(),'19129');assert.equal(writes.length,before);
       }
       readFails = true; await group.getByRole('button', { name: c.latest, exact: true }).click();

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PARENT_LOCALE_COOKIE, parentLocale, parentText, type ParentLocale } from "@/lib/parent/locale";
 import styles from "./parent.module.css";
@@ -54,12 +54,24 @@ export function ParentRecoveryLocale({ requestedLocale, children }: { requestedL
   </LocaleContext.Provider>;
 }
 
-export function ParentLanguageSelector() {
+export function ParentLanguageSelector({ settings = false }: { settings?: boolean } = {}) {
   const { locale, chooseLocale, t, provided } = useParentLocale();
+  const id = useId();
   if (!provided) return null;
-  return <label className={styles.label}>{t("Screen language / Idioma de pantalla")}
-    <select className={styles.select} value={locale} onChange={event => chooseLocale(parentLocale(event.target.value))}>
+  const label = t(settings ? "Display language" : "Screen language / Idioma de pantalla");
+  return <div className={styles.field}>
+    <label htmlFor={id} className={styles.label}>{label}</label>
+    <select id={id} className={styles.select} value={locale} onChange={event => chooseLocale(parentLocale(event.target.value))}>
       <option value="en" lang="en">English</option><option value="es" lang="es">Español</option>
     </select>
-  </label>;
+  </div>;
+}
+
+export function ParentDisplaySettings({ className }: { className?: string }) {
+  const { provided, t } = useParentLocale();
+  if (!provided) return null;
+  return <details className={className}>
+    <summary>{t("Settings")}</summary>
+    <ParentLanguageSelector />
+  </details>;
 }

@@ -1,7 +1,10 @@
 /** Approval candidate only. The separate default-closed purpose/notice gates control whether families can see it. */
 export const foodDescriptionCopy = {
   en: {
-    title: "Optional: describe the food help you need", intro: "You can use the guided questions instead. Public food information and official program links remain available either way.",
+    entryLabel: "What kind of food help do you need?",
+    entryExample: "For example, we’re running low on groceries this week.",
+    entryHint: "This text stays on this page until you choose to send it. Leave out private details and documents.",
+    title: "Describe your situation (optional)", intro: "You can use the guided questions instead. Public food information and official program links remain available either way.",
     notice: "How this optional tool uses your description", consent: "I choose this optional description tool and the processing explained here. I can use guided questions instead.",
     paragraphs: [
       "CaseLink sends your short description to OpenAI to suggest food or SNAP options and identify necessary routing questions. It uses only your current permitted routing answers and a limited summary of your own relevant food/SNAP requests: the kind of help and recorded progress, without names, account or request numbers, private documents or full case history. This version does not read your family profile or private applications.",
@@ -31,7 +34,10 @@ export const foodDescriptionCopy = {
     changed: "The draft, source information or account changed. Check the saved draft before using its proposed options.", invalid: "Remove private information and keep the description within 500 characters. Guided questions are available instead.", service: "We could not check this optional tool. Your text remains in this tab. Check again or use the guided questions.", pendingAuth: "Sign in again, then choose whether to send. Signing in never sends the saved description.", openExisting: "Continue with your existing support", viewExisting: "Open existing support", proposed: "Use these proposed options", contentDeadline: "Content deletion deadline", metadataDeadline: "Minimal evidence deletion deadline", empty: "This private draft has no description yet.", expired: "The original content deadline has passed. The old attempt cannot be sent again.", privacy: "Privacy and data policy", help: "Get help",
   },
   es: {
-    title: "Opcional: describa la ayuda alimentaria que necesita", intro: "Puede usar las preguntas guiadas. La información pública sobre alimentos y los enlaces oficiales siguen disponibles en ambos casos.",
+    entryLabel: "¿Qué tipo de ayuda alimentaria necesita?",
+    entryExample: "Por ejemplo, nos quedan pocos alimentos para esta semana.",
+    entryHint: "El texto se queda en esta página hasta que decida enviarlo. No incluya datos privados ni documentos.",
+    title: "Describa su situación (opcional)", intro: "Puede usar las preguntas guiadas. La información pública sobre alimentos y los enlaces oficiales siguen disponibles en ambos casos.",
     notice: "Cómo usa su descripción esta herramienta opcional", consent: "Elijo esta herramienta opcional de descripción y el procesamiento explicado aquí. Puedo usar las preguntas guiadas.",
     paragraphs: [
       "CaseLink envía su descripción breve a OpenAI para sugerir opciones de alimentos o SNAP e identificar las preguntas necesarias para orientarle. Solo usa sus respuestas actuales y permitidas para esa orientación y un resumen limitado de sus propias solicitudes pertinentes de alimentos o SNAP: el tipo de ayuda y el progreso registrado, sin nombres, números de cuenta o solicitud, documentos privados ni el historial completo del caso. Esta versión no lee su perfil familiar ni sus solicitudes privadas.",

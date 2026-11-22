@@ -620,6 +620,17 @@ describe("application workspace", () => {
     expect(screen.queryByRole("link", { name: "Start a new SNAP application with DHS" })).toBeNull();
     expect(screen.queryByText("No application submission recorded")).toBeNull();
   });
+  it.each([1, 0])("assigns unresolved delivery to CaseLink only for the current request version (%s)", (version) => {
+    mockApi();
+    const request = fixture();
+    render(<ApplicationWorkspace request={request} history={{
+      data: { operations: [{ id: "unknown", request_id: request.id, request_version: version,
+        program_id: "snap-pa", need: "snap_new", action: "submit", state: "delivery_unknown", created_at: request.created_at }],
+        historyLimited: false }, loading: false, error: null, reload: vi.fn(),
+    }}><section id="application-receipts">Recorded evidence</section></ApplicationWorkspace>);
+    expect(screen.getByText("Agency submission not confirmed")).toBeTruthy();
+    expect(!!screen.queryByRole("heading", { name: "Next: CaseLink" })).toBe(version === request.version);
+  });
   it.each(["loading", "error"])("hides retained confirmation data while history is %s", (state) => {
     mockApi();
     render(<ApplicationWorkspace request={fixture()} history={{
@@ -629,6 +640,7 @@ describe("application workspace", () => {
     }}>Saved work</ApplicationWorkspace>);
     expect(screen.queryByRole("region", { name: "Your SNAP submission record" })).toBeNull();
     expect(screen.queryByText("SNAP application complete")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Next: The program" })).toBeNull();
   });
   it("keeps all work states reachable and retains unsaved input when navigating the checklist", async () => {
     mockApi();
@@ -799,7 +811,8 @@ describe("application workspace", () => {
     expect(
       screen.queryByRole("button", { name: "Open application view" }),
     ).toBeNull();
-    expect(screen.getByText("Work is paused or finished")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Paused by you" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Review your permission" }).getAttribute("href")).toBe("#application-controls");
   });
   it("closes the actual browser session and can reopen the public application view", async () => {
     let status = "blocked";

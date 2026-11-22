@@ -35,8 +35,8 @@ function api(options: { assessment?: (body: unknown) => unknown | Promise<unknow
 }
 async function choose({ enough = "no", language = "en", both = false }: { enough?: string; language?: "en" | "es"; both?: boolean } = {}) {
   if (language === "es") fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
-  fireEvent.change(screen.getByLabelText(/enough food|suficiente comida/), { target: { value: enough } });
-  fireEvent.change(screen.getByLabelText(/help paying|ayuda para comprar/), { target: { value: "applied" } });
+  fireEvent.click(screen.getByRole("group", { name: /enough food|suficiente comida/ }).querySelector(`input[value="${enough}"]`)!);
+  fireEvent.click(screen.getByRole("radio", { name: /I applied and am waiting|Presenté una solicitud y estoy esperando/ }));
   fireEvent.click(screen.getByRole("button", { name: language === "es" ? "Ver mis opciones" : "See my options" }));
   fireEvent.click(screen.getByRole("button", { name: both ? language === "es" ? "Continuar con ambas opciones" : "Continue with both options" : language === "es" ? "Consultar una solicitud pendiente" : "Check a pending application" }));
 }
@@ -51,6 +51,30 @@ async function permission(language: "en" | "es" = "en") {
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("guided food handoff into the owned typed request", () => {
+  it("keeps the short form ZIP and priority through an expired sign-in on broader support", async () => {
+    const { state, fetcher } = api();
+    renderGuide(<ParentIntake initialNeed="food" simpleStart />);
+    fireEvent.click(screen.getByRole("radio", { name: "Yes" }));
+    fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19129" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+    fireEvent.click(screen.getByRole("button", { name: "See all support options" }));
+    await screen.findByRole("checkbox", { name: /groc.*meals now/i });
+    state.signedIn = false;
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await screen.findByLabelText("Password");
+    fireEvent.change(screen.getByLabelText("Your email address"), { target: { value: "fixture@example.invalid" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /groc.*meals now/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByLabelText("Household ZIP code")).toHaveProperty("value", "19129");
+    fireEvent.click(screen.getByLabelText(/I’m 18 or older/));
+    await permission();
+    fireEvent.click(screen.getByRole("button", { name: "Start getting support" }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalled());
+    const post = fetcher.mock.calls.find(([url, init]) => url.endsWith("/requests") && init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body)).intake).toMatchObject({ zip: "19129", urgency: "today" });
+  });
   it("carries a declared shortage and Spanish interface without changing service language without inventing another SNAP application", async () => {
     const { fetcher } = api(); renderGuide(<main><ParentIntake initialNeed="food"/></main>); await choose({ language: "es" }); await facts("es");
     expect((screen.getByLabelText("Prioridad de la solicitud") as HTMLSelectElement).value).toBe("today");
@@ -102,7 +126,7 @@ describe("guided food handoff into the owned typed request", () => {
     const notice = await screen.findByText(language === "es" ? /Se borraron las respuestas anteriores/ : /earlier answers were cleared/);
     expect(notice.closest("[lang]")?.getAttribute("lang")).toBe(language);
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
-    expect((screen.getByLabelText(/enough food|suficiente comida/) as HTMLSelectElement).value).toBe("");
+    expect(screen.getByRole("group", { name: /enough food|suficiente comida/ }).querySelector(":checked")).toBeNull();
     expect(fetcher.mock.calls.some(([url, init]) => url.endsWith("/requests") && init?.method === "POST")).toBe(false);
   });
   it("reconciles a combined uncertain start with its complete exact body and key without rerunning assessment", async () => {

@@ -9,8 +9,8 @@ assert.ok(target.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(tar
 const evidence = 'tmp/parent-verification/public-food-locale/browser', results = [];
 await mkdir(evidence, { recursive: true });
 const copy = {
-  en: { title: "Let's find food support that works for your family.", zip: 'Philadelphia ZIP code', search: 'Find food locations', loading: 'Checking the City’s food listings', hours: 'Listed hours & service details', expand: 'See 1 more city-listed locations', fewer: 'Show fewer locations', alternatives: 'More food options and a no-paperwork fridge', options: 'See my options', result: 'Your proposed next steps', direct: 'Open the City’s full food finder', error: 'We couldn’t finish this step', retry: 'Try again', empty: /Nearby help may still be available/, listed: /This is a directory check, not confirmation from a location/, unknown: /Your benefit history is still unknown/ },
-  es: { title: 'Busquemos apoyo alimentario para su familia.', zip: 'Código postal de Filadelfia', search: 'Buscar lugares con alimentos', loading: 'Consultando la lista municipal de alimentos', hours: 'Horarios y detalles publicados', expand: 'Ver más lugares de la lista municipal (1)', fewer: 'Mostrar menos lugares', alternatives: 'Más opciones de alimentos y una nevera sin papeleo', options: 'Ver mis opciones', result: 'Sus próximos pasos propuestos', direct: 'Abrir el buscador de alimentos de la Ciudad', error: 'No pudimos completar este paso', retry: 'Intentarlo de nuevo', empty: /Puede haber ayuda en lugares cercanos/, listed: /Es una consulta del directorio, no una confirmación del lugar/ },
+  en: { title: "Let's find food support that works for your family.", zip: 'Philadelphia ZIP code', search: 'Find food locations', loading: 'Checking the City’s food listings', hours: 'Listed hours & service details', expand: 'See 1 more city-listed locations', fewer: 'Show fewer locations', alternatives: 'More food and WIC resources', options: 'See my options', result: 'Your proposed next steps', direct: 'Open the City’s full food finder', error: 'We couldn’t finish this step', retry: 'Try again', empty: /Nearby help may still be available/, listed: /This is a directory check, not confirmation from a location/, unknown: /Your benefit history is still unknown/ },
+  es: { title: 'Busquemos apoyo alimentario para su familia.', zip: 'Código postal de Filadelfia', search: 'Buscar lugares con alimentos', loading: 'Consultando la lista municipal de alimentos', hours: 'Horarios y detalles publicados', expand: 'Ver más lugares de la lista municipal (1)', fewer: 'Mostrar menos lugares', alternatives: 'Más recursos de alimentos y WIC', options: 'Ver mis opciones', result: 'Sus próximos pasos propuestos', direct: 'Abrir el buscador de alimentos de la Ciudad', error: 'No pudimos completar este paso', retry: 'Intentarlo de nuevo', empty: /Puede haber ayuda en lugares cercanos/, listed: /Es una consulta del directorio, no una confirmación del lugar/ },
 };
 const sites = Array.from({ length: 4 }, (_, i) => ({ id: i + 1, name: `Synthetic source location ${i + 1}`, address: '100 Example Street', zip: '19104', category: 'Senior Meal Site', phoneNumber: '215-555-0123', website: 'https://example.test/', hours: [{ day: 'mon', windows: ['09:00–11:00'], notes: 'Call before traveling' }], serviceAreaNotes: 'Confirm eligibility with the location.' }));
 const browser = await chromium.launch({ headless: true });
@@ -33,7 +33,11 @@ try {
     });
     const main = page.locator('#main-content'), listings = main.locator('section[aria-labelledby="food-sites-title"]');
     await page.goto(`${origin}/get-support?need=food`, { waitUntil: 'networkidle' });
-    await main.getByRole('heading', { name: c.title, exact: true }).waitFor();
+    const chooseSupport = async () => {
+      await main.getByRole('radio', { name: 'No', exact: true }).check();
+      await main.locator('#start-zip').fill('19104');
+      await main.getByRole('button', { name: locale === 'es' ? 'Buscar apoyo' : 'Find support', exact: true }).click();
+    };
     if (largeText) { await page.addStyleTag({ content: 'html{font-size:200%}' }); await main.evaluate(el => { el.parentElement.style.fontSize = '32px'; }); assert.equal(await main.evaluate(el => getComputedStyle(el).fontSize), '32px'); }
     async function check(state, scope = main) {
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -59,8 +63,14 @@ try {
       results.push({ locale, width, largeText, state });
     }
     await check('guide');
-    await page.locator('#food-guide-enough').selectOption('no'); await page.locator('#food-guide-history').selectOption('applied'); await main.getByRole('button', { name: c.options, exact: true }).click();
+    await chooseSupport();
+    await main.getByRole('button', { name: locale === 'es' ? 'Alimentos o SNAP' : 'Food or SNAP', exact: true }).click();
+    await main.getByText(locale === 'es' ? 'Buscar ayuda para pagar los alimentos' : 'Explore help paying for groceries', { exact: true }).click();
+    await page.locator('#food-guide-enough input[value=no]').check(); await page.locator('#food-guide-history input[value=applied]').check(); await main.getByRole('button', { name: c.options, exact: true }).click();
     await main.getByRole('heading', { name: c.result }).waitFor(); await page.waitForFunction(() => document.activeElement?.id === 'food-guide-results'); await check('guide-results');
+    await main.getByRole('button', { name: locale === 'es' ? 'Ver otras opciones de apoyo' : 'See other support options', exact: true }).click();
+    const openFinder = () => main.getByText(locale === 'es' ? 'Buscar lugares cercanos con alimentos' : 'Browse local food locations', { exact: true }).click();
+    await openFinder();
     await listings.getByLabel(c.zip).fill('19000'); await listings.getByRole('button', { name: c.search }).click();
     assert.equal(await listings.getByLabel(c.zip).getAttribute('aria-invalid'), 'true'); assert.equal(await listings.getByLabel(c.zip).getAttribute('aria-describedby'), await listings.getByRole('alert').getAttribute('id')); assert.equal(requests.filter(x => x.path.endsWith('/food-sites')).length, 0); await check('invalid');
     await listings.getByLabel(c.zip).fill('19104'); mode = 'loading'; await listings.getByRole('button', { name: c.search }).click(); await listings.getByRole('status', { name: c.loading }).waitFor(); await check('loading'); mode = 'list'; release();
@@ -69,8 +79,14 @@ try {
     assert.equal(await listings.getByRole('heading', { name: 'Synthetic source location 4' }).getAttribute('lang'), ''); assert.equal(await listings.getByText('Confirm eligibility with the location.', { exact: true }).first().getAttribute('lang'), ''); await check('expanded');
     await listings.getByRole('button', { name: c.fewer }).click(); await listings.getByText(c.alternatives, { exact: true }).click(); await check('alternatives');
     assert.equal(await listings.getByRole('link', { name: c.direct, exact: true }).getAttribute('href'), 'https://www.phila.gov/food/');
+    for (const href of [
+      'https://www.sharefoodprogram.org/community-fridges/',
+      'https://www.feedingamerica.org/need-help-find-food',
+      'https://www.feedingamerica.org/need-help-find-food/wic',
+      'https://www.pa.gov/services/health/request-a-pre-application-appointment-with-a-wic-specialist',
+    ]) assert.equal(await listings.locator(`a[href="${href}"]`).isVisible(), true);
     // Re-open the screen to keep the synthetic contract exact to19104.
-    async function reopen(state) { mode = state; await page.reload({ waitUntil: 'networkidle' }); if (largeText) { await page.addStyleTag({ content: 'html{font-size:200%}' }); await main.evaluate(el => { el.parentElement.style.fontSize = '32px'; }); } await listings.getByLabel(c.zip).fill('19104'); await listings.getByRole('button', { name: c.search }).click(); }
+    async function reopen(state) { mode = state; await page.reload({ waitUntil: 'networkidle' }); if (largeText) { await page.addStyleTag({ content: 'html{font-size:200%}' }); await main.evaluate(el => { el.parentElement.style.fontSize = '32px'; }); } await chooseSupport(); await openFinder(); await listings.getByRole('button', { name: c.search }).click(); }
     await reopen('empty'); await listings.getByText(c.empty).waitFor(); await check('empty');
     await reopen('error'); await listings.getByText(c.error, { exact: true }).waitFor(); await listings.getByText(locale === 'es' ? /El directorio de alimentos de la Ciudad no está disponible/ : /The City's food directory is unavailable/).waitFor(); await check('error'); mode = 'list'; await listings.getByRole('button', { name: c.retry }).click(); await listings.getByRole('heading', { name: 'Synthetic source location 1' }).waitFor(); await check('retried');
     assert.ok(requests.every(x => x.method === 'GET'), 'No account, request, provider or storage mutation.');

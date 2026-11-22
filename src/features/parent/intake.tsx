@@ -35,6 +35,7 @@ import { projectFamilyProfileApplication, matchingFamilyProfileFields, mergeFami
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { UrgentHelp } from "./landing";
+import type { SupportStartAnswers } from "./food-description";
 import { FoodServices } from "./food-services";
 import { foodAssessmentHandoffSchema, foodAssessmentReplySchema, type FoodAssessmentHandoff } from "@/lib/parent/food-assessment";
 import { ParentSignIn } from "./sign-in";
@@ -150,27 +151,44 @@ export function buildMandate(
 
 const reusableZipReadSchema = z.object({ ownerId: z.uuid(), zip: reusableZipSchema.nullable() });
 export type ParentIntakeSignInOptions = { existingAccountRecovery?: boolean; recoveryHref?: string; emailCodeAvailable?: boolean };
-export function ParentIntake({ initialNeed, signInOptions }: { initialNeed?: string; signInOptions?: ParentIntakeSignInOptions }) {
+export function ParentIntake({ initialNeed, signInOptions, simpleStart = false }: {
+  initialNeed?: string; signInOptions?: ParentIntakeSignInOptions; simpleStart?: boolean;
+}) {
   const { t, locale } = useParentLocale();
   const [guide, setGuide] = useState<{ handoff: FoodAssessmentHandoff; editing: boolean } | null>(null);
+  const [start, setStart] = useState<SupportStartAnswers>();
+  const [otherNeed, setOtherNeed] = useState<string>();
   const [guideOwnerChanged, setGuideOwnerChanged] = useState(false);
   const guidePanel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (guide && !guide.editing) guidePanel.current?.querySelector<HTMLElement>("#food-guide-results")?.focus();
   }, [guide]);
+  function resetForOwner() {
+    setGuide(null); setStart(undefined); setOtherNeed(undefined); setGuideOwnerChanged(true);
+  }
   const guideNeed = guide?.handoff.needs.find(need => need !== "food_now") ?? guide?.handoff.needs[0];
-  return initialNeed === "food" ? (
-    <><div ref={guidePanel} hidden={guide?.editing}><FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} signInOptions={signInOptions} onOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }} onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/></div>
-      {guideOwnerChanged && <p lang={locale} role="status">{t("Your sign-in changed. The earlier answers were cleared; begin with your current household.")}</p>}
-      {guide && <div hidden={!guide.editing}><ParentIntakeForm key={guideNeed} active={guide.editing} initialNeed={guideNeed} handoff={guide.handoff} signInOptions={signInOptions}
-      onFoodBack={() => setGuide({ ...guide, editing: false })}
-      onFoodOwnerChanged={() => { setGuide(null); setGuideOwnerChanged(true); }}/></div>}</>
-  ) : (
-    <ParentIntakeForm key={initialNeed ?? "all"} initialNeed={initialNeed} />
-  );
+  if (initialNeed !== "food") return <ParentIntakeForm key={initialNeed ?? "all"} initialNeed={initialNeed} signInOptions={signInOptions} />;
+  return <>
+    <div ref={guidePanel} hidden={guide?.editing || !!otherNeed}>
+      <FoodServices key={guideOwnerChanged ? "fresh" : "guide"} initial={guide?.handoff} signInOptions={signInOptions}
+        onOwnerChanged={resetForOwner} onStart={simpleStart ? setStart : undefined}
+        onOtherSupport={simpleStart ? (need = "all") => setOtherNeed(need) : undefined}
+        onChoose={value => { setGuideOwnerChanged(false); setGuide({ handoff: foodAssessmentHandoffSchema.parse(value), editing: true }); }}/>
+    </div>
+    {guideOwnerChanged && <p lang={locale} role="status">{t("Your sign-in changed. The earlier answers were cleared; begin with your current household.")}</p>}
+    {otherNeed ? <ParentIntakeForm key={otherNeed} initialNeed={otherNeed} start={start} signInOptions={signInOptions}
+      onFoodBack={() => setOtherNeed(undefined)} onFoodOwnerChanged={resetForOwner} /> :
+      guide && <div hidden={!guide.editing}>
+        <ParentIntakeForm key={`${guideNeed}:${start?.zip ?? ""}:${start?.urgent ?? ""}`} active={guide.editing} initialNeed={guideNeed} start={start} handoff={guide.handoff}
+          signInOptions={signInOptions} onFoodBack={() => setGuide({ ...guide, editing: false })} onFoodOwnerChanged={resetForOwner} />
+      </div>}
+  </>;
 }
 
-function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged, signInOptions, active = true }: { initialNeed?: string; handoff?: FoodAssessmentHandoff; onFoodBack?: () => void; onFoodOwnerChanged?: () => void; signInOptions?: ParentIntakeSignInOptions; active?: boolean }) {
+function ParentIntakeForm({ initialNeed, start, handoff, onFoodBack, onFoodOwnerChanged, signInOptions, active = true }: {
+  initialNeed?: string; start?: SupportStartAnswers; handoff?: FoodAssessmentHandoff; onFoodBack?: () => void;
+  onFoodOwnerChanged?: () => void; signInOptions?: ParentIntakeSignInOptions; active?: boolean;
+}) {
   const { t, locale } = useParentLocale();
   const session = useParentResource<{
     account: { id?: string; email: string; preferences?: ParentPreferences };
@@ -194,7 +212,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const explicitLanguage = useRef<"en" | "es" | null>(null);
   const guideOwner = useRef<string | null>(null);
   const [guideSignIn, setGuideSignIn] = useState(false);
-  const [guideTimingChosen, setGuideTimingChosen] = useState(handoff?.answers.foodForTwoDays === "no");
+  const [guideTimingChosen, setGuideTimingChosen] = useState(!!start || handoff?.answers.foodForTwoDays === "no");
   const guideTimingManual = useRef(false);
   const [previousGuide, setPreviousGuide] = useState(handoff);
   const [guideCheck, setGuideCheck] = useState<z.infer<typeof foodAssessmentReplySchema> | null>(null);
@@ -207,7 +225,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const [familyAccountPerson, setFamilyAccountPerson] = useState("");
   const [familyHomeAddress, setFamilyHomeAddress] = useState(false);
   const [familyPecoPhone, setFamilyPecoPhone] = useState<"home" | "cell" | "">("");
-  const zipDefaultConsumed = useRef(false);
+  const zipDefaultConsumed = useRef(!!start);
   const intakeOwner = useRef<string | null>(null);
   const [reusedZip, setReusedZip] = useState<z.infer<typeof reusableZipSchema> | null>(null);
   const [intake, setIntake] = useState<SupportIntake>(() => ({
@@ -216,7 +234,8 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       ? [initialNeed as SupportNeed]
       : []),
     ...(initialNeed === "wic_new" ? { accountAuthority: "self" as const } : {}),
-    ...(handoff?.answers.foodForTwoDays === "no" ? { urgency: "today" as const } : {}),
+    ...(start ? { zip: start.zip, urgency: start.urgent ? "today" as const : "soon" as const }
+      : handoff?.answers.foodForTwoDays === "no" ? { urgency: "today" as const } : {}),
   }));
   const [step, setStep] = useState(() => intake.needs.length ? 1 : 0);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
@@ -262,18 +281,18 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
         setAccepted(false);
       }
     }
-    if (handoff && previousGuide && !guideTimingManual.current && handoff.answers.foodForTwoDays !== previousGuide.answers.foodForTwoDays) {
+    if (!start && handoff && previousGuide && !guideTimingManual.current && handoff.answers.foodForTwoDays !== previousGuide.answers.foodForTwoDays) {
       setGuideTimingChosen(handoff.answers.foodForTwoDays === "no");
       if (handoff.answers.foodForTwoDays === "no") setIntake(current => ({ ...current, urgency: "today" }));
     }
   }
   useEffect(() => {
-    if (!handoff) return;
+    if (!handoff && !start) return;
     const current = z.uuid().safeParse(session.data?.account.id);
     if (!current.success) return;
     if (guideOwner.current && guideOwner.current !== current.data.toLowerCase()) onFoodOwnerChanged?.();
     else guideOwner.current ??= current.data.toLowerCase();
-  }, [handoff, session.data?.account.id, onFoodOwnerChanged]);
+  }, [handoff, start, session.data?.account.id, onFoodOwnerChanged]);
   async function checkGuideOwner(signal: AbortSignal, deadline: string) {
     const account = z.object({ account: z.object({ id: z.uuid() }) }).parse(await boundedParentApi("/account", {}, signal, deadline));
     signal.throwIfAborted();
@@ -354,7 +373,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
         controller.signal.throwIfAborted(); setFamilyAccess("ready");
       } catch (failure) {
         if ((familyOwner.current || intakeOwner.current) && !controller.signal.aborted) {
-          if (handoff && failure instanceof ParentApiError && failure.status === 401) {
+          if ((handoff || start) && failure instanceof ParentApiError && failure.status === 401) {
             setGuideSignIn(true); setFamilyAccess("ready"); reloadSession();
           } else if (failure instanceof ParentApiError && [401, 403].includes(failure.status)) closeChangedFamily();
           else setFamilyAccess("unavailable");
@@ -363,7 +382,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       } finally { if (familyOwnerCheck.current?.controller === controller) familyOwnerCheck.current = null; }
     })();
     familyOwnerCheck.current = { controller, promise }; return promise;
-  }, [closeChangedFamily, readOwnedFamilyProfile, startUncertain, handoff, reloadSession]);
+  }, [closeChangedFamily, readOwnedFamilyProfile, startUncertain, handoff, start, reloadSession]);
   useEffect(() => {
     const check = () => { if (familyOwner.current || intakeOwner.current) void ensureFamilyOwner().catch(() => {}); };
     const returned = (event: PageTransitionEvent) => { if (event.persisted) check(); };
@@ -608,7 +627,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
     familyDraftChanged.current.snap = true; languageChosen.current = true;
     if (details.language === "en" || details.language === "es") explicitLanguage.current = details.language;
     setSnapDetails(details);setDetailsReady(false);setAccepted(false);setError(null);startAttempt.current=null;
-    setIntake(current=>({...current,zip:reusedZip ? current.zip : details.zip??"",householdSize:details.household?.length??null,
+    setIntake(current=>({...current,zip:start || reusedZip ? current.zip : details.zip??"",householdSize:details.household?.length??null,
       ...(details.language==='en'||details.language==='es'?{language:details.language}:{}),
       incomeAmount:null,incomeFrequency:"unknown",
     }));
@@ -944,7 +963,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
   const localizedIntake = snapSelected || foodNeedsOnly;
   const st = (copy: string) => localizedIntake ? t(copy) : copy;
   return (
-    <div className={`${styles.container} ${snapSelected || foodNeedsOnly && !wicNeedsOnly ? styles.snapIntake : ""} ${wicNeedsOnly ? wicStyles.intake : ""}`}>
+    <div className={`${styles.container} ${styles.intakePage} ${snapSelected || foodNeedsOnly && !wicNeedsOnly ? styles.snapIntake : ""} ${wicNeedsOnly ? wicStyles.intake : ""}`}>
       <div lang={localizedIntake ? locale : "en"} className={styles.pageTop}>
         <div>
           <h1>{st(directSnap ? "Apply for SNAP" : "Let’s make the next steps easier.")}</h1>
@@ -957,7 +976,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
       {session.loading ? (
         <ParentLoading label="Checking secure access" />
       ) : familyAccess === "changed" ? <section lang={localizedIntake ? locale : "en"} className={styles.surface}><h2>{st("Your sign-in changed")}</h2><p>{st("This tab’s earlier family information was cleared. Start a fresh request for your current account. If an earlier save was unconfirmed, check My support using that earlier sign-in.")}</p><a className={styles.textLink} href={`/get-support${initialNeed ? `?need=${initialNeed}` : ""}`}>{st("Start a fresh request")}</a></section>
-      : handoff && (guideSignIn || session.error instanceof ParentApiError && [401, 403].includes(session.error.status)) ? <ParentSignIn {...signInOptions} onSignedIn={async () => {
+      : (handoff || start) && (guideSignIn || session.error instanceof ParentApiError && [401, 403].includes(session.error.status)) ? <ParentSignIn {...signInOptions} onSignedIn={async () => {
         const controller = work.current;
         if (!controller || controller.signal.aborted) throw new Error("The request changed. Return to the food questions before continuing.");
         await checkGuideOwner(controller.signal, new Date(Date.now() + 30_000).toISOString());
@@ -974,7 +993,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
           {familyAccess === "checking" && <ParentLoading label="Checking secure access"/>}
           {familyAccess === "unavailable" && <section lang={localizedIntake ? locale : "en"} className={styles.surface}><h2>{st("We could not recheck your saved family information")}</h2><p>{st("Your draft is kept in this tab. Recheck access before continuing so information stays with the right family.")}</p><button type="button" className={styles.secondary} onClick={() => { void ensureFamilyOwner().catch(() => {}); }}>{st("Recheck secure access")}</button></section>}
           <div hidden={familyAccess !== "ready"}>
-          {handoff && step === 1 && <fieldset className={styles.fieldset} disabled={pending || startUncertain}>
+          {!start && handoff && step === 1 && <fieldset className={styles.fieldset} disabled={pending || startUncertain}>
             <legend className={styles.legend}>{st("When should CaseLink prioritize this request?")}</legend>
             <p className={styles.hint}>{st(handoff.answers.foodForTwoDays === "no" ? "You said there is not enough food for today and tomorrow. Today is the proposed priority; you can change it." : "Your earlier answer does not establish a deadline. Choose the timing that works for this request.")}</p>
             <label htmlFor="guided-food-timing">{st("Request timing")}</label><select id="guided-food-timing" className={styles.select} value={guideTimingChosen ? intake.urgency : ""} onChange={event => { guideTimingManual.current = true; setGuideTimingChosen(true); change("urgency", event.target.value as SupportIntake["urgency"]); }} required>
@@ -1018,7 +1037,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                     st([
                       "Choose the food or utility support your household needs.",
                       fullSnap ? "Answer the questions that apply to you. CaseLink will use these answers to prepare your application; you can review and correct it afterward. Leave optional or uncertain answers blank." : "Add what you know now so you don’t have to answer the same questions later. You can leave uncertain details blank.",
-                      "These are the specific programs and limits for this request. No unknown recipients or open-ended permission.",
+                      "Review who can receive information, what CaseLink can do, and when permission ends.",
                     ][step])
                   }
                 </p>
@@ -1074,7 +1093,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       </label>)}
                     </div>
                   </fieldset>
-                  <fieldset className={styles.fieldset}>
+                  {!start && <fieldset className={styles.fieldset}>
                     <legend className={styles.legend}>
                       {st("How soon do you need help?")}{" "}</legend>
                     <div className={styles.choices}>
@@ -1103,7 +1122,7 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                         </label>
                       ))}
                     </div>
-                  </fieldset>
+                  </fieldset>}
                 </>
               )}
               {step === 1 && (
@@ -1390,22 +1409,6 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       ))}
                     </div>
                   </fieldset>}
-                  <details className={styles.programDetails}>
-                    <summary>{st("About these programs & direct access")}</summary>
-                    <ul className={styles.programDescriptions}>
-                      {programs.map((program) => (
-                        <li key={program.id}>
-                          <strong>{program.name}</strong>
-                        <p lang={wicNeedsOnly || st(program.description) === program.description ? "en" : locale}>{wicNeedsOnly ? program.description : st(program.description)}</p>
-                          <a
-                            className={styles.textLink}
-                            href={program.officialUrl}
-                          >
-                            {st("Open official program")}{" "}</a>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
                   {fullAvailable && (
                     <fieldset className={styles.fieldset}>
                       <legend className={styles.legend}>
@@ -1477,6 +1480,22 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
                       </div>
                     </div>
                   </div>
+                  <details className={styles.programDetails}>
+                    <summary>{st("About these programs & direct access")}</summary>
+                    <ul className={styles.programDescriptions}>
+                      {programs.map((program) => (
+                        <li key={program.id}>
+                          <strong>{program.name}</strong>
+                        <p lang={wicNeedsOnly || st(program.description) === program.description ? "en" : locale}>{wicNeedsOnly ? program.description : st(program.description)}</p>
+                          <a
+                            className={styles.textLink}
+                            href={program.officialUrl}
+                          >
+                            {st("Open official program")}{" "}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                   {mode === "full" && fullAvailable && (!fullSnap || intake.needs.some(need=>need!=='snap_new')) && (
                     <div className={styles.field}>
                       <label htmlFor="booking-preference">
@@ -1532,12 +1551,12 @@ function ParentIntakeForm({ initialNeed, handoff, onFoodBack, onFoodOwnerChanged
               {error && (wicNeedsOnly ? <div className={wicStyles.feedback}><ServiceError error={error} /></div> : <ServiceError error={error} />)}
               {startUncertain && <p className={styles.notice}><span>{st("The save result has not been confirmed. Retry the same request before changing answers or starting another request.")}{" "}<Link className={styles.textLink} href="/my-support">{st("Check My support for the saved request")}</Link>.</span></p>}
               <div className={styles.formFooter}>
-                {step > 0 ? (
+                {step > 0 || onFoodBack ? (
                   <button
                     type="button"
                     className={styles.quiet}
                     onClick={() => {
-                      if (handoff && step === 1) { onFoodBack?.(); return; }
+                      if (onFoodBack && (step === 0 || step === 1 && (handoff || initialNeed !== "all"))) { onFoodBack(); return; }
                       if (step === 2 && familyProfile) {
                         const program: FamilyProfileApplicationProgram | undefined = fullSnap ? "snap-pa" : fullWic ? "wic-pa" : fullUtility ? utilityConfig?.programId : undefined;
                         if (program) seedFamilyProfile(familyProfile, program, intake.accountAuthority);

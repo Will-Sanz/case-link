@@ -12,7 +12,7 @@ export const SPANISH_ASSISTANT_COPY: Record<string, string> = {
   "Ask CaseLink for assistance": "Pedir ayuda a CaseLink",
   "Your family support assistant": "Su asistente de apoyo familiar",
   "Minimize chat": "Minimizar conversación",
-  "Hide floating button": "Ocultar el botón flotante",
+  "Hide assistant button": "Ocultar el botón del asistente",
   "Show CaseLink assistant": "Mostrar el asistente de CaseLink",
   "Which request can we help with?": "¿Con qué solicitud necesita ayuda?",
   "Choose a saved request": "Elija una solicitud guardada",

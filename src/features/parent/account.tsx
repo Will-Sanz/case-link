@@ -8,8 +8,9 @@ import type { ParentPreferences } from "@/lib/parent/domain";
 import { parentApi } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { AccountDeletion, AccountDeletionAccess } from "./account-deletion";
+import { FoodDescription } from "./food-description";
 import { useParentResource } from "./use-parent-resource";
-import { useParentLocale } from "./parent-locale";
+import { ParentLanguageSelector, useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
 type Account = { id: string; email: string; preferences: ParentPreferences };
@@ -30,6 +31,7 @@ function AccountSettings({
   const errorMessage = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorMessage.current?.focus(); }, [error]);
   const [deleted, setDeleted] = useState(false);
+  const [showDescriptions, setShowDescriptions] = useState(false);
   const router = useRouter();
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,6 +213,10 @@ function AccountSettings({
         </form>
       </section>
       </>}
+      {!deleted && <details className={styles.disclosure} onToggle={event => setShowDescriptions(event.currentTarget.open)}>
+        <summary>{t("Saved support descriptions")}</summary>
+        {showDescriptions && <FoodDescription archiveOwner={account.id} />}
+      </details>}
       <AccountDeletion key={account.id} ownerId={account.id} showExport onRecorded={() => setDeleted(true)} />
       {!deleted && message && (
         <p className={styles.success} role="status">
@@ -242,7 +248,15 @@ export function ParentAccount({ deletionOnly = false }: { deletionOnly?: boolean
         <h1>{t(deletionOnly ? "Delete parent-support data" : "Your account")}</h1>
         <p>{t("Choose how to hear from us, protect your information, and stay in control.")}</p>
       </div></div>
-      {deletionOnly ? <AccountDeletionAccess /> : <AccountResource />}
+      {deletionOnly ? <AccountDeletionAccess /> : (
+        <div className={styles.stack}>
+          <section id="display-settings" className={`${styles.surface} ${styles.displaySettings}`} aria-labelledby="display-settings-title">
+            <h2 id="display-settings-title">{t("Display preferences")}</h2>
+            <ParentLanguageSelector settings />
+          </section>
+          <AccountResource />
+        </div>
+      )}
     </div>
   );
 }

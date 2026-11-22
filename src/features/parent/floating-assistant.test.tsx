@@ -98,7 +98,7 @@ it("keeps a sole request selectable and preserves the draft after minimizing", a
 it("lets the family hide the floating button without losing an unfinished question", async () => {
   stubRequests([first]); render(<FloatingAssistant signedIn />); open();
   fireEvent.change(await screen.findByRole("textbox"), { target: { value: "Keep this unfinished question" } });
-  fireEvent.click(screen.getByRole("button", { name: "Hide floating button" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hide assistant button" }));
   expect(screen.queryByRole("button", { name: "Ask CaseLink for assistance" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show CaseLink assistant" }));
   expect((await screen.findByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep this unfinished question");

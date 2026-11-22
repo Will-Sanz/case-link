@@ -72,8 +72,8 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("saved family information in actual application intake", () => {
   it("retains private SNAP answers and profile links through food changes and an exact unknown combined start retry", async () => {
     const fetcher = api(); render(<ParentLocaleProvider initialLocale="en"><ParentIntake initialNeed="food"/></ParentLocaleProvider>);
-    fireEvent.change(screen.getByLabelText(/enough food/), { target: { value: "no" } });
-    fireEvent.change(screen.getByLabelText(/help paying/), { target: { value: "never" } });
+    fireEvent.click(screen.getByRole("radio", { name: /^No$/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "No, and I have not applied" }));
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     fireEvent.click(screen.getByRole("button", { name: "Apply for SNAP" }));
     await waitFor(() => expect((screen.getByLabelText("Your first name") as HTMLInputElement).value).toBe("Saved"));
@@ -111,8 +111,8 @@ describe("saved family information in actual application intake", () => {
   it("keeps screen language separate and preserves a manual service-language correction during SNAP profile reuse", async () => {
     const fetcher = api(); render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header><ParentIntake initialNeed="food"/></ParentLocaleProvider>);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: "es" } });
-    fireEvent.change(screen.getByLabelText(/suficiente comida/), { target: { value: "no" } });
-    fireEvent.change(screen.getByLabelText(/ayuda para comprar/), { target: { value: "never" } });
+    fireEvent.click(screen.getByRole("radio", { name: /^No$/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "No, y no he presentado una solicitud" }));
     fireEvent.click(screen.getByRole("button", { name: "Ver mis opciones" }));
     fireEvent.click(screen.getByRole("button", { name: "Solicitar SNAP" }));
     await waitFor(() => expect((screen.getByLabelText("Su nombre") as HTMLInputElement).value).toBe("Saved"));

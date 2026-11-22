@@ -1,3 +1,4 @@
+import { chooseScreenLanguage } from "./screen-language.mjs";
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
@@ -44,7 +45,7 @@ try {
     async function open(name) {
       await page.goto(`${origin}/support/${name}`, { waitUntil: 'networkidle' }); await main.getByRole('heading', { name: c[name], exact: true }).waitFor(); await enlarge();
       await page.getByRole('button', { name: locale === 'es' ? 'Pedir ayuda a CaseLink' : 'Ask CaseLink for assistance', exact: true }).click();
-      await page.getByRole('button', { name: locale === 'es' ? 'Ocultar el botón flotante' : 'Hide floating button', exact: true }).click();
+      await page.getByRole('button', { name: locale === 'es' ? 'Ocultar el botón del asistente' : 'Hide assistant button', exact: true }).click();
       assert.equal(await main.evaluate(el => document.activeElement === el), true);
     }
     async function check(state) {
@@ -113,14 +114,16 @@ try {
     }
     mode = 'list'; await listings.getByRole('button', { name: c.retry }).click(); await listings.getByRole('heading', { name: site.name }).waitFor(); await check('help-retried');
     for (const value of [locale === 'es' ? 'en' : 'es', locale]) {
-      await page.getByLabel(/Screen language|Idioma de pantalla/).selectOption(value);
+      await chooseScreenLanguage(page, value);
       await main.getByRole('heading', { name: copy[value].help, exact: true }).waitFor(); await page.waitForLoadState('networkidle'); await enlarge();
       await page.waitForFunction(expected => document.title === expected, titles[value].help + ' | CaseLink');
       assert.equal(await listings.getByLabel(copy[value].zip).inputValue(), '19104');
       assert.equal(await listings.getByRole('heading', { name: site.name }).getAttribute('lang'), '');
     }
     await check('help-return-use');
-    assert.equal(await main.getByRole('link', { name: locale === 'es' ? 'restablezca su contraseña actual' : 'reset your existing password' }).getAttribute('href'), `/forgot-password?ui=${locale}`);
+    const recovery = main.getByRole('link', { name: locale === 'es' ? 'restablezca su contraseña actual' : 'reset your existing password' });
+    if (process.argv.includes('--closed-account')) assert.equal(await recovery.count(), 0);
+    else assert.equal(await recovery.getAttribute('href'), `/forgot-password?ui=${locale}`);
     await keyboardFollow(main.getByRole('link', { name: c.privacyLink, exact: true }), '/support/privacy');
     await main.getByRole('heading', { name: c.privacy, exact: true }).waitFor();
     assert.ok(requests.every(request => request.method === 'GET'));
